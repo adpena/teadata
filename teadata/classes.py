@@ -1,0 +1,1344 @@
+from __future__ import annotations
+from dataclasses import dataclass, field
+from functools import lru_cache, cached_property, singledispatchmethod, wraps
+from typing import Iterable, List, Dict, Optional, Any, Callable, Tuple
+from contextlib import contextmanager
+from collections import defaultdict
+from datetime import date
+import math
+import time
+import uuid
+
+# Global profiling flag for timeit decorator
+ENABLE_PROFILING = False
+
+# --------- Optional Shapely support (falls back to pure-Python) ---------
+try:
+    from shapely.geometry import Point as ShapelyPoint, Polygon as ShapelyPolygon, MultiPolygon
+    SHAPELY = True
+except Exception:
+    SHAPELY = False
+
+# --------- Utilities ---------
+
+def timeit(func: Callable):
+    """Decorator: log how long the function took (example of AOP-style concern)."""
+    @wraps(func)
+    def wrapper(*args, **kwargs):
+        t0 = time.perf_counter()
+        out = func(*args, **kwargs)
+        dt = (time.perf_counter() - t0) * 1000
+        if ENABLE_PROFILING:
+            print(f"[timeit] {func.__name__} took {dt:.2f} ms")
+        return out
+    return wrapper
+
+def validate_non_empty_str(name: str):
+    """Decorator factory: enforce non-empty string attribute on __post_init__."""
+    def deco(cls):
+        orig_post = getattr(cls, "__post_init__", None)
+        @wraps(orig_post)
+        def post(self):
+            if not getattr(self, name) or not isinstance(getattr(self, name), str):
+                raise ValueError(f"{cls.__name__}.{name} must be a non-empty string")
+            if orig_post:
+                orig_post(self)
+        cls.__post_init__ = post
+        return cls
+    return deco
+
+# --------- Minimal geometry helpers (when Shapely is absent) ---------
+
+def point_in_polygon(point: Tuple[float, float], polygon: List[Tuple[float, float]]) -> bool:
+    """Ray casting algorithm. polygon is list of (x,y), point is (x,y)."""
+    x, y = point
+    inside = False
+    n = len(polygon)
+    for i in range(n):
+        x1, y1 = polygon[i]
+        x2, y2 = polygon[(i+1) % n]
+        # check edges that straddle the horizontal ray
+        if ((y1 > y) != (y2 > y)) and (x < (x2 - x1) * (y - y1) / ((y2 - y1) or 1e-12) + x1):
+            inside = not inside
+    return inside
+
+def polygon_area(polygon: List[Tuple[float, float]]) -> float:
+    """Shoelace formula."""
+    area = 0.0
+    for (x1, y1), (x2, y2) in zip(polygon, polygon[1:] + polygon[:1]):
+        area += x1 * y2 - x2 * y1
+    return abs(area) / 2.0
+
+def euclidean(a: Tuple[float, float], b: Tuple[float, float]) -> float:
+    (x1, y1), (x2, y2) = a, b
+    return math.hypot(x2 - x1, y2 - y1)
+
+# --------- Geodesic helper (miles) ---------
+def haversine_miles(x1: float, y1: float, x2: float, y2: float) -> float:
+    """
+    Approximate great-circle distance between two lon/lat points in miles.
+    x = longitude, y = latitude (degrees).
+    """
+    from math import radians, sin, cos, sqrt, atan2
+    R = 3958.7613  # Earth radius in miles
+    lon1, lat1, lon2, lat2 = map(radians, (x1, y1, x2, y2))
+    dlon = lon2 - lon1
+    dlat = lat2 - lat1
+    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    return R * c
+
+def _point_xy(pt: Any) -> Tuple[float, float] | None:
+    """
+    Extract (x, y) from a Shapely point or a tuple; return None if unavailable.
+    """
+    if pt is None:
+        return None
+    if SHAPELY:
+        try:
+            # Works for shapely Point
+            return (pt.x, pt.y)
+        except Exception:
+            pass
+    if isinstance(pt, tuple) and len(pt) == 2 and all(isinstance(v, (int, float)) for v in pt):
+        return (float(pt[0]), float(pt[1]))
+    return None
+
+def _probably_lonlat(x: float, y: float) -> bool:
+    # crude heuristic: lon in [-180, 180], lat in [-90, 90]
+    return -180.0 <= x <= 180.0 and -90.0 <= y <= 90.0
+
+# --------- Descriptor to enforce "geometry-like" fields ---------
+
+class GeoField:
+    """Descriptor that accepts a Shapely geometry or pure-Python fallback types."""
+    def __init__(self, geom_type: str):
+        self.geom_type = geom_type
+        self.private_name = None
+
+    def __set_name__(self, owner, name):
+        self.private_name = f"_{name}"
+
+    def __get__(self, obj, objtype=None):
+        if obj is None:
+            return self
+        return getattr(obj, self.private_name, None)
+
+    def __set__(self, obj, value):
+        # Accept Shapely or tuples/lists
+        if self.geom_type == "point":
+            ok = (SHAPELY and isinstance(value, ShapelyPoint)) or (
+                isinstance(value, tuple) and len(value) == 2 and all(isinstance(v, (int, float)) for v in value)
+            )
+        elif self.geom_type == "polygon":
+            ok = (SHAPELY and isinstance(value, (ShapelyPolygon, MultiPolygon))) or (
+                isinstance(value, list) and all(isinstance(p, tuple) and len(p) == 2 for p in value)
+            )
+        else:
+            ok = False
+        if not ok:
+            raise TypeError(f"Invalid {self.geom_type} geometry for {obj.__class__.__name__}")
+        setattr(obj, self.private_name, value)
+
+# --------- Domain Models ---------
+
+@validate_non_empty_str("name")
+@dataclass(slots=True)
+class District:
+    id: uuid.UUID
+    name: str
+    enrollment: int
+    district_number: str = field(default="")
+    aea: Optional[bool] = None
+    rating: Optional[str] = None
+    boundary: Any = field(default=None, repr=False)  # handled by GeoField descriptor below
+    _polygon: Any = field(init=False, repr=False, default=None)
+    _prepared: Any = field(default=None, init=False, repr=False, compare=False)
+
+    # plug in descriptor (must be defined after dataclass attributes exist)
+    polygon = GeoField("polygon")
+
+    # Arbitrary enrichment payload (columns we don’t model explicitly)
+    meta: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
+
+    def __post_init__(self):
+        # route boundary to descriptor-backed 'polygon' for validation
+        if self.boundary is not None:
+            self.polygon = self.boundary
+
+    # --- Operator overloading ideas ---
+
+    def __contains__(self, campus: "Campus") -> bool:
+        """Enable: campus in district  (point-in-polygon)."""
+        if self.polygon is None or campus.point is None:
+            return False
+        if SHAPELY:
+            return self.polygon.contains(campus.point)
+        return point_in_polygon(campus.point, list(self.polygon))
+
+    def __and__(self, other: "District") -> float:
+        """
+        Intersection area between two districts.
+        Returns area (arbitrary units) so you can sort/filter by overlap magnitude.
+        """
+        if self.polygon is None or other.polygon is None:
+            return 0.0
+        if SHAPELY:
+            return self.polygon.intersection(other.polygon).area
+        # crude: approximate overlap via polygon area if identical; else 0 (no robust poly clipping here)
+        return polygon_area(list(self.polygon)) if self.polygon == other.polygon else 0.0
+
+    def __or__(self, other: "District") -> float:
+        """Union area (handy for Jaccard-like indices)."""
+        if self.polygon is None or other.polygon is None:
+            return 0.0
+        if SHAPELY:
+            return self.polygon.union(other.polygon).area
+        # crude union fallback
+        if self.polygon == other.polygon:
+            return polygon_area(list(self.polygon))
+        return polygon_area(list(self.polygon)) + polygon_area(list(other.polygon))
+
+    def __matmul__(self, campus: "Campus") -> float:
+        """
+        Overload @ for 'distance to district' (0 if inside).
+        Enables: district @ campus
+        """
+        if self.polygon is None or campus.point is None:
+            return float("inf")
+        if SHAPELY:
+            return self.polygon.distance(campus.point)
+        # fallback: min vertex distance if outside; 0 if inside
+        if campus in self:
+            return 0.0
+        verts = list(self.polygon)
+        return min(euclidean(campus.point, v) for v in verts)
+
+    def __format__(self, spec: str) -> str:
+        """Custom formatting, e.g., f'{d:brief}'."""
+        if spec == "brief":
+            return f"{self.name} (enr={self.enrollment:,}, rating={self.rating or '-'})"
+        return f"District<{self.name}>"
+
+    # pattern matching convenience (match by name/enrollment)
+    __match_args__ = ("name", "enrollment")
+
+    @cached_property
+    def area(self) -> float:
+        if self.polygon is None:
+            return 0.0
+        if SHAPELY:
+            return self.polygon.area
+        return polygon_area(list(self.polygon))
+
+    # --------- Prepared polygon for fast point-in-polygon checks (Shapely only) ---------
+    if SHAPELY:
+        from shapely.prepared import prep as shapely_prep  # type: ignore
+
+    @property
+    def prepared(self):
+        """Prepared polygon for fast point-in-polygon checks (Shapely only). Works with slots."""
+        if not SHAPELY or self.polygon is None:
+            return None
+        if self._prepared is not None:
+            return self._prepared
+        try:
+            self._prepared = self.shapely_prep(self.polygon)
+        except Exception:
+            self._prepared = None
+        return self._prepared
+
+    def __getattr__(self, name: str):
+        """
+        Allow dot-access for enrichment fields stored in meta:
+        e.g., dist.overall_rating_2025 -> dist.meta['overall_rating_2025']
+        """
+        meta = object.__getattribute__(self, "meta")
+        if isinstance(meta, dict) and name in meta:
+            return meta[name]
+        raise AttributeError(f"{self.__class__.__name__} has no attribute {name!r}")
+
+    def __dir__(self):
+        # makes tab-completion show meta-backed keys too
+        base = list(super().__dir__())
+        m = object.__getattribute__(self, "meta")
+        if isinstance(m, dict):
+            base.extend(k for k in m.keys() if isinstance(k, str))
+        return sorted(set(base))
+
+@validate_non_empty_str("name")
+@dataclass(slots=True)
+class Campus:
+    id: uuid.UUID
+    district_id: uuid.UUID
+    name: str
+    enrollment: int
+    charter_type: str
+    is_charter: bool
+    rating: Optional[str] = None
+
+    aea: Optional[bool] = None
+    grade_range: Optional[str] = None
+    school_type: Optional[str] = None
+    school_status_date: Optional[date] = None
+    update_date: Optional[date] = None
+
+    district_number: str = field(default="")
+    campus_number: str = field(default="")
+
+    _repo: "DataEngine" = field(default=None, repr=False, compare=False)
+
+    location: Any = field(default=None, repr=False)  # handled by GeoField descriptor below
+    _point: Any = field(init=False, repr=False, default=None)
+
+    point = GeoField("point")
+
+    # Arbitrary enrichment payload (columns not explicitly modeled)
+    meta: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
+
+    def __post_init__(self):
+        if self.location is not None:
+            self.point = self.location
+
+    def __getattr__(self, name: str):
+        # Allow dot-access for enrichment fields stored in meta
+        meta = object.__getattribute__(self, 'meta')
+        if isinstance(meta, dict) and name in meta:
+            return meta[name]
+        raise AttributeError(f"{self.__class__.__name__} has no attribute {name!r}")
+
+    def __dir__(self):
+        base = list(super().__dir__())
+        m = object.__getattribute__(self, 'meta')
+        if isinstance(m, dict):
+            base.extend(k for k in m.keys() if isinstance(k, str))
+        return sorted(set(base))
+
+    @property
+    def district(self) -> Optional["District"]:
+        if self._repo is None:
+            return None
+        return self._repo._districts.get(self.district_id)
+
+    @property
+    def coords(self) -> tuple[float, float]:
+        return (self.point.x, self.point.y) if self.point else None
+
+    # Rich comparisons: sort campuses by enrollment descending
+    def __lt__(self, other: "Campus") -> bool:
+        return self.enrollment > other.enrollment
+
+    def __sub__(self, other: "Campus | Tuple[float, float]") -> float:
+        """
+        Overload '-' for distance. Enables:
+          campus1 - campus2   OR   campus - (x, y)
+        """
+        return self.distance_to(other)
+
+    @singledispatchmethod
+    def distance_to(self, other) -> float:
+        raise TypeError("unsupported type for distance")
+
+    def _distance_to_campus(self, other: "Campus") -> float:
+        if self.point is None or other.point is None:
+            return float("inf")
+        if SHAPELY:
+            return self.point.distance(other.point)
+        return euclidean(self.point, other.point)
+
+    @distance_to.register
+    def _(self, other: tuple) -> float:
+        if self.point is None:
+            return float("inf")
+        if SHAPELY and isinstance(self.point, ShapelyPoint):
+            return self.point.distance(ShapelyPoint(*other))
+        return euclidean(self.point, other)
+
+# Register the Campus-specific overload *after* the class is created to avoid
+# forward-reference issues with singledispatchmethod on Python 3.12.
+Campus.distance_to.register(Campus)(Campus._distance_to_campus)
+
+# --------- Helper: unwrap Query to its first item ---------
+def _unwrap_query(obj: Any) -> Any:
+    """
+    If obj is a Query, return its first() item; otherwise return obj unchanged.
+    Intended to make repo methods tolerant of Query inputs.
+    """
+    try:
+        if isinstance(obj, Query):
+            return obj.first()
+    except NameError:
+        # Query not defined yet (during type checking), just return as-is
+        pass
+    return obj
+
+# --------- Chainable query wrapper for repo results ---------
+class Query:
+    """
+    Lightweight, chainable view over a list of repo objects (Districts/Campuses).
+    Enables: repo >> ("nearest_charter", (x,y), 200, 25) >> ("filter", pred) >> ("take", 5)
+    """
+    def __init__(self, items: List[Any], repo: "DataEngine"):
+        self._items = list(items)
+        self._repo = repo
+
+    # iteration so list(...) and comprehensions work
+    def __iter__(self):
+        return iter(self._items)
+
+    def __len__(self):
+        return len(self._items)
+
+    def to_list(self) -> List[Any]:
+        return list(self._items)
+
+    def all(self) -> List[Any]:
+        return list(self._items)
+
+    def first(self) -> Optional[Any]:
+        return self._items[0] if self._items else None
+
+    def __getattr__(self, name: str):
+        """
+        Delegate missing attributes to the first item in the query (if any).
+        Enables: dist_q.name, dist_q.polygon, dist_q.some_method(...)
+        """
+        if not self._items:
+            raise AttributeError(f"'Query' object has no attribute '{name}' (empty result set)")
+        return getattr(self._items[0], name)
+
+    def __getitem__(self, idx: int) -> Any:
+        """Index into the underlying list (e.g., dist_q[0])."""
+        return self._items[idx]
+
+    def __bool__(self) -> bool:
+        """Truthiness reflects whether the query has any items."""
+        return bool(self._items)
+
+    def __repr__(self) -> str:
+        cls = self.__class__.__name__
+        n = len(self._items)
+        sample = self._items[0].__class__.__name__ if n else "None"
+        return f"<{cls} len={n} first={sample}>"
+
+    def __rshift__(self, op):
+        """
+        Support a small pipeline DSL on top of an existing item list.
+
+        - ("filter", predicate) -> keep items where predicate(item) is True
+        - ("take", n)           -> first n items
+        - ("sort", keyfunc, reverse=False) -> sort in place by key
+        - ("map", func)         -> map items (returns list of mapped values)
+        - ("where", predicate)    -> alias of ("filter", predicate)
+        - ("select", func)        -> alias of ("map", func)
+        - callable              -> predicate filter (same as ("filter", callable))
+        - ("nearest", (x,y|None), n?, max_miles?)           -> restart pipeline with nearest campuses; if (x,y) is None, infers from current items
+        - ("nearest_charter", (x,y|None), n?, max_miles?)   -> restart with nearest charter campuses; if (x,y) is None, infers from current items
+        - ("campuses_in",)      -> expand current District items into their campuses (chainable)
+        - ("within", target_or_None, charter_only=False, covers=False) -> campuses within a polygon/district (infers target from chain if None)
+        - ("radius", (lon, lat)|None, miles, limit=None, charter_only=False) -> campuses within miles (fast with KDTree; infers coords if None)
+        - ("knn", (lon, lat)|None, k, charter_only=False) -> k nearest campuses (fast with KDTree; infers coords if None)
+        - Attribute access on Query delegates to its first item (e.g., `dist_q.name`).
+        """
+        # Predicate-only filter
+        if callable(op):
+            self._items = [o for o in self._items if op(o)]
+            return self
+
+        if not (isinstance(op, tuple) and len(op) >= 1):
+            raise ValueError(f"Unsupported >> operation on Query: {op!r}")
+
+        key = op[0]
+
+        if key == "filter":
+            pred = op[1]
+            self._items = [o for o in self._items if pred(o)]
+            return self
+
+        if key == "where":  # alias of filter
+            pred = op[1]
+            self._items = [o for o in self._items if pred(o)]
+            return self
+
+        if key == "take":
+            n = int(op[1])
+            self._items = self._items[:n]
+            return self
+
+        if key == "sort":
+            keyfunc = op[1]
+            reverse = bool(op[2]) if len(op) >= 3 else False
+            self._items.sort(key=keyfunc, reverse=reverse)
+            return self
+
+        if key == "map":
+            func = op[1]
+            # mapping returns a *plain list*, not a Query, to allow terminal projections
+            return [func(o) for o in self._items]
+
+        if key == "select":  # alias of map
+            func = op[1]
+            return [func(o) for o in self._items]
+
+        # New: campuses_in op expands Districts into their campuses
+        if key == "campuses_in":
+            # Expand current District items into their campuses
+            campuses: List[Any] = []
+            for item in self._items:
+                # If item is a District, pull campuses; if already Campus, keep it
+                if hasattr(item, "id") and item.__class__.__name__ == "District":
+                    campuses.extend(self._repo.campuses_in(item))
+                elif item.__class__.__name__ == "Campus":
+                    campuses.append(item)
+            self._items = campuses
+            return self
+
+        # New: distinct operator
+        if key == "distinct":
+            keyfunc = op[1]
+            seen = set(); out = []
+            for o in self._items:
+                k = keyfunc(o)
+                if k in seen:
+                    continue
+                seen.add(k); out.append(o)
+            self._items = out
+            return self
+
+        # Restart-style ops that source new items from the repo
+        if key in {"nearest", "nearest_charter"}:
+            coords = op[1] if len(op) >= 2 else None
+            n = int(op[2]) if len(op) >= 3 else 1
+            max_m = float(op[3]) if len(op) >= 4 and op[3] is not None else None
+            charter = (key == "nearest_charter")
+
+            # Infer coordinates if None:
+            if coords is None and self._items:
+                seed = self._items[0]
+                # Try Campus first
+                if hasattr(seed, "point") and seed.point is not None:
+                    xy = _point_xy(seed.point)
+                    if xy:
+                        coords = xy
+                # Try District centroid (Shapely)
+                elif hasattr(seed, "polygon") and seed.polygon is not None and SHAPELY and hasattr(seed.polygon, "centroid"):
+                    cent = seed.polygon.centroid
+                    coords = (cent.x, cent.y)
+
+            if coords is None:
+                raise ValueError("nearest/nearest_charter requires coordinates or a seed item with geometry in the chain")
+
+            items = self._repo.nearest_campuses(coords[0], coords[1], limit=n, charter_only=charter, max_miles=max_m, geodesic=True)
+            self._items = items
+            return self
+
+        # Spatial containment: campuses within polygon/district
+        if key == "within":
+            target = op[1] if len(op) >= 2 else None
+            charter_only = bool(op[2]) if len(op) >= 3 else False
+            covers = bool(op[3]) if len(op) >= 4 else False
+
+            # Infer target from current items if None (e.g., District in chain)
+            if target is None and self._items:
+                seed = self._items[0]
+                if hasattr(seed, "polygon"):
+                    target = seed
+
+            # Resolve polygon geometry
+            poly = None
+            if target is not None:
+                poly = getattr(target, "polygon", None) or getattr(target, "boundary", None)
+
+            if poly is None:
+                raise ValueError("within requires a polygon/district target or a District earlier in the chain")
+
+            # If current items are empty, source candidates smartly using STRtree (Shapely 2.x) or bbox
+            items: List[Any] = []
+            candidates = None
+
+            if SHAPELY and not self._items:
+                # Try STRtree first
+                self._repo._ensure_point_strtree()
+                if self._repo._point_tree is not None:
+                    try:
+                        idxs = self._repo._point_tree.query(poly, predicate="covers", return_indices=True)
+                        if isinstance(idxs, tuple):
+                            _, idxs = idxs
+                        idxs = list(map(int, idxs)) if idxs is not None else []
+                    except TypeError:
+                        idxs = []
+                    except Exception:
+                        idxs = []
+                    if idxs:
+                        cand_ids = [self._repo._point_ids[i] for i in idxs]
+                        candidates = [self._repo._campuses[cid] for cid in cand_ids]
+
+                # If STRtree had no hits, try cheap AABB prefilter
+                if candidates is None:
+                    bbox_cands = self._repo._bbox_candidates(poly)
+                    if bbox_cands:
+                        candidates = bbox_cands
+
+            if candidates is None:
+                candidates = list(self._items) if self._items else []
+
+            for c in candidates:
+                if charter_only and not getattr(c, "is_charter", False):
+                    continue
+                loc = getattr(c, "point", None) or getattr(c, "location", None)
+                if loc is None:
+                    continue
+                try:
+                    ok = (poly.covers(loc) if SHAPELY else False) if covers or True else (loc.within(poly) if SHAPELY else False)
+                except Exception:
+                    ok = False
+                if not SHAPELY and isinstance(poly, list) and isinstance(loc, tuple) and len(loc) == 2:
+                    ok = point_in_polygon(loc, poly)
+                if ok:
+                    items.append(c)
+
+            # If fast path produced zero results and we didn't have a seed list, double-check with a direct scan
+            if not items and SHAPELY and not self._items:
+                slow: List[Any] = []
+                for c in self._repo._campuses.values():
+                    if charter_only and not getattr(c, "is_charter", False):
+                        continue
+                    loc = getattr(c, "point", None) or getattr(c, "location", None)
+                    if loc is None:
+                        continue
+                    try:
+                        if poly.covers(loc):
+                            slow.append(c)
+                    except Exception:
+                        pass
+                if ENABLE_PROFILING:
+                    print(f"[sanity] Query>>within fast=0 slow={len(slow)} — using {'slow' if slow else 'fast'} path")
+                if slow:
+                    items = slow
+
+            self._items = items
+            return self
+
+        # Radius and KNN queries (fast when KDTree is available; robust fallback otherwise)
+        if key == "radius":
+            coords = op[1] if len(op) >= 2 else None
+            miles = float(op[2]) if len(op) >= 3 else 1.0
+            limit = int(op[3]) if len(op) >= 4 and op[3] is not None else None
+            charter_only = bool(op[4]) if len(op) >= 5 else False
+
+            # Infer coordinates if None from current items (Campus or District centroid)
+            if coords is None and self._items:
+                seed = self._items[0]
+                if hasattr(seed, "point") and seed.point is not None:
+                    xy = _point_xy(seed.point)
+                    if xy:
+                        coords = xy
+                elif hasattr(seed, "polygon") and seed.polygon is not None and SHAPELY and hasattr(seed.polygon, "centroid"):
+                    cent = seed.polygon.centroid
+                    coords = (cent.x, cent.y)
+
+            if coords is None:
+                raise ValueError("radius requires coordinates or a seed item with geometry in the chain")
+
+            items = self._repo.radius_campuses(coords[0], coords[1], miles, charter_only=charter_only, limit=limit)
+            self._items = items
+            return self
+
+        if key == "knn":
+            coords = op[1] if len(op) >= 2 else None
+            k = int(op[2]) if len(op) >= 3 else 1
+            charter_only = bool(op[3]) if len(op) >= 4 else False
+
+            # Infer coordinates if None
+            if coords is None and self._items:
+                seed = self._items[0]
+                if hasattr(seed, "point") and seed.point is not None:
+                    xy = _point_xy(seed.point)
+                    if xy:
+                        coords = xy
+                elif hasattr(seed, "polygon") and seed.polygon is not None and SHAPELY and hasattr(seed.polygon, "centroid"):
+                    cent = seed.polygon.centroid
+                    coords = (cent.x, cent.y)
+
+            if coords is None:
+                raise ValueError("knn requires coordinates or a seed item with geometry in the chain")
+
+            items = self._repo.knn_campuses(coords[0], coords[1], k, charter_only=charter_only)
+            self._items = items
+            return self
+
+        raise ValueError(f"Unsupported Query op: {op!r}")
+
+# --------- Repository with expressive operators ---------
+
+class DataEngine:
+    def __init__(self):
+        self._districts: Dict[uuid.UUID, District] = {}
+        self._campuses: Dict[uuid.UUID, Campus] = {}
+        self._campuses_by_district: Dict[uuid.UUID, List[uuid.UUID]] = defaultdict(list)
+        self._in_bulk = False
+        # Spatial/attribute indexes (optional, built on demand)
+        self._kdtree = None
+        self._xy_deg = None
+        self._xy_rad = None
+        self._campus_list = None
+
+        # Shapely STRtree for campus points (built lazily)
+        self._point_tree = None
+        self._point_geoms = None
+        self._point_ids = None
+        self._geom_id_to_index = None
+
+        # Vectorized fallback arrays (NumPy) for haversine when KDTree unavailable
+        self._xy_deg_np = None
+        self._campus_list_np = None
+
+        # All-campus XY caches (NumPy) for bbox candidate generation
+        self._all_xy_np = None
+        self._all_campuses_np = None
+
+        # Coordinate → index lists (robust legacy mapping when STRtree returns copies)
+        self._xy_to_index = None  # dict[(x,y)] -> [index]
+
+    def __len__(self) -> int:
+        return len(self._districts) + len(self._campuses)
+
+    def __iter__(self):
+        # iterate districts first, then campuses
+        yield from self._districts.values()
+        yield from self._campuses.values()
+
+    def __getitem__(self, key: uuid.UUID) -> District | Campus:
+        return self._districts.get(key) or self._campuses[key]
+
+    def __or__(self, other: "DataEngine") -> "DataEngine":
+        """Repo union: r3 = r1 | r2 (non-destructive merge)."""
+        r = DataEngine()
+        for d in (*self._districts.values(), *other._districts.values()):
+            r.add_district(d)
+        for c in (*self._campuses.values(), *other._campuses.values()):
+            r.add_campus(c)
+        return r
+
+    def __rshift__(self, query):
+        """
+        Overloaded >> operator supports:
+          1) Predicate callables (existing behavior):
+             repo >> (lambda o: isinstance(o, Campus) and o.enrollment >= 2000)
+             -> Query[District|Campus]
+
+          2) Tuple-based mini-DSL:
+             repo >> ("district", "ALDINE ISD")
+             repo >> ("district", "'011901")        # TEA district_number
+             -> Query[District] (chainable; use >> "campuses_in" etc)
+             Note: "district" returns a Query[District]. Most repo methods accept Query inputs by unwrapping the first item.
+
+             repo >> ("charters_within", district)
+             -> Query[Campus]
+        """
+        # 1) Existing behavior: predicate filter
+        if callable(query):
+            return Query([o for o in self if query(o)], self)
+
+        # 2) Tuple-based queries
+        if isinstance(query, tuple) and len(query) >= 2:
+            key = query[0]
+
+            if key == "district":
+                target = str(query[1])
+                # match by name (case-insensitive) or by district_number
+                for d in self._districts.values():
+                    if d.name.upper() == target.upper() or getattr(d, "district_number", None) == target:
+                        return Query([d], self)
+                return Query([], self)
+
+            if key == "charters_within":
+                district = _unwrap_query(query[1])
+                return Query(self.charter_campuses_within(district), self)
+
+            if key == "nearest":
+                seed = query[1]
+                n = int(query[2]) if len(query) >= 3 else 1
+                max_m = float(query[3]) if len(query) >= 4 and query[3] is not None else None
+                # If seed is a Query or Campus, try to infer coords
+                seed = _unwrap_query(seed)
+                if hasattr(seed, "point"):
+                    xy = _point_xy(getattr(seed, "point"))
+                    if xy is not None:
+                        items = self.nearest_campuses(xy[0], xy[1], limit=n, charter_only=False, max_miles=max_m, geodesic=True)
+                        return Query(items, self)
+                # Otherwise assume it's a (lon, lat) tuple
+                coords = seed
+                items = self.nearest_campuses(coords[0], coords[1], limit=n, charter_only=False, max_miles=max_m, geodesic=True)
+                return Query(items, self)
+
+            if key == "nearest_charter":
+                seed = query[1]
+                n = int(query[2]) if len(query) >= 3 else 1
+                max_m = float(query[3]) if len(query) >= 4 and query[3] is not None else None
+                seed = _unwrap_query(seed)
+                if hasattr(seed, "point"):
+                    xy = _point_xy(getattr(seed, "point"))
+                    if xy is not None:
+                        items = self.nearest_campuses(xy[0], xy[1], limit=n, charter_only=True, max_miles=max_m, geodesic=True)
+                        return Query(items, self)
+                coords = seed
+                items = self.nearest_campuses(coords[0], coords[1], limit=n, charter_only=True, max_miles=max_m, geodesic=True)
+                return Query(items, self)
+
+        raise ValueError(f"Unsupported >> query: {query!r}")
+
+    @contextmanager
+    def bulk(self):
+        """
+        Context manager to defer index maintenance while bulk-loading.
+        """
+        prev = self._in_bulk
+        self._in_bulk = True
+        try:
+            yield
+        finally:
+            self._in_bulk = prev
+            self._rebuild_indexes()
+
+    def _rebuild_indexes(self):
+        self._campuses_by_district.clear()
+        for c in self._campuses.values():
+            self._campuses_by_district[c.district_id].append(c.id)
+        # Invalidate spatial index; rebuilt lazily
+        self._kdtree = None
+        self._xy_deg = None
+        self._xy_rad = None
+        self._campus_list = None
+        # Invalidate Shapely STRtree and vectorized caches
+        self._point_tree = None
+        self._point_geoms = None
+        self._point_ids = None
+        self._geom_id_to_index = None
+        self._xy_deg_np = None
+        self._campus_list_np = None
+    def profile(self, on: bool = True):
+        global ENABLE_PROFILING
+        ENABLE_PROFILING = bool(on)
+
+    def _ensure_point_strtree(self):
+        """Build a Shapely STRtree over campus points for fast spatial containment queries (Shapely 2.x–only)."""
+        if not SHAPELY:
+            self._point_tree = None
+            self._point_geoms = None
+            self._point_ids = None
+            return
+
+        # Already built?
+        if getattr(self, "_point_tree", None) is not None:
+            return
+
+        try:
+            from shapely.strtree import STRtree  # Shapely 2.x API
+        except Exception:
+            # Shapely not available or too old
+            self._point_tree = None
+            self._point_geoms = None
+            self._point_ids = None
+            return
+
+        geoms: list = []
+        ids: list = []
+        for cid, c in self._campuses.items():
+            p = getattr(c, "point", None) or getattr(c, "location", None)
+            if p is None:
+                continue
+            try:
+                # Ensure numeric coordinates to avoid lazy/proxy objects
+                float(p.x); float(p.y)
+            except Exception:
+                continue
+            geoms.append(p)
+            ids.append(cid)
+
+        if not geoms:
+            self._point_tree = None
+            self._point_geoms = None
+            self._point_ids = None
+            return
+
+        self._point_tree = STRtree(geoms)
+        self._point_geoms = geoms
+        self._point_ids = ids
+        # Clear legacy maps; we rely on indices-only in Shapely 2.x
+        self._geom_id_to_index = None
+        self._geom_wkb_to_index = None
+        self._xy_to_index = None
+
+        if ENABLE_PROFILING:
+            try:
+                print(f"[strtree] built with {len(geoms)} points")
+            except Exception:
+                pass
+
+    def _ensure_kdtree(self):
+        """
+        Build a KD-tree over campus points (in radians) for fast radius/KNN queries.
+        Uses scipy.spatial.cKDTree if available; otherwise leaves tree as None.
+        """
+        if getattr(self, "_kdtree", None) is not None:
+            return
+        try:
+            import numpy as np
+            from scipy.spatial import cKDTree  # type: ignore
+        except Exception:
+            # No SciPy/NumPy available; skip building the tree
+            self._kdtree = None
+            self._xy_deg = None
+            self._xy_rad = None
+            self._campus_list = None
+            return
+
+        xy = []
+        campus_list = []
+        for c in self._campuses.values():
+            p = getattr(c, "point", None) or getattr(c, "location", None)
+            if p is None:
+                continue
+            try:
+                xy.append((float(p.x), float(p.y)))
+                campus_list.append(c)
+            except Exception:
+                continue
+
+        if not xy:
+            self._kdtree = None
+            self._xy_deg = None
+            self._xy_rad = None
+            self._campus_list = None
+            return
+
+        import numpy as np
+        self._xy_deg = np.array(xy, dtype=float)
+        self._xy_rad = np.radians(self._xy_deg)
+        from scipy.spatial import cKDTree  # type: ignore
+        self._kdtree = cKDTree(self._xy_rad)
+        self._campus_list = campus_list
+
+    def _ensure_all_xy_arrays(self):
+        """Build NumPy arrays of all campus coordinates for fast bbox candidate queries."""
+        try:
+            import numpy as np  # type: ignore
+        except Exception:
+            self._all_xy_np = None
+            self._all_campuses_np = None
+            return
+        if self._all_xy_np is not None and self._all_campuses_np is not None:
+            return
+        xy = []
+        clist = []
+        for c in self._campuses.values():
+            p = getattr(c, "point", None) or getattr(c, "location", None)
+            if p is None:
+                continue
+            try:
+                xy.append((float(p.x), float(p.y)))
+                clist.append(c)
+            except Exception:
+                continue
+        if not xy:
+            self._all_xy_np = None
+            self._all_campuses_np = None
+            return
+        import numpy as np  # type: ignore
+        self._all_xy_np = np.array(xy, dtype=float)
+        self._all_campuses_np = clist
+
+    def _bbox_candidates(self, poly) -> List[Campus]:
+        """Return campuses whose points fall within the polygon's axis-aligned bounding box."""
+        if not SHAPELY:
+            # Fallback: simple Python loop without NumPy
+            minx, miny, maxx, maxy = poly.bounds if hasattr(poly, "bounds") else (None, None, None, None)
+            if minx is None:
+                return []
+            out = []
+            for c in self._campuses.values():
+                p = getattr(c, "point", None) or getattr(c, "location", None)
+                if p is None:
+                    continue
+                try:
+                    x, y = float(p.x), float(p.y)
+                except Exception:
+                    continue
+                if (minx <= x <= maxx) and (miny <= y <= maxy):
+                    out.append(c)
+            return out
+
+        # NumPy fast path
+        self._ensure_all_xy_arrays()
+        if self._all_xy_np is None:
+            return []
+        import numpy as np  # type: ignore
+        minx, miny, maxx, maxy = poly.bounds
+        xs = self._all_xy_np[:, 0]
+        ys = self._all_xy_np[:, 1]
+        mask = (xs >= minx) & (xs <= maxx) & (ys >= miny) & (ys <= maxy)
+        idxs = np.nonzero(mask)[0]
+        return [self._all_campuses_np[int(i)] for i in idxs]
+
+    def _haversine_miles_vec(self, lon: float, lat: float):
+        import numpy as np
+        R = 3958.7613
+        lon1, lat1 = np.radians([lon, lat])
+        lon2 = np.radians(self._xy_deg_np[:, 0]); lat2 = np.radians(self._xy_deg_np[:, 1])
+        dlon = lon2 - lon1; dlat = lat2 - lat1
+        a = np.sin(dlat/2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2
+        return R * 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
+
+    @timeit
+    def radius_campuses(self, lon: float, lat: float, miles: float, *, charter_only: bool = False, limit: Optional[int] = None) -> List[Campus]:
+        """
+        Fast radius query using KDTree when available; robust haversine fallback otherwise.
+        Returns campuses within 'miles' of (lon, lat), optionally filtered to charters, optionally limited.
+        """
+        # Try KDTree path
+        self._ensure_kdtree()
+        try:
+            import numpy as np  # noqa: F401
+        except Exception:
+            pass
+
+        results: List[Tuple[float, Campus]] = []
+
+        if self._kdtree is not None and self._xy_deg is not None and self._campus_list is not None:
+            # Query in radians
+            R = 3958.7613
+            r = miles / R
+            import numpy as np
+            idxs = self._kdtree.query_ball_point(np.radians([lon, lat]), r=r)
+            idxs = idxs if isinstance(idxs, list) else idxs[0]
+            for i in idxs:
+                c = self._campus_list[i]
+                if charter_only and not getattr(c, "is_charter", False):
+                    continue
+                x, y = self._xy_deg[i]
+                d = haversine_miles(lon, lat, x, y)
+                results.append((d, c))
+        else:
+            # Fallback: vectorized haversine if NumPy available; else brute-force
+            try:
+                import numpy as np  # noqa: F401
+            except Exception:
+                for c in self._campuses.values():
+                    if c.point is None:
+                        continue
+                    if charter_only and not getattr(c, "is_charter", False):
+                        continue
+                    x, y = c.point.x, c.point.y
+                    d = haversine_miles(lon, lat, x, y)
+                    if d <= miles:
+                        results.append((d, c))
+            else:
+                if self._xy_deg_np is None or self._campus_list_np is None:
+                    import numpy as np
+                    xy = []
+                    clist = []
+                    for c in self._campuses.values():
+                        if c.point is None:
+                            continue
+                        if charter_only and not getattr(c, "is_charter", False):
+                            continue
+                        xy.append((c.point.x, c.point.y))
+                        clist.append(c)
+                    if not xy:
+                        return []
+                    self._xy_deg_np = np.array(xy, dtype=float)
+                    self._campus_list_np = clist
+                dists = self._haversine_miles_vec(lon, lat)
+                import numpy as np
+                idxs = np.where(dists <= miles)[0]
+                order = np.argsort(dists[idxs])
+                idxs = [int(idxs[i]) for i in order]
+                if limit is not None:
+                    idxs = idxs[:limit]
+                return [self._campus_list_np[i] for i in idxs]
+
+        results.sort(key=lambda t: t[0])
+        if limit is not None:
+            results = results[:limit]
+        return [c for _, c in results]
+
+    @timeit
+    def knn_campuses(self, lon: float, lat: float, k: int, *, charter_only: bool = False) -> List[Campus]:
+        """
+        k-nearest neighbor query. KDTree if available; else brute-force sort by haversine.
+        """
+        self._ensure_kdtree()
+        results: List[Tuple[float, Campus]] = []
+
+        if self._kdtree is not None and self._xy_deg is not None and self._campus_list is not None:
+            from math import isfinite
+            import numpy as np
+            dists, idxs = self._kdtree.query(np.radians([lon, lat]), k=k if k > 1 else 1)
+            # Normalize outputs
+            if k == 1:
+                dists = [float(dists)]
+                idxs = [int(idxs)]
+            # Re-compute accurate miles and filter charter if needed
+            for d0, i in zip(dists, idxs):
+                c = self._campus_list[int(i)]
+                if charter_only and not getattr(c, "is_charter", False):
+                    continue
+                x, y = self._xy_deg[int(i)]
+                dm = haversine_miles(lon, lat, x, y)
+                results.append((dm, c))
+        else:
+            # Fallback: brute-force
+            for c in self._campuses.values():
+                if c.point is None:
+                    continue
+                if charter_only and not getattr(c, "is_charter", False):
+                    continue
+                dm = haversine_miles(lon, lat, c.point.x, c.point.y)
+                results.append((dm, c))
+
+        results.sort(key=lambda t: t[0])
+        return [c for _, c in results[:k]]
+
+    # --- CRUD ---
+    def add_district(self, d: District):
+        self._districts[d.id] = d
+
+    def add_campus(self, c: Campus):
+        if c.district_id not in self._districts:
+            raise ValueError("Campus references missing district")
+        c._repo = self  # attach back-reference
+        self._campuses[c.id] = c
+        if not self._in_bulk:
+            self._campuses_by_district[c.district_id].append(c.id)
+
+    def campuses_in(self, d: Any) -> List[Campus]:
+        """
+        Return campuses for a district. Accepts:
+          - District
+          - Query containing a District (first() is used)
+        """
+        d = _unwrap_query(d)
+        if d is None or not hasattr(d, "id"):
+            raise ValueError("campuses_in expects a District or a Query[District]")
+        return [self._campuses[cid] for cid in self._campuses_by_district.get(d.id, [])]
+
+    def charter_campuses_within(self, district: Any):
+        """
+        Return a list of Campus objects that are physically located *within*
+        the given district's boundary and are charter campuses (is_charter=True).
+        Uses pure spatial containment; district_id membership is ignored.
+        Accepts a District or a Query[District].
+        """
+        district = _unwrap_query(district)
+        if district is None:
+            return []
+
+        poly = getattr(district, "polygon", None) or getattr(district, "boundary", None)
+        if poly is None:
+            return []
+
+        # Quick AABB prefilter (NumPy) to cut the candidate set; then exact covers
+        if SHAPELY and hasattr(poly, "bounds"):
+            bbox_cands = self._bbox_candidates(poly)
+            if bbox_cands:
+                prep = getattr(district, "prepared", None)
+                out_bb: List[Campus] = []
+                for c in bbox_cands:
+                    if not getattr(c, "is_charter", False):
+                        continue
+                    p = getattr(c, "point", None) or getattr(c, "location", None)
+                    if p is None:
+                        continue
+                    try:
+                        inside = (prep.covers(p) if prep is not None else poly.covers(p))
+                    except Exception:
+                        inside = False
+                    if inside:
+                        out_bb.append(c)
+                if out_bb:
+                    return out_bb
+
+        # STRtree (Shapely 2.x) fast path using indices
+        if SHAPELY:
+            self._ensure_point_strtree()
+            if self._point_tree is not None:
+                try:
+                    idxs = self._point_tree.query(poly, predicate="covers", return_indices=True)
+                    # Some builds return (geoms, idxs) if return_geometry=True sneaks in; normalize:
+                    if isinstance(idxs, tuple):
+                        _, idxs = idxs
+                    idxs = list(map(int, idxs)) if idxs is not None else []
+                except TypeError:
+                    # Old API; fall back to slow scan
+                    idxs = []
+                except Exception:
+                    idxs = []
+
+                if idxs:
+                    prep = getattr(district, "prepared", None)
+                    out: List[Campus] = []
+                    for i in idxs:
+                        cid = self._point_ids[i]
+                        c = self._campuses.get(cid)
+                        if c is None or not getattr(c, "is_charter", False):
+                            continue
+                        p = getattr(c, "point", None) or getattr(c, "location", None)
+                        if p is None:
+                            continue
+                        try:
+                            inside = (prep.covers(p) if prep is not None else poly.covers(p))
+                        except Exception:
+                            inside = False
+                        if inside:
+                            out.append(c)
+                    if out:
+                        return out
+
+        # Final robust fallback: exact scan
+        slow: List[Campus] = []
+        for c in self._campuses.values():
+            if not getattr(c, "is_charter", False):
+                continue
+            p = getattr(c, "point", None) or getattr(c, "location", None)
+            if p is None:
+                continue
+            try:
+                if SHAPELY and poly.covers(p):
+                    slow.append(c)
+            except Exception:
+                # Non-shapely fallback (rare in this code path)
+                pass
+
+        if ENABLE_PROFILING:
+            try:
+                print(f"[sanity] charter_campuses_within fast=0 slow={len(slow)} — using {'slow' if slow else 'fast'} path")
+            except Exception:
+                pass
+        return slow
+
+    @timeit
+    def nearest_campuses(
+        self,
+        x: float,
+        y: float,
+        *,
+        limit: int = 1,
+        charter_only: bool = False,
+        max_miles: Optional[float] = None,
+        geodesic: bool = True,
+    ) -> List[Campus]:
+        """
+        Find the nearest N campuses to (x, y).
+
+        Parameters
+        ----------
+        x, y : float
+            Coordinates. If geodesic=True and values look like lon/lat, distances are in miles (haversine).
+            Otherwise, falls back to planar distance (units of your CRS).
+        limit : int
+            Number of campuses to return (use 1 for the single nearest).
+        charter_only : bool
+            If True, only consider campuses with is_charter=True.
+        max_miles : Optional[float]
+            If provided (and geodesic distance is used), filter out campuses farther than this many miles.
+            If geodesic=False, this is treated in *planar* units.
+        geodesic : bool
+            If True (default) and x/y look like lon/lat, compute great-circle miles.
+        """
+        # Collect candidates with distances
+        results: List[Tuple[float, Campus]] = []
+        for c in self._campuses.values():
+            if c.point is None:
+                continue
+            if charter_only and not getattr(c, "is_charter", False):
+                continue
+            cxy = _point_xy(c.point)
+            if cxy is None:
+                continue
+            if geodesic and _probably_lonlat(x, y) and _probably_lonlat(*cxy):
+                d = haversine_miles(x, y, cxy[0], cxy[1])
+            else:
+                # planar fallback
+                if SHAPELY and hasattr(c.point, "distance"):
+                    # distance in CRS units (assumed miles if your data is projected to a miles-based CRS)
+                    d = c.point.distance(ShapelyPoint(x, y)) if SHAPELY else euclidean((x, y), cxy)
+                else:
+                    d = euclidean((x, y), cxy)
+            if max_miles is not None and d > max_miles:
+                continue
+            results.append((d, c))
+
+        results.sort(key=lambda t: t[0])
+        if limit <= 1:
+            return [results[0][1]] if results else []
+        return [c for _, c in results[:limit]]
+
+    @timeit
+    @lru_cache(maxsize=2048)
+    def nearest_campus(self, x: float, y: float, charter_only: bool = False) -> Optional[Campus]:
+        """
+        Backward-compatible convenience for the single nearest campus.
+        Uses geodesic miles when (x,y) look like lon/lat.
+        """
+        res = self.nearest_campuses(x, y, limit=1, charter_only=charter_only, max_miles=None, geodesic=True)
+        return res[0] if res else None
+
+# --------- Demo data ---------
+
+def demo_repo() -> DataEngine:
+    repo = DataEngine()
+    d1 = District(id=uuid.uuid4(), name="Austin ISD", enrollment=73000, district_number="", rating="B",
+                  boundary=(ShapelyPolygon([(0,0), (5,0), (5,5), (0,5)])) if SHAPELY
+                  else [(0,0),(5,0),(5,5),(0,5)])
+    d2 = District(id=uuid.uuid4(), name="Round Rock ISD", enrollment=51000, district_number="", rating="A",
+                  boundary=(ShapelyPolygon([(4,2), (9,2), (9,7), (4,7)])) if SHAPELY
+                  else [(4,2),(9,2),(9,7),(4,7)])
+
+    with repo.bulk():
+        repo.add_district(d1)
+        repo.add_district(d2)
+
+        c1 = Campus(id=uuid.uuid4(), district_id=d1.id, name="Akins HS", campus_number="", charter_type="", is_charter=False, enrollment=2600, district_number="",
+                    location=ShapelyPoint(2, 1) if SHAPELY else (2,1))
+        c2 = Campus(id=uuid.uuid4(), district_id=d1.id, name="Kealing MS", campus_number="", charter_type="", is_charter=False, enrollment=1200, district_number="",
+                    location=ShapelyPoint(3, 3) if SHAPELY else (3,3))
+        c3 = Campus(id=uuid.uuid4(), district_id=d2.id, name="Westwood HS", campus_number="", charter_type="", is_charter=False, enrollment=2800, district_number="",
+                    location=ShapelyPoint(8, 6) if SHAPELY else (8,6))
+        repo.add_campus(c1)
+        repo.add_campus(c2)
+        repo.add_campus(c3)
+
+    return repo
+
+# --------- Example usage (uncomment to run as script) ---------
+if __name__ == "__main__":
+    repo = demo_repo()
+    aisd, rr = list(repo._districts.values())
+
+    # 1) Membership via "in"
+    for campus in repo.campuses_in(aisd):
+        print(f"{campus.name} in Austin ISD? {'yes' if campus in aisd else 'no'}")
+
+    # 2) Distances via '@' and '-' overloads
+    target = repo.nearest_campus(4.5, 4.5)
+    print("Nearest to (4.5,4.5):", target.name)
+
+    # Campus-to-campus distance
+    c_list = repo.campuses_in(aisd)
+    d_cc = c_list[0] - c_list[1]
+    print("Distance campus0 - campus1:", d_cc)
+
+    # 3) District overlaps via '&' and union via '|'
+    inter_area = aisd & rr
+    union_area = aisd | rr
+    print("Intersection area:", inter_area, "Union area:", union_area)
+
+    # 4) Repo pipeline operator '>>'
+    big = repo >> (lambda o: isinstance(o, Campus) and o.enrollment >= 2000)
+    print("Big campuses:", [c.name for c in big])
+
+    # 5) Pattern matching + custom formatting
+    match aisd:
+        case District(name, enr) if enr > 70000:
+            print(f"Match says: {aisd:brief}")

@@ -1,0 +1,54 @@
+year_min: 2009
+
+data_sources:
+  tapr:
+    2009: data/tapr/2009.csv
+    2013: data/tapr/2013.csv
+    2017: data/tapr/2017.parquet
+    2021: data/tapr/2021.parquet
+    2023: https://example.org/tapr/2023.parquet
+    latest: 2023
+  peims:
+    2009: data/peims/2009.csv
+    2012: data/peims/2012.csv
+    2016: data/peims/2016.parquet
+    2020: data/peims/2020.parquet
+    2024: data/peims/2024.parquet
+  askted:
+    2010: data/askted/2010.json
+    2018: data/askted/2018.json
+    current: https://example.org/askted/current.json
+  finance:
+    2009: data/finance/2009.xlsx
+    2015: data/finance/2015.parquet
+    2022: data/finance/2022.parquet
+  accountability:
+    2025: data/accountability/2025-enhanced-statewide-summary-after-2023-appeal.xlsx
+    latest: 2025
+
+spatial:
+  districts:
+    2011: shapes/districts_2011.geojson
+    2016: shapes/districts_2016.gpkg
+    2024: shapes/districts_2024.parquet
+    2025: data/shapes/Current_Districts_2025.geojson
+    latest: 2025
+  campuses:
+    2011: shapes/campuses_2011.geojson
+    2016: shapes/campuses_2016.gpkg
+    2024: shapes/campuses_2024.parquet
+    2025: data/shapes/Schools_2024_to_2025.geojson
+    latest: 2025
+
+schema:
+  data_sources:
+    tapr: ["parquet","csv"]
+    accountability: ["parquet","csv", "xlsx"]
+    finance: ["parquet","csv","xlsx"]
+  spatial:
+    districts: ["geojson","gpkg","parquet"]
+    campuses: ["geojson","gpkg","parquet"]
+
+options:
+  cache: true
+  log_level: INFO
