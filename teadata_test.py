@@ -2,7 +2,7 @@ from teadata import DataEngine
 
 repo = DataEngine.from_snapshot(search=True)
 print(len(repo.districts), len(repo.campuses))
-aldine = (repo >> ("district", "ALDINE ISD")).first()
+aldine = (repo >> ("district", "101902")).first()
 print("Example district:", aldine)
 
 # Inspect how many objects are loaded
@@ -22,5 +22,11 @@ print("Enriched rating 2025:", getattr(aldine, "overall_rating_2025", None))
 print(f"\nAldine has {len(aldine.campuses)} campuses. First few:")
 print(f"Aldine ISD campus ratings:", aldine.campuses.value_counts("rating"))
 for campus in list(aldine.campuses)[:5]:
-    print("-", campus.name, "| rating:", campus.rating, "| district rating:", campus.district.rating)
-
+    print(
+        "-",
+        campus.name,
+        "| rating:",
+        campus.rating,
+        "| district rating:",
+        campus.district.rating,
+    )

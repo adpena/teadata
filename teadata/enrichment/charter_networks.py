@@ -6,7 +6,10 @@ from typing import Optional
 import pandas as pd
 
 from teadata.teadata_config import load_config
-from teadata.teadata_config import normalize_district_number_column, normalize_district_number_value
+from teadata.teadata_config import (
+    normalize_district_number_column,
+    normalize_district_number_value,
+)
 
 from teadata.classes import DataEngine, District
 
@@ -57,6 +60,7 @@ def add_charter_networks_from_config(
 
     # column access (case-insensitive convenience)
     cols = {str(c).lower(): c for c in df.columns if c is not None}
+
     def col(name: Optional[str]) -> Optional[str]:
         if not name:
             return None
@@ -96,7 +100,11 @@ def add_charter_networks_from_config(
 
         # already present?
         exists = next(
-            (d for d in repo._districts.values() if getattr(d, "district_number", None) == dn),
+            (
+                d
+                for d in repo._districts.values()
+                if getattr(d, "district_number", None) == dn
+            ),
             None,
         )
         if exists:
@@ -113,6 +121,7 @@ def add_charter_networks_from_config(
 
         # create a virtual (statewide) district (no geometry)
         import uuid
+
         d = District(
             id=uuid.uuid4(),
             name=name,

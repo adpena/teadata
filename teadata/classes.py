@@ -14,6 +14,8 @@ import os
 import pickle
 import io
 
+from teadata.teadata_config import normalize_district_number_value
+
 try:
     from platformdirs import user_cache_dir  # type: ignore
 except Exception:
@@ -576,6 +578,7 @@ def _discover_snapshot(explicit: str | Path | None = None) -> Optional[Path]:
 
 # --------- Rich mapping containers (pandas-like helpers) ---------
 
+
 class EntityMap(dict):
     """
     Dict keyed by UUID with District/Campus values, with pandas-like helpers.
@@ -614,7 +617,9 @@ class EntityMap(dict):
                 pass
         return out
 
-    def value_counts(self, attr, *, dropna: bool = True, sort: bool = True, descending: bool = True):
+    def value_counts(
+        self, attr, *, dropna: bool = True, sort: bool = True, descending: bool = True
+    ):
         """
         Return counts of values for an attribute across all entities in this map.
 
@@ -666,7 +671,9 @@ class EntityList(list):
         values = [getter(obj) for obj in self]
         return sorted(set(v for v in values if v is not None))
 
-    def value_counts(self, attr, *, dropna: bool = True, sort: bool = True, descending: bool = True):
+    def value_counts(
+        self, attr, *, dropna: bool = True, sort: bool = True, descending: bool = True
+    ):
         """
         Return counts of values for an attribute across all objects in the list.
         Returns a list of (value, count) pairs by default (sorted by count).
@@ -699,6 +706,7 @@ class EntityList(list):
     def sample(self, n=5, seed=None):
         """Random sample of n elements."""
         import random
+
         rng = random.Random(seed)
         return rng.sample(self, min(n, len(self)))
 
@@ -748,6 +756,7 @@ class ReadOnlyEntityView:
         base = set(type(self).__dict__.keys())
         base.update(["unique", "value_counts", "keys", "values", "items"])
         return sorted(base)
+
 
 # --------- Chainable query wrapper for repo results ---------
 class Query:
@@ -1105,6 +1114,17 @@ class Query:
 
 
 class DataEngine:
+    @staticmethod
+    def _match_district_number(d: "District", key) -> bool:
+        canon = normalize_district_number_value(key)
+        if canon is None:
+            return False
+        stored = getattr(d, "district_number", "") or ""
+        # Compare also unsuffixed variants for safety
+        stored_uns = stored[1:] if stored.startswith("'") else stored
+        canon_uns = canon[1:] if canon.startswith("'") else canon
+        return stored == canon or stored_uns == canon_uns
+
     def _as_district(self, v):
         """
         Coerce v to a District instance if possible.
@@ -1611,8 +1631,14 @@ class DataEngine:
              -> Query[District|Campus]
 
           2) Tuple-based mini-DSL:
-             repo >> ("district", "ALDINE ISD")
-             repo >> ("district", "'011901")        # TEA district_number
+            repo >> ("district", "'011901")        # TEA district_number
+            repo >> ("district", "ALDINE ISD")      # exact name (case-insensitive)
+            repo >> ("district", "ALDINE%")         # SQL-like wildcard (% and _) supported
+            repo >> ("district", "ALDINE*ISD")      # glob wildcards (* and ?) supported
+            repo >> ("district", 101902)            # district number as int
+            repo >> ("district", "101902")          # number string (no apostrophe)
+            repo >> ("district", "'101902")         # canonical apostrophe-prefixed string
+
              -> Query[District] (chainable; use >> "campuses_in" etc)
              Note: "district" returns a Query[District]. Most repo methods accept Query inputs by unwrapping the first item.
 
@@ -1628,15 +1654,42 @@ class DataEngine:
             key = query[0]
 
             if key == "district":
-                target = str(query[1])
-                # match by name (case-insensitive) or by district_number
+                raw = query[1]
+
+                # 1) District-number lookup if the input looks number-ish (int or contains any digit)
+                if isinstance(raw, int) or (
+                    isinstance(raw, str) and any(ch.isdigit() for ch in raw)
+                ):
+                    hits = [
+                        d
+                        for d in self._districts.values()
+                        if self._match_district_number(d, raw)
+                    ]
+                    return Query(hits, self)
+
+                # 2) Name lookup (supports wildcards); case-insensitive
+                target = (str(raw) if raw is not None else "").strip()
+                if not target:
+                    return Query([], self)
+
+                import fnmatch
+
+                # Allow SQL-like '%' and '_' or glob '*' and '?'
+                pattern = target.replace("%", "*").replace("_", "?")
+                pattern_up = pattern.upper()
+                has_glob = any(ch in pattern_up for ch in ("*", "?"))
+
+                matches = []
                 for d in self._districts.values():
-                    if (
-                        d.name.upper() == target.upper()
-                        or getattr(d, "district_number", None) == target
-                    ):
-                        return Query([d], self)
-                return Query([], self)
+                    name_up = (d.name or "").upper()
+                    if has_glob:
+                        if fnmatch.fnmatchcase(name_up, pattern_up):
+                            matches.append(d)
+                    else:
+                        if name_up == pattern_up:
+                            matches.append(d)
+
+                return Query(matches, self)
 
             if key == "charters_within":
                 district = _unwrap_query(query[1])
@@ -2079,7 +2132,9 @@ class DataEngine:
         d = _unwrap_query(d)
         if d is None or not hasattr(d, "id"):
             raise ValueError("campuses_in expects a District or a Query[District]")
-        return EntityList([self._campuses[cid] for cid in self._campuses_by_district.get(d.id, [])])
+        return EntityList(
+            [self._campuses[cid] for cid in self._campuses_by_district.get(d.id, [])]
+        )
 
     def charter_campuses_within(self, district: Any):
         """
