@@ -35,30 +35,39 @@ YEAR_MIN_DEFAULT = 2009
 # Loading utilities (YAML/TOML)
 # ------------------------------
 
+
 def _load_yaml(text: str) -> dict:
     try:
         import yaml  # PyYAML
     except Exception as e:
-        raise RuntimeError("PyYAML is required to read .yaml/.yml configs. pip install pyyaml") from e
+        raise RuntimeError(
+            "PyYAML is required to read .yaml/.yml configs. pip install pyyaml"
+        ) from e
     data = yaml.safe_load(text) or {}
     if not isinstance(data, dict):
         raise ValueError("YAML root must be a mapping (dict).")
     return data
 
+
 def _load_toml(text: str) -> dict:
     # Prefer stdlib tomllib on 3.11+, fallback to tomli
     try:
         import tomllib  # type: ignore[attr-defined]
+
         data = tomllib.loads(text)  # pyright: ignore[reportAttributeAccessIssue]
     except Exception:
         try:
-            import tomllib as tomli
+            import tomli
+
             data = tomli.loads(text)
         except Exception as e:
-            raise RuntimeError("tomllib (3.11+) or tomli is required to read .toml configs.") from e
+            raise RuntimeError(
+                "tomllib (3.11+) or tomli is required to read .toml configs."
+            ) from e
     if not isinstance(data, dict):
         raise ValueError("TOML root must be a mapping (dict).")
     return data
+
 
 def _detect_and_load(path: Path) -> dict:
     suffix = path.suffix.lower()
@@ -73,15 +82,18 @@ def _detect_and_load(path: Path) -> dict:
     except Exception:
         return _load_toml(text)
 
+
 # ------------------------------
 # Helpers
 # ------------------------------
+
 
 def _expand_path(value: str) -> str:
     """Expand ~ and $ENV in a path-like string, but leave URLs untouched."""
     if isinstance(value, str) and ("://" not in value):
         return os.path.expandvars(os.path.expanduser(value))
     return value
+
 
 def _coerce_year_key(k: Any) -> Optional[int]:
     """Accept int keys, or strings like '2015' -> 2015."""
@@ -90,6 +102,7 @@ def _coerce_year_key(k: Any) -> Optional[int]:
     if isinstance(k, str) and k.isdigit():
         return int(k)
     return None
+
 
 def _basename_and_ext(path_or_url: str) -> tuple[str, str]:
     """Return lowercase (basename, extension including dot). Works for local paths and URLs with querystrings."""
@@ -101,20 +114,27 @@ def _basename_and_ext(path_or_url: str) -> tuple[str, str]:
     _, ext = os.path.splitext(base)
     return base, ext
 
+
 # ------------------------------
 # Data model & validation
 # ------------------------------
 
+
 @dataclass
 class YearMap:
     """Mapping of year -> location (path or URL)."""
+
     entries: Dict[int, str] = field(default_factory=dict)
     year_min: int = YEAR_MIN_DEFAULT
 
     @staticmethod
-    def from_raw(raw: Dict[str, Any], *, section: str, dataset: str, year_min: int) -> "YearMap":
+    def from_raw(
+        raw: Dict[str, Any], *, section: str, dataset: str, year_min: int
+    ) -> "YearMap":
         if not isinstance(raw, dict):
-            raise ValueError(f"[{section}.{dataset}] must be a mapping of year->path/url")
+            raise ValueError(
+                f"[{section}.{dataset}] must be a mapping of year->path/url"
+            )
         entries: Dict[int, str] = {}
         for k, v in raw.items():
             y = _coerce_year_key(k)
@@ -124,16 +144,22 @@ class YearMap:
                     if isinstance(v, (int, str)) and str(v).isdigit():
                         y2 = int(v)
                         if y2 < year_min:
-                            raise ValueError(f"[{section}.{dataset}] year {y2} < {year_min}")
+                            raise ValueError(
+                                f"[{section}.{dataset}] year {y2} < {year_min}"
+                            )
                         entries[y2] = entries.get(y2, "")
                     else:
                         entries[9999] = _expand_path(str(v))  # synthetic latest path
                     continue
-                raise ValueError(f"[{section}.{dataset}] invalid key '{k}' (expected year like '2017')")
+                raise ValueError(
+                    f"[{section}.{dataset}] invalid key '{k}' (expected year like '2017')"
+                )
             if y < year_min:
                 raise ValueError(f"[{section}.{dataset}] year {y} < {year_min}")
             if not isinstance(v, (str, int, float)):
-                raise ValueError(f"[{section}.{dataset}.{y}] value must be a path or URL string")
+                raise ValueError(
+                    f"[{section}.{dataset}.{y}] value must be a path or URL string"
+                )
             entries[y] = _expand_path(str(v))
         entries = {y: p for y, p in entries.items() if p}
         if not entries:
@@ -150,15 +176,20 @@ class YearMap:
             return None
         if year in self.entries:
             return year, self.entries[year]
-        prior_years = [y for y in self.entries.keys() if isinstance(y, int) and y <= year]
+        prior_years = [
+            y for y in self.entries.keys() if isinstance(y, int) and y <= year
+        ]
         if prior_years:
             best = max(prior_years)
             return best, self.entries[best]
         if not strict and 9999 in self.entries:
             return 9999, self.entries[9999]
         if strict:
-            raise KeyError(f"No data available for {year} (and no prior years) in this dataset.")
+            raise KeyError(
+                f"No data available for {year} (and no prior years) in this dataset."
+            )
         return None
+
 
 # ---------- Schema model ----------
 
@@ -173,8 +204,10 @@ _ALLOWED_EXT_GROUPS: Mapping[str, Sequence[str]] = {
     "shp": (".shp",),
 }
 
+
 def _normalize_kind(kind: str) -> str:
     return kind.strip().lower()
+
 
 @dataclass
 class SchemaHints:
@@ -190,6 +223,7 @@ class SchemaHints:
           districts: ["parquet","geojson","gpkg"]
           campuses: ["parquet","geojson","gpkg"]
     """
+
     data_sources: Dict[str, List[str]] = field(default_factory=dict)
     spatial: Dict[str, List[str]] = field(default_factory=dict)
 
@@ -198,13 +232,19 @@ class SchemaHints:
         def coerce(section: str) -> Dict[str, List[str]]:
             raw = d.get(section, {}) or {}
             if not isinstance(raw, dict):
-                raise ValueError(f"[schema.{section}] must be a mapping of dataset->list[str]")
+                raise ValueError(
+                    f"[schema.{section}] must be a mapping of dataset->list[str]"
+                )
             out: Dict[str, List[str]] = {}
             for ds, kinds in raw.items():
                 if isinstance(kinds, str):
                     kinds = [kinds]
-                if not (isinstance(kinds, list) and all(isinstance(k, str) for k in kinds)):
-                    raise ValueError(f"[schema.{section}.{ds}] must be a string or list of strings")
+                if not (
+                    isinstance(kinds, list) and all(isinstance(k, str) for k in kinds)
+                ):
+                    raise ValueError(
+                        f"[schema.{section}.{ds}] must be a string or list of strings"
+                    )
                 out[ds] = [_normalize_kind(k) for k in kinds]
             return out
 
@@ -223,13 +263,17 @@ class SchemaHints:
             if group:
                 exts.extend(group)
         # dedupe preserve order
-        seen = set(); out: List[str] = []
+        seen = set()
+        out: List[str] = []
         for e in exts:
             if e not in seen:
-                seen.add(e); out.append(e)
+                seen.add(e)
+                out.append(e)
         return out
 
+
 # ---------- Config root ----------
+
 
 @dataclass
 class Config:
@@ -261,15 +305,25 @@ class Config:
 
         data_sources: Dict[str, YearMap] = {}
         for dataset, yearmap_raw in data_sources_raw.items():
-            data_sources[dataset] = YearMap.from_raw(yearmap_raw, section="data_sources", dataset=dataset, year_min=year_min)
+            data_sources[dataset] = YearMap.from_raw(
+                yearmap_raw, section="data_sources", dataset=dataset, year_min=year_min
+            )
 
         spatial: Dict[str, YearMap] = {}
         for layer, yearmap_raw in spatial_raw.items():
-            spatial[layer] = YearMap.from_raw(yearmap_raw, section="spatial", dataset=layer, year_min=year_min)
+            spatial[layer] = YearMap.from_raw(
+                yearmap_raw, section="spatial", dataset=layer, year_min=year_min
+            )
 
         schema = SchemaHints.from_dict(schema_raw)
 
-        cfg = Config(data_sources=data_sources, spatial=spatial, options=options, schema=schema, year_min=year_min)
+        cfg = Config(
+            data_sources=data_sources,
+            spatial=spatial,
+            options=options,
+            schema=schema,
+            year_min=year_min,
+        )
         cfg.validate_file_types()  # fail fast
         return cfg
 
@@ -291,26 +345,46 @@ class Config:
             raise KeyError("Key must be (dataset, year) or (section, dataset, year)")
 
     @property
-    def tapr(self): return self.data_sources.get("tapr")
+    def tapr(self):
+        return self.data_sources.get("tapr")
+
     @property
-    def peims(self): return self.data_sources.get("peims")
+    def peims(self):
+        return self.data_sources.get("peims")
+
     @property
-    def askted(self): return self.data_sources.get("askted")
+    def askted(self):
+        return self.data_sources.get("askted")
+
     @property
-    def finance(self): return self.data_sources.get("finance")
+    def finance(self):
+        return self.data_sources.get("finance")
+
     @property
-    def districts(self): return self.spatial.get("districts")
+    def districts(self):
+        return self.spatial.get("districts")
+
     @property
-    def campuses(self): return self.spatial.get("campuses")
+    def campuses(self):
+        return self.spatial.get("campuses")
 
     # ---------- Core APIs ----------
-    def resolve(self, dataset: str, year: int, *, strict: bool = False, section: str = "data_sources") -> Tuple[int, str]:
+    def resolve(
+        self,
+        dataset: str,
+        year: int,
+        *,
+        strict: bool = False,
+        section: str = "data_sources",
+    ) -> Tuple[int, str]:
         catalog = self.data_sources if section == "data_sources" else self.spatial
         if dataset not in catalog:
             raise KeyError(f"{section} does not contain dataset '{dataset}'.")
         resolved = catalog[dataset].resolve(year, strict=strict)
         if not resolved:
-            raise KeyError(f"No entry for {dataset} in {section} for year {year} (and no prior fallback).")
+            raise KeyError(
+                f"No entry for {dataset} in {section} for year {year} (and no prior fallback)."
+            )
         return resolved
 
     def to_json(self) -> str:
@@ -342,7 +416,9 @@ class Config:
                     base, ext = _basename_and_ext(path)
                     tag = "latest" if y == 9999 else str(y)
                     if ext not in allowed:
-                        problems.append(f"[{section}.{ds}.{tag}] '{base}' has extension '{ext}', expected one of {allowed}")
+                        problems.append(
+                            f"[{section}.{ds}.{tag}] '{base}' has extension '{ext}', expected one of {allowed}"
+                        )
 
         check_section("data_sources", self.data_sources)
         check_section("spatial", self.spatial)
@@ -352,12 +428,18 @@ class Config:
             raise ValueError(msg)
 
     # ---------- Availability report ----------
-    def availability_report(self, *, year_min: Optional[int] = None, year_max: Optional[int] = None) -> Dict[str, Any]:
+    def availability_report(
+        self, *, year_min: Optional[int] = None, year_max: Optional[int] = None
+    ) -> Dict[str, Any]:
         yr_min = int(year_min) if year_min is not None else self.year_min
         declared_years: List[int] = []
         for m in list(self.data_sources.values()) + list(self.spatial.values()):
             declared_years.extend([y for y in m.entries.keys() if y != 9999])
-        yr_max = int(year_max) if year_max is not None else (max(declared_years) if declared_years else yr_min)
+        yr_max = (
+            int(year_max)
+            if year_max is not None
+            else (max(declared_years) if declared_years else yr_min)
+        )
 
         def section_report(catalog: Dict[str, YearMap]) -> Dict[str, Any]:
             section_out: Dict[str, Any] = {}
@@ -382,7 +464,9 @@ class Config:
         }
 
     # ---------- Auto-resolve & auto-load ----------
-    def _load_table(self, path: str, *, prefer_geopandas: bool = False, **reader_kwargs):
+    def _load_table(
+        self, path: str, *, prefer_geopandas: bool = False, **reader_kwargs
+    ):
         """
         Load a file into pandas (or GeoPandas if spatial and available).
         Detects loader by extension.
@@ -397,12 +481,18 @@ class Config:
                 try:
                     import geopandas as gpd  # optional
                 except Exception as e:
-                    raise RuntimeError("geopandas required to load spatial formats (.geojson/.gpkg/.shp)") from e
-                return gpd.read_file(path, **{k:v for k,v in reader_kwargs.items() if k not in {"dtype"}})
+                    raise RuntimeError(
+                        "geopandas required to load spatial formats (.geojson/.gpkg/.shp)"
+                    ) from e
+                return gpd.read_file(
+                    path,
+                    **{k: v for k, v in reader_kwargs.items() if k not in {"dtype"}},
+                )
             else:
                 # Fallback: load geometry as plain JSON/CSV if possible
                 try:
                     import geopandas as gpd
+
                     return gpd.read_file(path)
                 except Exception:
                     raise RuntimeError("Install geopandas to load spatial files.")
@@ -423,18 +513,26 @@ class Config:
             except ValueError:
                 return pd.read_json(path, **reader_kwargs)
 
-        raise ValueError(f"Unsupported file extension for loader: {ext} (from '{base}')")
+        raise ValueError(
+            f"Unsupported file extension for loader: {ext} (from '{base}')"
+        )
 
-    def load_df(self, dataset: str, year: int, *, section: str = "data_sources", **reader_kwargs):
+    def load_df(
+        self, dataset: str, year: int, *, section: str = "data_sources", **reader_kwargs
+    ):
         """
         Resolve the dataset for the year and load as DataFrame (or GeoDataFrame if spatial).
         For CSV loads, you can pass dtype=... etc through reader_kwargs.
         """
         resolved_year, path = self.resolve(dataset, year, section=section)
-        prefer_geo = (section == "spatial")
-        return resolved_year, self._load_table(path, prefer_geopandas=prefer_geo, **reader_kwargs)
+        prefer_geo = section == "spatial"
+        return resolved_year, self._load_table(
+            path, prefer_geopandas=prefer_geo, **reader_kwargs
+        )
+
 
 # ---------- Decorator: auto-resolve + auto-load ----------
+
 
 def auto_load(section="data_sources", **default_reader_kwargs):
     """
@@ -445,26 +543,51 @@ def auto_load(section="data_sources", **default_reader_kwargs):
         @auto_load("data_sources")
         def do_something(cfg, resolved, *, reader_kwargs=None): ...
     """
+
     def decorator(func):
         from functools import wraps
+
         @wraps(func)
-        def wrapper(cfg: Config, dataset: str, year: int, *args, reader_kwargs: Optional[dict] = None, **kwargs):
+        def wrapper(
+            cfg: Config,
+            dataset: str,
+            year: int,
+            *args,
+            reader_kwargs: Optional[dict] = None,
+            **kwargs,
+        ):
             rkw = dict(default_reader_kwargs)
             if reader_kwargs:
                 rkw.update(reader_kwargs)
             resolved_year, df = cfg.load_df(dataset, int(year), section=section, **rkw)
             return func(cfg, (resolved_year, df), *args, **kwargs)
+
         return wrapper
+
     return decorator
+
 
 # ---------- District number normalization & joining ----------
 
 _DEFAULT_DISTRICT_ALIASES: List[str] = [
     # common possibilities across TEA sources; extend as needed
-    "District Number", "DistrictNumber", "DISTRICT", "DISTRICT_ID",
-    "DISTRICT NUMBER", "DISTRICT_NBR", "DIST_NBR", "DistNbr",
-    "County-District Number", "CountyDistrictNumber", "county_district",
-    "CDN", "cds", "CDN Number", "LEA", "LEA_ID", "LEA Code",
+    "District Number",
+    "DistrictNumber",
+    "DISTRICT",
+    "DISTRICT_ID",
+    "DISTRICT NUMBER",
+    "DISTRICT_NBR",
+    "DIST_NBR",
+    "DistNbr",
+    "County-District Number",
+    "CountyDistrictNumber",
+    "county_district",
+    "CDN",
+    "cds",
+    "CDN Number",
+    "LEA",
+    "LEA_ID",
+    "LEA Code",
 ]
 
 _DISTRICT_RE = re.compile(r"(\d+)")
@@ -473,13 +596,24 @@ _DISTRICT_RE = re.compile(r"(\d+)")
 
 # Common possibilities across TEA sources for campus identifiers
 _DEFAULT_CAMPUS_ALIASES: List[str] = [
-    "Campus Number", "CampusNumber", "CAMPUS", "CAMPUS_ID",
-    "CAMPUS NUMBER", "CAMPUS_NBR", "CAMP_NBR", "CampNbr",
-    "CDC", "CDC Number", "Campus Code", "CDS", "CDCN",
+    "Campus Number",
+    "CampusNumber",
+    "CAMPUS",
+    "CAMPUS_ID",
+    "CAMPUS NUMBER",
+    "CAMPUS_NBR",
+    "CAMP_NBR",
+    "CampNbr",
+    "CDC",
+    "CDC Number",
+    "Campus Code",
+    "CDS",
+    "CDCN",
 ]
 
 # Reuse the same digit-run regex
 _CAMPUS_RE = _DISTRICT_RE
+
 
 def normalize_campus_number_value(x: Any) -> Optional[str]:
     """
@@ -512,7 +646,13 @@ def normalize_campus_number_value(x: Any) -> Optional[str]:
     # Zero-pad to 9
     return digits.zfill(9)
 
-def normalize_campus_number_column(df, aliases: Iterable[str] = _DEFAULT_CAMPUS_ALIASES, *, new_col: str = "campus_number"):
+
+def normalize_campus_number_column(
+    df,
+    aliases: Iterable[str] = _DEFAULT_CAMPUS_ALIASES,
+    *,
+    new_col: str = "campus_number",
+):
     """
     Find the first existing alias in df columns, normalize it to 9-digit string into `new_col`.
     Leaves original column intact.
@@ -524,9 +664,11 @@ def normalize_campus_number_column(df, aliases: Iterable[str] = _DEFAULT_CAMPUS_
     col_name = None
     for a in aliases:
         if a in df.columns:
-            col_name = a; break
+            col_name = a
+            break
         if a.lower() in lower_map:
-            col_name = lower_map[a.lower()]; break
+            col_name = lower_map[a.lower()]
+            break
     if col_name is None:
         # No alias found: create empty and return
         df[new_col] = pd.Series([None] * len(df), dtype="object")
@@ -535,6 +677,7 @@ def normalize_campus_number_column(df, aliases: Iterable[str] = _DEFAULT_CAMPUS_
     # Normalize
     df[new_col] = df[col_name].map(normalize_campus_number_value)
     return df, col_name
+
 
 def normalize_district_number_value(x: Any) -> Optional[str]:
     """
@@ -568,7 +711,13 @@ def normalize_district_number_value(x: Any) -> Optional[str]:
     # Zero-pad to 6
     return digits.zfill(6)
 
-def normalize_district_number_column(df, aliases: Iterable[str] = _DEFAULT_DISTRICT_ALIASES, *, new_col: str = "district_number"):
+
+def normalize_district_number_column(
+    df,
+    aliases: Iterable[str] = _DEFAULT_DISTRICT_ALIASES,
+    *,
+    new_col: str = "district_number",
+):
     """
     Find the first existing alias in df columns, normalize it to 6-digit string into `new_col`.
     Leaves original column intact.
@@ -580,9 +729,11 @@ def normalize_district_number_column(df, aliases: Iterable[str] = _DEFAULT_DISTR
     col_name = None
     for a in aliases:
         if a in df.columns:
-            col_name = a; break
+            col_name = a
+            break
         if a.lower() in lower_map:
-            col_name = lower_map[a.lower()]; break
+            col_name = lower_map[a.lower()]
+            break
     if col_name is None:
         # No alias found: create empty and return
         df[new_col] = pd.Series([None] * len(df), dtype="object")
@@ -592,12 +743,17 @@ def normalize_district_number_column(df, aliases: Iterable[str] = _DEFAULT_DISTR
     df[new_col] = df[col_name].map(normalize_district_number_value)
     return df, col_name
 
-def join_datasets_on_district(cfg: Config, year: int, *,
-                              datasets: Optional[List[str]] = None,
-                              aliases: Iterable[str] = _DEFAULT_DISTRICT_ALIASES,
-                              how: str = "outer",
-                              keep: Optional[Dict[str, List[str]]] = None,
-                              reader_overrides: Optional[Dict[str, dict]] = None):
+
+def join_datasets_on_district(
+    cfg: Config,
+    year: int,
+    *,
+    datasets: Optional[List[str]] = None,
+    aliases: Iterable[str] = _DEFAULT_DISTRICT_ALIASES,
+    how: str = "outer",
+    keep: Optional[Dict[str, List[str]]] = None,
+    reader_overrides: Optional[Dict[str, dict]] = None,
+):
     """
     Join selected datasets for `year` (resolving to nearest <= year) on normalized 'district_number'.
     - datasets: defaults to ALL cfg.data_sources keys (order matters for suffixing).
@@ -624,7 +780,11 @@ def join_datasets_on_district(cfg: Config, year: int, *,
         df, found_col = normalize_district_number_column(df, aliases=aliases)
         # Optionally subselect columns
         if keep and ds in keep:
-            cols = list(dict.fromkeys(["district_number"] + [c for c in keep[ds] if c in df.columns]))
+            cols = list(
+                dict.fromkeys(
+                    ["district_number"] + [c for c in keep[ds] if c in df.columns]
+                )
+            )
             df = df[cols]
         else:
             # Ensure we don't explode duplicates before merges
@@ -636,7 +796,8 @@ def join_datasets_on_district(cfg: Config, year: int, *,
 
     # Reduce outer-join on district_number
     def _merge(a, b):
-        _, left = a; ds_b, right = b
+        _, left = a
+        ds_b, right = b
         return (ds_b, left.merge(right, on="district_number", how=how))
 
     if not loaded:
@@ -647,19 +808,27 @@ def join_datasets_on_district(cfg: Config, year: int, *,
         _, merged = _merge((None, merged), item)
 
     # Sort columns: key first
-    cols_sorted = ["district_number"] + [c for c in merged.columns if c != "district_number"]
+    cols_sorted = ["district_number"] + [
+        c for c in merged.columns if c != "district_number"
+    ]
     merged = merged[cols_sorted]
 
     return resolved_years, merged
 
+
 # ---------- Campus join ----------
 
-def join_datasets_on_campus(cfg: Config, year: int, *,
-                             datasets: Optional[List[str]] = None,
-                             aliases: Iterable[str] = _DEFAULT_CAMPUS_ALIASES,
-                             how: str = "outer",
-                             keep: Optional[Dict[str, List[str]]] = None,
-                             reader_overrides: Optional[Dict[str, dict]] = None):
+
+def join_datasets_on_campus(
+    cfg: Config,
+    year: int,
+    *,
+    datasets: Optional[List[str]] = None,
+    aliases: Iterable[str] = _DEFAULT_CAMPUS_ALIASES,
+    how: str = "outer",
+    keep: Optional[Dict[str, List[str]]] = None,
+    reader_overrides: Optional[Dict[str, dict]] = None,
+):
     """
     Join selected datasets for `year` (resolving to nearest <= year) on normalized 'campus_number'.
     - datasets: defaults to ALL cfg.data_sources keys (order matters for suffixing).
@@ -685,7 +854,11 @@ def join_datasets_on_campus(cfg: Config, year: int, *,
         df, found_col = normalize_campus_number_column(df, aliases=aliases)
         # Optionally subselect columns
         if keep and ds in keep:
-            cols = list(dict.fromkeys(["campus_number"] + [c for c in keep[ds] if c in df.columns]))
+            cols = list(
+                dict.fromkeys(
+                    ["campus_number"] + [c for c in keep[ds] if c in df.columns]
+                )
+            )
             df = df[cols]
         # Suffix non-key columns to avoid collisions (except if keep explicitly trims them)
         nonkey = [c for c in df.columns if c != "campus_number"]
@@ -702,27 +875,38 @@ def join_datasets_on_campus(cfg: Config, year: int, *,
         merged = merged.merge(right, on="campus_number", how=how)
 
     # Sort columns: key first
-    cols_sorted = ["campus_number"] + [c for c in merged.columns if c != "campus_number"]
+    cols_sorted = ["campus_number"] + [
+        c for c in merged.columns if c != "campus_number"
+    ]
     merged = merged[cols_sorted]
 
     return resolved_years, merged
 
-def save_parquet(df, path: str, *, engine: str = "pyarrow", compression: str = "snappy"):
+
+def save_parquet(
+    df, path: str, *, engine: str = "pyarrow", compression: str = "snappy"
+):
     df.to_parquet(path, engine=engine, compression=compression, index=False)
     return path
 
+
 def save_duckdb(df, db_path: str, *, table: str = "teadata_year"):
     import duckdb
+
     con = duckdb.connect(db_path)
     con.register("df_tmp", df)
-    con.execute(f"CREATE TABLE IF NOT EXISTS {table} AS SELECT * FROM df_tmp WITH NO DATA;")
+    con.execute(
+        f"CREATE TABLE IF NOT EXISTS {table} AS SELECT * FROM df_tmp WITH NO DATA;"
+    )
     con.execute(f"INSERT INTO {table} SELECT * FROM df_tmp;")
     con.close()
     return db_path, table
 
+
 # ------------------------------
 # Public API
 # ------------------------------
+
 
 def load_config(path: str | Path) -> Config:
     p = Path(path)
@@ -731,6 +915,7 @@ def load_config(path: str | Path) -> Config:
     raw = _detect_and_load(p)
     cfg = Config.from_dict(raw)
     return cfg
+
 
 # ------------------------------
 # CLI helpers
@@ -789,6 +974,7 @@ options:
   log_level: INFO
 """
 
+
 def _cmd_init(out_path: str) -> None:
     p = Path(out_path)
     if p.exists():
@@ -797,14 +983,26 @@ def _cmd_init(out_path: str) -> None:
     p.write_text(_TEMPLATE_YAML, encoding="utf-8")
     print(f"Wrote starter config with schema hints: {p}")
 
+
 def _cmd_resolve(cfg_path: str, section: str, dataset: str, year: int) -> None:
     cfg = load_config(cfg_path)
     if section not in {"data_sources", "spatial"}:
         print("section must be 'data_sources' or 'spatial'", file=sys.stderr)
         sys.exit(2)
     resolved_year, path = cfg.resolve(dataset, year, section=section)
-    print(json.dumps({"section": section, "dataset": dataset, "request_year": year,
-                      "resolved_year": resolved_year, "path": path}, indent=2))
+    print(
+        json.dumps(
+            {
+                "section": section,
+                "dataset": dataset,
+                "request_year": year,
+                "resolved_year": resolved_year,
+                "path": path,
+            },
+            indent=2,
+        )
+    )
+
 
 def _format_report_table(report: Dict[str, Any]) -> str:
     lines: List[str] = []
@@ -815,9 +1013,13 @@ def _format_report_table(report: Dict[str, Any]) -> str:
         lines.append(title)
         lines.append("-" * len(title))
         for ds, info in sorted(data.items()):
-            years = info["years"]; gaps = info["gaps"]
-            min_decl = info["min_declared"]; max_decl = info["max_declared"]
-            lines.append(f"{ds}: {info['count']} years (min={min_decl}, max={max_decl})")
+            years = info["years"]
+            gaps = info["gaps"]
+            min_decl = info["min_declared"]
+            max_decl = info["max_declared"]
+            lines.append(
+                f"{ds}: {info['count']} years (min={min_decl}, max={max_decl})"
+            )
             if gaps:
                 # compress gaps into runs
                 runs = []
@@ -826,7 +1028,8 @@ def _format_report_table(report: Dict[str, Any]) -> str:
                     if y == prev + 1:
                         prev = y
                     else:
-                        runs.append((start, prev)); start = prev = y
+                        runs.append((start, prev))
+                        start = prev = y
                 runs.append((start, prev))
                 run_txt = ", ".join([f"{a}-{b}" if a != b else f"{a}" for a, b in runs])
                 lines.append(f"  gaps: {run_txt}")
@@ -838,7 +1041,10 @@ def _format_report_table(report: Dict[str, Any]) -> str:
     section_block("SPATIAL", report["spatial"])
     return "\n".join(lines)
 
-def _cmd_report(cfg_path: str, *, as_json: bool, year_min: Optional[int], year_max: Optional[int]) -> None:
+
+def _cmd_report(
+    cfg_path: str, *, as_json: bool, year_min: Optional[int], year_max: Optional[int]
+) -> None:
     cfg = load_config(cfg_path)
     rep = cfg.availability_report(year_min=year_min, year_max=year_max)
     if as_json:
@@ -846,11 +1052,24 @@ def _cmd_report(cfg_path: str, *, as_json: bool, year_min: Optional[int], year_m
     else:
         print(_format_report_table(rep))
 
-def _cmd_join(cfg_path: str, year: int, *, datasets: Optional[List[str]], out_parquet: Optional[str],
-              out_duckdb: Optional[str], duckdb_table: str) -> None:
+
+def _cmd_join(
+    cfg_path: str,
+    year: int,
+    *,
+    datasets: Optional[List[str]],
+    out_parquet: Optional[str],
+    out_duckdb: Optional[str],
+    duckdb_table: str,
+) -> None:
     cfg = load_config(cfg_path)
     resolved_years, df = join_datasets_on_district(cfg, year, datasets=datasets)
-    meta = {"requested_year": year, "resolved_years": resolved_years, "rows": len(df), "cols": len(df.columns)}
+    meta = {
+        "requested_year": year,
+        "resolved_years": resolved_years,
+        "rows": len(df),
+        "cols": len(df.columns),
+    }
     print(json.dumps(meta, indent=2))
     if out_parquet:
         save_parquet(df, out_parquet)
@@ -859,31 +1078,45 @@ def _cmd_join(cfg_path: str, year: int, *, datasets: Optional[List[str]], out_pa
         save_duckdb(df, out_duckdb, table=duckdb_table)
         print(f"Appended to DuckDB: {out_duckdb} (table={duckdb_table})")
 
+
 def main(argv: List[str]) -> None:
     if len(argv) >= 2 and argv[1] == "init":
         if len(argv) != 3:
             print("Usage: teadata_config.py init <output.yaml>", file=sys.stderr)
             sys.exit(2)
-        _cmd_init(argv[2]); return
+        _cmd_init(argv[2])
+        return
 
     if len(argv) >= 2 and argv[1] == "resolve":
         if len(argv) != 6:
-            print("Usage: teadata_config.py resolve <config.(yaml|toml)> <section> <dataset> <year>", file=sys.stderr)
-            print("Example: teadata_config.py resolve config.yaml data_sources tapr 2017", file=sys.stderr)
+            print(
+                "Usage: teadata_config.py resolve <config.(yaml|toml)> <section> <dataset> <year>",
+                file=sys.stderr,
+            )
+            print(
+                "Example: teadata_config.py resolve config.yaml data_sources tapr 2017",
+                file=sys.stderr,
+            )
             sys.exit(2)
         _, _, cfg_path, section, dataset, year_s = argv
         try:
             year = int(year_s)
         except ValueError:
-            print("year must be an integer like 2021", file=sys.stderr); sys.exit(2)
-        _cmd_resolve(cfg_path, section, dataset, year); return
+            print("year must be an integer like 2021", file=sys.stderr)
+            sys.exit(2)
+        _cmd_resolve(cfg_path, section, dataset, year)
+        return
 
     if len(argv) >= 2 and argv[1] == "report":
         if len(argv) < 3:
-            print("Usage: teadata_config.py report <config.(yaml|toml)> [--json] [--min N] [--max N]", file=sys.stderr)
+            print(
+                "Usage: teadata_config.py report <config.(yaml|toml)> [--json] [--min N] [--max N]",
+                file=sys.stderr,
+            )
             sys.exit(2)
         cfg_path = argv[2]
         as_json = "--json" in argv
+
         def _get_flag_val(flag: str) -> Optional[int]:
             if flag in argv:
                 i = argv.index(flag)
@@ -891,49 +1124,75 @@ def main(argv: List[str]) -> None:
                     try:
                         return int(argv[i + 1])
                     except ValueError:
-                        print(f"{flag} expects an integer", file=sys.stderr); sys.exit(2)
+                        print(f"{flag} expects an integer", file=sys.stderr)
+                        sys.exit(2)
             return None
-        year_min = _get_flag_val("--min"); year_max = _get_flag_val("--max")
-        _cmd_report(cfg_path, as_json=as_json, year_min=year_min, year_max=year_max); return
+
+        year_min = _get_flag_val("--min")
+        year_max = _get_flag_val("--max")
+        _cmd_report(cfg_path, as_json=as_json, year_min=year_min, year_max=year_max)
+        return
 
     if len(argv) >= 2 and argv[1] == "join":
         # teadata_config.py join cfg.yaml 2021 [--datasets tapr,peims,finance] [--parquet out.parquet] [--duckdb out.duckdb --table name]
         if len(argv) < 4:
-            print("Usage: teadata_config.py join <config.(yaml|toml)> <year> [--datasets a,b,c] [--parquet out.parquet] [--duckdb out.duckdb --table name]", file=sys.stderr)
+            print(
+                "Usage: teadata_config.py join <config.(yaml|toml)> <year> [--datasets a,b,c] [--parquet out.parquet] [--duckdb out.duckdb --table name]",
+                file=sys.stderr,
+            )
             sys.exit(2)
         cfg_path = argv[2]
         try:
             year = int(argv[3])
         except ValueError:
-            print("year must be an integer like 2021", file=sys.stderr); sys.exit(2)
+            print("year must be an integer like 2021", file=sys.stderr)
+            sys.exit(2)
         datasets = None
         if "--datasets" in argv:
             i = argv.index("--datasets")
             if i + 1 < len(argv):
-                datasets = [s.strip() for s in argv[i+1].split(",") if s.strip()]
+                datasets = [s.strip() for s in argv[i + 1].split(",") if s.strip()]
         out_parquet = None
         if "--parquet" in argv:
             i = argv.index("--parquet")
             if i + 1 < len(argv):
-                out_parquet = argv[i+1]
-        out_duckdb = None; duckdb_table = "teadata_year"
+                out_parquet = argv[i + 1]
+        out_duckdb = None
+        duckdb_table = "teadata_year"
         if "--duckdb" in argv:
             i = argv.index("--duckdb")
             if i + 1 < len(argv):
-                out_duckdb = argv[i+1]
+                out_duckdb = argv[i + 1]
         if "--table" in argv:
             i = argv.index("--table")
             if i + 1 < len(argv):
-                duckdb_table = argv[i+1]
-        _cmd_join(cfg_path, year, datasets=datasets, out_parquet=out_parquet, out_duckdb=out_duckdb, duckdb_table=duckdb_table)
+                duckdb_table = argv[i + 1]
+        _cmd_join(
+            cfg_path,
+            year,
+            datasets=datasets,
+            out_parquet=out_parquet,
+            out_duckdb=out_duckdb,
+            duckdb_table=duckdb_table,
+        )
         return
 
     print("Usage:", file=sys.stderr)
     print("  teadata_config.py init <output.yaml>", file=sys.stderr)
-    print("  teadata_config.py resolve <config.(yaml|toml)> <section> <dataset> <year>", file=sys.stderr)
-    print("  teadata_config.py report <config.(yaml|toml)> [--json] [--min N] [--max N]", file=sys.stderr)
-    print("  teadata_config.py join <config.(yaml|toml)> <year> [--datasets a,b,c] [--parquet out.parquet] [--duckdb out.duckdb --table name]", file=sys.stderr)
+    print(
+        "  teadata_config.py resolve <config.(yaml|toml)> <section> <dataset> <year>",
+        file=sys.stderr,
+    )
+    print(
+        "  teadata_config.py report <config.(yaml|toml)> [--json] [--min N] [--max N]",
+        file=sys.stderr,
+    )
+    print(
+        "  teadata_config.py join <config.(yaml|toml)> <year> [--datasets a,b,c] [--parquet out.parquet] [--duckdb out.duckdb --table name]",
+        file=sys.stderr,
+    )
     sys.exit(2)
+
 
 if __name__ == "__main__":
     main(sys.argv)

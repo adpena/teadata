@@ -1,0 +1,217 @@
+# ---- Python / PyPI library project (.gitignore) ----
+# This project is developed in PyCharm, hosted on GitHub, and published to PyPI.
+
+# =========================
+# Core Python ignores
+# =========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+*.dll
+
+# Byte-compiled / optimized / DLL files
+.Python
+.python-version
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.pipenv/
+pipenv/
+.pythonbrew/
+pyenv.local
+# PEP 582; used by some package managers
+__pypackages__/
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+.junit/
+.pyre/
+.pytype/
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.ruff_cache/
+.pylint.d/
+.pyright
+.pyrightcache/
+
+# Profiling / benchmarking
+.prof
+.profraw
+.pyperf/
+.pyre-check/
+
+# Type checker caches
+.mypy_cache/
+
+# =========================
+# Build / packaging artifacts
+# =========================
+build/
+dist/
+sdist/
+wheelhouse/
+*.egg-info/
+*.egg
+.eggs/
+MANIFEST
+pip-wheel-metadata/
+*.whl
+
+# Build backend scratch (setuptools/poetry/flit may create these)
+*.manifest
+*.spec
+
+# =========================
+# Project / runtime logs
+# =========================
+*.log
+logs/
+log/
+*.tmp
+tmp/
+temp/
+
+# =========================
+# Editors / IDEs
+# =========================
+# PyCharm / IntelliJ
+.idea/
+.idea/**/*
+*.iml
+out/
+# If you later want to version specific shared templates, remove the stars above and unignore selectively:
+# !.idea/inspectionProfiles/
+# !.idea/runConfigurations/
+
+# VS Code (optional)
+.vscode/
+
+# Other editors
+*.swp
+*~
+.history/
+.vscode-test/
+
+# =========================
+# OS-generated files
+# =========================
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# =========================
+# Notebooks / checkpoints
+# =========================
+.ipynb_checkpoints/
+*.ipynb-*
+
+# =========================
+# Documentation artifacts
+# =========================
+/site/
+docs/_build/
+_build/
+target/
+.sphinx/
+.doctrees/
+
+# =========================
+# Security / environment
+# =========================
+.env
+.env.*
+*.env
+*.key
+*.pem
+*.crt
+*.pfx
+*.p12
+*.bak
+*.backup
+*.secrets*
+.terraform/
+
+# =========================
+# Data & analytics outputs (adjust to taste)
+# =========================
+# Large tabular & analytic files
+*.parquet
+*.feather
+*.arrow
+*.orc
+*.duckdb
+*.sqlite
+*.sqlite3
+*.db
+# Spatial data (comment out if you version control canonical shapes)
+*.geojson
+*.gpkg
+*.shp
+*.shx
+*.dbf
+*.prj
+*.cpg
+*.qgz
+*.qgs
+# Local data/cache directories (uncomment and customize as needed)
+# .cache/
+accountability/
+shapes/
+# data/
+# data_raw/
+# data_cache/
+# outputs/
+# reports/
+
+# =========================
+# Project-specific: config samples vs. real configs
+# =========================
+# Keep example configs in repo; ignore real machine-local configs
+config.local.yaml
+*.local.yaml
+*.local.toml
+*.local.json
+config.yaml
+config.toml
+
+# If you publish starter templates, do not ignore those:
+# config.example.yaml
+# config.template.yaml
+
+# =========================
+# teadata_config helpers (CLI outputs)
+# =========================
+# CLI-generated reports / exports (adjust if you want them versioned)
+*.report.json
+*.report.txt
+
+# =========================
+# Wheel/metadata caches created by build tools
+# =========================
+.pyproject-build/
+.py-build/

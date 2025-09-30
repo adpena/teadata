@@ -1,13 +1,15 @@
 from teadata import DataEngine
 
-# Initialize the DataEngine, this will use the cached .pkl snapshot if available
-repo = DataEngine()
+repo = DataEngine.from_snapshot(search=True)
+print(len(repo.districts), len(repo.campuses))
+aldine = (repo >> ("district", "ALDINE ISD")).first()
+print("Example district:", aldine)
 
 # Inspect how many objects are loaded
 print(f"Loaded {len(repo.districts)} districts and {len(repo.campuses)} campuses")
 
 # Pick one district by name
-aldine = repo.districts["Aldine ISD"]
+aldine = (repo >> ("district", "ALDINE ISD")).first()
 
 print("\nExample district:")
 print(aldine)

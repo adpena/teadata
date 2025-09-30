@@ -24,6 +24,7 @@ from teadata_config import (
 CFG = "teadata_sources.yaml"
 YEAR = 2025
 
+
 def parse_date(val: Optional[str]) -> Optional[date]:
     if not val:
         return None
@@ -60,6 +61,7 @@ def _file_mtime(p: str | Path) -> float:
     except FileNotFoundError:
         return 0.0
 
+
 # --- robust cache signature helpers ---
 def _file_size(p: str | Path) -> int:
     try:
@@ -67,8 +69,10 @@ def _file_size(p: str | Path) -> int:
     except FileNotFoundError:
         return 0
 
+
 def _sha256_text(text: str) -> str:
     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
 
 def _path_signature(p: str | Path) -> str:
     """Return a stable signature for a *local* file path (mtime+size).
@@ -81,6 +85,7 @@ def _path_signature(p: str | Path) -> str:
     except FileNotFoundError:
         return "missing"
 
+
 def _source_signature(module) -> str:
     """Return a signature for a loaded module's source file (mtime+size path)."""
     try:
@@ -91,6 +96,7 @@ def _source_signature(module) -> str:
     except Exception:
         return "nosrc"
 
+
 def _safe_path_or_url_signature(path_or_url: str) -> str:
     """If it's a local file, use mtime+size. If it's a URL or non-local,
     include the literal string so signature changes when config path changes."""
@@ -99,15 +105,18 @@ def _safe_path_or_url_signature(path_or_url: str) -> str:
         return f"url:{s}"
     return f"file:{Path(s)}|{_path_signature(s)}"
 
+
 def _repo_cache_dir() -> Path:
-    d = Path('.cache')
+    d = Path(".cache")
     d.mkdir(exist_ok=True)
     return d
+
 
 def _snapshot_path(districts_fp: str, campuses_fp: str) -> Path:
     d = _repo_cache_dir()
     tag = f"repo_{Path(districts_fp).stem}_{Path(campuses_fp).stem}.pkl"
     return d / tag
+
 
 # Helper to compute robust extra signature for cache invalidation (config content hash, code, data source signatures)
 def _compute_extra_signature() -> dict:
@@ -149,48 +158,66 @@ def _compute_extra_signature() -> dict:
 
     return sig
 
+
 def _prepare_repo_for_pickle(repo: DataEngine) -> None:
     """Drop transient spatial indexes so the pickle is small and portable."""
-    for attr in ("_kdtree", "_xy_deg", "_xy_rad", "_campus_list",
-                 "_point_tree", "_point_geoms", "_point_ids", "_geom_id_to_index",
-                 "_xy_deg_np", "_campus_list_np", "_all_xy_np", "_all_campuses_np"):
+    for attr in (
+        "_kdtree",
+        "_xy_deg",
+        "_xy_rad",
+        "_campus_list",
+        "_point_tree",
+        "_point_geoms",
+        "_point_ids",
+        "_geom_id_to_index",
+        "_xy_deg_np",
+        "_campus_list_np",
+        "_all_xy_np",
+        "_all_campuses_np",
+    ):
         if hasattr(repo, attr):
             setattr(repo, attr, None)
 
-def _load_repo_snapshot(districts_fp: str, campuses_fp: str, extra_sig: dict) -> DataEngine | None:
+
+def _load_repo_snapshot(
+    districts_fp: str, campuses_fp: str, extra_sig: dict
+) -> DataEngine | None:
     snap = _snapshot_path(districts_fp, campuses_fp)
     if not snap.exists():
         return None
     try:
-        with snap.open('rb') as f:
+        with snap.open("rb") as f:
             meta, repo = pickle.load(f)
         src_mtimes = {
-            'districts': _file_mtime(districts_fp),
-            'campuses': _file_mtime(campuses_fp),
+            "districts": _file_mtime(districts_fp),
+            "campuses": _file_mtime(campuses_fp),
         }
         if (
-            meta.get('version') == 4 and
-            meta.get('src_mtimes') == src_mtimes and
-            meta.get('extra_sig', {}) == (extra_sig or {})
+            meta.get("version") == 4
+            and meta.get("src_mtimes") == src_mtimes
+            and meta.get("extra_sig", {}) == (extra_sig or {})
         ):
             return repo
     except Exception:
         return None
     return None
 
-def _save_repo_snapshot(repo: DataEngine, districts_fp: str, campuses_fp: str, extra_sig: dict) -> None:
+
+def _save_repo_snapshot(
+    repo: DataEngine, districts_fp: str, campuses_fp: str, extra_sig: dict
+) -> None:
     snap = _snapshot_path(districts_fp, campuses_fp)
     meta = {
-        'version': 4,
-        'src_mtimes': {
-            'districts': _file_mtime(districts_fp),
-            'campuses': _file_mtime(campuses_fp),
+        "version": 4,
+        "src_mtimes": {
+            "districts": _file_mtime(districts_fp),
+            "campuses": _file_mtime(campuses_fp),
         },
-        'extra_sig': extra_sig or {},
+        "extra_sig": extra_sig or {},
     }
     try:
         _prepare_repo_for_pickle(repo)
-        with snap.open('wb') as f:
+        with snap.open("wb") as f:
             pickle.dump((meta, repo), f, protocol=pickle.HIGHEST_PROTOCOL)
     except Exception:
         # Cache is best-effort; ignore failures
@@ -200,7 +227,10 @@ def _save_repo_snapshot(repo: DataEngine, districts_fp: str, campuses_fp: str, e
 # ------------------ Sanity probe: fast vs slow charter-within ------------------
 from typing import List
 
-def sanity_probe_charters(repo: DataEngine, district_name: str, *, n_print: int = 5) -> None:
+
+def sanity_probe_charters(
+    repo: DataEngine, district_name: str, *, n_print: int = 5
+) -> None:
     """Compare fast path (repo.charter_campuses_within) vs a direct slow scan for a district.
     Prints counts and a small diff if there is a mismatch.
     """
@@ -213,7 +243,9 @@ def sanity_probe_charters(repo: DataEngine, district_name: str, *, n_print: int 
     if dist is None:
         # fallback simple search
         up = district_name.upper()
-        dist = next((d for d in repo._districts.values() if (d.name or "").upper() == up), None)
+        dist = next(
+            (d for d in repo._districts.values() if (d.name or "").upper() == up), None
+        )
     if dist is None:
         print(f"[sanity] district not found: {district_name}")
         return
@@ -258,6 +290,7 @@ def sanity_probe_charters(repo: DataEngine, district_name: str, *, n_print: int 
 # ------------------ Enrichment (from config) ------------------
 from typing import Iterable, Dict, Any, Tuple
 
+
 def enrich_districts_from_config(
     repo: DataEngine,
     cfg_path: str,
@@ -274,11 +307,15 @@ def enrich_districts_from_config(
     """Load a dataset via teadata_config, normalize district_number, and copy selected
     columns onto District objects. Returns (resolved_year, updated_count)."""
     cfg = load_config(cfg_path)
-    resolved_year, df = cfg.load_df(dataset, year, section="data_sources", **(reader_kwargs or {}))
+    resolved_year, df = cfg.load_df(
+        dataset, year, section="data_sources", **(reader_kwargs or {})
+    )
 
     # Diagnostics: show first few columns to help spot mismatches
     try:
-        cols_preview = list(df.columns)[:12] if hasattr(df, 'columns') else list(df.keys())
+        cols_preview = (
+            list(df.columns)[:12] if hasattr(df, "columns") else list(df.keys())
+        )
         print(f"[enrich:{dataset}] loaded columns (preview): {cols_preview}")
     except Exception:
         pass
@@ -288,9 +325,11 @@ def enrich_districts_from_config(
     if isinstance(df, dict):
         # Already loaded all sheets (sheet_name=None). Pick the first sheet that contains any expected source column.
         for name, dfi in df.items():
-            if not hasattr(dfi, 'columns'):
+            if not hasattr(dfi, "columns"):
                 continue
-            if (expected_sources and expected_sources.intersection(set(dfi.columns))) or (not expected_sources):
+            if (
+                expected_sources and expected_sources.intersection(set(dfi.columns))
+            ) or (not expected_sources):
                 print(f"[enrich:{dataset}] using sheet: {name}")
                 df = dfi
                 break
@@ -300,12 +339,16 @@ def enrich_districts_from_config(
             print(f"[enrich:{dataset}] fallback to first sheet: {name}")
     else:
         # If rename is provided but none of the source columns are present, try reloading all sheets
-        if expected_sources and not expected_sources.intersection(set(getattr(df, 'columns', []))):
+        if expected_sources and not expected_sources.intersection(
+            set(getattr(df, "columns", []))
+        ):
             try:
                 # re-resolve path so we can use pandas directly
                 _, path = cfg.resolve(dataset, year, section="data_sources")
                 all_sheets = pd.read_excel(path, sheet_name=None)
-                print(f"[enrich:{dataset}] reloaded all sheets to search for columns: {sorted(list(all_sheets.keys()))}")
+                print(
+                    f"[enrich:{dataset}] reloaded all sheets to search for columns: {sorted(list(all_sheets.keys()))}"
+                )
                 chosen = None
                 for name, dfi in all_sheets.items():
                     if expected_sources.intersection(set(dfi.columns)):
@@ -323,12 +366,18 @@ def enrich_districts_from_config(
     # Optional column renaming to make Python-friendly identifiers
     if rename:
         df = df.rename(columns=rename)
-        missing = [k for k in rename.keys() if k not in df.columns and rename[k] not in df.columns]
+        missing = [
+            k
+            for k in rename.keys()
+            if k not in df.columns and rename[k] not in df.columns
+        ]
         if missing:
             print(f"[enrich:{dataset}] warning: rename sources not found: {missing}")
 
     # Normalize to `district_number`
-    df_norm, found = normalize_district_number_column(df, aliases=_DEFAULT_DISTRICT_ALIASES, new_col="district_number")
+    df_norm, found = normalize_district_number_column(
+        df, aliases=_DEFAULT_DISTRICT_ALIASES, new_col="district_number"
+    )
     if found is None:
         raise ValueError(f"No district-number column found in dataset '{dataset}'.")
 
@@ -339,7 +388,9 @@ def enrich_districts_from_config(
         cols = [c for c in select if c in df_norm.columns]
         missing_sel = [c for c in (select or []) if c not in df_norm.columns]
         if missing_sel:
-            print(f"[enrich:{dataset}] warning: selected columns not found after rename: {missing_sel}")
+            print(
+                f"[enrich:{dataset}] warning: selected columns not found after rename: {missing_sel}"
+            )
     pre_suffix_cols = list(cols)
     if not cols:
         print(f"[enrich:{dataset}] nothing to enrich: selection empty after checks")
@@ -348,7 +399,13 @@ def enrich_districts_from_config(
     # Normalize selected column values: strip strings, turn NaN/empty to None
     for c in cols:
         if c in df_norm.columns:
-            df_norm[c] = df_norm[c].apply(lambda x: (None if (pd.isna(x) or (isinstance(x, str) and x.strip() == "")) else (str(x).strip() if isinstance(x, str) else x)))
+            df_norm[c] = df_norm[c].apply(
+                lambda x: (
+                    None
+                    if (pd.isna(x) or (isinstance(x, str) and x.strip() == ""))
+                    else (str(x).strip() if isinstance(x, str) else x)
+                )
+            )
 
     if transforms:
         for c, fn in transforms.items():
@@ -376,9 +433,13 @@ def enrich_districts_from_config(
     mapping: Dict[str, Dict[str, Any]] = {}
     for rec in sub.itertuples(index=False):
         d = rec._asdict()
-        dn = str(d.pop("district_number"))  # normalized: zero-padded 6-digit, no apostrophe
+        dn = str(
+            d.pop("district_number")
+        )  # normalized: zero-padded 6-digit, no apostrophe
         mapping[dn] = d
-        mapping[f"'{dn}"] = d  # also allow leading-apostrophe keys to match repo.district_number
+        mapping[f"'{dn}"] = (
+            d  # also allow leading-apostrophe keys to match repo.district_number
+        )
 
     # Targeted probe for Aldine ISD (CDN 101902) to help debug mismatches
     try:
@@ -423,7 +484,7 @@ def enrich_districts_from_config(
             else:
                 # Persist unknown/source-only attributes into the District metadata
                 try:
-                    if not hasattr(d, 'meta') or d.meta is None:
+                    if not hasattr(d, "meta") or d.meta is None:
                         d.meta = {}
                     d.meta[k] = v
                 except Exception as ex:
@@ -441,7 +502,9 @@ def enrich_districts_from_config(
                 try:
                     setattr(d, target, vv)
                 except Exception as ex:
-                    print(f"[enrich:{dataset}] alias setattr failed for {dn} {k}->{target}: {ex}")
+                    print(
+                        f"[enrich:{dataset}] alias setattr failed for {dn} {k}->{target}: {ex}"
+                    )
         updated += 1
         # debug a single well-known district
         try:
@@ -454,7 +517,9 @@ def enrich_districts_from_config(
 
     return resolved_year, updated
 
+
 from typing import Iterable, Dict, Any, Tuple
+
 
 def enrich_campuses_from_config(
     repo: DataEngine,
@@ -474,14 +539,18 @@ def enrich_campuses_from_config(
     columns onto Campus objects. Returns (resolved_year, updated_count).
     """
     cfg = load_config(cfg_path)
-    resolved_year, df = cfg.load_df(dataset, year, section="data_sources", **(reader_kwargs or {}))
+    resolved_year, df = cfg.load_df(
+        dataset, year, section="data_sources", **(reader_kwargs or {})
+    )
 
     # Optional column renaming
     if rename:
         df = df.rename(columns=rename)
 
     # Normalize to campus_number (9-digit zero-padded, handle apostrophes)
-    df_norm, found = normalize_campus_number_column(df, aliases=_DEFAULT_CAMPUS_ALIASES, new_col="campus_number")
+    df_norm, found = normalize_campus_number_column(
+        df, aliases=_DEFAULT_CAMPUS_ALIASES, new_col="campus_number"
+    )
     if found is None:
         raise ValueError(f"No campus-number column found in dataset '{dataset}'.")
 
@@ -492,7 +561,9 @@ def enrich_campuses_from_config(
         cols = [c for c in select if c in df_norm.columns]
         missing_sel = [c for c in (select or []) if c not in df_norm.columns]
         if missing_sel:
-            print(f"[enrich:{dataset}] warning: selected columns not found after rename: {missing_sel}")
+            print(
+                f"[enrich:{dataset}] warning: selected columns not found after rename: {missing_sel}"
+            )
     pre_suffix_cols = list(cols)
     if not cols:
         return resolved_year, 0
@@ -501,7 +572,11 @@ def enrich_campuses_from_config(
     for c in cols:
         if c in df_norm.columns:
             df_norm[c] = df_norm[c].apply(
-                lambda x: (None if (pd.isna(x) or (isinstance(x, str) and x.strip() == "")) else (str(x).strip() if isinstance(x, str) else x))
+                lambda x: (
+                    None
+                    if (pd.isna(x) or (isinstance(x, str) and x.strip() == ""))
+                    else (str(x).strip() if isinstance(x, str) else x)
+                )
             )
 
     if transforms:
@@ -559,7 +634,9 @@ def enrich_campuses_from_config(
                         cobj.meta = {}
                     cobj.meta[k] = v
                 except Exception as ex:
-                    print(f"[enrich:{dataset}] campus meta write failed for {cn} {k}: {ex}")
+                    print(
+                        f"[enrich:{dataset}] campus meta write failed for {cn} {k}: {ex}"
+                    )
 
             # Always try to set alias target, e.g. some_field -> rating
             if target:
@@ -571,10 +648,13 @@ def enrich_campuses_from_config(
                 try:
                     setattr(cobj, target, vv)
                 except Exception as ex:
-                    print(f"[enrich:{dataset}] campus alias setattr failed for {cn} {k}->{target}: {ex}")
+                    print(
+                        f"[enrich:{dataset}] campus alias setattr failed for {cn} {k}->{target}: {ex}"
+                    )
         updated += 1
 
     return resolved_year, updated
+
 
 def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
     # Compute extra signature (config + code + resolved accountability) to keep cache honest
@@ -591,7 +671,10 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
         try:
             acc_select = ["overall_rating_2025"]
             enrich_districts_from_config(
-                snap, CFG, "accountability", YEAR,
+                snap,
+                CFG,
+                "accountability",
+                YEAR,
                 select=acc_select,
                 rename={"2025 Overall Rating": "overall_rating_2025"},
                 aliases={"overall_rating_2025": "rating"},
@@ -604,7 +687,10 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
         try:
             cam_select = ["overall_rating_2025"]
             cam_year, cam_updated = enrich_campuses_from_config(
-                snap, CFG, "campus_accountability", YEAR,
+                snap,
+                CFG,
+                "campus_accountability",
+                YEAR,
                 select=cam_select,
                 rename={"2025 Overall Rating": "overall_rating_2025"},
                 aliases={"overall_rating_2025": "rating"},
@@ -622,7 +708,9 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
     gdf_campuses = gpd.read_file(campuses_fp, engine="pyogrio")
 
     # (Optional) vectorized normalize for districts (small but tidy)
-    gdf_districts["district_number_norm"] = gdf_districts["DISTRICT_C"].apply(normalize_district_code)
+    gdf_districts["district_number_norm"] = gdf_districts["DISTRICT_C"].apply(
+        normalize_district_code
+    )
 
     dn_to_id: dict[str, uuid.UUID] = {}
 
@@ -655,7 +743,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
             rating="",
             boundary=None,
         )
-        fallback_district.district_number = '000000'
+        fallback_district.district_number = "000000"
         repo.add_district(fallback_district)
         fallback_id = fallback_district.id
 
@@ -672,15 +760,17 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                 enrollment=getattr(row, "USER_School_Enrollment_as_of_Oc", -999999),
                 district_number=district_number,
                 campus_number=getattr(row, "USER_School_Number", None),
-
                 aea=getattr(row, "USER_AEA", None),
                 grade_range=getattr(row, "USER_Grade_Range", None),
                 school_type=getattr(row, "School_Type", None),
-                school_status_date=parse_date(getattr(row, "USER_School_Status_Date", None)),
+                school_status_date=parse_date(
+                    getattr(row, "USER_School_Status_Date", None)
+                ),
                 update_date=parse_date(getattr(row, "USER_Update_Date", None)),
-
                 charter_type=getattr(row, "USER_Charter_Type", ""),
-                is_charter=(getattr(row, "USER_Charter_Type", "") == "OPEN ENROLLMENT CHARTER"),
+                is_charter=(
+                    getattr(row, "USER_Charter_Type", "") == "OPEN ENROLLMENT CHARTER"
+                ),
                 location=getattr(row, "geometry"),
             )
             repo.add_campus(c)
@@ -698,18 +788,34 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
             select=acc_select,
             # suffix argument removed
             rename={"2025 Overall Rating": "overall_rating_2025"},
-            aliases={"overall_rating_2025": "rating"},  # also write to canonical District.rating
-            reader_kwargs={"sheet_name": '2011-2025 Summary'},  # first worksheet
-            transforms={"overall_rating_2025": lambda s: (None if (pd.isna(s) or (isinstance(s, str) and s.strip()=="")) else str(s).strip())},
+            aliases={
+                "overall_rating_2025": "rating"
+            },  # also write to canonical District.rating
+            reader_kwargs={"sheet_name": "2011-2025 Summary"},  # first worksheet
+            transforms={
+                "overall_rating_2025": lambda s: (
+                    None
+                    if (pd.isna(s) or (isinstance(s, str) and s.strip() == ""))
+                    else str(s).strip()
+                )
+            },
         )
         print(f"Enriched {updated} districts from accountability {acc_year}")
         # One-off confirmation for Aldine
         try:
-            aldine = next(d for d in repo._districts.values() if str(getattr(d, 'district_number', '')).lstrip("'`’") == '101902')
+            aldine = next(
+                d
+                for d in repo._districts.values()
+                if str(getattr(d, "district_number", "")).lstrip("'`’") == "101902"
+            )
             enr = getattr(aldine, "overall_rating_2025", None)
             if enr is None:
                 enr = getattr(aldine, "meta", {}).get("overall_rating_2025")
-            print("[enrich:accountability] final Aldine:", enr, getattr(aldine, "rating", None))
+            print(
+                "[enrich:accountability] final Aldine:",
+                enr,
+                getattr(aldine, "rating", None),
+            )
         except Exception:
             pass
     except Exception as e:
@@ -719,7 +825,10 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
     try:
         cam_select = ["overall_rating_2025"]
         cam_year, cam_updated = enrich_campuses_from_config(
-            repo, CFG, "accountability", YEAR,
+            repo,
+            CFG,
+            "accountability",
+            YEAR,
             select=cam_select,
             rename={"2025 Overall Rating": "overall_rating_2025"},
             aliases={"overall_rating_2025": "rating"},
@@ -734,8 +843,8 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
 
 
 if __name__ == "__main__":
-    districts_fp = "shapes/Current_Districts_2025.geojson"
-    campuses_fp = "shapes/Schools_2024_to_2025.geojson"
+    districts_fp = "data/shapes/Current_Districts_2025.geojson"
+    campuses_fp = "data/shapes/Schools_2024_to_2025.geojson"
 
     repo = load_repo(districts_fp, campuses_fp)
 
@@ -745,18 +854,22 @@ if __name__ == "__main__":
 
     # Example usage
     some_district = next(iter(repo._districts.values()))
-    print("Example district:", some_district.name, getattr(some_district, "district_number"))
+    print(
+        "Example district:",
+        some_district.name,
+        getattr(some_district, "district_number"),
+    )
     campuses = repo.campuses_in(some_district)
     print("Campuses in district:", [c.name for c in campuses])
 
     # 2) Pick a district (by name or district_number)
     #    (simple examples; replace with your own search logic)
     # dist = next(d for d in repo._districts.values() if d.name.upper() == "ALDINE ISD")
-    dist_q = repo >> ("district", "ALDINE ISD")   # returns a chainable Query
+    dist_q = repo >> ("district", "ALDINE ISD")  # returns a chainable Query
 
     print(dist_q.name)
 
-    dist = dist_q.first()                         # unwrap the District object
+    dist = dist_q.first()  # unwrap the District object
     print(dist.overall_rating_2025)
     charters = repo >> ("charters_within", dist)  # returns a Query of campuses
 
@@ -769,14 +882,21 @@ if __name__ == "__main__":
     # 4) Work with the results
     print(f"{dist.name}: {len(charters)} charter campuses inside boundary")
     for c in sorted(charters, key=lambda x: x.name):
-        print(f" - {c.name}, {c.campus_number} (type: {c.charter_type}, enrollment: {c.enrollment}, rating: {c.rating})")
+        print(
+            f" - {c.name}, {c.campus_number} (type: {c.charter_type}, enrollment: {c.enrollment}, rating: {c.rating})"
+        )
 
     # Show enriched attributes (if present)
     _enr = getattr(dist, "overall_rating_2025", None)
     if _enr is None:
         _enr = getattr(dist, "meta", {}).get("overall_rating_2025")
     if _enr is not None:
-        print("Enriched (accountability):", _enr, "| canonical rating:", getattr(dist, "rating", None))
+        print(
+            "Enriched (accountability):",
+            _enr,
+            "| canonical rating:",
+            getattr(dist, "rating", None),
+        )
 
     # Sanity probe: ensure fast equals slow for Aldine
     sanity_probe_charters(repo, "ALDINE ISD")
@@ -794,34 +914,51 @@ if __name__ == "__main__":
     print(charter.name)
 
     # 4) Top 3 nearest charter campuses within 7 miles
-    charters_3 = repo.nearest_campuses(-95.3698, 29.7604, limit=3, charter_only=True, max_miles=7)
+    charters_3 = repo.nearest_campuses(
+        -95.3698, 29.7604, limit=3, charter_only=True, max_miles=7
+    )
 
     # 5) Using the >> operator
-    d1 = repo >> ("nearest", (-95.3698, 29.7604))                  # one campus
-    d3 = repo >> ("nearest", (-95.3698, 29.7604), 3, 10)           # top 3 within 10 miles
-    dc = repo >> ("nearest_charter", (-95.3698, 29.7604), 5, 15)   # top 5 charters within 15 miles
+    d1 = repo >> ("nearest", (-95.3698, 29.7604))  # one campus
+    d3 = repo >> ("nearest", (-95.3698, 29.7604), 3, 10)  # top 3 within 10 miles
+    dc = repo >> (
+        "nearest_charter",
+        (-95.3698, 29.7604),
+        5,
+        15,
+    )  # top 5 charters within 15 miles
 
     # 5 nearest charter campuses within 200 miles of arbitrary Aldine ISD campus,
     # rated "" and enrollment > 200, sorted by enrollment desc,
     # then return just names and enrollment.
     dist = repo >> ("district", "ALDINE ISD")
-    result = (repo
-              >> ("nearest_charter", repo.campuses_in(dist)[0].coords, 200, 200)
-              >> ("filter", lambda c: (c.rating or "").startswith("") and (c.enrollment or 0) > 200)
-              >> ("sort", lambda c: c.enrollment, True)
-              >> ("take", 5)
-              >> ("map", lambda c: (c.name, c.enrollment)))
+    result = (
+        repo
+        >> ("nearest_charter", repo.campuses_in(dist)[0].coords, 200, 200)
+        >> (
+            "filter",
+            lambda c: (c.rating or "").startswith("") and (c.enrollment or 0) > 200,
+        )
+        >> ("sort", lambda c: c.enrollment, True)
+        >> ("take", 5)
+        >> ("map", lambda c: (c.name, c.enrollment))
+    )
 
     print(result)
 
-    result = (repo
-              >> ("district", "ALDINE ISD")
-              >> ("campuses_in", )
-              >> ("nearest_charter", None, 200, 25)       # infer centroid or seed coords
-              >> ("where", lambda c: (c.rating or "").startswith("") and (c.enrollment or 0) > 200)
-              >> ("sort", lambda c: c.enrollment, True)
-              >> ("take", 5)
-              >> ("select", lambda c: (c.name, c.enrollment)))
+    result = (
+        repo
+        >> ("district", "ALDINE ISD")
+        >> ("campuses_in",)
+        >> ("nearest_charter", None, 200, 25)  # infer centroid or seed coords
+        >> (
+            "where",
+            lambda c: (c.rating or "").startswith("") and (c.enrollment or 0) > 200,
+        )
+        >> ("sort", lambda c: c.enrollment, True)
+        >> ("take", 5)
+        >> ("select", lambda c: (c.name, c.enrollment))
+    )
     print(result)
 
     dist_q = repo >> ("district", "ALDINE ISD")  # Query[District]
@@ -832,9 +969,12 @@ if __name__ == "__main__":
     if val_unsuffixed is None:
         val_unsuffixed = getattr(dist_q, "meta", {}).get("overall_rating_2025")
     val_canonical = getattr(dist_q, "rating", None)
-    print("(info) enriched rating:", val_unsuffixed, "| canonical rating:", val_canonical)
+    print(
+        "(info) enriched rating:", val_unsuffixed, "| canonical rating:", val_canonical
+    )
 
     centroid = dist_q.polygon.centroid  # ✅ methods/attributes chain through
     first_campus = (dist_q >> ("campuses_in",))[0]  # __getitem__ for indexing
-    if dist_q: ...  # __bool__ reflects non-empty
+    if dist_q:
+        ...  # __bool__ reflects non-empty
     print(first_campus.rating)  # readable __repr__

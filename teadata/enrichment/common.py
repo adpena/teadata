@@ -1,5 +1,6 @@
 import pandas as pd
 
+
 def pick_sheet_with_columns(df, expected_cols: set[str]):
     if isinstance(df, dict):  # already a sheet_name=None read
         for name, dfi in df.items():
@@ -9,6 +10,7 @@ def pick_sheet_with_columns(df, expected_cols: set[str]):
         name, dfi = next(iter(df.items()))
         return dfi, name
     return df, None
+
 
 def prepare_columns(df, *, rename=None, select=None, transforms=None):
     if rename:
@@ -20,7 +22,13 @@ def prepare_columns(df, *, rename=None, select=None, transforms=None):
     for c in cols:
         s = df[c]
         if s.dtype == object:
-            df[c] = s.map(lambda x: None if (x is None or (isinstance(x, str) and x.strip()=="")) else (x.strip() if isinstance(x, str) else x))
+            df[c] = s.map(
+                lambda x: (
+                    None
+                    if (x is None or (isinstance(x, str) and x.strip() == ""))
+                    else (x.strip() if isinstance(x, str) else x)
+                )
+            )
     if transforms:
         for k, fn in transforms.items():
             if k in df.columns:

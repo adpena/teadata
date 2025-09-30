@@ -1,0 +1,22 @@
+# .github/workflows/ci.yml
+name: CI
+
+on:
+  push: {branches: [main]}
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: pip install -e .[dev]
+      - run: python -c "import shapely, sys; print(shapely.__version__); assert shapely.__version__.split('.')[0] == '2'"
+      - run: deptry .
+      - run: pytest -q

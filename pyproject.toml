@@ -1,0 +1,77 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "teadata"
+version = "0.0.1"
+description = "Pythonic data engine for Texas education datasets"
+authors = [{name="Alejandro Peña", email="adpena@gmail.com"}]
+readme = "README.md"
+license = {file = "LICENSE"}
+dependencies = [
+    "python-dateutil>=2.8.2",
+    "numpy>=1.26",
+    "pandas>=2.1",
+    "shapely>=2.0",
+    "geopandas>=0.14",
+    "pyogrio>=0.7",
+    "pyyaml>=6.0",
+    "openpyxl>=3.1",
+    "duckdb>=0.10",
+    "pyarrow>=14.0",
+    "packaging>=23.2",
+    "scipy>=1.10",
+]
+requires-python = ">=3.11"
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Scientific/Engineering :: GIS",
+]
+
+[project.optional-dependencies]
+# Faster I/O / performance add-ons
+speedups = [
+    "pyogrio>=0.7",
+    "pygeos; python_version<'3.11'",  # no-op on modern, left for legacy envs
+]
+
+# Development tooling
+dev = [
+    "ruff>=0.5",
+    "mypy>=1.8",
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "pip-tools>=7.4",
+    "pip-audit>=2.7",
+    "deptry>=0.16",
+]
+
+[project.scripts]
+teadata-config = "teadata_config:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["teadata*"]
+exclude = ["tests*", "docs*", "examples*"]
+
+[project.urls]
+"Homepage" = "https://github.com/adpena/teadata"
+"Bug Tracker" = "https://github.com/adpena/teadata/issues"
+
+[tool.deptry]
+# Optional: folders to skip
+exclude = ["tests", "docs", "examples"]
+
+# Per-rule ignores by code
+[tool.deptry.per_rule_ignores]
+DEP002 = ["openpyxl", "pyogrio", "pyarrow", "pygeos", "ruff", "mypy", "pytest", "pytest-cov", "pip-tools", "pip-audit", "deptry", "python-dateutil"]
+DEP003 = ["scipy"]

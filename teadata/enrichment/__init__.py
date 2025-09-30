@@ -1,6 +1,8 @@
 from typing import Callable, Dict, Literal, Any
 from .base import Enricher
+
 _registry: Dict[str, Enricher] = {}
+
 
 def enricher(name: str):
     def wrap(cls):
@@ -8,9 +10,13 @@ def enricher(name: str):
             raise TypeError("enricher must extend Enricher")
         _registry[name] = cls()
         return cls
+
     return wrap
 
-def run_enrichment(repo, cfg_path: str, year: int, *, datasets: list[str] | None = None):
+
+def run_enrichment(
+    repo, cfg_path: str, year: int, *, datasets: list[str] | None = None
+):
     # If datasets is None, run all registered
     selected = datasets or list(_registry.keys())
     stats = {}

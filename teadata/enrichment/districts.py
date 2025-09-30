@@ -28,7 +28,9 @@ def _apply_district_accountability(
     reader_kwargs=None,
 ):
     cfg = load_config(cfg_path)
-    resolved_year, df = cfg.load_df(dataset, year, section="data_sources", **(reader_kwargs or {}))
+    resolved_year, df = cfg.load_df(
+        dataset, year, section="data_sources", **(reader_kwargs or {})
+    )
 
     # Rename spreadsheet headers to pythonic names
     if rename:
@@ -46,10 +48,19 @@ def _apply_district_accountability(
         use_cols = [c for c in select if c in df.columns]
     for c in use_cols:
         if c in df.columns:
-            df[c] = df[c].apply(lambda x: (None if (pd.isna(x) or (isinstance(x, str) and x.strip()=="")) else (x.strip() if isinstance(x, str) else x)))
+            df[c] = df[c].apply(
+                lambda x: (
+                    None
+                    if (pd.isna(x) or (isinstance(x, str) and x.strip() == ""))
+                    else (x.strip() if isinstance(x, str) else x)
+                )
+            )
 
     sub = df[["district_number"] + use_cols].drop_duplicates("district_number")
-    mapping = {str(r.district_number).lstrip("'`’"): {k: getattr(r, k) for k in use_cols} for r in sub.itertuples(index=False)}
+    mapping = {
+        str(r.district_number).lstrip("'`’"): {k: getattr(r, k) for k in use_cols}
+        for r in sub.itertuples(index=False)
+    }
 
     updated = 0
     for d in repo._districts.values():

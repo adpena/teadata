@@ -4,25 +4,87 @@ from functools import lru_cache, cached_property, singledispatchmethod, wraps
 from typing import Iterable, List, Dict, Optional, Any, Callable, Tuple
 from contextlib import contextmanager
 from collections import defaultdict
+from types import MappingProxyType
 from datetime import date
 import math
 import time
 import uuid
+from pathlib import Path
+import os
+import pickle
+import io
+
+try:
+    from platformdirs import user_cache_dir  # type: ignore
+except Exception:
+    user_cache_dir = None  # optional; we can still work without it
+
+
+# --- Backward-compatible unpickling (remap old module paths like "classes" -> current module) ---
+class _ModuleMappingUnpickler(pickle.Unpickler):
+    """
+    An Unpickler that remaps legacy module names to the current module path
+    so that older snapshots created when this file lived at top-level 'classes.py'
+    can still be loaded after packaging as 'teadata.classes'.
+    """
+
+    def __init__(self, file, module_map: dict[str, str] | None = None):
+        super().__init__(file)
+        self._module_map = module_map or {}
+
+    def find_class(self, module, name):
+        remapped = self._module_map.get(module, module)
+        return super().find_class(remapped, name)
+
+
+def _compat_pickle_load(fobj) -> object:
+    """
+    Try a normal pickle.load first. If it fails with ModuleNotFoundError due to moved modules,
+    retry using _ModuleMappingUnpickler remapping legacy names (e.g., 'classes' -> current module).
+    """
+    try:
+        return pickle.load(fobj)
+    except ModuleNotFoundError as e:
+        # Rewind and retry with mapping
+        try:
+            # If fobj is a real file, seek; else, copy into BytesIO
+            try:
+                fobj.seek(0)
+                bio = fobj  # type: ignore
+            except Exception:
+                data = fobj.read()
+                bio = io.BytesIO(data)
+            current_mod = __name__  # e.g., 'teadata.classes'
+            module_map = {
+                "classes": current_mod,  # old snapshots pickled with top-level classes.py
+                "__main__": current_mod,  # some scripts pickle while running as __main__
+            }
+            return _ModuleMappingUnpickler(bio, module_map).load()
+        except Exception as ee:
+            raise ee from e
+
 
 # Global profiling flag for timeit decorator
 ENABLE_PROFILING = False
 
 # --------- Optional Shapely support (falls back to pure-Python) ---------
 try:
-    from shapely.geometry import Point as ShapelyPoint, Polygon as ShapelyPolygon, MultiPolygon
+    from shapely.geometry import (
+        Point as ShapelyPoint,
+        Polygon as ShapelyPolygon,
+        MultiPolygon,
+    )
+
     SHAPELY = True
 except Exception:
     SHAPELY = False
 
 # --------- Utilities ---------
 
+
 def timeit(func: Callable):
     """Decorator: log how long the function took (example of AOP-style concern)."""
+
     @wraps(func)
     def wrapper(*args, **kwargs):
         t0 = time.perf_counter()
@@ -31,36 +93,49 @@ def timeit(func: Callable):
         if ENABLE_PROFILING:
             print(f"[timeit] {func.__name__} took {dt:.2f} ms")
         return out
+
     return wrapper
+
 
 def validate_non_empty_str(name: str):
     """Decorator factory: enforce non-empty string attribute on __post_init__."""
+
     def deco(cls):
         orig_post = getattr(cls, "__post_init__", None)
+
         @wraps(orig_post)
         def post(self):
             if not getattr(self, name) or not isinstance(getattr(self, name), str):
                 raise ValueError(f"{cls.__name__}.{name} must be a non-empty string")
             if orig_post:
                 orig_post(self)
+
         cls.__post_init__ = post
         return cls
+
     return deco
+
 
 # --------- Minimal geometry helpers (when Shapely is absent) ---------
 
-def point_in_polygon(point: Tuple[float, float], polygon: List[Tuple[float, float]]) -> bool:
+
+def point_in_polygon(
+    point: Tuple[float, float], polygon: List[Tuple[float, float]]
+) -> bool:
     """Ray casting algorithm. polygon is list of (x,y), point is (x,y)."""
     x, y = point
     inside = False
     n = len(polygon)
     for i in range(n):
         x1, y1 = polygon[i]
-        x2, y2 = polygon[(i+1) % n]
+        x2, y2 = polygon[(i + 1) % n]
         # check edges that straddle the horizontal ray
-        if ((y1 > y) != (y2 > y)) and (x < (x2 - x1) * (y - y1) / ((y2 - y1) or 1e-12) + x1):
+        if ((y1 > y) != (y2 > y)) and (
+            x < (x2 - x1) * (y - y1) / ((y2 - y1) or 1e-12) + x1
+        ):
             inside = not inside
     return inside
+
 
 def polygon_area(polygon: List[Tuple[float, float]]) -> float:
     """Shoelace formula."""
@@ -69,9 +144,11 @@ def polygon_area(polygon: List[Tuple[float, float]]) -> float:
         area += x1 * y2 - x2 * y1
     return abs(area) / 2.0
 
+
 def euclidean(a: Tuple[float, float], b: Tuple[float, float]) -> float:
     (x1, y1), (x2, y2) = a, b
     return math.hypot(x2 - x1, y2 - y1)
+
 
 # --------- Geodesic helper (miles) ---------
 def haversine_miles(x1: float, y1: float, x2: float, y2: float) -> float:
@@ -80,13 +157,15 @@ def haversine_miles(x1: float, y1: float, x2: float, y2: float) -> float:
     x = longitude, y = latitude (degrees).
     """
     from math import radians, sin, cos, sqrt, atan2
+
     R = 3958.7613  # Earth radius in miles
     lon1, lat1, lon2, lat2 = map(radians, (x1, y1, x2, y2))
     dlon = lon2 - lon1
     dlat = lat2 - lat1
-    a = sin(dlat/2)**2 + cos(lat1) * cos(lat2) * sin(dlon/2)**2
+    a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
     c = 2 * atan2(sqrt(a), sqrt(1 - a))
     return R * c
+
 
 def _point_xy(pt: Any) -> Tuple[float, float] | None:
     """
@@ -100,18 +179,26 @@ def _point_xy(pt: Any) -> Tuple[float, float] | None:
             return (pt.x, pt.y)
         except Exception:
             pass
-    if isinstance(pt, tuple) and len(pt) == 2 and all(isinstance(v, (int, float)) for v in pt):
+    if (
+        isinstance(pt, tuple)
+        and len(pt) == 2
+        and all(isinstance(v, (int, float)) for v in pt)
+    ):
         return (float(pt[0]), float(pt[1]))
     return None
+
 
 def _probably_lonlat(x: float, y: float) -> bool:
     # crude heuristic: lon in [-180, 180], lat in [-90, 90]
     return -180.0 <= x <= 180.0 and -90.0 <= y <= 90.0
 
+
 # --------- Descriptor to enforce "geometry-like" fields ---------
+
 
 class GeoField:
     """Descriptor that accepts a Shapely geometry or pure-Python fallback types."""
+
     def __init__(self, geom_type: str):
         self.geom_type = geom_type
         self.private_name = None
@@ -128,19 +215,26 @@ class GeoField:
         # Accept Shapely or tuples/lists
         if self.geom_type == "point":
             ok = (SHAPELY and isinstance(value, ShapelyPoint)) or (
-                isinstance(value, tuple) and len(value) == 2 and all(isinstance(v, (int, float)) for v in value)
+                isinstance(value, tuple)
+                and len(value) == 2
+                and all(isinstance(v, (int, float)) for v in value)
             )
         elif self.geom_type == "polygon":
             ok = (SHAPELY and isinstance(value, (ShapelyPolygon, MultiPolygon))) or (
-                isinstance(value, list) and all(isinstance(p, tuple) and len(p) == 2 for p in value)
+                isinstance(value, list)
+                and all(isinstance(p, tuple) and len(p) == 2 for p in value)
             )
         else:
             ok = False
         if not ok:
-            raise TypeError(f"Invalid {self.geom_type} geometry for {obj.__class__.__name__}")
+            raise TypeError(
+                f"Invalid {self.geom_type} geometry for {obj.__class__.__name__}"
+            )
         setattr(obj, self.private_name, value)
 
+
 # --------- Domain Models ---------
+
 
 @validate_non_empty_str("name")
 @dataclass(slots=True)
@@ -151,7 +245,9 @@ class District:
     district_number: str = field(default="")
     aea: Optional[bool] = None
     rating: Optional[str] = None
-    boundary: Any = field(default=None, repr=False)  # handled by GeoField descriptor below
+    boundary: Any = field(
+        default=None, repr=False
+    )  # handled by GeoField descriptor below
     _polygon: Any = field(init=False, repr=False, default=None)
     _prepared: Any = field(default=None, init=False, repr=False, compare=False)
 
@@ -160,6 +256,7 @@ class District:
 
     # Arbitrary enrichment payload (columns we don’t model explicitly)
     meta: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
+    _repo: "DataEngine" = field(default=None, repr=False, compare=False)
 
     def __post_init__(self):
         # route boundary to descriptor-backed 'polygon' for validation
@@ -186,7 +283,9 @@ class District:
         if SHAPELY:
             return self.polygon.intersection(other.polygon).area
         # crude: approximate overlap via polygon area if identical; else 0 (no robust poly clipping here)
-        return polygon_area(list(self.polygon)) if self.polygon == other.polygon else 0.0
+        return (
+            polygon_area(list(self.polygon)) if self.polygon == other.polygon else 0.0
+        )
 
     def __or__(self, other: "District") -> float:
         """Union area (handy for Jaccard-like indices)."""
@@ -231,6 +330,18 @@ class District:
             return self.polygon.area
         return polygon_area(list(self.polygon))
 
+    @property
+    def campuses(self) -> list["Campus"]:
+        """
+        All campuses whose district_id == this district's id, using the engine's index.
+        Returns an empty list if the district is not attached to a DataEngine.
+        """
+        repo = getattr(self, "_repo", None)
+        if repo is None:
+            return []
+        ids = repo._campuses_by_district.get(self.id, [])
+        return [repo._campuses[cid] for cid in ids]
+
     # --------- Prepared polygon for fast point-in-polygon checks (Shapely only) ---------
     if SHAPELY:
         from shapely.prepared import prep as shapely_prep  # type: ignore
@@ -266,6 +377,7 @@ class District:
             base.extend(k for k in m.keys() if isinstance(k, str))
         return sorted(set(base))
 
+
 @validate_non_empty_str("name")
 @dataclass(slots=True)
 class Campus:
@@ -288,7 +400,9 @@ class Campus:
 
     _repo: "DataEngine" = field(default=None, repr=False, compare=False)
 
-    location: Any = field(default=None, repr=False)  # handled by GeoField descriptor below
+    location: Any = field(
+        default=None, repr=False
+    )  # handled by GeoField descriptor below
     _point: Any = field(init=False, repr=False, default=None)
 
     point = GeoField("point")
@@ -302,14 +416,14 @@ class Campus:
 
     def __getattr__(self, name: str):
         # Allow dot-access for enrichment fields stored in meta
-        meta = object.__getattribute__(self, 'meta')
+        meta = object.__getattribute__(self, "meta")
         if isinstance(meta, dict) and name in meta:
             return meta[name]
         raise AttributeError(f"{self.__class__.__name__} has no attribute {name!r}")
 
     def __dir__(self):
         base = list(super().__dir__())
-        m = object.__getattribute__(self, 'meta')
+        m = object.__getattribute__(self, "meta")
         if isinstance(m, dict):
             base.extend(k for k in m.keys() if isinstance(k, str))
         return sorted(set(base))
@@ -354,10 +468,13 @@ class Campus:
             return self.point.distance(ShapelyPoint(*other))
         return euclidean(self.point, other)
 
+
 # Register the Campus-specific overload *after* the class is created to avoid
 # forward-reference issues with singledispatchmethod on Python 3.12.
 Campus.distance_to.register(Campus)(Campus._distance_to_campus)
 
+
+# --------- Helper: unwrap Query to its first item ---------
 # --------- Helper: unwrap Query to its first item ---------
 def _unwrap_query(obj: Any) -> Any:
     """
@@ -372,12 +489,98 @@ def _unwrap_query(obj: Any) -> Any:
         pass
     return obj
 
+
+# --------- Snapshot discovery helpers ---------
+def _iter_parents(start: Path):
+    """Yield start and its parents up to filesystem root."""
+    cur = start.resolve()
+    yielded = set()
+    while True:
+        if cur in yielded:
+            break
+        yielded.add(cur)
+        yield cur
+        if cur.parent == cur:
+            break
+        cur = cur.parent
+
+
+def _newest_pickle(folder: Path) -> Optional[Path]:
+    try:
+        if not folder.exists() or not folder.is_dir():
+            return None
+        picks = list(folder.glob("*.pkl"))
+        if not picks:
+            return None
+        picks.sort(key=lambda pp: pp.stat().st_mtime, reverse=True)
+        return picks[0]
+    except Exception:
+        return None
+
+
+def _discover_snapshot(explicit: str | Path | None = None) -> Optional[Path]:
+    """
+    Find a .pkl snapshot to bootstrap the repo, searching in this priority order:
+      1) explicit path argument
+      2) TEADATA_SNAPSHOT environment variable
+      3) the package's own '.cache' directory (inner library dir)
+      4) .cache/*.pkl in CWD and its parents (repo-root style)
+      5) platform-specific user cache dir (platformdirs), if available
+
+    The “inner library dir” is resolved from this module file:
+        Path(__file__).resolve().parent / ".cache"
+    This is prioritized so that when the package includes its own snapshot,
+    it is selected over any older copies in the outer repo directory.
+    """
+    # 1) explicit argument
+    if explicit:
+        p = Path(explicit)
+        if p.exists() and p.is_file():
+            return p
+
+    # 2) environment variable
+    env = os.environ.get("TEADATA_SNAPSHOT")
+    if env:
+        p = Path(env)
+        if p.exists() and p.is_file():
+            return p
+
+    # 3) package (inner library) .cache first
+    try:
+        package_dir = Path(__file__).resolve().parent
+        pkg_cache = package_dir / ".cache"
+        p = _newest_pickle(pkg_cache)
+        if p is not None:
+            return p
+    except Exception:
+        pass
+
+    # 4) walk up from CWD for .cache/*.pkl
+    for base in _iter_parents(Path.cwd()):
+        p = _newest_pickle(base / ".cache")
+        if p is not None:
+            return p
+
+    # 5) user cache dir (platformdirs)
+    if user_cache_dir:
+        try:
+            ucache = Path(user_cache_dir("teadata", "adpena"))
+            p = _newest_pickle(ucache)
+            if p is not None:
+                return p
+        except Exception:
+            pass
+
+    return None
+
+
 # --------- Chainable query wrapper for repo results ---------
 class Query:
     """
     Lightweight, chainable view over a list of repo objects (Districts/Campuses).
     Enables: repo >> ("nearest_charter", (x,y), 200, 25) >> ("filter", pred) >> ("take", 5)
     """
+
     def __init__(self, items: List[Any], repo: "DataEngine"):
         self._items = list(items)
         self._repo = repo
@@ -404,7 +607,9 @@ class Query:
         Enables: dist_q.name, dist_q.polygon, dist_q.some_method(...)
         """
         if not self._items:
-            raise AttributeError(f"'Query' object has no attribute '{name}' (empty result set)")
+            raise AttributeError(
+                f"'Query' object has no attribute '{name}' (empty result set)"
+            )
         return getattr(self._items[0], name)
 
     def __getitem__(self, idx: int) -> Any:
@@ -496,12 +701,14 @@ class Query:
         # New: distinct operator
         if key == "distinct":
             keyfunc = op[1]
-            seen = set(); out = []
+            seen = set()
+            out = []
             for o in self._items:
                 k = keyfunc(o)
                 if k in seen:
                     continue
-                seen.add(k); out.append(o)
+                seen.add(k)
+                out.append(o)
             self._items = out
             return self
 
@@ -510,7 +717,7 @@ class Query:
             coords = op[1] if len(op) >= 2 else None
             n = int(op[2]) if len(op) >= 3 else 1
             max_m = float(op[3]) if len(op) >= 4 and op[3] is not None else None
-            charter = (key == "nearest_charter")
+            charter = key == "nearest_charter"
 
             # Infer coordinates if None:
             if coords is None and self._items:
@@ -521,14 +728,28 @@ class Query:
                     if xy:
                         coords = xy
                 # Try District centroid (Shapely)
-                elif hasattr(seed, "polygon") and seed.polygon is not None and SHAPELY and hasattr(seed.polygon, "centroid"):
+                elif (
+                    hasattr(seed, "polygon")
+                    and seed.polygon is not None
+                    and SHAPELY
+                    and hasattr(seed.polygon, "centroid")
+                ):
                     cent = seed.polygon.centroid
                     coords = (cent.x, cent.y)
 
             if coords is None:
-                raise ValueError("nearest/nearest_charter requires coordinates or a seed item with geometry in the chain")
+                raise ValueError(
+                    "nearest/nearest_charter requires coordinates or a seed item with geometry in the chain"
+                )
 
-            items = self._repo.nearest_campuses(coords[0], coords[1], limit=n, charter_only=charter, max_miles=max_m, geodesic=True)
+            items = self._repo.nearest_campuses(
+                coords[0],
+                coords[1],
+                limit=n,
+                charter_only=charter,
+                max_miles=max_m,
+                geodesic=True,
+            )
             self._items = items
             return self
 
@@ -547,10 +768,14 @@ class Query:
             # Resolve polygon geometry
             poly = None
             if target is not None:
-                poly = getattr(target, "polygon", None) or getattr(target, "boundary", None)
+                poly = getattr(target, "polygon", None) or getattr(
+                    target, "boundary", None
+                )
 
             if poly is None:
-                raise ValueError("within requires a polygon/district target or a District earlier in the chain")
+                raise ValueError(
+                    "within requires a polygon/district target or a District earlier in the chain"
+                )
 
             # If current items are empty, source candidates smartly using STRtree (Shapely 2.x) or bbox
             items: List[Any] = []
@@ -561,7 +786,9 @@ class Query:
                 self._repo._ensure_point_strtree()
                 if self._repo._point_tree is not None:
                     try:
-                        idxs = self._repo._point_tree.query(poly, predicate="covers", return_indices=True)
+                        idxs = self._repo._point_tree.query(
+                            poly, predicate="covers", return_indices=True
+                        )
                         if isinstance(idxs, tuple):
                             _, idxs = idxs
                         idxs = list(map(int, idxs)) if idxs is not None else []
@@ -589,10 +816,19 @@ class Query:
                 if loc is None:
                     continue
                 try:
-                    ok = (poly.covers(loc) if SHAPELY else False) if covers or True else (loc.within(poly) if SHAPELY else False)
+                    ok = (
+                        (poly.covers(loc) if SHAPELY else False)
+                        if covers or True
+                        else (loc.within(poly) if SHAPELY else False)
+                    )
                 except Exception:
                     ok = False
-                if not SHAPELY and isinstance(poly, list) and isinstance(loc, tuple) and len(loc) == 2:
+                if (
+                    not SHAPELY
+                    and isinstance(poly, list)
+                    and isinstance(loc, tuple)
+                    and len(loc) == 2
+                ):
                     ok = point_in_polygon(loc, poly)
                 if ok:
                     items.append(c)
@@ -612,7 +848,9 @@ class Query:
                     except Exception:
                         pass
                 if ENABLE_PROFILING:
-                    print(f"[sanity] Query>>within fast=0 slow={len(slow)} — using {'slow' if slow else 'fast'} path")
+                    print(
+                        f"[sanity] Query>>within fast=0 slow={len(slow)} — using {'slow' if slow else 'fast'} path"
+                    )
                 if slow:
                     items = slow
 
@@ -633,14 +871,23 @@ class Query:
                     xy = _point_xy(seed.point)
                     if xy:
                         coords = xy
-                elif hasattr(seed, "polygon") and seed.polygon is not None and SHAPELY and hasattr(seed.polygon, "centroid"):
+                elif (
+                    hasattr(seed, "polygon")
+                    and seed.polygon is not None
+                    and SHAPELY
+                    and hasattr(seed.polygon, "centroid")
+                ):
                     cent = seed.polygon.centroid
                     coords = (cent.x, cent.y)
 
             if coords is None:
-                raise ValueError("radius requires coordinates or a seed item with geometry in the chain")
+                raise ValueError(
+                    "radius requires coordinates or a seed item with geometry in the chain"
+                )
 
-            items = self._repo.radius_campuses(coords[0], coords[1], miles, charter_only=charter_only, limit=limit)
+            items = self._repo.radius_campuses(
+                coords[0], coords[1], miles, charter_only=charter_only, limit=limit
+            )
             self._items = items
             return self
 
@@ -656,23 +903,446 @@ class Query:
                     xy = _point_xy(seed.point)
                     if xy:
                         coords = xy
-                elif hasattr(seed, "polygon") and seed.polygon is not None and SHAPELY and hasattr(seed.polygon, "centroid"):
+                elif (
+                    hasattr(seed, "polygon")
+                    and seed.polygon is not None
+                    and SHAPELY
+                    and hasattr(seed.polygon, "centroid")
+                ):
                     cent = seed.polygon.centroid
                     coords = (cent.x, cent.y)
 
             if coords is None:
-                raise ValueError("knn requires coordinates or a seed item with geometry in the chain")
+                raise ValueError(
+                    "knn requires coordinates or a seed item with geometry in the chain"
+                )
 
-            items = self._repo.knn_campuses(coords[0], coords[1], k, charter_only=charter_only)
+            items = self._repo.knn_campuses(
+                coords[0], coords[1], k, charter_only=charter_only
+            )
             self._items = items
             return self
 
         raise ValueError(f"Unsupported Query op: {op!r}")
 
+
 # --------- Repository with expressive operators ---------
 
+
 class DataEngine:
-    def __init__(self):
+    def _as_district(self, v):
+        """
+        Coerce v to a District instance if possible.
+        Handles District, dict, or foreign class with attributes.
+        Guarantees a non-empty name by deriving from common fields or using a fallback.
+        """
+
+        def _coerce_uuid_safe(x):
+            try:
+                return (
+                    uuid.UUID(x)
+                    if (x is not None and not isinstance(x, uuid.UUID))
+                    else x
+                )
+            except Exception:
+                return uuid.uuid4()
+
+        def _derive_name_from_dict(m: dict) -> Optional[str]:
+            for key in (
+                "name",
+                "district_name",
+                "DISTNAME",
+                "District",
+                "DISTRICT",
+                "DISTRICT_NAME",
+            ):
+                val = m.get(key)
+                if isinstance(val, str) and val.strip():
+                    return val.strip()
+            meta = m.get("meta")
+            if isinstance(meta, dict):
+                for key in ("name", "district_name", "DISTNAME"):
+                    val = meta.get(key)
+                    if isinstance(val, str) and val.strip():
+                        return val.strip()
+            return None
+
+        def _derive_name_from_obj(obj) -> Optional[str]:
+            candidates = [
+                getattr(obj, "name", None),
+                getattr(obj, "district_name", None),
+                getattr(obj, "DISTNAME", None),
+            ]
+            meta = getattr(obj, "meta", None)
+            if isinstance(meta, dict):
+                candidates.extend(
+                    [meta.get("name"), meta.get("district_name"), meta.get("DISTNAME")]
+                )
+            for val in candidates:
+                if isinstance(val, str) and val.strip():
+                    return val.strip()
+            return None
+
+        # 1) Already a District
+        if isinstance(v, District):
+            # Ensure the name isn't empty; fix-up in place if needed
+            if not (isinstance(v.name, str) and v.name.strip()):
+                dn = getattr(v, "district_number", None)
+                v.name = f"Unknown District {dn or v.id}"
+            return v
+
+        # 2) Mapping input
+        if isinstance(v, dict):
+            id_ = _coerce_uuid_safe(v.get("id"))
+            dn = (
+                v.get("district_number")
+                or v.get("cdn")
+                or v.get("CDN")
+                or v.get("District Number")
+            )
+            name = _derive_name_from_dict(v) or f"Unknown District {dn or id_}"
+            enrollment = v.get("enrollment") or 0
+            aea = v.get("aea")
+            rating = v.get("rating")
+            # Accept either 'polygon' or 'boundary' for geometry; pass None if absent
+            boundary = v.get("polygon", v.get("boundary"))
+            meta = v.get("meta", {}) if isinstance(v.get("meta", {}), dict) else {}
+            return District(
+                id=id_,
+                name=name,
+                enrollment=(
+                    int(enrollment) if isinstance(enrollment, (int, float)) else 0
+                ),
+                district_number=dn or "",
+                aea=aea,
+                rating=rating,
+                boundary=boundary,
+                meta=meta,
+            )
+
+        # 3) Foreign object with attributes
+        id_ = _coerce_uuid_safe(getattr(v, "id", None))
+        dn = (
+            getattr(v, "district_number", None)
+            or getattr(v, "cdn", None)
+            or getattr(v, "CDN", None)
+        )
+        name = _derive_name_from_obj(v) or f"Unknown District {dn or id_}"
+        enrollment = getattr(v, "enrollment", 0) or 0
+        aea = getattr(v, "aea", None)
+        rating = getattr(v, "rating", None)
+        boundary = (
+            getattr(v, "polygon", None)
+            or getattr(v, "boundary", None)
+            or getattr(v, "geometry", None)
+        )
+        meta = (
+            getattr(v, "meta", {}) if isinstance(getattr(v, "meta", {}), dict) else {}
+        )
+
+        return District(
+            id=id_,
+            name=name,
+            enrollment=int(enrollment) if isinstance(enrollment, (int, float)) else 0,
+            district_number=dn or "",
+            aea=aea,
+            rating=rating,
+            boundary=boundary,
+            meta=meta,
+        )
+
+    def _as_campus(self, v):
+        """
+        Coerce v to a Campus instance if possible.
+        Handles Campus, dict, or foreign class with attributes.
+        """
+        if isinstance(v, Campus):
+            return v
+        # Dict input
+        if isinstance(v, dict):
+            id = v.get("id")
+            try:
+                id = (
+                    uuid.UUID(id)
+                    if not isinstance(id, uuid.UUID) and id is not None
+                    else id
+                )
+            except Exception:
+                pass
+            district_id = v.get("district_id")
+            try:
+                district_id = (
+                    uuid.UUID(district_id)
+                    if not isinstance(district_id, uuid.UUID)
+                    and district_id is not None
+                    else district_id
+                )
+            except Exception:
+                pass
+            name = v.get("name")
+            enrollment = v.get("enrollment")
+            charter_type = v.get("charter_type")
+            is_charter = v.get("is_charter")
+            rating = v.get("rating")
+            aea = v.get("aea")
+            grade_range = v.get("grade_range")
+            school_type = v.get("school_type")
+            school_status_date = v.get("school_status_date")
+            update_date = v.get("update_date")
+            district_number = v.get("district_number", "")
+            campus_number = v.get("campus_number", "")
+            # Accept either 'point' or 'location' for geometry
+            location = v.get("point", v.get("location"))
+            meta = v.get("meta", {})
+            return Campus(
+                id=id,
+                district_id=district_id,
+                name=name,
+                enrollment=enrollment,
+                charter_type=charter_type,
+                is_charter=is_charter,
+                rating=rating,
+                aea=aea,
+                grade_range=grade_range,
+                school_type=school_type,
+                school_status_date=school_status_date,
+                update_date=update_date,
+                district_number=district_number,
+                campus_number=campus_number,
+                location=location,
+                meta=meta,
+            )
+        # Foreign class/object with attributes
+        id = getattr(v, "id", None)
+        try:
+            id = (
+                uuid.UUID(id)
+                if not isinstance(id, uuid.UUID) and id is not None
+                else id
+            )
+        except Exception:
+            pass
+        district_id = getattr(v, "district_id", None)
+        try:
+            district_id = (
+                uuid.UUID(district_id)
+                if not isinstance(district_id, uuid.UUID) and district_id is not None
+                else district_id
+            )
+        except Exception:
+            pass
+        name = getattr(v, "name", None)
+        enrollment = getattr(v, "enrollment", None)
+        charter_type = getattr(v, "charter_type", None)
+        is_charter = getattr(v, "is_charter", None)
+        rating = getattr(v, "rating", None)
+        aea = getattr(v, "aea", None)
+        grade_range = getattr(v, "grade_range", None)
+        school_type = getattr(v, "school_type", None)
+        school_status_date = getattr(v, "school_status_date", None)
+        update_date = getattr(v, "update_date", None)
+        district_number = getattr(v, "district_number", "")
+        campus_number = getattr(v, "campus_number", "")
+        # Prefer 'point', else 'location'
+        location = getattr(v, "point", None)
+        if location is None:
+            location = getattr(v, "location", None)
+        meta = getattr(v, "meta", {}) if hasattr(v, "meta") else {}
+        return Campus(
+            id=id,
+            district_id=district_id,
+            name=name,
+            enrollment=enrollment,
+            charter_type=charter_type,
+            is_charter=is_charter,
+            rating=rating,
+            aea=aea,
+            grade_range=grade_range,
+            school_type=school_type,
+            school_status_date=school_status_date,
+            update_date=update_date,
+            district_number=district_number,
+            campus_number=campus_number,
+            location=location,
+            meta=meta,
+        )
+
+    @classmethod
+    def from_snapshot(
+        cls, snapshot: str | Path | None = None, *, search: bool = True
+    ) -> "DataEngine":
+        """
+        Load a DataEngine from a pickled snapshot (.pkl). This method **never** returns None.
+        It either returns a valid DataEngine instance or raises a clear RuntimeError/TypeError.
+
+        Snapshot discovery prioritizes the package's own `.cache` folder over outer repo folders.
+        Accepts snapshot payloads saved by different builder scripts, including:
+          - a full DataEngine instance
+          - a dict with keys like "_districts"/"districts" and "_campuses"/"campuses"
+          - a tuple produced by load_data2.py such as:
+                (districts_dict, campuses_dict)
+            or  (districts_dict, campuses_dict, meta_dict)
+            or  lists of District/Campus instead of dicts
+        """
+        # Resolve the path to open
+        path: Optional[Path]
+        if snapshot is not None:
+            path = Path(snapshot)
+        else:
+            path = _discover_snapshot(None) if search else None
+
+        if path is None:
+            return cls()  # empty engine (no snapshot found)
+
+        if not path.exists() or not path.is_file():
+            raise RuntimeError(f"Snapshot not found or not a file: {path}")
+
+        try:
+            with open(path, "rb") as f:
+                obj = _compat_pickle_load(f)
+        except Exception as e:
+            raise RuntimeError(f"Failed to unpickle snapshot {path}: {e}") from e
+
+        # Case 1: the snapshot already contains a DataEngine
+        if isinstance(obj, cls):
+            return obj
+
+        # Create an instance early so we can use instance coercers
+        eng = cls()
+
+        # Helper to coerce various container shapes into {uuid -> District/Campus}
+        def _coerce_entity_map(x, kind: str):
+            """
+            Accept a dict or list/tuple and return a dict keyed by entity.id, coercing to District or Campus.
+            kind: "district" or "campus"
+            """
+            out = {}
+            if isinstance(x, dict):
+                values = list(x.values())
+            elif isinstance(x, (list, tuple)):
+                values = list(x)
+            else:
+                return out
+            for v in values:
+                try:
+                    obj2 = (
+                        eng._as_district(v) if kind == "district" else eng._as_campus(v)
+                    )
+                except Exception:
+                    obj2 = None
+                if getattr(obj2, "id", None) is not None:
+                    out[obj2.id] = obj2
+            return out
+
+        # Case 2: dict payload with districts/campuses inside
+        if isinstance(obj, dict):
+            dmap = None
+            cmap = None
+            for k in ("_districts", "districts"):
+                if k in obj:
+                    dmap = _coerce_entity_map(obj.get(k), kind="district")
+                    break
+            if dmap is None:
+                dmap = {}
+            for k in ("_campuses", "campuses"):
+                if k in obj:
+                    cmap = _coerce_entity_map(obj.get(k), kind="campus")
+                    break
+            if cmap is None:
+                cmap = {}
+
+            with eng.bulk():
+                for d in dmap.values():
+                    eng.add_district(d)
+                for c in cmap.values():
+                    if c.district_id in eng._districts:
+                        eng.add_campus(c)
+            eng._rebuild_indexes()
+            if os.environ.get("TEADATA_DEBUG"):
+                print(
+                    f"[snapshot] loaded districts={len(eng._districts)} campuses={len(eng._campuses)} from {path}"
+                )
+            return eng
+
+        # Case 3: tuple/list payloads emitted by loader scripts (e.g., load_data2.py)
+        # Case: tuple/list payloads (various shapes)
+        if isinstance(obj, (tuple, list)):
+            parts = list(obj)
+
+            # (A) If any element is already a DataEngine instance, just use it.
+            for p in parts:
+                if isinstance(p, cls):
+                    if os.environ.get("TEADATA_DEBUG"):
+                        print(
+                            f"[snapshot] tuple contains DataEngine; returning embedded engine "
+                            f"with {len(p._districts)} districts / {len(p._campuses)} campuses"
+                        )
+                    return p
+
+            # (B) Otherwise try to coerce “(district_map, campus_map)” style payloads
+            if len(parts) >= 2:
+                dmap = _coerce_entity_map(parts[0], kind="district")
+                cmap = _coerce_entity_map(parts[1], kind="campus")
+                with eng.bulk():
+                    for d in dmap.values():
+                        eng.add_district(d)
+                    for c in cmap.values():
+                        if c.district_id in eng._districts:
+                            eng.add_campus(c)
+                eng._rebuild_indexes()
+                if os.environ.get("TEADATA_DEBUG"):
+                    print(
+                        f"[snapshot] tuple->coerced maps: districts={len(eng._districts)} "
+                        f"campuses={len(eng._campuses)} from {path}"
+                    )
+                return eng
+
+        # Unsupported payload type
+        raise TypeError(f"Unsupported snapshot payload type: {type(obj)!r} in {path}")
+
+    @classmethod
+    def load_default(cls) -> "DataEngine":
+        """
+        Convenience: try to load a snapshot discovered from common locations; otherwise return a fresh engine.
+        Never returns None.
+        """
+        return cls.from_snapshot(None, search=True)
+
+    def __init__(self, snapshot: str | Path | None = None, *, autoload: bool = False):
+        # Optional early autoload from snapshot
+        if snapshot is not None or autoload:
+            eng = self.from_snapshot(snapshot, search=autoload and snapshot is None)
+            # If we got a different instance, copy its state into self
+            if eng is not self:
+                # Initialize empty containers first (will be re-assigned below)
+                self._districts = {}
+                self._campuses = {}
+                self._campuses_by_district = defaultdict(list)
+                # Copy over the dictionaries
+                try:
+                    self._districts.update(eng._districts)
+                    self._campuses.update(eng._campuses)
+                    self._campuses_by_district.update(eng._campuses_by_district)
+                except Exception:
+                    pass
+                # Initialize indexes as empty; they will rebuild on demand
+                self._in_bulk = False
+                self._kdtree = None
+                self._xy_deg = None
+                self._xy_rad = None
+                self._campus_list = None
+                self._point_tree = None
+                self._point_geoms = None
+                self._point_ids = None
+                self._geom_id_to_index = None
+                self._xy_deg_np = None
+                self._campus_list_np = None
+                self._all_xy_np = None
+                self._all_campuses_np = None
+                self._xy_to_index = None
+                self._rebuild_indexes()
+                return
+        # Normal cold init (no snapshot)
         self._districts: Dict[uuid.UUID, District] = {}
         self._campuses: Dict[uuid.UUID, Campus] = {}
         self._campuses_by_district: Dict[uuid.UUID, List[uuid.UUID]] = defaultdict(list)
@@ -699,6 +1369,45 @@ class DataEngine:
 
         # Coordinate → index lists (robust legacy mapping when STRtree returns copies)
         self._xy_to_index = None  # dict[(x,y)] -> [index]
+
+    # --- Public, read-only views of entities ---
+    @property
+    def districts(self):
+        """
+        Read-only mapping of {uuid.UUID: District}.
+        Use DataEngine methods to mutate; external callers get an immutable view.
+        """
+        return MappingProxyType(self._districts)
+
+    @property
+    def campuses(self):
+        """
+        Read-only mapping of {uuid.UUID: Campus}.
+        """
+        return MappingProxyType(self._campuses)
+
+    # --- Convenience name lookups ---
+    def district_by_name(self, name: str) -> Optional["District"]:
+        """
+        Case-insensitive exact match for district name.
+        Returns the first match or None.
+        """
+        target = (name or "").strip().lower()
+        for d in self._districts.values():
+            if d.name.lower() == target:
+                return d
+        return None
+
+    def campus_by_name(self, name: str) -> Optional["Campus"]:
+        """
+        Case-insensitive exact match for campus name.
+        Returns the first match or None.
+        """
+        target = (name or "").strip().lower()
+        for c in self._campuses.values():
+            if c.name.lower() == target:
+                return c
+        return None
 
     def __len__(self) -> int:
         return len(self._districts) + len(self._campuses)
@@ -748,7 +1457,10 @@ class DataEngine:
                 target = str(query[1])
                 # match by name (case-insensitive) or by district_number
                 for d in self._districts.values():
-                    if d.name.upper() == target.upper() or getattr(d, "district_number", None) == target:
+                    if (
+                        d.name.upper() == target.upper()
+                        or getattr(d, "district_number", None) == target
+                    ):
                         return Query([d], self)
                 return Query([], self)
 
@@ -759,31 +1471,67 @@ class DataEngine:
             if key == "nearest":
                 seed = query[1]
                 n = int(query[2]) if len(query) >= 3 else 1
-                max_m = float(query[3]) if len(query) >= 4 and query[3] is not None else None
+                max_m = (
+                    float(query[3])
+                    if len(query) >= 4 and query[3] is not None
+                    else None
+                )
                 # If seed is a Query or Campus, try to infer coords
                 seed = _unwrap_query(seed)
                 if hasattr(seed, "point"):
                     xy = _point_xy(getattr(seed, "point"))
                     if xy is not None:
-                        items = self.nearest_campuses(xy[0], xy[1], limit=n, charter_only=False, max_miles=max_m, geodesic=True)
+                        items = self.nearest_campuses(
+                            xy[0],
+                            xy[1],
+                            limit=n,
+                            charter_only=False,
+                            max_miles=max_m,
+                            geodesic=True,
+                        )
                         return Query(items, self)
                 # Otherwise assume it's a (lon, lat) tuple
                 coords = seed
-                items = self.nearest_campuses(coords[0], coords[1], limit=n, charter_only=False, max_miles=max_m, geodesic=True)
+                items = self.nearest_campuses(
+                    coords[0],
+                    coords[1],
+                    limit=n,
+                    charter_only=False,
+                    max_miles=max_m,
+                    geodesic=True,
+                )
                 return Query(items, self)
 
             if key == "nearest_charter":
                 seed = query[1]
                 n = int(query[2]) if len(query) >= 3 else 1
-                max_m = float(query[3]) if len(query) >= 4 and query[3] is not None else None
+                max_m = (
+                    float(query[3])
+                    if len(query) >= 4 and query[3] is not None
+                    else None
+                )
                 seed = _unwrap_query(seed)
                 if hasattr(seed, "point"):
                     xy = _point_xy(getattr(seed, "point"))
                     if xy is not None:
-                        items = self.nearest_campuses(xy[0], xy[1], limit=n, charter_only=True, max_miles=max_m, geodesic=True)
+                        items = self.nearest_campuses(
+                            xy[0],
+                            xy[1],
+                            limit=n,
+                            charter_only=True,
+                            max_miles=max_m,
+                            geodesic=True,
+                        )
                         return Query(items, self)
                 coords = seed
-                items = self.nearest_campuses(coords[0], coords[1], limit=n, charter_only=True, max_miles=max_m, geodesic=True)
+                items = self.nearest_campuses(
+                    coords[0],
+                    coords[1],
+                    limit=n,
+                    charter_only=True,
+                    max_miles=max_m,
+                    geodesic=True,
+                )
                 return Query(items, self)
 
         raise ValueError(f"Unsupported >> query: {query!r}")
@@ -817,6 +1565,7 @@ class DataEngine:
         self._geom_id_to_index = None
         self._xy_deg_np = None
         self._campus_list_np = None
+
     def profile(self, on: bool = True):
         global ENABLE_PROFILING
         ENABLE_PROFILING = bool(on)
@@ -850,7 +1599,8 @@ class DataEngine:
                 continue
             try:
                 # Ensure numeric coordinates to avoid lazy/proxy objects
-                float(p.x); float(p.y)
+                float(p.x)
+                float(p.y)
             except Exception:
                 continue
             geoms.append(p)
@@ -914,9 +1664,11 @@ class DataEngine:
             return
 
         import numpy as np
+
         self._xy_deg = np.array(xy, dtype=float)
         self._xy_rad = np.radians(self._xy_deg)
         from scipy.spatial import cKDTree  # type: ignore
+
         self._kdtree = cKDTree(self._xy_rad)
         self._campus_list = campus_list
 
@@ -946,6 +1698,7 @@ class DataEngine:
             self._all_campuses_np = None
             return
         import numpy as np  # type: ignore
+
         self._all_xy_np = np.array(xy, dtype=float)
         self._all_campuses_np = clist
 
@@ -953,7 +1706,9 @@ class DataEngine:
         """Return campuses whose points fall within the polygon's axis-aligned bounding box."""
         if not SHAPELY:
             # Fallback: simple Python loop without NumPy
-            minx, miny, maxx, maxy = poly.bounds if hasattr(poly, "bounds") else (None, None, None, None)
+            minx, miny, maxx, maxy = (
+                poly.bounds if hasattr(poly, "bounds") else (None, None, None, None)
+            )
             if minx is None:
                 return []
             out = []
@@ -974,6 +1729,7 @@ class DataEngine:
         if self._all_xy_np is None:
             return []
         import numpy as np  # type: ignore
+
         minx, miny, maxx, maxy = poly.bounds
         xs = self._all_xy_np[:, 0]
         ys = self._all_xy_np[:, 1]
@@ -983,15 +1739,26 @@ class DataEngine:
 
     def _haversine_miles_vec(self, lon: float, lat: float):
         import numpy as np
+
         R = 3958.7613
         lon1, lat1 = np.radians([lon, lat])
-        lon2 = np.radians(self._xy_deg_np[:, 0]); lat2 = np.radians(self._xy_deg_np[:, 1])
-        dlon = lon2 - lon1; dlat = lat2 - lat1
-        a = np.sin(dlat/2)**2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon/2)**2
+        lon2 = np.radians(self._xy_deg_np[:, 0])
+        lat2 = np.radians(self._xy_deg_np[:, 1])
+        dlon = lon2 - lon1
+        dlat = lat2 - lat1
+        a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
         return R * 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
 
     @timeit
-    def radius_campuses(self, lon: float, lat: float, miles: float, *, charter_only: bool = False, limit: Optional[int] = None) -> List[Campus]:
+    def radius_campuses(
+        self,
+        lon: float,
+        lat: float,
+        miles: float,
+        *,
+        charter_only: bool = False,
+        limit: Optional[int] = None,
+    ) -> List[Campus]:
         """
         Fast radius query using KDTree when available; robust haversine fallback otherwise.
         Returns campuses within 'miles' of (lon, lat), optionally filtered to charters, optionally limited.
@@ -1005,11 +1772,16 @@ class DataEngine:
 
         results: List[Tuple[float, Campus]] = []
 
-        if self._kdtree is not None and self._xy_deg is not None and self._campus_list is not None:
+        if (
+            self._kdtree is not None
+            and self._xy_deg is not None
+            and self._campus_list is not None
+        ):
             # Query in radians
             R = 3958.7613
             r = miles / R
             import numpy as np
+
             idxs = self._kdtree.query_ball_point(np.radians([lon, lat]), r=r)
             idxs = idxs if isinstance(idxs, list) else idxs[0]
             for i in idxs:
@@ -1036,6 +1808,7 @@ class DataEngine:
             else:
                 if self._xy_deg_np is None or self._campus_list_np is None:
                     import numpy as np
+
                     xy = []
                     clist = []
                     for c in self._campuses.values():
@@ -1051,6 +1824,7 @@ class DataEngine:
                     self._campus_list_np = clist
                 dists = self._haversine_miles_vec(lon, lat)
                 import numpy as np
+
                 idxs = np.where(dists <= miles)[0]
                 order = np.argsort(dists[idxs])
                 idxs = [int(idxs[i]) for i in order]
@@ -1064,17 +1838,26 @@ class DataEngine:
         return [c for _, c in results]
 
     @timeit
-    def knn_campuses(self, lon: float, lat: float, k: int, *, charter_only: bool = False) -> List[Campus]:
+    def knn_campuses(
+        self, lon: float, lat: float, k: int, *, charter_only: bool = False
+    ) -> List[Campus]:
         """
         k-nearest neighbor query. KDTree if available; else brute-force sort by haversine.
         """
         self._ensure_kdtree()
         results: List[Tuple[float, Campus]] = []
 
-        if self._kdtree is not None and self._xy_deg is not None and self._campus_list is not None:
+        if (
+            self._kdtree is not None
+            and self._xy_deg is not None
+            and self._campus_list is not None
+        ):
             from math import isfinite
             import numpy as np
-            dists, idxs = self._kdtree.query(np.radians([lon, lat]), k=k if k > 1 else 1)
+
+            dists, idxs = self._kdtree.query(
+                np.radians([lon, lat]), k=k if k > 1 else 1
+            )
             # Normalize outputs
             if k == 1:
                 dists = [float(dists)]
@@ -1102,15 +1885,16 @@ class DataEngine:
 
     # --- CRUD ---
     def add_district(self, d: District):
+        d._repo = self
         self._districts[d.id] = d
 
     def add_campus(self, c: Campus):
-        if c.district_id not in self._districts:
-            raise ValueError("Campus references missing district")
         c._repo = self  # attach back-reference
         self._campuses[c.id] = c
+        # Only append to _campuses_by_district if the district exists
         if not self._in_bulk:
-            self._campuses_by_district[c.district_id].append(c.id)
+            if c.district_id in self._districts:
+                self._campuses_by_district[c.district_id].append(c.id)
 
     def campuses_in(self, d: Any) -> List[Campus]:
         """
@@ -1151,7 +1935,7 @@ class DataEngine:
                     if p is None:
                         continue
                     try:
-                        inside = (prep.covers(p) if prep is not None else poly.covers(p))
+                        inside = prep.covers(p) if prep is not None else poly.covers(p)
                     except Exception:
                         inside = False
                     if inside:
@@ -1164,7 +1948,9 @@ class DataEngine:
             self._ensure_point_strtree()
             if self._point_tree is not None:
                 try:
-                    idxs = self._point_tree.query(poly, predicate="covers", return_indices=True)
+                    idxs = self._point_tree.query(
+                        poly, predicate="covers", return_indices=True
+                    )
                     # Some builds return (geoms, idxs) if return_geometry=True sneaks in; normalize:
                     if isinstance(idxs, tuple):
                         _, idxs = idxs
@@ -1187,7 +1973,9 @@ class DataEngine:
                         if p is None:
                             continue
                         try:
-                            inside = (prep.covers(p) if prep is not None else poly.covers(p))
+                            inside = (
+                                prep.covers(p) if prep is not None else poly.covers(p)
+                            )
                         except Exception:
                             inside = False
                         if inside:
@@ -1212,7 +2000,9 @@ class DataEngine:
 
         if ENABLE_PROFILING:
             try:
-                print(f"[sanity] charter_campuses_within fast=0 slow={len(slow)} — using {'slow' if slow else 'fast'} path")
+                print(
+                    f"[sanity] charter_campuses_within fast=0 slow={len(slow)} — using {'slow' if slow else 'fast'} path"
+                )
             except Exception:
                 pass
         return slow
@@ -1262,7 +2052,11 @@ class DataEngine:
                 # planar fallback
                 if SHAPELY and hasattr(c.point, "distance"):
                     # distance in CRS units (assumed miles if your data is projected to a miles-based CRS)
-                    d = c.point.distance(ShapelyPoint(x, y)) if SHAPELY else euclidean((x, y), cxy)
+                    d = (
+                        c.point.distance(ShapelyPoint(x, y))
+                        if SHAPELY
+                        else euclidean((x, y), cxy)
+                    )
                 else:
                     d = euclidean((x, y), cxy)
             if max_miles is not None and d > max_miles:
@@ -1276,40 +2070,98 @@ class DataEngine:
 
     @timeit
     @lru_cache(maxsize=2048)
-    def nearest_campus(self, x: float, y: float, charter_only: bool = False) -> Optional[Campus]:
+    def nearest_campus(
+        self, x: float, y: float, charter_only: bool = False
+    ) -> Optional[Campus]:
         """
         Backward-compatible convenience for the single nearest campus.
         Uses geodesic miles when (x,y) look like lon/lat.
         """
-        res = self.nearest_campuses(x, y, limit=1, charter_only=charter_only, max_miles=None, geodesic=True)
+        res = self.nearest_campuses(
+            x, y, limit=1, charter_only=charter_only, max_miles=None, geodesic=True
+        )
         return res[0] if res else None
+
+
+# Public helper for quick-start scripts/tests
+def load_default_repo() -> DataEngine:
+    """Return a DataEngine loaded from the newest available snapshot, or an empty one."""
+    return DataEngine.from_snapshot(None, search=True)
+
 
 # --------- Demo data ---------
 
+
 def demo_repo() -> DataEngine:
     repo = DataEngine()
-    d1 = District(id=uuid.uuid4(), name="Austin ISD", enrollment=73000, district_number="", rating="B",
-                  boundary=(ShapelyPolygon([(0,0), (5,0), (5,5), (0,5)])) if SHAPELY
-                  else [(0,0),(5,0),(5,5),(0,5)])
-    d2 = District(id=uuid.uuid4(), name="Round Rock ISD", enrollment=51000, district_number="", rating="A",
-                  boundary=(ShapelyPolygon([(4,2), (9,2), (9,7), (4,7)])) if SHAPELY
-                  else [(4,2),(9,2),(9,7),(4,7)])
+    d1 = District(
+        id=uuid.uuid4(),
+        name="Austin ISD",
+        enrollment=73000,
+        district_number="",
+        rating="B",
+        boundary=(
+            (ShapelyPolygon([(0, 0), (5, 0), (5, 5), (0, 5)]))
+            if SHAPELY
+            else [(0, 0), (5, 0), (5, 5), (0, 5)]
+        ),
+    )
+    d2 = District(
+        id=uuid.uuid4(),
+        name="Round Rock ISD",
+        enrollment=51000,
+        district_number="",
+        rating="A",
+        boundary=(
+            (ShapelyPolygon([(4, 2), (9, 2), (9, 7), (4, 7)]))
+            if SHAPELY
+            else [(4, 2), (9, 2), (9, 7), (4, 7)]
+        ),
+    )
 
     with repo.bulk():
         repo.add_district(d1)
         repo.add_district(d2)
 
-        c1 = Campus(id=uuid.uuid4(), district_id=d1.id, name="Akins HS", campus_number="", charter_type="", is_charter=False, enrollment=2600, district_number="",
-                    location=ShapelyPoint(2, 1) if SHAPELY else (2,1))
-        c2 = Campus(id=uuid.uuid4(), district_id=d1.id, name="Kealing MS", campus_number="", charter_type="", is_charter=False, enrollment=1200, district_number="",
-                    location=ShapelyPoint(3, 3) if SHAPELY else (3,3))
-        c3 = Campus(id=uuid.uuid4(), district_id=d2.id, name="Westwood HS", campus_number="", charter_type="", is_charter=False, enrollment=2800, district_number="",
-                    location=ShapelyPoint(8, 6) if SHAPELY else (8,6))
+        c1 = Campus(
+            id=uuid.uuid4(),
+            district_id=d1.id,
+            name="Akins HS",
+            campus_number="",
+            charter_type="",
+            is_charter=False,
+            enrollment=2600,
+            district_number="",
+            location=ShapelyPoint(2, 1) if SHAPELY else (2, 1),
+        )
+        c2 = Campus(
+            id=uuid.uuid4(),
+            district_id=d1.id,
+            name="Kealing MS",
+            campus_number="",
+            charter_type="",
+            is_charter=False,
+            enrollment=1200,
+            district_number="",
+            location=ShapelyPoint(3, 3) if SHAPELY else (3, 3),
+        )
+        c3 = Campus(
+            id=uuid.uuid4(),
+            district_id=d2.id,
+            name="Westwood HS",
+            campus_number="",
+            charter_type="",
+            is_charter=False,
+            enrollment=2800,
+            district_number="",
+            location=ShapelyPoint(8, 6) if SHAPELY else (8, 6),
+        )
         repo.add_campus(c1)
         repo.add_campus(c2)
         repo.add_campus(c3)
 
     return repo
+
 
 # --------- Example usage (uncomment to run as script) ---------
 if __name__ == "__main__":

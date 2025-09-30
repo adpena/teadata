@@ -1,6 +1,17 @@
 # scripts/check_env.py
 import importlib, sys
-mods = ["numpy", "pandas", "shapely", "geopandas", "pyogrio", "pyarrow", "duckdb", "yaml", "openpyxl"]
+
+mods = [
+    "numpy",
+    "pandas",
+    "shapely",
+    "geopandas",
+    "pyogrio",
+    "pyarrow",
+    "duckdb",
+    "yaml",
+    "openpyxl",
+]
 print(f"Python: {sys.version}")
 for m in mods:
     try:
