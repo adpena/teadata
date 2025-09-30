@@ -21,4 +21,5 @@ print("Enriched rating 2025:", getattr(aldine, "overall_rating_2025", None))
 # Explore campuses inside the district
 print(f"\nAldine has {len(aldine.campuses)} campuses. First few:")
 for campus in list(aldine.campuses)[:5]:
-    print("-", campus.name, "| rating:", campus.rating)
+    print("-", campus.name, "| rating:", campus.rating, "| district rating:", campus.district.rating)
+

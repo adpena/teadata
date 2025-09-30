@@ -17,6 +17,7 @@ from teadata.classes import District, Campus, DataEngine, _point_xy
 from teadata.teadata_config import load_config
 from teadata.enrichment.districts import enrich_districts_from_config
 from teadata.enrichment.campuses import enrich_campuses_from_config
+from teadata.enrichment.charter_networks import add_charter_networks_from_config
 
 CFG = "teadata_sources.yaml"
 YEAR = 2025
@@ -203,7 +204,7 @@ def _compute_extra_signature() -> dict:
     # Resolved data sources that affect enrichment
     try:
         cfg = load_config(CFG)
-        for ds in ("accountability", "campus_accountability"):
+        for ds in ("accountability", "campus_accountability", "charter_reference"):
             try:
                 _, p = cfg.resolve(ds, YEAR, section="data_sources")
                 sig[f"ds:{ds}"] = _safe_path_or_url_signature(p)
@@ -394,6 +395,20 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
             d.district_number = district_number
             repo.add_district(d)
             dn_to_id[district_number] = d.id
+
+        # Inject statewide charter networks (no geometry) from config, if provided
+        try:
+            charter_networks = add_charter_networks_from_config(repo, CFG, YEAR)
+            if charter_networks:
+                # refresh the mapping used for campus linking
+                dn_to_id = {
+                    getattr(d, "district_number", None): d.id
+                    for d in repo._districts.values()
+                    if getattr(d, "district_number", None)
+                }
+                print(f"[virtual] added {charter_networks} statewide districts")
+        except Exception as e:
+            print(f"[virtual] add failed: {e}")
 
         # Add default fallback District object
         fallback_district = District(

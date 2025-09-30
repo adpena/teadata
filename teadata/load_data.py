@@ -7,13 +7,13 @@ import json
 import hashlib
 import inspect
 import os
-import classes as _classes_mod
-import teadata_config as _cfg_mod
-from classes import District, Campus, DataEngine, _point_xy
+import teadata.classes as _classes_mod
+import teadata.teadata_config as _cfg_mod
+from teadata.classes import District, Campus, DataEngine, _point_xy
 
 from datetime import datetime, date
 from typing import Optional
-from teadata_config import (
+from teadata.teadata_config import (
     _DEFAULT_DISTRICT_ALIASES,
     _DEFAULT_CAMPUS_ALIASES,
     load_config,

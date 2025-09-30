@@ -22,6 +22,8 @@ dependencies = [
     "pyarrow>=14.0",
     "packaging>=23.2",
     "scipy>=1.10",
+    "platformdirs>=3.7",
+    "tomli>=2.0",
 ]
 requires-python = ">=3.11"
 classifiers = [
@@ -70,6 +72,7 @@ exclude = ["tests*", "docs*", "examples*"]
 [tool.deptry]
 # Optional: folders to skip
 exclude = ["tests", "docs", "examples"]
+known_first_party = ["teadata"]
 
 # Per-rule ignores by code
 [tool.deptry.per_rule_ignores]

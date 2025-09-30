@@ -4,15 +4,9 @@ from .common import prepare_columns
 from . import enricher
 from .base import Enricher
 
-try:
-    from teadata_config import load_config
-except ImportError:  # running inside a package (python -m ...)
-    from ..teadata_config import load_config  # type: ignore
+from teadata.teadata_config import load_config
 
-try:
-    from teadata_config import normalize_campus_number_column
-except ImportError:
-    from ..teadata_config import normalize_campus_number_column  # type: ignore
+from teadata.teadata_config import normalize_campus_number_column
 
 
 # Shared helper for campus accountability enrichment

@@ -241,7 +241,7 @@ class GeoField:
 class District:
     id: uuid.UUID
     name: str
-    enrollment: int
+    enrollment: Optional[int] = None
     district_number: str = field(default="")
     aea: Optional[bool] = None
     rating: Optional[str] = None
