@@ -1,248 +1,327 @@
 # TEA Data Engine
 
-The TEA Data Engine is a Python-based toolkit for working with Texas public education datasets.
-
-It provides object-oriented access to rich, spatially-aware data about school districts and campuses, making it easy for developers to explore, enrich, and analyze educational data.
+Python toolkit for Texas public education data — spatially-aware, object-oriented, fast.  
+It ships a cache-first “data repo” you can load in seconds, then query with clean, Pythonic primitives (including a fluent `>>` operator).
 
 ---
 
-## 🚀 Quick Start
+## Contents
 
-Getting started is straightforward. First, clone the repository to your local machine:
+- [Quick start](#quick-start)
+- [What you get](#what-you-get)
+- [Data models](#data-models)
+- [Query system (the `>>` operator)](#query-system-the--operator)
+- [Spatial tricks (`coords`, `within`, nearest)](#spatial-tricks-coords-within-nearest)
+- [Enrichment pipeline](#enrichment-pipeline)
+- [Config & data resolution](#config--data-resolution)
+- [Performance notes](#performance-notes)
+- [Repo layout](#repo-layout)
+- [FAQ](#faq)
+- [License](#license)
+
+---
+
+## Quick start
+
+### 1) Clone & install (editable)
 
 ```bash
 git clone https://github.com/adpena/teadata.git
 cd teadata
-```
-
-Then, install the package in editable mode:
-
-```bash
 pip install -e .
 ```
 
-Next, import the library and initialize the engine:
+> The editable install makes `import teadata` available and lets you iterate quickly.
+
+### 2) Load the prebuilt snapshot
+
+The engine will automatically discover a `.pkl` snapshot in either:
+- `./.cache/` under your repository root, or
+- `<site-packages>/teadata/.cache/` shipping with the library.
 
 ```python
 from teadata import DataEngine
 
-# Initialize the engine directly from cache for instant access
-engine = DataEngine()
+# Fast-path: load the latest discovered snapshot
+engine = DataEngine.from_snapshot(search=True)
 
-# Quickly retrieve a district by its unique number
-aldine = engine.get_district("101902")
-print(aldine.name)                   # Aldine ISD
-print(aldine.overall_rating_2025)   # Access enriched accountability rating instantly
-
-# Iterate through all campuses within the district effortlessly
-for campus in aldine.campuses:
-    print(campus.name, campus.rating)
+print(len(engine.districts), len(engine.campuses))
+# -> e.g. 1018 9739
 ```
 
-This setup avoids unnecessary data wrangling and lets you focus on analysis immediately.
+> If you prefer the implicit path: `engine = DataEngine()` also tries to auto-load a snapshot.
+
+### 3) First query in 10 seconds
+
+```python
+# Retrieve district by TEA code (digits only; leading apostrophe handled internally)
+aldine = engine.get_district("101902")
+
+print(aldine)                 # District(...)
+print(aldine.rating)          # canonical (may be enriched via alias)
+print(aldine.overall_rating_2025)  # enriched attribute, if present
+
+# Iterate campuses physically inside the district
+for c in aldine.campuses:
+    print(c.name, c.rating)
+```
 
 ---
 
-## 📊 Models
+## What you get
 
-At the heart of the TEA Data Engine are two rich, spatially-aware models designed to mirror the real world:
+- **Rich domain objects**: `District` with polygon boundaries; `Campus` with point geometry and canonical IDs.
+- **Fluent query language**: chain filters/transforms with `>>` (details below).
+- **Spatial acceleration**: nearest-k, containment, and district/campus lookups.
+- **Config-driven ingestion**: add datasets by editing YAML/TOML; get schema checks and year-based resolution.
+- **Enrichment**: attach new fields (e.g., accountability, finance) as dynamic attributes — and alias into canonical ones.
+- **Reproducible caches**: build once into a `.pkl` “repo snapshot”, reload instantly next time.
+
+---
+
+## Data models
 
 ### `District`
 
-A `District` represents a Texas school district with comprehensive attributes:
+Key fields & behavior:
 
-- **Unique ID & District Number**: Normalized identifiers including zero-padding for consistency.
-- **Name & Enrollment**: Key demographic and identifying info.
-- **Type**: Classifies the district (e.g., charter, traditional ISD).
-- **Ratings**: Both canonical and dynamically enriched ratings like `overall_rating_2025`.
-- **Spatial Geometry**: Precise district boundaries enabling advanced geospatial queries.
-
-The `District` class is packed with powerful behaviors:
-
-- `.campuses`: Fetch all campuses within the district boundary with a simple attribute access.
-- `.nearest_campuses()`: Perform location-based queries to find closest campuses, supporting proximity analyses.
-- `.enrich()`: Dynamically attach new attributes from external datasets, allowing your data to evolve seamlessly.
+- `id: UUID`
+- `name: str`
+- `district_number: str` — normalized **six-digit**, zero-padded, may be stored with a **leading apostrophe** to match TEA data where needed.
+- `rating: Optional[str]` — canonical; can be synced from enrichment via alias
+- `boundary: shapely.Polygon | MultiPolygon`
+- **Computed / accessors**
+  - `campuses: list[Campus]` — all campuses physically inside the boundary (spatial join is precomputed during repo build)
+  - `nearest_campuses(...)`
+  - `charter_campuses`: campuses with charter flag
+  - Dynamic attributes from enrichment (e.g., `overall_rating_2025`)
 
 ### `Campus`
 
-Each `Campus` is modeled with equal richness:
+- `id: UUID`
+- `campus_number: str` — normalized **nine-digit** TEA code (zero-padded; apostrophe-safe)
+- `name: str`
+- `enrollment: Optional[int]`
+- `type: Optional[str]` — e.g. `"OPEN ENROLLMENT CHARTER"`
+- `point: shapely.Point`
+- `coords: tuple[float, float]` — `(lon, lat)` for convenience
+- `district_id: UUID` — back-link to parent
+- `district: District` — property resolving the back-link
+- Dynamic enrichment fields (e.g., `overall_rating_2025`)
 
-- **Unique ID & Campus Number**: Normalized to the official nine-digit TEA format.
-- **Name, Enrollment, Type**: Core descriptive attributes.
-- **Ratings**: Access canonical or enriched ratings effortlessly.
-- **Spatial Geometry**: Precise campus location points for spatial analysis.
-
-Campus objects link back to their parent district through `.district`, enabling easy navigation across hierarchical data.
-
-Both models are designed to be extensible and dynamic, supporting complex workflows without sacrificing clarity or performance.
-
----
-
-## 🧠 Why Object-Oriented?
-
-The TEA Data Engine leverages Python’s OOP principles to deliver a developer-friendly, highly expressive API that feels natural and intuitive.
-
-### Dynamic Attributes & Enrichment
-
-Forget rigid schemas or cumbersome joins. The engine’s enrichment system lets you **inject new attributes on the fly**, turning raw datasets into rich, multidimensional objects:
-
-```python
-print(district.overall_rating_2025)   # Seamless access to enriched accountability data
-print(campus.finance_per_pupil)       # Instantly available finance metrics
-```
-
-This dynamic enrichment means your analyses can evolve as new datasets arrive, without rewriting core logic or managing complex merges.
-
-### Operator Overloading for Natural Comparisons
-
-Districts and campuses implement Python’s comparison operators based on meaningful attributes like enrollment or ratings, enabling elegant and readable code:
-
-```python
-if campus1.enrollment > campus2.enrollment:
-    print(f"{campus1.name} has more students than {campus2.name}")
-
-if district1.rating == 'A' and district2.rating != 'A':
-    print(f"{district1.name} outperforms {district2.name}")
-```
-
-This reduces boilerplate and lets you write code that reads like plain English, enhancing maintainability and reducing errors.
-
-### Query Chaining with the `>>` Operator
-
-One of the toolkit’s coolest features is the **`>>` operator**, which enables **fluent query chaining** to compose filters, transformations, and traversals in a clean, pipeline style:
-
-```python
-# From a district, retrieve campuses, then filter by rating 'A'
-top_campuses = aldine >> 'campuses' >> (lambda c: c.rating == 'A')
-for campus in top_campuses:
-    print(campus.name, campus.rating)
-
-# Chain multiple filters: campuses with enrollment > 500 and rating 'B' or better
-filtered = aldine >> 'campuses' >> (lambda c: c.enrollment > 500) >> (lambda c: c.rating in ['A', 'B'])
-```
-
-This expressive syntax dramatically simplifies complex queries, eliminating nested loops or intermediate variables. It encourages concise, readable code that scales naturally as your analysis grows.
+> **Normalization helpers** exist for both district/campus numbers; they’ll accept ints, strings with/without apostrophes, and coerce to canonical text forms.
 
 ---
 
-## 🌍 Spatial Power
+## Query system (the `>>` operator)
 
-Every district and campus object includes detailed geospatial data, unlocking a world of location-based insights:
-
-- **Boundary Lookups**: Easily find all charter campuses inside a district with a simple filter.
-- **Campus-in-District Matching**: Determine which district a campus belongs to based on spatial containment.
-- **Proximity Queries**: Find the nearest campuses to any coordinate, enabling targeted outreach or resource planning.
+The `Query` object wraps lists of `District` or `Campus` and supports fluent chaining via `>>`:
 
 ```python
-aldine = engine.get_district("101902")
-print(f"{aldine.name} has {len(aldine.campuses)} campuses")
+# All campuses inside a district, then filter and take top 5 by enrollment
+top5 = (aldine
+        >> 'campuses'
+        >> (lambda c: c.enrollment and c.enrollment > 1000)
+        >> ("sort", lambda c: c.enrollment, True)  # True -> descending
+        >> ("take", 5)
+        >> ("map", lambda c: (c.name, c.enrollment)))
 
-nearest = engine.nearest_campuses(lon=-95.37, lat=29.76, k=5)
-for campus, distance in nearest:
-    print(f"{campus.name} is {distance:.1f} meters away")
+print(top5)
 ```
 
-Spatial operations are seamlessly integrated into the data model, so you can conduct advanced geospatial analyses without external GIS tools or complicated workflows.
+Common operators:
+
+- `>> 'campuses'` — traverse District ➜ campuses
+- `>> ("filter", predicate)` or `>> (lambda x: ...)`
+- `>> ("sort", key_fn, descending: bool=False)`
+- `>> ("take", n)`
+- `>> ("nearest_charter", coords, mile_limit, k)` — from repo-level query context
+- `first()` — take first element
+- Attribute fall-through: `Query.attr` proxies to `first().attr` for convenience.
 
 ---
 
-## 🛠️ Enrichment System
+## Spatial tricks (`coords`, `within`, nearest)
 
-The enrichment system is a game-changer, letting you wire in external datasets from configuration files like `teadata_sources.yaml` and `teadata_config.py` with minimal effort.
+### Using `coords`
 
-- **Dynamic Attribute Injection**: Add new data fields like accountability ratings, finance metrics, or demographic summaries directly onto District and Campus objects.
-- **Alias Mapping**: Map enriched attributes into canonical fields (e.g., `overall_rating_2025` into `.rating`) for consistent access.
-- **Cache Snapshots**: Save enriched datasets as `.pkl` snapshots for lightning-fast reloads and reproducible analyses.
+Every campus exposes `coords` as `(lon, lat)`. This is handy for distance-based queries and pipelines:
 
-This modular enrichment architecture means your data ecosystem can grow organically, supporting new research questions and deliverables without rewriting foundational code.
+```python
+c0 = (aldine >> 'campuses').first()
+k_nearest = engine.nearest_campuses(c0.coords, k=5)  # returns list[(Campus, meters)]
+```
+
+> The engine keeps a fast spatial index (STRtree, Shapely 2.x) for nearest-k and containment probes.
+
+### `within` and `charters_within`
+
+Two common helpers:
+
+```python
+# All campuses within a district boundary
+inside = engine.within(aldine, items="campuses")
+
+# Charter-only campuses within
+charters = engine.charter_campuses_within(aldine)
+
+# The same via queries:
+q = (engine >> ("within", aldine, "campuses")
+          >> ("filter", lambda c: (c.type or "").upper() == "OPEN ENROLLMENT CHARTER"))
+```
+
+These use polygon containment and are validated by a built-in slow-path check to avoid false negatives.
+
+### Nearest
+
+```python
+# Five nearest charters within 10 linear miles of a target point
+pt = (-95.36, 29.83)  # (lon, lat)
+nearest_charters = engine.nearest_campuses(
+    pt, k=5, miles=10, charter_only=True
+)
+```
 
 ---
 
-## 📖 Example Workflows
+## Enrichment pipeline
 
-### Find all charter campuses in a district
+Bring in external datasets (accountability, finance, etc.) and attach fields directly to objects.
 
-```python
-aldine = engine.get_district("101902")
-for campus in aldine.campuses:
-    if "CHARTER" in campus.type.upper():
-        print(campus.name, campus.rating)
-```
-
-### Query nearest campuses to a coordinate
+### Districts
 
 ```python
-nearest = engine.nearest_campuses(lon=-95.35, lat=29.85, k=3)
-for campus, distance in nearest:
-    print(f"{campus.name} is {distance} meters away")
+from teadata.enrichment.districts import enrich_districts_from_config
+from teadata.teadata_config import load_config
+
+CFG = load_config("teadata_sources.yaml")
+year, updated = enrich_districts_from_config(
+    engine, CFG, dataset="accountability", year=2025,
+    select=["2025 Overall Rating"],
+    rename={"2025 Overall Rating": "overall_rating_2025"},
+    aliases={"overall_rating_2025": "rating"},  # also write canonical slot
+)
+print(f"Enriched {updated} districts from {year}")
 ```
 
-### Enrichment example
+### Campuses
 
 ```python
-print(aldine.rating)  # canonical rating
-print(aldine.overall_rating_2025)  # enriched accountability rating
+from teadata.enrichment.campuses import enrich_campuses_from_config
+
+year, updated = enrich_campuses_from_config(
+    engine, CFG, dataset="accountability", year=2025,
+    select=["2025 Overall Rating"],
+    rename={"2025 Overall Rating": "overall_rating_2025"},
+    aliases={"overall_rating_2025": "rating"},
+)
+print(f"Enriched {updated} campuses from {year}")
 ```
 
-### Complex chained query example
+### Snapshots
+
+After enrichment, persist a reproducible repo:
 
 ```python
-# Campuses within Aldine ISD that are charters and have rating 'A'
-charter_a_campuses = aldine >> 'campuses' \
-                             >> (lambda c: "CHARTER" in c.type.upper()) \
-                             >> (lambda c: c.rating == 'A')
-for campus in charter_a_campuses:
-    print(campus.name, campus.rating)
+engine.save_snapshot(".cache/repo_<tag>.pkl")
+# Later:
+engine2 = DataEngine.from_snapshot(".cache/repo_<tag>.pkl")
 ```
 
-### Combining enrichment and filtering
-
-```python
-# After enriching districts with finance data, filter by per pupil spending and rating
-affordable_high_rating = (engine.all_districts()
-                         >> (lambda d: d.finance_per_pupil < 10000)
-                         >> (lambda d: d.rating in ['A', 'B']))
-for district in affordable_high_rating:
-    print(district.name, district.finance_per_pupil, district.rating)
-```
-
-These examples highlight how the TEA Data Engine’s design encourages clear, concise, and powerful data exploration.
+Snapshots are versioned with a content signature. The loader can discover and pick the latest automatically with `search=True`.
 
 ---
 
-## ⏳ Time Savings & Research Power
+## Config & data resolution
 
-The TEA Data Engine isn’t just a toolkit — it’s a **productivity powerhouse** that transforms how you conduct education data research:
+All external data locations and schema expectations are declared in a single YAML (or TOML) config.  
+Highlights:
 
-- **Accelerate Data Preparation**: Eliminate hours of manual data cleaning, joining, and formatting. The engine’s built-in normalization and enrichment handle these automatically.
-- **Simplify Complex Queries**: The `>>` operator and dynamic attributes let you write expressive, maintainable code that would otherwise require verbose SQL or nested loops.
-- **Enable New Analyses**: Spatial awareness and dynamic enrichment unlock research questions that were previously too time-consuming or complex, such as proximity-based resource allocation or multi-dimensional performance comparisons.
-- **Improve Reproducibility**: Cached snapshots and modular enrichment pipelines ensure your workflows are consistent and easy to share.
-- **Reduce Cognitive Load**: By encapsulating data and behavior within intuitive objects, the engine lets you focus on insights rather than data plumbing.
+- **Per-dataset per-year** entries (2009+)
+- **`latest`** and **`current`** shortcuts
+- **Schema hints** (allowed file extensions per dataset)
+- **Spatial layers** declared alongside tabular sources
 
-Compared to spreadsheets or ad hoc scripts, the TEA Data Engine dramatically reduces errors, saves development time, and opens doors to richer, more nuanced educational analyses. It’s the ideal tool for analysts, policymakers, and developers who want to move fast without sacrificing rigor.
+Example (excerpt):
+
+```yaml
+year_min: 2009
+
+data_sources:
+  accountability:
+    2025: data/accountability/2025-enhanced-statewide-summary-after-2023-appeal.xlsx
+    latest: 2025
+
+spatial:
+  districts:
+    2025: data/shapes/Current_Districts_2025.geojson
+  campuses:
+    2025: data/shapes/Schools_2024_to_2025.geojson
+
+schema:
+  data_sources:
+    accountability: ["parquet","csv","xlsx"]
+  spatial:
+    districts: ["geojson","gpkg","parquet"]
+    campuses: ["geojson","gpkg","parquet"]
+```
+
+**Programmatic access**
+
+```python
+from teadata.teadata_config import load_config
+cfg = load_config("teadata_sources.yaml")
+
+# Resolve “best” file for a year (exact match or nearest prior)
+resolved_year, path = cfg["data_sources", "accountability", 2025]
+print(resolved_year, path)
+
+# Quick availability report
+print(cfg.availability_report())
+```
+
+**Cross-dataset joins**
+
+Use the provided helpers to normalize `district_number` and join TAPR/PEIMS/etc. without fighting column name variations.
 
 ---
 
-## 🗂️ Repository Structure
+## Performance notes
 
-The repository is thoughtfully organized to support extensibility and ease of use:
-
-- `classes.py`: Core object models including `District`, `Campus`, and `DataEngine` that form the foundation of the toolkit.
-- `load_data.py` / `load_data2.py`: Scripts to build the repository from raw datasets or cached snapshots, facilitating flexible data ingestion workflows.
-- `enrichment/`: Modular enrichment logic organized by entity type (districts, campuses) and dataset, enabling easy addition of new data sources.
-- `.cache/`: Stores prebuilt `.pkl` snapshots for instant loading and reproducibility.
-- `shapes/`: GeoJSON boundaries for spatial analysis (not included in repo by default to save space).
-- `accountability/`: Source spreadsheets and reports (not included by default), supporting transparency and traceability.
-
-This structure supports clean separation of concerns, encourages modular development, and makes it easy to extend or customize the engine for your unique needs.
+- **Shapely 2.x + STRtree** powers nearest and containment queries at scale.
+- **One-time precomputation** during repo build: district ➜ campuses index, ID maps, clean normalizations.
+- **Cache everything**: Snapshots persist the derived indices; reloads are **milliseconds**, not minutes.
+- **Slow-path sanity check** on spatial containment can be toggled, and only runs when the fast path returns 0 where >0 is expected.
 
 ---
 
-## 📝 License
+## Repo layout
 
-MIT License. See `LICENSE` for details.
+- `teadata/classes.py` — models (`District`, `Campus`, `DataEngine`), query object, spatial index.
+- `teadata/load_data.py` / `teadata/load_data2.py` — examples/scripts to build and snapshot repos from raw sources.
+- `teadata/teadata_config.py` — config reader/validator (YAML/TOML), year-resolution, schema validation.
+- `teadata/enrichment/` — modular enrichment functions (districts, campuses, charter networks, etc.).
+- `.cache/` — binary snapshots (`repo_*.pkl`) for instant loads.
 
 ---
 
-With the TEA Data Engine, you’re equipped with a cutting-edge toolkit that makes Texas education data more accessible, analyzable, and actionable than ever before. Experience faster workflows, richer insights, and a new level of research power—try it today!
+## FAQ
+
+**Q: Where do snapshots live?**  
+A: Prefer the package-internal `.cache/` for the “best known” snapshot. The loader also searches your repo root `.cache/`.
+
+**Q: Does `district_number` need an apostrophe?**  
+A: Normalizers accept either digits-only or apostrophe-prefixed strings and standardize internally.
+
+**Q: Can I chain spatial + attribute filters?**  
+A: Yes — use `>>` to compose: `engine >> ("within", d, "campuses") >> (lambda c: c.rating in {"A","B"})`.
+
+---
+
+## License
+
+MIT. See `LICENSE`.
+
+---
+
+If you build cool analyses or add new enrichments (finance, demographics, staffing), PRs welcome. This toolkit is meant to cut hours of wrangling to minutes and make room for the hard, interesting questions.

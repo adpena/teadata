@@ -331,16 +331,16 @@ class District:
         return polygon_area(list(self.polygon))
 
     @property
-    def campuses(self) -> list["Campus"]:
+    def campuses(self) -> "EntityList":
         """
         All campuses whose district_id == this district's id, using the engine's index.
-        Returns an empty list if the district is not attached to a DataEngine.
+        Returns an empty EntityList if the district is not attached to a DataEngine.
         """
         repo = getattr(self, "_repo", None)
         if repo is None:
-            return []
+            return EntityList()
         ids = repo._campuses_by_district.get(self.id, [])
-        return [repo._campuses[cid] for cid in ids]
+        return EntityList([repo._campuses[cid] for cid in ids])
 
     # --------- Prepared polygon for fast point-in-polygon checks (Shapely only) ---------
     if SHAPELY:
@@ -384,9 +384,9 @@ class Campus:
     id: uuid.UUID
     district_id: uuid.UUID
     name: str
-    enrollment: int
     charter_type: str
     is_charter: bool
+    enrollment: Optional[int] = None
     rating: Optional[str] = None
 
     aea: Optional[bool] = None
@@ -573,6 +573,181 @@ def _discover_snapshot(explicit: str | Path | None = None) -> Optional[Path]:
 
     return None
 
+
+# --------- Rich mapping containers (pandas-like helpers) ---------
+
+class EntityMap(dict):
+    """
+    Dict keyed by UUID with District/Campus values, with pandas-like helpers.
+    You can call .unique() directly on these maps.
+    """
+
+    def unique(self, attr, *, dropna: bool = True, sort: bool = True):
+        """
+        Return unique values of an attribute across all entities in this map.
+
+        - attr can be a string attribute name (canonical or enriched via .meta),
+          or a callable taking the entity and returning a value.
+        - dropna: skip None values
+        - sort: return a sorted list
+        """
+        if callable(attr):
+            getter = attr
+        else:
+            getter = lambda o: getattr(o, attr, None)
+
+        vals = set()
+        for obj in self.values():
+            try:
+                v = getter(obj)
+            except Exception:
+                v = None
+            if v is None and dropna:
+                continue
+            vals.add(v)
+        out = list(vals)
+        if sort:
+            try:
+                out.sort()
+            except Exception:
+                # heterogeneous types may not sort; leave as-is
+                pass
+        return out
+
+    def value_counts(self, attr, *, dropna: bool = True, sort: bool = True, descending: bool = True):
+        """
+        Return counts of values for an attribute across all entities in this map.
+
+        - attr can be a string attribute name (canonical or enriched via .meta),
+          or a callable taking the entity and returning a value.
+        - dropna: skip None values
+        - sort: return a sorted list (by count desc/asc depending on `descending`)
+
+        Returns:
+            List[Tuple[value, count]] if sort=True, else a dict[value] = count
+        """
+        if callable(attr):
+            getter = attr
+        else:
+            getter = lambda o: getattr(o, attr, None)
+
+        counts = {}
+        for obj in self.values():
+            try:
+                v = getter(obj)
+            except Exception:
+                v = None
+            if v is None and dropna:
+                continue
+            counts[v] = counts.get(v, 0) + 1
+
+        if sort:
+            items = list(counts.items())
+            items.sort(key=lambda kv: (-(kv[1]) if descending else kv[1], kv[0]))
+            return items
+        return counts
+
+
+class EntityList(list):
+    """
+    A thin wrapper around list to add Pandas-like helpers for District and Campus collections.
+    """
+
+    def unique(self, attr):
+        """
+        Return sorted unique values of an attribute across all objects in the list.
+        Example:
+            districts.unique("rating")
+        """
+        if callable(attr):
+            getter = attr
+        else:
+            getter = lambda o: getattr(o, attr, None)
+        values = [getter(obj) for obj in self]
+        return sorted(set(v for v in values if v is not None))
+
+    def value_counts(self, attr, *, dropna: bool = True, sort: bool = True, descending: bool = True):
+        """
+        Return counts of values for an attribute across all objects in the list.
+        Returns a list of (value, count) pairs by default (sorted by count).
+        """
+        if callable(attr):
+            getter = attr
+        else:
+            getter = lambda o: getattr(o, attr, None)
+
+        counts = {}
+        for obj in self:
+            try:
+                v = getter(obj)
+            except Exception:
+                v = None
+            if v is None and dropna:
+                continue
+            counts[v] = counts.get(v, 0) + 1
+
+        if sort:
+            items = list(counts.items())
+            items.sort(key=lambda kv: (-(kv[1]) if descending else kv[1], kv[0]))
+            return items
+        return counts
+
+    def head(self, n=5):
+        """Return the first n elements, like pandas.DataFrame.head()."""
+        return self[:n]
+
+    def sample(self, n=5, seed=None):
+        """Random sample of n elements."""
+        import random
+        rng = random.Random(seed)
+        return rng.sample(self, min(n, len(self)))
+
+
+class ReadOnlyEntityView:
+    """
+    Read-only view that exposes mapping operations and EntityMap helpers (e.g., .unique()).
+    Prevents accidental mutation while keeping a nice, pandas-like API at the repo surface:
+
+        repo.districts.unique("rating")
+        repo.campuses.unique(lambda c: c.charter_type)
+    """
+
+    __slots__ = ("_m",)
+
+    def __init__(self, backing: EntityMap):
+        self._m = backing
+
+    # --- read-only mapping protocol ---
+    def __len__(self):
+        return len(self._m)
+
+    def __iter__(self):
+        return iter(self._m)
+
+    def __getitem__(self, k):
+        return self._m[k]
+
+    def keys(self):
+        return self._m.keys()
+
+    def values(self):
+        return self._m.values()
+
+    def items(self):
+        return self._m.items()
+
+    # --- helpers mirrored from EntityMap ---
+    def unique(self, *args, **kwargs):
+        return self._m.unique(*args, **kwargs)
+
+    def value_counts(self, *args, **kwargs):
+        return self._m.value_counts(*args, **kwargs)
+
+    # Let hasattr()/dir() discover helper methods cleanly
+    def __dir__(self):
+        base = set(type(self).__dict__.keys())
+        base.update(["unique", "value_counts", "keys", "values", "items"])
+        return sorted(base)
 
 # --------- Chainable query wrapper for repo results ---------
 class Query:
@@ -1315,8 +1490,8 @@ class DataEngine:
             # If we got a different instance, copy its state into self
             if eng is not self:
                 # Initialize empty containers first (will be re-assigned below)
-                self._districts = {}
-                self._campuses = {}
+                self._districts = EntityMap()
+                self._campuses = EntityMap()
                 self._campuses_by_district = defaultdict(list)
                 # Copy over the dictionaries
                 try:
@@ -1343,8 +1518,8 @@ class DataEngine:
                 self._rebuild_indexes()
                 return
         # Normal cold init (no snapshot)
-        self._districts: Dict[uuid.UUID, District] = {}
-        self._campuses: Dict[uuid.UUID, Campus] = {}
+        self._districts: Dict[uuid.UUID, District] = EntityMap()
+        self._campuses: Dict[uuid.UUID, Campus] = EntityMap()
         self._campuses_by_district: Dict[uuid.UUID, List[uuid.UUID]] = defaultdict(list)
         self._in_bulk = False
         # Spatial/attribute indexes (optional, built on demand)
@@ -1374,17 +1549,16 @@ class DataEngine:
     @property
     def districts(self):
         """
-        Read-only mapping of {uuid.UUID: District}.
-        Use DataEngine methods to mutate; external callers get an immutable view.
+        Read-only mapping of {uuid.UUID: District} with pandas-like helpers (.unique).
         """
-        return MappingProxyType(self._districts)
+        return ReadOnlyEntityView(self._districts)
 
     @property
     def campuses(self):
         """
-        Read-only mapping of {uuid.UUID: Campus}.
+        Read-only mapping of {uuid.UUID: Campus} with pandas-like helpers (.unique).
         """
-        return MappingProxyType(self._campuses)
+        return ReadOnlyEntityView(self._campuses)
 
     # --- Convenience name lookups ---
     def district_by_name(self, name: str) -> Optional["District"]:
@@ -1896,7 +2070,7 @@ class DataEngine:
             if c.district_id in self._districts:
                 self._campuses_by_district[c.district_id].append(c.id)
 
-    def campuses_in(self, d: Any) -> List[Campus]:
+    def campuses_in(self, d: Any) -> "EntityList":
         """
         Return campuses for a district. Accepts:
           - District
@@ -1905,7 +2079,7 @@ class DataEngine:
         d = _unwrap_query(d)
         if d is None or not hasattr(d, "id"):
             raise ValueError("campuses_in expects a District or a Query[District]")
-        return [self._campuses[cid] for cid in self._campuses_by_district.get(d.id, [])]
+        return EntityList([self._campuses[cid] for cid in self._campuses_by_district.get(d.id, [])])
 
     def charter_campuses_within(self, district: Any):
         """

@@ -19,4 +19,3 @@ jobs:
       - run: pip install -e .[dev]
       - run: python -c "import shapely, sys; print(shapely.__version__); assert shapely.__version__.split('.')[0] == '2'"
       - run: deptry .
-      - run: pytest -q

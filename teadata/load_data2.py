@@ -406,9 +406,9 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                     for d in repo._districts.values()
                     if getattr(d, "district_number", None)
                 }
-                print(f"[virtual] added {charter_networks} statewide districts")
+                print(f"[charters] added {charter_networks} statewide districts")
         except Exception as e:
-            print(f"[virtual] add failed: {e}")
+            print(f"[charters] add failed: {e}")
 
         # Add default fallback District object
         fallback_district = District(
