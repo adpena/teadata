@@ -379,6 +379,44 @@ class District:
             base.extend(k for k in m.keys() if isinstance(k, str))
         return sorted(set(base))
 
+    def to_dict(self, *, include_meta: bool = True, include_geometry: bool = False) -> dict:
+        """
+        Serialize this District into a plain dict suitable for DataFrame/JSON.
+
+        Args:
+            include_meta: include enrichment fields stored in self.meta
+            include_geometry: include simple geometry representation (bounds; and WKT if available)
+
+        Notes:
+            Geometry is summarized to avoid heavy objects in JSON/DFs.
+        """
+        out = {
+            "id": str(self.id),
+            "name": self.name,
+            "enrollment": self.enrollment,
+            "district_number": self.district_number,
+            "aea": self.aea,
+            "rating": self.rating,
+        }
+        if include_meta and isinstance(self.meta, dict):
+            # Do not overwrite canonical keys
+            for k, v in self.meta.items():
+                if k not in out:
+                    out[k] = v
+
+        if include_geometry:
+            poly = getattr(self, "polygon", None)
+            try:
+                if poly is not None:
+                    # Prefer shapely attributes if present
+                    b = poly.bounds if hasattr(poly, "bounds") else None
+                    out["geometry_bounds"] = tuple(b) if b else None
+                    if hasattr(poly, "wkt"):
+                        out["geometry_wkt"] = poly.wkt
+            except Exception:
+                out["geometry_bounds"] = None
+        return out
+
 
 @validate_non_empty_str("name")
 @dataclass(slots=True)
@@ -429,6 +467,47 @@ class Campus:
         if isinstance(m, dict):
             base.extend(k for k in m.keys() if isinstance(k, str))
         return sorted(set(base))
+
+    def to_dict(self, *, include_meta: bool = True, include_geometry: bool = False) -> dict:
+        """
+        Serialize this Campus into a plain dict suitable for DataFrame/JSON.
+
+        Args:
+            include_meta: include enrichment fields stored in self.meta
+            include_geometry: include simple geometry representation (lon/lat; WKT if available)
+        """
+        out = {
+            "id": str(self.id),
+            "district_id": str(self.district_id) if self.district_id else None,
+            "name": self.name,
+            "charter_type": self.charter_type,
+            "is_charter": self.is_charter,
+            "enrollment": self.enrollment,
+            "rating": self.rating,
+            "aea": self.aea,
+            "grade_range": self.grade_range,
+            "school_type": self.school_type,
+            "school_status_date": self.school_status_date.isoformat() if hasattr(self.school_status_date, "isoformat") else self.school_status_date,
+            "update_date": self.update_date.isoformat() if hasattr(self.update_date, "isoformat") else self.update_date,
+            "district_number": self.district_number,
+            "campus_number": self.campus_number,
+        }
+        if include_meta and isinstance(self.meta, dict):
+            for k, v in self.meta.items():
+                if k not in out:
+                    out[k] = v
+
+        if include_geometry:
+            pt = getattr(self, "point", None) or getattr(self, "location", None)
+            try:
+                if pt is not None:
+                    out["lon"] = float(pt.x) if hasattr(pt, "x") else float(pt[0])
+                    out["lat"] = float(pt.y) if hasattr(pt, "y") else float(pt[1])
+                    if hasattr(pt, "wkt"):
+                        out["geometry_wkt"] = pt.wkt
+            except Exception:
+                out["lon"] = out["lat"] = None
+        return out
 
     @property
     def district(self) -> Optional["District"]:
@@ -580,6 +659,29 @@ def _discover_snapshot(explicit: str | Path | None = None) -> Optional[Path]:
 
 
 class EntityMap(dict):
+    def to_dicts(self, *, include_meta: bool = True, include_geometry: bool = False) -> list[dict]:
+        rows = []
+        for obj in self.values():
+            if hasattr(obj, "to_dict"):
+                rows.append(obj.to_dict(include_meta=include_meta, include_geometry=include_geometry))
+            else:
+                try:
+                    rows.append(dict(vars(obj)))
+                except Exception:
+                    rows.append({"value": obj})
+        return rows
+
+    def to_df(self, columns: list[str] | None = None, *, include_meta: bool = True, include_geometry: bool = False):
+        try:
+            import pandas as pd  # type: ignore
+        except Exception as e:
+            raise ImportError("pandas is required for .to_df(); install pandas to use this feature") from e
+        data = self.to_dicts(include_meta=include_meta, include_geometry=include_geometry)
+        df = pd.DataFrame(data)
+        if columns is not None:
+            cols = [c for c in columns if c in df.columns]
+            df = df[cols]
+        return df
     """
     Dict keyed by UUID with District/Campus values, with pandas-like helpers.
     You can call .unique() directly on these maps.
@@ -654,6 +756,39 @@ class EntityMap(dict):
 
 
 class EntityList(list):
+    def to_dicts(self, *, include_meta: bool = True, include_geometry: bool = False) -> list[dict]:
+        """
+        Convert this collection of entities into a list of dicts by calling .to_dict() on each.
+        Falls back to vars(obj) if an entity lacks .to_dict().
+        """
+        rows = []
+        for obj in self:
+            if hasattr(obj, "to_dict"):
+                rows.append(obj.to_dict(include_meta=include_meta, include_geometry=include_geometry))
+            else:
+                # basic fallback
+                try:
+                    d = dict(vars(obj))
+                except Exception:
+                    d = {"value": obj}
+                rows.append(d)
+        return rows
+
+    def to_df(self, columns: list[str] | None = None, *, include_meta: bool = True, include_geometry: bool = False):
+        """
+        Return a pandas DataFrame for this collection. Requires pandas.
+        """
+        try:
+            import pandas as pd  # type: ignore
+        except Exception as e:
+            raise ImportError("pandas is required for .to_df(); install pandas to use this feature") from e
+        data = self.to_dicts(include_meta=include_meta, include_geometry=include_geometry)
+        df = pd.DataFrame(data)
+        if columns is not None:
+            # Only keep requested columns that actually exist
+            cols = [c for c in columns if c in df.columns]
+            df = df[cols]
+        return df
     """
     A thin wrapper around list to add Pandas-like helpers for District and Campus collections.
     """
@@ -754,12 +889,107 @@ class ReadOnlyEntityView:
     # Let hasattr()/dir() discover helper methods cleanly
     def __dir__(self):
         base = set(type(self).__dict__.keys())
-        base.update(["unique", "value_counts", "keys", "values", "items"])
+        base.update(["unique", "value_counts", "keys", "values", "items", "to_df", "to_dicts"])
         return sorted(base)
+
+    def to_dicts(self, *args, **kwargs):
+        return self._m.to_dicts(*args, **kwargs)
+
+    def to_df(self, *args, **kwargs):
+        return self._m.to_df(*args, **kwargs)
 
 
 # --------- Chainable query wrapper for repo results ---------
 class Query:
+    def to_dicts(self, *, include_meta: bool = True, include_geometry: bool = False) -> list[dict]:
+        """
+        Materialize the current query items as a list of dicts suitable for DataFrame/JSON.
+
+        This method is tuple-aware:
+        - If an item is a 3-tuple of (Campus, Campus|None, miles), it will be flattened
+          into a single dict with "campus_*" and "match_*" prefixes plus "distance_miles".
+        - For any other tuple shape, each element is flattened with prefixes "p0_", "p1_", ...
+          to avoid column-name collisions.
+        """
+        def _obj_to_basic_dict(obj, *, prefix: str = "") -> dict:
+            # Prefer each object's own serializer if available
+            if hasattr(obj, "to_dict"):
+                d = obj.to_dict(include_meta=include_meta, include_geometry=include_geometry)
+            else:
+                try:
+                    d = dict(vars(obj))
+                except Exception:
+                    # Fallback to a minimal representation
+                    d = {"value": obj}
+            if prefix:
+                return {f"{prefix}{k}": v for k, v in d.items()}
+            return d
+
+        rows = []
+        for item in self._items:
+            # Special-case: results from >> ("nearest_charter_same_type",)
+            # expected shape: (Campus, Campus|None, miles: float|None)
+            try:
+                from .classes import Campus  # relative import-safe if packaged
+            except Exception:
+                Campus = None  # type: ignore
+
+            if isinstance(item, tuple):
+                # Detect the nearest-charter tuple signature robustly
+                is_ncst = (
+                    len(item) == 3
+                    and (Campus is not None)
+                    and (getattr(item[0].__class__, "__name__", "") == "Campus")
+                    and (item[1] is None or getattr(item[1].__class__, "__name__", "") == "Campus")
+                )
+                if is_ncst:
+                    campus, match, miles = item
+                    row = {}
+                    row.update(_obj_to_basic_dict(campus, prefix="campus_"))
+                    if match is not None:
+                        row.update(_obj_to_basic_dict(match, prefix="match_"))
+                    else:
+                        # Provide consistent keys for the "match_" side when missing
+                        row["match_id"] = None
+                        row["match_name"] = None
+                        row["match_enrollment"] = None
+                        row["match_rating"] = None
+                        row["match_school_type"] = None
+                        row["match_district_number"] = None
+                        row["match_campus_number"] = None
+                    row["distance_miles"] = miles
+                    rows.append(row)
+                    continue
+
+                # Generic tuple flattening: prefix p0_, p1_, ...
+                row = {}
+                for i, elem in enumerate(item):
+                    row.update(_obj_to_basic_dict(elem, prefix=f"p{i}_"))
+                rows.append(row)
+                continue
+
+            # Non-tuple items use the normal single-object path
+            rows.append(_obj_to_basic_dict(item))
+
+        return rows
+
+    def to_df(self, columns: list[str] | None = None, *, include_meta: bool = True, include_geometry: bool = False):
+        """
+        Materialize the current query items as a pandas DataFrame (requires pandas).
+
+        Tuple rows are auto-flattened with prefixes (e.g., "campus_*", "match_*", or "p0_*")
+        to avoid column collisions.
+        """
+        try:
+            import pandas as pd  # type: ignore
+        except Exception as e:
+            raise ImportError("pandas is required for .to_df(); install pandas to use this feature") from e
+        data = self.to_dicts(include_meta=include_meta, include_geometry=include_geometry)
+        df = pd.DataFrame(data)
+        if columns is not None:
+            cols = [c for c in columns if c in df.columns]
+            df = df[cols]
+        return df
     """
     Lightweight, chainable view over a list of repo objects (Districts/Campuses).
     Enables: repo >> ("nearest_charter", (x,y), 200, 25) >> ("filter", pred) >> ("take", 5)
@@ -1105,6 +1335,34 @@ class Query:
                 coords[0], coords[1], k, charter_only=charter_only
             )
             self._items = items
+            return self
+
+        if key == "nearest_charter_same_type":
+            # Usage:
+            #   (repo >> ("campuses_in", district)) >> ("nearest_charter_same_type", k)
+            # or, starting from a District chainable:
+            #   (repo >> ("district", "ALDINE ISD")) >> ("campuses_in",) >> ("nearest_charter_same_type",)
+            k = int(op[1]) if len(op) >= 2 else 1
+
+            # Determine campuses from current items
+            campuses: List[Any] = []
+            for item in self._items:
+                if item.__class__.__name__ == "Campus":
+                    campuses.append(item)
+                elif item.__class__.__name__ == "District":
+                    campuses.extend(self._repo.campuses_in(item))
+            if not campuses:
+                self._items = []
+                return self
+
+            res = self._repo.nearest_charter_same_type(campuses, k=k)
+
+            # Represent each result as a tuple (campus, match, miles)
+            out = []
+            for c in campuses:
+                r = res.get(str(c.id), {"match": None, "miles": None})
+                out.append((c, r["match"], r["miles"]))
+            self._items = out
             return self
 
         raise ValueError(f"Unsupported Query op: {op!r}")
@@ -1691,6 +1949,13 @@ class DataEngine:
 
                 return Query(matches, self)
 
+            if key == "campuses_in":
+                # Accept a District instance or a Query[District]; unwrap if needed
+                district = _unwrap_query(query[1])
+                if district is None:
+                    return Query([], self)
+                return Query(self.campuses_in(district), self)
+
             if key == "charters_within":
                 district = _unwrap_query(query[1])
                 return Query(self.charter_campuses_within(district), self)
@@ -2110,6 +2375,148 @@ class DataEngine:
         results.sort(key=lambda t: t[0])
         return [c for _, c in results[:k]]
 
+    def nearest_charter_same_type(
+            self,
+            campuses: Iterable["Campus"],
+            *,
+            k: int = 1,
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        For each campus in `campuses`, find the nearest charter campus with the *same* school_type.
+        Returns a dict keyed by str(campus.id) -> {"match": Campus|None, "miles": float|None}.
+
+        Implementation:
+        - Group target campuses by school_type.
+        - Build a KDTree per school_type over charter campuses only (if SciPy available).
+        - Fallback to vectorized / brute-force when SciPy is unavailable.
+        """
+        from collections import defaultdict
+        try:
+            import numpy as np  # type: ignore
+        except Exception:
+            np = None  # type: ignore
+
+        by_type_targets: Dict[str, list[Campus]] = defaultdict(list)
+        for c in campuses:
+            st = (getattr(c, "school_type", None) or "").strip()
+            p = getattr(c, "point", None) or getattr(c, "location", None)
+            if not st or p is None:
+                continue
+            by_type_targets[st].append(c)
+
+        if not by_type_targets:
+            return {}
+
+        by_type_charters_xy: Dict[str, list[tuple[float, float]]] = defaultdict(list)
+        by_type_charters_obj: Dict[str, list[Campus]] = defaultdict(list)
+        for cand in self._campuses.values():
+            if not getattr(cand, "is_charter", False):
+                continue
+            st = (getattr(cand, "school_type", None) or "").strip()
+            if not st:
+                continue
+            p = getattr(cand, "point", None) or getattr(cand, "location", None)
+            if p is None:
+                continue
+            try:
+                x, y = float(p.x), float(p.y)
+            except Exception:
+                continue
+            by_type_charters_xy[st].append((x, y))
+            by_type_charters_obj[st].append(cand)
+
+        trees: Dict[str, Any] = {}
+        degcoords: Dict[str, Any] = {}
+        for st, xy in by_type_charters_xy.items():
+            if not xy:
+                continue
+            if np is None:
+                trees[st] = None
+                degcoords[st] = xy
+                continue
+            arr_deg = np.array(xy, dtype=float)
+            try:
+                from scipy.spatial import cKDTree  # type: ignore
+            except Exception:
+                trees[st] = None
+                degcoords[st] = arr_deg
+                continue
+            arr_rad = np.radians(arr_deg)
+            trees[st] = cKDTree(arr_rad)
+            degcoords[st] = arr_deg  # keep degrees for accurate miles
+
+        results: Dict[str, Dict[str, Any]] = {}
+        R = 3958.7613  # miles
+
+        for st, targets in by_type_targets.items():
+            tree = trees.get(st)
+            cand_deg = degcoords.get(st)
+            cand_objs = by_type_charters_obj.get(st, [])
+            if not cand_objs:
+                for c in targets:
+                    results[str(c.id)] = {"match": None, "miles": None}
+                continue
+
+            tgt_pairs = []
+            tgt_list = []
+            for c in targets:
+                p = getattr(c, "point", None) or getattr(c, "location", None)
+                if p is None:
+                    continue
+                try:
+                    lon, lat = float(p.x), float(p.y)
+                except Exception:
+                    continue
+                tgt_pairs.append((lon, lat))
+                tgt_list.append(c)
+
+            if not tgt_list:
+                continue
+
+            if tree is not None and np is not None:
+                tgt_deg = np.array(tgt_pairs, dtype=float)
+                tgt_rad = np.radians(tgt_deg)
+                from .classes import haversine_miles
+                d_rad, idx = tree.query(tgt_rad, k=1)
+                idx = np.atleast_1d(idx)
+                for (lon1, lat1), j, camp in zip(tgt_deg, idx, tgt_list):
+                    lon2, lat2 = cand_deg[int(j)]
+                    dm = haversine_miles(lon1, lat1, float(lon2), float(lat2))
+                    results[str(camp.id)] = {"match": cand_objs[int(j)], "miles": float(dm)}
+            else:
+                # fallback
+                try:
+                    import numpy as np  # type: ignore
+                except Exception:
+                    np = None  # type: ignore
+
+                from .classes import haversine_miles
+                if np is None:
+                    for (lon1, lat1), camp in zip(tgt_pairs, tgt_list):
+                        best_dm, best_idx = None, None
+                        for j, (lon2, lat2) in enumerate(cand_deg):
+                            dm = haversine_miles(lon1, lat1, float(lon2), float(lat2))
+                            if best_dm is None or dm < best_dm:
+                                best_dm, best_idx = dm, j
+                        results[str(camp.id)] = {
+                            "match": cand_objs[best_idx] if best_idx is not None else None,
+                            "miles": float(best_dm) if best_dm is not None else None,
+                        }
+                else:
+                    cand_arr = np.array(cand_deg, dtype=float)
+                    for (lon1, lat1), camp in zip(tgt_pairs, tgt_list):
+                        lon2r = np.radians(cand_arr[:, 0])
+                        lat2r = np.radians(cand_arr[:, 1])
+                        lon1r, lat1r = np.radians([lon1, lat1])
+                        dlon = lon2r - lon1r
+                        dlat = lat2r - lat1r
+                        a = np.sin(dlat / 2) ** 2 + np.cos(lat1r) * np.cos(lat2r) * np.sin(dlon / 2) ** 2
+                        miles = R * 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
+                        j = int(np.argmin(miles))
+                        results[str(camp.id)] = {"match": cand_objs[j], "miles": float(miles[j])}
+
+        return results
+
     # --- CRUD ---
     def add_district(self, d: District):
         d._repo = self
@@ -2423,3 +2830,23 @@ if __name__ == "__main__":
     match aisd:
         case District(name, enr) if enr > 70000:
             print(f"Match says: {aisd:brief}")
+
+    def to_df(self, which: str = "districts", **kwargs):
+        """
+        Convenience: DataFrame of 'districts' or 'campuses'.
+        Example: repo.to_df("campuses", columns=["name","enrollment"])
+        """
+        if which == "districts":
+            return self.districts.to_df(**kwargs)
+        elif which == "campuses":
+            return self.campuses.to_df(**kwargs)
+        else:
+            raise ValueError("which must be 'districts' or 'campuses'")
+
+    def to_dicts(self, which: str = "districts", **kwargs) -> list[dict]:
+        if which == "districts":
+            return self.districts.to_dicts(**kwargs)
+        elif which == "campuses":
+            return self.campuses.to_dicts(**kwargs)
+        else:
+            raise ValueError("which must be 'districts' or 'campuses'")
