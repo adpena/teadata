@@ -1,10 +1,9 @@
 from __future__ import annotations
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields, is_dataclass
 from functools import lru_cache, cached_property, singledispatchmethod, wraps
 from typing import Iterable, List, Dict, Optional, Any, Callable, Tuple
 from contextlib import contextmanager
 from collections import defaultdict
-from types import MappingProxyType
 from datetime import date
 import math
 import time
@@ -14,7 +13,10 @@ import os
 import pickle
 import io
 
-from teadata.teadata_config import normalize_district_number_value
+from teadata.teadata_config import (
+    normalize_district_number_value,
+    normalize_campus_number_value,
+)
 
 try:
     from platformdirs import user_cache_dir  # type: ignore
@@ -244,9 +246,13 @@ class District:
     id: uuid.UUID
     name: str
     enrollment: Optional[int] = None
-    district_number: str = field(default="")
+    district_number: str = ""     # public, with apostrophe for display/export
     aea: Optional[bool] = None
     rating: Optional[str] = None
+
+    # hidden canonical
+    _district_number_canon: str = field(init=False, repr=False, compare=False)
+
     boundary: Any = field(
         default=None, repr=False
     )  # handled by GeoField descriptor below
@@ -264,6 +270,15 @@ class District:
         # route boundary to descriptor-backed 'polygon' for validation
         if self.boundary is not None:
             self.polygon = self.boundary
+
+        # 1) derive canonical key (no apostrophe)
+        cdn = normalize_district_number_value(self.district_number)
+        if not cdn:
+            # keep empty, but set a sane canonical token for internal maps
+            cdn = ""
+        self._district_number_canon = cdn
+        # 2) force public attr to *apostrophe* style for consistency if you want that look
+        self.district_number = _fmt_apostrophe(cdn) or self.district_number
 
     # --- Operator overloading ideas ---
 
@@ -324,6 +339,11 @@ class District:
     # pattern matching convenience (match by name/enrollment)
     __match_args__ = ("name", "enrollment")
 
+    # Convenience accessor for internal logic
+    @property
+    def district_number_canon(self) -> str:
+        return self._district_number_canon
+
     @cached_property
     def area(self) -> float:
         if self.polygon is None:
@@ -379,7 +399,9 @@ class District:
             base.extend(k for k in m.keys() if isinstance(k, str))
         return sorted(set(base))
 
-    def to_dict(self, *, include_meta: bool = True, include_geometry: bool = False) -> dict:
+    def to_dict(
+        self, *, include_meta: bool = True, include_geometry: bool = False
+    ) -> dict:
         """
         Serialize this District into a plain dict suitable for DataFrame/JSON.
 
@@ -435,8 +457,11 @@ class Campus:
     school_status_date: Optional[date] = None
     update_date: Optional[date] = None
 
-    district_number: str = field(default="")
-    campus_number: str = field(default="")
+    district_number: Optional[str] = None
+    campus_number: Optional[str] = None
+
+    _district_number_canon: Optional[str] = field(init=False, repr=False, compare=False)
+    _campus_number_canon: Optional[str] = field(init=False, repr=False, compare=False)
 
     _repo: "DataEngine" = field(default=None, repr=False, compare=False)
 
@@ -454,6 +479,18 @@ class Campus:
         if self.location is not None:
             self.point = self.location
 
+        # District
+        cdn = normalize_district_number_value(self.district_number)
+        self._district_number_canon = cdn
+        if cdn:
+            self.district_number = _fmt_apostrophe(cdn)
+
+        # Campus
+        cdc = normalize_campus_number_value(self.campus_number)
+        self._campus_number_canon = cdc
+        if cdc:
+            self.campus_number = _fmt_apostrophe(cdc)
+
     def __getattr__(self, name: str):
         # Allow dot-access for enrichment fields stored in meta
         meta = object.__getattribute__(self, "meta")
@@ -468,7 +505,22 @@ class Campus:
             base.extend(k for k in m.keys() if isinstance(k, str))
         return sorted(set(base))
 
-    def to_dict(self, *, include_meta: bool = True, include_geometry: bool = False) -> dict:
+    def transfers_out(self) -> "EntityList":
+        """List of destination campuses this campus sends students to (ignores suppressed counts)."""
+        if not hasattr(self, "_repo") or self._repo is None:
+            return EntityList([])
+        rows = [c for (c, cnt, masked) in self._repo.transfers_out(self)]
+        return EntityList(rows)
+
+    def transfers_out_edges(self) -> list[tuple["Campus", Optional[int], bool]]:
+        """Edges as (to_campus, count, masked)."""
+        if not hasattr(self, "_repo") or self._repo is None:
+            return []
+        return self._repo.transfers_out(self)
+
+    def to_dict(
+        self, *, include_meta: bool = True, include_geometry: bool = False
+    ) -> dict:
         """
         Serialize this Campus into a plain dict suitable for DataFrame/JSON.
 
@@ -487,8 +539,16 @@ class Campus:
             "aea": self.aea,
             "grade_range": self.grade_range,
             "school_type": self.school_type,
-            "school_status_date": self.school_status_date.isoformat() if hasattr(self.school_status_date, "isoformat") else self.school_status_date,
-            "update_date": self.update_date.isoformat() if hasattr(self.update_date, "isoformat") else self.update_date,
+            "school_status_date": (
+                self.school_status_date.isoformat()
+                if hasattr(self.school_status_date, "isoformat")
+                else self.school_status_date
+            ),
+            "update_date": (
+                self.update_date.isoformat()
+                if hasattr(self.update_date, "isoformat")
+                else self.update_date
+            ),
             "district_number": self.district_number,
             "campus_number": self.campus_number,
         }
@@ -508,6 +568,14 @@ class Campus:
             except Exception:
                 out["lon"] = out["lat"] = None
         return out
+
+    @property
+    def district_number_canon(self) -> Optional[str]:
+        return self._district_number_canon
+
+    @property
+    def campus_number_canon(self) -> Optional[str]:
+        return self._campus_number_canon
 
     @property
     def district(self) -> Optional["District"]:
@@ -659,11 +727,17 @@ def _discover_snapshot(explicit: str | Path | None = None) -> Optional[Path]:
 
 
 class EntityMap(dict):
-    def to_dicts(self, *, include_meta: bool = True, include_geometry: bool = False) -> list[dict]:
+    def to_dicts(
+        self, *, include_meta: bool = True, include_geometry: bool = False
+    ) -> list[dict]:
         rows = []
         for obj in self.values():
             if hasattr(obj, "to_dict"):
-                rows.append(obj.to_dict(include_meta=include_meta, include_geometry=include_geometry))
+                rows.append(
+                    obj.to_dict(
+                        include_meta=include_meta, include_geometry=include_geometry
+                    )
+                )
             else:
                 try:
                     rows.append(dict(vars(obj)))
@@ -671,17 +745,28 @@ class EntityMap(dict):
                     rows.append({"value": obj})
         return rows
 
-    def to_df(self, columns: list[str] | None = None, *, include_meta: bool = True, include_geometry: bool = False):
+    def to_df(
+        self,
+        columns: list[str] | None = None,
+        *,
+        include_meta: bool = True,
+        include_geometry: bool = False,
+    ):
         try:
             import pandas as pd  # type: ignore
         except Exception as e:
-            raise ImportError("pandas is required for .to_df(); install pandas to use this feature") from e
-        data = self.to_dicts(include_meta=include_meta, include_geometry=include_geometry)
+            raise ImportError(
+                "pandas is required for .to_df(); install pandas to use this feature"
+            ) from e
+        data = self.to_dicts(
+            include_meta=include_meta, include_geometry=include_geometry
+        )
         df = pd.DataFrame(data)
         if columns is not None:
             cols = [c for c in columns if c in df.columns]
             df = df[cols]
         return df
+
     """
     Dict keyed by UUID with District/Campus values, with pandas-like helpers.
     You can call .unique() directly on these maps.
@@ -756,7 +841,9 @@ class EntityMap(dict):
 
 
 class EntityList(list):
-    def to_dicts(self, *, include_meta: bool = True, include_geometry: bool = False) -> list[dict]:
+    def to_dicts(
+        self, *, include_meta: bool = True, include_geometry: bool = False
+    ) -> list[dict]:
         """
         Convert this collection of entities into a list of dicts by calling .to_dict() on each.
         Falls back to vars(obj) if an entity lacks .to_dict().
@@ -764,7 +851,11 @@ class EntityList(list):
         rows = []
         for obj in self:
             if hasattr(obj, "to_dict"):
-                rows.append(obj.to_dict(include_meta=include_meta, include_geometry=include_geometry))
+                rows.append(
+                    obj.to_dict(
+                        include_meta=include_meta, include_geometry=include_geometry
+                    )
+                )
             else:
                 # basic fallback
                 try:
@@ -774,21 +865,32 @@ class EntityList(list):
                 rows.append(d)
         return rows
 
-    def to_df(self, columns: list[str] | None = None, *, include_meta: bool = True, include_geometry: bool = False):
+    def to_df(
+        self,
+        columns: list[str] | None = None,
+        *,
+        include_meta: bool = True,
+        include_geometry: bool = False,
+    ):
         """
         Return a pandas DataFrame for this collection. Requires pandas.
         """
         try:
             import pandas as pd  # type: ignore
         except Exception as e:
-            raise ImportError("pandas is required for .to_df(); install pandas to use this feature") from e
-        data = self.to_dicts(include_meta=include_meta, include_geometry=include_geometry)
+            raise ImportError(
+                "pandas is required for .to_df(); install pandas to use this feature"
+            ) from e
+        data = self.to_dicts(
+            include_meta=include_meta, include_geometry=include_geometry
+        )
         df = pd.DataFrame(data)
         if columns is not None:
             # Only keep requested columns that actually exist
             cols = [c for c in columns if c in df.columns]
             df = df[cols]
         return df
+
     """
     A thin wrapper around list to add Pandas-like helpers for District and Campus collections.
     """
@@ -889,7 +991,9 @@ class ReadOnlyEntityView:
     # Let hasattr()/dir() discover helper methods cleanly
     def __dir__(self):
         base = set(type(self).__dict__.keys())
-        base.update(["unique", "value_counts", "keys", "values", "items", "to_df", "to_dicts"])
+        base.update(
+            ["unique", "value_counts", "keys", "values", "items", "to_df", "to_dicts"]
+        )
         return sorted(base)
 
     def to_dicts(self, *args, **kwargs):
@@ -901,20 +1005,24 @@ class ReadOnlyEntityView:
 
 # --------- Chainable query wrapper for repo results ---------
 class Query:
-    def to_dicts(self, *, include_meta: bool = True, include_geometry: bool = False) -> list[dict]:
+    def to_dicts(
+        self, *, include_meta: bool = True, include_geometry: bool = False
+    ) -> list[dict]:
         """
         Materialize the current query items as a list of dicts suitable for DataFrame/JSON.
 
         This method is tuple-aware:
-        - If an item is a 3-tuple of (Campus, Campus|None, miles), it will be flattened
-          into a single dict with "campus_*" and "match_*" prefixes plus "distance_miles".
-        - For any other tuple shape, each element is flattened with prefixes "p0_", "p1_", ...
-          to avoid column-name collisions.
+        - (Campus, Campus|None, miles)   from ("nearest_charter_same_type",) → "campus_*", "match_*", "distance_miles"
+        - (Campus, Campus|None, count, masked) from ("transfers_out",)       → "campus_*", "to_*", "count", "masked"
+        - Any other tuple: each element is flattened with prefixes "p0_", "p1_", ...
         """
+
         def _obj_to_basic_dict(obj, *, prefix: str = "") -> dict:
             # Prefer each object's own serializer if available
             if hasattr(obj, "to_dict"):
-                d = obj.to_dict(include_meta=include_meta, include_geometry=include_geometry)
+                d = obj.to_dict(
+                    include_meta=include_meta, include_geometry=include_geometry
+                )
             else:
                 try:
                     d = dict(vars(obj))
@@ -928,11 +1036,6 @@ class Query:
         rows = []
         for item in self._items:
             # Special-case: results from >> ("nearest_charter_same_type",)
-            # expected shape: (Campus, Campus|None, miles: float|None)
-            try:
-                from .classes import Campus  # relative import-safe if packaged
-            except Exception:
-                Campus = None  # type: ignore
 
             if isinstance(item, tuple):
                 # Detect the nearest-charter tuple signature robustly
@@ -940,7 +1043,10 @@ class Query:
                     len(item) == 3
                     and (Campus is not None)
                     and (getattr(item[0].__class__, "__name__", "") == "Campus")
-                    and (item[1] is None or getattr(item[1].__class__, "__name__", "") == "Campus")
+                    and (
+                        item[1] is None
+                        or getattr(item[1].__class__, "__name__", "") == "Campus"
+                    )
                 )
                 if is_ncst:
                     campus, match, miles = item
@@ -961,6 +1067,36 @@ class Query:
                     rows.append(row)
                     continue
 
+                # Special-case: results from >> ("transfers_out",)
+                # Shape: (Campus, Campus|None, count, masked)
+                is_transfers = (
+                    len(item) == 4
+                    and (getattr(item[0].__class__, "__name__", "") == "Campus")
+                    and (
+                        item[1] is None
+                        or getattr(item[1].__class__, "__name__", "") == "Campus"
+                    )
+                )
+                if is_transfers:
+                    campus, to_campus, count, masked = item
+                    row = {}
+                    row.update(_obj_to_basic_dict(campus, prefix="campus_"))
+                    if to_campus is not None:
+                        row.update(_obj_to_basic_dict(to_campus, prefix="to_"))
+                    else:
+                        # Provide consistent keys when the destination campus is missing
+                        row["to_id"] = None
+                        row["to_name"] = None
+                        row["to_enrollment"] = None
+                        row["to_rating"] = None
+                        row["to_school_type"] = None
+                        row["to_district_number"] = None
+                        row["to_campus_number"] = None
+                    row["count"] = count
+                    row["masked"] = masked
+                    rows.append(row)
+                    continue
+
                 # Generic tuple flattening: prefix p0_, p1_, ...
                 row = {}
                 for i, elem in enumerate(item):
@@ -973,7 +1109,13 @@ class Query:
 
         return rows
 
-    def to_df(self, columns: list[str] | None = None, *, include_meta: bool = True, include_geometry: bool = False):
+    def to_df(
+        self,
+        columns: list[str] | None = None,
+        *,
+        include_meta: bool = True,
+        include_geometry: bool = False,
+    ):
         """
         Materialize the current query items as a pandas DataFrame (requires pandas).
 
@@ -983,13 +1125,18 @@ class Query:
         try:
             import pandas as pd  # type: ignore
         except Exception as e:
-            raise ImportError("pandas is required for .to_df(); install pandas to use this feature") from e
-        data = self.to_dicts(include_meta=include_meta, include_geometry=include_geometry)
+            raise ImportError(
+                "pandas is required for .to_df(); install pandas to use this feature"
+            ) from e
+        data = self.to_dicts(
+            include_meta=include_meta, include_geometry=include_geometry
+        )
         df = pd.DataFrame(data)
         if columns is not None:
             cols = [c for c in columns if c in df.columns]
             df = df[cols]
         return df
+
     """
     Lightweight, chainable view over a list of repo objects (Districts/Campuses).
     Enables: repo >> ("nearest_charter", (x,y), 200, 25) >> ("filter", pred) >> ("take", 5)
@@ -1363,6 +1510,50 @@ class Query:
                 r = res.get(str(c.id), {"match": None, "miles": None})
                 out.append((c, r["match"], r["miles"]))
             self._items = out
+            return self
+
+        if key == "transfers_out":
+            # Expand a list of Campus items into tuples: (campus, to_campus, count, masked)
+            campuses = [
+                it
+                for it in self._items
+                if getattr(it.__class__, "__name__", "") == "Campus"
+            ]
+            rows = []
+            for c in campuses:
+                for to_c, cnt, masked in self._repo.transfers_out(c):
+                    rows.append((c, to_c, cnt, masked))
+            self._items = rows
+            return self
+
+        if key == "transfers_in":
+            # Expand a list of Campus items into tuples: (from_campus, campus, count, masked)
+            campuses = [
+                it
+                for it in self._items
+                if getattr(it.__class__, "__name__", "") == "Campus"
+            ]
+            rows = []
+            for c in campuses:
+                for from_c, cnt, masked in self._repo.transfers_in(c):
+                    rows.append((from_c, c, cnt, masked))
+            self._items = rows
+            return self
+
+        if key == "where_to":
+            # Predicate applied to the 'to' campus when items are tuples (campus, to_campus, ...)
+            pred = op[1]
+            new_items = []
+            for it in self._items:
+                if isinstance(it, tuple) and len(it) >= 2:
+                    to_c = it[1]
+                    try:
+                        if pred(to_c):
+                            new_items.append(it)
+                    except Exception:
+                        # ignore predicate errors per-item
+                        pass
+            self._items = new_items
             return self
 
         raise ValueError(f"Unsupported Query op: {op!r}")
@@ -1771,11 +1962,25 @@ class DataEngine:
                 self._districts = EntityMap()
                 self._campuses = EntityMap()
                 self._campuses_by_district = defaultdict(list)
+
+                # Transfer enrichment diagnostics: counts of rows skipped due to missing campuses
+                self._xfers_missing = {"src": 0, "dst": 0, "either": 0}
+
                 # Copy over the dictionaries
                 try:
                     self._districts.update(eng._districts)
                     self._campuses.update(eng._campuses)
                     self._campuses_by_district.update(eng._campuses_by_district)
+
+                    # Copy enrichment maps if present
+                    self._xfers_out = getattr(eng, "_xfers_out", defaultdict(list))  # type: ignore
+                    self._xfers_in = getattr(eng, "_xfers_in", defaultdict(list))  # type: ignore
+                    self._campus_by_number = getattr(eng, "_campus_by_number", {})
+
+                    self._xfers_missing = getattr(
+                        eng, "_xfers_missing", {"src": 0, "dst": 0, "either": 0}
+                    )
+
                 except Exception:
                     pass
                 # Initialize indexes as empty; they will rebuild on demand
@@ -1793,6 +1998,24 @@ class DataEngine:
                 self._all_xy_np = None
                 self._all_campuses_np = None
                 self._xy_to_index = None
+
+                # Student transfer edges (optional enrichment).
+                # _xfers_out: campus_id -> list[(to_campus_id, count:int|None, masked:bool)]
+                # _xfers_in:  campus_id -> list[(from_campus_id, count:int|None, masked:bool)]
+                self._xfers_out: Dict[
+                    uuid.UUID, List[Tuple[uuid.UUID, Optional[int], bool]]
+                ] = defaultdict(
+                    list
+                )  # type: ignore
+                self._xfers_in: Dict[
+                    uuid.UUID, List[Tuple[uuid.UUID, Optional[int], bool]]
+                ] = defaultdict(
+                    list
+                )  # type: ignore
+
+                # Fast lookup by normalized campus number (e.g., "'101902001")
+                self._campus_by_number: Dict[str, uuid.UUID] = {}
+
                 self._rebuild_indexes()
                 return
         # Normal cold init (no snapshot)
@@ -2057,6 +2280,29 @@ class DataEngine:
         self._geom_id_to_index = None
         self._xy_deg_np = None
         self._campus_list_np = None
+
+        # Rebuild campus-number index (supports enrichment joins by campus_number)
+        try:
+            self._campus_by_number = {}
+            for cid, c in self._campuses.items():
+                num = getattr(c, "campus_number", None)
+                if not num:
+                    continue
+
+                if normalize_campus_number_value is not None:
+                    key = normalize_campus_number_value(num)
+                else:
+                    s = str(num).strip()
+                    s = s[1:] if s.startswith("'") else s
+                    s = ("000000000" + s)[-9:]
+                    key = "'" + s
+                if key:
+                    self._campus_by_number[key] = cid
+        except Exception:
+            self._campus_by_number = {}
+
+        if not hasattr(self, "_xfers_missing"):
+            self._xfers_missing = {"src": 0, "dst": 0, "either": 0}
 
     def profile(self, on: bool = True):
         global ENABLE_PROFILING
@@ -2376,10 +2622,10 @@ class DataEngine:
         return [c for _, c in results[:k]]
 
     def nearest_charter_same_type(
-            self,
-            campuses: Iterable["Campus"],
-            *,
-            k: int = 1,
+        self,
+        campuses: Iterable["Campus"],
+        *,
+        k: int = 1,
     ) -> Dict[str, Dict[str, Any]]:
         """
         For each campus in `campuses`, find the nearest charter campus with the *same* school_type.
@@ -2391,6 +2637,7 @@ class DataEngine:
         - Fallback to vectorized / brute-force when SciPy is unavailable.
         """
         from collections import defaultdict
+
         try:
             import numpy as np  # type: ignore
         except Exception:
@@ -2477,12 +2724,16 @@ class DataEngine:
                 tgt_deg = np.array(tgt_pairs, dtype=float)
                 tgt_rad = np.radians(tgt_deg)
                 from .classes import haversine_miles
+
                 d_rad, idx = tree.query(tgt_rad, k=1)
                 idx = np.atleast_1d(idx)
                 for (lon1, lat1), j, camp in zip(tgt_deg, idx, tgt_list):
                     lon2, lat2 = cand_deg[int(j)]
                     dm = haversine_miles(lon1, lat1, float(lon2), float(lat2))
-                    results[str(camp.id)] = {"match": cand_objs[int(j)], "miles": float(dm)}
+                    results[str(camp.id)] = {
+                        "match": cand_objs[int(j)],
+                        "miles": float(dm),
+                    }
             else:
                 # fallback
                 try:
@@ -2491,6 +2742,7 @@ class DataEngine:
                     np = None  # type: ignore
 
                 from .classes import haversine_miles
+
                 if np is None:
                     for (lon1, lat1), camp in zip(tgt_pairs, tgt_list):
                         best_dm, best_idx = None, None
@@ -2499,7 +2751,9 @@ class DataEngine:
                             if best_dm is None or dm < best_dm:
                                 best_dm, best_idx = dm, j
                         results[str(camp.id)] = {
-                            "match": cand_objs[best_idx] if best_idx is not None else None,
+                            "match": (
+                                cand_objs[best_idx] if best_idx is not None else None
+                            ),
                             "miles": float(best_dm) if best_dm is not None else None,
                         }
                 else:
@@ -2510,10 +2764,16 @@ class DataEngine:
                         lon1r, lat1r = np.radians([lon1, lat1])
                         dlon = lon2r - lon1r
                         dlat = lat2r - lat1r
-                        a = np.sin(dlat / 2) ** 2 + np.cos(lat1r) * np.cos(lat2r) * np.sin(dlon / 2) ** 2
+                        a = (
+                            np.sin(dlat / 2) ** 2
+                            + np.cos(lat1r) * np.cos(lat2r) * np.sin(dlon / 2) ** 2
+                        )
                         miles = R * 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
                         j = int(np.argmin(miles))
-                        results[str(camp.id)] = {"match": cand_objs[j], "miles": float(miles[j])}
+                        results[str(camp.id)] = {
+                            "match": cand_objs[j],
+                            "miles": float(miles[j]),
+                        }
 
         return results
 
@@ -2643,6 +2903,147 @@ class DataEngine:
                 pass
         return slow
 
+    # ---------------- Transfers enrichment (campus->campus edges) ----------------
+    def apply_transfers_from_dataframe(
+        self,
+        df,
+        *,
+        src_col: str = "REPORT_CAMPUS",
+        dst_col: str = "CAMPUS_RES_OR_ATTEND",
+        count_col: str = "TRANSFERS_IN_OR_OUT",
+        type_col: str = "REPORT_TYPE",
+        want_type: str = "Transfers Out To",
+    ) -> int:
+        """
+        Ingest a campus-to-campus transfer table and build bidirectional edge maps.
+        Returns the number of *source campuses* for which at least one outgoing edge was recorded.
+
+        The dataframe is expected to contain:
+          - `src_col`: source campus number (int/str), e.g. 101902001
+          - `dst_col`: destination campus number (int/str)
+          - `count_col`: number of transfers (may be masked like -999)
+          - `type_col`: when provided, only rows with `type_col == want_type` are used.
+
+        Campus numbers are normalized to canonical 9-digit apostrophe-prefixed strings
+        and mapped to repo campus UUIDs via `_campus_by_number`.
+        """
+        # Filter to the requested report type if present
+        if type_col in df.columns:
+            df = df[df[type_col] == want_type]
+
+        # Local normalizer (use shared helper when available)
+        try:
+            from .classes import normalize_campus_number_value  # type: ignore
+        except Exception:
+            normalize_campus_number_value = None  # type: ignore
+
+        def norm(x):
+            if x is None:
+                return None
+            # keep ints, int-like floats, and strings robustly
+            s = str(int(x)) if isinstance(x, float) and x == int(x) else str(x)
+            s = s.strip()
+            if normalize_campus_number_value is not None:
+                return normalize_campus_number_value(s)
+            s = s[1:] if s.startswith("'") else s
+            s = ("000000000" + s)[-9:]
+            return "'" + s
+
+        # Reset maps
+        self._xfers_out = defaultdict(list)  # type: ignore
+        self._xfers_in = defaultdict(list)  # type: ignore
+
+        # Reset diagnostics
+        self._xfers_missing = {"src": 0, "dst": 0, "either": 0}
+
+        updated_sources = set()
+
+        # Iterate rows and build edges
+        for _, row in df.iterrows():
+            src_key = norm(row.get(src_col))
+            dst_key = norm(row.get(dst_col))
+            if not src_key or not dst_key:
+                continue
+
+            src_id = self._campus_by_number.get(src_key)
+            dst_id = self._campus_by_number.get(dst_key)
+            if src_id is None or dst_id is None:
+                if src_id is None and dst_id is None:
+                    self._xfers_missing["either"] = (
+                        self._xfers_missing.get("either", 0) + 1
+                    )
+                elif src_id is None:
+                    self._xfers_missing["src"] = self._xfers_missing.get("src", 0) + 1
+                else:
+                    self._xfers_missing["dst"] = self._xfers_missing.get("dst", 0) + 1
+                # Skip edges where either side is not in the repo
+                continue
+
+            raw = row.get(count_col)
+            try:
+                cnt = int(raw)
+            except Exception:
+                cnt = None
+
+            # Many TEA files use -999 for masked small counts
+            masked = cnt is not None and cnt < 0
+            cnt = None if masked else cnt
+
+            self._xfers_out[src_id].append((dst_id, cnt, bool(masked)))
+            self._xfers_in[dst_id].append((src_id, cnt, bool(masked)))
+            updated_sources.add(src_id)
+
+        # Sort edges deterministically: largest counts first, then by campus name
+        def _sort_key(edge):
+            to_id, cnt, _ = edge
+            cobj = self._campuses.get(to_id)
+            return (-(cnt or -1), (cobj.name if cobj else ""))
+
+        for k in list(self._xfers_out.keys()):
+            self._xfers_out[k].sort(key=_sort_key)
+
+        for k in list(self._xfers_in.keys()):
+            # for transfers_in sort by the incoming count, same logic
+            from_id, cnt, _ = (
+                self._xfers_in[k][0] if self._xfers_in[k] else (None, None, None)
+            )
+            self._xfers_in[k].sort(
+                key=lambda ed: (
+                    -(ed[1] or -1),
+                    (
+                        self._campuses.get(ed[0]).name
+                        if self._campuses.get(ed[0])
+                        else ""
+                    ),
+                )
+            )
+
+        return len(updated_sources)
+
+    def transfers_out(
+        self, campus: "Campus"
+    ) -> List[Tuple["Campus", Optional[int], bool]]:
+        """Return list of (to_campus, count, masked) for a given source campus."""
+        cid = getattr(campus, "id", None)
+        out = []
+        for to_id, cnt, masked in self._xfers_out.get(cid, []):
+            c2 = self._campuses.get(to_id)
+            if c2 is not None:
+                out.append((c2, cnt, masked))
+        return out
+
+    def transfers_in(
+        self, campus: "Campus"
+    ) -> List[Tuple["Campus", Optional[int], bool]]:
+        """Return list of (from_campus, count, masked) for a given destination campus."""
+        cid = getattr(campus, "id", None)
+        out = []
+        for from_id, cnt, masked in self._xfers_in.get(cid, []):
+            c1 = self._campuses.get(from_id)
+            if c1 is not None:
+                out.append((c1, cnt, masked))
+        return out
+
     @timeit
     def nearest_campuses(
         self,
@@ -2724,6 +3125,53 @@ def load_default_repo() -> DataEngine:
     """Return a DataEngine loaded from the newest available snapshot, or an empty one."""
     return DataEngine.from_snapshot(None, search=True)
 
+
+
+def to_df(self, which: str = "districts", **kwargs):
+    """
+    Convenience: DataFrame of 'districts' or 'campuses'.
+    Example: repo.to_df("campuses", columns=["name","enrollment"])
+    """
+    if which == "districts":
+        return self.districts.to_df(**kwargs)
+    elif which == "campuses":
+        return self.campuses.to_df(**kwargs)
+    else:
+        raise ValueError("which must be 'districts' or 'campuses'")
+
+def to_dicts(self, which: str = "districts", **kwargs) -> list[dict]:
+    if which == "districts":
+        return self.districts.to_dicts(**kwargs)
+    elif which == "campuses":
+        return self.campuses.to_dicts(**kwargs)
+    else:
+        raise ValueError("which must be 'districts' or 'campuses'")
+
+
+def inspect_object(o):
+    # 1) Canonical dataclass fields
+    base = [f.name for f in fields(o)] if is_dataclass(o) else []
+    # 2) Enriched fields (live in .meta but are dot-accessible)
+    meta = sorted(getattr(o, "meta", {}).keys())
+    # 3) Public methods/attrs (handy to discover helpers/operators)
+    public = [n for n in dir(o) if not n.startswith("_")]
+
+    print("dataclass fields:", base)
+    print("enriched keys   :", meta)
+    print("public members  :", public)
+
+    # If your class implements to_dict()
+    try:
+        d = o.to_dict()
+        print("to_dict keys    :", list(d.keys()))
+    except Exception:
+        pass
+
+def _fmt_apostrophe(s: str | None) -> str | None:
+    if not s:
+        return None
+    s = str(s).strip()
+    return s if s[:1] in ("'", "’", "`") else f"'{s}"
 
 # --------- Demo data ---------
 
@@ -2830,23 +3278,3 @@ if __name__ == "__main__":
     match aisd:
         case District(name, enr) if enr > 70000:
             print(f"Match says: {aisd:brief}")
-
-    def to_df(self, which: str = "districts", **kwargs):
-        """
-        Convenience: DataFrame of 'districts' or 'campuses'.
-        Example: repo.to_df("campuses", columns=["name","enrollment"])
-        """
-        if which == "districts":
-            return self.districts.to_df(**kwargs)
-        elif which == "campuses":
-            return self.campuses.to_df(**kwargs)
-        else:
-            raise ValueError("which must be 'districts' or 'campuses'")
-
-    def to_dicts(self, which: str = "districts", **kwargs) -> list[dict]:
-        if which == "districts":
-            return self.districts.to_dicts(**kwargs)
-        elif which == "campuses":
-            return self.campuses.to_dicts(**kwargs)
-        else:
-            raise ValueError("which must be 'districts' or 'campuses'")

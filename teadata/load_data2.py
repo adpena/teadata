@@ -14,7 +14,7 @@ from typing import Optional
 from teadata import classes as _classes_mod
 from teadata import teadata_config as _cfg_mod
 from teadata.classes import District, Campus, DataEngine, _point_xy
-from teadata.teadata_config import load_config
+from teadata.teadata_config import load_config, normalize_campus_number_value
 from teadata.enrichment.districts import enrich_districts_from_config
 from teadata.enrichment.campuses import enrich_campuses_from_config
 from teadata.enrichment.charter_networks import add_charter_networks_from_config
@@ -100,6 +100,49 @@ def run_enrichments(repo: DataEngine) -> None:
         print(f"Enriched {cam_updated} campuses from {cam_year} (dataset={ds_name})")
     except Exception as e:
         print(f"[enrich] campus failed: {e}")
+
+    try:
+        cfg_obj = load_config(CFG)
+        dist_year, xfers_fp = cfg_obj.resolve(
+            "campus_transfer_reports", YEAR, section="data_sources"
+        )
+
+        df = pd.read_csv(
+            xfers_fp,
+            dtype={
+                "REPORT_CAMPUS": "string",
+                "CAMPUS_RES_OR_ATTEND": "string",
+                "TRANSFERS_IN_OR_OUT": "string",
+                "REPORT_TYPE": "string",
+            },
+        )
+        # optional: trim and coerce the count to numeric while keeping masks
+        # (apply_transfers_from_dataframe handles -999 masking too)
+        updated = repo.apply_transfers_from_dataframe(
+            df,
+            src_col="REPORT_CAMPUS",
+            dst_col="CAMPUS_RES_OR_ATTEND",
+            count_col="TRANSFERS_IN_OR_OUT",
+            type_col="REPORT_TYPE",
+            want_type="Transfers Out To",
+        )
+        print(f"[enrich:transfers] built outgoing edges for {updated} campuses")
+    except Exception as e:
+        print(f"[enrich:transfers] failed: {e}")
+
+    try:
+        yr_peims, n_peims = enrich_campuses_from_config(
+            repo,
+            CFG,
+            "campus_peims_financials",
+            YEAR,
+            select=['instruction_af_perc', 'transportation_af_per_student', 'extracurricular_af_per_student', 'security_monitoring_af_per_student', 'students_w_disabilities_af_per_student', 'bilingual_ed_af_per_student', 'dyslexia_or_related_disorder_serv_af_per_student', 'ccmr_af_per_student', 'guidance_counseling_af_per_student', 'school_leadership_af_per_student'],  # let auto-detection pick the three canonical fields
+            rename=None,
+            reader_kwargs=None,
+        )
+        print(f"Enriched {n_peims} campuses from PEIMS financials {yr_peims}")
+    except Exception as e:
+        print(f"[enrich] campus_peims_financials failed: {e}")
 
 
 def normalize_district_code(value: str | int | float) -> str:
@@ -204,7 +247,13 @@ def _compute_extra_signature() -> dict:
     # Resolved data sources that affect enrichment
     try:
         cfg = load_config(CFG)
-        for ds in ("accountability", "campus_accountability", "charter_reference"):
+        for ds in (
+                "accountability",
+                "campus_accountability",
+                "charter_reference",
+                "campus_peims_financials",
+                "campus_transfer_reports",
+        ):
             try:
                 _, p = cfg.resolve(ds, YEAR, section="data_sources")
                 sig[f"ds:{ds}"] = _safe_path_or_url_signature(p)
@@ -452,6 +501,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
 
     # Run all enrichments once data is loaded
     run_enrichments(repo)
+
     # Save snapshot for next warm start
     _save_repo_snapshot(repo, districts_fp, campuses_fp, extra_sig)
     return repo

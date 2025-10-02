@@ -28,6 +28,12 @@ data_sources:
   charter_reference:
     2025: data/charter_reference/AskTED Directory_09.30.2025.xlsx
     latest: 2025
+  campus_transfer_reports:
+    2025: data/transfer_reports/xfers_campus_2024_25.csv
+    latest: 2025
+  campus_peims_financials:
+    2024: data/campus_peims_financials/2023-2024 Campus PEIMS Actual Financials Statewide.csv
+    latest: 2024
 
 spatial:
   districts:
@@ -43,6 +49,8 @@ schema:
     accountability: ["parquet","csv", "xlsx"]
     finance: ["parquet","csv","xlsx"]
     charter_reference: ["xlsx"]
+    campus_transfer_reports: ["csv"]
+    campus_peims_financials: ["csv"]
   spatial:
     districts: ["geojson","gpkg","parquet"]
     campuses: ["geojson","gpkg","parquet"]
