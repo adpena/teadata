@@ -14,8 +14,10 @@ import pickle
 import io
 
 from teadata.teadata_config import (
-    normalize_district_number_value,
+    canonical_campus_number,
+    canonical_district_number,
     normalize_campus_number_value,
+    normalize_district_number_value,
 )
 
 try:
@@ -272,13 +274,16 @@ class District:
             self.polygon = self.boundary
 
         # 1) derive canonical key (no apostrophe)
-        cdn = normalize_district_number_value(self.district_number)
+        raw_dn = self.district_number
+        cdn = normalize_district_number_value(raw_dn)
         if not cdn:
-            # keep empty, but set a sane canonical token for internal maps
             cdn = ""
         self._district_number_canon = cdn
-        # 2) force public attr to *apostrophe* style for consistency if you want that look
-        self.district_number = _fmt_apostrophe(cdn) or self.district_number
+        if cdn:
+            can = canonical_district_number(raw_dn)
+            self.district_number = can or ""
+        else:
+            self.district_number = ""
 
     # --- Operator overloading ideas ---
 
@@ -480,16 +485,24 @@ class Campus:
             self.point = self.location
 
         # District
-        cdn = normalize_district_number_value(self.district_number)
+        raw_dn = self.district_number
+        cdn = normalize_district_number_value(raw_dn)
         self._district_number_canon = cdn
         if cdn:
-            self.district_number = _fmt_apostrophe(cdn)
+            can = canonical_district_number(raw_dn)
+            self.district_number = can or None
+        else:
+            self.district_number = None
 
         # Campus
-        cdc = normalize_campus_number_value(self.campus_number)
+        raw_cn = self.campus_number
+        cdc = normalize_campus_number_value(raw_cn)
         self._campus_number_canon = cdc
         if cdc:
-            self.campus_number = _fmt_apostrophe(cdc)
+            can = canonical_campus_number(raw_cn)
+            self.campus_number = can or None
+        else:
+            self.campus_number = None
 
     def __getattr__(self, name: str):
         # Allow dot-access for enrichment fields stored in meta
@@ -2289,15 +2302,14 @@ class DataEngine:
                 if not num:
                     continue
 
-                if normalize_campus_number_value is not None:
-                    key = normalize_campus_number_value(num)
-                else:
-                    s = str(num).strip()
-                    s = s[1:] if s.startswith("'") else s
-                    s = ("000000000" + s)[-9:]
-                    key = "'" + s
-                if key:
-                    self._campus_by_number[key] = cid
+                key = canonical_campus_number(num)
+                if not key:
+                    continue
+                self._campus_by_number[key] = cid
+                digits = key[1:]
+                self._campus_by_number[digits] = cid
+                if digits.isdigit():
+                    self._campus_by_number[str(int(digits))] = cid
         except Exception:
             self._campus_by_number = {}
 
@@ -2931,23 +2943,16 @@ class DataEngine:
         if type_col in df.columns:
             df = df[df[type_col] == want_type]
 
-        # Local normalizer (use shared helper when available)
-        try:
-            from .classes import normalize_campus_number_value  # type: ignore
-        except Exception:
-            normalize_campus_number_value = None  # type: ignore
-
         def norm(x):
             if x is None:
                 return None
             # keep ints, int-like floats, and strings robustly
             s = str(int(x)) if isinstance(x, float) and x == int(x) else str(x)
             s = s.strip()
-            if normalize_campus_number_value is not None:
-                return normalize_campus_number_value(s)
-            s = s[1:] if s.startswith("'") else s
-            s = ("000000000" + s)[-9:]
-            return "'" + s
+            key = canonical_campus_number(s)
+            if not key:
+                return None
+            return key
 
         # Reset maps
         self._xfers_out = defaultdict(list)  # type: ignore
@@ -2965,8 +2970,11 @@ class DataEngine:
             if not src_key or not dst_key:
                 continue
 
-            src_id = self._campus_by_number.get(src_key)
-            dst_id = self._campus_by_number.get(dst_key)
+            src_digits = src_key[1:] if src_key and src_key.startswith("'") else src_key
+            dst_digits = dst_key[1:] if dst_key and dst_key.startswith("'") else dst_key
+
+            src_id = self._campus_by_number.get(src_key) or self._campus_by_number.get(src_digits)
+            dst_id = self._campus_by_number.get(dst_key) or self._campus_by_number.get(dst_digits)
             if src_id is None or dst_id is None:
                 if src_id is None and dst_id is None:
                     self._xfers_missing["either"] = (
@@ -3166,12 +3174,6 @@ def inspect_object(o):
         print("to_dict keys    :", list(d.keys()))
     except Exception:
         pass
-
-def _fmt_apostrophe(s: str | None) -> str | None:
-    if not s:
-        return None
-    s = str(s).strip()
-    return s if s[:1] in ("'", "’", "`") else f"'{s}"
 
 # --------- Demo data ---------
 
