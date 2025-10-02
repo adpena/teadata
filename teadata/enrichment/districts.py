@@ -6,8 +6,8 @@ from . import enricher
 from .base import Enricher
 
 from teadata.teadata_config import load_config
+from teadata.teadata_config import canonical_district_number
 from teadata.teadata_config import normalize_district_number_column
-from teadata.teadata_config import normalize_district_number_value
 
 
 # -----------------------------
@@ -23,19 +23,8 @@ def _canon_district_number(x: Any) -> Optional[str]:
     - 11901, "11901", "011901", "'011901", "011901-001" → "'011901"
     - None/empty → None
     """
-    if x is None:
-        return None
     try:
-        s = str(x).strip()
-        if not s:
-            return None
-        # strip common Excel leading quote/backtick variants before normalizing
-        if s.startswith(("'", "`", "’")):
-            s = s[1:].strip()
-        norm = normalize_district_number_value(s)  # returns 6-digit zero-padded (no apostrophe)
-        if norm is None:
-            return None
-        return "'" + norm
+        return canonical_district_number(x)
     except Exception:
         return None
 
@@ -76,11 +65,18 @@ def _apply_district_accountability(
         df["district_number"] = df["district_number"].map(_canon_district_number)
         df = df[df["district_number"].notna()]
 
-    # Decide which value columns to carry through
-    if select is None:
-        use_cols = [c for c in df.columns if c != "district_number"]
-    else:
-        use_cols = [c for c in select if c in df.columns]
+    if not select:
+        raise ValueError(
+            "district enrichment requires an explicit `select` collection of column names"
+        )
+
+    use_cols = list(select)
+    missing = [c for c in use_cols if c not in df.columns]
+    if missing:
+        raise KeyError(
+            "district enrichment missing expected columns after rename: "
+            + ", ".join(sorted(missing))
+        )
 
     # Basic whitespace/NA cleanup on the value columns
     for c in use_cols:
