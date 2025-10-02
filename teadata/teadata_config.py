@@ -744,6 +744,32 @@ def normalize_district_number_column(
     return df, col_name
 
 
+def canonical_campus_number(value: Any) -> Optional[str]:
+    """
+    Return the repository-preferred representation of a campus number: a
+    9-digit, zero-padded string with a leading apostrophe. Returns ``None`` for
+    empty inputs.
+    """
+
+    normalized = normalize_campus_number_value(value)
+    if normalized is None:
+        return None
+    return f"'{normalized}"
+
+
+def canonical_district_number(value: Any) -> Optional[str]:
+    """
+    Return the repository-preferred representation of a district number: a
+    6-digit, zero-padded string with a leading apostrophe. Returns ``None`` for
+    empty inputs.
+    """
+
+    normalized = normalize_district_number_value(value)
+    if normalized is None:
+        return None
+    return f"'{normalized}"
+
+
 def join_datasets_on_district(
     cfg: Config,
     year: int,

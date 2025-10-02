@@ -4,54 +4,21 @@ from .common import prepare_columns
 from . import enricher
 from .base import Enricher
 
-import re
-
 from teadata.teadata_config import load_config
 
 from teadata.teadata_config import (
+    canonical_campus_number,
     normalize_campus_number_column,
-    normalize_campus_number_value,
 )
 
 
 def _canon_campus_number(x) -> str | None:
-    """
-    Canonicalize any campus-number-like value to the repository form:
-    a 9-digit, zero-padded string **with a leading apostrophe** (e.g., "'123456789").
-
-    Tolerates ints, floats (will truncate decimals), strings with punctuation/whitespace,
-    and Excel-style leading quotes/backticks. Returns None if no digits present.
-    """
-    if x is None:
-        return None
-    # Fast path for ints
-    if isinstance(x, int):
-        return f"'{x:09d}"
-    # Try float cast (some CSVs load IDs as floats)
-    if isinstance(x, float):
-        try:
-            i = int(x)
-            return f"'{i:09d}"
-        except Exception:
-            pass
-    # String path: strip quotes/backticks and non-digits
-    s = str(x).strip()
-    if not s:
-        return None
-    s = s.lstrip("'`’ ")
-    digits = re.sub(r"\D", "", s)
-    if not digits:
-        return None
-    return "'" + digits.zfill(9)
+    return canonical_campus_number(x)
 
 
 def _canon_series(series: pd.Series) -> pd.Series:
     """Vectorized canonicalization for a pandas Series of campus numbers."""
-    s = series.astype("string").fillna("").str.strip()
-    # Remove leading Excel quotes/backticks, keep digits, zfill(9), then prefix apostrophe
-    s = s.str.lstrip("'`’ ")
-    s = s.str.replace(r"\D", "", regex=True).str.zfill(9)
-    return "'" + s
+    return series.map(canonical_campus_number)
 
 
 def _build_campus_multi_index(repo) -> dict[str, Any]:
@@ -112,8 +79,8 @@ def _apply_campus_accountability(
         return resolved_year, 0
 
     # Canonicalize to leading-apostrophe format used across the repo
-    df["campus_number"] = _canon_series(df["campus_number"])  # vectorized
-    df = df[df["campus_number"].str.len() > 1]
+    df["campus_number"] = _canon_series(df["campus_number"])
+    df = df[df["campus_number"].notna()]
 
     # Column selection/cleanup
     if select is None:
@@ -134,11 +101,16 @@ def _apply_campus_accountability(
     sub = df[["campus_number"] + use_cols].drop_duplicates("campus_number")
     for r in sub.itertuples(index=False):
         key = getattr(r, "campus_number")
-        mapping[key] = {k: getattr(r, k) for k in use_cols}
+        if not key:
+            continue
+        record = {k: getattr(r, k) for k in use_cols}
+        mapping[key] = record
+        digits = key[1:]
+        mapping.setdefault(digits, record)
+        if digits.isdigit():
+            mapping.setdefault(str(int(digits)), record)
 
     # Multi-key index for robust matching
-    campus_idx = _build_campus_multi_index(repo)
-
     updated = 0
     missing = 0
     for cobj in repo._campuses.values():
@@ -146,7 +118,13 @@ def _apply_campus_accountability(
         if not cn:
             continue
         can = _canon_campus_number(cn)
-        attrs = mapping.get(can) or mapping.get(can[1:]) or mapping.get(str(int(can[1:])) if can and can[1:].isdigit() else None)
+        if not can:
+            missing += 1
+            continue
+        digits = can[1:]
+        attrs = mapping.get(can) or mapping.get(digits)
+        if attrs is None and digits.isdigit():
+            attrs = mapping.get(str(int(digits)))
         if not attrs:
             missing += 1
             continue
@@ -213,8 +191,8 @@ def _apply_campus_peims_financials(
     if "campus_number" not in df.columns:
         return resolved_year, 0
 
-    df["campus_number"] = _canon_series(df["campus_number"])  # '#########
-    df = df[df["campus_number"].str.len() > 1]
+    df["campus_number"] = _canon_series(df["campus_number"])
+    df = df[df["campus_number"].notna()]
 
     # --- Column auto-detection -------------------------------------------------
     # Build a normalization for column headers to be robust to spacing, case, and punctuation
@@ -271,10 +249,14 @@ def _apply_campus_peims_financials(
     mapping: dict[str, dict[str, Any]] = {}
     for r in sub.itertuples(index=False):
         key = getattr(r, "campus_number")
+        if not key:
+            continue
         record = {canon: getattr(r, src) for canon, src in selected_map.items()}
         mapping[key] = record
-
-    campus_idx = _build_campus_multi_index(repo)
+        digits = key[1:]
+        mapping.setdefault(digits, record)
+        if digits.isdigit():
+            mapping.setdefault(str(int(digits)), record)
 
     updated = 0
     missing = 0
@@ -283,7 +265,13 @@ def _apply_campus_peims_financials(
         if not cn:
             continue
         can = _canon_campus_number(cn)
-        attrs = mapping.get(can) or mapping.get(can[1:]) or mapping.get(str(int(can[1:])) if can and can[1:].isdigit() else None)
+        if not can:
+            missing += 1
+            continue
+        digits = can[1:]
+        attrs = mapping.get(can) or mapping.get(digits)
+        if attrs is None and digits.isdigit():
+            attrs = mapping.get(str(int(digits)))
         if not attrs:
             missing += 1
             continue
@@ -311,7 +299,20 @@ def enrich_campuses_from_config(
     aliases=None,
     reader_kwargs=None,
 ):
-    """Compatibility wrapper for legacy callers. Returns (resolved_year, updated_count)."""
+    """Dispatch to the appropriate enrichment routine based on dataset name."""
+
+    ds_lower = dataset.lower()
+    if ds_lower == "campus_peims_financials":
+        return _apply_campus_peims_financials(
+            repo,
+            cfg_path,
+            dataset,
+            year,
+            select=select,
+            rename=rename,
+            reader_kwargs=reader_kwargs,
+        )
+
     return _apply_campus_accountability(
         repo,
         cfg_path,
