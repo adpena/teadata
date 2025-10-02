@@ -1,57 +1,23 @@
 from typing import Dict, Any
 import pandas as pd
-from .common import prepare_columns
 from . import enricher
 from .base import Enricher
-
-import re
 
 from teadata.teadata_config import load_config
 
 from teadata.teadata_config import (
+    canonical_campus_number,
     normalize_campus_number_column,
-    normalize_campus_number_value,
 )
 
 
 def _canon_campus_number(x) -> str | None:
-    """
-    Canonicalize any campus-number-like value to the repository form:
-    a 9-digit, zero-padded string **with a leading apostrophe** (e.g., "'123456789").
-
-    Tolerates ints, floats (will truncate decimals), strings with punctuation/whitespace,
-    and Excel-style leading quotes/backticks. Returns None if no digits present.
-    """
-    if x is None:
-        return None
-    # Fast path for ints
-    if isinstance(x, int):
-        return f"'{x:09d}"
-    # Try float cast (some CSVs load IDs as floats)
-    if isinstance(x, float):
-        try:
-            i = int(x)
-            return f"'{i:09d}"
-        except Exception:
-            pass
-    # String path: strip quotes/backticks and non-digits
-    s = str(x).strip()
-    if not s:
-        return None
-    s = s.lstrip("'`’ ")
-    digits = re.sub(r"\D", "", s)
-    if not digits:
-        return None
-    return "'" + digits.zfill(9)
+    return canonical_campus_number(x)
 
 
 def _canon_series(series: pd.Series) -> pd.Series:
     """Vectorized canonicalization for a pandas Series of campus numbers."""
-    s = series.astype("string").fillna("").str.strip()
-    # Remove leading Excel quotes/backticks, keep digits, zfill(9), then prefix apostrophe
-    s = s.str.lstrip("'`’ ")
-    s = s.str.replace(r"\D", "", regex=True).str.zfill(9)
-    return "'" + s
+    return series.map(canonical_campus_number)
 
 
 def _build_campus_multi_index(repo) -> dict[str, Any]:
@@ -112,8 +78,8 @@ def _apply_campus_accountability(
         return resolved_year, 0
 
     # Canonicalize to leading-apostrophe format used across the repo
-    df["campus_number"] = _canon_series(df["campus_number"])  # vectorized
-    df = df[df["campus_number"].str.len() > 1]
+    df["campus_number"] = _canon_series(df["campus_number"])
+    df = df[df["campus_number"].notna()]
 
     # Column selection/cleanup
     if select is None:
@@ -134,11 +100,16 @@ def _apply_campus_accountability(
     sub = df[["campus_number"] + use_cols].drop_duplicates("campus_number")
     for r in sub.itertuples(index=False):
         key = getattr(r, "campus_number")
-        mapping[key] = {k: getattr(r, k) for k in use_cols}
+        if not key:
+            continue
+        record = {k: getattr(r, k) for k in use_cols}
+        mapping[key] = record
+        digits = key[1:]
+        mapping.setdefault(digits, record)
+        if digits.isdigit():
+            mapping.setdefault(str(int(digits)), record)
 
     # Multi-key index for robust matching
-    campus_idx = _build_campus_multi_index(repo)
-
     updated = 0
     missing = 0
     for cobj in repo._campuses.values():
@@ -146,7 +117,13 @@ def _apply_campus_accountability(
         if not cn:
             continue
         can = _canon_campus_number(cn)
-        attrs = mapping.get(can) or mapping.get(can[1:]) or mapping.get(str(int(can[1:])) if can and can[1:].isdigit() else None)
+        if not can:
+            missing += 1
+            continue
+        digits = can[1:]
+        attrs = mapping.get(can) or mapping.get(digits)
+        if attrs is None and digits.isdigit():
+            attrs = mapping.get(str(int(digits)))
         if not attrs:
             missing += 1
             continue
@@ -191,7 +168,7 @@ def _apply_campus_peims_financials(
     Returns (resolved_year, updated_count).
     """
     import re
-    import pandas as pd
+    from difflib import SequenceMatcher
     from teadata.teadata_config import normalize_campus_number_column, load_config
 
     cfg = load_config(cfg_path)
@@ -213,8 +190,8 @@ def _apply_campus_peims_financials(
     if "campus_number" not in df.columns:
         return resolved_year, 0
 
-    df["campus_number"] = _canon_series(df["campus_number"])  # '#########
-    df = df[df["campus_number"].str.len() > 1]
+    df["campus_number"] = _canon_series(df["campus_number"])
+    df = df[df["campus_number"].notna()]
 
     # --- Column auto-detection -------------------------------------------------
     # Build a normalization for column headers to be robust to spacing, case, and punctuation
@@ -222,6 +199,70 @@ def _apply_campus_peims_financials(
         return re.sub(r"[^a-z0-9]", "", str(s).lower())
 
     actual_cols = {norm(c): c for c in df.columns}
+
+    def _resolve_aliases(name: str) -> list[str]:
+        """Generate possible header aliases for a canonical field name.
+
+        We expand common tokens so that callers can pass snake_case keys while the
+        dataset may use human-readable headers (e.g., ``Instruction (AF) Percent``).
+        """
+
+        base = name.replace("_", " ").lower()
+        tokens = base.split()
+        expanded = []
+        token_map = {
+            "perc": ["perc", "percent", "pct"],
+            "per": ["per"],
+            "student": ["student", "pupil"],
+            "af": ["af", "actual financials"],
+            "ccmr": ["ccmr", "college career military readiness"],
+            "dyslexia": ["dyslexia"],
+            "serv": ["services", "serv"],
+            "ed": ["education", "ed"],
+            "security": ["security"],
+            "monitoring": ["monitoring", "monitor"],
+            "guidance": ["guidance"],
+            "counseling": ["counseling", "counsel"],
+            "school": ["school"],
+            "leadership": ["leadership"],
+            "students": ["students", "student"],
+            "disabilities": ["disabilities", "disability"],
+            "w": ["with", "w"],
+        }
+
+        def _expand(idx: int, current: list[str]):
+            if idx == len(tokens):
+                expanded.append(" ".join(current))
+                return
+            tok = tokens[idx]
+            choices = token_map.get(tok, [tok])
+            for choice in choices:
+                _expand(idx + 1, current + [choice])
+
+        _expand(0, [])
+        # Include direct underscored variant (for already-normalized headers)
+        expanded.append(name)
+        # Deduplicate while preserving order
+        seen: set[str] = set()
+        uniq: list[str] = []
+        for alias in expanded:
+            if alias not in seen:
+                uniq.append(alias)
+                seen.add(alias)
+        return uniq
+
+    def _match_via_sequence(target: str) -> str | None:
+        key = norm(target)
+        best_col = None
+        best_score = 0.0
+        for col, normed in actual_cols.items():
+            score = SequenceMatcher(None, key, col).ratio()
+            if score > best_score:
+                best_col = normed
+                best_score = score
+        if best_score >= 0.55:
+            return best_col
+        return None
 
     # Candidate source headers for each canonical field
     candidates = {
@@ -250,6 +291,9 @@ def _apply_campus_peims_financials(
         selected_map = {}
         for canonical, opts in candidates.items():
             sel = next((actual_cols[k] for k in opts if k in actual_cols), None)
+            if not sel:
+                # try fuzzy matching on canonical key
+                sel = _match_via_sequence(canonical)
             if sel:
                 selected_map[canonical] = sel
         if not selected_map:
@@ -260,8 +304,34 @@ def _apply_campus_peims_financials(
             )
             return resolved_year, 0
     else:
-        selected_map = {c: c for c in select if c in df.columns}
+        selected_map: dict[str, str] = {}
+        seen_cols: set[str] = set()
+        for canonical in select:
+            target_norm = norm(canonical)
+            chosen = None
+            # direct match on raw header
+            if canonical in df.columns:
+                chosen = canonical
+            elif target_norm in actual_cols:
+                chosen = actual_cols[target_norm]
+            else:
+                # try alias expansion
+                for alias in _resolve_aliases(canonical):
+                    alias_norm = norm(alias)
+                    if alias_norm in actual_cols:
+                        chosen = actual_cols[alias_norm]
+                        break
+                if chosen is None:
+                    chosen = _match_via_sequence(canonical)
+            if chosen and chosen not in seen_cols:
+                selected_map[canonical] = chosen
+                seen_cols.add(chosen)
         if not selected_map:
+            preview = list(df.columns)[:12]
+            print(
+                "[enrich:campus_peims_financials] Requested columns not found; "
+                f"select={select} first headers={preview}"
+            )
             return resolved_year, 0
 
     keep_src_cols = list(selected_map.values())
@@ -271,10 +341,14 @@ def _apply_campus_peims_financials(
     mapping: dict[str, dict[str, Any]] = {}
     for r in sub.itertuples(index=False):
         key = getattr(r, "campus_number")
+        if not key:
+            continue
         record = {canon: getattr(r, src) for canon, src in selected_map.items()}
         mapping[key] = record
-
-    campus_idx = _build_campus_multi_index(repo)
+        digits = key[1:]
+        mapping.setdefault(digits, record)
+        if digits.isdigit():
+            mapping.setdefault(str(int(digits)), record)
 
     updated = 0
     missing = 0
@@ -283,7 +357,13 @@ def _apply_campus_peims_financials(
         if not cn:
             continue
         can = _canon_campus_number(cn)
-        attrs = mapping.get(can) or mapping.get(can[1:]) or mapping.get(str(int(can[1:])) if can and can[1:].isdigit() else None)
+        if not can:
+            missing += 1
+            continue
+        digits = can[1:]
+        attrs = mapping.get(can) or mapping.get(digits)
+        if attrs is None and digits.isdigit():
+            attrs = mapping.get(str(int(digits)))
         if not attrs:
             missing += 1
             continue
@@ -311,7 +391,20 @@ def enrich_campuses_from_config(
     aliases=None,
     reader_kwargs=None,
 ):
-    """Compatibility wrapper for legacy callers. Returns (resolved_year, updated_count)."""
+    """Dispatch to the appropriate enrichment routine based on dataset name."""
+
+    ds_lower = dataset.lower()
+    if ds_lower == "campus_peims_financials":
+        return _apply_campus_peims_financials(
+            repo,
+            cfg_path,
+            dataset,
+            year,
+            select=select,
+            rename=rename,
+            reader_kwargs=reader_kwargs,
+        )
+
     return _apply_campus_accountability(
         repo,
         cfg_path,
