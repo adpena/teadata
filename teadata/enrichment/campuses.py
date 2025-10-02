@@ -1,6 +1,5 @@
 from typing import Dict, Any
 import pandas as pd
-from .common import prepare_columns
 from . import enricher
 from .base import Enricher
 
@@ -169,7 +168,7 @@ def _apply_campus_peims_financials(
     Returns (resolved_year, updated_count).
     """
     import re
-    import pandas as pd
+    from difflib import SequenceMatcher
     from teadata.teadata_config import normalize_campus_number_column, load_config
 
     cfg = load_config(cfg_path)
@@ -201,6 +200,70 @@ def _apply_campus_peims_financials(
 
     actual_cols = {norm(c): c for c in df.columns}
 
+    def _resolve_aliases(name: str) -> list[str]:
+        """Generate possible header aliases for a canonical field name.
+
+        We expand common tokens so that callers can pass snake_case keys while the
+        dataset may use human-readable headers (e.g., ``Instruction (AF) Percent``).
+        """
+
+        base = name.replace("_", " ").lower()
+        tokens = base.split()
+        expanded = []
+        token_map = {
+            "perc": ["perc", "percent", "pct"],
+            "per": ["per"],
+            "student": ["student", "pupil"],
+            "af": ["af", "actual financials"],
+            "ccmr": ["ccmr", "college career military readiness"],
+            "dyslexia": ["dyslexia"],
+            "serv": ["services", "serv"],
+            "ed": ["education", "ed"],
+            "security": ["security"],
+            "monitoring": ["monitoring", "monitor"],
+            "guidance": ["guidance"],
+            "counseling": ["counseling", "counsel"],
+            "school": ["school"],
+            "leadership": ["leadership"],
+            "students": ["students", "student"],
+            "disabilities": ["disabilities", "disability"],
+            "w": ["with", "w"],
+        }
+
+        def _expand(idx: int, current: list[str]):
+            if idx == len(tokens):
+                expanded.append(" ".join(current))
+                return
+            tok = tokens[idx]
+            choices = token_map.get(tok, [tok])
+            for choice in choices:
+                _expand(idx + 1, current + [choice])
+
+        _expand(0, [])
+        # Include direct underscored variant (for already-normalized headers)
+        expanded.append(name)
+        # Deduplicate while preserving order
+        seen: set[str] = set()
+        uniq: list[str] = []
+        for alias in expanded:
+            if alias not in seen:
+                uniq.append(alias)
+                seen.add(alias)
+        return uniq
+
+    def _match_via_sequence(target: str) -> str | None:
+        key = norm(target)
+        best_col = None
+        best_score = 0.0
+        for col, normed in actual_cols.items():
+            score = SequenceMatcher(None, key, col).ratio()
+            if score > best_score:
+                best_col = normed
+                best_score = score
+        if best_score >= 0.55:
+            return best_col
+        return None
+
     # Candidate source headers for each canonical field
     candidates = {
         "peims_total_expenditures": [
@@ -228,6 +291,9 @@ def _apply_campus_peims_financials(
         selected_map = {}
         for canonical, opts in candidates.items():
             sel = next((actual_cols[k] for k in opts if k in actual_cols), None)
+            if not sel:
+                # try fuzzy matching on canonical key
+                sel = _match_via_sequence(canonical)
             if sel:
                 selected_map[canonical] = sel
         if not selected_map:
@@ -238,8 +304,34 @@ def _apply_campus_peims_financials(
             )
             return resolved_year, 0
     else:
-        selected_map = {c: c for c in select if c in df.columns}
+        selected_map: dict[str, str] = {}
+        seen_cols: set[str] = set()
+        for canonical in select:
+            target_norm = norm(canonical)
+            chosen = None
+            # direct match on raw header
+            if canonical in df.columns:
+                chosen = canonical
+            elif target_norm in actual_cols:
+                chosen = actual_cols[target_norm]
+            else:
+                # try alias expansion
+                for alias in _resolve_aliases(canonical):
+                    alias_norm = norm(alias)
+                    if alias_norm in actual_cols:
+                        chosen = actual_cols[alias_norm]
+                        break
+                if chosen is None:
+                    chosen = _match_via_sequence(canonical)
+            if chosen and chosen not in seen_cols:
+                selected_map[canonical] = chosen
+                seen_cols.add(chosen)
         if not selected_map:
+            preview = list(df.columns)[:12]
+            print(
+                "[enrich:campus_peims_financials] Requested columns not found; "
+                f"select={select} first headers={preview}"
+            )
             return resolved_year, 0
 
     keep_src_cols = list(selected_map.values())
