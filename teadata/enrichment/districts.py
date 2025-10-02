@@ -1,6 +1,8 @@
 import pandas as pd
 from typing import Dict, Any, Optional
 
+import teadata.classes as classes_mod
+
 from .common import pick_sheet_with_columns, prepare_columns  # optional utilities if you use them elsewhere
 from . import enricher
 from .base import Enricher
@@ -8,6 +10,16 @@ from .base import Enricher
 from teadata.teadata_config import load_config
 from teadata.teadata_config import canonical_district_number
 from teadata.teadata_config import normalize_district_number_column
+
+
+def _profile_enabled() -> bool:
+    return bool(getattr(classes_mod, "ENABLE_PROFILING", False))
+
+
+def _debug(msg: str) -> None:
+    if _profile_enabled():
+        print(msg)
+
 
 
 # -----------------------------
@@ -51,7 +63,14 @@ def _apply_district_accountability(
     Returns: (resolved_year, updated_count)
     """
     cfg = load_config(cfg_path)
-    resolved_year, df = cfg.load_df(dataset, year, section="data_sources", **(reader_kwargs or {}))
+    resolved_year, df = cfg.load_df(
+        dataset, year, section="data_sources", **(reader_kwargs or {})
+    )
+
+    if _profile_enabled():
+        _debug(
+            f"[enrich:{dataset}] resolved_year={resolved_year} (requested={year}) rows={len(df)}"
+        )
 
     # Optional column rename from spreadsheet-style headers to pythonic names
     if rename:
@@ -60,16 +79,40 @@ def _apply_district_accountability(
     # Ensure we have a clean, machine-joinable district_number column
     df, found = normalize_district_number_column(df, new_col="district_number")
 
-    # Canonicalize to leading-apostrophe format used across the repo
-    if "district_number" in df.columns:
-        df["district_number"] = df["district_number"].map(_canon_district_number)
-        df = df[df["district_number"].notna()]
+    if "district_number" not in df.columns:
+        if _profile_enabled():
+            _debug(
+                f"[enrich:{dataset}] abort: district_number column missing after normalization (found={found})"
+            )
+        return resolved_year, 0
 
-    # Decide which value columns to carry through
-    if select is None:
-        use_cols = [c for c in df.columns if c != "district_number"]
-    else:
-        use_cols = [c for c in select if c in df.columns]
+    # Canonicalize to leading-apostrophe format used across the repo
+    df["district_number"] = df["district_number"].map(_canon_district_number)
+    df = df[df["district_number"].notna()]
+
+    if _profile_enabled():
+        valid_rows = len(df)
+        unique_keys = df["district_number"].nunique(dropna=True)
+        _debug(
+            f"[enrich:{dataset}] canonical district numbers -> valid_rows={valid_rows} unique_keys={unique_keys}"
+        )
+
+    if not select:
+        raise ValueError(
+            "district enrichment requires an explicit `select` collection of column names"
+        )
+
+    use_cols = list(select)
+    missing = [c for c in use_cols if c not in df.columns]
+    if missing:
+        if _profile_enabled():
+            _debug(
+                f"[enrich:{dataset}] missing columns after rename: {', '.join(sorted(missing))}"
+            )
+        raise KeyError(
+            "district enrichment missing expected columns after rename: "
+            + ", ".join(sorted(missing))
+        )
 
     # Basic whitespace/NA cleanup on the value columns
     for c in use_cols:
@@ -90,8 +133,16 @@ def _apply_district_accountability(
         if key:
             mapping[key] = {k: getattr(r, k) for k in use_cols}
 
+    if _profile_enabled():
+        _debug(
+            f"[enrich:{dataset}] prepared mapping for {len(mapping)} district numbers (select={use_cols})"
+        )
+
     # Apply to repo districts
     updated = 0
+    missing_no_number = 0
+    missing_no_match = 0
+    sample_missing: list[str] = []
     # repo may expose either ._districts (dict) or .districts (list/iterable)
     districts_iter = (
         repo._districts.values() if hasattr(repo, "_districts") else getattr(repo, "districts", [])
@@ -100,9 +151,13 @@ def _apply_district_accountability(
     for d in districts_iter:
         dn = _canon_district_number(getattr(d, "district_number", None))
         if not dn:
+            missing_no_number += 1
             continue
         attrs = mapping.get(dn)
         if not attrs:
+            missing_no_match += 1
+            if _profile_enabled() and len(sample_missing) < 10:
+                sample_missing.append(str(getattr(d, "district_number", None)))
             continue
         # ensure meta exists for dynamic attribute overlay
         if getattr(d, "meta", None) is None:
@@ -122,6 +177,15 @@ def _apply_district_accountability(
                     # some District implementations may freeze fields; meta still holds value
                     pass
         updated += 1
+
+    if _profile_enabled():
+        _debug(
+            f"[enrich:{dataset}] updated={updated} missing_no_number={missing_no_number} missing_no_match={missing_no_match}"
+        )
+        if sample_missing:
+            _debug(
+                f"[enrich:{dataset}] sample unmatched district_numbers: {sample_missing}"
+            )
 
     return resolved_year, updated
 

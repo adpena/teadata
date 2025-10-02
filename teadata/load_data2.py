@@ -20,7 +20,10 @@ from teadata.teadata_config import (
     load_config,
 )
 from teadata.enrichment.districts import enrich_districts_from_config
-from teadata.enrichment.campuses import enrich_campuses_from_config
+from teadata.enrichment.campuses import (
+    enrich_campuses_from_config,
+    DEFAULT_PEIMS_FINANCIAL_COLUMNS,
+)
 from teadata.enrichment.charter_networks import add_charter_networks_from_config
 
 CFG = "teadata_sources.yaml"
@@ -140,7 +143,7 @@ def run_enrichments(repo: DataEngine) -> None:
             CFG,
             "campus_peims_financials",
             YEAR,
-            select=['instruction_af_perc', 'transportation_af_per_student', 'extracurricular_af_per_student', 'security_monitoring_af_per_student', 'students_w_disabilities_af_per_student', 'bilingual_ed_af_per_student', 'dyslexia_or_related_disorder_serv_af_per_student', 'ccmr_af_per_student', 'guidance_counseling_af_per_student', 'school_leadership_af_per_student'],  # let auto-detection pick the three canonical fields
+            select=DEFAULT_PEIMS_FINANCIAL_COLUMNS,
             rename=None,
             reader_kwargs=None,
         )
