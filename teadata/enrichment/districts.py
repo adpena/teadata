@@ -6,8 +6,8 @@ from . import enricher
 from .base import Enricher
 
 from teadata.teadata_config import load_config
+from teadata.teadata_config import canonical_district_number
 from teadata.teadata_config import normalize_district_number_column
-from teadata.teadata_config import normalize_district_number_value
 
 
 # -----------------------------
@@ -23,19 +23,8 @@ def _canon_district_number(x: Any) -> Optional[str]:
     - 11901, "11901", "011901", "'011901", "011901-001" → "'011901"
     - None/empty → None
     """
-    if x is None:
-        return None
     try:
-        s = str(x).strip()
-        if not s:
-            return None
-        # strip common Excel leading quote/backtick variants before normalizing
-        if s.startswith(("'", "`", "’")):
-            s = s[1:].strip()
-        norm = normalize_district_number_value(s)  # returns 6-digit zero-padded (no apostrophe)
-        if norm is None:
-            return None
-        return "'" + norm
+        return canonical_district_number(x)
     except Exception:
         return None
 
