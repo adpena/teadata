@@ -25,6 +25,19 @@ DEFAULT_PEIMS_FINANCIAL_COLUMNS: list[str] = [
     "school_leadership_af_per_student",
 ]
 
+DEFAULT_PEIMS_FINANCIAL_COLUMNS: list[str] = [
+    "instruction_af_perc",
+    "transportation_af_per_student",
+    "extracurricular_af_per_student",
+    "security_monitoring_af_per_student",
+    "students_w_disabilities_af_per_student",
+    "bilingual_ed_af_per_student",
+    "dyslexia_or_related_disorder_serv_af_per_student",
+    "ccmr_af_per_student",
+    "guidance_counseling_af_per_student",
+    "school_leadership_af_per_student",
+]
+
 
 def _profile_enabled() -> bool:
     return bool(getattr(classes_mod, "ENABLE_PROFILING", False))
