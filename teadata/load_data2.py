@@ -14,9 +14,16 @@ from typing import Optional
 from teadata import classes as _classes_mod
 from teadata import teadata_config as _cfg_mod
 from teadata.classes import District, Campus, DataEngine, _point_xy
-from teadata.teadata_config import load_config, normalize_campus_number_value
+from teadata.teadata_config import (
+    canonical_campus_number,
+    canonical_district_number,
+    load_config,
+)
 from teadata.enrichment.districts import enrich_districts_from_config
-from teadata.enrichment.campuses import enrich_campuses_from_config
+from teadata.enrichment.campuses import (
+    enrich_campuses_from_config,
+    DEFAULT_PEIMS_FINANCIAL_COLUMNS,
+)
 from teadata.enrichment.charter_networks import add_charter_networks_from_config
 
 CFG = "teadata_sources.yaml"
@@ -136,22 +143,13 @@ def run_enrichments(repo: DataEngine) -> None:
             CFG,
             "campus_peims_financials",
             YEAR,
-            select=['instruction_af_perc', 'transportation_af_per_student', 'extracurricular_af_per_student', 'security_monitoring_af_per_student', 'students_w_disabilities_af_per_student', 'bilingual_ed_af_per_student', 'dyslexia_or_related_disorder_serv_af_per_student', 'ccmr_af_per_student', 'guidance_counseling_af_per_student', 'school_leadership_af_per_student'],  # let auto-detection pick the three canonical fields
+            select=DEFAULT_PEIMS_FINANCIAL_COLUMNS,
             rename=None,
             reader_kwargs=None,
         )
         print(f"Enriched {n_peims} campuses from PEIMS financials {yr_peims}")
     except Exception as e:
         print(f"[enrich] campus_peims_financials failed: {e}")
-
-
-def normalize_district_code(value: str | int | float) -> str:
-    """
-    Normalize district code into a 6-digit, zero-padded string
-    with a leading apostrophe (Excel style).
-    """
-    s = str(int(float(value))).zfill(6)
-    return f"'{s}"
 
 
 # ------------------ Repo snapshot cache (warm start) ------------------
@@ -419,7 +417,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
 
     # (Optional) vectorized normalize for districts (small but tidy)
     gdf_districts["district_number_norm"] = gdf_districts["DISTRICT_C"].apply(
-        normalize_district_code
+        canonical_district_number
     )
 
     dn_to_id: dict[str, uuid.UUID] = {}
@@ -428,8 +426,10 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
         # Districts
         for row in gdf_districts.itertuples(index=False):
             district_number = getattr(row, "district_number_norm", None)
-            if district_number is None:
-                district_number = normalize_district_code(getattr(row, "DISTRICT_C"))
+            if not district_number:
+                district_number = canonical_district_number(getattr(row, "DISTRICT_C"))
+            if not district_number:
+                district_number = ""
             rating_val = getattr(row, "RATING", "")
             rating_str = str(rating_val) if rating_val is not None else ""
             d = District(
@@ -443,18 +443,33 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
             # Attach normalized ID as extra attribute
             d.district_number = district_number
             repo.add_district(d)
-            dn_to_id[district_number] = d.id
+            if district_number:
+                dn_to_id[district_number] = d.id
+                digits = (
+                    district_number[1:]
+                    if isinstance(district_number, str) and district_number.startswith("'")
+                    else district_number
+                )
+                dn_to_id[digits] = d.id
+                if isinstance(digits, str) and digits.isdigit():
+                    dn_to_id[str(int(digits))] = d.id
 
         # Inject statewide charter networks (no geometry) from config, if provided
         try:
             charter_networks = add_charter_networks_from_config(repo, CFG, YEAR)
             if charter_networks:
                 # refresh the mapping used for campus linking
-                dn_to_id = {
-                    getattr(d, "district_number", None): d.id
-                    for d in repo._districts.values()
-                    if getattr(d, "district_number", None)
-                }
+                refreshed: dict[str, uuid.UUID] = {}
+                for d in repo._districts.values():
+                    key = getattr(d, "district_number", None)
+                    if not key:
+                        continue
+                    refreshed[key] = d.id
+                    digits = key[1:] if isinstance(key, str) and key.startswith("'") else key
+                    refreshed[digits] = d.id
+                    if isinstance(digits, str) and digits.isdigit():
+                        refreshed[str(int(digits))] = d.id
+                dn_to_id = refreshed
                 print(f"[charters] added {charter_networks} statewide districts")
         except Exception as e:
             print(f"[charters] add failed: {e}")
@@ -467,23 +482,37 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
             rating="",
             boundary=None,
         )
-        fallback_district.district_number = "000000"
+        fallback_district.district_number = canonical_district_number("000000") or "'000000"
         repo.add_district(fallback_district)
         fallback_id = fallback_district.id
 
         # Campuses
         for row in gdf_campuses.itertuples(index=False):
-            district_number = getattr(row, "USER_District_Number")
+            raw_district = getattr(row, "USER_District_Number")
+            district_key = canonical_district_number(raw_district)
+            lookup_keys = []
+            if district_key:
+                lookup_keys.append(district_key)
+                digits = district_key[1:]
+                lookup_keys.append(digits)
+                if digits.isdigit():
+                    lookup_keys.append(str(int(digits)))
+            elif raw_district:
+                lookup_keys.append(str(raw_district).strip())
 
-            district_id = dn_to_id.get(district_number, fallback_id)
+            district_id = next((dn_to_id.get(k) for k in lookup_keys if k in dn_to_id), None)
+            if district_id is None:
+                district_id = fallback_id
 
             c = Campus(
                 id=uuid.uuid4(),
                 district_id=district_id,
                 name=getattr(row, "USER_School_Name", "Unnamed Campus"),
                 enrollment=getattr(row, "USER_School_Enrollment_as_of_Oc", -999999),
-                district_number=district_number,
-                campus_number=getattr(row, "USER_School_Number", None),
+                district_number=district_key,
+                campus_number=canonical_campus_number(
+                    getattr(row, "USER_School_Number", None)
+                ),
                 aea=getattr(row, "USER_AEA", None),
                 grade_range=getattr(row, "USER_Grade_Range", None),
                 school_type=getattr(row, "School_Type", None),

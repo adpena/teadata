@@ -579,6 +579,9 @@ _DEFAULT_DISTRICT_ALIASES: List[str] = [
     "DISTRICT_NBR",
     "DIST_NBR",
     "DistNbr",
+    "district_number",
+    "districtnumber",
+    "district_id",
     "County-District Number",
     "CountyDistrictNumber",
     "county_district",
@@ -604,6 +607,9 @@ _DEFAULT_CAMPUS_ALIASES: List[str] = [
     "CAMPUS_NBR",
     "CAMP_NBR",
     "CampNbr",
+    "campus_number",
+    "campusnumber",
+    "campus_id",
     "CDC",
     "CDC Number",
     "Campus Code",
@@ -669,6 +675,9 @@ def normalize_campus_number_column(
         if a.lower() in lower_map:
             col_name = lower_map[a.lower()]
             break
+    if col_name is None and new_col in df.columns:
+        col_name = new_col
+
     if col_name is None:
         # No alias found: create empty and return
         df[new_col] = pd.Series([None] * len(df), dtype="object")
@@ -734,6 +743,9 @@ def normalize_district_number_column(
         if a.lower() in lower_map:
             col_name = lower_map[a.lower()]
             break
+    if col_name is None and new_col in df.columns:
+        col_name = new_col
+
     if col_name is None:
         # No alias found: create empty and return
         df[new_col] = pd.Series([None] * len(df), dtype="object")
@@ -742,6 +754,32 @@ def normalize_district_number_column(
     # Normalize
     df[new_col] = df[col_name].map(normalize_district_number_value)
     return df, col_name
+
+
+def canonical_campus_number(value: Any) -> Optional[str]:
+    """
+    Return the repository-preferred representation of a campus number: a
+    9-digit, zero-padded string with a leading apostrophe. Returns ``None`` for
+    empty inputs.
+    """
+
+    normalized = normalize_campus_number_value(value)
+    if normalized is None:
+        return None
+    return f"'{normalized}"
+
+
+def canonical_district_number(value: Any) -> Optional[str]:
+    """
+    Return the repository-preferred representation of a district number: a
+    6-digit, zero-padded string with a leading apostrophe. Returns ``None`` for
+    empty inputs.
+    """
+
+    normalized = normalize_district_number_value(value)
+    if normalized is None:
+        return None
+    return f"'{normalized}"
 
 
 def join_datasets_on_district(
