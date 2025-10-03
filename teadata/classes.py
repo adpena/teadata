@@ -248,7 +248,7 @@ class District:
     id: uuid.UUID
     name: str
     enrollment: Optional[int] = None
-    district_number: str = ""     # public, with apostrophe for display/export
+    district_number: str = ""  # public, with apostrophe for display/export
     aea: Optional[bool] = None
     rating: Optional[str] = None
 
@@ -2973,8 +2973,12 @@ class DataEngine:
             src_digits = src_key[1:] if src_key and src_key.startswith("'") else src_key
             dst_digits = dst_key[1:] if dst_key and dst_key.startswith("'") else dst_key
 
-            src_id = self._campus_by_number.get(src_key) or self._campus_by_number.get(src_digits)
-            dst_id = self._campus_by_number.get(dst_key) or self._campus_by_number.get(dst_digits)
+            src_id = self._campus_by_number.get(src_key) or self._campus_by_number.get(
+                src_digits
+            )
+            dst_id = self._campus_by_number.get(dst_key) or self._campus_by_number.get(
+                dst_digits
+            )
             if src_id is None or dst_id is None:
                 if src_id is None and dst_id is None:
                     self._xfers_missing["either"] = (
@@ -3134,7 +3138,6 @@ def load_default_repo() -> DataEngine:
     return DataEngine.from_snapshot(None, search=True)
 
 
-
 def to_df(self, which: str = "districts", **kwargs):
     """
     Convenience: DataFrame of 'districts' or 'campuses'.
@@ -3146,6 +3149,7 @@ def to_df(self, which: str = "districts", **kwargs):
         return self.campuses.to_df(**kwargs)
     else:
         raise ValueError("which must be 'districts' or 'campuses'")
+
 
 def to_dicts(self, which: str = "districts", **kwargs) -> list[dict]:
     if which == "districts":
@@ -3174,6 +3178,7 @@ def inspect_object(o):
         print("to_dict keys    :", list(d.keys()))
     except Exception:
         pass
+
 
 # --------- Demo data ---------
 
