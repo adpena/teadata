@@ -7,6 +7,7 @@ import json
 import hashlib
 import inspect
 import os
+import shutil
 
 from datetime import datetime, date
 from typing import Optional
@@ -374,6 +375,13 @@ def _save_repo_snapshot(
         _prepare_repo_for_pickle(repo)
         with snap.open("wb") as f:
             pickle.dump((meta, repo), f, protocol=pickle.HIGHEST_PROTOCOL)
+        # Attempt to also copy snapshot to absolute project cache path; fail quietly if missing
+        try:
+            abs_cache_dir = Path("/Users/adpena/PycharmProjects/teadata/.cache")
+            if abs_cache_dir.is_dir():
+                shutil.copy2(snap, abs_cache_dir / snap.name)
+        except Exception:
+            pass
     except Exception:
         # Cache is best-effort; ignore failures
         pass

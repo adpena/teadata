@@ -57,6 +57,23 @@ dev = [
     "deptry>=0.16",
 ]
 
+# Notebook-only dependencies used in .ipynb files
+notebooks = [
+    "jupyterlab>=4.0",
+    "ipython>=8.0",
+    "ipywidgets>=8.0",
+    "ipyleaflet>=0.18",
+    "itables>=1.6",
+    "google-auth>=2.0",
+    "google-api-python-client>=2.0",
+]
+
+# Dependencies used by maintenance/utility scripts under teadata/scripts
+scripts = [
+    "requests>=2.31",
+    "tqdm>=4.66",
+]
+
 [project.scripts]
 teadata-config = "teadata_config:main"
 
@@ -71,10 +88,17 @@ exclude = ["tests*", "docs*", "examples*"]
 
 [tool.deptry]
 # Optional: folders to skip
-exclude = ["tests", "docs", "examples"]
+exclude = ["tests", "docs", "examples", ".ipynb_checkpoints"]
 known_first_party = ["teadata"]
 
 # Per-rule ignores by code
 [tool.deptry.per_rule_ignores]
-DEP002 = ["openpyxl", "pyogrio", "pyarrow", "pygeos", "ruff", "mypy", "pytest", "pytest-cov", "pip-tools", "pip-audit", "deptry", "python-dateutil"]
-DEP003 = ["scipy"]
+DEP002 = ["openpyxl", "pyogrio", "pyarrow", "pygeos", "ruff", "mypy", "pytest", "pytest-cov", "pip-tools", "pip-audit", "deptry", "python-dateutil", "jupyterlab", "google-api-python-client"]
+DEP003 = [
+    "scipy",
+    "google",        # namespace package; satisfied by google-auth/google-api-python-client
+    "IPython",       # notebook-only; provided by optional 'notebooks' extra
+    "ipyleaflet",    # notebook-only; provided by optional 'notebooks' extra
+    "ipywidgets",    # notebook-only; provided by optional 'notebooks' extra
+    "itables"        # notebook-only; provided by optional 'notebooks' extra
+]
