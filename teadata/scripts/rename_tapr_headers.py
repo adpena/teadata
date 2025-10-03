@@ -49,30 +49,40 @@ def restore_labels_from_reference(cols: list[str], reference_df: pd.DataFrame) -
     return [lookup.get(c, c) for c in cols]
 
 
-INPUT_FILE = "/Users/adpena/PycharmProjects/teadata/teadata/data/tapr/CAMPPROF_2023-2024.csv"
-REFERENCE_FILE = "/Users/adpena/PycharmProjects/teadata/teadata/data/tapr/CAMPPROF_2023-2024_data_elements.xlsx"
-OUTPUT_FILE = "/Users/adpena/PycharmProjects/teadata/teadata/data/tapr/CAMPPROF_2023-2024_FINAL.xlsx"
+INPUT_FILE = "/Users/adpena/PycharmProjects/teadata/teadata/data/tapr/OLD/CAMPPROF_2014-2015.csv"
+REFERENCE_FILE = "/Users/adpena/PycharmProjects/teadata/teadata/data/tapr/OLD/CAMPPROF_2014-2015_data_elements.xlsx"
+OUTPUT_FILE = "/Users/adpena/PycharmProjects/teadata/teadata/data/tapr/CAMPPROF_2014-2015_FINAL.xlsx"
 
 
 def main():
     # Options to control workflow
     DO_SANITIZE = True
     DO_RESTORE = False
+    FILTER = True
 
     tapr_df = pd.read_csv(INPUT_FILE)
     tapr_reference_df = pd.read_excel(REFERENCE_FILE)
 
     rename_dict = {
         "CAMPUS": "campus_number",
-        "CAMPNAME": "campus_name",
-        "DISTRICT": "district_number",
-        "DISTNAME": "district_name",
+        "CPETALLC": "campus_2015_student_enrollment_all_students_count"
+        # "CAMPNAME": "campus_name",
+        # "DISTRICT": "district_number",
+        # "DISTNAME": "district_name",
     }
 
-    auto_rename_dict = dict(zip(tapr_reference_df["Name"], tapr_reference_df["Label"]))
+    try:
+        auto_rename_dict = dict(zip(tapr_reference_df["Name"], tapr_reference_df["Label"]))
+    except Exception:
+        auto_rename_dict = dict(zip(tapr_reference_df["NAME"], tapr_reference_df["LABEL"]))
 
     tapr_df = tapr_df.rename(columns=rename_dict)
     tapr_df = tapr_df.rename(columns=auto_rename_dict)
+
+    cols = rename_dict.values()
+
+    if FILTER is True:
+        tapr_df = tapr_df[cols]
 
     if DO_SANITIZE:
         # Normalize column names to be Python-safe identifiers (using the same logic as sanitize_header)
