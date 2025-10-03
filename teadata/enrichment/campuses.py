@@ -34,6 +34,7 @@ def _debug(msg: str) -> None:
     if _profile_enabled():
         print(msg)
 
+
 def _canon_campus_number(x) -> str | None:
     return canonical_campus_number(x)
 
@@ -141,7 +142,8 @@ def _apply_campus_accountability(
         if c in df.columns:
             df[c] = df[c].apply(
                 lambda x: (
-                    None if (pd.isna(x) or (isinstance(x, str) and x.strip() == ""))
+                    None
+                    if (pd.isna(x) or (isinstance(x, str) and x.strip() == ""))
                     else (x.strip() if isinstance(x, str) else x)
                 )
             )
@@ -292,7 +294,7 @@ def _apply_campus_peims_financials(
         key = getattr(r, "campus_number")
         if not key:
             continue
-            
+
         record = {k: getattr(r, k) for k in use_cols}
 
         mapping[key] = record
@@ -347,6 +349,7 @@ def _apply_campus_peims_financials(
             )
 
     return resolved_year, updated
+
 
 def enrich_campuses_from_config(
     repo,

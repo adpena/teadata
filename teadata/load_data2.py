@@ -246,11 +246,11 @@ def _compute_extra_signature() -> dict:
     try:
         cfg = load_config(CFG)
         for ds in (
-                "accountability",
-                "campus_accountability",
-                "charter_reference",
-                "campus_peims_financials",
-                "campus_transfer_reports",
+            "accountability",
+            "campus_accountability",
+            "charter_reference",
+            "campus_peims_financials",
+            "campus_transfer_reports",
         ):
             try:
                 _, p = cfg.resolve(ds, YEAR, section="data_sources")
@@ -447,7 +447,8 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                 dn_to_id[district_number] = d.id
                 digits = (
                     district_number[1:]
-                    if isinstance(district_number, str) and district_number.startswith("'")
+                    if isinstance(district_number, str)
+                    and district_number.startswith("'")
                     else district_number
                 )
                 dn_to_id[digits] = d.id
@@ -465,7 +466,9 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                     if not key:
                         continue
                     refreshed[key] = d.id
-                    digits = key[1:] if isinstance(key, str) and key.startswith("'") else key
+                    digits = (
+                        key[1:] if isinstance(key, str) and key.startswith("'") else key
+                    )
                     refreshed[digits] = d.id
                     if isinstance(digits, str) and digits.isdigit():
                         refreshed[str(int(digits))] = d.id
@@ -482,7 +485,9 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
             rating="",
             boundary=None,
         )
-        fallback_district.district_number = canonical_district_number("000000") or "'000000"
+        fallback_district.district_number = (
+            canonical_district_number("000000") or "'000000"
+        )
         repo.add_district(fallback_district)
         fallback_id = fallback_district.id
 
@@ -500,7 +505,9 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
             elif raw_district:
                 lookup_keys.append(str(raw_district).strip())
 
-            district_id = next((dn_to_id.get(k) for k in lookup_keys if k in dn_to_id), None)
+            district_id = next(
+                (dn_to_id.get(k) for k in lookup_keys if k in dn_to_id), None
+            )
             if district_id is None:
                 district_id = fallback_id
 

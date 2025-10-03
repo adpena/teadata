@@ -3,7 +3,10 @@ from typing import Dict, Any, Optional
 
 import teadata.classes as classes_mod
 
-from .common import pick_sheet_with_columns, prepare_columns  # optional utilities if you use them elsewhere
+from .common import (
+    pick_sheet_with_columns,
+    prepare_columns,
+)  # optional utilities if you use them elsewhere
 from . import enricher
 from .base import Enricher
 
@@ -21,10 +24,10 @@ def _debug(msg: str) -> None:
         print(msg)
 
 
-
 # -----------------------------
 # Canonical district-number helper
 # -----------------------------
+
 
 def _canon_district_number(x: Any) -> Optional[str]:
     """
@@ -44,6 +47,7 @@ def _canon_district_number(x: Any) -> Optional[str]:
 # -----------------------------
 # Core enrichment routine used by both the @enricher class and legacy wrapper
 # -----------------------------
+
 
 def _apply_district_accountability(
     repo,
@@ -145,7 +149,9 @@ def _apply_district_accountability(
     sample_missing: list[str] = []
     # repo may expose either ._districts (dict) or .districts (list/iterable)
     districts_iter = (
-        repo._districts.values() if hasattr(repo, "_districts") else getattr(repo, "districts", [])
+        repo._districts.values()
+        if hasattr(repo, "_districts")
+        else getattr(repo, "districts", [])
     )
 
     for d in districts_iter:
@@ -194,6 +200,7 @@ def _apply_district_accountability(
 # Decorator-driven enricher (used by load_data2 pipeline)
 # -----------------------------
 
+
 @enricher("accountability")
 class DistrictAccountability(Enricher):
     def apply(self, repo, cfg_path: str, year: int) -> Dict[str, Any]:
@@ -213,6 +220,7 @@ class DistrictAccountability(Enricher):
 # -----------------------------
 # Back-compat helper for legacy callers
 # -----------------------------
+
 
 def enrich_districts_from_config(
     repo,
