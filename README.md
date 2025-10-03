@@ -1,6 +1,6 @@
 # TEA Data Engine
 
-Python toolkit for Texas public education data — spatially-aware, object-oriented, fast.  
+Unofficial Python toolkit for Texas public education data — spatially-aware, object-oriented, fast.  
 It ships a cache-first “data repo” you can load in seconds, then query with clean, Pythonic primitives (including a fluent `>>` operator).
 
 ---
@@ -46,7 +46,7 @@ from teadata import DataEngine
 engine = DataEngine.from_snapshot(search=True)
 
 print(len(engine.districts), len(engine.campuses))
-# -> e.g. 1018 9739
+# -> e.g. 1207 9739
 ```
 
 > If you prefer the implicit path: `engine = DataEngine()` also tries to auto-load a snapshot.
@@ -54,8 +54,11 @@ print(len(engine.districts), len(engine.campuses))
 ### 3) First query in 10 seconds
 
 ```python
-# Retrieve district by TEA code (digits only; leading apostrophe handled internally)
+# Retrieve district by TEA campus number (integer, digits only, or 6-digit left-zero padded string with leading apostrophe all work)
 aldine = engine.get_district("101902")
+
+# Retrieve district by district name (case insensitive - returns multiple results if there are multiple districts with the same name, such as "Northside ISD")
+aldine = engine.get_district("Aldine ISD")
 
 print(aldine)                 # District(...)
 print(aldine.rating)          # canonical (may be enriched via alias)
