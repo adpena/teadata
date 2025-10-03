@@ -25,10 +25,21 @@ DEFAULT_PEIMS_FINANCIAL_COLUMNS: list[str] = [
     "school_leadership_af_per_student",
 ]
 
+DEFAULT_PEIMS_FINANCIAL_COLUMNS: list[str] = [
+    "instruction_af_perc",
+    "transportation_af_per_student",
+    "extracurricular_af_per_student",
+    "security_monitoring_af_per_student",
+    "students_w_disabilities_af_per_student",
+    "bilingual_ed_af_per_student",
+    "dyslexia_or_related_disorder_serv_af_per_student",
+    "ccmr_af_per_student",
+    "guidance_counseling_af_per_student",
+    "school_leadership_af_per_student",
+]
 
 def _profile_enabled() -> bool:
     return bool(getattr(classes_mod, "ENABLE_PROFILING", False))
-
 
 def _debug(msg: str) -> None:
     if _profile_enabled():
@@ -38,11 +49,9 @@ def _debug(msg: str) -> None:
 def _canon_campus_number(x) -> str | None:
     return canonical_campus_number(x)
 
-
 def _canon_series(series: pd.Series) -> pd.Series:
     """Vectorized canonicalization for a pandas Series of campus numbers."""
     return series.map(canonical_campus_number)
-
 
 def _build_campus_multi_index(repo) -> dict[str, Any]:
     """Return a dict mapping multiple key shapes to Campus.id for robust matching.

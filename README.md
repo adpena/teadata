@@ -118,20 +118,24 @@ Key fields & behavior:
 The `Query` object wraps lists of `District` or `Campus` and supports fluent chaining via `>>`:
 
 ```python
-# All campuses inside a district, then filter and take top 5 by enrollment
-top5 = (aldine
-        >> 'campuses'
-        >> (lambda c: c.enrollment and c.enrollment > 1000)
-        >> ("sort", lambda c: c.enrollment, True)  # True -> descending
-        >> ("take", 5)
-        >> ("map", lambda c: (c.name, c.enrollment)))
+# Start a query from a district TEA number, expand to campuses, then score
+district_q = engine >> ("district", "101902")
 
-print(top5)
+top5 = (
+    district_q
+    >> ("campuses_in",)
+    >> ("filter", lambda c: (c.enrollment or 0) > 1000)
+    >> ("sort", lambda c: c.enrollment or 0, True)  # True -> descending
+    >> ("take", 5)
+    >> ("map", lambda c: (c.name, c.enrollment))
+)
+
+print(top5)  # list[(name, enrollment)]
 ```
 
 Common operators:
 
-- `>> 'campuses'` — traverse District ➜ campuses
+- `>> ("campuses_in",)` — expand the current district query into its campuses
 - `>> ("filter", predicate)` or `>> (lambda x: ...)`
 - `>> ("sort", key_fn, descending: bool=False)`
 - `>> ("take", n)`
@@ -148,8 +152,9 @@ Common operators:
 Every campus exposes `coords` as `(lon, lat)`. This is handy for distance-based queries and pipelines:
 
 ```python
-c0 = (aldine >> 'campuses').first()
-k_nearest = engine.nearest_campuses(c0.coords, k=5)  # returns list[(Campus, meters)]
+campus_q = (engine >> ("district", "101902")) >> ("campuses_in",)
+c0 = campus_q.first()
+k_nearest = engine.nearest_campuses(*c0.coords, limit=5)  # list[(Campus, miles)]
 ```
 
 > The engine keeps a fast spatial index (STRtree, Shapely 2.x) for nearest-k and containment probes.
@@ -159,15 +164,15 @@ k_nearest = engine.nearest_campuses(c0.coords, k=5)  # returns list[(Campus, met
 Two common helpers:
 
 ```python
-# All campuses within a district boundary
-inside = engine.within(aldine, items="campuses")
+# All campuses within a district boundary (inferred from the district query)
+inside = ((engine >> ("district", "101902")) >> ("within", None)).to_list()
 
-# Charter-only campuses within
-charters = engine.charter_campuses_within(aldine)
+# Charter-only campuses within the same boundary
+charters = ((engine >> ("district", "101902")) >> ("within", None, True)).to_list()
 
-# The same via queries:
-q = (engine >> ("within", aldine, "campuses")
-          >> ("filter", lambda c: (c.type or "").upper() == "OPEN ENROLLMENT CHARTER"))
+# Equivalent imperative helpers
+inside_alt = engine.within(aldine, items="campuses")
+charters_alt = engine.charter_campuses_within(aldine)
 ```
 
 These use polygon containment and are validated by a built-in slow-path check to avoid false negatives.
@@ -178,7 +183,11 @@ These use polygon containment and are validated by a built-in slow-path check to
 # Five nearest charters within 10 linear miles of a target point
 pt = (-95.36, 29.83)  # (lon, lat)
 nearest_charters = engine.nearest_campuses(
-    pt, k=5, miles=10, charter_only=True
+    pt[0],
+    pt[1],
+    limit=5,
+    max_miles=10,
+    charter_only=True,
 )
 ```
 
