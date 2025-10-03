@@ -565,6 +565,12 @@ class Campus:
             "district_number": self.district_number,
             "campus_number": self.campus_number,
         }
+        # Include computed property if available; fall back to None on error
+        try:
+            out["percent_enrollment_change"] = self.percent_enrollment_change
+        except Exception:
+            out["percent_enrollment_change"] = None
+
         if include_meta and isinstance(self.meta, dict):
             for k, v in self.meta.items():
                 if k not in out:
@@ -593,21 +599,27 @@ class Campus:
     @property
     def percent_enrollment_change(self) -> float:
         """
-        Compute the absolute percent change in enrollment from the 2015 baseline.
+        Compute the signed percent change in enrollment from the 2014–2015 baseline.
+        Positive values indicate an increase, negative values a decrease.
         Uses the 'campus_2015_student_enrollment_all_students_count' field from meta if present,
         or from the object directly if available.
         Returns:
-            float: abs((self.enrollment - baseline) / baseline)
+            float: (self.enrollment - baseline) / baseline
         Raises:
             ValueError: if enrollment or baseline is missing or None.
         """
         enrollment = self.enrollment
         # Try meta first, then direct attribute as fallback
         baseline = None
-        if isinstance(self.meta, dict) and "campus_2015_student_enrollment_all_students_count" in self.meta:
+        if (
+            isinstance(self.meta, dict)
+            and "campus_2015_student_enrollment_all_students_count" in self.meta
+        ):
             baseline = self.meta["campus_2015_student_enrollment_all_students_count"]
         elif hasattr(self, "campus_2015_student_enrollment_all_students_count"):
-            baseline = getattr(self, "campus_2015_student_enrollment_all_students_count")
+            baseline = getattr(
+                self, "campus_2015_student_enrollment_all_students_count"
+            )
         if enrollment is None:
             raise ValueError("Current enrollment is missing or None.")
         if baseline is None:
@@ -618,8 +630,10 @@ class Campus:
         except Exception:
             raise ValueError("Enrollment or baseline could not be cast to float.")
         if baseline == 0:
-            raise ValueError("Baseline 2015 enrollment is zero, cannot compute percent change.")
-        return abs((enrollment - baseline) / baseline)
+            raise ValueError(
+                "Baseline 2015 enrollment is zero, cannot compute percent change."
+            )
+        return (enrollment - baseline) / baseline
 
     @property
     def district(self) -> Optional["District"]:
