@@ -452,3 +452,19 @@ class CampusTaprStudentStaffProfile(Enricher):
             reader_kwargs=None,
         )
         return {"updated": updated, "year": yr}
+
+
+@enricher("campus_tapr_historical_enrollment")
+class CampusTaprHistoricalEnrollment(Enricher):
+    def apply(self, repo, cfg_path: str, year: int) -> Dict[str, Any]:
+        yr, updated = _apply_campus_accountability(
+            repo,
+            cfg_path,
+            "campus_tapr_historical_enrollment",
+            year,
+            select=None,
+            rename=None,
+            aliases=None,
+            reader_kwargs=None,
+        )
+        return {"updated": updated, "year": yr}
