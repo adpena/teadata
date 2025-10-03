@@ -58,6 +58,7 @@ schema:
     campus_transfer_reports: ["csv"]
     campus_peims_financials: ["csv"]
     campus_tapr_student_staff_profile: ["xlsx"]
+    campus_tapr_historical_enrollment: ["xlsx"]
   spatial:
     districts: ["geojson","gpkg","parquet"]
     campuses: ["geojson","gpkg","parquet"]
