@@ -151,6 +151,54 @@ def run_enrichments(repo: DataEngine) -> None:
     except Exception as e:
         print(f"[enrich] campus_peims_financials failed: {e}")
 
+    try:
+        yr_tapr, n_tapr = enrich_campuses_from_config(
+            repo,
+            CFG,
+            "campus_tapr_student_staff_profile",
+            YEAR,
+            select=None,
+            rename=None,
+            reader_kwargs=None,
+        )
+        print(
+            f"Enriched {n_tapr} campuses from TAPR student/staff profile {yr_tapr}"
+        )
+    except Exception as e:
+        print(f"[enrich] campus_tapr_student_staff_profile failed: {e}")
+
+    try:
+        yr_hist, n_hist = enrich_campuses_from_config(
+            repo,
+            CFG,
+            "campus_tapr_historical_enrollment",
+            YEAR,
+            select=None,
+            rename=None,
+            reader_kwargs=None,
+        )
+        print(
+            f"Enriched {n_hist} campuses from TAPR historical enrollment {yr_hist}"
+        )
+    except Exception as e:
+        print(f"[enrich] campus_tapr_historical_enrollment failed: {e}")
+
+    try:
+        yr_closure, n_closure = enrich_campuses_from_config(
+            repo,
+            CFG,
+            "campus_planned_closures",
+            YEAR,
+            select=None,
+            rename=None,
+            reader_kwargs=None,
+        )
+        print(
+            f"Enriched {n_closure} campuses from planned closures {yr_closure}"
+        )
+    except Exception as e:
+        print(f"[enrich] campus_planned_closures failed: {e}")
+
 
 # ------------------ Repo snapshot cache (warm start) ------------------
 def _file_mtime(p: str | Path) -> float:
@@ -250,6 +298,9 @@ def _compute_extra_signature() -> dict:
             "campus_accountability",
             "charter_reference",
             "campus_peims_financials",
+            "campus_tapr_student_staff_profile",
+            "campus_tapr_historical_enrollment",
+            "campus_planned_closures",
             "campus_transfer_reports",
         ):
             try:
