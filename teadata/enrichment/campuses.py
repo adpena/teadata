@@ -121,22 +121,32 @@ def _apply_campus_accountability(
             f"[enrich:{dataset}] canonical campus numbers -> valid_rows={valid_rows} unique_keys={unique_keys}"
         )
 
-    if not select:
-        raise ValueError(
-            "campus enrichment requires an explicit `select` collection of column names"
-        )
-
-    use_cols = list(select)
-    missing = [c for c in use_cols if c not in df.columns]
-    if missing:
-        if _profile_enabled():
-            _debug(
-                f"[enrich:{dataset}] missing columns after rename: {', '.join(sorted(missing))}"
+    if select is None:
+        use_cols = [c for c in df.columns if c != "campus_number"]
+    else:
+        missing: list[str] = []
+        use_cols = []
+        for col in select:
+            if col == "campus_number":
+                continue
+            if col not in df.columns:
+                missing.append(col)
+                continue
+            if col not in use_cols:
+                use_cols.append(col)
+        if missing:
+            if _profile_enabled():
+                _debug(
+                    f"[enrich:{dataset}] missing columns after rename: {', '.join(sorted(missing))}"
+                )
+            raise KeyError(
+                "campus enrichment missing expected columns after rename: "
+                + ", ".join(sorted(missing))
             )
-        raise KeyError(
-            "campus enrichment missing expected columns after rename: "
-            + ", ".join(sorted(missing))
-        )
+        if not use_cols:
+            raise ValueError(
+                "campus enrichment requires a non-empty `select` collection of column names"
+            )
 
     for c in use_cols:
         if c in df.columns:
@@ -414,6 +424,22 @@ class CampusPEIMSFinancials(Enricher):
             year,
             select=DEFAULT_PEIMS_FINANCIAL_COLUMNS,
             rename=None,
+            reader_kwargs=None,
+        )
+        return {"updated": updated, "year": yr}
+
+
+@enricher("campus_tapr_student_staff_profile")
+class CampusTaprStudentStaffProfile(Enricher):
+    def apply(self, repo, cfg_path: str, year: int) -> Dict[str, Any]:
+        yr, updated = _apply_campus_accountability(
+            repo,
+            cfg_path,
+            "campus_tapr_student_staff_profile",
+            year,
+            select=None,
+            rename=None,
+            aliases=None,
             reader_kwargs=None,
         )
         return {"updated": updated, "year": yr}
