@@ -7,6 +7,7 @@ import json
 import hashlib
 import inspect
 import os
+import shutil
 
 from datetime import datetime, date
 from typing import Optional
@@ -161,9 +162,7 @@ def run_enrichments(repo: DataEngine) -> None:
             rename=None,
             reader_kwargs=None,
         )
-        print(
-            f"Enriched {n_tapr} campuses from TAPR student/staff profile {yr_tapr}"
-        )
+        print(f"Enriched {n_tapr} campuses from TAPR student/staff profile {yr_tapr}")
     except Exception as e:
         print(f"[enrich] campus_tapr_student_staff_profile failed: {e}")
 
@@ -177,9 +176,7 @@ def run_enrichments(repo: DataEngine) -> None:
             rename=None,
             reader_kwargs=None,
         )
-        print(
-            f"Enriched {n_hist} campuses from TAPR historical enrollment {yr_hist}"
-        )
+        print(f"Enriched {n_hist} campuses from TAPR historical enrollment {yr_hist}")
     except Exception as e:
         print(f"[enrich] campus_tapr_historical_enrollment failed: {e}")
 
@@ -357,6 +354,13 @@ def _save_repo_snapshot(
         _prepare_repo_for_pickle(repo)
         with snap.open("wb") as f:
             pickle.dump((meta, repo), f, protocol=pickle.HIGHEST_PROTOCOL)
+        # Attempt to also copy snapshot to absolute project cache path; fail quietly if missing
+        try:
+            abs_cache_dir = Path("/Users/adpena/PycharmProjects/teadata/.cache")
+            if abs_cache_dir.is_dir():
+                shutil.copy2(snap, abs_cache_dir / snap.name)
+        except Exception:
+            pass
     except Exception:
         # Cache is best-effort; ignore failures
         pass

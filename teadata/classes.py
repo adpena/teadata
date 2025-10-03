@@ -591,6 +591,37 @@ class Campus:
         return self._campus_number_canon
 
     @property
+    def percent_enrollment_change(self) -> float:
+        """
+        Compute the absolute percent change in enrollment from the 2015 baseline.
+        Uses the 'campus_2015_student_enrollment_all_students_count' field from meta if present,
+        or from the object directly if available.
+        Returns:
+            float: abs((self.enrollment - baseline) / baseline)
+        Raises:
+            ValueError: if enrollment or baseline is missing or None.
+        """
+        enrollment = self.enrollment
+        # Try meta first, then direct attribute as fallback
+        baseline = None
+        if isinstance(self.meta, dict) and "campus_2015_student_enrollment_all_students_count" in self.meta:
+            baseline = self.meta["campus_2015_student_enrollment_all_students_count"]
+        elif hasattr(self, "campus_2015_student_enrollment_all_students_count"):
+            baseline = getattr(self, "campus_2015_student_enrollment_all_students_count")
+        if enrollment is None:
+            raise ValueError("Current enrollment is missing or None.")
+        if baseline is None:
+            raise ValueError("Baseline 2015 enrollment is missing or None.")
+        try:
+            enrollment = float(enrollment)
+            baseline = float(baseline)
+        except Exception:
+            raise ValueError("Enrollment or baseline could not be cast to float.")
+        if baseline == 0:
+            raise ValueError("Baseline 2015 enrollment is zero, cannot compute percent change.")
+        return abs((enrollment - baseline) / baseline)
+
+    @property
     def district(self) -> Optional["District"]:
         if self._repo is None:
             return None
