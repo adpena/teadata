@@ -38,8 +38,8 @@ data_sources:
     2024: data/tapr/CAMPPROF_2023-2024_FINAL.xlsx
     latest: 2024
   campus_tapr_historical_enrollment:
-    2024: data/tapr/CAMPENR_2023-2024_FINAL.xlsx
-    latest: 2024
+    2014: data/tapr/CAMPPROF_2014-2015_FINAL.xlsx
+    latest: 2014
 
 spatial:
   districts:
