@@ -34,6 +34,9 @@ data_sources:
   campus_peims_financials:
     2024: data/campus_peims_financials/2023-2024 Campus PEIMS Actual Financials Statewide.csv
     latest: 2024
+  campus_tapr_student_staff_profile:
+    2024: data/tapr/CAMPPROF_2023-2024_FINAL.xlsx
+    latest: 2024
 
 spatial:
   districts:
@@ -51,6 +54,7 @@ schema:
     charter_reference: ["xlsx"]
     campus_transfer_reports: ["csv"]
     campus_peims_financials: ["csv"]
+    campus_tapr_student_staff_profile: ["xlsx"]
   spatial:
     districts: ["geojson","gpkg","parquet"]
     campuses: ["geojson","gpkg","parquet"]
