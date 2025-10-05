@@ -25,6 +25,7 @@ DEFAULT_PEIMS_FINANCIAL_COLUMNS: list[str] = [
     "school_leadership_af_per_student",
 ]
 
+
 def _profile_enabled() -> bool:
     return bool(getattr(classes_mod, "ENABLE_PROFILING", False))
 
@@ -80,8 +81,9 @@ def _apply_campus_accountability(
     aliases=None,
     reader_kwargs=None,
     transform_df: Callable[[pd.DataFrame], pd.DataFrame] | None = None,
-    record_hook: Callable[[Any, Dict[str, Any], int | None], Dict[str, Any] | None]
-    | None = None,
+    record_hook: (
+        Callable[[Any, Dict[str, Any], int | None], Dict[str, Any] | None] | None
+    ) = None,
 ):
     cfg = load_config(cfg_path)
     resolved_year, df = cfg.load_df(

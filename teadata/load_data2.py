@@ -162,9 +162,7 @@ def run_enrichments(repo: DataEngine) -> None:
             rename=None,
             reader_kwargs=None,
         )
-        print(
-            f"Enriched {n_tapr} campuses from TAPR student/staff profile {yr_tapr}"
-        )
+        print(f"Enriched {n_tapr} campuses from TAPR student/staff profile {yr_tapr}")
     except Exception as e:
         print(f"[enrich] campus_tapr_student_staff_profile failed: {e}")
 
@@ -178,9 +176,7 @@ def run_enrichments(repo: DataEngine) -> None:
             rename=None,
             reader_kwargs=None,
         )
-        print(
-            f"Enriched {n_hist} campuses from TAPR historical enrollment {yr_hist}"
-        )
+        print(f"Enriched {n_hist} campuses from TAPR historical enrollment {yr_hist}")
     except Exception as e:
         print(f"[enrich] campus_tapr_historical_enrollment failed: {e}")
 
@@ -194,9 +190,7 @@ def run_enrichments(repo: DataEngine) -> None:
             rename=None,
             reader_kwargs=None,
         )
-        print(
-            f"Enriched {n_closure} campuses from planned closures {yr_closure}"
-        )
+        print(f"Enriched {n_closure} campuses from planned closures {yr_closure}")
     except Exception as e:
         print(f"[enrich] campus_planned_closures failed: {e}")
 
