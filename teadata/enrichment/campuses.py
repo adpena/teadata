@@ -1,3 +1,4 @@
+import re
 from typing import Dict, Any, Callable
 
 import teadata.classes as classes_mod
