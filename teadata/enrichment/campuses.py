@@ -1,4 +1,3 @@
-import re
 from typing import Dict, Any, Callable
 
 import teadata.classes as classes_mod
@@ -386,6 +385,19 @@ def _apply_campus_planned_closures(
     *,
     reader_kwargs=None,
 ):
+    # Ensure the standard planned-closure columns are always exposed so attribute
+    # access like ``campus.facing_closure`` works even for campuses that are not
+    # present in the dataset.  Other enrichments that cover every campus (such as
+    # TAPR historical enrollment) implicitly provide this behaviour; for this
+    # sparse dataset we seed the meta dicts with ``None`` first and then let the
+    # shared helper overwrite matches with real values.
+    default_columns = ("facing_closure", "closure_date")
+    for campus in repo._campuses.values():
+        if getattr(campus, "meta", None) is None or not isinstance(campus.meta, dict):
+            campus.meta = {}
+        for col in default_columns:
+            campus.meta.setdefault(col, None)
+
     return _apply_campus_accountability(
         repo,
         cfg_path,
