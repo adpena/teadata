@@ -93,7 +93,27 @@ known_first_party = ["teadata"]
 
 # Per-rule ignores by code
 [tool.deptry.per_rule_ignores]
-DEP002 = ["openpyxl", "pyogrio", "pyarrow", "pygeos", "ruff", "mypy", "pytest", "pytest-cov", "pip-tools", "pip-audit", "deptry", "python-dateutil", "jupyterlab", "google-api-python-client"]
+DEP002 = [
+    "openpyxl",
+    "pyogrio",
+    "pyarrow",
+    "pygeos",
+    "ruff",
+    "mypy",
+    "pytest",
+    "pytest-cov",
+    "pip-tools",
+    "pip-audit",
+    "deptry",
+    "python-dateutil",
+    "jupyterlab",
+    "google-api-python-client",
+    "ipython",
+    "ipywidgets",
+    "ipyleaflet",
+    "itables",
+    "google-auth",
+]
 DEP003 = [
     "scipy",
     "google",        # namespace package; satisfied by google-auth/google-api-python-client
