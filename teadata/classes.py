@@ -583,6 +583,8 @@ class Campus:
         except Exception:
             out["total_unmasked_charter_transfers_out"] = None
 
+        out["planned_closure"] = self.planned_closure
+
         if include_meta and isinstance(self.meta, dict):
             for k, v in self.meta.items():
                 if k not in out:
@@ -607,6 +609,24 @@ class Campus:
     @property
     def campus_number_canon(self) -> Optional[str]:
         return self._campus_number_canon
+
+    @property
+    def planned_closure(self) -> Optional[dict[str, Any]]:
+        meta = getattr(self, "meta", None)
+        if isinstance(meta, dict):
+            val = meta.get("planned_closure")
+            if isinstance(val, dict):
+                return val
+        return None
+
+    @planned_closure.setter
+    def planned_closure(self, value: Optional[dict[str, Any]]):
+        if getattr(self, "meta", None) is None or not isinstance(self.meta, dict):
+            self.meta = {}
+        if value is None:
+            self.meta.pop("planned_closure", None)
+        else:
+            self.meta["planned_closure"] = value
 
     @property
     def percent_enrollment_change(self) -> float:
