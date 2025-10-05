@@ -570,6 +570,18 @@ class Campus:
             out["percent_enrollment_change"] = self.percent_enrollment_change
         except Exception:
             out["percent_enrollment_change"] = None
+        try:
+            out["num_charter_transfer_destinations"] = self.num_charter_transfer_destinations
+        except Exception:
+            out["num_charter_transfer_destinations"] = None
+        try:
+            out["num_charter_transfer_destinations_masked"] = self.num_charter_transfer_destinations_masked
+        except Exception:
+            out["num_charter_transfer_destinations_masked"] = None
+        try:
+            out["total_unmasked_charter_transfers_out"] = self.total_unmasked_charter_transfers_out
+        except Exception:
+            out["total_unmasked_charter_transfers_out"] = None
 
         if include_meta and isinstance(self.meta, dict):
             for k, v in self.meta.items():
@@ -634,6 +646,72 @@ class Campus:
                 "Baseline 2015 enrollment is zero, cannot compute percent change."
             )
         return (enrollment - baseline) / baseline
+
+    @property
+    def num_charter_transfer_destinations(self) -> int:
+        """
+        Total number of *unique* charter schools (is_charter is True)
+        that receive student transfers from this campus.
+        Safe defaults to 0 when no repository is attached.
+        """
+        if not hasattr(self, "_repo") or self._repo is None:
+            return 0
+        try:
+            edges = self._repo.transfers_out(self)
+        except Exception:
+            return 0
+        ids = set()
+        for to_campus, count, masked in ((e[0], e[1], e[2]) for e in edges):
+            if to_campus is not None and getattr(to_campus, "is_charter", False):
+                ids.add(getattr(to_campus, "id", None))
+        return len(ids)
+
+    @property
+    def num_charter_transfer_destinations_masked(self) -> int:
+        """
+        Among the charter transfer destinations, count how many destination campuses
+        are present with a masked transfer count. Uses unique campuses (by id).
+        """
+        if not hasattr(self, "_repo") or self._repo is None:
+            return 0
+        try:
+            edges = self._repo.transfers_out(self)
+        except Exception:
+            return 0
+        masked_ids = set()
+        for to_campus, count, masked in ((e[0], e[1], e[2]) for e in edges):
+            if (
+                to_campus is not None
+                and getattr(to_campus, "is_charter", False)
+                and bool(masked)
+            ):
+                masked_ids.add(getattr(to_campus, "id", None))
+        return len(masked_ids)
+
+    @property
+    def total_unmasked_charter_transfers_out(self) -> int:
+        """
+        Sum of student transfers out from this campus to *charter* destinations
+        where the transfer `count` is not None (i.e., unmasked).
+        """
+        if not hasattr(self, "_repo") or self._repo is None:
+            return 0
+        try:
+            edges = self._repo.transfers_out(self)
+        except Exception:
+            return 0
+        total = 0
+        for to_campus, count, masked in ((e[0], e[1], e[2]) for e in edges):
+            if to_campus is None or not getattr(to_campus, "is_charter", False):
+                continue
+            if count is None:
+                continue
+            try:
+                total += int(count)
+            except Exception:
+                # Skip counts that can't be coerced to int
+                continue
+        return total
 
     @property
     def district(self) -> Optional["District"]:
