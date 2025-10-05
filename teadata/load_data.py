@@ -147,7 +147,11 @@ def _compute_extra_signature() -> dict:
     # Resolved data sources that affect enrichment
     try:
         cfg = load_config(CFG)
-        for ds in ("accountability", "campus_accountability"):
+        for ds in (
+            "accountability",
+            "campus_accountability",
+            "campus_planned_closures",
+        ):
             try:
                 _, p = cfg.resolve(ds, YEAR, section="data_sources")
                 sig[f"ds:{ds}"] = _safe_path_or_url_signature(p)
