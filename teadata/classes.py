@@ -571,19 +571,23 @@ class Campus:
         except Exception:
             out["percent_enrollment_change"] = None
         try:
-            out["num_charter_transfer_destinations"] = self.num_charter_transfer_destinations
+            out["num_charter_transfer_destinations"] = (
+                self.num_charter_transfer_destinations
+            )
         except Exception:
             out["num_charter_transfer_destinations"] = None
         try:
-            out["num_charter_transfer_destinations_masked"] = self.num_charter_transfer_destinations_masked
+            out["num_charter_transfer_destinations_masked"] = (
+                self.num_charter_transfer_destinations_masked
+            )
         except Exception:
             out["num_charter_transfer_destinations_masked"] = None
         try:
-            out["total_unmasked_charter_transfers_out"] = self.total_unmasked_charter_transfers_out
+            out["total_unmasked_charter_transfers_out"] = (
+                self.total_unmasked_charter_transfers_out
+            )
         except Exception:
             out["total_unmasked_charter_transfers_out"] = None
-
-        out["planned_closure"] = self.planned_closure
 
         if include_meta and isinstance(self.meta, dict):
             for k, v in self.meta.items():
@@ -614,19 +618,10 @@ class Campus:
     def planned_closure(self) -> Optional[dict[str, Any]]:
         meta = getattr(self, "meta", None)
         if isinstance(meta, dict):
-            val = meta.get("planned_closure")
-            if isinstance(val, dict):
-                return val
-        return None
-
-    @planned_closure.setter
-    def planned_closure(self, value: Optional[dict[str, Any]]):
-        if getattr(self, "meta", None) is None or not isinstance(self.meta, dict):
-            self.meta = {}
-        if value is None:
-            self.meta.pop("planned_closure", None)
-        else:
-            self.meta["planned_closure"] = value
+            val = meta.get("facing_closure")
+            if val == "TRUE":
+                return True
+        return False
 
     @property
     def percent_enrollment_change(self) -> float:
@@ -1661,6 +1656,31 @@ class Query:
             res = self._repo.nearest_charter_same_type(campuses, k=k)
 
             # Represent each result as a tuple (campus, match, miles)
+            out = []
+            for c in campuses:
+                r = res.get(str(c.id), {"match": None, "miles": None})
+                out.append((c, r["match"], r["miles"]))
+            self._items = out
+            return self
+
+        if key == "nearest_charter_transfer_destination":
+            # For each Campus in the chain (or District -> campuses_in),
+            # find the nearest *charter* destination that receives transfers from that campus.
+            # Output shape mirrors nearest_charter_same_type: list of (campus, match, miles)
+
+            # Determine campuses from current items
+            campuses: List[Any] = []
+            for item in self._items:
+                if item.__class__.__name__ == "Campus":
+                    campuses.append(item)
+                elif item.__class__.__name__ == "District":
+                    campuses.extend(self._repo.campuses_in(item))
+            if not campuses:
+                self._items = []
+                return self
+
+            res = self._repo.nearest_charter_transfer_destination(campuses)
+
             out = []
             for c in campuses:
                 r = res.get(str(c.id), {"match": None, "miles": None})
@@ -2929,6 +2949,62 @@ class DataEngine:
                             "match": cand_objs[j],
                             "miles": float(miles[j]),
                         }
+
+        return results
+
+    def nearest_charter_transfer_destination(
+        self,
+        campuses: Iterable["Campus"],
+    ) -> Dict[str, Dict[str, Any]]:
+        """
+        For each campus, among the *charter* campuses that receive student transfers
+        from that campus (edges in _xfers_out), return the spatially nearest one.
+
+        Returns a dict keyed by str(campus.id) -> {"match": Campus|None, "miles": float|None}.
+        If a campus has no charter transfer destinations or lacks geometry, returns None values.
+        """
+        from .classes import haversine_miles  # ensure local import path
+
+        results: Dict[str, Dict[str, Any]] = {}
+
+        for c in campuses:
+            cid = getattr(c, "id", None)
+            if cid is None:
+                continue
+            # Source point
+            p = getattr(c, "point", None) or getattr(c, "location", None)
+            try:
+                lon1, lat1 = (float(p.x), float(p.y)) if p is not None else (None, None)
+            except Exception:
+                lon1, lat1 = (None, None)
+
+            best_dm: Optional[float] = None
+            best_obj: Optional[Campus] = None
+
+            # Gather charter destinations from transfers_out
+            edges = self._xfers_out.get(cid, [])
+            if edges:
+                for to_id, _cnt, _masked in edges:
+                    dest = self._campuses.get(to_id)
+                    if dest is None or not getattr(dest, "is_charter", False):
+                        continue
+                    q = getattr(dest, "point", None) or getattr(dest, "location", None)
+                    try:
+                        lon2, lat2 = (
+                            (float(q.x), float(q.y)) if q is not None else (None, None)
+                        )
+                    except Exception:
+                        lon2, lat2 = (None, None)
+                    if None in (lon1, lat1, lon2, lat2):
+                        continue
+                    dm = haversine_miles(lon1, lat1, lon2, lat2)
+                    if best_dm is None or dm < best_dm:
+                        best_dm, best_obj = float(dm), dest
+
+            results[str(cid)] = {
+                "match": best_obj,
+                "miles": best_dm if best_dm is not None else None,
+            }
 
         return results
 
