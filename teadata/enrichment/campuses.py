@@ -1,4 +1,4 @@
-from typing import Dict, Any
+from typing import Dict, Any, Callable
 
 import teadata.classes as classes_mod
 import pandas as pd
@@ -24,20 +24,6 @@ DEFAULT_PEIMS_FINANCIAL_COLUMNS: list[str] = [
     "guidance_counseling_af_per_student",
     "school_leadership_af_per_student",
 ]
-
-DEFAULT_PEIMS_FINANCIAL_COLUMNS: list[str] = [
-    "instruction_af_perc",
-    "transportation_af_per_student",
-    "extracurricular_af_per_student",
-    "security_monitoring_af_per_student",
-    "students_w_disabilities_af_per_student",
-    "bilingual_ed_af_per_student",
-    "dyslexia_or_related_disorder_serv_af_per_student",
-    "ccmr_af_per_student",
-    "guidance_counseling_af_per_student",
-    "school_leadership_af_per_student",
-]
-
 
 def _profile_enabled() -> bool:
     return bool(getattr(classes_mod, "ENABLE_PROFILING", False))
@@ -93,6 +79,9 @@ def _apply_campus_accountability(
     rename=None,
     aliases=None,
     reader_kwargs=None,
+    transform_df: Callable[[pd.DataFrame], pd.DataFrame] | None = None,
+    record_hook: Callable[[Any, Dict[str, Any], int | None], Dict[str, Any] | None]
+    | None = None,
 ):
     cfg = load_config(cfg_path)
     resolved_year, df = cfg.load_df(
@@ -126,6 +115,13 @@ def _apply_campus_accountability(
     # Canonicalize to leading-apostrophe format used across the repo
     df["campus_number"] = _canon_series(df["campus_number"])
     df = df[df["campus_number"].notna()]
+
+    if transform_df:
+        df = transform_df(df)
+        if "campus_number" not in df.columns:
+            raise KeyError(
+                "campus enrichment transform_df removed the required 'campus_number' column"
+            )
 
     if _profile_enabled():
         valid_rows = len(df)
@@ -214,9 +210,16 @@ def _apply_campus_accountability(
             if _profile_enabled() and len(sample_missing) < 10:
                 sample_missing.append(str(cn))
             continue
-        if getattr(cobj, "meta", None) is None:
+        if getattr(cobj, "meta", None) is None or not isinstance(cobj.meta, dict):
             cobj.meta = {}
-        for k, v in attrs.items():
+
+        attrs_for_meta = attrs
+        if record_hook:
+            maybe_new_attrs = record_hook(cobj, dict(attrs), resolved_year)
+            if isinstance(maybe_new_attrs, dict):
+                attrs_for_meta = maybe_new_attrs
+
+        for k, v in attrs_for_meta.items():
             cobj.meta[k] = v
             if aliases and k in aliases:
                 try:
@@ -374,6 +377,39 @@ def _apply_campus_peims_financials(
     return resolved_year, updated
 
 
+def _apply_campus_planned_closures(
+    repo,
+    cfg_path: str,
+    dataset: str,
+    year: int,
+    *,
+    reader_kwargs=None,
+):
+    # Ensure the standard planned-closure columns are always exposed so attribute
+    # access like ``campus.facing_closure`` works even for campuses that are not
+    # present in the dataset.  Other enrichments that cover every campus (such as
+    # TAPR historical enrollment) implicitly provide this behaviour; for this
+    # sparse dataset we seed the meta dicts with ``None`` first and then let the
+    # shared helper overwrite matches with real values.
+    default_columns = ("facing_closure", "closure_date")
+    for campus in repo._campuses.values():
+        if getattr(campus, "meta", None) is None or not isinstance(campus.meta, dict):
+            campus.meta = {}
+        for col in default_columns:
+            campus.meta.setdefault(col, None)
+
+    return _apply_campus_accountability(
+        repo,
+        cfg_path,
+        dataset,
+        year,
+        select=["campus_number", "facing_closure", "closure_date"],
+        rename=None,
+        aliases=None,
+        reader_kwargs=reader_kwargs,
+    )
+
+
 def enrich_campuses_from_config(
     repo,
     cfg_path: str,
@@ -396,6 +432,14 @@ def enrich_campuses_from_config(
             year,
             select=select,
             rename=rename,
+            reader_kwargs=reader_kwargs,
+        )
+    if ds_lower == "campus_planned_closures":
+        return _apply_campus_planned_closures(
+            repo,
+            cfg_path,
+            dataset,
+            year,
             reader_kwargs=reader_kwargs,
         )
 
@@ -469,6 +513,19 @@ class CampusTaprHistoricalEnrollment(Enricher):
             select=None,
             rename=None,
             aliases=None,
+            reader_kwargs=None,
+        )
+        return {"updated": updated, "year": yr}
+
+
+@enricher("campus_planned_closures")
+class CampusPlannedClosures(Enricher):
+    def apply(self, repo, cfg_path: str, year: int) -> Dict[str, Any]:
+        yr, updated = _apply_campus_planned_closures(
+            repo,
+            cfg_path,
+            "campus_planned_closures",
+            year,
             reader_kwargs=None,
         )
         return {"updated": updated, "year": yr}
