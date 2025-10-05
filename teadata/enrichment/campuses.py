@@ -378,23 +378,6 @@ def _apply_campus_peims_financials(
     return resolved_year, updated
 
 
-def _snake_case(value: str) -> str:
-    value = re.sub(r"[^0-9A-Za-z]+", "_", str(value).strip())
-    value = re.sub(r"_+", "_", value)
-    return value.strip("_").lower()
-
-
-def _planned_closure_column_name(raw: str) -> str:
-    base = _snake_case(raw)
-    if not base:
-        base = "value"
-    if not base.startswith("planned_closure_"):
-        base = f"planned_closure_{base}"
-    if base == "planned_closure_campus_number":
-        base = "planned_closure_campus_number_value"
-    return base
-
-
 def _apply_campus_planned_closures(
     repo,
     cfg_path: str,
@@ -403,53 +386,15 @@ def _apply_campus_planned_closures(
     *,
     reader_kwargs=None,
 ):
-    original_column_map: dict[str, str] = {}
-
-    def _transform(df: pd.DataFrame) -> pd.DataFrame:
-        nonlocal original_column_map
-        df_local = df.copy()
-        rename_map: dict[str, str] = {}
-        seen: set[str] = set()
-        column_map: dict[str, str] = {}
-        for col in df_local.columns:
-            if col == "campus_number":
-                continue
-            safe = _planned_closure_column_name(col)
-            base = safe
-            idx = 2
-            while safe in seen or safe == "campus_number":
-                safe = f"{base}_{idx}"
-                idx += 1
-            if safe != col:
-                rename_map[col] = safe
-            seen.add(safe)
-            column_map[safe] = str(col)
-        if rename_map:
-            df_local = df_local.rename(columns=rename_map)
-        original_column_map = column_map
-        return df_local
-
-    def _record_hook(campus, attrs: Dict[str, Any], resolved_year: int | None):
-        record = dict(attrs)
-        if resolved_year is not None:
-            record.setdefault("planned_closure_data_year", resolved_year)
-        summary = dict(record)
-        if original_column_map:
-            summary["planned_closure_original_columns"] = original_column_map.copy()
-        campus.planned_closure = summary
-        return record
-
     return _apply_campus_accountability(
         repo,
         cfg_path,
         dataset,
         year,
-        select=None,
+        select=["campus_number", "facing_closure", "closure_date"],
         rename=None,
         aliases=None,
         reader_kwargs=reader_kwargs,
-        transform_df=_transform,
-        record_hook=_record_hook,
     )
 
 
