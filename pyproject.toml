@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "teadata"
-version = "0.0.2"
+version = "0.0.3"
 description = "Pythonic data engine for Texas education datasets"
 authors = [{name="Alejandro Peña", email="adpena@gmail.com"}]
 readme = "README.md"
@@ -81,6 +81,12 @@ teadata-config = "teadata_config:main"
 where = ["."]
 include = ["teadata*"]
 exclude = ["tests*", "docs*", "examples*"]
+
+[tool.setuptools.package-data]
+teadata = [".cache/*.pkl"]
+
+[tool.setuptools]
+include-package-data = true
 
 [project.urls]
 "Homepage" = "https://github.com/adpena/teadata"

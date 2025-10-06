@@ -13,6 +13,13 @@ import os
 import pickle
 import io
 
+import os
+import pickle
+import tempfile
+import urllib.request
+from importlib import resources as _pkg_resources
+from pathlib import Path
+
 from teadata.teadata_config import (
     canonical_campus_number,
     canonical_district_number,
@@ -24,6 +31,16 @@ try:
     from platformdirs import user_cache_dir  # type: ignore
 except Exception:
     user_cache_dir = None  # optional; we can still work without it
+
+# Embedded/remote pickle support
+DEFAULT_REPO_PKL_RELATIVE = (
+    ".cache/repo_Current_Districts_2025_Schools_2024_to_2025.pkl"
+)
+DEFAULT_REPO_PKL_URL = (
+    "https://raw.githubusercontent.com/adpena/teadata/"
+    "bddeb222dd579542453ae47163ebe39cc3a07081/teadata/.cache/"
+    "repo_Current_Districts_2025_Schools_2024_to_2025.pkl"
+)
 
 
 # --- Backward-compatible unpickling (remap old module paths like "classes" -> current module) ---
@@ -3351,9 +3368,73 @@ class DataEngine:
         return res[0] if res else None
 
 
+def _load_repo_from_embedded_pickle():
+    """Try to load a pickled DataEngine bundled inside the installed package."""
+    try:
+        pkg_root = _pkg_resources.files("teadata")
+        pkl = pkg_root.joinpath(DEFAULT_REPO_PKL_RELATIVE)
+        if not pkl.is_file():
+            return None
+        with pkl.open("rb") as f:
+            obj = pickle.load(f)
+        # sanity check
+        return obj if obj.__class__.__name__ == "DataEngine" else None
+    except Exception:
+        return None
+
+
+def _load_repo_from_url(url: str):
+    """Download a pickled DataEngine from a URL (e.g., GitHub raw) then load it.
+    Uses stdlib urllib so it works in minimal environments like Render."""
+    try:
+        if not url:
+            return None
+        tmpdir = Path(tempfile.gettempdir()) / "teadata-cache"
+        tmpdir.mkdir(parents=True, exist_ok=True)
+        import hashlib
+
+        key = hashlib.md5(url.encode("utf-8")).hexdigest()[:8]
+        cache_path = tmpdir / f"repo.pkl.{key}"
+        if not cache_path.exists():
+            with (
+                urllib.request.urlopen(url, timeout=30) as r,
+                open(cache_path, "wb") as out,
+            ):
+                out.write(r.read())
+        with open(cache_path, "rb") as f:
+            obj = pickle.load(f)
+        return obj if obj.__class__.__name__ == "DataEngine" else None
+    except Exception:
+        return None
+
+
 # Public helper for quick-start scripts/tests
-def load_default_repo() -> DataEngine:
-    """Return a DataEngine loaded from the newest available snapshot, or an empty one."""
+def load_default_repo() -> "DataEngine":
+    """Return a DataEngine from (in order):
+    1) an embedded pickle shipped with the package,
+    2) a remote pickle URL (TEADATA_REPO_PKL_URL or DEFAULT_REPO_PKL_URL),
+    3) the newest available local snapshot (existing behavior).
+    """
+    # 1) Embedded pickle inside the wheel/sdist
+    repo = _load_repo_from_embedded_pickle()
+    if repo is not None:
+        try:
+            repo._rebuild_indexes()
+        except Exception:
+            pass
+        return repo
+
+    # 2) Remote pickle (env override wins)
+    url = os.getenv("TEADATA_REPO_PKL_URL", DEFAULT_REPO_PKL_URL)
+    repo = _load_repo_from_url(url)
+    if repo is not None:
+        try:
+            repo._rebuild_indexes()
+        except Exception:
+            pass
+        return repo
+
+    # 3) Fallback to your previous behavior
     return DataEngine.from_snapshot(None, search=True)
 
 
