@@ -1707,6 +1707,18 @@ class Query:
 
         if key == "transfers_out":
             # Expand a list of Campus items into tuples: (campus, to_campus, count, masked)
+            # Optional arg forms:
+            #   ("transfers_out", True)        -> only rows where to_campus.is_charter is True
+            #   ("transfers_out", predicate)   -> only rows where predicate(to_campus) is True
+            charter_only = False
+            pred_to = None
+            if len(op) >= 2:
+                arg = op[1]
+                if isinstance(arg, bool):
+                    charter_only = arg
+                elif callable(arg):
+                    pred_to = arg
+
             campuses = [
                 it
                 for it in self._items
@@ -1715,6 +1727,16 @@ class Query:
             rows = []
             for c in campuses:
                 for to_c, cnt, masked in self._repo.transfers_out(c):
+                    # Apply optional filters on the destination campus
+                    if charter_only and not (to_c is not None and getattr(to_c, "is_charter", False)):
+                        continue
+                    if pred_to is not None:
+                        try:
+                            if not pred_to(to_c):
+                                continue
+                        except Exception:
+                            # If the predicate fails, skip this row silently
+                            continue
                     rows.append((c, to_c, cnt, masked))
             self._items = rows
             return self
