@@ -1728,7 +1728,9 @@ class Query:
             for c in campuses:
                 for to_c, cnt, masked in self._repo.transfers_out(c):
                     # Apply optional filters on the destination campus
-                    if charter_only and not (to_c is not None and getattr(to_c, "is_charter", False)):
+                    if charter_only and not (
+                        to_c is not None and getattr(to_c, "is_charter", False)
+                    ):
                         continue
                     if pred_to is not None:
                         try:
