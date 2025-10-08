@@ -582,7 +582,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                 update_date=parse_date(getattr(row, "USER_Update_Date", None)),
                 charter_type=getattr(row, "USER_Charter_Type", ""),
                 is_charter=(
-                    getattr(row, "USER_Charter_Type", "") == "OPEN ENROLLMENT CHARTER"
+                    getattr(row, "USER_Charter_Type", "") in ["OPEN ENROLLMENT CHARTER", "COLLEGE/UNIVERSITY CHARTER"]
                 ),
                 location=getattr(row, "geometry"),
             )
