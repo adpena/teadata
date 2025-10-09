@@ -424,6 +424,22 @@ class LazyMetaDict(dict):
         self._ensure_loaded()
         return super().pop(key, default)
 
+    def __iter__(self):  # type: ignore[override]
+        self._ensure_loaded()
+        return super().__iter__()
+
+    def __len__(self):  # type: ignore[override]
+        self._ensure_loaded()
+        return super().__len__()
+
+    def copy(self):  # type: ignore[override]
+        self._ensure_loaded()
+        return super().copy()
+
+    def clear(self):  # type: ignore[override]
+        self._ensure_loaded()
+        return super().clear()
+
 
 def _meta_loader(
     default_session: Session,
@@ -819,6 +835,14 @@ def import_dataengine(
     """Hydrate a :class:`~teadata.classes.DataEngine` from the SQL database."""
 
     repo = DataEngine()
+
+    if lazy_meta and meta_session_factory is None:
+        try:
+            bind = session.get_bind()
+        except Exception:  # pragma: no cover - Session without bind
+            bind = None
+        if bind is not None:
+            meta_session_factory = sessionmaker(bind=bind, future=True, expire_on_commit=False)
 
     district_stmt = select(DistrictRecord).options(defer(DistrictRecord.meta))
     campus_stmt = select(CampusRecord).options(defer(CampusRecord.meta))
