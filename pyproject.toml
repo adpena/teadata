@@ -68,6 +68,12 @@ notebooks = [
     "google-api-python-client>=2.0",
 ]
 
+# Relational database connectivity helpers
+database = [
+    "sqlalchemy>=2.0",
+    "psycopg[binary]>=3.1",
+]
+
 # Dependencies used by maintenance/utility scripts under teadata/scripts
 scripts = [
     "requests>=2.31",
