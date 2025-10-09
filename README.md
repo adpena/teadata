@@ -284,8 +284,9 @@ with Session() as session:
         prefetch_campus_meta_keys=["accountability.rating"],  # optional targeted warm-up
     )
 
-# Need the lazy meta loader to operate outside the current session scope?
-# Pass a callable that yields a new Session on demand:
+# Lazy meta hydration will automatically spin up lightweight ad-hoc sessions
+# using the same engine when the originating Session is closed.  If you prefer
+# to manage that lifecycle yourself, pass a callable that yields a new Session:
 # repo_from_db = import_dataengine(session, meta_session_factory=Session)
 
 # Inspect which enrichment columns are available before fetching values
