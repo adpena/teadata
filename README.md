@@ -242,6 +242,99 @@ engine2 = DataEngine.from_snapshot(".cache/repo_<tag>.pkl")
 
 Snapshots are versioned with a content signature. The loader can discover and pick the latest automatically with `search=True`.
 
+### Relational persistence (PostgreSQL via SQLAlchemy)
+
+Prefer a shared database over large pickle blobs?  Install the optional extra and
+use the new SQLAlchemy bridge:
+
+```bash
+pip install "teadata[database]"
+```
+
+```python
+from teadata import DataEngine
+from teadata.persistence import (
+    available_meta_keys,
+    create_engine,
+    create_sessionmaker,
+    ensure_schema,
+    export_dataengine,
+    fetch_meta_values,
+    import_dataengine,
+)
+
+# 1. Build or load an in-memory repo as usual
+repo = DataEngine.from_snapshot(search=True)
+
+# 2. Connect to PostgreSQL (any SQLAlchemy URL works)
+engine = create_engine("postgresql+psycopg://user:pass@host:5432/teadata")
+ensure_schema(engine)  # creates tables on first run
+Session = create_sessionmaker(engine)
+
+# 3. Persist everything: districts, campuses, enrichment meta, transfers, geometry
+with Session() as session:
+    export_dataengine(repo, session)
+    session.commit()
+
+# 4. Hydrate a fresh DataEngine straight from SQL when serving web/API requests
+with Session() as session:
+    repo_from_db = import_dataengine(
+        session,
+        lazy_meta=True,  # defer meta JSON until accessed (saves RAM per request)
+        prefetch_campus_meta_keys=["accountability.rating"],  # optional targeted warm-up
+    )
+
+# Need the lazy meta loader to operate outside the current session scope?
+# Pass a callable that yields a new Session on demand:
+# repo_from_db = import_dataengine(session, meta_session_factory=Session)
+
+# Inspect which enrichment columns are available before fetching values
+with Session() as session:
+    top_keys = available_meta_keys(session, entity="campus")[:5]
+    print("First few enrichment keys:", top_keys)
+
+    # Pull just a handful of enrichment columns without materializing the full JSON
+    preview = fetch_meta_values(
+        session,
+        entity="campus",
+        keys=["accountability.rating", "finance.per_pupil_spend"],
+    )
+    if preview:
+        print(next(iter(preview.values())))
+```
+
+The ORM models keep canonical UUIDs and TEA numbers indexed for quick lookup,
+serialize `meta` dictionaries as JSONB (or JSON on non-Postgres backends),
+explode scalar metadata into `district_meta` / `campus_meta` tables with typed
+columns for sorting/filtering, and store campus-to-campus transfer edges in a
+dedicated join table so existing graph helpers keep working.
+
+`import_dataengine` now keeps enrichment payloads lazy by default: districts and
+campuses hydrate with lightweight `meta` dictionaries that fetch their JSON only
+when a request accesses an enrichment key.  This keeps per-request memory close
+to the bare domain objects instead of eagerly allocating tens of megabytes of
+metadata.  When you do need specific enrichment columns for a bulk analysis,
+use `available_meta_keys` to discover what exists and `fetch_meta_values` or the
+`prefetch_*` arguments to warm just those keys.
+
+Want to query enrichment fields directly?  Example Postgres snippets:
+
+```sql
+-- Count campuses by an enrichment key promoted out of campus.meta
+SELECT value_text AS accountability_rating, COUNT(*)
+FROM campus_meta
+WHERE key = 'accountability.rating'
+GROUP BY value_text
+ORDER BY value_text;
+
+-- Numeric sort / filter on scalar meta
+SELECT campus_id, value_numeric
+FROM campus_meta
+WHERE key = 'finance.per_pupil_spend'
+ORDER BY value_numeric DESC
+LIMIT 20;
+```
+
 ---
 
 ## Config & data resolution
