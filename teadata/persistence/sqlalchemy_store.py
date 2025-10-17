@@ -299,7 +299,9 @@ def create_sqlite_memory_engine(echo: bool = False):
 def create_sessionmaker(engine, *, expire_on_commit: bool = False, **kwargs):
     """Return a configured ``sessionmaker`` factory for the given engine."""
 
-    return sessionmaker(bind=engine, expire_on_commit=expire_on_commit, class_=Session, **kwargs)
+    return sessionmaker(
+        bind=engine, expire_on_commit=expire_on_commit, class_=Session, **kwargs
+    )
 
 
 def ensure_schema(engine) -> None:
@@ -366,7 +368,12 @@ def _flatten_meta(meta: Mapping[str, Any] | None) -> list[tuple[str, int, Any]]:
 class LazyMetaDict(dict):
     """Dictionary-like wrapper that loads values on demand via a callback."""
 
-    def __init__(self, loader: Callable[[], Mapping[str, Any] | None], *, seed: Mapping[str, Any] | None = None):
+    def __init__(
+        self,
+        loader: Callable[[], Mapping[str, Any] | None],
+        *,
+        seed: Mapping[str, Any] | None = None,
+    ):
         super().__init__()
         self._loader = loader
         self._loaded = False
@@ -453,7 +460,9 @@ def _meta_loader(
         active = session_factory() if session_factory is not None else default_session
         close_after = session_factory is not None
         try:
-            result = active.execute(select(record_cls.meta).where(column == pk_value)).scalar_one_or_none()
+            result = active.execute(
+                select(record_cls.meta).where(column == pk_value)
+            ).scalar_one_or_none()
             return result if isinstance(result, Mapping) else {}
         finally:
             if close_after:
@@ -535,7 +544,9 @@ def _meta_record_for(entity: Literal["district", "campus"]):
     raise ValueError(f"Unsupported entity type: {entity}")
 
 
-def _accumulate_meta_value(bucket: MutableMapping[str, Any], key: str, ordinal: int, value: Any) -> None:
+def _accumulate_meta_value(
+    bucket: MutableMapping[str, Any], key: str, ordinal: int, value: Any
+) -> None:
     existing = bucket.get(key)
     if existing is None and ordinal == 0:
         bucket[key] = value
@@ -595,7 +606,11 @@ def available_meta_keys(
     """Return distinct enrichment keys (optionally with occurrence counts)."""
 
     record_cls, _ = _meta_record_for(entity)
-    stmt = select(record_cls.key, func.count()).group_by(record_cls.key).order_by(record_cls.key)
+    stmt = (
+        select(record_cls.key, func.count())
+        .group_by(record_cls.key)
+        .order_by(record_cls.key)
+    )
     rows = session.execute(stmt).all()
     if with_counts:
         return {row[0]: int(row[1]) for row in rows}
@@ -631,7 +646,9 @@ def _dump_polygon(polygon: Any) -> tuple[bytes | None, dict[str, Any] | None]:
     return None, {"type": "Polygon", "coordinates": [coords]}
 
 
-def _dump_point(point: Any) -> tuple[bytes | None, dict[str, Any] | None, float | None, float | None]:
+def _dump_point(
+    point: Any,
+) -> tuple[bytes | None, dict[str, Any] | None, float | None, float | None]:
     if point is None:
         return None, None, None, None
 
@@ -842,7 +859,9 @@ def import_dataengine(
         except Exception:  # pragma: no cover - Session without bind
             bind = None
         if bind is not None:
-            meta_session_factory = sessionmaker(bind=bind, future=True, expire_on_commit=False)
+            meta_session_factory = sessionmaker(
+                bind=bind, future=True, expire_on_commit=False
+            )
 
     district_stmt = select(DistrictRecord).options(defer(DistrictRecord.meta))
     campus_stmt = select(CampusRecord).options(defer(CampusRecord.meta))
@@ -874,7 +893,9 @@ def import_dataengine(
     with repo.bulk():
         for d in districts:
             if lazy_meta:
-                loader = _meta_loader(session, meta_session_factory, DistrictRecord, d.id)
+                loader = _meta_loader(
+                    session, meta_session_factory, DistrictRecord, d.id
+                )
                 seed = district_seed.get(d.id) if district_seed else None
                 meta_payload = LazyMetaDict(loader, seed=seed)
             else:
@@ -927,7 +948,11 @@ def import_dataengine(
     repo._xfers_missing = {"src": 0, "dst": 0, "either": 0}
 
     for edge in transfers:
-        repo._xfers_out[edge.source_id].append((edge.destination_id, edge.student_count, edge.masked))
-        repo._xfers_in[edge.destination_id].append((edge.source_id, edge.student_count, edge.masked))
+        repo._xfers_out[edge.source_id].append(
+            (edge.destination_id, edge.student_count, edge.masked)
+        )
+        repo._xfers_in[edge.destination_id].append(
+            (edge.source_id, edge.student_count, edge.masked)
+        )
 
     return repo
