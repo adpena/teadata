@@ -79,6 +79,7 @@ for c in aldine.campuses:
 - **Config-driven ingestion**: add datasets by editing YAML/TOML; get schema checks and year-based resolution.
 - **Enrichment**: attach new fields (e.g., accountability, finance) as dynamic attributes — and alias into canonical ones.
 - **Reproducible caches**: build once into a `.pkl` “repo snapshot”, reload instantly next time.
+- **Private school coverage**: ingest Texas private schools when the dataset is present, flagged via `Campus.is_private` for easy filtering.
 
 ---
 
@@ -96,7 +97,7 @@ Key fields & behavior:
 - **Computed / accessors**
   - `campuses: list[Campus]` — all campuses physically inside the boundary (spatial join is precomputed during repo build)
   - `nearest_campuses(...)`
-  - `charter_campuses`: campuses with charter flag
+- `charter_campuses`: campuses flagged as charters (excludes private schools)
   - Dynamic attributes from enrichment (e.g., `overall_rating_2025`)
 
 ### `Campus`
@@ -104,6 +105,9 @@ Key fields & behavior:
 - `id: UUID`
 - `campus_number: str` — normalized **nine-digit** TEA code (zero-padded; apostrophe-safe)
 - `name: str`
+- `charter_type: str`
+- `is_charter: bool`
+- `is_private: bool` — True for private schools loaded from the new dataset
 - `enrollment: Optional[int]`
 - `type: Optional[str]` — e.g. `"OPEN ENROLLMENT CHARTER"`
 - `point: shapely.Point`
@@ -170,7 +174,7 @@ Two common helpers:
 # All campuses within a district boundary (inferred from the district query)
 inside = ((engine >> ("district", "101902")) >> ("within", None)).to_list()
 
-# Charter-only campuses within the same boundary
+# Charter-only campuses within the same boundary (excludes private schools)
 charters = ((engine >> ("district", "101902")) >> ("within", None, True)).to_list()
 
 # Equivalent imperative helpers
@@ -183,7 +187,7 @@ These use polygon containment and are validated by a built-in slow-path check to
 ### Nearest
 
 ```python
-# Five nearest charters within 10 linear miles of a target point
+# Five nearest charters within 10 linear miles of a target point (private schools are automatically excluded)
 pt = (-95.36, 29.83)  # (lon, lat)
 nearest_charters = engine.nearest_campuses(
     pt[0],

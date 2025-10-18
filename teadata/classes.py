@@ -211,6 +211,14 @@ def _point_xy(pt: Any) -> Tuple[float, float] | None:
     return None
 
 
+def _is_charter(obj: Any) -> bool:
+    """Return True when the campus is a charter campus that is not private."""
+
+    return bool(getattr(obj, "is_charter", False)) and not bool(
+        getattr(obj, "is_private", False)
+    )
+
+
 def _probably_lonlat(x: float, y: float) -> bool:
     # crude heuristic: lon in [-180, 180], lat in [-90, 90]
     return -180.0 <= x <= 180.0 and -90.0 <= y <= 90.0
@@ -470,6 +478,7 @@ class Campus:
     name: str
     charter_type: str
     is_charter: bool
+    is_private: bool = False
     enrollment: Optional[int] = None
     rating: Optional[str] = None
 
@@ -498,6 +507,8 @@ class Campus:
     meta: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
     def __post_init__(self):
+        self.is_charter = bool(self.is_charter)
+        self.is_private = bool(self.is_private)
         if self.location is not None:
             self.point = self.location
 
@@ -564,6 +575,7 @@ class Campus:
             "name": self.name,
             "charter_type": self.charter_type,
             "is_charter": self.is_charter,
+            "is_private": self.is_private,
             "enrollment": self.enrollment,
             "rating": self.rating,
             "aea": self.aea,
@@ -682,7 +694,7 @@ class Campus:
     @property
     def num_charter_transfer_destinations(self) -> int:
         """
-        Total number of *unique* charter schools (is_charter is True)
+        Total number of *unique* charter schools (excludes private schools)
         that receive student transfers from this campus.
         Safe defaults to 0 when no repository is attached.
         """
@@ -694,7 +706,7 @@ class Campus:
             return 0
         ids = set()
         for to_campus, count, masked in ((e[0], e[1], e[2]) for e in edges):
-            if to_campus is not None and getattr(to_campus, "is_charter", False):
+            if to_campus is not None and _is_charter(to_campus):
                 ids.add(getattr(to_campus, "id", None))
         return len(ids)
 
@@ -714,7 +726,7 @@ class Campus:
         for to_campus, count, masked in ((e[0], e[1], e[2]) for e in edges):
             if (
                 to_campus is not None
-                and getattr(to_campus, "is_charter", False)
+                and _is_charter(to_campus)
                 and bool(masked)
             ):
                 masked_ids.add(getattr(to_campus, "id", None))
@@ -734,7 +746,7 @@ class Campus:
             return 0
         total = 0
         for to_campus, count, masked in ((e[0], e[1], e[2]) for e in edges):
-            if to_campus is None or not getattr(to_campus, "is_charter", False):
+            if to_campus is None or not _is_charter(to_campus):
                 continue
             if count is None:
                 continue
@@ -1539,7 +1551,7 @@ class Query:
                 candidates = list(self._items) if self._items else []
 
             for c in candidates:
-                if charter_only and not getattr(c, "is_charter", False):
+                if charter_only and not _is_charter(c):
                     continue
                 loc = getattr(c, "point", None) or getattr(c, "location", None)
                 if loc is None:
@@ -1566,7 +1578,7 @@ class Query:
             if not items and SHAPELY and not self._items:
                 slow: List[Any] = []
                 for c in self._repo._campuses.values():
-                    if charter_only and not getattr(c, "is_charter", False):
+                    if charter_only and not _is_charter(c):
                         continue
                     loc = getattr(c, "point", None) or getattr(c, "location", None)
                     if loc is None:
@@ -1708,7 +1720,7 @@ class Query:
         if key == "transfers_out":
             # Expand a list of Campus items into tuples: (campus, to_campus, count, masked)
             # Optional arg forms:
-            #   ("transfers_out", True)        -> only rows where to_campus.is_charter is True
+            #   ("transfers_out", True)        -> only rows where to_campus is a charter campus
             #   ("transfers_out", predicate)   -> only rows where predicate(to_campus) is True
             charter_only = False
             pred_to = None
@@ -1729,7 +1741,7 @@ class Query:
                 for to_c, cnt, masked in self._repo.transfers_out(c):
                     # Apply optional filters on the destination campus
                     if charter_only and not (
-                        to_c is not None and getattr(to_c, "is_charter", False)
+                        to_c is not None and _is_charter(to_c)
                     ):
                         continue
                     if pred_to is not None:
@@ -1944,6 +1956,7 @@ class DataEngine:
             enrollment = v.get("enrollment")
             charter_type = v.get("charter_type")
             is_charter = v.get("is_charter")
+            is_private = v.get("is_private", False)
             rating = v.get("rating")
             aea = v.get("aea")
             grade_range = v.get("grade_range")
@@ -1962,6 +1975,7 @@ class DataEngine:
                 enrollment=enrollment,
                 charter_type=charter_type,
                 is_charter=is_charter,
+                is_private=is_private,
                 rating=rating,
                 aea=aea,
                 grade_range=grade_range,
@@ -1996,6 +2010,7 @@ class DataEngine:
         enrollment = getattr(v, "enrollment", None)
         charter_type = getattr(v, "charter_type", None)
         is_charter = getattr(v, "is_charter", None)
+        is_private = getattr(v, "is_private", False)
         rating = getattr(v, "rating", None)
         aea = getattr(v, "aea", None)
         grade_range = getattr(v, "grade_range", None)
@@ -2016,6 +2031,7 @@ class DataEngine:
             enrollment=enrollment,
             charter_type=charter_type,
             is_charter=is_charter,
+            is_private=is_private,
             rating=rating,
             aea=aea,
             grade_range=grade_range,
@@ -2740,7 +2756,7 @@ class DataEngine:
             idxs = idxs if isinstance(idxs, list) else idxs[0]
             for i in idxs:
                 c = self._campus_list[i]
-                if charter_only and not getattr(c, "is_charter", False):
+                if charter_only and not _is_charter(c):
                     continue
                 x, y = self._xy_deg[i]
                 d = haversine_miles(lon, lat, x, y)
@@ -2753,7 +2769,7 @@ class DataEngine:
                 for c in self._campuses.values():
                     if c.point is None:
                         continue
-                    if charter_only and not getattr(c, "is_charter", False):
+                    if charter_only and not _is_charter(c):
                         continue
                     x, y = c.point.x, c.point.y
                     d = haversine_miles(lon, lat, x, y)
@@ -2768,7 +2784,7 @@ class DataEngine:
                     for c in self._campuses.values():
                         if c.point is None:
                             continue
-                        if charter_only and not getattr(c, "is_charter", False):
+                        if charter_only and not _is_charter(c):
                             continue
                         xy.append((c.point.x, c.point.y))
                         clist.append(c)
@@ -2819,7 +2835,7 @@ class DataEngine:
             # Re-compute accurate miles and filter charter if needed
             for d0, i in zip(dists, idxs):
                 c = self._campus_list[int(i)]
-                if charter_only and not getattr(c, "is_charter", False):
+                if charter_only and not _is_charter(c):
                     continue
                 x, y = self._xy_deg[int(i)]
                 dm = haversine_miles(lon, lat, x, y)
@@ -2829,7 +2845,7 @@ class DataEngine:
             for c in self._campuses.values():
                 if c.point is None:
                     continue
-                if charter_only and not getattr(c, "is_charter", False):
+                if charter_only and not _is_charter(c):
                     continue
                 dm = haversine_miles(lon, lat, c.point.x, c.point.y)
                 results.append((dm, c))
@@ -2844,7 +2860,8 @@ class DataEngine:
         k: int = 1,
     ) -> Dict[str, Dict[str, Any]]:
         """
-        For each campus in `campuses`, find the nearest charter campus with the *same* school_type.
+        For each campus in `campuses`, find the nearest charter campus (excluding private schools)
+        with the *same* school_type.
         Returns a dict keyed by str(campus.id) -> {"match": Campus|None, "miles": float|None}.
 
         Implementation:
@@ -2873,7 +2890,7 @@ class DataEngine:
         by_type_charters_xy: Dict[str, list[tuple[float, float]]] = defaultdict(list)
         by_type_charters_obj: Dict[str, list[Campus]] = defaultdict(list)
         for cand in self._campuses.values():
-            if not getattr(cand, "is_charter", False):
+            if not _is_charter(cand):
                 continue
             st = (getattr(cand, "school_type", None) or "").strip()
             if not st:
@@ -2998,8 +3015,9 @@ class DataEngine:
         campuses: Iterable["Campus"],
     ) -> Dict[str, Dict[str, Any]]:
         """
-        For each campus, among the *charter* campuses that receive student transfers
-        from that campus (edges in _xfers_out), return the spatially nearest one.
+        For each campus, among the *charter* campuses (excluding private schools) that
+        receive student transfers from that campus (edges in _xfers_out), return the
+        spatially nearest one.
 
         Returns a dict keyed by str(campus.id) -> {"match": Campus|None, "miles": float|None}.
         If a campus has no charter transfer destinations or lacks geometry, returns None values.
@@ -3027,7 +3045,7 @@ class DataEngine:
             if edges:
                 for to_id, _cnt, _masked in edges:
                     dest = self._campuses.get(to_id)
-                    if dest is None or not getattr(dest, "is_charter", False):
+                    if dest is None or not _is_charter(dest):
                         continue
                     q = getattr(dest, "point", None) or getattr(dest, "location", None)
                     try:
@@ -3078,7 +3096,7 @@ class DataEngine:
     def charter_campuses_within(self, district: Any):
         """
         Return a list of Campus objects that are physically located *within*
-        the given district's boundary and are charter campuses (is_charter=True).
+        the given district's boundary and are charter campuses (excludes private schools).
         Uses pure spatial containment; district_id membership is ignored.
         Accepts a District or a Query[District].
         """
@@ -3097,7 +3115,7 @@ class DataEngine:
                 prep = getattr(district, "prepared", None)
                 out_bb: List[Campus] = []
                 for c in bbox_cands:
-                    if not getattr(c, "is_charter", False):
+                    if not _is_charter(c):
                         continue
                     p = getattr(c, "point", None) or getattr(c, "location", None)
                     if p is None:
@@ -3135,7 +3153,7 @@ class DataEngine:
                     for i in idxs:
                         cid = self._point_ids[i]
                         c = self._campuses.get(cid)
-                        if c is None or not getattr(c, "is_charter", False):
+                        if c is None or not _is_charter(c):
                             continue
                         p = getattr(c, "point", None) or getattr(c, "location", None)
                         if p is None:
@@ -3154,7 +3172,7 @@ class DataEngine:
         # Final robust fallback: exact scan
         slow: List[Campus] = []
         for c in self._campuses.values():
-            if not getattr(c, "is_charter", False):
+            if not _is_charter(c):
                 continue
             p = getattr(c, "point", None) or getattr(c, "location", None)
             if p is None:
@@ -3338,7 +3356,7 @@ class DataEngine:
         limit : int
             Number of campuses to return (use 1 for the single nearest).
         charter_only : bool
-            If True, only consider campuses with is_charter=True.
+            If True, only consider campuses with is_charter=True and is_private=False.
         max_miles : Optional[float]
             If provided (and geodesic distance is used), filter out campuses farther than this many miles.
             If geodesic=False, this is treated in *planar* units.
@@ -3350,7 +3368,7 @@ class DataEngine:
         for c in self._campuses.values():
             if c.point is None:
                 continue
-            if charter_only and not getattr(c, "is_charter", False):
+            if charter_only and not _is_charter(c):
                 continue
             cxy = _point_xy(c.point)
             if cxy is None:
