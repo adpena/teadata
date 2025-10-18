@@ -43,6 +43,9 @@ data_sources:
   campus_planned_closures:
     2025: data/closures/Planned School Closures_10.03.2025.xlsx
     latest: 2025
+  private_schools:
+    2025: data/private_schools/texas_private_schools_2025_sample.csv
+    latest: 2025
 
 spatial:
   districts:
@@ -63,6 +66,7 @@ schema:
     campus_tapr_student_staff_profile: ["xlsx"]
     campus_tapr_historical_enrollment: ["xlsx"]
     campus_planned_closures: ["xlsx"]
+    private_schools: ["csv"]
   spatial:
     districts: ["geojson","gpkg","parquet"]
     campuses: ["geojson","gpkg","parquet"]

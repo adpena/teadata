@@ -175,6 +175,7 @@ class CampusRecord(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     charter_type: Mapped[str | None] = mapped_column(String(64))
     is_charter: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_private: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     enrollment: Mapped[int | None] = mapped_column(Integer)
     rating: Mapped[str | None] = mapped_column(String(16))
     aea: Mapped[bool | None] = mapped_column(Boolean)
@@ -788,6 +789,7 @@ def export_dataengine(
         record.name = campus.name
         record.charter_type = campus.charter_type
         record.is_charter = bool(campus.is_charter)
+        record.is_private = bool(getattr(campus, "is_private", False))
         record.enrollment = campus.enrollment
         record.rating = campus.rating
         record.aea = campus.aea
@@ -927,6 +929,7 @@ def import_dataengine(
                 name=c.name,
                 charter_type=c.charter_type or "",
                 is_charter=bool(c.is_charter),
+                is_private=bool(getattr(c, "is_private", False)),
                 enrollment=c.enrollment,
                 rating=c.rating,
                 aea=c.aea,
