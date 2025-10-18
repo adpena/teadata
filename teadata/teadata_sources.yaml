@@ -46,6 +46,9 @@ data_sources:
   private_schools:
     2025: data/private_schools/texas_private_schools_2025_sample.csv
     latest: 2025
+  tepsac:
+    2025: data/tepsac/tepsac_geocoded_FINAL.csv
+    latest: 2025
 
 spatial:
   districts:
@@ -67,6 +70,7 @@ schema:
     campus_tapr_historical_enrollment: ["xlsx"]
     campus_planned_closures: ["xlsx"]
     private_schools: ["csv"]
+    tepsac: ["csv"]
   spatial:
     districts: ["geojson","gpkg","parquet"]
     campuses: ["geojson","gpkg","parquet"]
