@@ -142,7 +142,8 @@ print(top5)  # list[(name, enrollment)]
 
 Common operators:
 
-- `>> ("campuses_in",)` — expand the current district query into its campuses
+- `>> ("campuses_in",)` — expand the current district query into its district-operated campuses (excludes charters and private schools)
+- `>> ("private_campuses_in",)` — expand into private-school campuses attached to the district
 - `>> ("filter", predicate)` or `>> (lambda x: ...)`
 - `>> ("sort", key_fn, descending: bool=False)`
 - `>> ("take", n)`
