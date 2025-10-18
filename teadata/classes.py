@@ -2443,6 +2443,9 @@ class DataEngine:
 
              repo >> ("privates_within", district)
              -> Query[Campus]
+
+             repo >> ("private_campuses_in", district)
+             -> Query[Campus]
         """
         # 1) Existing behavior: predicate filter
         if callable(query):
@@ -2496,6 +2499,12 @@ class DataEngine:
                 if district is None:
                     return Query([], self)
                 return Query(self.campuses_in(district), self)
+
+            if key == "private_campuses_in":
+                district = _unwrap_query(query[1])
+                if district is None:
+                    return Query([], self)
+                return Query(self.private_campuses_in(district), self)
 
             if key == "charters_within":
                 district = _unwrap_query(query[1])
@@ -3178,8 +3187,29 @@ class DataEngine:
         d = _unwrap_query(d)
         if d is None or not hasattr(d, "id"):
             raise ValueError("campuses_in expects a District or a Query[District]")
+        campuses = [
+            self._campuses[cid]
+            for cid in self._campuses_by_district.get(d.id, [])
+            if cid in self._campuses
+        ]
+
         return EntityList(
-            [self._campuses[cid] for cid in self._campuses_by_district.get(d.id, [])]
+            [c for c in campuses if not _is_charter(c) and not _is_private(c)]
+        )
+
+    def private_campuses_in(self, d: Any) -> "EntityList":
+        """Return private-school campuses attached to a district by membership."""
+
+        d = _unwrap_query(d)
+        if d is None or not hasattr(d, "id"):
+            raise ValueError("private_campuses_in expects a District or a Query[District]")
+
+        return EntityList(
+            [
+                self._campuses[cid]
+                for cid in self._campuses_by_district.get(d.id, [])
+                if cid in self._campuses and _is_private(self._campuses[cid])
+            ]
         )
 
     def _campuses_within_filtered(
