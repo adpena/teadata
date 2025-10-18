@@ -219,6 +219,12 @@ def _is_charter(obj: Any) -> bool:
     )
 
 
+def _is_private(obj: Any) -> bool:
+    """Return True when the campus is explicitly marked as a private school."""
+
+    return bool(getattr(obj, "is_private", False))
+
+
 def _probably_lonlat(x: float, y: float) -> bool:
     # crude heuristic: lon in [-180, 180], lat in [-90, 90]
     return -180.0 <= x <= 180.0 and -90.0 <= y <= 90.0
@@ -2358,6 +2364,9 @@ class DataEngine:
 
              repo >> ("charters_within", district)
              -> Query[Campus]
+
+             repo >> ("privates_within", district)
+             -> Query[Campus]
         """
         # 1) Existing behavior: predicate filter
         if callable(query):
@@ -2415,6 +2424,10 @@ class DataEngine:
             if key == "charters_within":
                 district = _unwrap_query(query[1])
                 return Query(self.charter_campuses_within(district), self)
+
+            if key == "privates_within":
+                district = _unwrap_query(query[1])
+                return Query(self.private_campuses_within(district), self)
 
             if key == "nearest":
                 seed = query[1]
@@ -3093,13 +3106,13 @@ class DataEngine:
             [self._campuses[cid] for cid in self._campuses_by_district.get(d.id, [])]
         )
 
-    def charter_campuses_within(self, district: Any):
-        """
-        Return a list of Campus objects that are physically located *within*
-        the given district's boundary and are charter campuses (excludes private schools).
-        Uses pure spatial containment; district_id membership is ignored.
-        Accepts a District or a Query[District].
-        """
+    def _campuses_within_filtered(
+        self,
+        district: Any,
+        *,
+        predicate: Callable[["Campus"], bool],
+        label: str,
+    ) -> List[Campus]:
         district = _unwrap_query(district)
         if district is None:
             return []
@@ -3115,7 +3128,10 @@ class DataEngine:
                 prep = getattr(district, "prepared", None)
                 out_bb: List[Campus] = []
                 for c in bbox_cands:
-                    if not _is_charter(c):
+                    try:
+                        if not predicate(c):
+                            continue
+                    except Exception:
                         continue
                     p = getattr(c, "point", None) or getattr(c, "location", None)
                     if p is None:
@@ -3153,7 +3169,12 @@ class DataEngine:
                     for i in idxs:
                         cid = self._point_ids[i]
                         c = self._campuses.get(cid)
-                        if c is None or not _is_charter(c):
+                        if c is None:
+                            continue
+                        try:
+                            if not predicate(c):
+                                continue
+                        except Exception:
                             continue
                         p = getattr(c, "point", None) or getattr(c, "location", None)
                         if p is None:
@@ -3172,7 +3193,10 @@ class DataEngine:
         # Final robust fallback: exact scan
         slow: List[Campus] = []
         for c in self._campuses.values():
-            if not _is_charter(c):
+            try:
+                if not predicate(c):
+                    continue
+            except Exception:
                 continue
             p = getattr(c, "point", None) or getattr(c, "location", None)
             if p is None:
@@ -3187,11 +3211,39 @@ class DataEngine:
         if ENABLE_PROFILING:
             try:
                 print(
-                    f"[sanity] charter_campuses_within fast=0 slow={len(slow)} — using {'slow' if slow else 'fast'} path"
+                    f"[sanity] {label} fast=0 slow={len(slow)} — using {'slow' if slow else 'fast'} path"
                 )
             except Exception:
                 pass
         return slow
+
+    def charter_campuses_within(self, district: Any):
+        """
+        Return a list of Campus objects that are physically located *within*
+        the given district's boundary and are charter campuses (excludes private schools).
+        Uses pure spatial containment; district_id membership is ignored.
+        Accepts a District or a Query[District].
+        """
+
+        return self._campuses_within_filtered(
+            district,
+            predicate=_is_charter,
+            label="charter_campuses_within",
+        )
+
+    def private_campuses_within(self, district: Any):
+        """
+        Return a list of Campus objects that are physically located *within*
+        the given district's boundary and are private schools (Campus.is_private is True).
+        Uses pure spatial containment; district_id membership is ignored.
+        Accepts a District or a Query[District].
+        """
+
+        return self._campuses_within_filtered(
+            district,
+            predicate=_is_private,
+            label="private_campuses_within",
+        )
 
     # ---------------- Transfers enrichment (campus->campus edges) ----------------
     def apply_transfers_from_dataframe(
