@@ -589,6 +589,153 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
             )
             repo.add_campus(c)
 
+        # Optional private school campuses
+        private_loaded = 0
+        private_year = None
+        try:
+            cfg_obj = load_config(CFG)
+            private_year, private_fp = cfg_obj.resolve(
+                "private_schools", YEAR, section="data_sources"
+            )
+        except Exception:
+            private_fp = None
+
+        if private_fp:
+            try:
+                df_private = pd.read_csv(
+                    private_fp,
+                    dtype={
+                        "district_number": "string",
+                        "school_number": "string",
+                    },
+                )
+            except Exception as exc:
+                print(f"[private] failed to load {private_fp}: {exc}")
+            else:
+                def _grade_span(low, high):
+                    try:
+                        low_missing = pd.isna(low)
+                    except Exception:
+                        low_missing = False
+                    try:
+                        high_missing = pd.isna(high)
+                    except Exception:
+                        high_missing = False
+
+                    low_s = "" if low is None or low_missing else str(low).strip()
+                    high_s = "" if high is None or high_missing else str(high).strip()
+                    if not low_s and not high_s:
+                        return None
+                    if not low_s:
+                        return high_s or None
+                    if not high_s or low_s == high_s:
+                        return low_s or None
+                    return f"{low_s}–{high_s}"
+
+                def _clean_number(val):
+                    if val is None:
+                        return None
+                    try:
+                        if pd.isna(val):
+                            return None
+                    except Exception:
+                        pass
+                    text = str(val).strip()
+                    if not text:
+                        return None
+                    try:
+                        return int(float(text.replace(",", "")))
+                    except Exception:
+                        return None
+
+                def _coords(row_obj):
+                    lon_raw = getattr(row_obj, "best_lng", None)
+                    lat_raw = getattr(row_obj, "best_lat", None)
+                    try:
+                        if pd.isna(lon_raw) or pd.isna(lat_raw):
+                            return None
+                    except Exception:
+                        pass
+                    if lon_raw is None or lat_raw is None:
+                        return None
+                    try:
+                        lon_val = float(lon_raw)
+                        lat_val = float(lat_raw)
+                    except Exception:
+                        return None
+                    return (lon_val, lat_val)
+
+                for row in df_private.itertuples(index=False):
+                    raw_district = getattr(row, "district_number", None)
+                    district_key = canonical_district_number(raw_district)
+                    lookup_keys: list[str] = []
+                    if district_key:
+                        lookup_keys.append(district_key)
+                        digits = (
+                            district_key[1:]
+                            if isinstance(district_key, str)
+                            and district_key.startswith("'")
+                            else district_key
+                        )
+                        if digits:
+                            lookup_keys.append(digits)
+                            if isinstance(digits, str) and digits.isdigit():
+                                lookup_keys.append(str(int(digits)))
+                    elif raw_district:
+                        lookup_keys.append(str(raw_district).strip())
+
+                    district_id = next(
+                        (dn_to_id.get(k) for k in lookup_keys if k in dn_to_id),
+                        None,
+                    )
+                    if district_id is None:
+                        district_id = fallback_id
+
+                    meta_fields = [
+                        "school_full_address",
+                        "school_website",
+                        "school_accreditations",
+                    ]
+                    meta_payload = {}
+                    for field_name in meta_fields:
+                        val = getattr(row, field_name, None)
+                        try:
+                            if hasattr(pd, "isna") and pd.isna(val):
+                                continue
+                        except Exception:
+                            pass
+                        if val is not None:
+                            meta_payload[field_name] = val
+                    if private_year is not None:
+                        meta_payload["private_school_dataset_year"] = private_year
+
+                    campus = Campus(
+                        id=uuid.uuid4(),
+                        district_id=district_id,
+                        name=getattr(row, "school_name", "Unnamed Private School"),
+                        charter_type="",
+                        is_charter=False,
+                        is_private=True,
+                        enrollment=_clean_number(getattr(row, "enrollment", None)),
+                        grade_range=_grade_span(
+                            getattr(row, "grade_low", None),
+                            getattr(row, "grade_high", None),
+                        ),
+                        district_number=district_key
+                        or (str(raw_district).strip() if raw_district else None),
+                        campus_number=canonical_campus_number(
+                            getattr(row, "school_number", None)
+                        ),
+                        location=_coords(row),
+                        meta=meta_payload,
+                    )
+                    repo.add_campus(campus)
+                    private_loaded += 1
+
+                print(
+                    f"[private] loaded {private_loaded} private campuses from {private_year}"
+                )
+
     # Run all enrichments once data is loaded
     run_enrichments(repo)
 

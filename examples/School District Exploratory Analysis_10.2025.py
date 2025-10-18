@@ -37,7 +37,7 @@ rows = (
     >> ("where", lambda x: x.facing_closure is True)
     >> ("sort", lambda x: x.name or "", False)
     # >> ("take", 5)
-    # >> ("transfers_out", True)  # Option 1: charter_only=True baked in
+    # >> ("transfers_out", True)  # Option 1: charter_only=True (excludes private schools)
     >> (
         "nearest_charter_transfer_destination",
     )  # yields list of (campus, match, miles)
@@ -68,6 +68,7 @@ cols = {
     "overall_rating_2025": "2025 Overall Rating",
     "aea": "AEA",
     "grade_range": "Grade Range",
+    "is_private": "Is Private Campus",
     "percent_enrollment_change": "2014-15 to 2024-2025 Percent Enrollment Change",
     "num_charter_transfer_destinations": "Number of Charter Campuses Receiving Student Transfers - TOTAL",
     "num_charter_transfer_destinations_masked": "Number of Charter Campuses Receiving Student Transfers - MASKED",
