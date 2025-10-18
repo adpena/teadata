@@ -180,6 +180,10 @@ charters = ((engine >> ("district", "101902")) >> ("within", None, True)).to_lis
 # Equivalent imperative helpers
 inside_alt = engine.within(aldine, items="campuses")
 charters_alt = engine.charter_campuses_within(aldine)
+
+# Private-school campuses (Campus.is_private) within the boundary
+privates_alt = engine.private_campuses_within(aldine)
+privates_query = repo >> ("privates_within", dist)
 ```
 
 These use polygon containment and are validated by a built-in slow-path check to avoid false negatives.

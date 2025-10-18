@@ -595,7 +595,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
         try:
             cfg_obj = load_config(CFG)
             private_year, private_fp = cfg_obj.resolve(
-                "private_schools", YEAR, section="data_sources"
+                "tepsac", YEAR, section="data_sources"
             )
         except Exception:
             private_fp = None
