@@ -250,24 +250,54 @@ class GeoField:
 
     def __set__(self, obj, value):
         # Accept Shapely or tuples/lists
+        target = None
+
         if self.geom_type == "point":
-            ok = (SHAPELY and isinstance(value, ShapelyPoint)) or (
-                isinstance(value, tuple)
-                and len(value) == 2
-                and all(isinstance(v, (int, float)) for v in value)
-            )
+            if SHAPELY:
+                if isinstance(value, ShapelyPoint):
+                    target = value
+                elif (
+                    isinstance(value, tuple)
+                    and len(value) == 2
+                    and all(isinstance(v, (int, float)) for v in value)
+                ):
+                    try:
+                        target = ShapelyPoint(float(value[0]), float(value[1]))
+                    except Exception:
+                        target = None
+            else:
+                if (
+                    isinstance(value, tuple)
+                    and len(value) == 2
+                    and all(isinstance(v, (int, float)) for v in value)
+                ):
+                    target = (float(value[0]), float(value[1]))
+
         elif self.geom_type == "polygon":
-            ok = (SHAPELY and isinstance(value, (ShapelyPolygon, MultiPolygon))) or (
-                isinstance(value, list)
-                and all(isinstance(p, tuple) and len(p) == 2 for p in value)
-            )
-        else:
-            ok = False
-        if not ok:
+            if SHAPELY:
+                if isinstance(value, (ShapelyPolygon, MultiPolygon)):
+                    target = value
+                elif (
+                    isinstance(value, list)
+                    and all(isinstance(p, tuple) and len(p) == 2 for p in value)
+                ):
+                    try:
+                        target = ShapelyPolygon(value)
+                    except Exception:
+                        target = None
+            else:
+                if (
+                    isinstance(value, list)
+                    and all(isinstance(p, tuple) and len(p) == 2 for p in value)
+                ):
+                    target = value
+
+        if target is None:
             raise TypeError(
                 f"Invalid {self.geom_type} geometry for {obj.__class__.__name__}"
             )
-        setattr(obj, self.private_name, value)
+
+        setattr(obj, self.private_name, target)
 
 
 # --------- Domain Models ---------
@@ -2088,6 +2118,10 @@ class DataEngine:
 
         # Case 1: the snapshot already contains a DataEngine
         if isinstance(obj, cls):
+            try:
+                obj._rehydrate_geometries()
+            except Exception:
+                pass
             return obj
 
         # Create an instance early so we can use instance coercers
@@ -2160,6 +2194,10 @@ class DataEngine:
                             f"[snapshot] tuple contains DataEngine; returning embedded engine "
                             f"with {len(p._districts)} districts / {len(p._campuses)} campuses"
                         )
+                    try:
+                        p._rehydrate_geometries()
+                    except Exception:
+                        pass
                     return p
 
             # (B) Otherwise try to coerce “(district_map, campus_map)” style payloads
@@ -2173,6 +2211,10 @@ class DataEngine:
                         if c.district_id in eng._districts:
                             eng.add_campus(c)
                 eng._rebuild_indexes()
+                try:
+                    eng._rehydrate_geometries()
+                except Exception:
+                    pass
                 if os.environ.get("TEADATA_DEBUG"):
                     print(
                         f"[snapshot] tuple->coerced maps: districts={len(eng._districts)} "
@@ -2256,6 +2298,10 @@ class DataEngine:
                 self._campus_by_number: Dict[str, uuid.UUID] = {}
 
                 self._rebuild_indexes()
+                try:
+                    self._rehydrate_geometries()
+                except Exception:
+                    pass
                 return
         # Normal cold init (no snapshot)
         self._districts: Dict[uuid.UUID, District] = EntityMap()
@@ -2333,6 +2379,36 @@ class DataEngine:
 
     def __getitem__(self, key: uuid.UUID) -> District | Campus:
         return self._districts.get(key) or self._campuses[key]
+
+    def _rehydrate_geometries(self) -> None:
+        """
+        Ensure polygon/point attributes are Shapely geometries when Shapely is available.
+        Older snapshots may deserialize tuples/lists instead of actual geometry objects;
+        we reassign through the GeoField descriptor to normalize them.
+        """
+
+        if not SHAPELY:
+            return
+
+        for district in self._districts.values():
+            poly = getattr(district, "polygon", None)
+            if poly is None or isinstance(poly, (ShapelyPolygon, MultiPolygon)):
+                continue
+            try:
+                district.polygon = poly
+            except Exception:
+                continue
+
+        for campus in self._campuses.values():
+            pt = getattr(campus, "point", None)
+            if pt is None:
+                pt = getattr(campus, "location", None)
+            if pt is None or isinstance(pt, ShapelyPoint):
+                continue
+            try:
+                campus.point = pt
+            except Exception:
+                continue
 
     def __or__(self, other: "DataEngine") -> "DataEngine":
         """Repo union: r3 = r1 | r2 (non-destructive merge)."""
