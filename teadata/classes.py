@@ -211,6 +211,66 @@ def _point_xy(pt: Any) -> Tuple[float, float] | None:
     return None
 
 
+def _district_centroid_xy(district: Any) -> Tuple[float, float] | None:
+    """Return (x, y) for the district centroid when geometry is available."""
+
+    if district is None:
+        return None
+
+    poly = getattr(district, "polygon", None) or getattr(district, "boundary", None)
+    if poly is None:
+        return None
+
+    if SHAPELY and hasattr(poly, "centroid"):
+        try:
+            cent = poly.centroid
+            return (float(cent.x), float(cent.y))
+        except Exception:
+            pass
+
+    try:
+        coords = list(poly)
+    except TypeError:
+        return None
+
+    cleaned: List[Tuple[float, float]] = []
+    for pt in coords:
+        if (
+            isinstance(pt, (tuple, list))
+            and len(pt) == 2
+            and all(isinstance(v, (int, float)) for v in pt)
+        ):
+            cleaned.append((float(pt[0]), float(pt[1])))
+
+    if not cleaned:
+        return None
+
+    if len(cleaned) == 1:
+        return cleaned[0]
+
+    closed = cleaned[:]
+    if closed[0] != closed[-1]:
+        closed.append(closed[0])
+
+    area_acc = 0.0
+    cx_acc = 0.0
+    cy_acc = 0.0
+    for (x0, y0), (x1, y1) in zip(closed, closed[1:]):
+        cross = x0 * y1 - x1 * y0
+        area_acc += cross
+        cx_acc += (x0 + x1) * cross
+        cy_acc += (y0 + y1) * cross
+
+    area = area_acc / 2.0
+    if abs(area) < 1e-12:
+        xs = [x for x, _ in cleaned]
+        ys = [y for _, y in cleaned]
+        return (sum(xs) / len(xs), sum(ys) / len(ys))
+
+    factor = 1.0 / (6.0 * area)
+    return (cx_acc * factor, cy_acc * factor)
+
+
 def _is_charter(obj: Any) -> bool:
     """Return True when the campus is a charter campus that is not private."""
 
@@ -1417,6 +1477,7 @@ class Query:
         - ("nearest", (x,y|None), n?, max_miles?)           -> restart pipeline with nearest campuses; if (x,y) is None, infers from current items
         - ("nearest_charter", (x,y|None), n?, max_miles?)   -> restart with nearest charter campuses; if (x,y) is None, infers from current items
         - ("campuses_in",)      -> expand current District items into their campuses (chainable)
+        - ("private_campuses_in", max_miles?) -> expand Districts into private-school campuses; optional miles radius from district centroid
         - ("within", target_or_None, charter_only=False, covers=False) -> campuses within a polygon/district (infers target from chain if None)
         - ("radius", (lon, lat)|None, miles, limit=None, charter_only=False) -> campuses within miles (fast with KDTree; infers coords if None)
         - ("knn", (lon, lat)|None, k, charter_only=False) -> k nearest campuses (fast with KDTree; infers coords if None)
@@ -1472,6 +1533,46 @@ class Query:
                     campuses.extend(self._repo.campuses_in(item))
                 elif item.__class__.__name__ == "Campus":
                     campuses.append(item)
+            self._items = campuses
+            return self
+
+        if key == "private_campuses_in":
+            max_m = float(op[1]) if len(op) >= 2 and op[1] is not None else None
+
+            campuses: List[Any] = []
+            for item in self._items:
+                if hasattr(item, "id") and item.__class__.__name__ == "District":
+                    campuses.extend(
+                        self._repo.private_campuses_in(item, max_miles=max_m)
+                    )
+                elif item.__class__.__name__ == "Campus" and _is_private(item):
+                    campuses.append(item)
+
+            if max_m is not None and campuses:
+                allowed_cache: Dict[uuid.UUID, set[uuid.UUID]] = {}
+                filtered: List[Any] = []
+                for campus in campuses:
+                    cid = getattr(campus, "id", None)
+                    did = getattr(campus, "district_id", None)
+                    if cid is None or did is None:
+                        continue
+                    allowed = allowed_cache.get(did)
+                    if allowed is None:
+                        district = self._repo._districts.get(did)
+                        if district is None:
+                            allowed = set()
+                        else:
+                            allowed = {
+                                c.id
+                                for c in self._repo.private_campuses_in(
+                                    district, max_miles=max_m
+                                )
+                            }
+                        allowed_cache[did] = allowed
+                    if cid in allowed:
+                        filtered.append(campus)
+                campuses = filtered
+
             self._items = campuses
             return self
 
@@ -2443,6 +2544,9 @@ class DataEngine:
 
              repo >> ("privates_within", district)
              -> Query[Campus]
+
+             repo >> ("private_campuses_in", district, max_miles?)
+             -> Query[Campus]
         """
         # 1) Existing behavior: predicate filter
         if callable(query):
@@ -2496,6 +2600,19 @@ class DataEngine:
                 if district is None:
                     return Query([], self)
                 return Query(self.campuses_in(district), self)
+
+            if key == "private_campuses_in":
+                district = _unwrap_query(query[1])
+                if district is None:
+                    return Query([], self)
+                max_m = (
+                    float(query[2])
+                    if len(query) >= 3 and query[2] is not None
+                    else None
+                )
+                return Query(
+                    self.private_campuses_in(district, max_miles=max_m), self
+                )
 
             if key == "charters_within":
                 district = _unwrap_query(query[1])
@@ -3178,9 +3295,65 @@ class DataEngine:
         d = _unwrap_query(d)
         if d is None or not hasattr(d, "id"):
             raise ValueError("campuses_in expects a District or a Query[District]")
+        campuses = [
+            self._campuses[cid]
+            for cid in self._campuses_by_district.get(d.id, [])
+            if cid in self._campuses
+        ]
+
         return EntityList(
-            [self._campuses[cid] for cid in self._campuses_by_district.get(d.id, [])]
+            [c for c in campuses if not _is_charter(c) and not _is_private(c)]
         )
+
+    def private_campuses_in(
+        self, d: Any, *, max_miles: Optional[float] = None
+    ) -> "EntityList":
+        """Return private-school campuses attached to a district by membership.
+
+        When ``max_miles`` is provided the results are limited to campuses whose
+        coordinates fall within that many miles of the district's centroid. Campuses
+        without point geometry (or districts without usable geometry) are omitted
+        from the radius-filtered result.
+        """
+
+        d = _unwrap_query(d)
+        if d is None or not hasattr(d, "id"):
+            raise ValueError("private_campuses_in expects a District or a Query[District]")
+
+        campuses = [
+            self._campuses[cid]
+            for cid in self._campuses_by_district.get(d.id, [])
+            if cid in self._campuses and _is_private(self._campuses[cid])
+        ]
+
+        if max_miles is None:
+            return EntityList(campuses)
+
+        centroid = _district_centroid_xy(d)
+        if centroid is None:
+            return EntityList([])
+
+        cx, cy = centroid
+        filtered: List[Campus] = []
+        for campus in campuses:
+            pt = getattr(campus, "point", None) or getattr(campus, "location", None)
+            xy = _point_xy(pt)
+            if xy is None:
+                continue
+            if _probably_lonlat(cx, cy) and _probably_lonlat(*xy):
+                dist = haversine_miles(cx, cy, xy[0], xy[1])
+            elif SHAPELY and pt is not None and hasattr(pt, "distance"):
+                try:
+                    dist = pt.distance(ShapelyPoint(cx, cy))
+                except Exception:
+                    dist = euclidean((cx, cy), xy)
+            else:
+                dist = euclidean((cx, cy), xy)
+
+            if dist <= max_miles:
+                filtered.append(campus)
+
+        return EntityList(filtered)
 
     def _campuses_within_filtered(
         self,
