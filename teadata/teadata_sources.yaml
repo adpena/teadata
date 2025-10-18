@@ -47,7 +47,7 @@ data_sources:
     2025: data/private_schools/texas_private_schools_2025_sample.csv
     latest: 2025
   tepsac:
-    2025: teadata/data/tepsac/tepsac_geocoded_FINAL.csv
+    2025: data/tepsac/tepsac_geocoded_FINAL.csv
     latest: 2025
 
 spatial:
