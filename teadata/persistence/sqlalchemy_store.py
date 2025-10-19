@@ -76,7 +76,7 @@ try:  # SQLAlchemy 2.0 native UUID type (works across backends)
 except Exception:  # pragma: no cover
     _GenericUUID = None
 
-from ..classes import Campus, DataEngine, District
+from ..classes import Campus, DataEngine, District, _coerce_grade_spans, _spans_to_bounds
 
 try:  # Optional Shapely helpers for geometry round-tripping
     from shapely import wkb as _shapely_wkb
@@ -180,6 +180,11 @@ class CampusRecord(Base):
     rating: Mapped[str | None] = mapped_column(String(16))
     aea: Mapped[bool | None] = mapped_column(Boolean)
     grade_range: Mapped[str | None] = mapped_column(String(64))
+    grade_range_low_code: Mapped[int | None] = mapped_column(Integer, index=True)
+    grade_range_high_code: Mapped[int | None] = mapped_column(Integer, index=True)
+    grade_range_code_spans: Mapped[list[list[int | None]] | None] = mapped_column(
+        _JSONType
+    )
     school_type: Mapped[str | None] = mapped_column(String(64))
     school_status_date: Mapped[date | None] = mapped_column(Date)
     update_date: Mapped[date | None] = mapped_column(Date)
@@ -794,6 +799,12 @@ def export_dataengine(
         record.rating = campus.rating
         record.aea = campus.aea
         record.grade_range = campus.grade_range
+        record.grade_range_low_code = campus.grade_range_low_code
+        record.grade_range_high_code = campus.grade_range_high_code
+        spans_payload = [
+            [low, high] for (low, high) in getattr(campus, "grade_range_code_spans", ())
+        ]
+        record.grade_range_code_spans = spans_payload or None
         record.school_type = campus.school_type
         record.school_status_date = campus.school_status_date
         record.update_date = campus.update_date
@@ -942,6 +953,15 @@ def import_dataengine(
                 location=_load_point(c.point_wkb, c.point_geojson, c.lon, c.lat),
                 meta=meta_payload,
             )
+            spans_payload = getattr(c, "grade_range_code_spans", None)
+            if spans_payload:
+                spans_list = _coerce_grade_spans(spans_payload)
+                if spans_list:
+                    spans_tuple = tuple(spans_list)
+                    object.__setattr__(campus, "grade_range_code_spans", spans_tuple)
+                    low_val, high_val = _spans_to_bounds(spans_tuple)
+                    object.__setattr__(campus, "grade_range_low_code", low_val)
+                    object.__setattr__(campus, "grade_range_high_code", high_val)
             repo.add_campus(campus)
 
     repo._rebuild_indexes()
