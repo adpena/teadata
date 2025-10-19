@@ -12,6 +12,7 @@ from pathlib import Path
 import os
 import pickle
 import io
+import re
 
 import os
 import pickle
@@ -188,6 +189,396 @@ def haversine_miles(x1: float, y1: float, x2: float, y2: float) -> float:
     a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
     c = 2 * atan2(sqrt(a), sqrt(1 - a))
     return R * c
+
+
+# --------- Grade range normalization ---------
+
+_GRADE_SEQUENCE: list[tuple[str, int]] = [
+    ("EARLY_EDUCATION", 0),
+    ("PREK", 1),
+    ("KINDERGARTEN", 2),
+    ("FIRST", 3),
+    ("SECOND", 4),
+    ("THIRD", 5),
+    ("FOURTH", 6),
+    ("FIFTH", 7),
+    ("SIXTH", 8),
+    ("SEVENTH", 9),
+    ("EIGHTH", 10),
+    ("NINTH", 11),
+    ("TENTH", 12),
+    ("ELEVENTH", 13),
+    ("TWELFTH", 14),
+    ("ADULT_EDUCATION", 15),
+]
+
+_GRADE_NAME_TO_CODE: dict[str, int] = {name: code for name, code in _GRADE_SEQUENCE}
+_GRADE_CODE_SET: set[int] = set(_GRADE_NAME_TO_CODE.values())
+_GRADE_NUMBER_TO_CODE: dict[int, int] = {
+    idx: _GRADE_NAME_TO_CODE[name]
+    for idx, name in enumerate(
+        [
+            "FIRST",
+            "SECOND",
+            "THIRD",
+            "FOURTH",
+            "FIFTH",
+            "SIXTH",
+            "SEVENTH",
+            "EIGHTH",
+            "NINTH",
+            "TENTH",
+            "ELEVENTH",
+            "TWELFTH",
+        ],
+        start=1,
+    )
+}
+
+_GRADE_ALIAS_MAP: dict[str, int] = {
+    "EE": _GRADE_NAME_TO_CODE["EARLY_EDUCATION"],
+    "EARLYEDUCATION": _GRADE_NAME_TO_CODE["EARLY_EDUCATION"],
+    "PREK": _GRADE_NAME_TO_CODE["PREK"],
+    "PRE": _GRADE_NAME_TO_CODE["PREK"],
+    "PK": _GRADE_NAME_TO_CODE["PREK"],
+    "PREPRIMARY": _GRADE_NAME_TO_CODE["PREK"],
+    "PRESCHOOL": _GRADE_NAME_TO_CODE["PREK"],
+    "PRE SCHOOL": _GRADE_NAME_TO_CODE["PREK"],
+    "K": _GRADE_NAME_TO_CODE["KINDERGARTEN"],
+    "KG": _GRADE_NAME_TO_CODE["KINDERGARTEN"],
+    "KDG": _GRADE_NAME_TO_CODE["KINDERGARTEN"],
+    "KINDER": _GRADE_NAME_TO_CODE["KINDERGARTEN"],
+    "KINDERGARTEN": _GRADE_NAME_TO_CODE["KINDERGARTEN"],
+    "FIRST": _GRADE_NAME_TO_CODE["FIRST"],
+    "SECOND": _GRADE_NAME_TO_CODE["SECOND"],
+    "THIRD": _GRADE_NAME_TO_CODE["THIRD"],
+    "FOURTH": _GRADE_NAME_TO_CODE["FOURTH"],
+    "FIFTH": _GRADE_NAME_TO_CODE["FIFTH"],
+    "SIXTH": _GRADE_NAME_TO_CODE["SIXTH"],
+    "SEVENTH": _GRADE_NAME_TO_CODE["SEVENTH"],
+    "EIGHTH": _GRADE_NAME_TO_CODE["EIGHTH"],
+    "NINTH": _GRADE_NAME_TO_CODE["NINTH"],
+    "TENTH": _GRADE_NAME_TO_CODE["TENTH"],
+    "ELEVENTH": _GRADE_NAME_TO_CODE["ELEVENTH"],
+    "TWELFTH": _GRADE_NAME_TO_CODE["TWELFTH"],
+    "FRESHMAN": _GRADE_NAME_TO_CODE["NINTH"],
+    "SOPHOMORE": _GRADE_NAME_TO_CODE["TENTH"],
+    "JUNIOR": _GRADE_NAME_TO_CODE["ELEVENTH"],
+    "SENIOR": _GRADE_NAME_TO_CODE["TWELFTH"],
+    "AE": _GRADE_NAME_TO_CODE["ADULT_EDUCATION"],
+    "ADULT": _GRADE_NAME_TO_CODE["ADULT_EDUCATION"],
+    "ADULTED": _GRADE_NAME_TO_CODE["ADULT_EDUCATION"],
+    "ADULTEDUCATION": _GRADE_NAME_TO_CODE["ADULT_EDUCATION"],
+}
+
+_GRADE_IGNORE_TOKENS = {"UG", "NONE", "NA"}
+
+_GRADE_PHRASE_SUBS: tuple[tuple[str, str], ...] = (
+    ("EARLY CHILDHOOD", "EARLY EDUCATION"),
+    ("EARLY CHILDHOOD EDUCATION", "EARLY EDUCATION"),
+    ("EARLY EDUCATION", "EE"),
+    ("PRE-KINDERGARTEN", "PREK"),
+    ("PRE KINDERGARTEN", "PREK"),
+    ("PRE-KG", "PREK"),
+    ("PRE-K", "PREK"),
+    ("PRE K", "PREK"),
+    ("PREKINDERGARTEN", "PREK"),
+    ("PREKINDER", "PREK"),
+    ("PRE KINDER", "PREK"),
+    ("PRE-SCHOOL", "PRESCHOOL"),
+    ("PRE SCHOOL", "PRESCHOOL"),
+    ("PRESCHOOL", "PRESCHOOL"),
+    ("KINDER GARTEN", "KINDERGARTEN"),
+    ("KINDERGARTEN", "KG"),
+    ("ADULT EDUCATION", "AE"),
+)
+
+_ORDINAL_SUFFIX_RE = re.compile(r"(ST|ND|RD|TH)$")
+
+_GRADE_SEGMENT_RE = re.compile(r"[A-Z0-9]+(?:\s*-\s*[A-Z0-9]+)?")
+
+
+def _grade_spec_to_tokens(spec: str) -> list[str]:
+    text = spec.upper()
+    for src, dst in _GRADE_PHRASE_SUBS:
+        text = text.replace(src, dst)
+    text = text.replace("\u2013", " ").replace("\u2014", " ")
+    text = text.replace("-", " ")
+    text = text.replace("/", " ")
+    text = text.replace("\\", " ")
+    text = text.replace("&", " ")
+    text = text.replace("+", " ")
+    text = text.replace(" TO ", " ")
+    text = text.replace(" THRU ", " ")
+    text = text.replace(" THROUGH ", " ")
+    text = text.replace("’", "")
+    text = text.replace("'", "")
+    text = text.replace(".", "")
+    text = re.sub(r"[^A-Z0-9 ]+", " ", text)
+    tokens = [tok for tok in text.split() if tok]
+    return tokens
+
+
+def _grade_spec_to_segments(spec: str) -> list[str]:
+    text = spec.upper()
+    for src, dst in _GRADE_PHRASE_SUBS:
+        text = text.replace(src, dst)
+    text = text.replace("\u2013", "-").replace("\u2014", "-")
+    text = text.replace("/", " ")
+    text = text.replace("\\", " ")
+    text = text.replace("&", " ")
+    text = text.replace("+", " ")
+    text = text.replace(" TO ", " ")
+    text = text.replace(" THRU ", " ")
+    text = text.replace(" THROUGH ", " ")
+    text = text.replace("’", "")
+    text = text.replace("'", "")
+    text = text.replace(".", " ")
+    text = re.sub(r"[^A-Z0-9\- ]+", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+    if not text:
+        return []
+    segments = _GRADE_SEGMENT_RE.findall(text)
+    return segments
+
+
+def _grade_segment_to_span(
+    segment: str,
+) -> tuple[Optional[int], Optional[int]] | None:
+    if not segment:
+        return None
+    parts = [part for part in re.split(r"\s*-\s*", segment) if part]
+    if not parts:
+        return None
+    codes = [_grade_token_to_code(part) for part in parts]
+    codes = [c for c in codes if c is not None]
+    if not codes:
+        return None
+    if len(codes) == 1:
+        code = codes[0]
+        return (code, code)
+    return _normalize_grade_bounds(codes[0], codes[-1])
+
+
+def _grade_token_to_code(token: Any) -> Optional[int]:
+    if token is None:
+        return None
+    if isinstance(token, (int, float)) and not isinstance(token, bool):
+        val = int(token)
+        if val in _GRADE_CODE_SET:
+            return val
+        if val in _GRADE_NUMBER_TO_CODE:
+            return _GRADE_NUMBER_TO_CODE[val]
+        return None
+    if isinstance(token, str):
+        text = token.strip().upper()
+        if not text:
+            return None
+        text = text.replace("’", "")
+        if text.startswith("'"):
+            text = text[1:]
+        text = text.replace(".", "")
+        text = _ORDINAL_SUFFIX_RE.sub("", text)
+        if not text:
+            return None
+        if text in _GRADE_IGNORE_TOKENS:
+            return None
+        if text in _GRADE_ALIAS_MAP:
+            return _GRADE_ALIAS_MAP[text]
+        if text.startswith("GRADE"):
+            rem = text[5:]
+            if rem in _GRADE_ALIAS_MAP:
+                return _GRADE_ALIAS_MAP[rem]
+            text = rem
+        if text.startswith("PK") and text[2:].isdigit():
+            return _GRADE_ALIAS_MAP["PK"]
+        if text.startswith("PREK") and text[4:].isdigit():
+            return _GRADE_ALIAS_MAP["PREK"]
+        if text.startswith("KG") and text[2:].isdigit():
+            return _GRADE_ALIAS_MAP["KG"]
+        if text in _GRADE_NAME_TO_CODE:
+            return _GRADE_NAME_TO_CODE[text]
+        if text.isdigit():
+            num = int(text)
+            if num in _GRADE_NUMBER_TO_CODE:
+                return _GRADE_NUMBER_TO_CODE[num]
+            if num in _GRADE_CODE_SET:
+                return num
+        return None
+    return None
+
+
+def _normalize_grade_bounds(
+    low: Optional[int], high: Optional[int]
+) -> tuple[Optional[int], Optional[int]]:
+    if low is None and high is None:
+        return (None, None)
+    if low is None:
+        low = high
+    if high is None:
+        high = low
+    if low is not None and high is not None and low > high:
+        low, high = high, low
+    return (low, high)
+
+
+def _grade_value_to_code(value: Any) -> Optional[int]:
+    if value is None:
+        return None
+    if isinstance(value, (list, tuple)):
+        codes = [_grade_value_to_code(v) for v in value]
+        codes = [c for c in codes if c is not None]
+        return min(codes) if codes else None
+    if isinstance(value, dict):
+        spans_payload = value.get("grade_range_code_spans")
+        if spans_payload is not None:
+            spans = _coerce_grade_spans(spans_payload)
+            lows = [low for low, _ in spans if low is not None]
+            if lows:
+                return min(lows)
+        if "grade_range_low_code" in value or "grade_range_high_code" in value:
+            low_val = value.get("grade_range_low_code")
+            high_val = value.get("grade_range_high_code")
+            low_val, _ = _normalize_grade_bounds(low_val, high_val)
+            return low_val
+        for key in ("low", "min", "start", "from", "lower"):
+            if key in value:
+                return _grade_value_to_code(value[key])
+        return None
+    if isinstance(value, str):
+        tokens = _grade_spec_to_tokens(value)
+        codes = [_grade_token_to_code(tok) for tok in tokens]
+        codes = [c for c in codes if c is not None]
+        if len(codes) == 1:
+            return codes[0]
+        return min(codes) if codes else None
+    return _grade_token_to_code(value)
+
+
+def _spans_to_bounds(
+    spans: Iterable[tuple[Optional[int], Optional[int]]]
+) -> tuple[Optional[int], Optional[int]]:
+    materialized = [
+        _normalize_grade_bounds(low, high) for (low, high) in spans if low is not None or high is not None
+    ]
+    if not materialized:
+        return (None, None)
+    lows = [low for low, _ in materialized if low is not None]
+    highs = [high for _, high in materialized if high is not None]
+    low_val = min(lows) if lows else (min(highs) if highs else None)
+    high_val = max(highs) if highs else (max(lows) if lows else None)
+    if low_val is not None and high_val is not None and low_val > high_val:
+        low_val, high_val = high_val, low_val
+    return (low_val, high_val)
+
+
+def _coerce_grade_spans(
+    spec: Any, high: Any | None = None
+) -> list[tuple[Optional[int], Optional[int]]]:
+    if high is not None:
+        span = _normalize_grade_bounds(
+            _grade_value_to_code(spec), _grade_value_to_code(high)
+        )
+        return [span] if span != (None, None) else []
+    if spec is None:
+        return []
+    result: list[tuple[Optional[int], Optional[int]]] = []
+    if hasattr(spec, "grade_range_code_spans"):
+        spans = getattr(spec, "grade_range_code_spans")
+        if spans:
+            for span in spans:
+                if isinstance(span, (list, tuple)) and span:
+                    low = _grade_value_to_code(span[0])
+                    high_val = _grade_value_to_code(span[1]) if len(span) > 1 else low
+                else:
+                    low = _grade_value_to_code(span)
+                    high_val = low
+                normalized = _normalize_grade_bounds(low, high_val)
+                if normalized != (None, None):
+                    result.append(normalized)
+            if result:
+                return result
+    if hasattr(spec, "grade_range_low_code") or hasattr(spec, "grade_range_high_code"):
+        low_val = getattr(spec, "grade_range_low_code", None)
+        high_val = getattr(spec, "grade_range_high_code", None)
+        normalized = _normalize_grade_bounds(low_val, high_val)
+        if normalized != (None, None):
+            result.append(normalized)
+        if result:
+            return result
+    if hasattr(spec, "grade_range"):
+        spans = _coerce_grade_spans(getattr(spec, "grade_range"))
+        if spans:
+            return spans
+    if isinstance(spec, dict):
+        spans_payload = spec.get("grade_range_code_spans")
+        if spans_payload is not None:
+            spans = _coerce_grade_spans(spans_payload)
+            if spans:
+                return spans
+        low_val = None
+        high_val = None
+        for key in ("low", "min", "start", "from", "lower"):
+            if key in spec:
+                low_val = _grade_value_to_code(spec[key])
+                break
+        for key in ("high", "max", "end", "to", "upper"):
+            if key in spec:
+                high_val = _grade_value_to_code(spec[key])
+                break
+        if low_val is not None or high_val is not None:
+            normalized = _normalize_grade_bounds(low_val, high_val)
+            if normalized != (None, None):
+                return [normalized]
+        if "grade_range" in spec:
+            spans = _coerce_grade_spans(spec["grade_range"])
+            if spans:
+                return spans
+        return []
+    if isinstance(spec, (list, tuple)):
+        if not spec:
+            return []
+        if (
+            len(spec) == 2
+            and not any(isinstance(elem, (list, tuple, dict)) for elem in spec)
+        ):
+            normalized = _normalize_grade_bounds(
+                _grade_value_to_code(spec[0]), _grade_value_to_code(spec[1])
+            )
+            return [normalized] if normalized != (None, None) else []
+        spans: list[tuple[Optional[int], Optional[int]]] = []
+        for elem in spec:
+            spans.extend(_coerce_grade_spans(elem))
+        return spans
+    if isinstance(spec, str):
+        segments = _grade_spec_to_segments(spec)
+        spans: list[tuple[Optional[int], Optional[int]]] = []
+        for segment in segments:
+            span = _grade_segment_to_span(segment)
+            if span and span != (None, None):
+                spans.append(span)
+        if spans:
+            return spans
+        tokens = _grade_spec_to_tokens(spec)
+        codes = [_grade_token_to_code(tok) for tok in tokens]
+        codes = [c for c in codes if c is not None]
+        if not codes:
+            return []
+        normalized = _normalize_grade_bounds(min(codes), max(codes))
+        return [normalized] if normalized != (None, None) else []
+    code = _grade_token_to_code(spec)
+    if code is None:
+        return []
+    return [(code, code)]
+
+
+def _coerce_grade_bounds(
+    spec: Any, high: Any | None = None
+) -> tuple[Optional[int], Optional[int]]:
+    spans = _coerce_grade_spans(spec, high)
+    if not spans:
+        return (None, None)
+    return _spans_to_bounds(spans)
 
 
 def _point_xy(pt: Any) -> Tuple[float, float] | None:
@@ -584,6 +975,16 @@ class Campus:
     school_status_date: Optional[date] = None
     update_date: Optional[date] = None
 
+    grade_range_code_spans: tuple[tuple[Optional[int], Optional[int]], ...] = field(
+        init=False, repr=False, default=(), compare=False
+    )
+    grade_range_low_code: Optional[int] = field(
+        init=False, repr=False, default=None, compare=False
+    )
+    grade_range_high_code: Optional[int] = field(
+        init=False, repr=False, default=None, compare=False
+    )
+
     district_number: Optional[str] = None
     campus_number: Optional[str] = None
 
@@ -602,11 +1003,29 @@ class Campus:
     # Arbitrary enrichment payload (columns not explicitly modeled)
     meta: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "grade_range":
+            object.__setattr__(self, name, value)
+            spans = tuple(_coerce_grade_spans(value))
+            object.__setattr__(self, "grade_range_code_spans", spans)
+            low, high = _spans_to_bounds(spans)
+            object.__setattr__(self, "grade_range_low_code", low)
+            object.__setattr__(self, "grade_range_high_code", high)
+            return
+        object.__setattr__(self, name, value)
+
     def __post_init__(self):
         self.is_charter = bool(self.is_charter)
         self.is_private = bool(self.is_private)
         if self.location is not None:
             self.point = self.location
+
+        # Ensure grade-range codes are computed for post-init adjustments
+        spans = tuple(_coerce_grade_spans(self.grade_range))
+        object.__setattr__(self, "grade_range_code_spans", spans)
+        low, high = _spans_to_bounds(spans)
+        object.__setattr__(self, "grade_range_low_code", low)
+        object.__setattr__(self, "grade_range_high_code", high)
 
         # District
         raw_dn = self.district_number
@@ -676,6 +1095,11 @@ class Campus:
             "rating": self.rating,
             "aea": self.aea,
             "grade_range": self.grade_range,
+            "grade_range_code_spans": [
+                [low, high] for (low, high) in self.grade_range_code_spans
+            ],
+            "grade_range_low_code": self.grade_range_low_code,
+            "grade_range_high_code": self.grade_range_high_code,
             "school_type": self.school_type,
             "school_status_date": (
                 self.school_status_date.isoformat()
@@ -1473,6 +1897,7 @@ class Query:
         - ("map", func)         -> map items (returns list of mapped values)
         - ("where", predicate)    -> alias of ("filter", predicate)
         - ("select", func)        -> alias of ("map", func)
+        - ("grade_overlap", spec_low, spec_high=None) -> filter to campuses whose grade spans overlap the requested bounds
         - callable              -> predicate filter (same as ("filter", callable))
         - ("nearest", (x,y|None), n?, max_miles?)           -> restart pipeline with nearest campuses; if (x,y) is None, infers from current items
         - ("nearest_charter", (x,y|None), n?, max_miles?)   -> restart with nearest charter campuses; if (x,y) is None, infers from current items
@@ -1501,6 +1926,35 @@ class Query:
         if key == "where":  # alias of filter
             pred = op[1]
             self._items = [o for o in self._items if pred(o)]
+            return self
+
+        if key in {"grade_overlap", "grade_overlaps", "grade_range_overlap"}:
+            if len(op) == 2:
+                low, high = _coerce_grade_bounds(op[1])
+            elif len(op) >= 3:
+                low, high = _coerce_grade_bounds(op[1], op[2])
+            else:
+                raise ValueError(
+                    "grade_overlap requires a grade specification (low[, high])"
+                )
+            if low is None and high is None:
+                raise ValueError("grade_overlap received an empty/unknown grade span")
+
+            want_low, want_high = low, high
+
+            def _item_grade_spans(obj: Any) -> list[tuple[Optional[int], Optional[int]]]:
+                return _coerce_grade_spans(obj)
+
+            def _overlaps(obj: Any) -> bool:
+                spans = _item_grade_spans(obj)
+                for low_val, high_val in spans:
+                    if low_val is None or high_val is None:
+                        continue
+                    if not (want_high < low_val or high_val < want_low):
+                        return True
+                return False
+
+            self._items = [o for o in self._items if _overlaps(o)]
             return self
 
         if key == "take":
