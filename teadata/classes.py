@@ -2924,6 +2924,59 @@ class DataEngine:
                 return c
         return None
 
+    def campus_by_number(self, campus_number: Any) -> Optional["Campus"]:
+        """Return a campus by its TEA campus number in any common format."""
+
+        if campus_number is None:
+            return None
+
+        index = getattr(self, "_campus_by_number", None)
+        if not index:
+            # Ensure the lookup table is populated (e.g., after bulk loads)
+            try:
+                self._rebuild_indexes()
+            except Exception:
+                index = {}
+            else:
+                index = getattr(self, "_campus_by_number", {})
+
+        candidates: list[str] = []
+
+        canonical = canonical_campus_number(campus_number)
+        if canonical:
+            candidates.append(canonical)
+            digits = canonical[1:]
+            if digits:
+                candidates.append(digits)
+                if digits.isdigit():
+                    candidates.append(str(int(digits)))
+
+        raw = str(campus_number).strip()
+        if raw:
+            candidates.append(raw)
+            if raw.startswith(("'", "’", "`")):
+                trimmed = raw[1:].lstrip()
+                if trimmed:
+                    candidates.append(trimmed)
+            try:
+                candidates.append(str(int(raw)))
+            except Exception:
+                pass
+
+        seen: set[str] = set()
+        for key in candidates:
+            if not key or key in seen:
+                continue
+            seen.add(key)
+            cid = index.get(key) if index is not None else None
+            if cid is None:
+                continue
+            campus = self._campuses.get(cid)
+            if campus is not None:
+                return campus
+
+        return None
+
     def __len__(self) -> int:
         return len(self._districts) + len(self._campuses)
 
@@ -3045,6 +3098,37 @@ class DataEngine:
                     else:
                         if name_up == pattern_up:
                             matches.append(d)
+
+                return Query(matches, self)
+
+            if key == "campus":
+                raw = query[1]
+
+                if isinstance(raw, int) or (
+                    isinstance(raw, str) and any(ch.isdigit() for ch in raw)
+                ):
+                    campus = self.campus_by_number(raw)
+                    return Query([campus] if campus is not None else [], self)
+
+                target = (str(raw) if raw is not None else "").strip()
+                if not target:
+                    return Query([], self)
+
+                import fnmatch
+
+                pattern = target.replace("%", "*").replace("_", "?")
+                pattern_up = pattern.upper()
+                has_glob = any(ch in pattern_up for ch in ("*", "?"))
+
+                matches = []
+                for c in self._campuses.values():
+                    name_up = (c.name or "").upper()
+                    if has_glob:
+                        if fnmatch.fnmatchcase(name_up, pattern_up):
+                            matches.append(c)
+                    else:
+                        if name_up == pattern_up:
+                            matches.append(c)
 
                 return Query(matches, self)
 
