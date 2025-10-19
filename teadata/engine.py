@@ -40,6 +40,7 @@ from .geometry import (
     district_centroid_xy,
     euclidean,
     haversine_miles,
+    point_in_polygon,
     point_xy,
     probably_lonlat,
 )
@@ -535,6 +536,10 @@ class DataEngine:
                     if c.district_id in eng._districts:
                         eng.add_campus(c)
             eng._rebuild_indexes()
+            try:
+                eng._rehydrate_geometries()
+            except Exception:
+                pass
             if os.environ.get("TEADATA_DEBUG"):
                 print(
                     f"[snapshot] loaded districts={len(eng._districts)} campuses={len(eng._campuses)} from {path}"
@@ -1273,13 +1278,41 @@ class DataEngine:
         self._all_xy_np = np.array(xy, dtype=float)
         self._all_campuses_np = clist
 
+    @staticmethod
+    def _extract_polygon_coords(poly) -> List[Tuple[float, float]]:
+        """Return a cleaned list of (x, y) vertices for non-Shapely polygons."""
+
+        try:
+            coords = list(poly)
+        except TypeError:
+            return []
+
+        cleaned: List[Tuple[float, float]] = []
+        for pt in coords:
+            if (
+                isinstance(pt, (tuple, list))
+                and len(pt) == 2
+                and all(isinstance(v, (int, float)) for v in pt)
+            ):
+                cleaned.append((float(pt[0]), float(pt[1])))
+        return cleaned
+
     def _bbox_candidates(self, poly) -> List[Campus]:
         """Return campuses whose points fall within the polygon's axis-aligned bounding box."""
         if not SHAPELY:
             # Fallback: simple Python loop without NumPy
-            minx, miny, maxx, maxy = (
-                poly.bounds if hasattr(poly, "bounds") else (None, None, None, None)
-            )
+            if hasattr(poly, "bounds"):
+                minx, miny, maxx, maxy = poly.bounds
+            else:
+                coords = self._extract_polygon_coords(poly)
+                if not coords:
+                    return []
+                xs = [pt[0] for pt in coords]
+                ys = [pt[1] for pt in coords]
+                minx = min(xs)
+                maxx = max(xs)
+                miny = min(ys)
+                maxy = max(ys)
             if minx is None:
                 return []
             out = []
@@ -1287,10 +1320,10 @@ class DataEngine:
                 p = getattr(c, "point", None) or getattr(c, "location", None)
                 if p is None:
                     continue
-                try:
-                    x, y = float(p.x), float(p.y)
-                except Exception:
+                xy = point_xy(p)
+                if xy is None:
                     continue
+                x, y = xy
                 if (minx <= x <= maxx) and (miny <= y <= maxy):
                     out.append(c)
             return out
@@ -1780,6 +1813,7 @@ class DataEngine:
 
         # Final robust fallback: exact scan
         slow: List[Campus] = []
+        poly_coords: Optional[List[Tuple[float, float]]] = None
         for c in self._campuses.values():
             try:
                 if not predicate(c):
@@ -1789,12 +1823,24 @@ class DataEngine:
             p = getattr(c, "point", None) or getattr(c, "location", None)
             if p is None:
                 continue
-            try:
-                if SHAPELY and poly.covers(p):
-                    slow.append(c)
-            except Exception:
-                # Non-shapely fallback (rare in this code path)
-                pass
+            inside = False
+            if SHAPELY and hasattr(poly, "covers"):
+                try:
+                    inside = poly.covers(p)
+                except Exception:
+                    inside = False
+            if not inside:
+                if poly_coords is None:
+                    poly_coords = self._extract_polygon_coords(poly)
+                if poly_coords:
+                    xy = point_xy(p)
+                    if xy is not None:
+                        try:
+                            inside = point_in_polygon(xy, poly_coords)
+                        except Exception:
+                            inside = False
+            if inside:
+                slow.append(c)
 
         if ENABLE_PROFILING:
             try:
