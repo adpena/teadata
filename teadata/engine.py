@@ -1278,13 +1278,41 @@ class DataEngine:
         self._all_xy_np = np.array(xy, dtype=float)
         self._all_campuses_np = clist
 
+    @staticmethod
+    def _extract_polygon_coords(poly) -> List[Tuple[float, float]]:
+        """Return a cleaned list of (x, y) vertices for non-Shapely polygons."""
+
+        try:
+            coords = list(poly)
+        except TypeError:
+            return []
+
+        cleaned: List[Tuple[float, float]] = []
+        for pt in coords:
+            if (
+                isinstance(pt, (tuple, list))
+                and len(pt) == 2
+                and all(isinstance(v, (int, float)) for v in pt)
+            ):
+                cleaned.append((float(pt[0]), float(pt[1])))
+        return cleaned
+
     def _bbox_candidates(self, poly) -> List[Campus]:
         """Return campuses whose points fall within the polygon's axis-aligned bounding box."""
         if not SHAPELY:
             # Fallback: simple Python loop without NumPy
-            minx, miny, maxx, maxy = (
-                poly.bounds if hasattr(poly, "bounds") else (None, None, None, None)
-            )
+            if hasattr(poly, "bounds"):
+                minx, miny, maxx, maxy = poly.bounds
+            else:
+                coords = self._extract_polygon_coords(poly)
+                if not coords:
+                    return []
+                xs = [pt[0] for pt in coords]
+                ys = [pt[1] for pt in coords]
+                minx = min(xs)
+                maxx = max(xs)
+                miny = min(ys)
+                maxy = max(ys)
             if minx is None:
                 return []
             out = []
@@ -1292,10 +1320,10 @@ class DataEngine:
                 p = getattr(c, "point", None) or getattr(c, "location", None)
                 if p is None:
                     continue
-                try:
-                    x, y = float(p.x), float(p.y)
-                except Exception:
+                xy = point_xy(p)
+                if xy is None:
                     continue
+                x, y = xy
                 if (minx <= x <= maxx) and (miny <= y <= maxy):
                     out.append(c)
             return out
@@ -1809,6 +1837,7 @@ class DataEngine:
 
         # Final robust fallback: exact scan
         slow: List[Campus] = []
+        poly_coords: Optional[List[Tuple[float, float]]] = None
         for c in self._campuses.values():
             try:
                 if not predicate(c):
