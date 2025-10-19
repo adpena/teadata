@@ -1742,6 +1742,30 @@ class DataEngine:
         if poly is None:
             return []
 
+        poly_xy: List[Tuple[float, float]] = []
+        bbox_min_x = bbox_min_y = bbox_max_x = bbox_max_y = None  # type: Optional[float]
+        if not SHAPELY or not hasattr(poly, "covers"):
+            try:
+                coords = list(poly)
+            except TypeError:
+                coords = []
+            cleaned: List[Tuple[float, float]] = []
+            for pt in coords:
+                if (
+                    isinstance(pt, (tuple, list))
+                    and len(pt) == 2
+                    and all(isinstance(v, (int, float)) for v in pt)
+                ):
+                    cleaned.append((float(pt[0]), float(pt[1])))
+            if cleaned:
+                poly_xy = cleaned
+                xs = [p[0] for p in cleaned]
+                ys = [p[1] for p in cleaned]
+                bbox_min_x = min(xs)
+                bbox_max_x = max(xs)
+                bbox_min_y = min(ys)
+                bbox_max_y = max(ys)
+
         # Quick AABB prefilter (NumPy) to cut the candidate set; then exact covers
         if SHAPELY and hasattr(poly, "bounds"):
             bbox_cands = self._bbox_candidates(poly)
