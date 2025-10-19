@@ -326,6 +326,19 @@ class Query:
         func = op[1]
         return [func(o) for o in self._items]
 
+    def _op_distinct(self, op: tuple):
+        keyfunc = op[1]
+        seen = set()
+        out = []
+        for obj in self._items:
+            key = keyfunc(obj)
+            if key in seen:
+                continue
+            seen.add(key)
+            out.append(obj)
+        self._items = out
+        return self
+
     def _op_grade_overlap(self, op: tuple):
         if len(op) == 2:
             low, high = coerce_grade_bounds(op[1])
@@ -596,6 +609,7 @@ _register("filter", Query._op_filter)
 _register("take", Query._op_take)
 _register("sort", Query._op_sort)
 _register("map", Query._op_map)
+_register("distinct", Query._op_distinct)
 _register("grade_overlap", Query._op_grade_overlap)
 _register("campuses_in", Query._op_campuses_in)
 _register("private_campuses_in", Query._op_private_campuses_in)
