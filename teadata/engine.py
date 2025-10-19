@@ -1847,29 +1847,24 @@ class DataEngine:
             p = getattr(c, "point", None) or getattr(c, "location", None)
             if p is None:
                 continue
+            inside = False
             if SHAPELY and hasattr(poly, "covers"):
                 try:
-                    if poly.covers(p):
-                        slow.append(c)
-                        continue
+                    inside = poly.covers(p)
                 except Exception:
-                    pass
-
-            if poly_xy:
-                xy = point_xy(p)
-                if xy is None:
-                    continue
-                x, y = xy
-                if (
-                    bbox_min_x is not None
-                    and (x < bbox_min_x or x > bbox_max_x or y < bbox_min_y or y > bbox_max_y)
-                ):
-                    continue
-                try:
-                    if point_in_polygon(xy, poly_xy):
-                        slow.append(c)
-                except Exception:
-                    continue
+                    inside = False
+            if not inside:
+                if poly_coords is None:
+                    poly_coords = self._extract_polygon_coords(poly)
+                if poly_coords:
+                    xy = point_xy(p)
+                    if xy is not None:
+                        try:
+                            inside = point_in_polygon(xy, poly_coords)
+                        except Exception:
+                            inside = False
+            if inside:
+                slow.append(c)
 
         if ENABLE_PROFILING:
             try:
