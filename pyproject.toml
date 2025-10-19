@@ -98,6 +98,10 @@ include-package-data = true
 "Homepage" = "https://github.com/adpena/teadata"
 "Bug Tracker" = "https://github.com/adpena/teadata/issues"
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
 [tool.deptry]
 # Optional: folders to skip
 exclude = ["tests", "docs", "examples", ".ipynb_checkpoints"]
