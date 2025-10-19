@@ -40,6 +40,7 @@ from .geometry import (
     district_centroid_xy,
     euclidean,
     haversine_miles,
+    point_in_polygon,
     point_xy,
     probably_lonlat,
 )
@@ -535,6 +536,10 @@ class DataEngine:
                     if c.district_id in eng._districts:
                         eng.add_campus(c)
             eng._rebuild_indexes()
+            try:
+                eng._rehydrate_geometries()
+            except Exception:
+                pass
             if os.environ.get("TEADATA_DEBUG"):
                 print(
                     f"[snapshot] loaded districts={len(eng._districts)} campuses={len(eng._campuses)} from {path}"
@@ -1709,6 +1714,30 @@ class DataEngine:
         if poly is None:
             return []
 
+        poly_xy: List[Tuple[float, float]] = []
+        bbox_min_x = bbox_min_y = bbox_max_x = bbox_max_y = None  # type: Optional[float]
+        if not SHAPELY or not hasattr(poly, "covers"):
+            try:
+                coords = list(poly)
+            except TypeError:
+                coords = []
+            cleaned: List[Tuple[float, float]] = []
+            for pt in coords:
+                if (
+                    isinstance(pt, (tuple, list))
+                    and len(pt) == 2
+                    and all(isinstance(v, (int, float)) for v in pt)
+                ):
+                    cleaned.append((float(pt[0]), float(pt[1])))
+            if cleaned:
+                poly_xy = cleaned
+                xs = [p[0] for p in cleaned]
+                ys = [p[1] for p in cleaned]
+                bbox_min_x = min(xs)
+                bbox_max_x = max(xs)
+                bbox_min_y = min(ys)
+                bbox_max_y = max(ys)
+
         # Quick AABB prefilter (NumPy) to cut the candidate set; then exact covers
         if SHAPELY and hasattr(poly, "bounds"):
             bbox_cands = self._bbox_candidates(poly)
@@ -1789,12 +1818,29 @@ class DataEngine:
             p = getattr(c, "point", None) or getattr(c, "location", None)
             if p is None:
                 continue
-            try:
-                if SHAPELY and poly.covers(p):
-                    slow.append(c)
-            except Exception:
-                # Non-shapely fallback (rare in this code path)
-                pass
+            if SHAPELY and hasattr(poly, "covers"):
+                try:
+                    if poly.covers(p):
+                        slow.append(c)
+                        continue
+                except Exception:
+                    pass
+
+            if poly_xy:
+                xy = point_xy(p)
+                if xy is None:
+                    continue
+                x, y = xy
+                if (
+                    bbox_min_x is not None
+                    and (x < bbox_min_x or x > bbox_max_x or y < bbox_min_y or y > bbox_max_y)
+                ):
+                    continue
+                try:
+                    if point_in_polygon(xy, poly_xy):
+                        slow.append(c)
+                except Exception:
+                    continue
 
         if ENABLE_PROFILING:
             try:
