@@ -40,11 +40,11 @@ data_sources:
   campus_tapr_historical_enrollment:
     2014: data/tapr/CAMPPROF_2014-2015_FINAL.xlsx
     latest: 2014
+  district_tapr_student_staff_profile:
+    2024: data/tapr/DISTPROF_2023-2024_FINAL.xlsx
+    latest: 2024
   campus_planned_closures:
     2025: data/closures/Planned School Closures_10.03.2025.xlsx
-    latest: 2025
-  private_schools:
-    2025: data/private_schools/texas_private_schools_2025_sample.csv
     latest: 2025
   tepsac:
     2025: data/tepsac/tepsac_geocoded_FINAL.csv
@@ -68,6 +68,7 @@ schema:
     campus_peims_financials: ["csv"]
     campus_tapr_student_staff_profile: ["xlsx"]
     campus_tapr_historical_enrollment: ["xlsx"]
+    district_tapr_student_staff_profile: ["xlsx"]
     campus_planned_closures: ["xlsx"]
     private_schools: ["csv"]
     tepsac: ["csv"]
