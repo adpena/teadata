@@ -130,7 +130,7 @@ def grade_spec_to_tokens(spec: str) -> list[str]:
     text = spec.upper()
     for src, dst in GRADE_PHRASE_SUBS:
         text = text.replace(src, dst)
-    text = text.replace("\u2013", " ").replace("\u2014", " ")
+    text = text.replace("\N{EN DASH}", "-").replace("\N{EM DASH}", "-")
     text = text.replace("-", " ")
     text = text.replace("/", " ")
     text = text.replace("\\", " ")
@@ -151,7 +151,7 @@ def grade_spec_to_segments(spec: str) -> list[str]:
     text = spec.upper()
     for src, dst in GRADE_PHRASE_SUBS:
         text = text.replace(src, dst)
-    text = text.replace("\u2013", "-").replace("\u2014", "-")
+    text = text.replace("\N{EN DASH}", "-").replace("\N{EM DASH}", "-")
     text = text.replace("/", " ")
     text = text.replace("\\", " ")
     text = text.replace("&", " ")
