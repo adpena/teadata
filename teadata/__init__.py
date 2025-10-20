@@ -36,8 +36,7 @@ for pkg, minv in _REQUIRED_DEPENDENCIES.items():
 
 if _required_issues:
     raise ImportError(
-        "teadata requires the following dependencies: "
-        + ", ".join(_required_issues)
+        "teadata requires the following dependencies: " + ", ".join(_required_issues)
     ) from None
 
 
