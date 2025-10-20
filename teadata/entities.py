@@ -1,4 +1,5 @@
 """Domain entities (District, Campus) and collection helpers."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass, field, fields, is_dataclass
@@ -127,7 +128,9 @@ class District:
             return 0.0
         if SHAPELY:
             return self.polygon.intersection(other.polygon).area
-        return polygon_area(list(self.polygon)) if self.polygon == other.polygon else 0.0
+        return (
+            polygon_area(list(self.polygon)) if self.polygon == other.polygon else 0.0
+        )
 
     def __or__(self, other: "District") -> float:
         if self.polygon is None or other.polygon is None:
@@ -203,7 +206,9 @@ class District:
             base.extend(k for k in m.keys() if isinstance(k, str))
         return sorted(set(base))
 
-    def to_dict(self, *, include_meta: bool = True, include_geometry: bool = False) -> dict:
+    def to_dict(
+        self, *, include_meta: bool = True, include_geometry: bool = False
+    ) -> dict:
         out = {
             "id": str(self.id),
             "name": self.name,
@@ -327,7 +332,9 @@ class Campus:
             base.extend(k for k in m.keys() if isinstance(k, str))
         return sorted(set(base))
 
-    def to_dict(self, *, include_meta: bool = True, include_geometry: bool = False) -> dict:
+    def to_dict(
+        self, *, include_meta: bool = True, include_geometry: bool = False
+    ) -> dict:
         out = {
             "id": str(self.id),
             "district_id": str(self.district_id),
@@ -400,8 +407,10 @@ class Campus:
     def _distance_to_campus(self, other: "Campus") -> float:
         if self.point is None or other.point is None:
             return float("inf")
-        if SHAPELY and isinstance(self.point, ShapelyPoint) and isinstance(
-            other.point, ShapelyPoint
+        if (
+            SHAPELY
+            and isinstance(self.point, ShapelyPoint)
+            and isinstance(other.point, ShapelyPoint)
         ):
             return self.point.distance(other.point)
         return euclidean((self.point.x, self.point.y), (other.point.x, other.point.y))
@@ -423,7 +432,9 @@ class Campus:
         ):
             baseline = self.meta["campus_2015_student_enrollment_all_students_count"]
         elif hasattr(self, "campus_2015_student_enrollment_all_students_count"):
-            baseline = getattr(self, "campus_2015_student_enrollment_all_students_count")
+            baseline = getattr(
+                self, "campus_2015_student_enrollment_all_students_count"
+            )
         if enrollment is None:
             raise ValueError("Current enrollment is missing or None.")
         if baseline is None:
@@ -432,7 +443,9 @@ class Campus:
             enrollment = float(enrollment)
             baseline = float(baseline)
         except Exception as exc:  # pragma: no cover - defensive
-            raise ValueError("Enrollment or baseline could not be cast to float.") from exc
+            raise ValueError(
+                "Enrollment or baseline could not be cast to float."
+            ) from exc
         if baseline == 0:
             raise ValueError(
                 "Baseline 2015 enrollment is zero, cannot compute percent change."
@@ -489,12 +502,16 @@ class Campus:
 
 
 class EntityMap(dict):
-    def to_dicts(self, *, include_meta: bool = True, include_geometry: bool = False) -> list[dict]:
+    def to_dicts(
+        self, *, include_meta: bool = True, include_geometry: bool = False
+    ) -> list[dict]:
         rows = []
         for obj in self.values():
             if hasattr(obj, "to_dict"):
                 rows.append(
-                    obj.to_dict(include_meta=include_meta, include_geometry=include_geometry)
+                    obj.to_dict(
+                        include_meta=include_meta, include_geometry=include_geometry
+                    )
                 )
             else:
                 try:
@@ -574,12 +591,16 @@ class EntityMap(dict):
 
 
 class EntityList(list):
-    def to_dicts(self, *, include_meta: bool = True, include_geometry: bool = False) -> list[dict]:
+    def to_dicts(
+        self, *, include_meta: bool = True, include_geometry: bool = False
+    ) -> list[dict]:
         rows = []
         for obj in self:
             if hasattr(obj, "to_dict"):
                 rows.append(
-                    obj.to_dict(include_meta=include_meta, include_geometry=include_geometry)
+                    obj.to_dict(
+                        include_meta=include_meta, include_geometry=include_geometry
+                    )
                 )
             else:
                 try:

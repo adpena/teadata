@@ -612,6 +612,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
             except Exception as exc:
                 print(f"[private] failed to load {private_fp}: {exc}")
             else:
+
                 def _grade_span(low, high):
                     try:
                         low_missing = pd.isna(low)

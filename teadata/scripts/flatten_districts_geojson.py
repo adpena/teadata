@@ -1,4 +1,3 @@
-
 import argparse
 import json
 from typing import List
@@ -14,7 +13,12 @@ DEFAULT_FILTER_FIELD = "NAME"
 DEFAULT_FILTER_VALUE = "AUSTIN ISD"
 
 
-def flatten_and_filter_geojson(input_path: str, output_path: str, filter_field: str | None = None, filter_value: str | None = None) -> None:
+def flatten_and_filter_geojson(
+    input_path: str,
+    output_path: str,
+    filter_field: str | None = None,
+    filter_value: str | None = None,
+) -> None:
     """
     Flatten nested geometries into (Multi)Polygon and optionally filter by a property/value.
 
@@ -50,7 +54,9 @@ def flatten_and_filter_geojson(input_path: str, output_path: str, filter_field: 
 
             # Normalize to Polygon/MultiPolygon
             if geom.geom_type == "GeometryCollection":
-                parts = [g for g in geom.geoms if g.geom_type in ("Polygon", "MultiPolygon")]
+                parts = [
+                    g for g in geom.geoms if g.geom_type in ("Polygon", "MultiPolygon")
+                ]
                 if not parts:
                     continue
                 geom = MultiPolygon(parts) if len(parts) > 1 else parts[0]
@@ -66,7 +72,9 @@ def flatten_and_filter_geojson(input_path: str, output_path: str, filter_field: 
 
             # If repair returns a GeometryCollection, keep only polygonal parts
             if geom.geom_type == "GeometryCollection":
-                polys = [g for g in geom.geoms if g.geom_type in ("Polygon", "MultiPolygon")]
+                polys = [
+                    g for g in geom.geoms if g.geom_type in ("Polygon", "MultiPolygon")
+                ]
                 if not polys:
                     continue
                 geom = MultiPolygon(polys) if len(polys) > 1 else polys[0]
@@ -96,17 +104,37 @@ def flatten_and_filter_geojson(input_path: str, output_path: str, filter_field: 
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Flatten and optionally filter a districts GeoJSON.")
-    parser.add_argument("--input", "-i", dest="input_path", required=False,
-                        default=DEFAULT_INPUT,
-                        help="Path to input GeoJSON")
-    parser.add_argument("--output", "-o", dest="output_path", required=False,
-                        default=DEFAULT_OUTPUT,
-                        help="Path to output GeoJSON")
-    parser.add_argument("--filter-field", dest="filter_field", default=DEFAULT_FILTER_FIELD,
-                        help="Property field to filter on (e.g., NAME)")
-    parser.add_argument("--filter-value", dest="filter_value", default=DEFAULT_FILTER_VALUE,
-                        help="Value to match for the filter field (e.g., AUSTIN ISD)")
+    parser = argparse.ArgumentParser(
+        description="Flatten and optionally filter a districts GeoJSON."
+    )
+    parser.add_argument(
+        "--input",
+        "-i",
+        dest="input_path",
+        required=False,
+        default=DEFAULT_INPUT,
+        help="Path to input GeoJSON",
+    )
+    parser.add_argument(
+        "--output",
+        "-o",
+        dest="output_path",
+        required=False,
+        default=DEFAULT_OUTPUT,
+        help="Path to output GeoJSON",
+    )
+    parser.add_argument(
+        "--filter-field",
+        dest="filter_field",
+        default=DEFAULT_FILTER_FIELD,
+        help="Property field to filter on (e.g., NAME)",
+    )
+    parser.add_argument(
+        "--filter-value",
+        dest="filter_value",
+        default=DEFAULT_FILTER_VALUE,
+        help="Value to match for the filter field (e.g., AUSTIN ISD)",
+    )
 
     args = parser.parse_args()
 
@@ -121,7 +149,9 @@ if __name__ == "__main__":
 
     # 2) Filtered district-only file (e.g., Austin ISD)
     #    If you change DEFAULT_FILTER_FIELD/DEFAULT_FILTER_VALUE above, this will follow.
-    filtered_output = args.output_path.replace(".geojson", f"_{args.filter_value.replace(' ', '_').upper()}.geojson")
+    filtered_output = args.output_path.replace(
+        ".geojson", f"_{args.filter_value.replace(' ', '_').upper()}.geojson"
+    )
     flatten_and_filter_geojson(
         input_path=args.input_path,
         output_path=filtered_output,
