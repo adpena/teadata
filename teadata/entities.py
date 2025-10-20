@@ -357,6 +357,15 @@ class Campus:
                 if k not in out:
                     out[k] = v
 
+        derived_attrs = {
+            "num_charter_transfer_destinations": self.num_charter_transfer_destinations,
+            "num_charter_transfer_destinations_masked": self.num_charter_transfer_destinations_masked,
+            "total_unmasked_charter_transfers_out": self.total_unmasked_charter_transfers_out,
+        }
+        for key, value in derived_attrs.items():
+            if key not in out:
+                out[key] = value
+
         if include_geometry:
             pt = getattr(self, "point", None)
             try:
