@@ -101,22 +101,30 @@ def _apply_district_accountability(
             f"[enrich:{dataset}] canonical district numbers -> valid_rows={valid_rows} unique_keys={unique_keys}"
         )
 
-    if not select:
-        raise ValueError(
-            "district enrichment requires an explicit `select` collection of column names"
-        )
-
-    use_cols = list(select)
-    missing = [c for c in use_cols if c not in df.columns]
-    if missing:
-        if _profile_enabled():
-            _debug(
-                f"[enrich:{dataset}] missing columns after rename: {', '.join(sorted(missing))}"
+    if select is None:
+        use_cols = [c for c in df.columns if c != "district_number"]
+        if not use_cols:
+            if _profile_enabled():
+                _debug(
+                    f"[enrich:{dataset}] abort: no columns available after excluding district_number"
+                )
+            return resolved_year, 0
+    else:
+        use_cols = [c for c in select if c != "district_number"]
+        missing = [c for c in use_cols if c not in df.columns]
+        if missing:
+            if _profile_enabled():
+                _debug(
+                    f"[enrich:{dataset}] missing columns after rename: {', '.join(sorted(missing))}"
+                )
+            raise KeyError(
+                "district enrichment missing expected columns after rename: "
+                + ", ".join(sorted(missing))
             )
-        raise KeyError(
-            "district enrichment missing expected columns after rename: "
-            + ", ".join(sorted(missing))
-        )
+        if not use_cols:
+            raise ValueError(
+                "district enrichment requires a non-empty `select` collection of column names"
+            )
 
     # Basic whitespace/NA cleanup on the value columns
     for c in use_cols:
@@ -193,6 +201,19 @@ def _apply_district_accountability(
                 f"[enrich:{dataset}] sample unmatched district_numbers: {sample_missing}"
             )
 
+    total_repo_districts = updated + missing_no_number + missing_no_match
+    summary_year = resolved_year if resolved_year is not None else year
+    summary_msg = (
+        f"District enrichment '{dataset}' ({summary_year}) updated {updated}"
+        f" of {total_repo_districts} district object(s)."
+    )
+    if missing_no_number or missing_no_match:
+        summary_msg += (
+            " Missing district_number: "
+            f"{missing_no_number}; no matching TAPR row: {missing_no_match}."
+        )
+    print(summary_msg)
+
     return resolved_year, updated
 
 
@@ -213,6 +234,19 @@ class DistrictAccountability(Enricher):
             rename={"2025 Overall Rating": "overall_rating_2025"},
             aliases={"overall_rating_2025": "rating"},
             reader_kwargs={"sheet_name": "2011-2025 Summary"},
+        )
+        return {"updated": updated, "year": year_resolved}
+
+
+@enricher("district_tapr_student_staff_profile")
+class DistrictTaprStudentStaffProfile(Enricher):
+    def apply(self, repo, cfg_path: str, year: int) -> Dict[str, Any]:
+        year_resolved, updated = _apply_district_accountability(
+            repo,
+            cfg_path,
+            "district_tapr_student_staff_profile",
+            year,
+            select=None,
         )
         return {"updated": updated, "year": year_resolved}
 
