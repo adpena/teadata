@@ -4,11 +4,14 @@ import sys
 import warnings
 
 _MINIMUM_PYTHON = (3, 11)
+_REQUIRED_DEPENDENCIES = {
+    "pandas": "2.1",
+    "numpy": "1.26",
+}
+
 _OPTIONAL_DEPENDENCIES = {
     "shapely": "2.0",
     "geopandas": "0.14",
-    "pandas": "2.1",
-    "numpy": "1.26",
 }
 
 if sys.version_info < _MINIMUM_PYTHON:
@@ -21,20 +24,37 @@ def _gte(installed: str, required: str) -> bool:
     return pv.parse(installed) >= pv.parse(required)
 
 
-_missing: list[str] = []
+_required_issues: list[str] = []
+for pkg, minv in _REQUIRED_DEPENDENCIES.items():
+    try:
+        v = version(pkg)
+    except PackageNotFoundError:
+        _required_issues.append(f"{pkg}>={minv} (not installed)")
+        continue
+    if not _gte(v, minv):
+        _required_issues.append(f"{pkg}>={minv} (found {v})")
+
+if _required_issues:
+    raise ImportError(
+        "teadata requires the following dependencies: "
+        + ", ".join(_required_issues)
+    ) from None
+
+
+_optional_issues: list[str] = []
 for pkg, minv in _OPTIONAL_DEPENDENCIES.items():
     try:
         v = version(pkg)
     except PackageNotFoundError:
-        _missing.append(f"{pkg}>={minv} (not installed)")
+        _optional_issues.append(f"{pkg}>={minv} (not installed)")
         continue
     if not _gte(v, minv):
-        _missing.append(f"{pkg}>={minv} (found {v})")
+        _optional_issues.append(f"{pkg}>={minv} (found {v})")
 
-if _missing:
+if _optional_issues:
     warnings.warn(
         "Optional geospatial dependencies are missing or out of date: "
-        + ", ".join(_missing)
+        + ", ".join(_optional_issues)
         + ". Certain geometry features may be unavailable.",
         RuntimeWarning,
         stacklevel=2,
