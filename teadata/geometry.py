@@ -1,4 +1,5 @@
 """Geometry helpers and descriptors used throughout the teadata package."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,7 +7,11 @@ from typing import Any, Iterable, List, Optional, Tuple
 import math
 
 try:
-    from shapely.geometry import MultiPolygon, Point as ShapelyPoint, Polygon as ShapelyPolygon
+    from shapely.geometry import (
+        MultiPolygon,
+        Point as ShapelyPoint,
+        Polygon as ShapelyPolygon,
+    )
 
     SHAPELY = True
 except Exception:  # pragma: no cover - optional dependency
@@ -30,7 +35,9 @@ __all__ = [
 ]
 
 
-def point_in_polygon(point: Tuple[float, float], polygon: List[Tuple[float, float]]) -> bool:
+def point_in_polygon(
+    point: Tuple[float, float], polygon: List[Tuple[float, float]]
+) -> bool:
     """Ray casting algorithm. polygon is list of (x,y), point is (x,y)."""
     x, y = point
     inside = False
@@ -80,7 +87,11 @@ def point_xy(pt: Any) -> Tuple[float, float] | None:
             return (pt.x, pt.y)
         except Exception:  # pragma: no cover - shapely failure path
             pass
-    if isinstance(pt, tuple) and len(pt) == 2 and all(isinstance(v, (int, float)) for v in pt):
+    if (
+        isinstance(pt, tuple)
+        and len(pt) == 2
+        and all(isinstance(v, (int, float)) for v in pt)
+    ):
         return (float(pt[0]), float(pt[1]))
     return None
 
@@ -185,18 +196,16 @@ class GeoField:
             if SHAPELY:
                 if isinstance(value, (ShapelyPolygon, MultiPolygon)):
                     target = value
-                elif (
-                    isinstance(value, list)
-                    and all(isinstance(p, tuple) and len(p) == 2 for p in value)
+                elif isinstance(value, list) and all(
+                    isinstance(p, tuple) and len(p) == 2 for p in value
                 ):
                     try:
                         target = ShapelyPolygon(value)
                     except Exception:  # pragma: no cover - shapely failure path
                         target = None
             else:
-                if (
-                    isinstance(value, list)
-                    and all(isinstance(p, tuple) and len(p) == 2 for p in value)
+                if isinstance(value, list) and all(
+                    isinstance(p, tuple) and len(p) == 2 for p in value
                 ):
                     target = value
 

@@ -76,7 +76,13 @@ try:  # SQLAlchemy 2.0 native UUID type (works across backends)
 except Exception:  # pragma: no cover
     _GenericUUID = None
 
-from ..classes import Campus, DataEngine, District, _coerce_grade_spans, _spans_to_bounds
+from ..classes import (
+    Campus,
+    DataEngine,
+    District,
+    _coerce_grade_spans,
+    _spans_to_bounds,
+)
 
 try:  # Optional Shapely helpers for geometry round-tripping
     from shapely import wkb as _shapely_wkb

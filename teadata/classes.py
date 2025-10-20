@@ -1,4 +1,5 @@
 """Compatibility shims for the refactored teadata package structure."""
+
 from __future__ import annotations
 
 from .engine import (

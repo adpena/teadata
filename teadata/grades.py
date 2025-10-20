@@ -1,4 +1,5 @@
 """Grade range parsing and normalization helpers."""
+
 from __future__ import annotations
 
 from typing import Any, Optional, Tuple
@@ -215,7 +216,7 @@ def normalize_grade_bounds(
 
 
 def spans_to_bounds(
-    spans: Iterable[tuple[Optional[int], Optional[int]]]
+    spans: Iterable[tuple[Optional[int], Optional[int]]],
 ) -> tuple[Optional[int], Optional[int]]:
     low = None
     high = None
@@ -289,9 +290,8 @@ def coerce_grade_spans(
     if isinstance(spec, (list, tuple)):
         if not spec:
             return []
-        if (
-            len(spec) == 2
-            and not any(isinstance(elem, (list, tuple, dict)) for elem in spec)
+        if len(spec) == 2 and not any(
+            isinstance(elem, (list, tuple, dict)) for elem in spec
         ):
             normalized = normalize_grade_bounds(
                 grade_value_to_code(spec[0]), grade_value_to_code(spec[1])
@@ -323,7 +323,9 @@ def coerce_grade_spans(
     return [(code, code)]
 
 
-def coerce_grade_bounds(spec: Any, high: Any | None = None) -> tuple[Optional[int], Optional[int]]:
+def coerce_grade_bounds(
+    spec: Any, high: Any | None = None
+) -> tuple[Optional[int], Optional[int]]:
     spans = coerce_grade_spans(spec, high)
     if not spans:
         return (None, None)

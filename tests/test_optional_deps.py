@@ -18,4 +18,3 @@ def test_import_without_optional_dependencies(monkeypatch):
 
     assert isinstance(reloaded, types.ModuleType)
     assert hasattr(reloaded, "DataEngine")
-

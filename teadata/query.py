@@ -1,4 +1,5 @@
 """Query pipeline utilities and operator dispatch."""
+
 from __future__ import annotations
 
 from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -121,7 +122,9 @@ class Query:
 
     def __getattr__(self, name: str):
         if not self._items:
-            raise AttributeError(f"'Query' object has no attribute '{name}' (empty result set)")
+            raise AttributeError(
+                f"'Query' object has no attribute '{name}' (empty result set)"
+            )
         return getattr(self._items[0], name)
 
     def __getitem__(self, idx: int) -> Any:
@@ -139,12 +142,16 @@ class Query:
     # ------------------------------------------------------------------
     # Serialization helpers
     # ------------------------------------------------------------------
-    def to_dicts(self, *, include_meta: bool = True, include_geometry: bool = False) -> list[dict]:
+    def to_dicts(
+        self, *, include_meta: bool = True, include_geometry: bool = False
+    ) -> list[dict]:
         """Materialize the current query items as a list of dictionaries."""
 
         def _obj_to_basic_dict(obj, *, prefix: str = "") -> dict:
             if hasattr(obj, "to_dict"):
-                d = obj.to_dict(include_meta=include_meta, include_geometry=include_geometry)
+                d = obj.to_dict(
+                    include_meta=include_meta, include_geometry=include_geometry
+                )
             else:
                 try:
                     d = dict(vars(obj))
@@ -252,7 +259,9 @@ class Query:
                 "pandas is required for .to_df(); install pandas to use this feature"
             ) from exc
 
-        data = self.to_dicts(include_meta=include_meta, include_geometry=include_geometry)
+        data = self.to_dicts(
+            include_meta=include_meta, include_geometry=include_geometry
+        )
         df = pd.DataFrame(data)
 
         config_order: Sequence[str] | None = None
@@ -272,13 +281,17 @@ class Query:
 
         order = list(column_order or [])
         if config_order:
-            order = list(config_order) if not order else list(order) + [
-                c for c in config_order if c not in order
-            ]
+            order = (
+                list(config_order)
+                if not order
+                else list(order) + [c for c in config_order if c not in order]
+            )
         if columns:
-            order = list(columns) if not order else list(order) + [
-                c for c in columns if c not in order
-            ]
+            order = (
+                list(columns)
+                if not order
+                else list(order) + [c for c in columns if c not in order]
+            )
         if order:
             cols = [c for c in order if c in df.columns]
             cols += [c for c in df.columns if c not in cols]
@@ -345,7 +358,9 @@ class Query:
         elif len(op) >= 3:
             low, high = coerce_grade_bounds(op[1], op[2])
         else:
-            raise ValueError("grade_overlap requires a grade specification (low[, high])")
+            raise ValueError(
+                "grade_overlap requires a grade specification (low[, high])"
+            )
         if low is None and high is None:
             raise ValueError("grade_overlap received an empty/unknown grade span")
 
@@ -383,7 +398,9 @@ class Query:
         for item in self._items:
             if getattr(item.__class__, "__name__", "") == "District":
                 campuses.extend(self._repo.private_campuses_in(item, max_miles=max_m))
-            elif getattr(item.__class__, "__name__", "") == "Campus" and is_private(item):
+            elif getattr(item.__class__, "__name__", "") == "Campus" and is_private(
+                item
+            ):
                 campuses.append(item)
 
         if max_m is not None and campuses:
@@ -397,7 +414,10 @@ class Query:
                 allowed = allowed_cache.get(did)
                 if allowed is None:
                     allowed = {
-                        c.id for c in self._repo.private_campuses_in(district, max_miles=max_m)
+                        c.id
+                        for c in self._repo.private_campuses_in(
+                            district, max_miles=max_m
+                        )
                     }
                     allowed_cache[did] = allowed
                 if campus.id in allowed:
@@ -407,9 +427,13 @@ class Query:
         self._items = campuses
         return self
 
-    def _resolve_seed_coords(self, op: tuple, *, offset: int = 1) -> Tuple[float, float]:
+    def _resolve_seed_coords(
+        self, op: tuple, *, offset: int = 1
+    ) -> Tuple[float, float]:
         if len(op) <= offset:
-            raise ValueError("operation requires coordinates or a seed item in the chain")
+            raise ValueError(
+                "operation requires coordinates or a seed item in the chain"
+            )
         seed = op[offset]
         seed = unwrap_query(seed)
         if hasattr(seed, "point"):
@@ -502,7 +526,9 @@ class Query:
                 )
             target = seed
         return Query(
-            self._repo.campuses_within(target, charter_only=charter_only, covers=covers),
+            self._repo.campuses_within(
+                target, charter_only=charter_only, covers=covers
+            ),
             self._repo,
         )
 
@@ -620,7 +646,8 @@ _register("knn", Query._op_knn)
 _register("within", Query._op_within)
 _register("nearest_charter_same_type", Query._op_nearest_charter_same_type)
 _register(
-    "nearest_charter_transfer_destination", Query._op_nearest_charter_transfer_destination
+    "nearest_charter_transfer_destination",
+    Query._op_nearest_charter_transfer_destination,
 )
 _register("transfers_out", Query._op_transfers_out)
 _register("transfers_in", Query._op_transfers_in)

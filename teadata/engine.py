@@ -1,4 +1,5 @@
 """Core data engine responsible for snapshot loading and spatial queries."""
+
 from __future__ import annotations
 
 from collections import defaultdict
@@ -127,7 +128,6 @@ def _newest_pickle(folder: Path) -> Optional[Path]:
         if not folder.exists() or not folder.is_dir():
             return None
 
-
         picks = list(folder.glob("*.pkl"))
         if not picks:
             return None
@@ -187,6 +187,7 @@ class _CharterCacheEntry:
 class _CharterCache:
     has_numpy: bool
     entries: Dict[str, _CharterCacheEntry]
+
 
 class DataEngine:
     @staticmethod
@@ -960,9 +961,7 @@ class DataEngine:
                     if len(query) >= 3 and query[2] is not None
                     else None
                 )
-                return Query(
-                    self.private_campuses_in(district, max_miles=max_m), self
-                )
+                return Query(self.private_campuses_in(district, max_miles=max_m), self)
 
             if key == "charters_within":
                 district = unwrap_query(query[1])
@@ -1554,8 +1553,13 @@ class DataEngine:
                 idx = np_mod.atleast_1d(idx)
                 for (lon1, lat1), j, campus in zip(tgt_deg, idx, tgt_list):
                     lon2, lat2 = entry.coords_deg[int(j)]
-                    dm = haversine_miles(float(lon1), float(lat1), float(lon2), float(lat2))
-                    results[str(campus.id)] = {"match": cand_objs[int(j)], "miles": float(dm)}
+                    dm = haversine_miles(
+                        float(lon1), float(lat1), float(lon2), float(lat2)
+                    )
+                    results[str(campus.id)] = {
+                        "match": cand_objs[int(j)],
+                        "miles": float(dm),
+                    }
                 continue
 
             if np_mod is not None:
@@ -1570,10 +1574,18 @@ class DataEngine:
                     lat2r = np_mod.radians(cand_arr[:, 1])
                     dlon = lon2r - lon1r
                     dlat = lat2r - lat1r
-                    a = np_mod.sin(dlat / 2) ** 2 + np_mod.cos(lat1r) * np_mod.cos(lat2r) * np_mod.sin(dlon / 2) ** 2
+                    a = (
+                        np_mod.sin(dlat / 2) ** 2
+                        + np_mod.cos(lat1r)
+                        * np_mod.cos(lat2r)
+                        * np_mod.sin(dlon / 2) ** 2
+                    )
                     miles = R * 2 * np_mod.arctan2(np_mod.sqrt(a), np_mod.sqrt(1 - a))
                     j = int(np_mod.argmin(miles))
-                    results[str(campus.id)] = {"match": cand_objs[j], "miles": float(miles[j])}
+                    results[str(campus.id)] = {
+                        "match": cand_objs[j],
+                        "miles": float(miles[j]),
+                    }
                 continue
 
             cand_list = list(cand_deg)
@@ -1581,7 +1593,9 @@ class DataEngine:
                 best_dm: Optional[float] = None
                 best_obj: Optional[Campus] = None
                 for (lon2, lat2), cand in zip(cand_list, cand_objs):
-                    dm = haversine_miles(float(lon1), float(lat1), float(lon2), float(lat2))
+                    dm = haversine_miles(
+                        float(lon1), float(lat1), float(lon2), float(lat2)
+                    )
                     if best_dm is None or dm < best_dm:
                         best_dm = float(dm)
                         best_obj = cand
@@ -1690,7 +1704,9 @@ class DataEngine:
 
         d = unwrap_query(d)
         if d is None or not hasattr(d, "id"):
-            raise ValueError("private_campuses_in expects a District or a Query[District]")
+            raise ValueError(
+                "private_campuses_in expects a District or a Query[District]"
+            )
 
         campuses = [
             self._campuses[cid]
@@ -1743,7 +1759,9 @@ class DataEngine:
             return []
 
         poly_xy: List[Tuple[float, float]] = []
-        bbox_min_x = bbox_min_y = bbox_max_x = bbox_max_y = None  # type: Optional[float]
+        bbox_min_x = bbox_min_y = bbox_max_x = bbox_max_y = (
+            None
+        )  # type: Optional[float]
         if not SHAPELY or not hasattr(poly, "covers"):
             try:
                 coords = list(poly)

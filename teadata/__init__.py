@@ -12,9 +12,7 @@ _OPTIONAL_DEPENDENCIES = {
 }
 
 if sys.version_info < _MINIMUM_PYTHON:
-    raise RuntimeError(
-        f"Python >= {'.'.join(map(str, _MINIMUM_PYTHON))} is required."
-    )
+    raise RuntimeError(f"Python >= {'.'.join(map(str, _MINIMUM_PYTHON))} is required.")
 
 
 def _gte(installed: str, required: str) -> bool:
