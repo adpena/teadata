@@ -530,6 +530,77 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
         except Exception as e:
             print(f"[charters] add failed: {e}")
 
+        # Inject statewide districts from reference dataset (no geometry)
+        try:
+            cfg_obj = load_config(CFG)
+            ref_year, ref_fp = cfg_obj.resolve(
+                "all_districts_reference", YEAR, section="data_sources"
+            )
+            ref_df = pd.read_excel(ref_fp)
+            added_ref = 0
+            for record in ref_df.to_dict(orient="records"):
+                raw_dn = record.get("Organization  Number")
+                district_number = canonical_district_number(raw_dn)
+                if not district_number:
+                    continue
+
+                lookup_keys: list[str] = [district_number]
+                digits = (
+                    district_number[1:]
+                    if isinstance(district_number, str)
+                    and district_number.startswith("'")
+                    else district_number
+                )
+                lookup_keys.append(digits)
+                if isinstance(digits, str) and digits.isdigit():
+                    lookup_keys.append(str(int(digits)))
+
+                if any(key in dn_to_id for key in lookup_keys if key):
+                    continue
+
+                name = (
+                    record.get("Organization Name")
+                    or record.get("Organization  Name")
+                    or record.get("Organization")
+                    or (str(raw_dn).strip() if raw_dn else None)
+                    or "Unnamed District"
+                )
+
+                enrollment_val = record.get("Enrollment as of Oct 2024")
+                enrollment = 0
+                if isinstance(enrollment_val, (int, float)) and not pd.isna(enrollment_val):
+                    try:
+                        enrollment = int(float(enrollment_val))
+                    except (TypeError, ValueError):
+                        enrollment = 0
+                elif isinstance(enrollment_val, str):
+                    cleaned = enrollment_val.replace(",", "").strip()
+                    if cleaned:
+                        try:
+                            enrollment = int(float(cleaned))
+                        except ValueError:
+                            enrollment = 0
+
+                district = District(
+                    id=uuid.uuid4(),
+                    name=name,
+                    enrollment=enrollment,
+                    boundary=None,
+                )
+                district.district_number = district_number
+                repo.add_district(district)
+                for key in lookup_keys:
+                    if key:
+                        dn_to_id[key] = district.id
+                added_ref += 1
+
+            if added_ref:
+                print(
+                    f"[districts_ref] added {added_ref} statewide districts from reference {ref_year}"
+                )
+        except Exception as e:
+            print(f"[districts_ref] add failed: {e}")
+
         # Add default fallback District object
         fallback_district = District(
             id=uuid.uuid4(),
