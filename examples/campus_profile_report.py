@@ -35,7 +35,7 @@ BASE_COLUMNS = [
 def build_campus_summary() -> pd.DataFrame:
     repo = DataEngine.from_snapshot(search=True)
 
-    campus_df = repo.campuses.to_df()
+    campus_df = repo.campuses.to_df(include_geometry=True)
     district_df = repo.districts.to_df()[["id", "name"]].rename(
         columns={"id": "district_id_merge", "name": "district_name"}
     )
@@ -113,15 +113,13 @@ def add_county_from_geometry(
     # Determine or construct campus geometry (assumed WGS84 lon/lat).
     geom_col = None
     temp_geom_built = False
-    if "location" in campus_df.columns.str.lower():
-        # Find the exact-cased column named 'geometry'
-        for c in campus_df.columns:
-            if c.lower() == "location":
-                geom_col = c
-                break
-            elif c.lower() == "coords":
-                geom_col = c
-                break
+    lower_name_map = {c.lower(): c for c in campus_df.columns}
+
+    # Prefer explicit geometry columns that may already contain shapely Points.
+    for key in ("geometry", "geometry_point", "point", "location", "coords"):
+        if key in lower_name_map:
+            geom_col = lower_name_map[key]
+            break
 
     if geom_col is None:
         # Try common latitude/longitude column pairs
@@ -147,6 +145,21 @@ def add_county_from_geometry(
             geom_col = "_tmp_geom"
             temp_geom_built = True
 
+    elif geom_col == lower_name_map.get("geometry_point"):
+        # Geometry provided as (lon, lat) tuples from the repository snapshot.
+        campus_df = campus_df.copy()
+        campus_df["_tmp_geom"] = [
+            Point(float(coords[0]), float(coords[1]))
+            if isinstance(coords, (tuple, list))
+            and len(coords) == 2
+            and pd.notna(coords[0])
+            and pd.notna(coords[1])
+            else None
+            for coords in campus_df[geom_col]
+        ]
+        geom_col = "_tmp_geom"
+        temp_geom_built = True
+
     if geom_col is None:
         # No geometry available — return with County as NA
         campus_df = campus_df.copy()
@@ -160,7 +173,16 @@ def add_county_from_geometry(
     try:
         counties = gpd.read_file(counties_path)
     except Exception:
-        counties = gpd.read_file("/Users/adpena/PycharmProjects/teadata/teadata/data/shapes/Texas_County_Boundaries_Detailed_7317697762830183947.geojson")
+        try:
+            counties = gpd.read_file(
+                "/mnt/data/Texas_County_Boundaries_Detailed_7317697762830183947.geojson"
+            )
+        except Exception:
+            campus_df = campus_df.copy()
+            campus_df["County"] = pd.NA
+            if temp_geom_built:
+                campus_df = campus_df.drop(columns=[geom_col], errors="ignore")
+            return campus_df
 
     # Ensure CRS alignment
     if counties.crs is None:
