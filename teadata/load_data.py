@@ -771,6 +771,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                     getattr(row, "USER_Charter_Type", "")
                     in ["OPEN ENROLLMENT CHARTER", "COLLEGE/UNIVERSITY CHARTER"]
                 ),
+                is_magnet=getattr(row, "USER_Magnet_Status", None),
                 location=getattr(row, "geometry"),
             )
             repo.add_campus(c)

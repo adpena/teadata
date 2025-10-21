@@ -22,6 +22,7 @@ BASE_COLUMNS = [
     "governance_type",
     "grade_levels_served",
     "school_type_label",
+    "is_magnet",
     "rating_2025",
     "pct_econ_disadv",
     "pct_special_ed",
@@ -73,6 +74,9 @@ def build_campus_summary() -> pd.DataFrame:
     campus_df["governance_type"] = campus_df["is_charter"].map(
         {True: "Charter", False: "District"}
     )
+
+    if "is_magnet" not in campus_df.columns:
+        campus_df["is_magnet"] = pd.NA
 
     numeric_cols = [
         "pct_econ_disadv",
@@ -252,6 +256,7 @@ if __name__ == "__main__":
         "governance_type": "District/Charter",
         "grade_levels_served": "Grades Served",
         "school_type_label": "School Type",
+        "is_magnet": "Is Magnet",
         "rating_2025": "2025 Overall Rating",
         "pct_econ_disadv": "2023-24 % Economically Disadvantaged",
         "pct_special_ed": "2023-24 % Special Education",

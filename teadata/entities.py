@@ -244,6 +244,7 @@ class Campus:
     charter_type: str
     is_charter: bool
     is_private: bool = False
+    is_magnet: Optional[str] = None
     enrollment: Optional[int] = None
     rating: Optional[str] = None
 
@@ -342,6 +343,7 @@ class Campus:
             "charter_type": self.charter_type,
             "is_charter": bool(self.is_charter),
             "is_private": bool(self.is_private),
+            "is_magnet": self.is_magnet,
             "enrollment": self.enrollment,
             "rating": self.rating,
             "aea": self.aea,
