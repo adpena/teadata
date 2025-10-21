@@ -55,6 +55,34 @@ def parse_date(val: Optional[str]) -> Optional[date]:
     raise ValueError(f"Unrecognized date format: {val}")
 
 
+def _district_lookup_keys(district_number: Optional[str]) -> list[str]:
+    """Return canonical lookup aliases for a district number."""
+
+    if not district_number:
+        return []
+
+    keys: list[str] = []
+    primary = str(district_number)
+    if primary:
+        keys.append(primary)
+
+    digits = (
+        primary[1:]
+        if isinstance(primary, str) and primary.startswith("'") and len(primary) > 1
+        else primary
+    )
+
+    if digits and digits not in keys:
+        keys.append(digits)
+
+    if isinstance(digits, str) and digits.isdigit():
+        normalized = str(int(digits))
+        if normalized not in keys:
+            keys.append(normalized)
+
+    return keys
+
+
 def _first_existing_dataset(cfg, candidates: list[str]) -> str | None:
     for name in candidates:
         try:
@@ -496,17 +524,9 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
             # Attach normalized ID as extra attribute
             d.district_number = district_number
             repo.add_district(d)
-            if district_number:
-                dn_to_id[district_number] = d.id
-                digits = (
-                    district_number[1:]
-                    if isinstance(district_number, str)
-                    and district_number.startswith("'")
-                    else district_number
-                )
-                dn_to_id[digits] = d.id
-                if isinstance(digits, str) and digits.isdigit():
-                    dn_to_id[str(int(digits))] = d.id
+            for key in _district_lookup_keys(district_number):
+                if key:
+                    dn_to_id[key] = d.id
 
         # Inject statewide charter networks (and others with no geometry) from config, if provided
         try:
@@ -515,16 +535,9 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                 # refresh the mapping used for campus linking
                 refreshed: dict[str, uuid.UUID] = {}
                 for d in repo._districts.values():
-                    key = getattr(d, "district_number", None)
-                    if not key:
-                        continue
-                    refreshed[key] = d.id
-                    digits = (
-                        key[1:] if isinstance(key, str) and key.startswith("'") else key
-                    )
-                    refreshed[digits] = d.id
-                    if isinstance(digits, str) and digits.isdigit():
-                        refreshed[str(int(digits))] = d.id
+                    for key in _district_lookup_keys(getattr(d, "district_number", None)):
+                        if key:
+                            refreshed[key] = d.id
                 dn_to_id = refreshed
                 print(f"[charters] added {charter_networks} statewide districts")
         except Exception as e:
@@ -544,16 +557,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                 if not district_number:
                     continue
 
-                lookup_keys: list[str] = [district_number]
-                digits = (
-                    district_number[1:]
-                    if isinstance(district_number, str)
-                    and district_number.startswith("'")
-                    else district_number
-                )
-                lookup_keys.append(digits)
-                if isinstance(digits, str) and digits.isdigit():
-                    lookup_keys.append(str(int(digits)))
+                lookup_keys = _district_lookup_keys(district_number)
 
                 if any(key in dn_to_id for key in lookup_keys if key):
                     continue
@@ -568,9 +572,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
 
                 enrollment_val = record.get("Enrollment as of Oct 2024")
                 enrollment = 0
-                if isinstance(enrollment_val, (int, float)) and not pd.isna(
-                    enrollment_val
-                ):
+                if isinstance(enrollment_val, (int, float)) and not pd.isna(enrollment_val):
                     try:
                         enrollment = int(float(enrollment_val))
                     except (TypeError, ValueError):
@@ -603,6 +605,50 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
         except Exception as e:
             print(f"[districts_ref] add failed: {e}")
 
+        # Inject statewide districts from second reference dataset (no geometry)
+        try:
+            cfg_obj = load_config(CFG)
+            ref2_year, ref2_fp = cfg_obj.resolve(
+                "all_districts_reference2", YEAR, section="data_sources"
+            )
+            ref2_df = pd.read_excel(ref2_fp)
+            added_ref2 = 0
+            for record in ref2_df.to_dict(orient="records"):
+                raw_dn = record.get("DISTRICT")
+                district_number = canonical_district_number(raw_dn)
+                if not district_number:
+                    continue
+
+                lookup_keys = _district_lookup_keys(district_number)
+                if any(key in dn_to_id for key in lookup_keys if key):
+                    continue
+
+                name = (
+                    record.get("DISTNAME")
+                    or (str(raw_dn).strip() if raw_dn else None)
+                    or "Unnamed District"
+                )
+
+                district = District(
+                    id=uuid.uuid4(),
+                    name=name,
+                    enrollment=0,
+                    boundary=None,
+                )
+                district.district_number = district_number
+                repo.add_district(district)
+                for key in lookup_keys:
+                    if key:
+                        dn_to_id[key] = district.id
+                added_ref2 += 1
+
+            if added_ref2:
+                print(
+                    f"[districts_ref2] added {added_ref2} statewide districts from reference {ref2_year}"
+                )
+        except Exception as e:
+            print(f"[districts_ref2] add failed: {e}")
+
         # Add default fallback District object
         fallback_district = District(
             id=uuid.uuid4(),
@@ -618,22 +664,21 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
         fallback_id = fallback_district.id
 
         # Campuses
-        for row in gdf_campuses.itertuples(index=False):
-            raw_district = getattr(row, "USER_District_Number")
-            district_key = canonical_district_number(raw_district)
-            lookup_keys = []
-            if district_key:
-                lookup_keys.append(district_key)
-                digits = district_key[1:]
-                lookup_keys.append(digits)
-                if digits.isdigit():
-                    lookup_keys.append(str(int(digits)))
-            elif raw_district:
-                lookup_keys.append(str(raw_district).strip())
+            for row in gdf_campuses.itertuples(index=False):
+                raw_district = getattr(row, "USER_District_Number")
+                district_key = canonical_district_number(raw_district)
+                lookup_keys = _district_lookup_keys(district_key)
+                if raw_district:
+                    raw_str = str(raw_district).strip()
+                    if raw_str:
+                        raw_aliases = _district_lookup_keys(raw_str) or [raw_str]
+                        for key in raw_aliases:
+                            if key and key not in lookup_keys:
+                                lookup_keys.append(key)
 
-            district_id = next(
-                (dn_to_id.get(k) for k in lookup_keys if k in dn_to_id), None
-            )
+                district_id = next(
+                    (dn_to_id.get(k) for k in lookup_keys if k in dn_to_id), None
+                )
             if district_id is None:
                 district_id = fallback_id
 
