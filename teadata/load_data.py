@@ -508,7 +508,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                 if isinstance(digits, str) and digits.isdigit():
                     dn_to_id[str(int(digits))] = d.id
 
-        # Inject statewide charter networks (no geometry) from config, if provided
+        # Inject statewide charter networks (and others with no geometry) from config, if provided
         try:
             charter_networks = add_charter_networks_from_config(repo, CFG, YEAR)
             if charter_networks:
