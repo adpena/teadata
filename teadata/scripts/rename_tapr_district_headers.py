@@ -90,9 +90,7 @@ def main():
     # Desired columns (sanitized identifiers)
     cols_sanitized = [
         "district_number",
-
         "district_2024_student_enrollment_all_students_count",
-
         "district_2024_student_enrollment_african_american_percent",
         "district_2024_student_enrollment_hispanic_percent",
         "district_2024_student_enrollment_white_percent",
@@ -100,7 +98,6 @@ def main():
         "district_2024_student_enrollment_asian_percent",
         "district_2024_student_enrollment_pacific_islander_percent",
         "district_2024_student_enrollment_two_or_more_races_percent",
-
         "district_2024_student_enrollment_econ_disadv_percent",
         "district_2024_student_enrollment_non_educationally_disadv_percent",
         "district_2024_student_enrollment_section_504_percent",
@@ -115,35 +112,27 @@ def main():
         "district_2024_student_enrollment_bilingual_esl_percent",
         "district_2024_student_enrollment_gifted_and_talented_percent",
         "district_2024_student_enrollment_special_ed_percent",
-
         "district_2023_daep_percent",
-
         "district_2024_student_membership_2022_23_attrition_all_students_percent",
-
         "district_2024_student_membership_2023_mobility_all_students_percent",
-
         "district_2024_staff_teacher_total_full_time_equiv_count",
         "district_2024_staff_support_total_full_time_equiv_count",
         "district_2024_staff_school_admin_total_full_time_equiv_count",
         "district_2024_staff_central_admin_total_full_time_equiv_count",
         "district_2024_staff_educ_aide_total_full_time_equiv_count",
         "district_2024_staff_ssa_educational_aides_full_time_equiv_count",
-
         "district_2024_staff_counselor_total_part_time_equiv_count",
         "district_2024_staff_counselor_total_full_time_equiv_count",
         "district_2024_staff_librarian_total_part_time_equiv_count",
         "district_2024_staff_librarian_total_full_time_equiv_count",
-
         "district_2024_staff_teacher_regular_program_full_time_equiv_count",
         "district_2024_staff_teacher_career_and_technical_prgms_full_time_equiv_count",
         "district_2024_staff_teacher_bilingual_program_full_time_equiv_count",
         "district_2024_staff_teacher_special_education_full_time_equiv_count",
-
         "district_2024_staff_teacher_turnover_ratio",
         "district_2024_staff_teacher_tenure_average",
         "district_2024_staff_teacher_experience_average",
         "district_2024_staff_teacher_student_ratio",
-
         "district_2024_staff_professional_total_full_time_equiv_percent",
         "district_2024_staff_teacher_total_full_time_equiv_percent",
         "district_2024_staff_support_total_full_time_equiv_percent",
@@ -151,31 +140,26 @@ def main():
         "district_2024_staff_central_admin_total_full_time_equiv_percent",
         "district_2024_staff_educ_aide_total_full_time_equiv_percent",
         "district_2024_staff_auxiliary_total_full_time_equiv_percent",
-
         "district_2024_staff_teacher_no_degree_full_time_equiv_percent",
         "district_2024_staff_teacher_ba_degree_full_time_equiv_percent",
         "district_2024_staff_teacher_ms_degree_full_time_equiv_percent",
         "district_2024_staff_teacher_ph_degree_full_time_equiv_percent",
-
         "district_2024_staff_teacher_beginning_full_time_equiv_percent",
         "district_2024_staff_teacher_1_5_years_full_time_equiv_percent",
         "district_2024_staff_teacher_6_10_years_full_time_equiv_percent",
         "district_2024_staff_teacher_11_20_years_full_time_equiv_percent",
         "district_2024_staff_teacher_21_30_years_full_time_equiv_percent",
         "district_2024_staff_teacher_gt_30_years_full_time_equiv_percent",
-
         "district_2024_staff_teacher_regular_program_full_time_equiv_percent",
         "district_2024_staff_teacher_career_and_technical_prgms_full_time_equiv_percent",
         "district_2024_staff_teacher_bilingual_program_full_time_equiv_percent",
         "district_2024_staff_teacher_special_education_full_time_equiv_percent",
-
         "district_2024_staff_teacher_beginning_base_salary_average",
         "district_2024_staff_teacher_1_5_years_base_salary_average",
         "district_2024_staff_teacher_6_10_years_base_salary_average",
         "district_2024_staff_teacher_11_20_years_base_salary_average",
         "district_2024_staff_teacher_21_30_years_base_salary_average",
         "district_2024_staff_teacher_gt_30_years_base_salary_average",
-
         "district_2024_staff_teacher_total_base_salary_average",
         "district_2024_staff_support_total_base_salary_average",
         "district_2024_staff_school_admin_total_base_salary_average",
@@ -207,13 +191,23 @@ def main():
                 desired = [c for c in cols_sanitized if c in tapr_df.columns]
             else:
                 desired = [c for c in cols_labels if c in tapr_df.columns]
-            missing = [c for c in (cols_labels if not _are_cols_sanitized(list(tapr_df.columns)) else cols_sanitized) if c not in tapr_df.columns]
+            missing = [
+                c
+                for c in (
+                    cols_labels
+                    if not _are_cols_sanitized(list(tapr_df.columns))
+                    else cols_sanitized
+                )
+                if c not in tapr_df.columns
+            ]
             if missing:
                 print("Warning: missing expected columns:", missing)
             tapr_df = tapr_df[desired]
         # Finally, restore human-friendly Labels if headers are sanitized
         if _are_cols_sanitized(list(tapr_df.columns)):
-            tapr_df.columns = restore_labels_from_reference(list(tapr_df.columns), tapr_reference_df)
+            tapr_df.columns = restore_labels_from_reference(
+                list(tapr_df.columns), tapr_reference_df
+            )
         pprint(list(tapr_df.columns))
         tapr_df.to_excel(OUTPUT_FILE, index=False)
 

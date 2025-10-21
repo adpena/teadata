@@ -53,7 +53,7 @@ data_sources:
     2025: data/all_districts_reference/ALL_DISTRICTS_ACTIVE.xlsx
     latest: 2025
   all_districts_reference2:
-    2025: data/all_districts_reference/ALL_DISTRICTS_ACTIVE_v2.xlsx
+    2025: data/all_districts_reference/DREF.xlsx
     latest: 2025
 
 spatial:
