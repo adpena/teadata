@@ -156,11 +156,11 @@ def add_county_from_geometry(
     # Promote to GeoDataFrame
     gcamp = gpd.GeoDataFrame(campus_df.copy(), geometry=campus_df[geom_col], crs="EPSG:4326")
 
-    # Read counties; fall back to /mnt/data path if the project-relative path isn't found.
+    # Read counties; fall back to data path if the project-relative path isn't found.
     try:
         counties = gpd.read_file(counties_path)
     except Exception:
-        counties = gpd.read_file("/mnt/data/Texas_County_Boundaries_Detailed_7317697762830183947.geojson")
+        counties = gpd.read_file("/Users/adpena/PycharmProjects/teadata/teadata/data/shapes/Texas_County_Boundaries_Detailed_7317697762830183947.geojson")
 
     # Ensure CRS alignment
     if counties.crs is None:
