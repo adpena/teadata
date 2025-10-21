@@ -728,21 +728,21 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
         fallback_id = fallback_district.id
 
         # Campuses
-            for row in gdf_campuses.itertuples(index=False):
-                raw_district = getattr(row, "USER_District_Number")
-                district_key = canonical_district_number(raw_district)
-                lookup_keys = _district_lookup_keys(district_key)
-                if raw_district:
-                    raw_str = str(raw_district).strip()
-                    if raw_str:
-                        raw_aliases = _district_lookup_keys(raw_str) or [raw_str]
-                        for key in raw_aliases:
-                            if key and key not in lookup_keys:
-                                lookup_keys.append(key)
+        for row in gdf_campuses.itertuples(index=False):
+            raw_district = getattr(row, "USER_District_Number")
+            district_key = canonical_district_number(raw_district)
+            lookup_keys = _district_lookup_keys(district_key)
+            if raw_district:
+                raw_str = str(raw_district).strip()
+                if raw_str:
+                    raw_aliases = _district_lookup_keys(raw_str) or [raw_str]
+                    for key in raw_aliases:
+                        if key and key not in lookup_keys:
+                            lookup_keys.append(key)
 
-                district_id = next(
-                    (dn_to_id.get(k) for k in lookup_keys if k in dn_to_id), None
-                )
+            district_id = next(
+                (dn_to_id.get(k) for k in lookup_keys if k in dn_to_id), None
+            )
             if district_id is None:
                 district_id = fallback_id
 
