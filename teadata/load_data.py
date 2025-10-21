@@ -10,7 +10,7 @@ import os
 import shutil
 
 from datetime import datetime, date
-from typing import Optional
+from typing import Any, Iterable, Mapping, Optional
 
 from teadata import classes as _classes_mod
 from teadata import teadata_config as _cfg_mod
@@ -37,6 +37,70 @@ DISABLE_CACHE = os.getenv("TEADATA_DISABLE_CACHE", "0") not in (
     "False",
     None,
 )
+
+
+_STATEWIDE_DISTRICT_NUMBER_ALIASES: list[str] = [
+    "Organization  Number",
+    "Organization Number",
+    "OrganizationNumber",
+    "Organization #",
+    "Organization ID",
+    "Organization Id",
+    "OrganizationID",
+    "Organization Code",
+    "OrganizationCode",
+]
+
+for _alias in _cfg_mod._DEFAULT_DISTRICT_ALIASES:
+    if _alias not in _STATEWIDE_DISTRICT_NUMBER_ALIASES:
+        _STATEWIDE_DISTRICT_NUMBER_ALIASES.append(_alias)
+
+
+def _record_value_is_missing(value: Any) -> bool:
+    if value is None:
+        return True
+    if isinstance(value, str):
+        return not value.strip()
+    try:
+        if pd.isna(value):
+            return True
+    except TypeError:
+        pass
+    return False
+
+
+def _get_record_value(record: Mapping[str, Any], aliases: Iterable[str]) -> Any:
+    for alias in aliases:
+        value = record.get(alias)
+        if not _record_value_is_missing(value):
+            return value
+
+    lower_map: dict[str, str] = {}
+    normalized_map: dict[str, str] = {}
+    for key in record.keys():
+        if not isinstance(key, str):
+            continue
+        lower_map.setdefault(key.lower(), key)
+        normalized_map.setdefault(" ".join(key.split()).lower(), key)
+
+    for alias in aliases:
+        key = lower_map.get(alias.lower())
+        if key is None:
+            continue
+        value = record.get(key)
+        if not _record_value_is_missing(value):
+            return value
+
+    for alias in aliases:
+        normalized_alias = " ".join(alias.split()).lower()
+        key = normalized_map.get(normalized_alias)
+        if key is None:
+            continue
+        value = record.get(key)
+        if not _record_value_is_missing(value):
+            return value
+
+    return None
 
 
 def parse_date(val: Optional[str]) -> Optional[date]:
@@ -539,7 +603,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
             ref_df = pd.read_excel(ref_fp)
             added_ref = 0
             for record in ref_df.to_dict(orient="records"):
-                raw_dn = record.get("Organization  Number")
+                raw_dn = _get_record_value(record, _STATEWIDE_DISTRICT_NUMBER_ALIASES)
                 district_number = canonical_district_number(raw_dn)
                 if not district_number:
                     continue
