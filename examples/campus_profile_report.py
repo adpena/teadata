@@ -37,6 +37,11 @@ def build_campus_summary() -> pd.DataFrame:
     repo = DataEngine.from_snapshot(search=True)
 
     campus_df = repo.campuses.to_df(include_geometry=True)
+
+    # Exclude private campuses
+    if "is_private" in campus_df.columns:
+        campus_df = campus_df[~campus_df["is_private"].fillna(False)]
+
     district_df = repo.districts.to_df()[["id", "name"]].rename(
         columns={"id": "district_id_merge", "name": "district_name"}
     )
