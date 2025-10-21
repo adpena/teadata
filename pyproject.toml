@@ -78,6 +78,8 @@ database = [
 scripts = [
     "requests>=2.31",
     "tqdm>=4.66",
+    "geopy>=2.4",
+    "aiohttp>=3.9",
 ]
 
 [project.scripts]
@@ -129,6 +131,7 @@ DEP002 = [
     "ipyleaflet",
     "itables",
     "google-auth",
+    "psycopg",
 ]
 DEP003 = [
     "scipy",
