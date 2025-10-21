@@ -22,11 +22,11 @@ from restyle_existing_excel import style_existing_excel
 RUN_CONFIG: dict[str, object] = {
     # Set to a float such as 75 to require a minimum percent economically
     # disadvantaged. Leave as None to include all campuses.
-    "min_pct_econ_disadv": None,
+    "min_pct_econ_disadv": 75,
     # Choose from "ab"/"high" (A or B campuses) or "df"/"low" (D or F campuses).
     # You may also provide a list like ["ab", "df"] or leave as None to disable
     # rating-based filtering.
-    "rating_filter": None,
+    "rating_filter": "low",
 }
 
 
