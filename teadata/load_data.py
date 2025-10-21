@@ -599,7 +599,9 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                 # refresh the mapping used for campus linking
                 refreshed: dict[str, uuid.UUID] = {}
                 for d in repo._districts.values():
-                    for key in _district_lookup_keys(getattr(d, "district_number", None)):
+                    for key in _district_lookup_keys(
+                        getattr(d, "district_number", None)
+                    ):
                         if key:
                             refreshed[key] = d.id
                 dn_to_id = refreshed
@@ -636,7 +638,9 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
 
                 enrollment_val = record.get("Enrollment as of Oct 2024")
                 enrollment = 0
-                if isinstance(enrollment_val, (int, float)) and not pd.isna(enrollment_val):
+                if isinstance(enrollment_val, (int, float)) and not pd.isna(
+                    enrollment_val
+                ):
                     try:
                         enrollment = int(float(enrollment_val))
                     except (TypeError, ValueError):
