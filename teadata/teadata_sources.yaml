@@ -52,6 +52,9 @@ data_sources:
   all_districts_reference:
     2025: data/all_districts_reference/ALL_DISTRICTS_ACTIVE.xlsx
     latest: 2025
+  all_districts_reference2:
+    2025: data/all_districts_reference/DREF.xlsx
+    latest: 2025
 
 spatial:
   districts:
@@ -76,6 +79,7 @@ schema:
     private_schools: ["csv"]
     tepsac: ["csv"]
     all_districts_reference: ["xlsx"]
+    all_districts_reference2: ["xlsx"]
   spatial:
     districts: ["geojson","gpkg","parquet"]
     campuses: ["geojson","gpkg","parquet"]
