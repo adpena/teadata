@@ -355,6 +355,7 @@ class DataEngine:
             charter_type = v.get("charter_type")
             is_charter = v.get("is_charter")
             is_private = v.get("is_private", False)
+            is_magnet = v.get("is_magnet")
             rating = v.get("rating")
             aea = v.get("aea")
             grade_range = v.get("grade_range")
@@ -374,6 +375,7 @@ class DataEngine:
                 charter_type=charter_type,
                 is_charter=is_charter,
                 is_private=is_private,
+                is_magnet=is_magnet,
                 rating=rating,
                 aea=aea,
                 grade_range=grade_range,
@@ -409,6 +411,7 @@ class DataEngine:
         charter_type = getattr(v, "charter_type", None)
         is_charter = getattr(v, "is_charter", None)
         is_private = getattr(v, "is_private", False)
+        is_magnet = getattr(v, "is_magnet", None)
         rating = getattr(v, "rating", None)
         aea = getattr(v, "aea", None)
         grade_range = getattr(v, "grade_range", None)
@@ -430,6 +433,7 @@ class DataEngine:
             charter_type=charter_type,
             is_charter=is_charter,
             is_private=is_private,
+            is_magnet=is_magnet,
             rating=rating,
             aea=aea,
             grade_range=grade_range,
