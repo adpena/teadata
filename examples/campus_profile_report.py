@@ -11,12 +11,14 @@ import pandas as pd
 
 from teadata import DataEngine
 
+from restyle_existing_excel import style_existing_excel
+
 
 BASE_COLUMNS = [
     "campus_id",
     "campus_name",
     "district_name",
-    "county_code",
+    "county",
     "governance_type",
     "grade_levels_served",
     "school_type_label",
@@ -28,7 +30,6 @@ BASE_COLUMNS = [
     "pct_at_risk",
     "pct_emergent_bilingual",
     "pct_beginning_teachers",
-    "County",
 ]
 
 
@@ -66,9 +67,6 @@ def build_campus_summary() -> pd.DataFrame:
 
     campus_df["governance_type"] = campus_df["is_charter"].map(
         {True: "Charter", False: "District"}
-    )
-    campus_df["county_code"] = (
-        campus_df["district_number"].str.replace("'", "", regex=False).str[:3]
     )
 
     numeric_cols = [
@@ -163,7 +161,7 @@ def add_county_from_geometry(
     if geom_col is None:
         # No geometry available — return with County as NA
         campus_df = campus_df.copy()
-        campus_df["County"] = pd.NA
+        campus_df["county"] = pd.NA
         return campus_df
 
     # Promote to GeoDataFrame
@@ -175,11 +173,11 @@ def add_county_from_geometry(
     except Exception:
         try:
             counties = gpd.read_file(
-                "/mnt/data/Texas_County_Boundaries_Detailed_7317697762830183947.geojson"
+                "/Users/adpena/PycharmProjects/teadata/teadata/data/shapes/Texas_County_Boundaries_Detailed_7317697762830183947.geojson"
             )
         except Exception:
             campus_df = campus_df.copy()
-            campus_df["County"] = pd.NA
+            campus_df["county"] = pd.NA
             if temp_geom_built:
                 campus_df = campus_df.drop(columns=[geom_col], errors="ignore")
             return campus_df
@@ -212,9 +210,9 @@ def add_county_from_geometry(
 
     # Write the unified 'County' and optional 'county_fips'
     if county_name_col:
-        joined["County"] = joined[county_name_col]
+        joined["county"] = joined[county_name_col]
     else:
-        joined["County"] = pd.NA
+        joined["county"] = pd.NA
     if county_fips_col and "county_fips" not in joined.columns:
         joined["county_fips"] = joined[county_fips_col]
 
@@ -240,7 +238,48 @@ if __name__ == "__main__":
     campus_summary = build_campus_summary()
     district_tab, charter_tab = split_by_governance(campus_summary)
 
+    # Rename columns for output readability
+    rename_map = {
+        "campus_id": "Campus Number",
+        "campus_name": "Campus Name",
+        "district_name": "District Name",
+        "county": "County",
+        "governance_type": "District/Charter",
+        "grade_levels_served": "Grades Served",
+        "school_type_label": "School Type",
+        "rating_2025": "2025 Overall Rating",
+        "pct_econ_disadv": "2023-24 % Economically Disadvantaged",
+        "pct_special_ed": "2023-24 % Special Education",
+        "pct_at_risk": "2023-24 % At-Risk",
+        "pct_emergent_bilingual": "2023-24 % Emergent Bilingual (EL)",
+        "pct_beginning_teachers": "2023-24 % Beginning Teachers",
+        "pct_attrition": "2023-24 % Attrition (2022-23)",
+        "pct_mobility": "2023-24 % Mobility (2023)",
+    }
+
+    # Apply renaming and enforce the order
+    district_tab = district_tab.rename(columns=rename_map)[[rename_map[c] for c in BASE_COLUMNS]]
+    charter_tab = charter_tab.rename(columns=rename_map)[[rename_map[c] for c in BASE_COLUMNS]]
+
+    # ✅ Sort by District Name then Campus Name
+    district_tab = district_tab.sort_values(by=["District Name", "Campus Name"], ascending=[True, True])
+    charter_tab = charter_tab.sort_values(by=["District Name", "Campus Name"], ascending=[True, True])
+
     district_tab.to_excel("campus_stats_district.xlsx", index=False)
     charter_tab.to_excel("campus_stats_charter.xlsx", index=False)
 
     print("Wrote campus_stats_district.xlsx and campus_stats_charter.xlsx")
+
+    style_existing_excel(
+        "campus_stats_district.xlsx",  # use the same absolute path we just wrote
+        sheet_name="Sheet1",
+        table_style="TableStyleMedium2",
+        open_after=False,
+    )
+
+    style_existing_excel(
+        "campus_stats_charter.xlsx",  # use the same absolute path we just wrote
+        sheet_name="Sheet1",
+        table_style="TableStyleMedium2",
+        open_after=False,
+    )

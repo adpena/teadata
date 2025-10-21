@@ -15,141 +15,6 @@ from pathlib import Path
 pd.set_option("display.max_rows", None)
 pd.set_option("display.max_columns", None)
 
-# Enter the district name or district number of the school district you wish to analyze
-DISTRICT_NAME = "Austin ISD"
-
-# Instantiate DataEngine object, a layer over the District and Campus objects
-repo = DataEngine.from_snapshot(search=True)
-
-# Inspect how many objects are loaded
-print(
-    f"Loaded {len(repo.districts)} districts/charters and {len(repo.campuses)} campuses"
-)
-
-# Select a district using either the district name (case insensitive) or district number (any format works - integer and string with or without a leading apostrophe are both acceptable)
-district = (repo >> ("district", DISTRICT_NAME)).first()
-print("Example district:", district.name, district.district_number)
-
-rows = (
-    repo
-    >> ("campuses_in", district)
-    >> ("where", lambda x: (x.enrollment or 0) > 0)
-    >> ("where", lambda x: x.facing_closure is True)
-    >> ("sort", lambda x: x.name or "", False)
-    # >> ("take", 5)
-    # >> ("transfers_out", True)  # Option 1: charter_only=True (excludes private schools)
-    >> (
-        "nearest_charter_transfer_destination",
-    )  # yields list of (campus, match, miles)
-)
-
-for closure_campus in rows:
-    match = closure_campus[1]
-    distance = closure_campus[2]
-    closure_campus = closure_campus[0]
-
-    print(
-        closure_campus.campus_number,
-        closure_campus.name,
-        closure_campus.enrollment,
-        closure_campus.rating,
-        closure_campus.aea,
-        closure_campus.grade_range,
-    )
-
-df = rows.to_df()
-
-# pprint(list(df.columns))
-
-cols = {
-    "campus_number": "Campus Number",
-    "name": "Campus Name",
-    "enrollment": "Enrollment as of Oct 2024",
-    "overall_rating_2025": "2025 Overall Rating",
-    "aea": "AEA",
-    "grade_range": "Grade Range",
-    "is_private": "Is Private Campus",
-    "percent_enrollment_change": "2014-15 to 2024-2025 Percent Enrollment Change",
-    "num_charter_transfer_destinations": "Number of Charter Campuses Receiving Student Transfers - TOTAL",
-    "num_charter_transfer_destinations_masked": "Number of Charter Campuses Receiving Student Transfers - MASKED",
-    "total_unmasked_charter_transfers_out": "Total Unmasked Charter Transfers Out",
-    "closure_date": "Proposed Closure Date",
-    "campus_2024_student_membership_2023_mobility_all_students_percent": "2024 Student Membership: 2023 Mobility All Students Percent",
-    "campus_2024_student_membership_2022_23_attrition_all_students_percent": "2024 Student Membership: 2022-23 Attrition All Students Percent",
-    "campus_2024_student_enrollment_african_american_percent": "2024 Student Enrollment: African American Percent",
-    "campus_2024_student_enrollment_hispanic_percent": "2024 Student Enrollment: Hispanic Percent",
-    "campus_2024_student_enrollment_econ_disadv_percent": "2024 Student Enrollment: Econ Disadvantaged Percent",
-    "campus_2024_student_enrollment_section_504_percent": "2024 Student Enrollment: Section 504 Percent",
-    "campus_2024_student_enrollment_el_percent": "2024 Student Enrollment: EL Percent",
-    "campus_2024_student_enrollment_dyslexia_percent": "2024 Student Enrollment: Dyslexia Percent",
-    "campus_2024_student_enrollment_foster_care_percent": "2024 Student Enrollment: Foster Care Percent",
-    "campus_2024_student_enrollment_homeless_percent": "2024 Student Enrollment: Homeless Percent",
-    "campus_2024_student_enrollment_immigrant_percent": "2024 Student Enrollment: Immigrant Percent",
-    "campus_2024_student_enrollment_migrant_percent": "2024 Student Enrollment: Migrant Percent",
-    "campus_2024_student_enrollment_title_i_percent": "2024 Student Enrollment: Title I Percent",
-    "campus_2024_student_enrollment_at_risk_percent": "2024 Student Enrollment: At Risk Percent",
-    "campus_2024_student_enrollment_bilingual_esl_percent": "2024 Student Enrollment: Bilingual ESL Percent",
-    "campus_2024_student_enrollment_special_ed_percent": "2024 Student Enrollment: Special Ed Percent",
-    "campus_2024_staff_teacher_beginning_full_time_equiv_percent": "2024 Staff: Teacher Beginning FTE Percent",
-    "campus_2024_staff_teacher_1_5_years_full_time_equiv_percent": "2024 Staff: Teacher 1-5 Years FTE Percent",
-    "campus_2024_staff_teacher_no_degree_full_time_equiv_percent": "2024 Staff: Teacher No Degree FTE Percent",
-    "campus_2024_staff_teacher_ba_degree_full_time_equiv_percent": "2024 Staff: Teacher BA Degree FTE Percent",
-    "campus_2024_staff_teacher_student_ratio": "2024 Staff: Teacher to Student Ratio",
-}
-
-
-# 1) Build ordered lists as before, but rely on the actual columns to exist
-campus_order = [f"campus_{k}" for k in cols if f"campus_{k}" in df.columns]
-match_order = [f"match_{k}" for k in cols if f"match_{k}" in df.columns]
-
-# 2) Handle distance column(s) gracefully (pick first present)
-distance_candidates = ["distance_miles", "distance", "miles"]
-distance_col = next((c for c in distance_candidates if c in df.columns), None)
-distance_order = [distance_col] if distance_col else []
-
-# 3) Final ordered columns: campus_* then match_* then distance
-ordered_cols = campus_order + match_order + distance_order
-
-# 4) Filter & copy
-_df = df[ordered_cols].copy()
-
-# 5) Create a rename map directly from ordered_cols and the cols dict
-rename_map = {}
-for col in ordered_cols:
-    new_name = col  # fallback to original if no match
-    if col.startswith("campus_"):
-        key = col[len("campus_") :]
-        if key in cols:
-            new_name = cols[key]
-    elif col.startswith("match_"):
-        key = col[len("match_") :]
-        if key in cols:
-            new_name = f"NEAREST CHARTER {cols[key]}"
-    elif col in ("distance_miles", "distance", "miles"):
-        new_name = "Distance in Miles"
-    rename_map[col] = new_name
-
-# 6) Apply renames
-df = _df.rename(columns=rename_map)
-
-print(len(df.columns))
-
-# 7) Export (use an absolute path and verify headers after save)
-OUTPUT_XLSX = str(
-    Path("Austin ISD Consolidation Plan_Exploratory Analysis_10.2025.xlsx").resolve()
-)
-
-df.to_excel(OUTPUT_XLSX, index=False, sheet_name="Sheet1")
-
-# Sanity check: read back just the header row from the file we wrote
-try:
-    saved_headers = pd.read_excel(
-        OUTPUT_XLSX, sheet_name="Sheet1", nrows=0
-    ).columns.tolist()
-    print("Saved file:", OUTPUT_XLSX)
-    print("Headers after save (first 20):", saved_headers[:20])
-except Exception as e:
-    print("[warn] Could not verify saved headers:", e)
 # In[11]:
 
 
@@ -403,11 +268,146 @@ def style_existing_excel(
 
 # In[12]:
 
+if __name__ == "__main__":
+    # Enter the district name or district number of the school district you wish to analyze
+    DISTRICT_NAME = "Austin ISD"
 
-style_existing_excel(
-    OUTPUT_XLSX,  # use the same absolute path we just wrote
-    sheet_name="Sheet1",
-    table_name="SchoolClosures",
-    table_style="TableStyleMedium2",
-    open_after=True,
-)
+    # Instantiate DataEngine object, a layer over the District and Campus objects
+    repo = DataEngine.from_snapshot(search=True)
+
+    # Inspect how many objects are loaded
+    print(
+        f"Loaded {len(repo.districts)} districts/charters and {len(repo.campuses)} campuses"
+    )
+
+    # Select a district using either the district name (case insensitive) or district number (any format works - integer and string with or without a leading apostrophe are both acceptable)
+    district = (repo >> ("district", DISTRICT_NAME)).first()
+    print("Example district:", district.name, district.district_number)
+
+    rows = (
+            repo
+            >> ("campuses_in", district)
+            >> ("where", lambda x: (x.enrollment or 0) > 0)
+            >> ("where", lambda x: x.facing_closure is True)
+            >> ("sort", lambda x: x.name or "", False)
+            # >> ("take", 5)
+            # >> ("transfers_out", True)  # Option 1: charter_only=True (excludes private schools)
+            >> (
+                "nearest_charter_transfer_destination",
+            )  # yields list of (campus, match, miles)
+    )
+
+    for closure_campus in rows:
+        match = closure_campus[1]
+        distance = closure_campus[2]
+        closure_campus = closure_campus[0]
+
+        print(
+            closure_campus.campus_number,
+            closure_campus.name,
+            closure_campus.enrollment,
+            closure_campus.rating,
+            closure_campus.aea,
+            closure_campus.grade_range,
+        )
+
+    df = rows.to_df()
+
+    # pprint(list(df.columns))
+
+    cols = {
+        "campus_number": "Campus Number",
+        "name": "Campus Name",
+        "enrollment": "Enrollment as of Oct 2024",
+        "overall_rating_2025": "2025 Overall Rating",
+        "aea": "AEA",
+        "grade_range": "Grade Range",
+        "is_private": "Is Private Campus",
+        "percent_enrollment_change": "2014-15 to 2024-2025 Percent Enrollment Change",
+        "num_charter_transfer_destinations": "Number of Charter Campuses Receiving Student Transfers - TOTAL",
+        "num_charter_transfer_destinations_masked": "Number of Charter Campuses Receiving Student Transfers - MASKED",
+        "total_unmasked_charter_transfers_out": "Total Unmasked Charter Transfers Out",
+        "closure_date": "Proposed Closure Date",
+        "campus_2024_student_membership_2023_mobility_all_students_percent": "2024 Student Membership: 2023 Mobility All Students Percent",
+        "campus_2024_student_membership_2022_23_attrition_all_students_percent": "2024 Student Membership: 2022-23 Attrition All Students Percent",
+        "campus_2024_student_enrollment_african_american_percent": "2024 Student Enrollment: African American Percent",
+        "campus_2024_student_enrollment_hispanic_percent": "2024 Student Enrollment: Hispanic Percent",
+        "campus_2024_student_enrollment_econ_disadv_percent": "2024 Student Enrollment: Econ Disadvantaged Percent",
+        "campus_2024_student_enrollment_section_504_percent": "2024 Student Enrollment: Section 504 Percent",
+        "campus_2024_student_enrollment_el_percent": "2024 Student Enrollment: EL Percent",
+        "campus_2024_student_enrollment_dyslexia_percent": "2024 Student Enrollment: Dyslexia Percent",
+        "campus_2024_student_enrollment_foster_care_percent": "2024 Student Enrollment: Foster Care Percent",
+        "campus_2024_student_enrollment_homeless_percent": "2024 Student Enrollment: Homeless Percent",
+        "campus_2024_student_enrollment_immigrant_percent": "2024 Student Enrollment: Immigrant Percent",
+        "campus_2024_student_enrollment_migrant_percent": "2024 Student Enrollment: Migrant Percent",
+        "campus_2024_student_enrollment_title_i_percent": "2024 Student Enrollment: Title I Percent",
+        "campus_2024_student_enrollment_at_risk_percent": "2024 Student Enrollment: At Risk Percent",
+        "campus_2024_student_enrollment_bilingual_esl_percent": "2024 Student Enrollment: Bilingual ESL Percent",
+        "campus_2024_student_enrollment_special_ed_percent": "2024 Student Enrollment: Special Ed Percent",
+        "campus_2024_staff_teacher_beginning_full_time_equiv_percent": "2024 Staff: Teacher Beginning FTE Percent",
+        "campus_2024_staff_teacher_1_5_years_full_time_equiv_percent": "2024 Staff: Teacher 1-5 Years FTE Percent",
+        "campus_2024_staff_teacher_no_degree_full_time_equiv_percent": "2024 Staff: Teacher No Degree FTE Percent",
+        "campus_2024_staff_teacher_ba_degree_full_time_equiv_percent": "2024 Staff: Teacher BA Degree FTE Percent",
+        "campus_2024_staff_teacher_student_ratio": "2024 Staff: Teacher to Student Ratio",
+    }
+
+    # 1) Build ordered lists as before, but rely on the actual columns to exist
+    campus_order = [f"campus_{k}" for k in cols if f"campus_{k}" in df.columns]
+    match_order = [f"match_{k}" for k in cols if f"match_{k}" in df.columns]
+
+    # 2) Handle distance column(s) gracefully (pick first present)
+    distance_candidates = ["distance_miles", "distance", "miles"]
+    distance_col = next((c for c in distance_candidates if c in df.columns), None)
+    distance_order = [distance_col] if distance_col else []
+
+    # 3) Final ordered columns: campus_* then match_* then distance
+    ordered_cols = campus_order + match_order + distance_order
+
+    # 4) Filter & copy
+    _df = df[ordered_cols].copy()
+
+    # 5) Create a rename map directly from ordered_cols and the cols dict
+    rename_map = {}
+    for col in ordered_cols:
+        new_name = col  # fallback to original if no match
+        if col.startswith("campus_"):
+            key = col[len("campus_"):]
+            if key in cols:
+                new_name = cols[key]
+        elif col.startswith("match_"):
+            key = col[len("match_"):]
+            if key in cols:
+                new_name = f"NEAREST CHARTER {cols[key]}"
+        elif col in ("distance_miles", "distance", "miles"):
+            new_name = "Distance in Miles"
+        rename_map[col] = new_name
+
+    # 6) Apply renames
+    df = _df.rename(columns=rename_map)
+
+    print(len(df.columns))
+
+    # 7) Export (use an absolute path and verify headers after save)
+    OUTPUT_XLSX = str(
+        Path("Austin ISD Consolidation Plan_Exploratory Analysis_10.2025.xlsx").resolve()
+    )
+
+    df.to_excel(OUTPUT_XLSX, index=False, sheet_name="Sheet1")
+
+    # Sanity check: read back just the header row from the file we wrote
+    try:
+        saved_headers = pd.read_excel(
+            OUTPUT_XLSX, sheet_name="Sheet1", nrows=0
+        ).columns.tolist()
+        print("Saved file:", OUTPUT_XLSX)
+        print("Headers after save (first 20):", saved_headers[:20])
+    except Exception as e:
+        print("[warn] Could not verify saved headers:", e)
+
+    style_existing_excel(
+        OUTPUT_XLSX,  # use the same absolute path we just wrote
+        sheet_name="Sheet1",
+        table_name="SchoolClosures",
+        table_style="TableStyleMedium2",
+        open_after=True,
+    )
