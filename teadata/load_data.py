@@ -568,7 +568,9 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
 
                 enrollment_val = record.get("Enrollment as of Oct 2024")
                 enrollment = 0
-                if isinstance(enrollment_val, (int, float)) and not pd.isna(enrollment_val):
+                if isinstance(enrollment_val, (int, float)) and not pd.isna(
+                    enrollment_val
+                ):
                     try:
                         enrollment = int(float(enrollment_val))
                     except (TypeError, ValueError):
