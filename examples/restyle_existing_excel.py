@@ -269,7 +269,7 @@ def style_existing_excel(
 # In[12]:
 
 if __name__ == "__main__":
-    # Enter the district name or district number of the school district you wish to analyze
+    """# Enter the district name or district number of the school district you wish to analyze
     DISTRICT_NAME = "Austin ISD"
 
     # Instantiate DataEngine object, a layer over the District and Campus objects
@@ -402,12 +402,14 @@ if __name__ == "__main__":
         print("Saved file:", OUTPUT_XLSX)
         print("Headers after save (first 20):", saved_headers[:20])
     except Exception as e:
-        print("[warn] Could not verify saved headers:", e)
+        print("[warn] Could not verify saved headers:", e)"""
+
+
 
     style_existing_excel(
-        OUTPUT_XLSX,  # use the same absolute path we just wrote
-        sheet_name="Sheet1",
-        table_name="SchoolClosures",
+        "/Users/adpena/PycharmProjects/CharterCostTracker/reports/transfer reports/charter_flow_analysis/AISD 2014-2025 Charter Transfer Flow.xlsx",  # use the same absolute path we just wrote
+        sheet_name="AISD 2014-2025 Charter Transfer",
+        table_name="",
         table_style="TableStyleMedium2",
-        open_after=True,
+        open_after=False,
     )
