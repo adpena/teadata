@@ -404,8 +404,6 @@ if __name__ == "__main__":
     except Exception as e:
         print("[warn] Could not verify saved headers:", e)"""
 
-
-
     style_existing_excel(
         "/Users/adpena/PycharmProjects/CharterCostTracker/reports/transfer reports/charter_flow_analysis/AISD 2014-2025 Charter Transfer Flow.xlsx",  # use the same absolute path we just wrote
         sheet_name="AISD 2014-2025 Charter Transfer",
