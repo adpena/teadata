@@ -148,7 +148,9 @@ def build_campus_summary(
             allowed_ratings.update(rating_groups[key])
 
         if "rating_2025" not in campus_df.columns:
-            raise ValueError("rating_filter requested but 'rating_2025' column is missing")
+            raise ValueError(
+                "rating_filter requested but 'rating_2025' column is missing"
+            )
 
         ratings_normalized = campus_df["rating_2025"].astype(str).str.upper()
         campus_df = campus_df[ratings_normalized.isin(allowed_ratings)]
@@ -174,7 +176,9 @@ def add_county_from_geometry(
         import geopandas as gpd
         from shapely.geometry import Point
     except Exception as e:
-        raise RuntimeError("geopandas and shapely are required for county mapping") from e
+        raise RuntimeError(
+            "geopandas and shapely are required for county mapping"
+        ) from e
 
     # Determine or construct campus geometry (assumed WGS84 lon/lat).
     geom_col = None
@@ -215,12 +219,14 @@ def add_county_from_geometry(
         # Geometry provided as (lon, lat) tuples from the repository snapshot.
         campus_df = campus_df.copy()
         campus_df["_tmp_geom"] = [
-            Point(float(coords[0]), float(coords[1]))
-            if isinstance(coords, (tuple, list))
-            and len(coords) == 2
-            and pd.notna(coords[0])
-            and pd.notna(coords[1])
-            else None
+            (
+                Point(float(coords[0]), float(coords[1]))
+                if isinstance(coords, (tuple, list))
+                and len(coords) == 2
+                and pd.notna(coords[0])
+                and pd.notna(coords[1])
+                else None
+            )
             for coords in campus_df[geom_col]
         ]
         geom_col = "_tmp_geom"
@@ -233,7 +239,9 @@ def add_county_from_geometry(
         return campus_df
 
     # Promote to GeoDataFrame
-    gcamp = gpd.GeoDataFrame(campus_df.copy(), geometry=campus_df[geom_col], crs="EPSG:4326")
+    gcamp = gpd.GeoDataFrame(
+        campus_df.copy(), geometry=campus_df[geom_col], crs="EPSG:4326"
+    )
 
     # Read counties; fall back to data path if the project-relative path isn't found.
     try:
@@ -256,7 +264,16 @@ def add_county_from_geometry(
     counties = counties.to_crs(gcamp.crs)
 
     # Detect the county name / FIPS fields commonly used
-    name_candidates = ["NAME", "Name", "county", "County", "CNTY_NM", "COUNTY_NAM", "COUNTY_NM", "COUNTYNAME"]
+    name_candidates = [
+        "NAME",
+        "Name",
+        "county",
+        "County",
+        "CNTY_NM",
+        "COUNTY_NAM",
+        "COUNTY_NM",
+        "COUNTYNAME",
+    ]
     fips_candidates = ["GEOID", "GEOID10", "COUNTYFP", "FIPS", "FIPS_CODE", "CNTY_FIPS"]
 
     county_name_col = next((c for c in name_candidates if c in counties.columns), None)
@@ -334,12 +351,20 @@ def main(
     }
 
     # Apply renaming and enforce the order
-    district_tab = district_tab.rename(columns=rename_map)[[rename_map[c] for c in BASE_COLUMNS]]
-    charter_tab = charter_tab.rename(columns=rename_map)[[rename_map[c] for c in BASE_COLUMNS]]
+    district_tab = district_tab.rename(columns=rename_map)[
+        [rename_map[c] for c in BASE_COLUMNS]
+    ]
+    charter_tab = charter_tab.rename(columns=rename_map)[
+        [rename_map[c] for c in BASE_COLUMNS]
+    ]
 
     # ✅ Sort by District Name then Campus Name
-    district_tab = district_tab.sort_values(by=["District Name", "Campus Name"], ascending=[True, True])
-    charter_tab = charter_tab.sort_values(by=["District Name", "Campus Name"], ascending=[True, True])
+    district_tab = district_tab.sort_values(
+        by=["District Name", "Campus Name"], ascending=[True, True]
+    )
+    charter_tab = charter_tab.sort_values(
+        by=["District Name", "Campus Name"], ascending=[True, True]
+    )
 
     district_tab.to_excel("campus_stats_district.xlsx", index=False)
     charter_tab.to_excel("campus_stats_charter.xlsx", index=False)
