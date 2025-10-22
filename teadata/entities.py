@@ -359,7 +359,16 @@ class Campus:
                 if k not in out:
                     out[k] = v
 
+        percent_change: Optional[float]
+        try:
+            percent_change = self.enrollment_percent_change_from_2015()
+        except ValueError:
+            percent_change = None
+        except Exception:  # pragma: no cover - defensive
+            percent_change = None
+
         derived_attrs = {
+            "percent_enrollment_change": percent_change,
             "num_charter_transfer_destinations": self.num_charter_transfer_destinations,
             "num_charter_transfer_destinations_masked": self.num_charter_transfer_destinations_masked,
             "total_unmasked_charter_transfers_out": self.total_unmasked_charter_transfers_out,
