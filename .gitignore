@@ -209,6 +209,7 @@ config.toml
 # CLI-generated reports / exports (adjust if you want them versioned)
 *.report.json
 *.report.txt
+examples/*.xlsx
 
 # =========================
 # Wheel/metadata caches created by build tools
