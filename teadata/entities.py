@@ -102,6 +102,7 @@ class District:
     _repo: Any = field(default=None, repr=False, compare=False)
 
     def __post_init__(self):
+        self.name = self.name.upper()
         if self.boundary is not None:
             self.polygon = self.boundary
 
@@ -291,6 +292,7 @@ class Campus:
         object.__setattr__(self, name, value)
 
     def __post_init__(self):
+        self.name = self.name.upper()
         self.is_charter = bool(self.is_charter)
         self.is_private = bool(self.is_private)
         if self.location is not None:
