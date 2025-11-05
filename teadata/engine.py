@@ -1691,9 +1691,7 @@ class DataEngine:
             if cid in self._campuses
         ]
 
-        return EntityList(
-            [c for c in campuses if not is_charter(c) and not is_private(c)]
-        )
+        return EntityList([c for c in campuses if not is_private(c)])
 
     def private_campuses_in(
         self, d: Any, *, max_miles: Optional[float] = None
