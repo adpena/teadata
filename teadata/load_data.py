@@ -179,6 +179,25 @@ def run_enrichments(repo: DataEngine) -> None:
     except Exception as e:
         print(f"[enrich] accountability (districts) failed: {e}")
 
+    # District enrichment
+    try:
+        acc_select = ["number_of_students"]
+        acc_year, updated = enrich_districts_from_config(
+            repo,
+            CFG,
+            "accountability",
+            YEAR,
+            select=acc_select,
+            rename={"Number of Students": "number_of_students"},
+            aliases={
+                     "number_of_students": "enrollment"
+                     },
+            reader_kwargs={"sheet_name": "2025 State Summary"},
+        )
+        print(f"Enriched {updated} districts enrollment from accountability {acc_year}")
+    except Exception as e:
+        print(f"[enrich] accountability - enrollment (districts) failed: {e}")
+
     # Campus enrichment
     try:
         cfg = load_config(CFG)
