@@ -1,6 +1,7 @@
 import uuid
 import pickle
 from pathlib import Path
+import gzip
 import geopandas as gpd
 import pandas as pd
 import json
@@ -15,6 +16,7 @@ from typing import Any, Iterable, Mapping, Optional
 from teadata import classes as _classes_mod
 from teadata import teadata_config as _cfg_mod
 from teadata.classes import District, Campus, DataEngine, _point_xy
+from teadata.engine import _load_snapshot_payload
 from teadata.teadata_config import (
     canonical_campus_number,
     canonical_district_number,
@@ -444,23 +446,28 @@ def _load_repo_snapshot(
     districts_fp: str, campuses_fp: str, extra_sig: dict
 ) -> DataEngine | None:
     snap = _snapshot_path(districts_fp, campuses_fp)
-    if not snap.exists():
-        return None
-    try:
-        with snap.open("rb") as f:
-            meta, repo = pickle.load(f)
-        src_mtimes = {
-            "districts": _file_mtime(districts_fp),
-            "campuses": _file_mtime(campuses_fp),
-        }
-        if (
-            meta.get("version") == 4
-            and meta.get("src_mtimes") == src_mtimes
-            and meta.get("extra_sig", {}) == (extra_sig or {})
-        ):
-            return repo
-    except Exception:
-        return None
+    candidates = [snap, snap.with_suffix(snap.suffix + ".gz")]
+    src_mtimes = {
+        "districts": _file_mtime(districts_fp),
+        "campuses": _file_mtime(campuses_fp),
+    }
+
+    for candidate in candidates:
+        if not candidate.exists():
+            continue
+        try:
+            loaded = _load_snapshot_payload(candidate)
+            if not (isinstance(loaded, tuple) and len(loaded) >= 2):
+                continue
+            meta, repo = loaded[0], loaded[1]
+            if (
+                meta.get("version") == 4
+                and meta.get("src_mtimes") == src_mtimes
+                and meta.get("extra_sig", {}) == (extra_sig or {})
+            ):
+                return repo
+        except Exception:
+            continue
     return None
 
 
@@ -468,6 +475,7 @@ def _save_repo_snapshot(
     repo: DataEngine, districts_fp: str, campuses_fp: str, extra_sig: dict
 ) -> None:
     snap = _snapshot_path(districts_fp, campuses_fp)
+    snap_gz = snap.with_suffix(snap.suffix + ".gz")
     meta = {
         "version": 4,
         "src_mtimes": {
@@ -480,11 +488,14 @@ def _save_repo_snapshot(
         _prepare_repo_for_pickle(repo)
         with snap.open("wb") as f:
             pickle.dump((meta, repo), f, protocol=pickle.HIGHEST_PROTOCOL)
-        # Attempt to also copy snapshot to absolute project cache path; fail quietly if missing
+        with gzip.open(snap_gz, "wb") as f:
+            pickle.dump((meta, repo), f, protocol=pickle.HIGHEST_PROTOCOL)
+        # Attempt to also copy snapshots to absolute project cache path; fail quietly if missing
         try:
             abs_cache_dir = Path("/Users/adpena/PycharmProjects/teadata/.cache")
             if abs_cache_dir.is_dir():
                 shutil.copy2(snap, abs_cache_dir / snap.name)
+                shutil.copy2(snap_gz, abs_cache_dir / snap_gz.name)
         except Exception:
             pass
     except Exception:

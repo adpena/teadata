@@ -35,7 +35,7 @@ pip install -e .
 
 ### 2) Load the prebuilt snapshot
 
-The engine will automatically discover a `.pkl` snapshot in either:
+The engine will automatically discover a `.pkl` or `.pkl.gz` snapshot in either:
 - `./.cache/` under your repository root, or
 - `<site-packages>/teadata/.cache/` shipping with the library.
 
@@ -78,7 +78,7 @@ for c in aldine.campuses:
 - **Spatial acceleration**: nearest-k, containment, and district/campus lookups.
 - **Config-driven ingestion**: add datasets by editing YAML/TOML; get schema checks and year-based resolution.
 - **Enrichment**: attach new fields (e.g., accountability, finance) as dynamic attributes — and alias into canonical ones.
-- **Reproducible caches**: build once into a `.pkl` “repo snapshot”, reload instantly next time.
+- **Reproducible caches**: build once into a `.pkl` (and `.pkl.gz`) “repo snapshot”, reload instantly next time.
 - **Private school coverage**: ingest Texas private schools when the dataset is present, flagged via `Campus.is_private` for easy filtering.
 
 ---

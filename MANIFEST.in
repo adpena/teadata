@@ -1,2 +1,3 @@
 recursive-include teadata/.cache *.pkl
+recursive-include teadata/.cache *.pkl.gz
 recursive-include data/private_schools *.csv

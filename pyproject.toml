@@ -91,7 +91,7 @@ include = ["teadata*"]
 exclude = ["tests*", "docs*", "examples*"]
 
 [tool.setuptools.package-data]
-teadata = [".cache/*.pkl"]
+teadata = [".cache/*.pkl", ".cache/*.pkl.gz"]
 
 [tool.setuptools]
 include-package-data = true
