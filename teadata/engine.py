@@ -670,6 +670,10 @@ class DataEngine:
                 self._xy_to_index = None
                 self._charter_cache = None
 
+                # Fast name lookups
+                self._district_by_name_lower: Dict[str, uuid.UUID] = {}
+                self._campus_by_name_lower: Dict[str, uuid.UUID] = {}
+
                 # Student transfer edges (optional enrichment).
                 # _xfers_out: campus_id -> list[(to_campus_id, count:int|None, masked:bool)]
                 # _xfers_in:  campus_id -> list[(from_campus_id, count:int|None, masked:bool)]
@@ -722,6 +726,10 @@ class DataEngine:
         self._xy_to_index = None  # dict[(x,y)] -> [index]
         self._charter_cache = None
 
+        # Fast name lookups (lowercase exact match)
+        self._district_by_name_lower: Dict[str, uuid.UUID] = {}
+        self._campus_by_name_lower: Dict[str, uuid.UUID] = {}
+
     # --- Public, read-only views of entities ---
     @property
     def districts(self):
@@ -744,6 +752,16 @@ class DataEngine:
         Returns the first match or None.
         """
         target = (name or "").strip().lower()
+        if not target:
+            return None
+        try:
+            did = self._district_by_name_lower.get(target)
+            if did is not None:
+                hit = self._districts.get(did)
+                if hit is not None:
+                    return hit
+        except Exception:
+            pass
         for d in self._districts.values():
             if d.name.lower() == target:
                 return d
@@ -755,6 +773,16 @@ class DataEngine:
         Returns the first match or None.
         """
         target = (name or "").strip().lower()
+        if not target:
+            return None
+        try:
+            cid = self._campus_by_name_lower.get(target)
+            if cid is not None:
+                hit = self._campuses.get(cid)
+                if hit is not None:
+                    return hit
+        except Exception:
+            pass
         for c in self._campuses.values():
             if c.name.lower() == target:
                 return c
@@ -1143,6 +1171,12 @@ class DataEngine:
         # Rebuild campus-number index (supports enrichment joins by campus_number)
         try:
             self._campus_by_number = {}
+            self._campus_by_name_lower = {}
+            self._district_by_name_lower = {}
+            for did, d in self._districts.items():
+                key = (d.name or "").lower()
+                if key and key not in self._district_by_name_lower:
+                    self._district_by_name_lower[key] = did
             for cid, c in self._campuses.items():
                 num = getattr(c, "campus_number", None)
                 if not num:
@@ -1156,8 +1190,13 @@ class DataEngine:
                 self._campus_by_number[digits] = cid
                 if digits.isdigit():
                     self._campus_by_number[str(int(digits))] = cid
+                name_key = (c.name or "").lower()
+                if name_key and name_key not in self._campus_by_name_lower:
+                    self._campus_by_name_lower[name_key] = cid
         except Exception:
             self._campus_by_number = {}
+            self._campus_by_name_lower = {}
+            self._district_by_name_lower = {}
 
         self._charter_cache = None
 
@@ -1685,6 +1724,12 @@ class DataEngine:
     def add_district(self, d: District):
         d._repo = self
         self._districts[d.id] = d
+        if not self._in_bulk:
+            if not hasattr(self, "_district_by_name_lower"):
+                self._district_by_name_lower = {}
+            key = (d.name or "").lower()
+            if key and key not in self._district_by_name_lower:
+                self._district_by_name_lower[key] = d.id
 
     def add_campus(self, c: Campus):
         c._repo = self  # attach back-reference
@@ -1693,6 +1738,11 @@ class DataEngine:
         if not self._in_bulk:
             if c.district_id in self._districts:
                 self._campuses_by_district[c.district_id].append(c.id)
+            if not hasattr(self, "_campus_by_name_lower"):
+                self._campus_by_name_lower = {}
+            key = (c.name or "").lower()
+            if key and key not in self._campus_by_name_lower:
+                self._campus_by_name_lower[key] = c.id
             self._clear_charter_cache()
 
     def campuses_in(self, d: Any) -> "EntityList":
@@ -1970,6 +2020,14 @@ class DataEngine:
         if type_col in df.columns:
             df = df[df[type_col] == want_type]
 
+        # Missing required columns → nothing to do (match previous no-op behavior)
+        if (
+            src_col not in df.columns
+            or dst_col not in df.columns
+            or count_col not in df.columns
+        ):
+            return 0
+
         def norm(x):
             if x is None:
                 return None
@@ -1990,22 +2048,35 @@ class DataEngine:
 
         updated_sources = set()
 
-        # Iterate rows and build edges
-        for _, row in df.iterrows():
-            src_key = norm(row.get(src_col))
-            dst_key = norm(row.get(dst_col))
+        # Vectorized normalization of campus numbers
+        src_series = df[src_col].map(norm)
+        dst_series = df[dst_col].map(norm)
+        counts = df[count_col].to_numpy()
+
+        # Local cache to avoid repeated lookups against _campus_by_number
+        id_cache: Dict[str, Optional[uuid.UUID]] = {}
+
+        def _lookup(normed: str | None) -> Optional[uuid.UUID]:
+            if normed is None:
+                return None
+            hit = id_cache.get(normed)
+            if hit is not None or normed in id_cache:
+                return hit
+            digits = normed[1:] if normed.startswith("'") else normed
+            cid = self._campus_by_number.get(normed) or self._campus_by_number.get(
+                digits
+            )
+            id_cache[normed] = cid
+            return cid
+
+        for src_key, dst_key, raw in zip(
+            src_series.to_numpy(), dst_series.to_numpy(), counts
+        ):
             if not src_key or not dst_key:
                 continue
 
-            src_digits = src_key[1:] if src_key and src_key.startswith("'") else src_key
-            dst_digits = dst_key[1:] if dst_key and dst_key.startswith("'") else dst_key
-
-            src_id = self._campus_by_number.get(src_key) or self._campus_by_number.get(
-                src_digits
-            )
-            dst_id = self._campus_by_number.get(dst_key) or self._campus_by_number.get(
-                dst_digits
-            )
+            src_id = _lookup(src_key)
+            dst_id = _lookup(dst_key)
             if src_id is None or dst_id is None:
                 if src_id is None and dst_id is None:
                     self._xfers_missing["either"] = (
@@ -2015,16 +2086,13 @@ class DataEngine:
                     self._xfers_missing["src"] = self._xfers_missing.get("src", 0) + 1
                 else:
                     self._xfers_missing["dst"] = self._xfers_missing.get("dst", 0) + 1
-                # Skip edges where either side is not in the repo
                 continue
 
-            raw = row.get(count_col)
             try:
                 cnt = int(raw)
             except Exception:
                 cnt = None
 
-            # Many TEA files use -999 for masked small counts
             masked = cnt is not None and cnt < 0
             cnt = None if masked else cnt
 
@@ -2112,8 +2180,53 @@ class DataEngine:
         geodesic : bool
             If True (default) and x/y look like lon/lat, compute great-circle miles.
         """
-        # Collect candidates with distances
         results: List[Tuple[float, Campus]] = []
+
+        use_geodesic = geodesic and probably_lonlat(x, y)
+
+        # KDTree fast path (geodesic lon/lat only)
+        if use_geodesic:
+            self._ensure_kdtree()
+            if (
+                self._kdtree is not None
+                and self._xy_deg is not None
+                and self._campus_list is not None
+            ):
+                import numpy as np
+
+                total = len(self._campus_list)
+                if total == 0:
+                    return []
+
+                want = (
+                    total
+                    if limit is None or charter_only or max_miles is not None
+                    else max(1, min(int(limit), total))
+                )
+                dists_rad, idxs = self._kdtree.query(
+                    np.radians([x, y]), k=want if want > 1 else 1
+                )
+                dists_rad = np.atleast_1d(dists_rad)
+                idxs_arr = np.atleast_1d(idxs)
+
+                for _dist_rad, idx in zip(dists_rad, idxs_arr):
+                    c = self._campus_list[int(idx)]
+                    if charter_only and not is_charter(c):
+                        continue
+                    x2, y2 = self._xy_deg[int(idx)]
+                    dm = haversine_miles(x, y, float(x2), float(y2))
+                    if max_miles is not None and dm > max_miles:
+                        continue
+                    results.append((dm, c))
+                    if limit is not None and len(results) >= limit:
+                        break
+
+                results.sort(key=lambda t: t[0])
+                if limit is not None:
+                    results = results[:limit]
+                return [c for _, c in results]
+
+        # Fallback: planar or brute-force geodesic
         for c in self._campuses.values():
             if c.point is None:
                 continue
@@ -2122,12 +2235,10 @@ class DataEngine:
             cxy = point_xy(c.point)
             if cxy is None:
                 continue
-            if geodesic and probably_lonlat(x, y) and probably_lonlat(*cxy):
+            if use_geodesic and probably_lonlat(*cxy):
                 d = haversine_miles(x, y, cxy[0], cxy[1])
             else:
-                # planar fallback
                 if SHAPELY and hasattr(c.point, "distance"):
-                    # distance in CRS units (assumed miles if your data is projected to a miles-based CRS)
                     d = (
                         c.point.distance(ShapelyPoint(x, y))
                         if SHAPELY

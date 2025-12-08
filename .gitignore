@@ -168,6 +168,8 @@ target/
 *.sqlite
 *.sqlite3
 *.db
+*.pkl
+*.pickle
 # Spatial data (comment out if you version control canonical shapes)
 *.geojson
 *.gpkg
