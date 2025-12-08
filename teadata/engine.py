@@ -8,6 +8,7 @@ from dataclasses import dataclass, is_dataclass
 from functools import cached_property, lru_cache
 from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
+import gzip
 import io
 import math
 import os
@@ -60,6 +61,7 @@ DEFAULT_REPO_PKL_URL = (
     "bddeb222dd579542453ae47163ebe39cc3a07081/teadata/.cache/"
     "repo_Current_Districts_2025_Schools_2024_to_2025.pkl"
 )
+GZIP_MAGIC = b"\x1f\x8b"
 
 
 class _ModuleMappingUnpickler(pickle.Unpickler):
@@ -128,13 +130,31 @@ def _newest_pickle(folder: Path) -> Optional[Path]:
         if not folder.exists() or not folder.is_dir():
             return None
 
-        picks = list(folder.glob("*.pkl"))
+        picks = []
+        for pattern in ("*.pkl", "*.pkl.gz"):
+            picks.extend(folder.glob(pattern))
         if not picks:
             return None
         picks.sort(key=lambda pp: pp.stat().st_mtime, reverse=True)
         return picks[0]
     except Exception:
         return None
+
+
+def _is_gzip_file(path: Path) -> bool:
+    if path.suffix == ".gz":
+        return True
+    try:
+        with path.open("rb") as f:
+            return f.read(2) == GZIP_MAGIC
+    except Exception:
+        return False
+
+
+def _load_snapshot_payload(path: Path):
+    opener = gzip.open if _is_gzip_file(path) else open
+    with opener(path, "rb") as f:
+        return _compat_pickle_load(f)
 
 
 def _discover_snapshot(explicit: str | Path | None = None) -> Optional[Path]:
@@ -451,7 +471,7 @@ class DataEngine:
         cls, snapshot: str | Path | None = None, *, search: bool = True
     ) -> "DataEngine":
         """
-        Load a DataEngine from a pickled snapshot (.pkl). This method **never** returns None.
+        Load a DataEngine from a pickled snapshot (.pkl or .pkl.gz). This method **never** returns None.
         It either returns a valid DataEngine instance or raises a clear RuntimeError/TypeError.
 
         Snapshot discovery prioritizes the package's own `.cache` folder over outer repo folders.
@@ -477,8 +497,7 @@ class DataEngine:
             raise RuntimeError(f"Snapshot not found or not a file: {path}")
 
         try:
-            with open(path, "rb") as f:
-                obj = _compat_pickle_load(f)
+            obj = _load_snapshot_payload(path)
         except Exception as e:
             raise RuntimeError(f"Failed to unpickle snapshot {path}: {e}") from e
 
