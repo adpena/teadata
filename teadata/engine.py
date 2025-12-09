@@ -468,7 +468,11 @@ class DataEngine:
 
     @classmethod
     def from_snapshot(
-        cls, snapshot: str | Path | None = None, *, search: bool = True
+        cls,
+        snapshot: str | Path | None = None,
+        *,
+        search: bool = True,
+        eager_indexes: bool = False,
     ) -> "DataEngine":
         """
         Load a DataEngine from a pickled snapshot (.pkl or .pkl.gz). This method **never** returns None.
@@ -507,6 +511,21 @@ class DataEngine:
                 obj._rehydrate_geometries()
             except Exception:
                 pass
+            for attr in (
+                "_kdtree_charter",
+                "_xy_deg_charter",
+                "_xy_rad_charter",
+                "_campus_list_charter",
+                "_xy_deg_np_charter",
+                "_campus_list_np_charter",
+            ):
+                if not hasattr(obj, attr):
+                    setattr(obj, attr, None)
+            if eager_indexes:
+                try:
+                    obj.warm_indexes()
+                except Exception:
+                    pass
             return obj
 
         # Create an instance early so we can use instance coercers
@@ -622,10 +641,20 @@ class DataEngine:
         """
         return cls.from_snapshot(None, search=True)
 
-    def __init__(self, snapshot: str | Path | None = None, *, autoload: bool = False):
+    def __init__(
+        self,
+        snapshot: str | Path | None = None,
+        *,
+        autoload: bool = False,
+        eager_indexes: bool = False,
+    ):
         # Optional early autoload from snapshot
         if snapshot is not None or autoload:
-            eng = self.from_snapshot(snapshot, search=autoload and snapshot is None)
+            eng = self.from_snapshot(
+                snapshot,
+                search=autoload and snapshot is None,
+                eager_indexes=eager_indexes,
+            )
             # If we got a different instance, copy its state into self
             if eng is not self:
                 # Initialize empty containers first (will be re-assigned below)
@@ -656,15 +685,21 @@ class DataEngine:
                 # Initialize indexes as empty; they will rebuild on demand
                 self._in_bulk = False
                 self._kdtree = None
+                self._kdtree_charter = None
                 self._xy_deg = None
                 self._xy_rad = None
                 self._campus_list = None
+                self._xy_deg_charter = None
+                self._xy_rad_charter = None
+                self._campus_list_charter = None
                 self._point_tree = None
                 self._point_geoms = None
                 self._point_ids = None
                 self._geom_id_to_index = None
                 self._xy_deg_np = None
                 self._campus_list_np = None
+                self._xy_deg_np_charter = None
+                self._campus_list_np_charter = None
                 self._all_xy_np = None
                 self._all_campuses_np = None
                 self._xy_to_index = None
@@ -696,6 +731,11 @@ class DataEngine:
                     self._rehydrate_geometries()
                 except Exception:
                     pass
+                if eager_indexes:
+                    try:
+                        self.warm_indexes()
+                    except Exception:
+                        pass
                 return
         # Normal cold init (no snapshot)
         self._districts: Dict[uuid.UUID, District] = EntityMap()
@@ -704,9 +744,13 @@ class DataEngine:
         self._in_bulk = False
         # Spatial/attribute indexes (optional, built on demand)
         self._kdtree = None
+        self._kdtree_charter = None
         self._xy_deg = None
         self._xy_rad = None
         self._campus_list = None
+        self._xy_deg_charter = None
+        self._xy_rad_charter = None
+        self._campus_list_charter = None
 
         # Shapely STRtree for campus points (built lazily)
         self._point_tree = None
@@ -717,6 +761,8 @@ class DataEngine:
         # Vectorized fallback arrays (NumPy) for haversine when KDTree unavailable
         self._xy_deg_np = None
         self._campus_list_np = None
+        self._xy_deg_np_charter = None
+        self._campus_list_np_charter = None
 
         # All-campus XY caches (NumPy) for bbox candidate generation
         self._all_xy_np = None
@@ -729,6 +775,41 @@ class DataEngine:
         # Fast name lookups (lowercase exact match)
         self._district_by_name_lower: Dict[str, uuid.UUID] = {}
         self._campus_by_name_lower: Dict[str, uuid.UUID] = {}
+
+        if eager_indexes:
+            try:
+                self.warm_indexes()
+            except Exception:
+                pass
+
+    def warm_indexes(self) -> None:
+        """
+        Eagerly (re)build spatial and vectorized caches. Useful when the host app
+        front-loads caching (e.g., teadata-app under Django) to avoid first-request
+        latency. Safe to call multiple times.
+        """
+        try:
+            self._ensure_kdtree()
+        except Exception:
+            pass
+        try:
+            self._ensure_point_strtree()
+        except Exception:
+            pass
+        try:
+            self._ensure_all_xy_arrays()
+        except Exception:
+            pass
+        try:
+            self._ensure_charter_cache()
+        except Exception:
+            pass
+        # Prime NumPy fallbacks for both charter/non-charter sets if available
+        try:
+            self._numpy_coords_and_campuses(False)
+            self._numpy_coords_and_campuses(True)
+        except Exception:
+            pass
 
     # --- Public, read-only views of entities ---
     @property
@@ -1157,9 +1238,13 @@ class DataEngine:
             self._campuses_by_district[c.district_id].append(c.id)
         # Invalidate spatial index; rebuilt lazily
         self._kdtree = None
+        self._kdtree_charter = None
         self._xy_deg = None
         self._xy_rad = None
         self._campus_list = None
+        self._xy_deg_charter = None
+        self._xy_rad_charter = None
+        self._campus_list_charter = None
         # Invalidate Shapely STRtree and vectorized caches
         self._point_tree = None
         self._point_geoms = None
@@ -1167,6 +1252,11 @@ class DataEngine:
         self._geom_id_to_index = None
         self._xy_deg_np = None
         self._campus_list_np = None
+        self._xy_deg_np_charter = None
+        self._campus_list_np_charter = None
+        self._all_xy_np = None
+        self._all_campuses_np = None
+        self._xy_to_index = None
 
         # Rebuild campus-number index (supports enrichment joins by campus_number)
         try:
@@ -1199,6 +1289,12 @@ class DataEngine:
             self._district_by_name_lower = {}
 
         self._charter_cache = None
+        try:
+            cache_clear = getattr(self.nearest_campus, "cache_clear", None)
+            if cache_clear:
+                cache_clear()
+        except Exception:
+            pass
 
         if not hasattr(self, "_xfers_missing"):
             self._xfers_missing = {"src": 0, "dst": 0, "either": 0}
@@ -1268,7 +1364,10 @@ class DataEngine:
         Build a KD-tree over campus points (in radians) for fast radius/KNN queries.
         Uses scipy.spatial.cKDTree if available; otherwise leaves tree as None.
         """
-        if getattr(self, "_kdtree", None) is not None:
+        if (
+            getattr(self, "_kdtree", None) is not None
+            and getattr(self, "_kdtree_charter", None) is not None
+        ):
             return
         try:
             import numpy as np
@@ -1279,25 +1378,39 @@ class DataEngine:
             self._xy_deg = None
             self._xy_rad = None
             self._campus_list = None
+            self._kdtree_charter = None
+            self._xy_deg_charter = None
+            self._xy_rad_charter = None
+            self._campus_list_charter = None
             return
 
         xy = []
         campus_list = []
+        xy_charter = []
+        campus_list_charter = []
         for c in self._campuses.values():
             p = getattr(c, "point", None) or getattr(c, "location", None)
             if p is None:
                 continue
             try:
-                xy.append((float(p.x), float(p.y)))
-                campus_list.append(c)
+                coords = (float(p.x), float(p.y))
             except Exception:
                 continue
+            xy.append(coords)
+            campus_list.append(c)
+            if is_charter(c):
+                xy_charter.append(coords)
+                campus_list_charter.append(c)
 
         if not xy:
             self._kdtree = None
             self._xy_deg = None
             self._xy_rad = None
             self._campus_list = None
+            self._kdtree_charter = None
+            self._xy_deg_charter = None
+            self._xy_rad_charter = None
+            self._campus_list_charter = None
             return
 
         import numpy as np
@@ -1308,6 +1421,17 @@ class DataEngine:
 
         self._kdtree = cKDTree(self._xy_rad)
         self._campus_list = campus_list
+
+        if xy_charter:
+            self._xy_deg_charter = np.array(xy_charter, dtype=float)
+            self._xy_rad_charter = np.radians(self._xy_deg_charter)
+            self._kdtree_charter = cKDTree(self._xy_rad_charter)
+            self._campus_list_charter = campus_list_charter
+        else:
+            self._xy_deg_charter = None
+            self._xy_rad_charter = None
+            self._kdtree_charter = None
+            self._campus_list_charter = None
 
     def _ensure_all_xy_arrays(self):
         """Build NumPy arrays of all campus coordinates for fast bbox candidate queries."""
@@ -1402,13 +1526,58 @@ class DataEngine:
         idxs = np.nonzero(mask)[0]
         return [self._all_campuses_np[int(i)] for i in idxs]
 
-    def _haversine_miles_vec(self, lon: float, lat: float):
+    def _numpy_coords_and_campuses(
+        self, charter_only: bool
+    ) -> tuple[Any, Any] | tuple[None, None]:
+        """Build or reuse NumPy coordinate arrays keyed by charter filter."""
+        try:
+            import numpy as np  # type: ignore
+        except Exception:
+            return (None, None)
+
+        if charter_only:
+            coords = self._xy_deg_np_charter
+            clist = self._campus_list_np_charter
+        else:
+            coords = self._xy_deg_np
+            clist = self._campus_list_np
+
+        if coords is not None and clist is not None:
+            return coords, clist
+
+        xy = []
+        campuses = []
+        for c in self._campuses.values():
+            p = getattr(c, "point", None) or getattr(c, "location", None)
+            if p is None:
+                continue
+            if charter_only and not is_charter(c):
+                continue
+            try:
+                xy.append((float(p.x), float(p.y)))
+                campuses.append(c)
+            except Exception:
+                continue
+
+        if not xy:
+            return (None, None)
+
+        coords_arr = np.array(xy, dtype=float)
+        if charter_only:
+            self._xy_deg_np_charter = coords_arr
+            self._campus_list_np_charter = campuses
+        else:
+            self._xy_deg_np = coords_arr
+            self._campus_list_np = campuses
+        return coords_arr, campuses
+
+    def _haversine_miles_vec(self, lon: float, lat: float, coords):
         import numpy as np
 
         R = 3958.7613
         lon1, lat1 = np.radians([lon, lat])
-        lon2 = np.radians(self._xy_deg_np[:, 0])
-        lat2 = np.radians(self._xy_deg_np[:, 1])
+        lon2 = np.radians(coords[:, 0])
+        lat2 = np.radians(coords[:, 1])
         dlon = lon2 - lon1
         dlat = lat2 - lat1
         a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
@@ -1437,23 +1606,33 @@ class DataEngine:
 
         results: List[Tuple[float, Campus]] = []
 
-        if (
-            self._kdtree is not None
-            and self._xy_deg is not None
-            and self._campus_list is not None
-        ):
+        tree = (
+            self._kdtree_charter
+            if charter_only and self._kdtree_charter is not None
+            else self._kdtree
+        )
+        xy_arr = (
+            self._xy_deg_charter
+            if charter_only and self._xy_deg_charter is not None
+            else self._xy_deg
+        )
+        clist = (
+            self._campus_list_charter
+            if charter_only and self._campus_list_charter is not None
+            else self._campus_list
+        )
+
+        if tree is not None and xy_arr is not None and clist is not None:
             # Query in radians
             R = 3958.7613
             r = miles / R
             import numpy as np
 
-            idxs = self._kdtree.query_ball_point(np.radians([lon, lat]), r=r)
+            idxs = tree.query_ball_point(np.radians([lon, lat]), r=r)
             idxs = idxs if isinstance(idxs, list) else idxs[0]
             for i in idxs:
-                c = self._campus_list[i]
-                if charter_only and not is_charter(c):
-                    continue
-                x, y = self._xy_deg[i]
+                c = clist[i]
+                x, y = xy_arr[i]
                 d = haversine_miles(lon, lat, x, y)
                 results.append((d, c))
         else:
@@ -1471,23 +1650,10 @@ class DataEngine:
                     if d <= miles:
                         results.append((d, c))
             else:
-                if self._xy_deg_np is None or self._campus_list_np is None:
-                    import numpy as np
-
-                    xy = []
-                    clist = []
-                    for c in self._campuses.values():
-                        if c.point is None:
-                            continue
-                        if charter_only and not is_charter(c):
-                            continue
-                        xy.append((c.point.x, c.point.y))
-                        clist.append(c)
-                    if not xy:
-                        return []
-                    self._xy_deg_np = np.array(xy, dtype=float)
-                    self._campus_list_np = clist
-                dists = self._haversine_miles_vec(lon, lat)
+                coords, clist = self._numpy_coords_and_campuses(charter_only)
+                if coords is None or clist is None:
+                    return []
+                dists = self._haversine_miles_vec(lon, lat, coords)
                 import numpy as np
 
                 idxs = np.where(dists <= miles)[0]
@@ -1495,7 +1661,7 @@ class DataEngine:
                 idxs = [int(idxs[i]) for i in order]
                 if limit is not None:
                     idxs = idxs[:limit]
-                return [self._campus_list_np[i] for i in idxs]
+                return [clist[i] for i in idxs]
 
         results.sort(key=lambda t: t[0])
         if limit is not None:
@@ -1512,27 +1678,35 @@ class DataEngine:
         self._ensure_kdtree()
         results: List[Tuple[float, Campus]] = []
 
-        if (
-            self._kdtree is not None
-            and self._xy_deg is not None
-            and self._campus_list is not None
-        ):
+        tree = (
+            self._kdtree_charter
+            if charter_only and self._kdtree_charter is not None
+            else self._kdtree
+        )
+        xy_arr = (
+            self._xy_deg_charter
+            if charter_only and self._xy_deg_charter is not None
+            else self._xy_deg
+        )
+        clist = (
+            self._campus_list_charter
+            if charter_only and self._campus_list_charter is not None
+            else self._campus_list
+        )
+
+        if tree is not None and xy_arr is not None and clist is not None:
             from math import isfinite
             import numpy as np
 
-            dists, idxs = self._kdtree.query(
-                np.radians([lon, lat]), k=k if k > 1 else 1
-            )
+            dists, idxs = tree.query(np.radians([lon, lat]), k=k if k > 1 else 1)
             # Normalize outputs
             if k == 1:
                 dists = [float(dists)]
                 idxs = [int(idxs)]
             # Re-compute accurate miles and filter charter if needed
             for d0, i in zip(dists, idxs):
-                c = self._campus_list[int(i)]
-                if charter_only and not is_charter(c):
-                    continue
-                x, y = self._xy_deg[int(i)]
+                c = clist[int(i)]
+                x, y = xy_arr[int(i)]
                 dm = haversine_miles(lon, lat, x, y)
                 results.append((dm, c))
         else:
@@ -2194,7 +2368,25 @@ class DataEngine:
             ):
                 import numpy as np
 
-                total = len(self._campus_list)
+                tree = (
+                    self._kdtree_charter
+                    if charter_only and self._kdtree_charter is not None
+                    else self._kdtree
+                )
+                xy_arr = (
+                    self._xy_deg_charter
+                    if charter_only and self._xy_deg_charter is not None
+                    else self._xy_deg
+                )
+                clist = (
+                    self._campus_list_charter
+                    if charter_only and self._campus_list_charter is not None
+                    else self._campus_list
+                )
+                if tree is None or xy_arr is None or clist is None:
+                    total = 0
+                else:
+                    total = len(clist)
                 if total == 0:
                     return []
 
@@ -2203,17 +2395,15 @@ class DataEngine:
                     if limit is None or charter_only or max_miles is not None
                     else max(1, min(int(limit), total))
                 )
-                dists_rad, idxs = self._kdtree.query(
+                dists_rad, idxs = tree.query(
                     np.radians([x, y]), k=want if want > 1 else 1
                 )
                 dists_rad = np.atleast_1d(dists_rad)
                 idxs_arr = np.atleast_1d(idxs)
 
                 for _dist_rad, idx in zip(dists_rad, idxs_arr):
-                    c = self._campus_list[int(idx)]
-                    if charter_only and not is_charter(c):
-                        continue
-                    x2, y2 = self._xy_deg[int(idx)]
+                    c = clist[int(idx)]
+                    x2, y2 = xy_arr[int(idx)]
                     dm = haversine_miles(x, y, float(x2), float(y2))
                     if max_miles is not None and dm > max_miles:
                         continue
@@ -2225,6 +2415,24 @@ class DataEngine:
                 if limit is not None:
                     results = results[:limit]
                 return [c for _, c in results]
+
+            # Vectorized geodesic fallback if NumPy is available
+            coords, clist = self._numpy_coords_and_campuses(charter_only)
+            if coords is not None and clist is not None:
+                import numpy as np
+
+                dists = self._haversine_miles_vec(x, y, coords)
+                idxs = np.arange(len(clist))
+                if max_miles is not None:
+                    mask = dists <= max_miles
+                    dists = dists[mask]
+                    idxs = idxs[mask]
+                if dists.size:
+                    order = np.argsort(dists)
+                    idxs = idxs[order]
+                    if limit is not None:
+                        idxs = idxs[:limit]
+                    return [clist[int(i)] for i in idxs]
 
         # Fallback: planar or brute-force geodesic
         for c in self._campuses.values():

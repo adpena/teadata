@@ -34,3 +34,6 @@
 - Keep credentials and machine-local paths out of tracked files; rely on `teadata/teadata_sources.yaml` and untracked `*.local.*` overrides.
 - Treat `.cache/` artifacts and enrichment outputs as ephemeral; do not publish them unless explicitly sanitized.
 - When using optional extras (`[database]`, notebooks), avoid embedding connection strings in code or examples—use env vars or local config instead.
+
+## Downstream Dependencies
+- `teadata-app` consumes the public `DataEngine`/`Query` APIs and snapshot loading behavior directly; avoid breaking signatures, return types, or query semantics, and coordinate any behavioral changes with that app before merging.

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any, Optional, Tuple
 import re
 
@@ -127,6 +128,12 @@ _GRADE_SEGMENT_RE = re.compile(r"[A-Z0-9]+(?:\s*-\s*[A-Z0-9]+)?")
 
 
 def grade_spec_to_tokens(spec: str) -> list[str]:
+    """Parse a grade spec string into normalized tokens (cached for reuse)."""
+    return _grade_spec_to_tokens_cached(spec)
+
+
+@lru_cache(maxsize=2048)
+def _grade_spec_to_tokens_cached(spec: str) -> list[str]:
     text = spec.upper()
     for src, dst in GRADE_PHRASE_SUBS:
         text = text.replace(src, dst)
@@ -148,6 +155,12 @@ def grade_spec_to_tokens(spec: str) -> list[str]:
 
 
 def grade_spec_to_segments(spec: str) -> list[str]:
+    """Split grade spec text into segments; cached to avoid repeated regex work."""
+    return _grade_spec_to_segments_cached(spec)
+
+
+@lru_cache(maxsize=2048)
+def _grade_spec_to_segments_cached(spec: str) -> list[str]:
     text = spec.upper()
     for src, dst in GRADE_PHRASE_SUBS:
         text = text.replace(src, dst)
