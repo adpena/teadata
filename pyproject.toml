@@ -27,7 +27,6 @@ dependencies = [
 ]
 requires-python = ">=3.11"
 classifiers = [
-    "License :: OSI Approved :: MIT License",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
@@ -55,6 +54,12 @@ dev = [
     "pip-tools>=7.4",
     "pip-audit>=2.7",
     "deptry>=0.16",
+]
+
+# Documentation generation
+docs = [
+    "mkdocs-material>=9.5",
+    "mkdocstrings[python]>=0.24",
 ]
 
 # Notebook-only dependencies used in .ipynb files

@@ -29,7 +29,7 @@ from teadata.enrichment.campuses import (
 )
 from teadata.enrichment.charter_networks import add_charter_networks_from_config
 
-CFG = "teadata_sources.yaml"
+CFG = str(Path(__file__).resolve().with_name("teadata_sources.yaml"))
 YEAR = 2025
 
 # Optional env toggles
@@ -159,11 +159,27 @@ def _first_existing_dataset(cfg, candidates: list[str]) -> str | None:
     return None
 
 
+def _latest_year_for_dataset(cfg, dataset: str) -> int:
+    ymap = cfg.data_sources.get(dataset)
+    if not ymap:
+        raise KeyError(f"Dataset not found: {dataset}")
+    years = ymap.available_years()
+    if not years:
+        resolved = ymap.resolve(YEAR, strict=False)
+        if resolved:
+            resolved_year, _ = resolved
+            return YEAR if resolved_year == 9999 else resolved_year
+        raise KeyError(f"No years available for dataset: {dataset}")
+    return max(years)
+
+
 def run_enrichments(repo: DataEngine) -> None:
     """Run both district and campus enrichments with sensible fallbacks.
     - Districts from 'accountability' (sheet: 2011-2025 Summary)
     - Campuses from 'campus_accountability' if present else 'accountability'
     """
+    cfg_obj = load_config(CFG)
+
     # District enrichment
     try:
         acc_select = ["overall_rating_2025"]
@@ -200,11 +216,26 @@ def run_enrichments(repo: DataEngine) -> None:
     except Exception as e:
         print(f"[enrich] accountability - enrollment (districts) failed: {e}")
 
+    try:
+        tapr_year = _latest_year_for_dataset(cfg_obj, "district_tapr_student_staff_profile")
+        yr_tapr, n_tapr = enrich_districts_from_config(
+            repo,
+            CFG,
+            "district_tapr_student_staff_profile",
+            tapr_year,
+            select=None,
+            rename=None,
+            aliases=None,
+            reader_kwargs=None,
+        )
+        print(f"Enriched {n_tapr} districts from TAPR student/staff profile {yr_tapr}")
+    except Exception as e:
+        print(f"[enrich] district_tapr_student_staff_profile failed: {e}")
+
     # Campus enrichment
     try:
-        cfg = load_config(CFG)
         ds_name = (
-            _first_existing_dataset(cfg, ["campus_accountability", "accountability"])
+            _first_existing_dataset(cfg_obj, ["campus_accountability", "accountability"])
             or "accountability"
         )
         cam_select = ["overall_rating_2025"]
@@ -223,7 +254,6 @@ def run_enrichments(repo: DataEngine) -> None:
         print(f"[enrich] campus failed: {e}")
 
     try:
-        cfg_obj = load_config(CFG)
         dist_year, xfers_fp = cfg_obj.resolve(
             "campus_transfer_reports", YEAR, section="data_sources"
         )
@@ -266,11 +296,12 @@ def run_enrichments(repo: DataEngine) -> None:
         print(f"[enrich] campus_peims_financials failed: {e}")
 
     try:
+        tapr_year = _latest_year_for_dataset(cfg_obj, "campus_tapr_student_staff_profile")
         yr_tapr, n_tapr = enrich_campuses_from_config(
             repo,
             CFG,
             "campus_tapr_student_staff_profile",
-            YEAR,
+            tapr_year,
             select=None,
             rename=None,
             reader_kwargs=None,
@@ -280,11 +311,12 @@ def run_enrichments(repo: DataEngine) -> None:
         print(f"[enrich] campus_tapr_student_staff_profile failed: {e}")
 
     try:
+        hist_year = _latest_year_for_dataset(cfg_obj, "campus_tapr_historical_enrollment")
         yr_hist, n_hist = enrich_campuses_from_config(
             repo,
             CFG,
             "campus_tapr_historical_enrollment",
-            YEAR,
+            hist_year,
             select=None,
             rename=None,
             reader_kwargs=None,
@@ -408,6 +440,7 @@ def _compute_extra_signature() -> dict:
             "campus_peims_financials",
             "campus_tapr_student_staff_profile",
             "campus_tapr_historical_enrollment",
+            "district_tapr_student_staff_profile",
             "campus_planned_closures",
             "campus_transfer_reports",
         ):

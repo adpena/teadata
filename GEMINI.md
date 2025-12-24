@@ -1,0 +1,100 @@
+# teadata Project Context
+
+## Project Overview
+
+**teadata** is a high-performance, spatially-aware Python framework designed for the comprehensive analysis and modeling of Texas public education data (TEA). It provides a robust, object-oriented interface for handling large-scale geographic and demographic datasets.
+
+The framework employs a "snapshot-based" architecture: instead of repeatedly processing raw data, it loads a pre-built, optimized binary snapshot (pickle/gzip) containing the complete state of Districts, Campuses, and Geometries into memory. This facilitates near-instantaneous query execution and complex spatial operations.
+
+**Key Technologies:**
+*   **Language:** Python 3.11+
+*   **Data Manipulation:** Pandas, NumPy, DuckDB, PyArrow
+*   **Geospatial:** Shapely 2.0+, GeoPandas, PyOgrio, SciPy (KDTree)
+*   **Build System:** `uv` (recommended), `setuptools`
+*   **Testing/Quality:** `pytest`, `ruff`, `mypy`
+
+## Architecture & Core Concepts
+
+### 1. DataEngine (`teadata.engine.DataEngine`)
+The central hub of the library.
+*   **Loading:** Loads data from a snapshot file (defaulting to `.cache/repo_*.pkl`).
+*   **Querying:** Provides a fluent interface (`>>`) for filtering districts and campuses.
+*   **Spatial:** Manages spatial indexes (`cKDTree` for points, `STRtree` for geometries) to perform fast nearest-neighbor and point-in-polygon queries.
+*   **Enrichment:** Facilitates attaching external datasets (finance, accountability ratings) to entities.
+
+### 2. Domain Entities (`teadata.entities`)
+*   **`District`**: Represents a school district (ISD). Contains geometry (Polygon/MultiPolygon), enrollment, rating, and metadata.
+*   **`Campus`**: Represents a school. Contains location (Point), grade levels, school type, and metadata.
+*   **`EntityMap` / `EntityList`**: Specialized collections for holding these objects, providing Pandas-like methods (`.to_df()`, `.value_counts()`).
+
+### 3. Fluent Query DSL
+The `>>` operator is overloaded on `DataEngine` to support concise queries:
+```python
+# Get a district by number
+district = engine >> ("district", "101902")
+
+# Get all campuses in that district
+campuses = engine >> ("campuses_in", district)
+
+# Find 5 nearest campuses to a point
+nearest = engine >> ("nearest", (lon, lat), 5)
+```
+
+### 4. Data Sources (`teadata/teadata_sources.yaml`)
+Defines the mapping between logical data keys (e.g., `tapr`, `peims`) and physical file paths or URLs.
+
+## Directory Structure
+
+*   `teadata/`: Main package source code.
+    *   `engine.py`: Core `DataEngine` logic.
+    *   `entities.py`: `District` and `Campus` dataclasses.
+    *   `teadata_sources.yaml`: Data source configuration.
+    *   `scripts/`: Utilities for downloading/processing raw data.
+*   `examples/`: Example scripts and Jupyter notebooks demonstrating usage.
+*   `tests/`: `pytest` test suite.
+*   `docs/`: MkDocs documentation source.
+
+## Development Workflow
+
+### Installation
+The project uses `uv` for dependency management, but supports standard pip.
+
+```bash
+# Recommended
+uv sync
+
+# Standard pip
+pip install -e ".[dev,speedups,docs]"
+```
+
+### Running Tests
+```bash
+pytest
+```
+
+### Linting & Formatting
+```bash
+ruff check .
+mypy .
+```
+
+### Building Documentation
+```bash
+mkdocs serve
+```
+
+## Common Tasks
+
+*   **Loading Data:**
+    ```python
+    from teadata import DataEngine
+    # Tries to find the latest snapshot automatically
+    engine = DataEngine.from_snapshot()
+    ```
+
+*   **Accessing Attributes:**
+    Entities use dynamic attribute access via `__getattr__` to expose data stored in their `.meta` dictionary, allowing for flexible schema evolution.
+
+*   **Adding New Data:**
+    1.  Add the source definition to `teadata/teadata_sources.yaml`.
+    2.  Use/Modify scripts in `teadata/scripts/` to process the raw data into the snapshot format.
