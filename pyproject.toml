@@ -111,7 +111,7 @@ addopts = "-ra"
 
 [tool.deptry]
 # Optional: folders to skip
-exclude = ["tests", "docs", "examples", ".ipynb_checkpoints"]
+exclude = ["tests", "docs", "examples", ".ipynb_checkpoints", ".venv", "build", "dist"]
 known_first_party = ["teadata"]
 
 # Per-rule ignores by code
@@ -137,6 +137,8 @@ DEP002 = [
     "itables",
     "google-auth",
     "psycopg",
+    "mkdocs-material",
+    "mkdocstrings",
 ]
 DEP003 = [
     "scipy",
