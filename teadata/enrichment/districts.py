@@ -49,7 +49,7 @@ def _canon_district_number(x: Any) -> Optional[str]:
 # -----------------------------
 
 
-def _apply_district_accountability(
+def _apply_district_enrichment_table(
     repo,
     cfg_path: str,
     dataset: str,
@@ -223,9 +223,9 @@ def _apply_district_accountability(
 
 
 @enricher("accountability")
-class DistrictAccountability(Enricher):
+class DistrictEnrichmentTable(Enricher):
     def apply(self, repo, cfg_path: str, year: int) -> Dict[str, Any]:
-        year_resolved, updated = _apply_district_accountability(
+        year_resolved, updated = _apply_district_enrichment_table(
             repo,
             cfg_path,
             "accountability",
@@ -241,7 +241,7 @@ class DistrictAccountability(Enricher):
 @enricher("district_tapr_student_staff_profile")
 class DistrictTaprStudentStaffProfile(Enricher):
     def apply(self, repo, cfg_path: str, year: int) -> Dict[str, Any]:
-        year_resolved, updated = _apply_district_accountability(
+        year_resolved, updated = _apply_district_enrichment_table(
             repo,
             cfg_path,
             "district_tapr_student_staff_profile",
@@ -268,7 +268,7 @@ def enrich_districts_from_config(
     reader_kwargs=None,
 ):
     """Compatibility wrapper. Returns (resolved_year, updated_count)."""
-    return _apply_district_accountability(
+    return _apply_district_enrichment_table(
         repo,
         cfg_path,
         dataset,

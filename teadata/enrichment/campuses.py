@@ -69,8 +69,8 @@ def _build_campus_multi_index(repo) -> dict[str, Any]:
     return idx
 
 
-# Shared helper for campus accountability enrichment
-def _apply_campus_accountability(
+# Shared helper for campus enrichment tables
+def _apply_campus_enrichment_table(
     repo,
     cfg_path: str,
     dataset: str,
@@ -400,7 +400,7 @@ def _apply_campus_planned_closures(
         for col in default_columns:
             campus.meta.setdefault(col, None)
 
-    return _apply_campus_accountability(
+    return _apply_campus_enrichment_table(
         repo,
         cfg_path,
         dataset,
@@ -445,7 +445,7 @@ def enrich_campuses_from_config(
             reader_kwargs=reader_kwargs,
         )
 
-    return _apply_campus_accountability(
+    return _apply_campus_enrichment_table(
         repo,
         cfg_path,
         dataset,
@@ -458,9 +458,9 @@ def enrich_campuses_from_config(
 
 
 @enricher("campus_accountability")
-class CampusAccountability(Enricher):
+class CampusEnrichmentTable(Enricher):
     def apply(self, repo, cfg_path: str, year: int) -> Dict[str, Any]:
-        year_resolved, updated = _apply_campus_accountability(
+        year_resolved, updated = _apply_campus_enrichment_table(
             repo,
             cfg_path,
             "campus_accountability",
@@ -491,7 +491,7 @@ class CampusPEIMSFinancials(Enricher):
 @enricher("campus_tapr_student_staff_profile")
 class CampusTaprStudentStaffProfile(Enricher):
     def apply(self, repo, cfg_path: str, year: int) -> Dict[str, Any]:
-        yr, updated = _apply_campus_accountability(
+        yr, updated = _apply_campus_enrichment_table(
             repo,
             cfg_path,
             "campus_tapr_student_staff_profile",
@@ -507,7 +507,7 @@ class CampusTaprStudentStaffProfile(Enricher):
 @enricher("campus_tapr_historical_enrollment")
 class CampusTaprHistoricalEnrollment(Enricher):
     def apply(self, repo, cfg_path: str, year: int) -> Dict[str, Any]:
-        yr, updated = _apply_campus_accountability(
+        yr, updated = _apply_campus_enrichment_table(
             repo,
             cfg_path,
             "campus_tapr_historical_enrollment",

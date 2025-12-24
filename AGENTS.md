@@ -7,10 +7,11 @@
 - Tests reside in `tests/` (e.g., `tests/test_snapshot_loading.py`), and example notebooks/scripts are in `examples/`. Packaging artifacts land in `build/` and `teadata.egg-info/`.
 
 ## Build, Test, and Development Commands
-- Install for iterative work: `pip install -e .` (add `[dev]` for pytest/ruff/mypy, `[database]` for SQLAlchemy extras).
-- Run the suite: `python -m pytest` or target a test (`pytest tests/test_entities.py::test_campus_to_dict_includes_percent_enrollment_change`).
-- Optional: build a fresh snapshot from the configured spatial files with `python -m teadata.load_data` (uses `teadata_sources.yaml` and writes to `.cache/`).
-- Packaging sanity check: `python -m build` after a clean `git status` if you need a wheel/sdist.
+- Install for iterative work: `uv sync --all-extras` (this handles dev, database, and notebook extras automatically).
+- Run the suite: `uv run pytest` or target a test (`uv run pytest tests/test_entities.py::test_campus_to_dict_includes_percent_enrollment_change`).
+- Optional: build a fresh snapshot from the configured spatial files with `uv run python -m teadata.load_data` (uses `teadata_sources.yaml` and writes to `.cache/`).
+- Packaging sanity check: `uv build` after a clean `git status` if you need a wheel/sdist.
+- Linting and type checking: `uv run ruff check .` and `uv run mypy .`.
 
 ## Coding Style & Naming Conventions
 - Python 3.11+, PEP 8 defaults, 4-space indents, and type hints preferred (modules use `from __future__ import annotations`).

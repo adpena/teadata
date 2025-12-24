@@ -95,6 +95,38 @@ def _expand_path(value: str) -> str:
     return value
 
 
+def _rewrite_relative_paths(raw: dict, base_dir: Path) -> dict:
+    """Rewrite relative file paths in data_sources/spatial to be relative to base_dir."""
+
+    def rewrite_value(val: Any) -> Any:
+        if not isinstance(val, str):
+            return val
+        stripped = val.strip()
+        if stripped.isdigit() or "://" in stripped:
+            return val
+        expanded = _expand_path(val)
+        path = Path(expanded)
+        if path.is_absolute():
+            return str(path)
+        return str(base_dir / path)
+
+    def rewrite_section(section: dict) -> dict:
+        out: dict = {}
+        for key, mapping in section.items():
+            if not isinstance(mapping, dict):
+                out[key] = mapping
+                continue
+            out[key] = {k: rewrite_value(v) for k, v in mapping.items()}
+        return out
+
+    updated = dict(raw)
+    for section_key in ("data_sources", "spatial"):
+        section = updated.get(section_key)
+        if isinstance(section, dict):
+            updated[section_key] = rewrite_section(section)
+    return updated
+
+
 def _coerce_year_key(k: Any) -> Optional[int]:
     """Accept int keys, or strings like '2015' -> 2015."""
     if isinstance(k, int):
@@ -951,6 +983,7 @@ def load_config(path: str | Path) -> Config:
     if not p.exists():
         raise FileNotFoundError(p)
     raw = _detect_and_load(p)
+    raw = _rewrite_relative_paths(raw, p.resolve().parent)
     cfg = Config.from_dict(raw)
     return cfg
 
