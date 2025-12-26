@@ -723,25 +723,25 @@ class DataEngine:
             # (A) If any element is already a DataEngine instance, just use it.
             for p in parts:
                 if isinstance(p, cls):
-                if os.environ.get("TEADATA_DEBUG"):
-                    print(
-                        f"[snapshot] tuple contains DataEngine; returning embedded engine "
-                        f"with {len(p._districts)} districts / {len(p._campuses)} campuses"
+                    if os.environ.get("TEADATA_DEBUG"):
+                        print(
+                            f"[snapshot] tuple contains DataEngine; returning embedded engine "
+                            f"with {len(p._districts)} districts / {len(p._campuses)} campuses"
+                        )
+                    try:
+                        p._rehydrate_geometries()
+                    except Exception:
+                        pass
+                    _log_memory(
+                        "snapshot.tuple.engine",
+                        {
+                            "path": path,
+                            "indexes_enabled": getattr(p, "_indexes_enabled", None),
+                            "districts": len(getattr(p, "_districts", {})),
+                            "campuses": len(getattr(p, "_campuses", {})),
+                        },
                     )
-                try:
-                    p._rehydrate_geometries()
-                except Exception:
-                    pass
-                _log_memory(
-                    "snapshot.tuple.engine",
-                    {
-                        "path": path,
-                        "indexes_enabled": getattr(p, "_indexes_enabled", None),
-                        "districts": len(getattr(p, "_districts", {})),
-                        "campuses": len(getattr(p, "_campuses", {})),
-                    },
-                )
-                return p
+                    return p
 
             # (B) Otherwise try to coerce “(district_map, campus_map)” style payloads
             if len(parts) >= 2:
