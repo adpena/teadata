@@ -100,6 +100,16 @@ def _compat_pickle_load(fobj) -> object:
 ENABLE_PROFILING = False
 
 
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return str(raw).strip().lower() not in ("0", "false", "no", "off", "")
+
+
+DEFAULT_INDEXES_ENABLED = not _env_flag("TEADATA_DISABLE_INDEXES", default=False)
+
+
 def timeit(func):
     def wrapper(*args, **kwargs):
         t0 = time.perf_counter()
@@ -473,6 +483,7 @@ class DataEngine:
         *,
         search: bool = True,
         eager_indexes: bool = False,
+        indexes_enabled: bool | None = None,
     ) -> "DataEngine":
         """
         Load a DataEngine from a pickled snapshot (.pkl or .pkl.gz). This method **never** returns None.
@@ -486,7 +497,11 @@ class DataEngine:
                 (districts_dict, campuses_dict)
             or  (districts_dict, campuses_dict, meta_dict)
             or  lists of District/Campus instead of dicts
+        indexes_enabled overrides TEADATA_DISABLE_INDEXES for this engine instance.
         """
+        if indexes_enabled is None:
+            indexes_enabled = DEFAULT_INDEXES_ENABLED
+
         # Resolve the path to open
         path: Optional[Path]
         if snapshot is not None:
@@ -495,7 +510,7 @@ class DataEngine:
             path = _discover_snapshot(None) if search else None
 
         if path is None:
-            return cls()  # empty engine (no snapshot found)
+            return cls(indexes_enabled=indexes_enabled)  # empty engine (no snapshot found)
 
         if not path.exists() or not path.is_file():
             raise RuntimeError(f"Snapshot not found or not a file: {path}")
@@ -521,6 +536,7 @@ class DataEngine:
             ):
                 if not hasattr(obj, attr):
                     setattr(obj, attr, None)
+            obj._set_indexes_enabled(indexes_enabled)
             if eager_indexes:
                 try:
                     obj.warm_indexes()
@@ -529,7 +545,7 @@ class DataEngine:
             return obj
 
         # Create an instance early so we can use instance coercers
-        eng = cls()
+        eng = cls(indexes_enabled=indexes_enabled)
 
         # Helper to coerce various container shapes into {uuid -> District/Campus}
         def _coerce_entity_map(x, kind: str):
@@ -634,12 +650,12 @@ class DataEngine:
         raise TypeError(f"Unsupported snapshot payload type: {type(obj)!r} in {path}")
 
     @classmethod
-    def load_default(cls) -> "DataEngine":
+    def load_default(cls, *, indexes_enabled: bool | None = None) -> "DataEngine":
         """
         Convenience: try to load a snapshot discovered from common locations; otherwise return a fresh engine.
         Never returns None.
         """
-        return cls.from_snapshot(None, search=True)
+        return cls.from_snapshot(None, search=True, indexes_enabled=indexes_enabled)
 
     def __init__(
         self,
@@ -647,13 +663,18 @@ class DataEngine:
         *,
         autoload: bool = False,
         eager_indexes: bool = False,
+        indexes_enabled: bool | None = None,
     ):
+        if indexes_enabled is None:
+            indexes_enabled = DEFAULT_INDEXES_ENABLED
+        self._indexes_enabled = bool(indexes_enabled)
         # Optional early autoload from snapshot
         if snapshot is not None or autoload:
             eng = self.from_snapshot(
                 snapshot,
                 search=autoload and snapshot is None,
                 eager_indexes=eager_indexes,
+                indexes_enabled=indexes_enabled,
             )
             # If we got a different instance, copy its state into self
             if eng is not self:
@@ -708,6 +729,9 @@ class DataEngine:
                 # Fast name lookups
                 self._district_by_name_lower: Dict[str, uuid.UUID] = {}
                 self._campus_by_name_lower: Dict[str, uuid.UUID] = {}
+                self._indexes_enabled = getattr(
+                    eng, "_indexes_enabled", DEFAULT_INDEXES_ENABLED
+                )
 
                 # Student transfer edges (optional enrichment).
                 # _xfers_out: campus_id -> list[(to_campus_id, count:int|None, masked:bool)]
@@ -731,7 +755,7 @@ class DataEngine:
                     self._rehydrate_geometries()
                 except Exception:
                     pass
-                if eager_indexes:
+                if eager_indexes and self._indexes_enabled:
                     try:
                         self.warm_indexes()
                     except Exception:
@@ -776,7 +800,7 @@ class DataEngine:
         self._district_by_name_lower: Dict[str, uuid.UUID] = {}
         self._campus_by_name_lower: Dict[str, uuid.UUID] = {}
 
-        if eager_indexes:
+        if eager_indexes and self._indexes_enabled:
             try:
                 self.warm_indexes()
             except Exception:
@@ -788,6 +812,8 @@ class DataEngine:
         front-loads caching (e.g., teadata-app under Django) to avoid first-request
         latency. Safe to call multiple times.
         """
+        if not getattr(self, "_indexes_enabled", True):
+            return
         try:
             self._ensure_kdtree()
         except Exception:
@@ -1187,7 +1213,42 @@ class DataEngine:
     def _clear_charter_cache(self):
         self._charter_cache = None
 
+    def _clear_spatial_indexes(self) -> None:
+        for attr in (
+            "_kdtree",
+            "_kdtree_charter",
+            "_xy_deg",
+            "_xy_rad",
+            "_campus_list",
+            "_xy_deg_charter",
+            "_xy_rad_charter",
+            "_campus_list_charter",
+            "_point_tree",
+            "_point_geoms",
+            "_point_ids",
+            "_geom_id_to_index",
+            "_geom_wkb_to_index",
+            "_xy_deg_np",
+            "_campus_list_np",
+            "_xy_deg_np_charter",
+            "_campus_list_np_charter",
+            "_all_xy_np",
+            "_all_campuses_np",
+            "_xy_to_index",
+        ):
+            setattr(self, attr, None)
+        self._charter_cache = None
+
+    def _set_indexes_enabled(self, enabled: bool) -> None:
+        self._indexes_enabled = bool(enabled)
+        if not self._indexes_enabled:
+            self._clear_spatial_indexes()
+
     def _ensure_charter_cache(self) -> _CharterCache:
+        if not getattr(self, "_indexes_enabled", True):
+            cache = _CharterCache(has_numpy=False, entries={})
+            self._charter_cache = cache
+            return cache
         cache = getattr(self, "_charter_cache", None)
         if cache is not None:
             return cache
@@ -1305,6 +1366,8 @@ class DataEngine:
 
     def _ensure_point_strtree(self):
         """Build a Shapely STRtree over campus points for fast spatial containment queries (Shapely 2.x–only)."""
+        if not getattr(self, "_indexes_enabled", True):
+            return
         if not SHAPELY:
             self._point_tree = None
             self._point_geoms = None
@@ -1364,6 +1427,8 @@ class DataEngine:
         Build a KD-tree over campus points (in radians) for fast radius/KNN queries.
         Uses scipy.spatial.cKDTree if available; otherwise leaves tree as None.
         """
+        if not getattr(self, "_indexes_enabled", True):
+            return
         if (
             getattr(self, "_kdtree", None) is not None
             and getattr(self, "_kdtree_charter", None) is not None
@@ -1435,6 +1500,8 @@ class DataEngine:
 
     def _ensure_all_xy_arrays(self):
         """Build NumPy arrays of all campus coordinates for fast bbox candidate queries."""
+        if not getattr(self, "_indexes_enabled", True):
+            return
         try:
             import numpy as np  # type: ignore
         except Exception:
@@ -1484,7 +1551,7 @@ class DataEngine:
 
     def _bbox_candidates(self, poly) -> List[Campus]:
         """Return campuses whose points fall within the polygon's axis-aligned bounding box."""
-        if not SHAPELY:
+        if not SHAPELY or not getattr(self, "_indexes_enabled", True):
             # Fallback: simple Python loop without NumPy
             if hasattr(poly, "bounds"):
                 minx, miny, maxx, maxy = poly.bounds
@@ -1597,6 +1664,21 @@ class DataEngine:
         Fast radius query using KDTree when available; robust haversine fallback otherwise.
         Returns campuses within 'miles' of (lon, lat), optionally filtered to charters, optionally limited.
         """
+        if not getattr(self, "_indexes_enabled", True):
+            results: List[Tuple[float, Campus]] = []
+            for c in self._campuses.values():
+                if c.point is None:
+                    continue
+                if charter_only and not is_charter(c):
+                    continue
+                x, y = c.point.x, c.point.y
+                d = haversine_miles(lon, lat, x, y)
+                if d <= miles:
+                    results.append((d, c))
+            results.sort(key=lambda t: t[0])
+            if limit is not None:
+                results = results[:limit]
+            return [c for _, c in results]
         # Try KDTree path
         self._ensure_kdtree()
         try:
@@ -1741,6 +1823,55 @@ class DataEngine:
 
         if not targets_by_type:
             return {}
+
+        if not getattr(self, "_indexes_enabled", True):
+            candidates_by_type: Dict[str, list[tuple[Campus, tuple[float, float]]]] = (
+                defaultdict(list)
+            )
+            for cand in self._campuses.values():
+                if not is_charter(cand):
+                    continue
+                st = (getattr(cand, "school_type", None) or "").strip()
+                if not st:
+                    continue
+                pt = getattr(cand, "point", None) or getattr(cand, "location", None)
+                if pt is None:
+                    continue
+                try:
+                    lon2, lat2 = float(pt.x), float(pt.y)
+                except Exception:
+                    continue
+                candidates_by_type[st].append((cand, (lon2, lat2)))
+
+            results: Dict[str, Dict[str, Any]] = {}
+            for st, targets in targets_by_type.items():
+                cand_list = candidates_by_type.get(st, [])
+                if not cand_list:
+                    for campus in targets:
+                        results[str(campus.id)] = {"match": None, "miles": None}
+                    continue
+                for campus in targets:
+                    pt = getattr(campus, "point", None) or getattr(
+                        campus, "location", None
+                    )
+                    if pt is None:
+                        results[str(campus.id)] = {"match": None, "miles": None}
+                        continue
+                    try:
+                        lon1, lat1 = float(pt.x), float(pt.y)
+                    except Exception:
+                        results[str(campus.id)] = {"match": None, "miles": None}
+                        continue
+
+                    best_dm: Optional[float] = None
+                    best_obj: Optional[Campus] = None
+                    for cand, (lon2, lat2) in cand_list:
+                        dm = haversine_miles(lon1, lat1, lon2, lat2)
+                        if best_dm is None or dm < best_dm:
+                            best_dm = float(dm)
+                            best_obj = cand
+                    results[str(campus.id)] = {"match": best_obj, "miles": best_dm}
+            return results
 
         cache = self._ensure_charter_cache()
         entries = cache.entries
@@ -2054,7 +2185,7 @@ class DataEngine:
                     return out_bb
 
         # STRtree (Shapely 2.x) fast path using indices
-        if SHAPELY:
+        if SHAPELY and getattr(self, "_indexes_enabled", True):
             self._ensure_point_strtree()
             if self._point_tree is not None:
                 try:
@@ -2359,7 +2490,7 @@ class DataEngine:
         use_geodesic = geodesic and probably_lonlat(x, y)
 
         # KDTree fast path (geodesic lon/lat only)
-        if use_geodesic:
+        if use_geodesic and getattr(self, "_indexes_enabled", True):
             self._ensure_kdtree()
             if (
                 self._kdtree is not None
