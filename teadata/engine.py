@@ -162,12 +162,40 @@ def _format_bytes(value: Optional[int]) -> Optional[str]:
     return f"{value / (1024 * 1024):.1f}MB"
 
 
+def _read_cgroup_value(path: str) -> Optional[int]:
+    try:
+        with open(path, "r", encoding="utf-8") as handle:
+            raw = handle.read().strip()
+    except Exception:
+        return None
+    if not raw or raw == "max":
+        return None
+    if raw.isdigit():
+        return int(raw)
+    return None
+
+
+def _read_cgroup_memory() -> dict[str, int]:
+    current = _read_cgroup_value("/sys/fs/cgroup/memory.current")
+    maximum = _read_cgroup_value("/sys/fs/cgroup/memory.max")
+    if current is None or maximum is None:
+        current = _read_cgroup_value("/sys/fs/cgroup/memory/memory.usage_in_bytes")
+        maximum = _read_cgroup_value("/sys/fs/cgroup/memory/memory.limit_in_bytes")
+    info: dict[str, int] = {}
+    if current is not None:
+        info["current"] = current
+    if maximum is not None and maximum < 1 << 60:
+        info["max"] = maximum
+    return info
+
+
 def _memory_snapshot(label: str, extra: Optional[dict[str, object]] = None) -> str:
     parts: list[str] = [f"label={label}", f"pid={os.getpid()}"]
     rss = _read_proc_status_value("VmRSS")
     hwm = _read_proc_status_value("VmHWM")
     maxrss = _ru_maxrss_bytes()
     meminfo = _read_proc_meminfo()
+    cgroup = _read_cgroup_memory()
     rss_fmt = _format_bytes(rss)
     hwm_fmt = _format_bytes(hwm)
     maxrss_fmt = _format_bytes(maxrss)
@@ -181,6 +209,10 @@ def _memory_snapshot(label: str, extra: Optional[dict[str, object]] = None) -> s
         parts.append(f"mem_available={_format_bytes(meminfo['MemAvailable'])}")
     if "MemTotal" in meminfo:
         parts.append(f"mem_total={_format_bytes(meminfo['MemTotal'])}")
+    if "current" in cgroup:
+        parts.append(f"cgroup_current={_format_bytes(cgroup['current'])}")
+    if "max" in cgroup:
+        parts.append(f"cgroup_max={_format_bytes(cgroup['max'])}")
     if extra:
         for key, value in extra.items():
             parts.append(f"{key}={value}")
