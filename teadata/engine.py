@@ -10,9 +10,11 @@ from pathlib import Path
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 import gzip
 import io
+import logging
 import math
 import os
 import pickle
+import sys
 import tempfile
 import time
 import urllib.request
@@ -97,6 +99,8 @@ def _compat_pickle_load(fobj) -> object:
             raise ee from e
 
 
+logger = logging.getLogger(__name__)
+
 ENABLE_PROFILING = False
 
 
@@ -108,6 +112,85 @@ def _env_flag(name: str, default: bool = False) -> bool:
 
 
 DEFAULT_INDEXES_ENABLED = not _env_flag("TEADATA_DISABLE_INDEXES", default=False)
+LOG_MEMORY = _env_flag("TEADATA_LOG_MEMORY", default=False)
+
+
+def _read_proc_status_value(key: str) -> Optional[int]:
+    try:
+        with open("/proc/self/status", "r", encoding="utf-8") as handle:
+            for line in handle:
+                if line.startswith(f"{key}:"):
+                    parts = line.split()
+                    if len(parts) >= 2 and parts[1].isdigit():
+                        return int(parts[1]) * 1024
+    except Exception:
+        return None
+    return None
+
+
+def _read_proc_meminfo() -> dict[str, int]:
+    info: dict[str, int] = {}
+    try:
+        with open("/proc/meminfo", "r", encoding="utf-8") as handle:
+            for line in handle:
+                if line.startswith(("MemTotal:", "MemAvailable:")):
+                    parts = line.split()
+                    if len(parts) >= 2 and parts[1].isdigit():
+                        info[parts[0].rstrip(":")] = int(parts[1]) * 1024
+    except Exception:
+        return info
+    return info
+
+
+def _ru_maxrss_bytes() -> Optional[int]:
+    try:
+        import resource
+    except Exception:
+        return None
+    try:
+        rss = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    except Exception:
+        return None
+    if sys.platform == "darwin":
+        return int(rss)
+    return int(rss) * 1024
+
+
+def _format_bytes(value: Optional[int]) -> Optional[str]:
+    if value is None:
+        return None
+    return f"{value / (1024 * 1024):.1f}MB"
+
+
+def _memory_snapshot(label: str, extra: Optional[dict[str, object]] = None) -> str:
+    parts: list[str] = [f"label={label}", f"pid={os.getpid()}"]
+    rss = _read_proc_status_value("VmRSS")
+    hwm = _read_proc_status_value("VmHWM")
+    maxrss = _ru_maxrss_bytes()
+    meminfo = _read_proc_meminfo()
+    rss_fmt = _format_bytes(rss)
+    hwm_fmt = _format_bytes(hwm)
+    maxrss_fmt = _format_bytes(maxrss)
+    if rss_fmt:
+        parts.append(f"rss={rss_fmt}")
+    if hwm_fmt:
+        parts.append(f"hwm={hwm_fmt}")
+    if maxrss_fmt:
+        parts.append(f"ru_maxrss={maxrss_fmt}")
+    if "MemAvailable" in meminfo:
+        parts.append(f"mem_available={_format_bytes(meminfo['MemAvailable'])}")
+    if "MemTotal" in meminfo:
+        parts.append(f"mem_total={_format_bytes(meminfo['MemTotal'])}")
+    if extra:
+        for key, value in extra.items():
+            parts.append(f"{key}={value}")
+    return " ".join(parts)
+
+
+def _log_memory(label: str, extra: Optional[dict[str, object]] = None) -> None:
+    if not LOG_MEMORY:
+        return
+    logger.info("memory %s", _memory_snapshot(label, extra=extra))
 
 
 def timeit(func):
@@ -510,7 +593,16 @@ class DataEngine:
             path = _discover_snapshot(None) if search else None
 
         if path is None:
-            return cls(indexes_enabled=indexes_enabled)  # empty engine (no snapshot found)
+            eng = cls(indexes_enabled=indexes_enabled)  # empty engine (no snapshot found)
+            _log_memory(
+                "snapshot.none",
+                {
+                    "indexes_enabled": getattr(eng, "_indexes_enabled", None),
+                    "districts": len(getattr(eng, "_districts", {})),
+                    "campuses": len(getattr(eng, "_campuses", {})),
+                },
+            )
+            return eng
 
         if not path.exists() or not path.is_file():
             raise RuntimeError(f"Snapshot not found or not a file: {path}")
@@ -542,6 +634,15 @@ class DataEngine:
                     obj.warm_indexes()
                 except Exception:
                     pass
+            _log_memory(
+                "snapshot.engine",
+                {
+                    "path": path,
+                    "indexes_enabled": getattr(obj, "_indexes_enabled", None),
+                    "districts": len(getattr(obj, "_districts", {})),
+                    "campuses": len(getattr(obj, "_campuses", {})),
+                },
+            )
             return obj
 
         # Create an instance early so we can use instance coercers
@@ -603,6 +704,15 @@ class DataEngine:
                 print(
                     f"[snapshot] loaded districts={len(eng._districts)} campuses={len(eng._campuses)} from {path}"
                 )
+            _log_memory(
+                "snapshot.dict",
+                {
+                    "path": path,
+                    "indexes_enabled": getattr(eng, "_indexes_enabled", None),
+                    "districts": len(getattr(eng, "_districts", {})),
+                    "campuses": len(getattr(eng, "_campuses", {})),
+                },
+            )
             return eng
 
         # Case 3: tuple/list payloads emitted by loader scripts (e.g., load_data2.py)
@@ -613,16 +723,25 @@ class DataEngine:
             # (A) If any element is already a DataEngine instance, just use it.
             for p in parts:
                 if isinstance(p, cls):
-                    if os.environ.get("TEADATA_DEBUG"):
-                        print(
-                            f"[snapshot] tuple contains DataEngine; returning embedded engine "
-                            f"with {len(p._districts)} districts / {len(p._campuses)} campuses"
-                        )
-                    try:
-                        p._rehydrate_geometries()
-                    except Exception:
-                        pass
-                    return p
+                if os.environ.get("TEADATA_DEBUG"):
+                    print(
+                        f"[snapshot] tuple contains DataEngine; returning embedded engine "
+                        f"with {len(p._districts)} districts / {len(p._campuses)} campuses"
+                    )
+                try:
+                    p._rehydrate_geometries()
+                except Exception:
+                    pass
+                _log_memory(
+                    "snapshot.tuple.engine",
+                    {
+                        "path": path,
+                        "indexes_enabled": getattr(p, "_indexes_enabled", None),
+                        "districts": len(getattr(p, "_districts", {})),
+                        "campuses": len(getattr(p, "_campuses", {})),
+                    },
+                )
+                return p
 
             # (B) Otherwise try to coerce “(district_map, campus_map)” style payloads
             if len(parts) >= 2:
@@ -644,6 +763,15 @@ class DataEngine:
                         f"[snapshot] tuple->coerced maps: districts={len(eng._districts)} "
                         f"campuses={len(eng._campuses)} from {path}"
                     )
+                _log_memory(
+                    "snapshot.tuple",
+                    {
+                        "path": path,
+                        "indexes_enabled": getattr(eng, "_indexes_enabled", None),
+                        "districts": len(getattr(eng, "_districts", {})),
+                        "campuses": len(getattr(eng, "_campuses", {})),
+                    },
+                )
                 return eng
 
         # Unsupported payload type
@@ -1243,11 +1371,27 @@ class DataEngine:
         self._indexes_enabled = bool(enabled)
         if not self._indexes_enabled:
             self._clear_spatial_indexes()
+        _log_memory(
+            "indexes.toggle",
+            {
+                "enabled": self._indexes_enabled,
+                "districts": len(getattr(self, "_districts", {})),
+                "campuses": len(getattr(self, "_campuses", {})),
+            },
+        )
 
     def _ensure_charter_cache(self) -> _CharterCache:
         if not getattr(self, "_indexes_enabled", True):
             cache = _CharterCache(has_numpy=False, entries={})
             self._charter_cache = cache
+            _log_memory(
+                "indexes.charter_cache.disabled",
+                {
+                    "entries": 0,
+                    "districts": len(getattr(self, "_districts", {})),
+                    "campuses": len(getattr(self, "_campuses", {})),
+                },
+            )
             return cache
         cache = getattr(self, "_charter_cache", None)
         if cache is not None:
@@ -1291,6 +1435,14 @@ class DataEngine:
             entries[st] = _CharterCacheEntry(objs_by_type[st], coords_payload, tree)
         cache = _CharterCache(has_numpy=np is not None, entries=entries)
         self._charter_cache = cache
+        _log_memory(
+            "indexes.charter_cache.built",
+            {
+                "entries": len(entries),
+                "districts": len(getattr(self, "_districts", {})),
+                "campuses": len(getattr(self, "_campuses", {})),
+            },
+        )
         return cache
 
     def _rebuild_indexes(self):
@@ -1415,6 +1567,14 @@ class DataEngine:
         self._geom_id_to_index = None
         self._geom_wkb_to_index = None
         self._xy_to_index = None
+        _log_memory(
+            "indexes.strtree.built",
+            {
+                "points": len(geoms),
+                "districts": len(getattr(self, "_districts", {})),
+                "campuses": len(getattr(self, "_campuses", {})),
+            },
+        )
 
         if ENABLE_PROFILING:
             try:
@@ -1497,6 +1657,15 @@ class DataEngine:
             self._xy_rad_charter = None
             self._kdtree_charter = None
             self._campus_list_charter = None
+        _log_memory(
+            "indexes.kdtree.built",
+            {
+                "points": len(xy),
+                "charter_points": len(xy_charter),
+                "districts": len(getattr(self, "_districts", {})),
+                "campuses": len(getattr(self, "_campuses", {})),
+            },
+        )
 
     def _ensure_all_xy_arrays(self):
         """Build NumPy arrays of all campus coordinates for fast bbox candidate queries."""
@@ -1529,6 +1698,14 @@ class DataEngine:
 
         self._all_xy_np = np.array(xy, dtype=float)
         self._all_campuses_np = clist
+        _log_memory(
+            "indexes.all_xy.built",
+            {
+                "points": len(xy),
+                "districts": len(getattr(self, "_districts", {})),
+                "campuses": len(getattr(self, "_campuses", {})),
+            },
+        )
 
     @staticmethod
     def _extract_polygon_coords(poly) -> List[Tuple[float, float]]:
