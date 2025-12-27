@@ -176,6 +176,8 @@ target/
 *.pickle
 !/.cache/boundaries_*.sqlite
 !/teadata/.cache/boundaries_*.sqlite
+!/.cache/map_payloads_*.sqlite
+!/teadata/.cache/map_payloads_*.sqlite
 # Spatial data (comment out if you version control canonical shapes)
 *.geojson
 *.gpkg

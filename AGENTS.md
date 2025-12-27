@@ -10,6 +10,7 @@
 - Install for iterative work: `uv sync --all-extras` (this handles dev, database, and notebook extras automatically).
 - Run the suite: `uv run pytest` or target a test (`uv run pytest tests/test_entities.py::test_campus_to_dict_includes_percent_enrollment_change`).
 - Optional: build a fresh snapshot from the configured spatial files with `uv run python -m teadata.load_data` (uses `teadata_sources.yaml` and writes to `.cache/`).
+- When code changes affect anything serialized into the snapshot (pickled data), run `uv run python -m teadata.load_data` as the final task to refresh snapshot artifacts.
 - Packaging sanity check: `uv build` after a clean `git status` if you need a wheel/sdist.
 - Linting and type checking: `uv run ruff check .` and `uv run mypy .`.
 

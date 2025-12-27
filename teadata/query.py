@@ -139,11 +139,29 @@ class Query:
     # Serialization helpers
     # ------------------------------------------------------------------
     def to_dicts(
-        self, *, include_meta: bool = True, include_geometry: bool = False
+        self,
+        *,
+        include_meta: bool = True,
+        include_geometry: bool = False,
+        columns: list[str] | None = None,
     ) -> list[dict]:
         """Materialize the current query items as a list of dictionaries."""
 
-        def _obj_to_basic_dict(obj, *, prefix: str = "") -> dict:
+        columns_set = set(columns) if columns is not None else None
+
+        def _include_column(name: str) -> bool:
+            return columns_set is None or name in columns_set
+
+        def _allowed_keys(prefix: str) -> set[str] | None:
+            if columns_set is None:
+                return None
+            prefix_len = len(prefix)
+            allowed = {col[prefix_len:] for col in columns_set if col.startswith(prefix)}
+            return allowed
+
+        def _obj_to_basic_dict(
+            obj, *, prefix: str = "", allowed_keys: set[str] | None = None
+        ) -> dict:
             if hasattr(obj, "to_dict"):
                 d = obj.to_dict(
                     include_meta=include_meta, include_geometry=include_geometry
@@ -153,6 +171,8 @@ class Query:
                     d = dict(vars(obj))
                 except Exception:
                     d = {"value": obj}
+            if allowed_keys is not None:
+                d = {k: v for k, v in d.items() if k in allowed_keys}
             if prefix:
                 return {f"{prefix}{k}": v for k, v in d.items()}
             return d
@@ -171,18 +191,38 @@ class Query:
                 if is_ncst:
                     campus, match, miles = item
                     row = {}
-                    row.update(_obj_to_basic_dict(campus, prefix="campus_"))
+                    row.update(
+                        _obj_to_basic_dict(
+                            campus, prefix="campus_", allowed_keys=_allowed_keys("campus_")
+                        )
+                    )
                     if match is not None:
-                        row.update(_obj_to_basic_dict(match, prefix="match_"))
+                        row.update(
+                            _obj_to_basic_dict(
+                                match,
+                                prefix="match_",
+                                allowed_keys=_allowed_keys("match_"),
+                            )
+                        )
                     else:
-                        row["match_id"] = None
-                        row["match_name"] = None
-                        row["match_enrollment"] = None
-                        row["match_rating"] = None
-                        row["match_school_type"] = None
-                        row["match_district_number"] = None
-                        row["match_campus_number"] = None
-                    row["distance_miles"] = miles
+                        if _include_column("match_id"):
+                            row["match_id"] = None
+                        if _include_column("match_name"):
+                            row["match_name"] = None
+                        if _include_column("match_enrollment"):
+                            row["match_enrollment"] = None
+                        if _include_column("match_rating"):
+                            row["match_rating"] = None
+                        if _include_column("match_school_type"):
+                            row["match_school_type"] = None
+                        if _include_column("match_district_number"):
+                            row["match_district_number"] = None
+                        if _include_column("match_campus_number"):
+                            row["match_campus_number"] = None
+                    if _include_column("distance_miles"):
+                        row["distance_miles"] = miles
+                    if columns_set is not None:
+                        row = {k: v for k, v in row.items() if k in columns_set}
                     rows.append(row)
                     continue
 
@@ -197,29 +237,61 @@ class Query:
                 if is_transfers:
                     campus, to_campus, count, masked = item
                     row = {}
-                    row.update(_obj_to_basic_dict(campus, prefix="campus_"))
+                    row.update(
+                        _obj_to_basic_dict(
+                            campus, prefix="campus_", allowed_keys=_allowed_keys("campus_")
+                        )
+                    )
                     if to_campus is not None:
-                        row.update(_obj_to_basic_dict(to_campus, prefix="to_"))
+                        row.update(
+                            _obj_to_basic_dict(
+                                to_campus,
+                                prefix="to_",
+                                allowed_keys=_allowed_keys("to_"),
+                            )
+                        )
                     else:
-                        row["to_id"] = None
-                        row["to_name"] = None
-                        row["to_enrollment"] = None
-                        row["to_rating"] = None
-                        row["to_school_type"] = None
-                        row["to_district_number"] = None
-                        row["to_campus_number"] = None
-                    row["count"] = count
-                    row["masked"] = masked
+                        if _include_column("to_id"):
+                            row["to_id"] = None
+                        if _include_column("to_name"):
+                            row["to_name"] = None
+                        if _include_column("to_enrollment"):
+                            row["to_enrollment"] = None
+                        if _include_column("to_rating"):
+                            row["to_rating"] = None
+                        if _include_column("to_school_type"):
+                            row["to_school_type"] = None
+                        if _include_column("to_district_number"):
+                            row["to_district_number"] = None
+                        if _include_column("to_campus_number"):
+                            row["to_campus_number"] = None
+                    if _include_column("count"):
+                        row["count"] = count
+                    if _include_column("masked"):
+                        row["masked"] = masked
+                    if columns_set is not None:
+                        row = {k: v for k, v in row.items() if k in columns_set}
                     rows.append(row)
                     continue
 
                 row = {}
                 for i, elem in enumerate(item):
-                    row.update(_obj_to_basic_dict(elem, prefix=f"p{i}_"))
+                    row.update(
+                        _obj_to_basic_dict(
+                            elem,
+                            prefix=f"p{i}_",
+                            allowed_keys=_allowed_keys(f"p{i}_"),
+                        )
+                    )
+                if columns_set is not None:
+                    row = {k: v for k, v in row.items() if k in columns_set}
                 rows.append(row)
                 continue
 
-            rows.append(_obj_to_basic_dict(item))
+            row = _obj_to_basic_dict(item)
+            if columns_set is not None:
+                row = {k: v for k, v in row.items() if k in columns_set}
+            rows.append(row)
 
         return rows
 
@@ -256,7 +328,9 @@ class Query:
             ) from exc
 
         data = self.to_dicts(
-            include_meta=include_meta, include_geometry=include_geometry
+            include_meta=include_meta,
+            include_geometry=include_geometry,
+            columns=columns,
         )
         df = pd.DataFrame(data)
 
