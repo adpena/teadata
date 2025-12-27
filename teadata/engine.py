@@ -256,7 +256,22 @@ def _newest_pickle(folder: Path) -> Optional[Path]:
             picks.extend(folder.glob(pattern))
         if not picks:
             return None
-        picks.sort(key=lambda pp: pp.stat().st_mtime, reverse=True)
+
+        def score(path: Path) -> tuple[int, float]:
+            support = 0
+            boundary = _boundary_store_path_for_snapshot(path)
+            if boundary and boundary.exists():
+                support += 2
+            map_store = _map_store_path_for_snapshot(path)
+            if map_store and map_store.exists():
+                support += 1
+            try:
+                mtime = path.stat().st_mtime
+            except Exception:
+                mtime = 0.0
+            return (support, mtime)
+
+        picks.sort(key=score, reverse=True)
         return picks[0]
     except Exception:
         return None
@@ -326,6 +341,18 @@ def _boundary_store_path_for_snapshot(snapshot_path: Path) -> Optional[Path]:
         elif base.endswith(".pkl"):
             base = base[: -len(".pkl")]
         return snapshot_path.with_name(f"boundaries_{base}.sqlite")
+    return None
+
+
+def _map_store_path_for_snapshot(snapshot_path: Path) -> Optional[Path]:
+    name = snapshot_path.name
+    if name.startswith("repo_"):
+        base = name[len("repo_") :]
+        if base.endswith(".pkl.gz"):
+            base = base[: -len(".pkl.gz")]
+        elif base.endswith(".pkl"):
+            base = base[: -len(".pkl")]
+        return snapshot_path.with_name(f"map_payloads_{base}.sqlite")
     return None
 
 

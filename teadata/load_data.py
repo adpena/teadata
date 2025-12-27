@@ -2,6 +2,7 @@ import uuid
 import pickle
 from pathlib import Path
 import gzip
+import json
 import geopandas as gpd
 import pandas as pd
 import hashlib
@@ -15,8 +16,9 @@ from typing import Any, Iterable, Mapping, Optional, List
 
 from teadata import classes as _classes_mod
 from teadata import teadata_config as _cfg_mod
-from teadata.classes import District, Campus, DataEngine
+from teadata.classes import District, Campus, DataEngine, haversine_miles
 from teadata.engine import _load_snapshot_payload
+from teadata.map_store import map_store_path_for_snapshot
 from teadata.teadata_config import (
     canonical_campus_number,
     canonical_district_number,
@@ -41,6 +43,13 @@ DISABLE_CACHE = os.getenv("TEADATA_DISABLE_CACHE", "0") not in (
 )
 
 SPLIT_BOUNDARIES = os.getenv("TEADATA_SPLIT_BOUNDARIES", "1") not in (
+    "0",
+    "false",
+    "False",
+    None,
+)
+
+BUILD_MAP_STORE = os.getenv("TEADATA_BUILD_MAP_STORE", "1") not in (
     "0",
     "false",
     "False",
@@ -436,6 +445,16 @@ def _boundary_store_path(districts_fp: str, campuses_fp: str) -> Path:
     return d / tag
 
 
+def _map_store_path(districts_fp: str, campuses_fp: str) -> Path:
+    snap = _snapshot_path(districts_fp, campuses_fp)
+    candidate = map_store_path_for_snapshot(snap)
+    if candidate is not None:
+        return candidate
+    d = _repo_cache_dir()
+    tag = f"map_payloads_{Path(districts_fp).stem}_{Path(campuses_fp).stem}.sqlite"
+    return d / tag
+
+
 # Helper to compute robust extra signature for cache invalidation (config content hash, code, data source signatures)
 def _compute_extra_signature() -> dict:
     sig: dict[str, str] = {}
@@ -571,6 +590,1159 @@ def _save_boundary_store(
         if rows:
             conn.executemany(
                 "INSERT OR REPLACE INTO boundaries (district_number, wkb) VALUES (?, ?)",
+                rows,
+            )
+        conn.commit()
+        conn.close()
+        tmp_path.replace(path)
+        _copy_cache_artifact(path)
+        return path
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        try:
+            if tmp_path.exists():
+                tmp_path.unlink()
+        except Exception:
+            pass
+        return None
+
+
+TEXAS_BOUNDS = (
+    (25.5, -106.65),
+    (36.5, -93.5),
+)
+
+
+def _canonical_campus_number(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    return text.lstrip("'")
+
+
+def _display_campus_number(value: Any) -> str:
+    number = _canonical_campus_number(value)
+    return number or ""
+
+
+def _campus_profile_url(campus_number: Any) -> str:
+    slug = _canonical_campus_number(campus_number)
+    if not slug:
+        return ""
+    return f"/campuses/profiles/{slug}/"
+
+
+def _is_charter_district(district: District) -> bool:
+    campuses = getattr(district, "campuses", None) or []
+    first = campuses[0] if campuses else None
+    return bool(first and getattr(first, "is_charter", False))
+
+
+def _resolve_district_type(district: District, district_type: Optional[str] = None) -> str:
+    if district_type:
+        normalized = str(district_type).strip().lower()
+        if normalized in {"isd", "charter"}:
+            return normalized
+    return "charter" if _is_charter_district(district) else "isd"
+
+
+def _build_campus_lookup(
+    repo: DataEngine,
+    district: District,
+    campus_numbers: Optional[set[str]] = None,
+    extra_campuses: Optional[list[Campus]] = None,
+) -> dict:
+    campus_index: dict = {}
+    campus_numbers = campus_numbers or set()
+    campus_numbers = {
+        _canonical_campus_number(number)
+        for number in campus_numbers
+        if _canonical_campus_number(number)
+    }
+
+    def _store_campus(campus: Campus) -> None:
+        campus_number = getattr(campus, "campus_number", None)
+        canonical = _canonical_campus_number(campus_number)
+        if not canonical:
+            return
+        if canonical in campus_index:
+            return
+        campus_index[canonical] = campus
+        campus_index[f"'{canonical}"] = campus
+
+    campus_iter = list(getattr(district, "campuses", None) or [])
+    if extra_campuses:
+        campus_iter.extend(c for c in extra_campuses if c is not None)
+    for campus in campus_iter:
+        _store_campus(campus)
+
+    missing_numbers = campus_numbers.difference(campus_index.keys())
+    for campus_number in missing_numbers:
+        candidates = (campus_number, f"'{campus_number}")
+        campus_obj = None
+        for candidate in candidates:
+            try:
+                campus_obj = (repo >> ("campus", candidate)).first()
+            except Exception:
+                campus_obj = None
+            if campus_obj is not None:
+                break
+        if campus_obj is not None:
+            _store_campus(campus_obj)
+
+    return campus_index
+
+
+def _valid_latlon(lat: Any, lon: Any) -> bool:
+    try:
+        lat = float(lat)
+        lon = float(lon)
+    except (TypeError, ValueError):
+        return False
+    return -90.0 <= lat <= 90.0 and -180.0 <= lon <= 180.0
+
+
+def _looks_like_texas(lat: float, lon: float) -> bool:
+    return 25.0 <= lat <= 37.0 and -107.0 <= lon <= -93.0
+
+
+def _haversine_distance(origin_latlon: Optional[tuple], dest_latlon: Optional[tuple]) -> Optional[float]:
+    if not origin_latlon or not dest_latlon:
+        return None
+    try:
+        origin_lat, origin_lon = origin_latlon
+        dest_lat, dest_lon = dest_latlon
+        if not (
+            _valid_latlon(origin_lat, origin_lon) and _valid_latlon(dest_lat, dest_lon)
+        ):
+            return None
+        return haversine_miles(origin_lon, origin_lat, dest_lon, dest_lat)
+    except Exception:
+        return None
+
+
+def _get_campus_stat_value(campus: Optional[Campus], key: str) -> Any:
+    if campus is None:
+        return None
+
+    candidates = [key]
+    if key.startswith("campus_"):
+        candidates.append(key[len("campus_") :])
+
+    for candidate in candidates:
+        value = getattr(campus, candidate, None)
+        if value not in (None, ""):
+            return value
+
+    meta = getattr(campus, "meta", {}) or {}
+    for candidate in candidates:
+        if candidate in meta and meta[candidate] not in (None, ""):
+            return meta[candidate]
+        prefixed = f"campus_{candidate}"
+        if prefixed in meta and meta[prefixed] not in (None, ""):
+            return meta[prefixed]
+    return None
+
+
+def _select_preferred_origin(origins: list[dict]) -> Optional[dict]:
+    best = None
+    for entry in origins:
+        if not isinstance(entry, dict):
+            continue
+        distance = entry.get("distance")
+        count_value = entry.get("count") or 0
+        if best is None:
+            best = entry
+            continue
+        best_distance = best.get("distance")
+        best_count = best.get("count") or 0
+        if distance is not None and best_distance is not None:
+            if distance < best_distance:
+                best = entry
+            elif distance == best_distance and count_value > best_count:
+                best = entry
+        elif distance is not None and best_distance is None:
+            best = entry
+        elif distance is None and best_distance is None and count_value > best_count:
+            best = entry
+    return best
+
+
+def _extract_latlon(campus_index: dict, campus_number: Any) -> Optional[tuple[float, float]]:
+    if campus_number is None:
+        return None
+    campus = campus_index.get(_canonical_campus_number(campus_number))
+    if not campus:
+        campus = campus_index.get(str(campus_number))
+    if not campus:
+        return None
+
+    coords = getattr(campus, "coords", None)
+    if coords is None:
+        return None
+
+    try:
+        if hasattr(coords, "x") and hasattr(coords, "y"):
+            lon = float(coords.x)
+            lat = float(coords.y)
+        else:
+            first, second = coords
+            lon = float(first)
+            lat = float(second)
+    except (TypeError, ValueError):
+        return None
+
+    candidates = [
+        (lat, lon),
+        (lon, lat),
+    ]
+
+    for candidate in candidates:
+        if _looks_like_texas(*candidate):
+            return candidate
+
+    for candidate in candidates:
+        if _valid_latlon(*candidate):
+            return candidate
+
+    return None
+
+
+def _format_stat_value(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, (int, float)):
+        if isinstance(value, float):
+            if pd.isna(value):
+                return None
+        if float(value).is_integer():
+            return f"{int(value):,}"
+        return f"{float(value):,.2f}"
+    if hasattr(value, "item"):
+        return _format_stat_value(value.item())
+    text = str(value).strip()
+    return text or None
+
+
+def _coerce_masked(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    if isinstance(value, float) and pd.isna(value):
+        return False
+    text = str(value).strip().lower()
+    if text in {"true", "yes", "y"}:
+        return True
+    if text in {"false", "no", "n"}:
+        return False
+    return False
+
+
+def _collect_charter_transfer_entries(
+    repo: DataEngine, district: District, *, only_closures: bool = False
+) -> list[dict]:
+    charter_entries: list[dict] = []
+    origin_candidates: list[Campus] = []
+    campus_numbers: set[str] = set()
+
+    try:
+        district_campuses = list(repo.campuses_in(district))
+    except Exception:
+        district_campuses = list(getattr(district, "campuses", None) or [])
+
+    for campus in district_campuses:
+        if campus is None or not getattr(campus, "is_charter", False):
+            continue
+        if only_closures and not getattr(campus, "facing_closure", False):
+            continue
+
+        canonical_number = _canonical_campus_number(
+            getattr(campus, "campus_number", None)
+        )
+        inbound_edges = []
+        try:
+            edge_rows = [
+                edge
+                for edge in repo.transfers_in(campus)
+                if edge and edge[0] is not None
+            ]
+        except Exception:
+            edge_rows = []
+        for origin_campus, count, masked in edge_rows:
+            if origin_campus is None:
+                continue
+            if getattr(origin_campus, "is_charter", False) or getattr(
+                origin_campus, "is_private", False
+            ):
+                continue
+            inbound_edges.append(
+                {
+                    "campus": origin_campus,
+                    "count": count,
+                    "masked": bool(masked),
+                }
+            )
+            origin_candidates.append(origin_campus)
+        charter_entries.append(
+            {
+                "campus": campus,
+                "canonical_number": canonical_number,
+                "edges": inbound_edges,
+            }
+        )
+        if canonical_number:
+            campus_numbers.add(canonical_number)
+
+    campus_lookup = _build_campus_lookup(
+        repo,
+        district,
+        campus_numbers=campus_numbers,
+        extra_campuses=origin_candidates,
+    )
+
+    for entry in charter_entries:
+        campus_number = entry.get("canonical_number")
+        latlon = _extract_latlon(campus_lookup, campus_number)
+        entry["latlon"] = latlon
+        processed_edges = []
+        for edge in entry.get("edges", []):
+            origin_campus = edge.get("campus")
+            origin_number = _canonical_campus_number(
+                getattr(origin_campus, "campus_number", None)
+            )
+            origin_latlon = _extract_latlon(campus_lookup, origin_number)
+            distance = _haversine_distance(latlon, origin_latlon)
+            count_value = None
+            if not edge.get("masked"):
+                try:
+                    if edge.get("count") is not None:
+                        count_value = int(round(float(edge.get("count"))))
+                except (TypeError, ValueError):
+                    count_value = None
+            processed_edges.append(
+                {
+                    "campus": origin_campus,
+                    "canonical_number": origin_number,
+                    "latlon": origin_latlon,
+                    "distance": distance,
+                    "count": count_value,
+                    "masked": bool(edge.get("masked")),
+                }
+            )
+        entry["edges"] = processed_edges
+        entry["nearest_origin"] = _select_preferred_origin(processed_edges)
+
+    return charter_entries
+
+
+def _build_charter_map_payload(repo: DataEngine, district: District) -> dict:
+    payload = {
+        "aisdCampuses": [],
+        "charterCampuses": [],
+        "privateCampuses": [],
+        "maxTransferCount": 0,
+        "bounds": None,
+        "districtBoundary": None,
+    }
+
+    if district is None:
+        payload["bounds"] = TEXAS_BOUNDS
+        return payload
+
+    entries = _collect_charter_transfer_entries(
+        repo,
+        district,
+        only_closures=False,
+    )
+    if not entries:
+        payload["bounds"] = TEXAS_BOUNDS
+        return payload
+
+    try:
+        private_candidates = list(repo.private_campuses_in(district))
+    except Exception:
+        private_candidates = []
+
+    campus_lookup = _build_campus_lookup(
+        repo,
+        district,
+        extra_campuses=private_candidates,
+    )
+
+    def _clean_text(value: Any) -> str:
+        if isinstance(value, str):
+            cleaned = value.strip()
+            if cleaned:
+                return cleaned
+        return ""
+
+    def _get_district_name(campus_obj: Optional[Campus]) -> str:
+        if campus_obj is None:
+            return ""
+        district_obj = getattr(campus_obj, "district", None)
+        name = getattr(district_obj, "name", None)
+        if not name:
+            name = getattr(campus_obj, "district_name", None)
+        return _clean_text(name)
+
+    def _get_campus_name(record_name: Any, campus_obj: Optional[Campus], campus_number: Any = None) -> str:
+        name = _clean_text(record_name)
+        if name:
+            if campus_number:
+                canonical_record = _canonical_campus_number(name)
+                canonical_number = _canonical_campus_number(campus_number)
+                if (
+                    canonical_record
+                    and canonical_number
+                    and canonical_record == canonical_number
+                ):
+                    name = ""
+            if name and name.isdigit() and len(name) >= 6:
+                name = ""
+        if name:
+            return name
+        if campus_obj is None:
+            return ""
+        campus_name = getattr(campus_obj, "name", None)
+        if not campus_name:
+            campus_name = getattr(campus_obj, "campus_name", None)
+        if not campus_name:
+            campus_name = getattr(campus_obj, "campus_name_long", None)
+        return _clean_text(campus_name)
+
+    def _get_school_type(campus_obj: Optional[Campus]) -> str:
+        if campus_obj is None:
+            return "Other"
+        value = getattr(campus_obj, "school_type", None) or getattr(
+            campus_obj, "schoolType", None
+        )
+        text = _clean_text(value)
+        return text or "Other"
+
+    charter_field_map = {
+        "grade_range": "Grade Range",
+        "enrollment": "2024-25 Enrollment",
+        "overall_rating_2025": "2025 Overall Rating",
+    }
+    origin_field_map = {
+        "grade_range": "Grade Range",
+        "enrollment": "2024-25 Enrollment",
+        "overall_rating_2025": "2025 Overall Rating",
+        "total_estimated_charter_transfers_out": "2024-25 Total Estimated Charter Transfers Out",
+    }
+
+    origin_lookup: dict[str, dict] = {}
+    charter_markers: list[dict] = []
+    all_latlons: list[tuple[float, float]] = []
+    max_transfer = 0
+
+    def _collect_stats(campus_obj: Optional[Campus], field_map: dict[str, str]) -> list[dict]:
+        stats = []
+        for column, label in field_map.items():
+            value = _format_stat_value(_get_campus_stat_value(campus_obj, column))
+            if value not in (None, "", "nan"):
+                stats.append({"label": label, "value": value})
+        return stats
+
+    for entry in entries:
+        campus = entry.get("campus")
+        canonical_number = entry.get("canonical_number")
+        latlon = entry.get("latlon")
+        if latlon and _valid_latlon(*latlon):
+            all_latlons.append(latlon)
+            lat, lon = latlon
+        else:
+            lat = None
+            lon = None
+
+        transfers_in = []
+        origin_numbers = set()
+        for edge in entry.get("edges", []):
+            origin = edge.get("campus")
+            origin_number = edge.get("canonical_number")
+            origin_numbers.add(origin_number)
+            origin_latlon = edge.get("latlon")
+            if origin_latlon and _valid_latlon(*origin_latlon):
+                all_latlons.append(origin_latlon)
+            count_value = edge.get("count")
+            if count_value and count_value > max_transfer:
+                max_transfer = count_value
+
+            transfers_in.append(
+                {
+                    "from": origin_number,
+                    "from_name": _get_campus_name(None, origin, origin_number),
+                    "count": None if edge.get("masked") else count_value,
+                    "masked": bool(edge.get("masked")),
+                }
+            )
+
+            if origin_number:
+                origin_lat = origin_lon = None
+                if origin_latlon and _valid_latlon(*origin_latlon):
+                    origin_lat, origin_lon = origin_latlon
+                facing_closure = bool(getattr(origin, "facing_closure", False))
+                origin_entry = origin_lookup.setdefault(
+                    origin_number,
+                    {
+                        "campusNumber": origin_number,
+                        "campusNumberDisplay": _display_campus_number(origin_number),
+                        "name": _get_campus_name(None, origin, origin_number),
+                        "profileUrl": _campus_profile_url(origin_number),
+                        "districtName": _get_district_name(origin),
+                        "lat": origin_lat,
+                        "lon": origin_lon,
+                        "schoolType": _get_school_type(origin),
+                        "gradeRange": _format_stat_value(
+                            _get_campus_stat_value(origin, "grade_range")
+                        ),
+                        "isCharter": False,
+                        "is_charter": False,
+                        "facingClosure": facing_closure,
+                        "stats": _collect_stats(origin, origin_field_map),
+                        "transfersOut": [],
+                    },
+                )
+                origin_entry["transfersOut"].append(
+                    {
+                        "to": canonical_number,
+                        "to_name": _get_campus_name(None, campus, canonical_number),
+                        "count": None if edge.get("masked") else count_value,
+                        "masked": bool(edge.get("masked")),
+                    }
+                )
+
+        charter_markers.append(
+            {
+                "campusNumber": canonical_number,
+                "campusNumberDisplay": _display_campus_number(canonical_number),
+                "name": _get_campus_name(None, campus, canonical_number),
+                "profileUrl": _campus_profile_url(canonical_number),
+                "districtName": _get_district_name(campus),
+                "lat": lat,
+                "lon": lon,
+                "schoolType": _get_school_type(campus),
+                "gradeRange": _format_stat_value(
+                    _get_campus_stat_value(campus, "grade_range")
+                ),
+                "isCharter": True,
+                "is_charter": True,
+                "stats": _collect_stats(campus, charter_field_map),
+                "transfersIn": sorted(
+                    transfers_in,
+                    key=lambda item: (
+                        item["count"] is None,
+                        -(item["count"] or 0),
+                        item.get("from") or "",
+                    ),
+                ),
+                "num_district_campus_transfer_origins": len(
+                    [number for number in origin_numbers if number]
+                ),
+            }
+        )
+
+    payload["charterCampuses"] = charter_markers
+    payload["aisdCampuses"] = list(origin_lookup.values())
+    payload["maxTransferCount"] = max_transfer
+
+    all_private_entries = []
+    for campus in private_candidates:
+        campus_number = getattr(campus, "campus_number", None)
+        canonical_number = _canonical_campus_number(campus_number)
+        latlon = _extract_latlon(campus_lookup, campus_number)
+        if not latlon or not _valid_latlon(*latlon):
+            continue
+        all_latlons.append(latlon)
+        lat, lon = latlon
+        raw_grade_range = getattr(campus, "grade_range", None) or getattr(
+            campus, "gradeRange", None
+        )
+        enrollment_raw = getattr(campus, "enrollment", None)
+        stats = []
+        grade_range = _format_stat_value(raw_grade_range)
+        if grade_range:
+            stats.append({"label": "Grade Range", "value": grade_range})
+        enrollment_value = _format_stat_value(enrollment_raw)
+        if enrollment_value:
+            stats.append({"label": "2024-25 Enrollment", "value": enrollment_value})
+        all_private_entries.append(
+            {
+                "campusNumber": canonical_number,
+                "campusNumberDisplay": _display_campus_number(canonical_number),
+                "name": _get_campus_name(
+                    getattr(campus, "name", None), campus, campus_number
+                ),
+                "profileUrl": _campus_profile_url(canonical_number),
+                "districtName": _get_district_name(campus),
+                "lat": lat,
+                "lon": lon,
+                "gradeRange": grade_range,
+                "isPrivate": True,
+                "stats": stats,
+            }
+        )
+    payload["privateCampuses"] = all_private_entries
+
+    valid_points = [(lat, lon) for lat, lon in all_latlons if _valid_latlon(lat, lon)]
+    if valid_points:
+        lats = [lat for lat, _ in valid_points]
+        lons = [lon for _, lon in valid_points]
+        padding = 0.02
+        payload["bounds"] = [
+            (min(lats) - padding, min(lons) - padding),
+            (max(lats) + padding, max(lons) + padding),
+        ]
+
+    if payload["bounds"] is None:
+        payload["bounds"] = TEXAS_BOUNDS
+
+    return payload
+
+
+def build_closures_map_payload(
+    repo: DataEngine, district: District, *, district_type: Optional[str] = None
+) -> dict:
+    try:
+        from shapely.geometry import mapping as shapely_mapping  # type: ignore
+    except Exception:
+        shapely_mapping = None
+
+    district_mode = _resolve_district_type(district, district_type)
+    if district_mode == "charter":
+        return _build_charter_map_payload(repo, district)
+
+    payload = {
+        "aisdCampuses": [],
+        "charterCampuses": [],
+        "privateCampuses": [],
+        "maxTransferCount": 0,
+        "bounds": None,
+        "districtBoundary": None,
+    }
+
+    if district is None:
+        return payload
+
+    boundary = getattr(district, "boundary", None) or getattr(district, "polygon", None)
+    if boundary is None:
+        try:
+            repo.ensure_boundary(district)
+            boundary = getattr(district, "boundary", None) or getattr(
+                district, "polygon", None
+            )
+        except Exception:
+            boundary = None
+    if boundary is not None:
+        try:
+            if shapely_mapping:
+                payload["districtBoundary"] = shapely_mapping(boundary)
+        except Exception:
+            payload["districtBoundary"] = None
+        try:
+            if hasattr(boundary, "bounds"):
+                minx, miny, maxx, maxy = boundary.bounds
+                sw = (float(miny), float(minx))
+                ne = (float(maxy), float(maxx))
+                if _valid_latlon(*sw) and _valid_latlon(*ne):
+                    payload["bounds"] = [sw, ne]
+        except Exception:
+            payload["bounds"] = None
+
+    try:
+        transfer_rows = (
+            repo
+            >> ("campuses_in", district)
+            >> ("where", lambda x: (x.enrollment or 0) > 0)
+            >> ("transfers_out", True)
+        )
+        required_columns = {
+            "campus_campus_number",
+            "campus_name",
+            "to_campus_number",
+            "to_name",
+            "count",
+            "masked",
+            "campus_num_charter_transfer_destinations",
+            "campus_num_charter_transfer_destinations_masked",
+            "campus_total_unmasked_charter_transfers_out",
+            "campus_total_estimated_masked_charter_transfers_out",
+            "campus_total_estimated_charter_transfers_out",
+            "to_is_charter",
+            "campus_is_charter",
+        }
+        required_columns.update(
+            {
+                "campus_grade_range",
+                "campus_enrollment",
+                "campus_overall_rating_2025",
+                "to_grade_range",
+                "to_enrollment",
+                "to_overall_rating_2025",
+            }
+        )
+        try:
+            transfer_df = transfer_rows.to_df(columns=sorted(required_columns))
+        except TypeError:
+            transfer_df = transfer_rows.to_df()
+    except Exception:
+        return payload
+
+    if transfer_df.empty:
+        return payload
+
+    origin_field_map = {
+        "campus_grade_range": "Grade Range",
+        "campus_enrollment": "2024-25 Enrollment",
+        "campus_overall_rating_2025": "2025 Overall Rating",
+        "campus_num_charter_transfer_destinations": "2024-25 Number of Charter Campuses Receiving Student Transfers - TOTAL",
+        "campus_total_estimated_charter_transfers_out": "2024-25 Total Estimated Charter Transfers Out",
+    }
+    charter_field_map = {
+        "to_grade_range": "Grade Range",
+        "to_enrollment": "2024-25 Enrollment",
+        "to_overall_rating_2025": "2025 Overall Rating",
+    }
+
+    available_columns = [col for col in required_columns if col in transfer_df.columns]
+    if (
+        "campus_campus_number" not in available_columns
+        or "to_campus_number" not in available_columns
+    ):
+        return payload
+
+    working_df = transfer_df[available_columns].copy()
+
+    working_df["campus_campus_number"] = working_df["campus_campus_number"].map(
+        _canonical_campus_number
+    )
+    working_df["to_campus_number"] = working_df["to_campus_number"].map(
+        _canonical_campus_number
+    )
+
+    working_df = working_df.dropna(subset=["campus_campus_number", "to_campus_number"])
+
+    if working_df.empty:
+        return payload
+
+    for column in (
+        "campus_num_charter_transfer_destinations",
+        "campus_num_charter_transfer_destinations_masked",
+        "campus_total_unmasked_charter_transfers_out",
+    ):
+        if column in working_df.columns:
+            working_df[column] = pd.to_numeric(working_df[column], errors="coerce")
+
+    if "campus_total_estimated_charter_transfers_out" not in working_df.columns:
+        if "campus_total_unmasked_charter_transfers_out" in working_df.columns:
+            unmasked = working_df["campus_total_unmasked_charter_transfers_out"].fillna(
+                0
+            )
+            if (
+                "campus_total_estimated_masked_charter_transfers_out"
+                in working_df.columns
+            ):
+                masked_estimates = pd.to_numeric(
+                    working_df["campus_total_estimated_masked_charter_transfers_out"],
+                    errors="coerce",
+                ).fillna(0)
+            elif (
+                "campus_num_charter_transfer_destinations_masked" in working_df.columns
+            ):
+                masked_estimates = (
+                    working_df["campus_num_charter_transfer_destinations_masked"]
+                    .fillna(0)
+                    .mul(5)
+                )
+            else:
+                masked_estimates = 0
+            working_df["campus_total_estimated_charter_transfers_out"] = (
+                unmasked + masked_estimates
+            )
+
+    if "count" in working_df.columns:
+        working_df["count"] = pd.to_numeric(
+            working_df["count"], errors="coerce"
+        ).fillna(0)
+    else:
+        working_df["count"] = 0
+
+    if "masked" in working_df.columns:
+        working_df["masked"] = working_df["masked"].map(_coerce_masked)
+    else:
+        working_df["masked"] = False
+
+    grouped = (
+        working_df.groupby(["campus_campus_number", "to_campus_number"], dropna=False)
+        .agg({"count": "sum", "masked": "max"})
+        .reset_index()
+    )
+
+    campus_numbers = set(working_df["campus_campus_number"].dropna())
+    campus_numbers.update(working_df["to_campus_number"].dropna())
+
+    try:
+        private_candidates = list(repo.private_campuses_in(district))
+    except Exception:
+        private_candidates = []
+
+    private_campuses = [
+        campus for campus in private_candidates if getattr(campus, "is_private", False)
+    ]
+
+    campus_lookup = _build_campus_lookup(
+        repo, district, campus_numbers, extra_campuses=private_campuses
+    )
+
+    def _clean_text(value: Any) -> str:
+        if isinstance(value, str):
+            cleaned = value.strip()
+            if cleaned:
+                return cleaned
+        return ""
+
+    def _get_district_name(campus_obj: Optional[Campus]) -> str:
+        if campus_obj is None:
+            return ""
+
+        district_obj = getattr(campus_obj, "district", None)
+        name = getattr(district_obj, "name", None)
+        if not name:
+            name = getattr(campus_obj, "district_name", None)
+        return _clean_text(name)
+
+    def _get_campus_name(record_name: Any, campus_obj: Optional[Campus], campus_number: Any = None) -> str:
+        name = _clean_text(record_name)
+        if name:
+            if campus_number:
+                canonical_record = _canonical_campus_number(name)
+                canonical_number = _canonical_campus_number(campus_number)
+                if (
+                    canonical_record
+                    and canonical_number
+                    and canonical_record == canonical_number
+                ):
+                    name = ""
+            if name and name.isdigit() and len(name) >= 6:
+                name = ""
+        if name:
+            return name
+
+        if campus_obj is None:
+            return ""
+
+        campus_name = getattr(campus_obj, "name", None)
+        if not campus_name:
+            campus_name = getattr(campus_obj, "campus_name", None)
+        if not campus_name:
+            campus_name = getattr(campus_obj, "campus_name_long", None)
+        return _clean_text(campus_name)
+
+    def _collect_stats(row: dict, field_map: dict[str, str]) -> list[dict]:
+        stats = []
+        for column, label in field_map.items():
+            if column not in row:
+                continue
+            value = _format_stat_value(row[column])
+            if value is not None and value != "nan":
+                stats.append({"label": label, "value": value})
+        return stats
+
+    transfers_out: dict[str, list[dict]] = {}
+    transfers_in: dict[str, list[dict]] = {}
+
+    max_transfer = 0
+    for row in grouped.itertuples(index=False):
+        origin = row.campus_campus_number
+        dest = row.to_campus_number
+        masked = bool(row.masked)
+        count_value = None if masked else row.count
+        if count_value is not None:
+            try:
+                count_value = int(round(float(count_value)))
+            except (TypeError, ValueError):
+                count_value = None
+        if count_value and count_value > max_transfer:
+            max_transfer = count_value
+
+        destination_obj = campus_lookup.get(dest)
+        origin_obj = campus_lookup.get(origin)
+
+        transfers_out.setdefault(origin, []).append(
+            {
+                "to": dest,
+                "to_name": _get_campus_name(None, destination_obj, dest),
+                "count": count_value,
+                "masked": masked,
+            }
+        )
+        transfers_in.setdefault(dest, []).append(
+            {
+                "from": origin,
+                "from_name": _get_campus_name(None, origin_obj, origin),
+                "count": count_value,
+                "masked": masked,
+            }
+        )
+
+    origin_columns = [
+        "campus_campus_number",
+        "campus_name",
+        "campus_is_charter",
+    ] + list(origin_field_map.keys())
+    origin_columns = [col for col in origin_columns if col in working_df.columns]
+    origin_details = (
+        working_df[origin_columns]
+        .drop_duplicates(subset=["campus_campus_number"])
+        .where(pd.notnull, None)
+    )
+
+    charter_columns = ["to_campus_number", "to_name"] + list(charter_field_map.keys())
+    charter_columns = [col for col in charter_columns if col in working_df.columns]
+    charter_details = (
+        working_df[charter_columns]
+        .drop_duplicates(subset=["to_campus_number"])
+        .where(pd.notnull, None)
+    )
+
+    all_latlons: list[tuple[float, float]] = []
+
+    for record in origin_details.to_dict(orient="records"):
+        campus_number = record.get("campus_campus_number")
+        campus_obj = campus_lookup.get(campus_number)
+        if campus_obj is None:
+            campus_obj = campus_lookup.get(f"'{campus_number}")
+        latlon = _extract_latlon(campus_lookup, campus_number)
+        if latlon:
+            all_latlons.append(latlon)
+            lat, lon = latlon
+        else:
+            lat = None
+            lon = None
+        facing_closure = False
+        if campus_obj is not None:
+            facing_closure = bool(getattr(campus_obj, "facing_closure", False))
+        payload["aisdCampuses"].append(
+            {
+                "campusNumber": campus_number,
+                "campusNumberDisplay": _display_campus_number(campus_number),
+                "name": _get_campus_name(
+                    record.get("campus_name"), campus_obj, campus_number
+                ),
+                "profileUrl": _campus_profile_url(campus_number),
+                "districtName": _get_district_name(campus_obj),
+                "lat": lat,
+                "lon": lon,
+                "facingClosure": facing_closure,
+                "gradeRange": _format_stat_value(record.get("campus_grade_range")),
+                "isCharter": bool(record.get("campus_is_charter")),
+                "is_charter": bool(record.get("campus_is_charter")),
+                "stats": _collect_stats(record, origin_field_map),
+                "transfersOut": sorted(
+                    transfers_out.get(campus_number, []),
+                    key=lambda item: (
+                        item["count"] is None,
+                        -(item["count"] or 0),
+                        item["to"],
+                    ),
+                ),
+            }
+        )
+
+    for record in charter_details.to_dict(orient="records"):
+        campus_number = record.get("to_campus_number")
+        campus_obj = campus_lookup.get(campus_number)
+        if campus_obj is None:
+            campus_obj = campus_lookup.get(f"'{campus_number}")
+        latlon = _extract_latlon(campus_lookup, campus_number)
+        if latlon:
+            all_latlons.append(latlon)
+            lat, lon = latlon
+        else:
+            lat = None
+            lon = None
+        campus_transfers_in = transfers_in.get(campus_number, [])
+
+        payload["charterCampuses"].append(
+            {
+                "campusNumber": campus_number,
+                "campusNumberDisplay": _display_campus_number(campus_number),
+                "name": _get_campus_name(
+                    record.get("to_name"), campus_obj, campus_number
+                ),
+                "profileUrl": _campus_profile_url(campus_number),
+                "districtName": _get_district_name(campus_obj),
+                "lat": lat,
+                "lon": lon,
+                "gradeRange": _format_stat_value(record.get("to_grade_range")),
+                "isCharter": bool(record.get("to_is_charter", True)),
+                "is_charter": bool(record.get("to_is_charter", True)),
+                "stats": _collect_stats(record, charter_field_map),
+                "transfersIn": sorted(
+                    campus_transfers_in,
+                    key=lambda item: (
+                        item["count"] is None,
+                        -(item["count"] or 0),
+                        item["from"],
+                    ),
+                ),
+                "num_district_campus_transfer_origins": len(
+                    {
+                        transfer.get("from")
+                        for transfer in campus_transfers_in
+                        if transfer and transfer.get("from")
+                    }
+                ),
+            }
+        )
+
+    for campus in private_campuses:
+        campus_number = getattr(campus, "campus_number", None)
+        canonical_number = _canonical_campus_number(campus_number)
+        latlon = _extract_latlon(campus_lookup, campus_number)
+        if not latlon:
+            continue
+
+        all_latlons.append(latlon)
+        lat, lon = latlon
+
+        raw_grade_range = getattr(campus, "grade_range", None)
+        if raw_grade_range is None:
+            raw_grade_range = getattr(campus, "gradeRange", None)
+        grade_range = _format_stat_value(raw_grade_range)
+
+        enrollment_raw = getattr(campus, "enrollment", None)
+        enrollment_value = _format_stat_value(enrollment_raw)
+
+        stats = []
+        if enrollment_value:
+            stats.append({"label": "2024-25 Enrollment", "value": enrollment_value})
+
+        payload["privateCampuses"].append(
+            {
+                "campusNumber": canonical_number,
+                "campusNumberDisplay": _display_campus_number(canonical_number),
+                "name": _get_campus_name(
+                    getattr(campus, "name", None), campus, campus_number
+                ),
+                "profileUrl": _campus_profile_url(canonical_number),
+                "districtName": _get_district_name(campus),
+                "lat": lat,
+                "lon": lon,
+                "gradeRange": grade_range,
+                "isPrivate": True,
+                "stats": stats,
+            }
+        )
+
+    payload["maxTransferCount"] = max_transfer
+
+    if payload["bounds"] is None and all_latlons:
+        valid_points = [
+            (lat, lon) for lat, lon in all_latlons if _valid_latlon(lat, lon)
+        ]
+        if valid_points:
+            lats = [lat for lat, _ in valid_points]
+            lons = [lon for _, lon in valid_points]
+            padding = 0.02
+            payload["bounds"] = [
+                (min(lats) - padding, min(lons) - padding),
+                (max(lats) + padding, max(lons) + padding),
+            ]
+
+    return payload
+
+
+def _split_map_payload(payload: dict) -> tuple[dict, dict]:
+    base = dict(payload)
+    transfers = {"transfersOut": {}, "transfersIn": {}}
+
+    base["aisdCampuses"] = []
+    for campus in payload.get("aisdCampuses") or []:
+        campus_copy = dict(campus)
+        transfers_out = campus_copy.pop("transfersOut", None)
+        if transfers_out is not None:
+            key = _canonical_campus_number(campus_copy.get("campusNumber"))
+            if key:
+                transfers["transfersOut"][key] = transfers_out
+        base["aisdCampuses"].append(campus_copy)
+
+    base["charterCampuses"] = []
+    for campus in payload.get("charterCampuses") or []:
+        campus_copy = dict(campus)
+        transfers_in = campus_copy.pop("transfersIn", None)
+        if transfers_in is not None:
+            key = _canonical_campus_number(campus_copy.get("campusNumber"))
+            if key:
+                transfers["transfersIn"][key] = transfers_in
+        base["charterCampuses"].append(campus_copy)
+
+    return base, transfers
+
+
+def _encode_payload(payload: dict) -> bytes:
+    raw = json.dumps(payload, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
+    return gzip.compress(raw)
+
+
+def _save_map_store(
+    repo: DataEngine, districts_fp: str, campuses_fp: str
+) -> Optional[Path]:
+    if not BUILD_MAP_STORE:
+        return None
+    path = _map_store_path(districts_fp, campuses_fp)
+    tmp_path = path.with_suffix(".sqlite.tmp")
+    try:
+        if tmp_path.exists():
+            tmp_path.unlink()
+    except Exception:
+        pass
+    try:
+        if path.exists():
+            path.unlink()
+    except Exception:
+        pass
+
+    try:
+        conn = sqlite3.connect(tmp_path)
+        conn.execute(
+            "CREATE TABLE closures_map (district_number TEXT PRIMARY KEY, payload_base BLOB, payload_transfers BLOB)"
+        )
+        rows = []
+        for district in repo._districts.values():
+            district_number = canonical_district_number(
+                getattr(district, "district_number", None)
+            )
+            if not district_number:
+                continue
+            try:
+                payload = build_closures_map_payload(repo, district)
+            except Exception:
+                continue
+            base_payload, transfers_payload = _split_map_payload(payload)
+            rows.append(
+                (
+                    district_number,
+                    sqlite3.Binary(_encode_payload(base_payload)),
+                    sqlite3.Binary(_encode_payload(transfers_payload)),
+                )
+            )
+            if len(rows) >= 50:
+                conn.executemany(
+                    "INSERT OR REPLACE INTO closures_map (district_number, payload_base, payload_transfers) VALUES (?, ?, ?)",
+                    rows,
+                )
+                conn.commit()
+                rows = []
+        if rows:
+            conn.executemany(
+                "INSERT OR REPLACE INTO closures_map (district_number, payload_base, payload_transfers) VALUES (?, ?, ?)",
                 rows,
             )
         conn.commit()
@@ -738,6 +1910,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                     snap.attach_boundary_store(boundary_path)
                 except Exception:
                     pass
+        _save_map_store(snap, districts_fp, campuses_fp)
         return snap
 
     repo = DataEngine()
@@ -1113,6 +2286,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
     run_enrichments(repo)
 
     boundary_path = _save_boundary_store(repo, districts_fp, campuses_fp)
+    _save_map_store(repo, districts_fp, campuses_fp)
     if boundary_path is not None:
         _strip_repo_boundaries(repo)
 
