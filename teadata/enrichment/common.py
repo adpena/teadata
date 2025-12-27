@@ -1,6 +1,3 @@
-import pandas as pd
-
-
 def pick_sheet_with_columns(df, expected_cols: set[str]):
     if isinstance(df, dict):  # already a sheet_name=None read
         for name, dfi in df.items():

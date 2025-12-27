@@ -1,5 +1,6 @@
 # scripts/check_env.py
-import importlib, sys
+import importlib
+import sys
 
 mods = [
     "numpy",

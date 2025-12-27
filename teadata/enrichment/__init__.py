@@ -1,4 +1,4 @@
-from typing import Callable, Dict, Literal, Any
+from typing import Dict
 from .base import Enricher
 
 _registry: Dict[str, Enricher] = {}

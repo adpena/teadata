@@ -65,6 +65,6 @@ try:
 except PackageNotFoundError:
     __version__ = "0.0.0"
 
-from .classes import DataEngine, District, Campus
+from .classes import DataEngine, District, Campus  # noqa: E402
 
 __all__ = ["DataEngine", "District", "Campus", "__version__"]

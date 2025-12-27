@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Any, Optional, Tuple
+from typing import Any, Iterable, Optional
 import re
 
 __all__ = [

@@ -3,10 +3,6 @@ from typing import Dict, Any, Optional
 
 import teadata.classes as classes_mod
 
-from .common import (
-    pick_sheet_with_columns,
-    prepare_columns,
-)  # optional utilities if you use them elsewhere
 from . import enricher
 from .base import Enricher
 

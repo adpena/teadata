@@ -4,26 +4,22 @@ from __future__ import annotations
 
 from collections import defaultdict
 from contextlib import contextmanager
-from dataclasses import dataclass, is_dataclass
-from functools import cached_property, lru_cache
+from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 import gzip
 import io
 import logging
-import math
 import os
 import pickle
 import sys
-import tempfile
 import time
-import urllib.request
 import uuid
 
+from .boundary_store import BoundaryStore
 from teadata.teadata_config import (
     canonical_campus_number,
-    canonical_district_number,
-    normalize_campus_number_value,
     normalize_district_number_value,
 )
 
@@ -318,6 +314,18 @@ def _discover_snapshot(explicit: str | Path | None = None) -> Optional[Path]:
         except Exception:
             pass
 
+    return None
+
+
+def _boundary_store_path_for_snapshot(snapshot_path: Path) -> Optional[Path]:
+    name = snapshot_path.name
+    if name.startswith("repo_"):
+        base = name[len("repo_") :]
+        if base.endswith(".pkl.gz"):
+            base = base[: -len(".pkl.gz")]
+        elif base.endswith(".pkl"):
+            base = base[: -len(".pkl")]
+        return snapshot_path.with_name(f"boundaries_{base}.sqlite")
     return None
 
 
@@ -626,6 +634,7 @@ class DataEngine:
 
         if path is None:
             eng = cls(indexes_enabled=indexes_enabled)  # empty engine (no snapshot found)
+            eng._maybe_attach_boundary_store(None)
             _log_memory(
                 "snapshot.none",
                 {
@@ -666,6 +675,7 @@ class DataEngine:
                     obj.warm_indexes()
                 except Exception:
                     pass
+            obj._maybe_attach_boundary_store(path)
             _log_memory(
                 "snapshot.engine",
                 {
@@ -736,6 +746,7 @@ class DataEngine:
                 print(
                     f"[snapshot] loaded districts={len(eng._districts)} campuses={len(eng._campuses)} from {path}"
                 )
+            eng._maybe_attach_boundary_store(path)
             _log_memory(
                 "snapshot.dict",
                 {
@@ -766,6 +777,10 @@ class DataEngine:
                         pass
                     try:
                         p._set_indexes_enabled(indexes_enabled)
+                    except Exception:
+                        pass
+                    try:
+                        p._maybe_attach_boundary_store(path)
                     except Exception:
                         pass
                     _log_memory(
@@ -799,6 +814,7 @@ class DataEngine:
                         f"[snapshot] tuple->coerced maps: districts={len(eng._districts)} "
                         f"campuses={len(eng._campuses)} from {path}"
                     )
+                eng._maybe_attach_boundary_store(path)
                 _log_memory(
                     "snapshot.tuple",
                     {
@@ -832,6 +848,8 @@ class DataEngine:
         if indexes_enabled is None:
             indexes_enabled = DEFAULT_INDEXES_ENABLED
         self._indexes_enabled = bool(indexes_enabled)
+        self._boundary_store = None
+        self._boundary_store_path = None
         # Optional early autoload from snapshot
         if snapshot is not None or autoload:
             eng = self.from_snapshot(
@@ -896,6 +914,8 @@ class DataEngine:
                 self._indexes_enabled = getattr(
                     eng, "_indexes_enabled", DEFAULT_INDEXES_ENABLED
                 )
+                self._boundary_store = getattr(eng, "_boundary_store", None)
+                self._boundary_store_path = getattr(eng, "_boundary_store_path", None)
 
                 # Student transfer edges (optional enrichment).
                 # _xfers_out: campus_id -> list[(to_campus_id, count:int|None, masked:bool)]
@@ -959,6 +979,8 @@ class DataEngine:
         # Coordinate → index lists (robust legacy mapping when STRtree returns copies)
         self._xy_to_index = None  # dict[(x,y)] -> [index]
         self._charter_cache = None
+        self._boundary_store = None
+        self._boundary_store_path = None
 
         # Fast name lookups (lowercase exact match)
         self._district_by_name_lower: Dict[str, uuid.UUID] = {}
@@ -1373,6 +1395,132 @@ class DataEngine:
         finally:
             self._in_bulk = prev
             self._rebuild_indexes()
+
+    def attach_boundary_store(self, path: str | Path, *, max_cache: int = 16) -> None:
+        try:
+            store = BoundaryStore(Path(path), max_cache=max_cache)
+        except Exception:
+            return
+        self._boundary_store = store
+        self._boundary_store_path = str(path)
+
+    def _maybe_attach_boundary_store(self, snapshot_path: Optional[Path] = None) -> None:
+        env_path = os.environ.get("TEADATA_BOUNDARY_STORE")
+        if env_path:
+            p = Path(env_path)
+            if p.exists() and p.is_file():
+                self.attach_boundary_store(p)
+                logger.info("boundary_store.attached source=env path=%s", p)
+                return
+            logger.warning("boundary_store.missing source=env path=%s", p)
+        if snapshot_path is None:
+            return
+        p = _boundary_store_path_for_snapshot(snapshot_path)
+        if p is not None and p.exists() and p.is_file():
+            self.attach_boundary_store(p)
+            logger.info("boundary_store.attached source=snapshot path=%s", p)
+        elif p is not None:
+            logger.info("boundary_store.missing source=snapshot path=%s", p)
+
+    def _missing_boundary_message(
+        self,
+        district: Any,
+        *,
+        context: Optional[str] = None,
+        reason: Optional[str] = None,
+    ) -> str:
+        name = getattr(district, "name", None)
+        dn = getattr(district, "district_number", None)
+        if not dn:
+            dn = getattr(district, "_district_number_canon", None)
+        ident = name or dn or getattr(district, "id", None) or "district"
+        parts = [f"Boundary geometry unavailable for {ident}."]
+        if context:
+            parts.append(f"Spatial query '{context}' requires district boundaries.")
+        if reason:
+            parts.append(f"{reason}.")
+        parts.append(
+            "Ensure a boundary store is available: set TEADATA_BOUNDARY_STORE to the "
+            "boundaries_*.sqlite path or place it next to the snapshot (TEADATA_SNAPSHOT)."
+        )
+        parts.append(
+            "If you want boundaries embedded in the snapshot, rebuild with "
+            "TEADATA_SPLIT_BOUNDARIES=0."
+        )
+        return " ".join(parts)
+
+    def ensure_boundary(
+        self,
+        district: Any,
+        *,
+        required: bool = False,
+        context: Optional[str] = None,
+    ) -> Any:
+        district = unwrap_query(district)
+        if district is None:
+            if required:
+                raise ValueError(
+                    self._missing_boundary_message(
+                        "district", context=context, reason="District is missing"
+                    )
+                )
+            return None
+        boundary = getattr(district, "boundary", None) or getattr(
+            district, "polygon", None
+        )
+        if boundary is not None:
+            if getattr(district, "boundary", None) is None:
+                try:
+                    district.boundary = boundary
+                except Exception:
+                    pass
+            return boundary
+        store = getattr(self, "_boundary_store", None)
+        if store is None:
+            if required:
+                raise ValueError(
+                    self._missing_boundary_message(
+                        district, context=context, reason="No boundary store attached"
+                    )
+                )
+            return None
+        key = getattr(district, "district_number", None)
+        if not key and hasattr(district, "_district_number_canon"):
+            key = getattr(district, "_district_number_canon", None)
+        if not key:
+            if required:
+                raise ValueError(
+                    self._missing_boundary_message(
+                        district,
+                        context=context,
+                        reason="District number is missing",
+                    )
+                )
+            return None
+        geom = store.get(key)
+        if geom is None:
+            if required:
+                raise ValueError(
+                    self._missing_boundary_message(
+                        district,
+                        context=context,
+                        reason=f"No boundary found for district_number={key}",
+                    )
+                )
+            return None
+        try:
+            district.boundary = geom
+        except Exception:
+            pass
+        try:
+            district.polygon = geom
+        except Exception:
+            pass
+        try:
+            district._prepared = None
+        except Exception:
+            pass
+        return geom
 
     def _clear_charter_cache(self):
         self._charter_cache = None
@@ -1990,7 +2138,6 @@ class DataEngine:
         )
 
         if tree is not None and xy_arr is not None and clist is not None:
-            from math import isfinite
             import numpy as np
 
             dists, idxs = tree.query(np.radians([lon, lat]), k=k if k > 1 else 1)
@@ -2306,6 +2453,7 @@ class DataEngine:
         if max_miles is None:
             return EntityList(campuses)
 
+        self.ensure_boundary(d, required=True, context="private_campuses_in")
         centroid = district_centroid_xy(d)
         if centroid is None:
             return EntityList([])
@@ -2343,35 +2491,10 @@ class DataEngine:
         if district is None:
             return []
 
+        self.ensure_boundary(district, required=True, context=label)
         poly = getattr(district, "polygon", None) or getattr(district, "boundary", None)
         if poly is None:
             return []
-
-        poly_xy: List[Tuple[float, float]] = []
-        bbox_min_x = bbox_min_y = bbox_max_x = bbox_max_y = (
-            None
-        )  # type: Optional[float]
-        if not SHAPELY or not hasattr(poly, "covers"):
-            try:
-                coords = list(poly)
-            except TypeError:
-                coords = []
-            cleaned: List[Tuple[float, float]] = []
-            for pt in coords:
-                if (
-                    isinstance(pt, (tuple, list))
-                    and len(pt) == 2
-                    and all(isinstance(v, (int, float)) for v in pt)
-                ):
-                    cleaned.append((float(pt[0]), float(pt[1])))
-            if cleaned:
-                poly_xy = cleaned
-                xs = [p[0] for p in cleaned]
-                ys = [p[1] for p in cleaned]
-                bbox_min_x = min(xs)
-                bbox_max_x = max(xs)
-                bbox_min_y = min(ys)
-                bbox_max_y = max(ys)
 
         # Quick AABB prefilter (NumPy) to cut the candidate set; then exact covers
         if SHAPELY and hasattr(poly, "bounds"):

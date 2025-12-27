@@ -6,7 +6,6 @@ from geopy.geocoders import ArcGIS, Nominatim
 from geopy.exc import GeocoderTimedOut, GeocoderServiceError
 
 import asyncio
-from functools import partial
 
 try:
     import aiohttp  # async HTTP client for Census

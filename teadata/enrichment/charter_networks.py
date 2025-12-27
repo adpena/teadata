@@ -6,10 +6,7 @@ from typing import Optional
 import pandas as pd
 
 from teadata.teadata_config import load_config
-from teadata.teadata_config import (
-    normalize_district_number_column,
-    normalize_district_number_value,
-)
+from teadata.teadata_config import normalize_district_number_value
 
 from teadata.classes import DataEngine, District
 

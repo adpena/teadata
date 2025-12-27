@@ -30,6 +30,10 @@ uv sync
 pip install teadata
 ```
 
+When adding a new library or tool, update `pyproject.toml` (dependencies or
+extras), refresh the lockfile, and adjust test/tooling configuration so CI and
+local environments stay in sync.
+
 **Installing from GitHub (for Render or other CI/CD)**
 
 If you are using this in a Django application deployed on **Render**, add it to your `requirements.txt`:

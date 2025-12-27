@@ -27,7 +27,6 @@ import os
 import sys
 import json
 import re
-from collections import defaultdict
 
 YEAR_MIN_DEFAULT = 2009
 
@@ -836,7 +835,6 @@ def join_datasets_on_district(
     Returns: (resolved_years: dict[str,int], df)
     """
     import pandas as pd
-    from functools import reduce
 
     ds_list = datasets or list(cfg.data_sources.keys())
     resolved_years: Dict[str, int] = {}
@@ -1084,7 +1082,6 @@ def _format_report_table(report: Dict[str, Any]) -> str:
         lines.append(title)
         lines.append("-" * len(title))
         for ds, info in sorted(data.items()):
-            years = info["years"]
             gaps = info["gaps"]
             min_decl = info["min_declared"]
             max_decl = info["max_declared"]
