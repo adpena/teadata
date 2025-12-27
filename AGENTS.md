@@ -25,6 +25,9 @@
 - For coverage when changing core logic: `pytest --cov=teadata --cov-report=term-missing`.
 - Keep assertions specific (types, counts, and key fields) to guard query/enrichment regressions.
 
+## Dependency & Tooling Updates
+- When adding a new library or tool, update `pyproject.toml` (dependencies/extras), refresh the lockfile, and adjust test/tooling configs (`pyproject.toml` tool sections, `pytest` coverage settings) so CI stays aligned.
+
 ## Commit & Pull Request Guidelines
 - Follow the existing history: short, imperative subject lines (e.g., “Create .gitattributes”, “Adding gzip support of snapshot repo cache”).
 - PRs should state what changed, why, data/config files touched, and the tests/commands run; link related issues.

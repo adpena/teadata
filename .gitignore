@@ -166,10 +166,16 @@ target/
 *.orc
 *.duckdb
 *.sqlite
+*.sqlite-journal
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite.tmp-journal
 *.sqlite3
 *.db
 *.pkl
 *.pickle
+!/.cache/boundaries_*.sqlite
+!/teadata/.cache/boundaries_*.sqlite
 # Spatial data (comment out if you version control canonical shapes)
 *.geojson
 *.gpkg

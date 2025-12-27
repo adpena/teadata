@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, fields, is_dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from functools import cached_property, singledispatchmethod
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Any, Optional, Tuple
 import uuid
 
 from teadata.teadata_config import (
@@ -19,13 +19,11 @@ from .geometry import (
     GeoField,
     SHAPELY,
     ShapelyPoint,
-    district_centroid_xy,
     euclidean,
-    haversine_miles,
     point_in_polygon,
     polygon_area,
 )
-from .grades import coerce_grade_bounds, coerce_grade_spans, spans_to_bounds
+from .grades import coerce_grade_spans, spans_to_bounds
 
 __all__ = [
     "District",
@@ -568,7 +566,8 @@ class EntityMap(dict):
         if callable(attr):
             getter = attr
         else:
-            getter = lambda o: getattr(o, attr, None)
+            def getter(obj, name=attr):
+                return getattr(obj, name, None)
 
         vals = set()
         for obj in self.values():
@@ -593,7 +592,8 @@ class EntityMap(dict):
         if callable(attr):
             getter = attr
         else:
-            getter = lambda o: getattr(o, attr, None)
+            def getter(obj, name=attr):
+                return getattr(obj, name, None)
 
         counts = {}
         for obj in self.values():
@@ -658,7 +658,8 @@ class EntityList(list):
         if callable(attr):
             getter = attr
         else:
-            getter = lambda o: getattr(o, attr, None)
+            def getter(obj, name=attr):
+                return getattr(obj, name, None)
         values = [getter(obj) for obj in self]
         return sorted(set(v for v in values if v is not None))
 
@@ -668,7 +669,8 @@ class EntityList(list):
         if callable(attr):
             getter = attr
         else:
-            getter = lambda o: getattr(o, attr, None)
+            def getter(obj, name=attr):
+                return getattr(obj, name, None)
 
         counts = {}
         for obj in self:

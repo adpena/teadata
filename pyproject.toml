@@ -96,7 +96,7 @@ include = ["teadata*"]
 exclude = ["tests*", "docs*", "examples*"]
 
 [tool.setuptools.package-data]
-teadata = [".cache/*.pkl", ".cache/*.pkl.gz"]
+teadata = [".cache/*.pkl", ".cache/*.pkl.gz", ".cache/*.sqlite"]
 
 [tool.setuptools]
 include-package-data = true
@@ -148,3 +148,10 @@ DEP003 = [
     "ipywidgets",    # notebook-only; provided by optional 'notebooks' extra
     "itables"        # notebook-only; provided by optional 'notebooks' extra
 ]
+
+[tool.ruff]
+exclude = ["examples", "docs", "build", "teadata.egg-info", ".venv"]
+extend-exclude = ["*.ipynb"]
+
+[tool.mypy]
+exclude = "^(build|teadata\\.egg-info|examples|docs)/"

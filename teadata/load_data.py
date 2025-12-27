@@ -4,18 +4,18 @@ from pathlib import Path
 import gzip
 import geopandas as gpd
 import pandas as pd
-import json
 import hashlib
 import inspect
 import os
 import shutil
+import sqlite3
 
 from datetime import datetime, date
-from typing import Any, Iterable, Mapping, Optional
+from typing import Any, Iterable, Mapping, Optional, List
 
 from teadata import classes as _classes_mod
 from teadata import teadata_config as _cfg_mod
-from teadata.classes import District, Campus, DataEngine, _point_xy
+from teadata.classes import District, Campus, DataEngine
 from teadata.engine import _load_snapshot_payload
 from teadata.teadata_config import (
     canonical_campus_number,
@@ -34,6 +34,13 @@ YEAR = 2025
 
 # Optional env toggles
 DISABLE_CACHE = os.getenv("TEADATA_DISABLE_CACHE", "0") not in (
+    "0",
+    "false",
+    "False",
+    None,
+)
+
+SPLIT_BOUNDARIES = os.getenv("TEADATA_SPLIT_BOUNDARIES", "1") not in (
     "0",
     "false",
     "False",
@@ -398,9 +405,34 @@ def _repo_cache_dir() -> Path:
     return d
 
 
+def _package_cache_dir() -> Path | None:
+    try:
+        d = Path(__file__).resolve().parent / ".cache"
+        d.mkdir(exist_ok=True)
+        return d
+    except Exception:
+        return None
+
+
+def _copy_cache_artifact(src: Path) -> None:
+    pkg_dir = _package_cache_dir()
+    if pkg_dir is None:
+        return
+    try:
+        shutil.copy2(src, pkg_dir / src.name)
+    except Exception:
+        pass
+
+
 def _snapshot_path(districts_fp: str, campuses_fp: str) -> Path:
     d = _repo_cache_dir()
     tag = f"repo_{Path(districts_fp).stem}_{Path(campuses_fp).stem}.pkl"
+    return d / tag
+
+
+def _boundary_store_path(districts_fp: str, campuses_fp: str) -> Path:
+    d = _repo_cache_dir()
+    tag = f"boundaries_{Path(districts_fp).stem}_{Path(campuses_fp).stem}.sqlite"
     return d / tag
 
 
@@ -482,6 +514,83 @@ def _prepare_repo_for_pickle(repo: DataEngine) -> None:
             setattr(repo, attr, None)
 
 
+def _strip_repo_boundaries(repo: DataEngine) -> None:
+    for district in repo._districts.values():
+        try:
+            district.boundary = None
+        except Exception:
+            pass
+        try:
+            district.polygon = None
+        except Exception:
+            pass
+        if hasattr(district, "_prepared"):
+            district._prepared = None
+
+
+def _save_boundary_store(
+    repo: DataEngine, districts_fp: str, campuses_fp: str
+) -> Optional[Path]:
+    if not SPLIT_BOUNDARIES:
+        return None
+    path = _boundary_store_path(districts_fp, campuses_fp)
+    tmp_path = path.with_suffix(".sqlite.tmp")
+    try:
+        if tmp_path.exists():
+            tmp_path.unlink()
+    except Exception:
+        pass
+    try:
+        if path.exists():
+            path.unlink()
+    except Exception:
+        pass
+
+    try:
+        conn = sqlite3.connect(tmp_path)
+        conn.execute(
+            "CREATE TABLE boundaries (district_number TEXT PRIMARY KEY, wkb BLOB)"
+        )
+        rows = []
+        for district in repo._districts.values():
+            district_number = canonical_district_number(
+                getattr(district, "district_number", None)
+            )
+            if not district_number:
+                continue
+            boundary = getattr(district, "boundary", None) or getattr(
+                district, "polygon", None
+            )
+            if boundary is None:
+                continue
+            try:
+                wkb = boundary.wkb
+            except Exception:
+                continue
+            rows.append((district_number, sqlite3.Binary(wkb)))
+        if rows:
+            conn.executemany(
+                "INSERT OR REPLACE INTO boundaries (district_number, wkb) VALUES (?, ?)",
+                rows,
+            )
+        conn.commit()
+        conn.close()
+        tmp_path.replace(path)
+        _copy_cache_artifact(path)
+        return path
+    except Exception:
+        try:
+            conn.close()
+        except Exception:
+            pass
+        try:
+            if tmp_path.exists():
+                tmp_path.unlink()
+        except Exception:
+            pass
+        return None
+
+
 def _load_repo_snapshot(
     districts_fp: str, campuses_fp: str, extra_sig: dict
 ) -> DataEngine | None:
@@ -530,6 +639,8 @@ def _save_repo_snapshot(
             pickle.dump((meta, repo), f, protocol=pickle.HIGHEST_PROTOCOL)
         with gzip.open(snap_gz, "wb") as f:
             pickle.dump((meta, repo), f, protocol=pickle.HIGHEST_PROTOCOL)
+        _copy_cache_artifact(snap)
+        _copy_cache_artifact(snap_gz)
         # Attempt to also copy snapshots to absolute project cache path; fail quietly if missing
         try:
             abs_cache_dir = Path("/Users/adpena/PycharmProjects/teadata/.cache")
@@ -544,9 +655,6 @@ def _save_repo_snapshot(
 
 
 # ------------------ Sanity probe: fast vs slow charter-within ------------------
-from typing import List
-
-
 def sanity_probe_charters(
     repo: DataEngine, district_name: str, *, n_print: int = 5
 ) -> None:
@@ -623,6 +731,13 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
     if snap is not None:
         # Re-run enrichments to ensure latest aliases/logic land on the cached repo
         run_enrichments(snap)
+        if SPLIT_BOUNDARIES:
+            boundary_path = _boundary_store_path(districts_fp, campuses_fp)
+            if boundary_path.exists():
+                try:
+                    snap.attach_boundary_store(boundary_path)
+                except Exception:
+                    pass
         return snap
 
     repo = DataEngine()
@@ -997,8 +1112,17 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
     # Run all enrichments once data is loaded
     run_enrichments(repo)
 
+    boundary_path = _save_boundary_store(repo, districts_fp, campuses_fp)
+    if boundary_path is not None:
+        _strip_repo_boundaries(repo)
+
     # Save snapshot for next warm start
     _save_repo_snapshot(repo, districts_fp, campuses_fp, extra_sig)
+    if boundary_path is not None:
+        try:
+            repo.attach_boundary_store(boundary_path)
+        except Exception:
+            pass
     return repo
 
 
@@ -1151,7 +1275,17 @@ if __name__ == "__main__":
         "(info) enriched rating:", val_unsuffixed, "| canonical rating:", val_canonical
     )
 
-    centroid = dist_q.polygon.centroid  # ✅ methods/attributes chain through
+    dist_obj = dist_q.first() if hasattr(dist_q, "first") else None
+    if dist_obj is not None:
+        try:
+            repo.ensure_boundary(dist_obj)
+        except Exception:
+            pass
+    centroid = (
+        dist_obj.polygon.centroid
+        if dist_obj is not None and getattr(dist_obj, "polygon", None) is not None
+        else None
+    )
     first_campus = (dist_q >> ("campuses_in",))[0]  # __getitem__ for indexing
     if dist_q:
         ...  # __bool__ reflects non-empty

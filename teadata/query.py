@@ -2,17 +2,13 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, TYPE_CHECKING
 import uuid
 
-from .entities import (
-    Campus,
-    EntityList,
-    EntityMap,
-    ReadOnlyEntityView,
-    is_charter,
-    is_private,
-)
+if TYPE_CHECKING:
+    from .engine import DataEngine
+
+from .entities import EntityList, EntityMap, ReadOnlyEntityView, is_charter, is_private
 from .geometry import point_xy
 from .grades import coerce_grade_bounds, coerce_grade_spans
 
@@ -101,7 +97,7 @@ class Query:
         "grade_range_overlap": "grade_overlap",
     }
 
-    def __init__(self, items: List[Any], repo: "DataEngine"):
+    def __init__(self, items: List[Any], repo: DataEngine):
         self._items = list(items)
         self._repo = repo
 
