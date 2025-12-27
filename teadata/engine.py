@@ -764,6 +764,10 @@ class DataEngine:
                         p._rehydrate_geometries()
                     except Exception:
                         pass
+                    try:
+                        p._set_indexes_enabled(indexes_enabled)
+                    except Exception:
+                        pass
                     _log_memory(
                         "snapshot.tuple.engine",
                         {
