@@ -34,6 +34,7 @@ nav:
     - Spatial Tools: spatial.md
     - Enrichment: enrichment.md
     - Configuration: config.md
+    - Versioning: versioning.md
   - Reference: reference.md
 
 plugins:

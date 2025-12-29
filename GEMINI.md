@@ -56,6 +56,17 @@ Defines the mapping between logical data keys (e.g., `tapr`, `peims`) and physic
 
 ## Development Workflow
 
+### Versioning Conventions
+The project follows a modified Semantic Versioning (SemVer) approach:
+*   **Major (X.0.0):** Significant architectural changes, API-breaking updates, or major framework migrations.
+*   **Minor (0.X.0):** New features, significant new data source integrations, or changes to the DataEngine query DSL.
+*   **Patch (0.0.X):** Bug fixes, minor logic updates, or metadata improvements.
+*   **Data Refresh (0.0.Xy):** When a simple data refresh occurs (e.g., running `load_data.py` to pick up latest TEA releases) without significant code changes, append an extra digit (e.g., `0.0.7` -> `0.0.71`).
+
+**When to increment:**
+*   Increment the version BEFORE running a release build or distributing a new snapshot.
+*   Always increment the version when `load_data.py` is executed for a production data refresh.
+
 ### Installation
 The project uses `uv` for dependency management, but supports standard pip.
 

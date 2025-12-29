@@ -3626,7 +3626,7 @@ wheels = [
 
 [[package]]
 name = "teadata"
-version = "0.0.7"
+version = "0.0.71"
 source = { editable = "." }
 dependencies = [
     { name = "duckdb" },
