@@ -1049,6 +1049,47 @@ class DataEngine:
             self._numpy_coords_and_campuses(True)
         except Exception:
             pass
+        import gc
+
+        gc.collect()
+
+    def clear_indexes(self) -> None:
+        """
+        Force-clear all spatial, vectorized, and name-lookup caches to free up memory.
+        The engine remains fully functional; caches will be rebuilt lazily on demand.
+        """
+        self._kdtree = None
+        self._kdtree_charter = None
+        self._xy_deg = None
+        self._xy_rad = None
+        self._campus_list = None
+        self._xy_deg_charter = None
+        self._xy_rad_charter = None
+        self._campus_list_charter = None
+        self._point_tree = None
+        self._point_geoms = None
+        self._point_ids = None
+        self._geom_id_to_index = None
+        self._xy_deg_np = None
+        self._campus_list_np = None
+        self._xy_deg_np_charter = None
+        self._campus_list_np_charter = None
+        self._all_xy_np = None
+        self._all_campuses_np = None
+        self._xy_to_index = None
+        self._charter_cache = None
+
+        # Name lookups are small but we clear them for completeness; they rebuild via _rebuild_indexes()
+        self._campus_by_number = {}
+        self._campus_by_name_lower = {}
+        self._district_by_name_lower = {}
+
+        if self._boundary_store:
+            self._boundary_store.close()
+
+        import gc
+
+        gc.collect()
 
     # --- Public, read-only views of entities ---
     @property
@@ -1689,8 +1730,10 @@ class DataEngine:
             self._district_by_name_lower = {}
             for did, d in self._districts.items():
                 key = (d.name or "").lower()
-                if key and key not in self._district_by_name_lower:
-                    self._district_by_name_lower[key] = did
+                if key:
+                    ikey = sys.intern(key)
+                    if ikey not in self._district_by_name_lower:
+                        self._district_by_name_lower[ikey] = did
             for cid, c in self._campuses.items():
                 num = getattr(c, "campus_number", None)
                 if not num:
@@ -1699,14 +1742,19 @@ class DataEngine:
                 key = canonical_campus_number(num)
                 if not key:
                     continue
-                self._campus_by_number[key] = cid
-                digits = key[1:]
-                self._campus_by_number[digits] = cid
-                if digits.isdigit():
-                    self._campus_by_number[str(int(digits))] = cid
+                ikey = sys.intern(key)
+                self._campus_by_number[ikey] = cid
+                digits = ikey[1:]
+                if digits:
+                    idigits = sys.intern(digits)
+                    self._campus_by_number[idigits] = cid
+                    if idigits.isdigit():
+                        self._campus_by_number[sys.intern(str(int(idigits)))] = cid
                 name_key = (c.name or "").lower()
-                if name_key and name_key not in self._campus_by_name_lower:
-                    self._campus_by_name_lower[name_key] = cid
+                if name_key:
+                    iname_key = sys.intern(name_key)
+                    if iname_key not in self._campus_by_name_lower:
+                        self._campus_by_name_lower[iname_key] = cid
         except Exception:
             self._campus_by_number = {}
             self._campus_by_name_lower = {}

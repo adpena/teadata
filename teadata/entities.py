@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import date
 from functools import cached_property, singledispatchmethod
 from typing import Any, Optional, Tuple
+import sys
 import uuid
 
 from teadata.teadata_config import (
@@ -34,6 +35,11 @@ __all__ = [
     "is_charter",
     "is_private",
 ]
+
+
+def _intern_key(k: Any) -> Any:
+    """Intern string keys to reduce memory overhead in large entity maps."""
+    return sys.intern(k) if isinstance(k, str) else k
 
 
 def validate_non_empty_str(name: str):
@@ -209,17 +215,18 @@ class District:
         self, *, include_meta: bool = True, include_geometry: bool = False
     ) -> dict:
         out = {
-            "id": str(self.id),
-            "name": self.name,
-            "enrollment": self.enrollment,
-            "district_number": self.district_number,
-            "aea": self.aea,
-            "rating": self.rating,
+            sys.intern("id"): str(self.id),
+            sys.intern("name"): self.name,
+            sys.intern("enrollment"): self.enrollment,
+            sys.intern("district_number"): self.district_number,
+            sys.intern("aea"): self.aea,
+            sys.intern("rating"): self.rating,
         }
         if include_meta and isinstance(self.meta, dict):
             for k, v in self.meta.items():
-                if k not in out:
-                    out[k] = v
+                ik = _intern_key(k)
+                if ik not in out:
+                    out[ik] = v
 
         if include_geometry:
             poly = getattr(self, "polygon", None)
@@ -337,27 +344,28 @@ class Campus:
         self, *, include_meta: bool = True, include_geometry: bool = False
     ) -> dict:
         out = {
-            "id": str(self.id),
-            "district_id": str(self.district_id),
-            "name": self.name,
-            "charter_type": self.charter_type,
-            "is_charter": bool(self.is_charter),
-            "is_private": bool(self.is_private),
-            "is_magnet": self.is_magnet,
-            "enrollment": self.enrollment,
-            "rating": self.rating,
-            "aea": self.aea,
-            "grade_range": self.grade_range,
-            "school_type": self.school_type,
-            "school_status_date": self.school_status_date,
-            "update_date": self.update_date,
-            "district_number": self.district_number,
-            "campus_number": self.campus_number,
+            sys.intern("id"): str(self.id),
+            sys.intern("district_id"): str(self.district_id),
+            sys.intern("name"): self.name,
+            sys.intern("charter_type"): self.charter_type,
+            sys.intern("is_charter"): bool(self.is_charter),
+            sys.intern("is_private"): bool(self.is_private),
+            sys.intern("is_magnet"): self.is_magnet,
+            sys.intern("enrollment"): self.enrollment,
+            sys.intern("rating"): self.rating,
+            sys.intern("aea"): self.aea,
+            sys.intern("grade_range"): self.grade_range,
+            sys.intern("school_type"): self.school_type,
+            sys.intern("school_status_date"): self.school_status_date,
+            sys.intern("update_date"): self.update_date,
+            sys.intern("district_number"): self.district_number,
+            sys.intern("campus_number"): self.campus_number,
         }
         if include_meta and isinstance(self.meta, dict):
             for k, v in self.meta.items():
-                if k not in out:
-                    out[k] = v
+                ik = _intern_key(k)
+                if ik not in out:
+                    out[ik] = v
 
         percent_change: Optional[float]
         try:
