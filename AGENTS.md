@@ -29,6 +29,11 @@
 ## Dependency & Tooling Updates
 - When adding a new library or tool, update `pyproject.toml` (dependencies/extras), refresh the lockfile, and adjust test/tooling configs (`pyproject.toml` tool sections, `pytest` coverage settings) so CI stays aligned.
 
+## Versioning Policy
+- **Standard SemVer (X.Y.Z):** Used for Major, Minor, and Patch updates to the codebase.
+- **Data Refreshes (X.Y.Zy):** Append an additional digit for data-only updates (e.g., `0.0.71` implies a refresh of version `0.0.7`).
+- **Release Process:** Increment the version in `pyproject.toml` prior to executing a production `load_data.py` run or distributing new snapshots.
+
 ## Commit & Pull Request Guidelines
 - Follow the existing history: short, imperative subject lines (e.g., “Create .gitattributes”, “Adding gzip support of snapshot repo cache”).
 - PRs should state what changed, why, data/config files touched, and the tests/commands run; link related issues.
