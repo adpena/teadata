@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
+from .assets import ensure_local_asset, is_lfs_pointer
 from .teadata_config import canonical_district_number
 
 try:
@@ -65,19 +66,32 @@ def _log_boundary_store(path: Path, source: str) -> None:
     logger.info("boundary_store.discovered source=%s path=%s", source, path_str)
 
 
+def _resolve_boundary_store(path: Path, source: str) -> Optional[Path]:
+    resolved = ensure_local_asset(
+        path, url_env="TEADATA_BOUNDARY_STORE_URL", label="boundary store"
+    )
+    if not resolved.exists() or is_lfs_pointer(resolved):
+        logger.warning("boundary_store.unavailable source=%s path=%s", source, path)
+        return None
+    _log_boundary_store(resolved, source)
+    return resolved
+
+
 def discover_boundary_store(explicit: str | Path | None = None) -> Optional[Path]:
     if explicit:
         p = Path(explicit)
         if p.exists() and p.is_file():
-            _log_boundary_store(p, "explicit")
-            return p
+            resolved = _resolve_boundary_store(p, "explicit")
+            if resolved:
+                return resolved
 
     env = os.environ.get("TEADATA_BOUNDARY_STORE")
     if env:
         p = Path(env)
         if p.exists() and p.is_file():
-            _log_boundary_store(p, "env")
-            return p
+            resolved = _resolve_boundary_store(p, "env")
+            if resolved:
+                return resolved
 
     if _discover_snapshot:
         try:
@@ -85,8 +99,9 @@ def discover_boundary_store(explicit: str | Path | None = None) -> Optional[Path
             if snap:
                 candidate = boundary_store_path_for_snapshot(Path(snap))
                 if candidate and candidate.exists():
-                    _log_boundary_store(candidate, "snapshot")
-                    return candidate
+                    resolved = _resolve_boundary_store(candidate, "snapshot")
+                    if resolved:
+                        return resolved
         except Exception:
             pass
 
@@ -95,16 +110,18 @@ def discover_boundary_store(explicit: str | Path | None = None) -> Optional[Path
         pkg_cache = package_dir / ".cache"
         candidate = _newest_sqlite(pkg_cache)
         if candidate:
-            _log_boundary_store(candidate, "package-cache")
-            return candidate
+            resolved = _resolve_boundary_store(candidate, "package-cache")
+            if resolved:
+                return resolved
     except Exception:
         pass
 
     for base in Path.cwd().parents:
         candidate = _newest_sqlite(base / ".cache")
         if candidate:
-            _log_boundary_store(candidate, "parent-cache")
-            return candidate
+            resolved = _resolve_boundary_store(candidate, "parent-cache")
+            if resolved:
+                return resolved
 
     return None
 

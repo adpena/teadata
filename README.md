@@ -48,6 +48,16 @@ Or install it directly via CLI:
 pip install git+https://github.com/adpena/teadata.git
 ```
 
+### Snapshot assets (Git LFS)
+
+Production deployments that install from GitHub often receive Git LFS pointer files instead of
+the large snapshot assets. Set these URLs so the engine can download the real files on demand:
+
+- `TEADATA_SNAPSHOT_URL` (e.g., a GitHub release asset for `repo_*.pkl.gz`)
+- `TEADATA_MAP_STORE_URL` (for `map_payloads_*.sqlite`)
+- `TEADATA_BOUNDARY_STORE_URL` (for `boundaries_*.sqlite`)
+- Optional: `TEADATA_ASSET_CACHE_DIR` to control where downloads are cached
+
 ### Usage
 
 ```python

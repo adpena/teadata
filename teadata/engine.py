@@ -17,6 +17,7 @@ import sys
 import time
 import uuid
 
+from .assets import ensure_local_asset, is_lfs_pointer
 from .boundary_store import BoundaryStore
 from teadata.teadata_config import (
     canonical_campus_number,
@@ -278,8 +279,6 @@ def _newest_pickle(folder: Path) -> Optional[Path]:
 
 
 def _is_gzip_file(path: Path) -> bool:
-    if path.suffix == ".gz":
-        return True
     try:
         with path.open("rb") as f:
             return f.read(2) == GZIP_MAGIC
@@ -288,6 +287,11 @@ def _is_gzip_file(path: Path) -> bool:
 
 
 def _load_snapshot_payload(path: Path):
+    path = ensure_local_asset(path, url_env="TEADATA_SNAPSHOT_URL", label="snapshot")
+    if is_lfs_pointer(path):
+        raise RuntimeError(
+            "Snapshot file is a git-lfs pointer; set TEADATA_SNAPSHOT_URL to a real asset."
+        )
     opener = gzip.open if _is_gzip_file(path) else open
     with opener(path, "rb") as f:
         return _compat_pickle_load(f)
