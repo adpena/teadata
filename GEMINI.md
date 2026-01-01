@@ -63,6 +63,10 @@ The project follows a modified Semantic Versioning (SemVer) approach:
 *   **Patch (0.0.X):** Bug fixes, minor logic updates, or metadata improvements.
 *   **Data Refresh (0.0.Xy):** When a simple data refresh occurs (e.g., running `load_data.py` to pick up latest TEA releases) without significant code changes, append an extra digit (e.g., `0.0.7` -> `0.0.71`).
 
+**Release tag policy:**
+*   Tags always use the thousandths place (e.g., `v0.0.101`, `v0.0.102`). If no tags exist, start at `v0.0.101`.
+*   Keep only the three most recent tags/releases; delete older tags and their release assets everywhere (GitHub releases included).
+
 **When to increment:**
 *   Increment the version BEFORE running a release build or distributing a new snapshot.
 *   Always increment the version when `load_data.py` is executed for a production data refresh.

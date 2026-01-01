@@ -30,9 +30,11 @@
 - When adding a new library or tool, update `pyproject.toml` (dependencies/extras), refresh the lockfile, and adjust test/tooling configs (`pyproject.toml` tool sections, `pytest` coverage settings) so CI stays aligned.
 
 ## Versioning Policy
+- **Release tags:** Always use the thousandths place (e.g., `v0.0.101`, `v0.0.102`). If no tags exist, start at `v0.0.101`.
 - **Standard SemVer (X.Y.Z):** Used for Major, Minor, and Patch updates to the codebase.
 - **Data Refreshes (X.Y.Zy):** Append an additional digit for data-only updates (e.g., `0.0.71` implies a refresh of version `0.0.7`).
 - **Release Process:** Increment the version in `pyproject.toml` prior to executing a production `load_data.py` run or distributing new snapshots.
+- **Tag retention:** Keep only the three most recent tags/releases; delete older tags and their GitHub release assets everywhere.
 
 ## Commit & Pull Request Guidelines
 - Follow the existing history: short, imperative subject lines (e.g., “Create .gitattributes”, “Adding gzip support of snapshot repo cache”).

@@ -1,4 +1,5 @@
 import uuid
+import math
 import pickle
 from pathlib import Path
 import gzip
@@ -16,7 +17,13 @@ from typing import Any, Iterable, Mapping, Optional, List
 
 from teadata import classes as _classes_mod
 from teadata import teadata_config as _cfg_mod
-from teadata.classes import District, Campus, DataEngine, haversine_miles
+from teadata.classes import (
+    Campus,
+    DataEngine,
+    District,
+    coerce_grade_spans,
+    haversine_miles,
+)
 from teadata.engine import _load_snapshot_payload
 from teadata.map_store import map_store_path_for_snapshot
 from teadata.teadata_config import (
@@ -1659,6 +1666,572 @@ def build_closures_map_payload(
     return payload
 
 
+def _clean_text(value: Any) -> str:
+    if isinstance(value, str):
+        text = value.strip()
+        return text
+    if value is None:
+        return ""
+    return str(value).strip()
+
+
+def _campus_district_name(campus: Optional[Campus]) -> str:
+    if campus is None:
+        return ""
+    district = getattr(campus, "district", None)
+    name = getattr(district, "name", None)
+    if not name:
+        name = getattr(campus, "district_name", None)
+    return _clean_text(name)
+
+
+def _campus_rating_value(campus: Optional[Campus]) -> Optional[str]:
+    if campus is None:
+        return None
+    rating = getattr(campus, "rating", None)
+    if rating:
+        return str(rating)
+    meta = getattr(campus, "meta", {}) or {}
+    return meta.get("overall_rating_2025") or meta.get("overall_rating")
+
+
+def _campus_enrollment_value(campus: Optional[Campus]) -> Optional[int]:
+    if campus is None:
+        return None
+    enrollment = getattr(campus, "enrollment", None)
+    if enrollment not in (None, ""):
+        try:
+            return int(enrollment)
+        except Exception:
+            try:
+                return int(float(enrollment))
+            except Exception:
+                return None
+    meta = getattr(campus, "meta", {}) or {}
+    for key in (
+        "campus_2025_student_enrollment_all_students_count",
+        "enrollment",
+        "student_enrollment",
+    ):
+        value = meta.get(key)
+        if value not in (None, ""):
+            try:
+                return int(value)
+            except Exception:
+                try:
+                    return int(float(value))
+                except Exception:
+                    continue
+    return None
+
+
+def _campus_grade_range(campus: Optional[Campus]) -> str:
+    if campus is None:
+        return ""
+    grade_range = getattr(campus, "grade_range", None)
+    if grade_range:
+        return _clean_text(grade_range)
+    meta = getattr(campus, "meta", {}) or {}
+    for key in ("grade_range", "campus_grade_range"):
+        value = meta.get(key)
+        if value:
+            return _clean_text(value)
+    return ""
+
+
+def _format_number(value: Optional[int]) -> str:
+    if value is None:
+        return ""
+    try:
+        return f"{int(value):,}"
+    except Exception:
+        return str(value)
+
+
+def _map_stats_for_campus(campus: Optional[Campus]) -> list[dict[str, str]]:
+    stats: list[dict[str, str]] = []
+    grade_range = _campus_grade_range(campus)
+    if grade_range:
+        stats.append({"label": "Grade range", "value": grade_range})
+    enrollment_value = _campus_enrollment_value(campus)
+    enrollment_text = _format_number(enrollment_value) if enrollment_value else ""
+    if enrollment_text:
+        stats.append({"label": "2024-25 Enrollment", "value": enrollment_text})
+    rating_value = _campus_rating_value(campus)
+    if rating_value:
+        stats.append({"label": "2025 Overall Rating", "value": _clean_text(rating_value)})
+    return stats
+
+
+def _extract_campus_latlon(campus: Optional[Campus]) -> tuple[Optional[float], Optional[float]]:
+    if campus is None:
+        return None, None
+    coords = getattr(campus, "coords", None)
+    if coords is None:
+        return None, None
+    try:
+        if hasattr(coords, "x") and hasattr(coords, "y"):
+            lon = float(coords.x)
+            lat = float(coords.y)
+        else:
+            first, second = coords
+            lon = float(first)
+            lat = float(second)
+    except (TypeError, ValueError):
+        return None, None
+
+    candidates = [
+        (lat, lon),
+        (lon, lat),
+    ]
+    for candidate in candidates:
+        if _looks_like_texas(*candidate):
+            return candidate
+    for candidate in candidates:
+        if _valid_latlon(*candidate):
+            return candidate
+    return None, None
+
+
+def _serialize_map_campus(campus: Optional[Campus]) -> dict[str, object]:
+    if campus is None:
+        return {}
+    campus_number = getattr(campus, "campus_number", None)
+    canonical_number = _canonical_campus_number(campus_number)
+    lat, lon = _extract_campus_latlon(campus)
+    return {
+        "campusNumber": _display_campus_number(canonical_number),
+        "canonicalCampusNumber": canonical_number,
+        "name": _clean_text(getattr(campus, "name", "")),
+        "districtName": _campus_district_name(campus),
+        "lat": lat,
+        "lon": lon,
+        "profileUrl": _campus_profile_url(canonical_number),
+        "charter": bool(getattr(campus, "is_charter", False)),
+        "isPrivate": bool(getattr(campus, "is_private", False)),
+        "stats": _map_stats_for_campus(campus),
+    }
+
+
+def _serialize_transfer_destination(
+    campus: Optional[Campus],
+    count: Any,
+    masked: Any,
+) -> dict[str, object]:
+    payload = _serialize_map_campus(campus)
+    numeric_count: Optional[int] = None
+    if not masked and count is not None:
+        try:
+            numeric_count = int(count)
+        except Exception:
+            try:
+                numeric_count = int(float(count))
+            except Exception:
+                numeric_count = None
+    payload.update(
+        {
+            "count": numeric_count,
+            "masked": bool(masked),
+        }
+    )
+    return payload
+
+
+def _bounds_from_points(points: list[tuple[Optional[float], Optional[float]]]):
+    valid_points = [
+        (lat, lon)
+        for lat, lon in points
+        if lat is not None and lon is not None and _valid_latlon(lat, lon)
+    ]
+    if not valid_points:
+        return None
+    lats = [lat for lat, _ in valid_points]
+    lons = [lon for _, lon in valid_points]
+    padding = 0.02
+    return [
+        (min(lats) - padding, min(lons) - padding),
+        (max(lats) + padding, max(lons) + padding),
+    ]
+
+
+def _bounds_from_radius(
+    lat: Optional[float],
+    lon: Optional[float],
+    radius_miles: Optional[float],
+):
+    if lat is None or lon is None or radius_miles in (None, ""):
+        return None
+    if not _valid_latlon(lat, lon):
+        return None
+    try:
+        radius = float(radius_miles)
+    except (TypeError, ValueError):
+        return None
+    if radius <= 0:
+        return None
+
+    miles_per_degree_lat = 69.0
+    try:
+        lat_delta = radius / miles_per_degree_lat
+    except ZeroDivisionError:
+        lat_delta = 0.0
+
+    lon_scale = math.cos(math.radians(float(lat)))
+    miles_per_degree_lon = 69.172 * lon_scale if lon_scale else 0.0
+    lon_delta = radius / miles_per_degree_lon if miles_per_degree_lon else 0.0
+
+    sw_lat = lat - lat_delta
+    sw_lon = lon - lon_delta
+    ne_lat = lat + lat_delta
+    ne_lon = lon + lon_delta
+
+    return [(sw_lat, sw_lon), (ne_lat, ne_lon)]
+
+
+def _grade_spans(campus: Optional[Campus]) -> list[tuple[Optional[int], Optional[int]]]:
+    if campus is None:
+        return []
+    spans = getattr(campus, "grade_range_code_spans", None)
+    if spans:
+        return [tuple(span) for span in spans if isinstance(span, (list, tuple))]
+    grade_range = getattr(campus, "grade_range", None)
+    if grade_range:
+        try:
+            return [tuple(span) for span in coerce_grade_spans(grade_range)]
+        except Exception:
+            return []
+    meta = getattr(campus, "meta", {}) or {}
+    meta_grade = meta.get("grade_range") or meta.get("campus_grade_range")
+    if meta_grade:
+        try:
+            return [tuple(span) for span in coerce_grade_spans(meta_grade)]
+        except Exception:
+            return []
+    return []
+
+
+def _spans_overlap(
+    span_a: tuple[Optional[int], Optional[int]],
+    span_b: tuple[Optional[int], Optional[int]],
+) -> bool:
+    low_a, high_a = span_a
+    low_b, high_b = span_b
+    if low_a is None and high_a is None:
+        return True
+    if low_b is None and high_b is None:
+        return True
+    low_a = -float("inf") if low_a is None else low_a
+    high_a = float("inf") if high_a is None else high_a
+    low_b = -float("inf") if low_b is None else low_b
+    high_b = float("inf") if high_b is None else high_b
+    return high_a >= low_b and high_b >= low_a
+
+
+def _grades_overlap(campus_a: Campus, campus_b: Campus) -> bool:
+    spans_a = _grade_spans(campus_a)
+    spans_b = _grade_spans(campus_b)
+    if not spans_a or not spans_b:
+        return True
+    for span_a in spans_a:
+        for span_b in spans_b:
+            if _spans_overlap(span_a, span_b):
+                return True
+    return False
+
+
+def _district_boundary_payload(repo: Optional[DataEngine], district: Optional[District]):
+    if district is None:
+        return (None, None)
+    try:
+        from shapely.geometry import mapping as shapely_mapping  # type: ignore
+    except Exception:
+        shapely_mapping = None
+
+    boundary = getattr(district, "boundary", None) or getattr(district, "polygon", None)
+    if boundary is None and repo is not None:
+        try:
+            repo.ensure_boundary(district)
+        except Exception:
+            boundary = None
+        else:
+            boundary = getattr(district, "boundary", None) or getattr(district, "polygon", None)
+    if boundary is None:
+        return (None, None)
+
+    geojson = None
+    bounds = None
+    if shapely_mapping:
+        try:
+            geojson = shapely_mapping(boundary)
+        except Exception:
+            geojson = None
+    try:
+        if hasattr(boundary, "bounds"):
+            minx, miny, maxx, maxy = boundary.bounds
+            sw = (float(miny), float(minx))
+            ne = (float(maxy), float(maxx))
+            if _valid_latlon(*sw) and _valid_latlon(*ne):
+                bounds = [sw, ne]
+    except Exception:
+        bounds = None
+    return (geojson, bounds)
+
+
+def _collect_private_campuses(
+    repo: DataEngine,
+    base_campuses: list[Campus],
+) -> list[dict[str, object]]:
+    if not base_campuses:
+        return []
+
+    district_ids = set()
+    districts = []
+    for campus in base_campuses:
+        district = getattr(campus, "district", None)
+        district_id = getattr(district, "id", None)
+        if district is None or district_id in district_ids:
+            continue
+        district_ids.add(district_id)
+        districts.append(district)
+
+    results: dict[object, dict[str, object]] = {}
+
+    for district in districts:
+        try:
+            candidates = list(repo.private_campuses_in(district))
+        except Exception:
+            candidates = []
+        for private_campus in candidates:
+            if not getattr(private_campus, "is_private", False):
+                continue
+            overlaps: list[dict[str, str]] = []
+            for base in base_campuses:
+                base_district = getattr(base, "district", None)
+                if getattr(base_district, "id", None) != getattr(district, "id", None):
+                    continue
+                if not _grades_overlap(private_campus, base):
+                    continue
+                overlaps.append(
+                    {
+                        "campusNumber": _display_campus_number(
+                            getattr(base, "campus_number", "")
+                        ),
+                        "name": _clean_text(getattr(base, "name", "")),
+                        "profileUrl": _campus_profile_url(
+                            getattr(base, "campus_number", "")
+                        ),
+                    }
+                )
+            if not overlaps:
+                continue
+
+            key = getattr(private_campus, "id", None) or _canonical_campus_number(
+                getattr(private_campus, "campus_number", None)
+            )
+            if key in results:
+                existing = results[key].get("overlapsWith") or []
+                results[key]["overlapsWith"] = existing + overlaps
+                continue
+
+            entry = _serialize_map_campus(private_campus)
+            entry["overlapsWith"] = overlaps
+            results[key] = entry
+
+    return sorted(
+        [
+            {
+                **entry,
+                "overlapsWith": sorted(
+                    entry.get("overlapsWith", []),
+                    key=lambda item: (
+                        item.get("name") or "",
+                        item.get("campusNumber") or "",
+                    ),
+                ),
+            }
+            for entry in results.values()
+        ],
+        key=lambda item: (item.get("name", ""), item.get("campusNumber", "")),
+    )
+
+
+def _build_isd_profile_map_payload(repo: DataEngine, campus: Campus) -> dict:
+    origin_entry = _serialize_map_campus(campus)
+    origin_entry["isOrigin"] = True
+
+    lat, lon = origin_entry.get("lat"), origin_entry.get("lon")
+    points = [(lat, lon)] if lat is not None and lon is not None else []
+
+    charter_destinations = []
+    district_destinations = []
+    isd_origins = []
+    max_transfer = 0
+
+    for to_campus, count, masked in repo.transfers_out(campus):
+        if to_campus is None:
+            continue
+        entry = _serialize_transfer_destination(to_campus, count, masked)
+        dest_lat, dest_lon = entry.get("lat"), entry.get("lon")
+        if dest_lat is not None and dest_lon is not None:
+            points.append((dest_lat, dest_lon))
+        count_value = entry.get("count")
+        if count_value and count_value > max_transfer:
+            max_transfer = count_value
+        if entry.get("charter"):
+            charter_destinations.append(entry)
+        else:
+            district_destinations.append(entry)
+
+    for from_campus, count, masked in repo.transfers_in(campus):
+        if from_campus is None or getattr(from_campus, "is_charter", False):
+            continue
+        entry = _serialize_transfer_destination(from_campus, count, masked)
+        entry["charter"] = False
+        entry["isDistrict"] = True
+        origin_lat, origin_lon = entry.get("lat"), entry.get("lon")
+        if origin_lat is not None and origin_lon is not None:
+            points.append((origin_lat, origin_lon))
+        isd_origins.append(entry)
+
+    charter_destinations.sort(key=lambda item: (item.get("name", "")))
+    district_destinations.sort(key=lambda item: (item.get("name", "")))
+    isd_origins.sort(key=lambda item: (item.get("districtName", ""), item.get("name", "")))
+
+    district = getattr(campus, "district", None)
+    boundary_geojson, boundary_bounds = _district_boundary_payload(repo, district)
+
+    private_overlays = _collect_private_campuses(repo, [campus])
+    for item in private_overlays:
+        priv_lat, priv_lon = item.get("lat"), item.get("lon")
+        if priv_lat is not None and priv_lon is not None:
+            points.append((priv_lat, priv_lon))
+
+    bounds = boundary_bounds or _bounds_from_points(points)
+
+    return {
+        "origin": origin_entry,
+        "charterDestinations": charter_destinations,
+        "districtDestinations": district_destinations,
+        "isdOrigins": isd_origins,
+        "privateCampuses": private_overlays,
+        "maxTransferCount": max_transfer,
+        "districtBoundary": boundary_geojson,
+        "bounds": bounds,
+    }
+
+
+def _build_charter_profile_map_payload(repo: DataEngine, campus: Campus) -> dict:
+    charter_entry = _serialize_map_campus(campus)
+    charter_entry["isCharter"] = True
+
+    lat, lon = charter_entry.get("lat"), charter_entry.get("lon")
+    points = [(lat, lon)] if lat is not None and lon is not None else []
+
+    isd_origins = []
+    max_transfer = 0
+    origin_campuses = []
+
+    for from_campus, count, masked in repo.transfers_in(campus):
+        if from_campus is None:
+            continue
+        origin_campuses.append(from_campus)
+        entry = _serialize_transfer_destination(from_campus, count, masked)
+        entry["charter"] = False
+        entry["isDistrict"] = True
+        origin_lat, origin_lon = entry.get("lat"), entry.get("lon")
+        if origin_lat is not None and origin_lon is not None:
+            points.append((origin_lat, origin_lon))
+        count_value = entry.get("count")
+        if count_value and count_value > max_transfer:
+            max_transfer = count_value
+        isd_origins.append(entry)
+
+    isd_origins.sort(
+        key=lambda item: (
+            item.get("districtName", ""),
+            item.get("name", ""),
+        )
+    )
+
+    private_overlays = _collect_private_campuses(repo, origin_campuses)
+    for item in private_overlays:
+        priv_lat, priv_lon = item.get("lat"), item.get("lon")
+        if priv_lat is not None and priv_lon is not None:
+            points.append((priv_lat, priv_lon))
+
+    bounds = _bounds_from_points(points)
+
+    return {
+        "charter": charter_entry,
+        "isdOrigins": isd_origins,
+        "privateCampuses": private_overlays,
+        "maxTransferCount": max_transfer,
+        "districtBoundary": None,
+        "bounds": bounds,
+    }
+
+
+def _build_private_profile_map_payload(repo: DataEngine, campus: Campus) -> dict:
+    private_entry = _serialize_map_campus(campus)
+    private_entry["isPrivateCampus"] = True
+
+    district = getattr(campus, "district", None)
+    boundary_geojson, boundary_bounds = _district_boundary_payload(repo, district)
+
+    nearby_public = []
+    points = []
+
+    priv_lat, priv_lon = private_entry.get("lat"), private_entry.get("lon")
+    if priv_lat is not None and priv_lon is not None:
+        points.append((priv_lat, priv_lon))
+
+    try:
+        district_campuses = list(repo.campuses_in(district)) if district else []
+    except Exception:
+        district_campuses = []
+
+    for candidate in district_campuses:
+        if getattr(candidate, "is_charter", False) or getattr(candidate, "is_private", False):
+            continue
+        if not _grades_overlap(candidate, campus):
+            continue
+        entry = _serialize_map_campus(candidate)
+        entry["isDistrict"] = True
+        entry_lat, entry_lon = entry.get("lat"), entry.get("lon")
+        if entry_lat is not None and entry_lon is not None:
+            points.append((entry_lat, entry_lon))
+        nearby_public.append(entry)
+
+    nearby_public.sort(
+        key=lambda item: (
+            item.get("districtName", ""),
+            item.get("name", ""),
+        )
+    )
+
+    bounds = boundary_bounds or _bounds_from_points(points)
+    focus_bounds = _bounds_from_radius(priv_lat, priv_lon, 3.0)
+
+    return {
+        "private": private_entry,
+        "publicCampuses": nearby_public,
+        "privateCampuses": [],
+        "districtBoundary": boundary_geojson,
+        "bounds": bounds,
+        "focusBounds": focus_bounds,
+    }
+
+
+def build_campus_profile_map_payload(repo: DataEngine, campus: Campus) -> dict:
+    if campus is None:
+        return {}
+    if getattr(campus, "is_private", False):
+        return _build_private_profile_map_payload(repo, campus)
+    if getattr(campus, "is_charter", False):
+        return _build_charter_profile_map_payload(repo, campus)
+    return _build_isd_profile_map_payload(repo, campus)
+
+
 def _split_map_payload(payload: dict) -> tuple[dict, dict]:
     base = dict(payload)
     transfers = {"transfersOut": {}, "transfersIn": {}}
@@ -1714,6 +2287,9 @@ def _save_map_store(
         conn.execute(
             "CREATE TABLE closures_map (district_number TEXT PRIMARY KEY, payload_base BLOB, payload_transfers BLOB)"
         )
+        conn.execute(
+            "CREATE TABLE campus_profile (campus_number TEXT PRIMARY KEY, payload BLOB)"
+        )
         rows = []
         for district in repo._districts.values():
             district_number = canonical_district_number(
@@ -1743,6 +2319,37 @@ def _save_map_store(
         if rows:
             conn.executemany(
                 "INSERT OR REPLACE INTO closures_map (district_number, payload_base, payload_transfers) VALUES (?, ?, ?)",
+                rows,
+            )
+        conn.commit()
+
+        rows = []
+        for campus in repo._campuses.values():
+            campus_number = canonical_campus_number(
+                getattr(campus, "campus_number", None)
+            )
+            if not campus_number:
+                continue
+            try:
+                payload = build_campus_profile_map_payload(repo, campus)
+            except Exception:
+                continue
+            rows.append(
+                (
+                    campus_number,
+                    sqlite3.Binary(_encode_payload(payload)),
+                )
+            )
+            if len(rows) >= 100:
+                conn.executemany(
+                    "INSERT OR REPLACE INTO campus_profile (campus_number, payload) VALUES (?, ?)",
+                    rows,
+                )
+                conn.commit()
+                rows = []
+        if rows:
+            conn.executemany(
+                "INSERT OR REPLACE INTO campus_profile (campus_number, payload) VALUES (?, ?)",
                 rows,
             )
         conn.commit()
