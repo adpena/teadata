@@ -6,6 +6,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Iterable, Optional, Tuple
 
+from .assets import ensure_local_asset, is_lfs_pointer
 from .teadata_config import canonical_campus_number, canonical_district_number
 
 try:
@@ -55,19 +56,30 @@ def _log_map_store(path: Path, source: str) -> None:
     logger.info("map_store.discovered source=%s path=%s", source, path_str)
 
 
+def _resolve_map_store(path: Path, source: str) -> Optional[Path]:
+    resolved = ensure_local_asset(path, url_env="TEADATA_MAP_STORE_URL", label="map store")
+    if not resolved.exists() or is_lfs_pointer(resolved):
+        logger.warning("map_store.unavailable source=%s path=%s", source, path)
+        return None
+    _log_map_store(resolved, source)
+    return resolved
+
+
 def discover_map_store(explicit: str | Path | None = None) -> Optional[Path]:
     if explicit:
         p = Path(explicit)
         if p.exists() and p.is_file():
-            _log_map_store(p, "explicit")
-            return p
+            resolved = _resolve_map_store(p, "explicit")
+            if resolved:
+                return resolved
 
     env = os.environ.get("TEADATA_MAP_STORE")
     if env:
         p = Path(env)
         if p.exists() and p.is_file():
-            _log_map_store(p, "env")
-            return p
+            resolved = _resolve_map_store(p, "env")
+            if resolved:
+                return resolved
 
     if _discover_snapshot:
         try:
@@ -75,8 +87,9 @@ def discover_map_store(explicit: str | Path | None = None) -> Optional[Path]:
             if snap:
                 candidate = map_store_path_for_snapshot(Path(snap))
                 if candidate and candidate.exists():
-                    _log_map_store(candidate, "snapshot")
-                    return candidate
+                    resolved = _resolve_map_store(candidate, "snapshot")
+                    if resolved:
+                        return resolved
         except Exception:
             pass
 
@@ -85,16 +98,18 @@ def discover_map_store(explicit: str | Path | None = None) -> Optional[Path]:
         pkg_cache = package_dir / ".cache"
         candidate = _newest_sqlite(pkg_cache)
         if candidate:
-            _log_map_store(candidate, "package-cache")
-            return candidate
+            resolved = _resolve_map_store(candidate, "package-cache")
+            if resolved:
+                return resolved
     except Exception:
         pass
 
     for base in Path.cwd().parents:
         candidate = _newest_sqlite(base / ".cache")
         if candidate:
-            _log_map_store(candidate, "parent-cache")
-            return candidate
+            resolved = _resolve_map_store(candidate, "parent-cache")
+            if resolved:
+                return resolved
 
     return None
 
