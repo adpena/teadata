@@ -65,6 +65,11 @@ for c in aldine.campuses:
     print(c.name)
 ```
 
+## Release Policy
+
+- Tags always use the thousandths place (e.g., `v0.0.101`, `v0.0.102`). If no tags exist, start at `v0.0.101`.
+- Keep only the three most recent tags/releases; delete older tags and their GitHub release assets.
+
 ## Features
 
 - **Rich domain objects**: `District` and `Campus` with geometry.

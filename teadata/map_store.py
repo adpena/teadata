@@ -6,7 +6,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Iterable, Optional, Tuple
 
-from .teadata_config import canonical_district_number
+from .teadata_config import canonical_campus_number, canonical_district_number
 
 try:
     from .engine import _discover_snapshot  # type: ignore
@@ -120,6 +120,27 @@ def _district_lookup_keys(district_number: Optional[str]) -> Iterable[str]:
     return keys
 
 
+def _campus_lookup_keys(campus_number: Optional[str]) -> Iterable[str]:
+    if not campus_number:
+        return ()
+    keys = []
+    canonical = canonical_campus_number(campus_number)
+    if canonical:
+        keys.append(canonical)
+    raw = str(campus_number).strip()
+    if raw and raw not in keys:
+        keys.append(raw)
+    if raw.startswith("'") and len(raw) > 1:
+        digits = raw[1:]
+        if digits not in keys:
+            keys.append(digits)
+        if digits.isdigit():
+            normalized = str(int(digits)).rjust(9, "0")
+            if normalized not in keys:
+                keys.append(normalized)
+    return keys
+
+
 def _decode_payload(payload: Any) -> Optional[dict]:
     if payload is None:
         return None
@@ -164,3 +185,25 @@ def load_map_payload_parts(
         return None, None
 
     return None, None
+
+
+def load_campus_profile_payload(
+    campus_number: str, *, store_path: str | Path | None = None
+) -> Optional[dict]:
+    path = discover_map_store(store_path)
+    if not path:
+        return None
+
+    try:
+        with sqlite3.connect(path) as conn:
+            for key in _campus_lookup_keys(campus_number):
+                row = conn.execute(
+                    "SELECT payload FROM campus_profile WHERE campus_number = ?",
+                    (key,),
+                ).fetchone()
+                if row:
+                    return _decode_payload(row[0])
+    except Exception:
+        return None
+
+    return None
