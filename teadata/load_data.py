@@ -26,6 +26,13 @@ from teadata.classes import (
 )
 from teadata.engine import _load_snapshot_payload
 from teadata.map_store import map_store_path_for_snapshot
+from teadata.entity_store import entity_store_path_for_snapshot
+from teadata.persistence.sqlalchemy_store import (
+    create_engine as _sql_create_engine,
+    create_sessionmaker as _sql_create_sessionmaker,
+    ensure_schema as _sql_ensure_schema,
+    export_dataengine as _sql_export_dataengine,
+)
 from teadata.teadata_config import (
     canonical_campus_number,
     canonical_district_number,
@@ -57,6 +64,13 @@ SPLIT_BOUNDARIES = os.getenv("TEADATA_SPLIT_BOUNDARIES", "1") not in (
 )
 
 BUILD_MAP_STORE = os.getenv("TEADATA_BUILD_MAP_STORE", "1") not in (
+    "0",
+    "false",
+    "False",
+    None,
+)
+
+BUILD_ENTITY_STORE = os.getenv("TEADATA_BUILD_ENTITY_STORE", "1") not in (
     "0",
     "false",
     "False",
@@ -459,6 +473,16 @@ def _map_store_path(districts_fp: str, campuses_fp: str) -> Path:
         return candidate
     d = _repo_cache_dir()
     tag = f"map_payloads_{Path(districts_fp).stem}_{Path(campuses_fp).stem}.sqlite"
+    return d / tag
+
+
+def _entity_store_path(districts_fp: str, campuses_fp: str) -> Path:
+    snap = _snapshot_path(districts_fp, campuses_fp)
+    candidate = entity_store_path_for_snapshot(snap)
+    if candidate is not None:
+        return candidate
+    d = _repo_cache_dir()
+    tag = f"entities_{Path(districts_fp).stem}_{Path(campuses_fp).stem}.sqlite"
     return d / tag
 
 
@@ -2370,6 +2394,46 @@ def _save_map_store(
         return None
 
 
+def _save_entity_store(
+    repo: DataEngine, districts_fp: str, campuses_fp: str
+) -> Optional[Path]:
+    if not BUILD_ENTITY_STORE:
+        return None
+    path = _entity_store_path(districts_fp, campuses_fp)
+    tmp_path = path.with_suffix(".sqlite.tmp")
+    try:
+        if tmp_path.exists():
+            tmp_path.unlink()
+    except Exception:
+        pass
+    try:
+        if path.exists():
+            path.unlink()
+    except Exception:
+        pass
+    try:
+        engine = _sql_create_engine(f"sqlite:///{tmp_path}")
+        _sql_ensure_schema(engine)
+        Session = _sql_create_sessionmaker(engine, expire_on_commit=False)
+        with Session.begin() as session:
+            _sql_export_dataengine(repo, session, replace=True)
+        engine.dispose()
+        tmp_path.replace(path)
+        _copy_cache_artifact(path)
+        return path
+    except Exception:
+        try:
+            engine.dispose()
+        except Exception:
+            pass
+        try:
+            if tmp_path.exists():
+                tmp_path.unlink()
+        except Exception:
+            pass
+        return None
+
+
 def _load_repo_snapshot(
     districts_fp: str, campuses_fp: str, extra_sig: dict
 ) -> DataEngine | None:
@@ -2518,6 +2582,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                 except Exception:
                     pass
         _save_map_store(snap, districts_fp, campuses_fp)
+        _save_entity_store(snap, districts_fp, campuses_fp)
         return snap
 
     repo = DataEngine()
@@ -2894,6 +2959,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
 
     boundary_path = _save_boundary_store(repo, districts_fp, campuses_fp)
     _save_map_store(repo, districts_fp, campuses_fp)
+    _save_entity_store(repo, districts_fp, campuses_fp)
     if boundary_path is not None:
         _strip_repo_boundaries(repo)
 

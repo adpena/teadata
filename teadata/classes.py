@@ -63,6 +63,8 @@ District.__module__ = __name__
 Campus = _Campus
 Campus.__module__ = __name__
 _point_xy = point_xy
+_coerce_grade_spans = coerce_grade_spans
+_spans_to_bounds = spans_to_bounds
 
 __all__ = [
     "DataEngine",
@@ -100,8 +102,10 @@ __all__ = [
     "grade_value_to_code",
     "normalize_grade_bounds",
     "spans_to_bounds",
+    "_spans_to_bounds",
     "coerce_grade_spans",
     "coerce_grade_bounds",
+    "_coerce_grade_spans",
     "is_charter",
     "is_private",
     "EntityList",

@@ -61,10 +61,16 @@ from sqlalchemy.orm import (
     sessionmaker,
 )
 
+from sqlalchemy import JSON as _BaseJSON  # type: ignore
+
 try:  # JSON type that degrades gracefully outside PostgreSQL
-    from sqlalchemy.dialects.postgresql import JSONB as _JSONType
+    from sqlalchemy.dialects.postgresql import JSONB as _PGJSONB
 except Exception:  # pragma: no cover - fallback for non-Postgres backends
-    from sqlalchemy import JSON as _JSONType  # type: ignore
+    _PGJSONB = None
+
+_JSONType = _BaseJSON
+if _PGJSONB is not None:
+    _JSONType = _PGJSONB().with_variant(_BaseJSON(), "sqlite")
 
 try:  # PostgreSQL-optimized UUID type; otherwise fall back to generic UUID/CHAR
     from sqlalchemy.dialects.postgresql import UUID as _PGUUID
@@ -83,6 +89,7 @@ from ..classes import (
     _coerce_grade_spans,
     _spans_to_bounds,
 )
+from ..teadata_config import canonical_campus_number, canonical_district_number
 
 try:  # Optional Shapely helpers for geometry round-tripping
     from shapely import wkb as _shapely_wkb
@@ -115,13 +122,13 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=_naming_convention)
 
 
-def _uuid_column(**kwargs) -> mapped_column[Any]:
+def _uuid_column(*args, **kwargs) -> mapped_column[Any]:
     """Return a mapped column configured for UUID primary/foreign keys."""
 
     if _PGUUID is not None:  # Prefer PostgreSQL UUID implementation
-        return mapped_column(_PGUUID(as_uuid=True), **kwargs)
+        return mapped_column(_PGUUID(as_uuid=True), *args, **kwargs)
     if _GenericUUID is not None:  # SQLAlchemy 2.0 portable UUID
-        return mapped_column(_GenericUUID(as_uuid=True), **kwargs)  # type: ignore[misc]
+        return mapped_column(_GenericUUID(as_uuid=True), *args, **kwargs)  # type: ignore[misc]
 
     # Fallback: store UUIDs as CHAR(36) while still returning uuid.UUID objects
     class _UUIDString(String):
@@ -146,7 +153,7 @@ def _uuid_column(**kwargs) -> mapped_column[Any]:
 
             return process
 
-    return mapped_column(_UUIDString(), **kwargs)
+    return mapped_column(_UUIDString(), *args, **kwargs)
 
 
 class DistrictRecord(Base):
@@ -348,6 +355,21 @@ def _clean_meta(meta: Mapping[str, Any] | None) -> dict[str, Any] | None:
             return repr(value)
 
     return {str(k): _coerce(v) for k, v in meta.items()}
+
+
+def _coerce_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    if isinstance(value, (int, float)):
+        return bool(value)
+    text = str(value).strip().lower()
+    if text in {"y", "yes", "true", "t", "1"}:
+        return True
+    if text in {"n", "no", "false", "f", "0"}:
+        return False
+    return bool(text)
 
 
 def _flatten_meta(meta: Mapping[str, Any] | None) -> list[tuple[str, int, Any]]:
@@ -776,8 +798,11 @@ def export_dataengine(
         record.name = district.name
         record.enrollment = district.enrollment
         record.district_number = district.district_number or None
-        record.district_number_canon = district.district_number_canon or None
-        record.aea = district.aea
+        record.district_number_canon = (
+            getattr(district, "district_number_canon", None)
+            or canonical_district_number(district.district_number)
+        )
+        record.aea = _coerce_bool(district.aea)
         record.rating = district.rating
         poly_wkb, poly_geojson = _dump_polygon(getattr(district, "polygon", None))
         record.polygon_wkb = poly_wkb
@@ -800,12 +825,12 @@ def export_dataengine(
         record.district_id = campus.district_id
         record.name = campus.name
         record.charter_type = campus.charter_type
-        record.is_charter = bool(campus.is_charter)
-        record.is_private = bool(getattr(campus, "is_private", False))
+        record.is_charter = _coerce_bool(campus.is_charter)
+        record.is_private = _coerce_bool(getattr(campus, "is_private", False))
         record.is_magnet = getattr(campus, "is_magnet", None)
         record.enrollment = campus.enrollment
         record.rating = campus.rating
-        record.aea = campus.aea
+        record.aea = _coerce_bool(campus.aea)
         record.grade_range = campus.grade_range
         record.grade_range_low_code = campus.grade_range_low_code
         record.grade_range_high_code = campus.grade_range_high_code
@@ -817,9 +842,15 @@ def export_dataengine(
         record.school_status_date = campus.school_status_date
         record.update_date = campus.update_date
         record.district_number = campus.district_number
-        record.district_number_canon = campus.district_number_canon
+        record.district_number_canon = (
+            getattr(campus, "district_number_canon", None)
+            or canonical_district_number(campus.district_number)
+        )
         record.campus_number = campus.campus_number
-        record.campus_number_canon = campus.campus_number_canon
+        record.campus_number_canon = (
+            getattr(campus, "campus_number_canon", None)
+            or canonical_campus_number(campus.campus_number)
+        )
         pt_wkb, pt_geojson, lon, lat = _dump_point(getattr(campus, "point", None))
         record.point_wkb = pt_wkb
         record.point_geojson = pt_geojson
@@ -840,7 +871,7 @@ def export_dataengine(
         for row in result.scalars():
             existing[(row.source_id, row.destination_id)] = row
 
-    for source_id, edges in repo._xfers_out.items():
+    for source_id, edges in getattr(repo, "_xfers_out", {}).items():
         for dest_id, count, masked in edges:
             if source_id is None or dest_id is None:
                 continue
