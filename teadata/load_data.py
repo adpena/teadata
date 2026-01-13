@@ -2416,7 +2416,13 @@ def _save_entity_store(
         _sql_ensure_schema(engine)
         Session = _sql_create_sessionmaker(engine, expire_on_commit=False)
         with Session.begin() as session:
-            _sql_export_dataengine(repo, session, replace=True)
+            _sql_export_dataengine(
+                repo,
+                session,
+                replace=True,
+                include_meta_entries=False,
+                include_geometry=False,
+            )
         engine.dispose()
         tmp_path.replace(path)
         _copy_cache_artifact(path)

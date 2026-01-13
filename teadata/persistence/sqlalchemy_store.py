@@ -768,6 +768,8 @@ def export_dataengine(
     session: Session,
     *,
     replace: bool = True,
+    include_meta_entries: bool = True,
+    include_geometry: bool = True,
 ) -> None:
     """Persist the contents of ``repo`` into the database bound to ``session``.
 
@@ -780,6 +782,10 @@ def export_dataengine(
     replace:
         When ``True`` (default) the destination tables are truncated prior to
         inserting fresh rows.  Set to ``False`` to perform in-place upserts.
+    include_meta_entries:
+        When ``True`` (default) populate the denormalized meta tables.
+    include_geometry:
+        When ``True`` (default) store geometry payloads alongside lon/lat.
     """
 
     if replace:
@@ -804,14 +810,20 @@ def export_dataengine(
         )
         record.aea = _coerce_bool(district.aea)
         record.rating = district.rating
-        poly_wkb, poly_geojson = _dump_polygon(getattr(district, "polygon", None))
+        if include_geometry:
+            poly_wkb, poly_geojson = _dump_polygon(getattr(district, "polygon", None))
+        else:
+            poly_wkb, poly_geojson = (None, None)
         record.polygon_wkb = poly_wkb
         record.polygon_geojson = poly_geojson
         clean_meta = _clean_meta(district.meta)
         record.meta = clean_meta
-        record.meta_entries = _build_meta_records(
-            clean_meta, DistrictMetaRecord, assume_clean=True
-        )
+        if include_meta_entries:
+            record.meta_entries = _build_meta_records(
+                clean_meta, DistrictMetaRecord, assume_clean=True
+            )
+        else:
+            record.meta_entries = []
 
     session.flush()
 
@@ -852,15 +864,21 @@ def export_dataengine(
             or canonical_campus_number(campus.campus_number)
         )
         pt_wkb, pt_geojson, lon, lat = _dump_point(getattr(campus, "point", None))
+        if not include_geometry:
+            pt_wkb = None
+            pt_geojson = None
         record.point_wkb = pt_wkb
         record.point_geojson = pt_geojson
         record.lon = lon
         record.lat = lat
         clean_meta = _clean_meta(campus.meta)
         record.meta = clean_meta
-        record.meta_entries = _build_meta_records(
-            clean_meta, CampusMetaRecord, assume_clean=True
-        )
+        if include_meta_entries:
+            record.meta_entries = _build_meta_records(
+                clean_meta, CampusMetaRecord, assume_clean=True
+            )
+        else:
+            record.meta_entries = []
 
     session.flush()
 

@@ -200,6 +200,24 @@ def _decode_json(payload: Any) -> dict[str, Any]:
     return {}
 
 
+def _collect_meta_keys_from_json(
+    conn: sqlite3.Connection, table: str, *, limit: int | None = None
+) -> list[str]:
+    keys: set[str] = set()
+    try:
+        rows = conn.execute(f"SELECT meta FROM {table}")
+    except Exception:
+        return []
+    for row in rows:
+        if not row:
+            continue
+        meta = _decode_json(row[0])
+        keys.update(meta.keys())
+        if limit and len(keys) >= limit:
+            break
+    return sorted(keys)
+
+
 def _district_type_from_flag(flag: bool | None) -> str:
     return "Charter" if flag else "ISD"
 
@@ -314,10 +332,16 @@ def list_meta_keys(
     try:
         with sqlite3.connect(path) as conn:
             rows = conn.execute(query).fetchall()
+            keys = [row[0] for row in rows if row and row[0]]
+            if keys:
+                return keys
+            return _collect_meta_keys_from_json(
+                conn,
+                "districts" if entity_type == "district" else "campuses",
+                limit=limit,
+            )
     except Exception:
         return []
-    keys = [row[0] for row in rows if row and row[0]]
-    return keys
 
 
 @dataclass
@@ -329,6 +353,9 @@ class EntityStore:
         default_factory=dict, init=False, repr=False
     )
     _district_cache: dict[str, dict[str, Any]] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    _meta_keys_cache: dict[str, list[str]] = field(
         default_factory=dict, init=False, repr=False
     )
 
@@ -451,6 +478,9 @@ class EntityStore:
             }
 
     def list_meta_keys(self, entity_type: str, *, limit: int | None = None) -> list[str]:
+        cached = self._meta_keys_cache.get(entity_type)
+        if cached:
+            return cached[:limit] if limit else list(cached)
         table = "district_meta" if entity_type == "district" else "campus_meta"
         query = f"SELECT DISTINCT key FROM {table} ORDER BY key"
         if limit:
@@ -458,11 +488,19 @@ class EntityStore:
         conn = self._connect()
         if conn is None:
             return []
+        keys: list[str] = []
         try:
             rows = conn.execute(query).fetchall()
+            keys = [row[0] for row in rows if row and row[0]]
         except Exception:
-            return []
-        return [row[0] for row in rows if row and row[0]]
+            keys = []
+        if not keys:
+            keys = _collect_meta_keys_from_json(
+                conn,
+                "districts" if entity_type == "district" else "campuses",
+            )
+        self._meta_keys_cache[entity_type] = keys
+        return keys[:limit] if limit else keys
 
     def _load_campus_from_conn(
         self, key: str, *, include_meta: bool = True
