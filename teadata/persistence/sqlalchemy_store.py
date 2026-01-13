@@ -68,10 +68,6 @@ try:  # JSON type that degrades gracefully outside PostgreSQL
 except Exception:  # pragma: no cover - fallback for non-Postgres backends
     _PGJSONB = None
 
-_JSONType = _BaseJSON
-if _PGJSONB is not None:
-    _JSONType = _PGJSONB().with_variant(_BaseJSON(), "sqlite")
-
 try:  # PostgreSQL-optimized UUID type; otherwise fall back to generic UUID/CHAR
     from sqlalchemy.dialects.postgresql import UUID as _PGUUID
 except Exception:  # pragma: no cover
@@ -104,6 +100,10 @@ except Exception:  # pragma: no cover - Shapely intentionally optional
     _BaseGeometry = None
     _shapely_mapping = None
     _SHAPELY_AVAILABLE = False
+
+_JSONType = _BaseJSON
+if _PGJSONB is not None:
+    _JSONType = _PGJSONB().with_variant(_BaseJSON(), "sqlite")
 
 # ---------------------------------------------------------------------------
 # SQLAlchemy ORM models
