@@ -184,7 +184,9 @@ class District:
         return EntityList([repo._campuses[cid] for cid in ids])
 
     if SHAPELY:
-        from shapely.prepared import prep as shapely_prep  # type: ignore
+        from shapely.prepared import prep as _shapely_prep
+
+        shapely_prep = staticmethod(_shapely_prep)
 
     @property
     def prepared(self):
@@ -556,7 +558,7 @@ class EntityMap(dict):
         include_geometry: bool = False,
     ):
         try:
-            import pandas as pd  # type: ignore
+            import pandas as pd
         except Exception as exc:
             raise ImportError(
                 "pandas is required for .to_df(); install pandas to use this feature"
@@ -648,7 +650,7 @@ class EntityList(list):
         include_geometry: bool = False,
     ):
         try:
-            import pandas as pd  # type: ignore
+            import pandas as pd
         except Exception as exc:
             raise ImportError(
                 "pandas is required for .to_df(); install pandas to use this feature"

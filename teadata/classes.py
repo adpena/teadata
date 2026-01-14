@@ -146,7 +146,7 @@ def inspect_object(obj: Any) -> OrderedDict[str, Any]:
             _maybe_add(field.name, getattr(obj, field.name))
 
     # ``slots=True`` dataclasses (e.g., District, Campus) expose ``__slots__``.
-    for slot_name in getattr(type(obj), "__slots__", ()):  # type: ignore[arg-type]
+    for slot_name in getattr(type(obj), "__slots__", ()):
         if isinstance(slot_name, str) and hasattr(obj, slot_name):
             _maybe_add(slot_name, getattr(obj, slot_name))
 

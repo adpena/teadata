@@ -154,6 +154,7 @@ exclude = ["examples", "docs", "build", "teadata.egg-info", ".venv"]
 extend-exclude = ["*.ipynb"]
 
 [tool.ty.src]
+include = ["teadata"]
 exclude = [
     "teadata/boundary_store.py",
     "teadata/engine.py",
@@ -164,4 +165,7 @@ exclude = [
     "teadata/persistence/**",
     "teadata/query.py",
     "teadata/scripts/**",
+    "examples/**",
+    "tests/**",
+    "**/*.ipynb",
 ]

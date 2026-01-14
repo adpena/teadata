@@ -37,7 +37,7 @@ YEAR_MIN_DEFAULT = 2009
 
 def _load_yaml(text: str) -> dict:
     try:
-        import yaml  # type: ignore[import-untyped]  # PyYAML
+        import yaml  # PyYAML
     except Exception as e:
         raise RuntimeError(
             "PyYAML is required to read .yaml/.yml configs. pip install pyyaml"
@@ -51,7 +51,7 @@ def _load_yaml(text: str) -> dict:
 def _load_toml(text: str) -> dict:
     # Prefer stdlib tomllib on 3.11+, fallback to tomli
     try:
-        import tomllib  # type: ignore[attr-defined]
+        import tomllib
 
         data = tomllib.loads(text)  # pyright: ignore[reportAttributeAccessIssue]
     except Exception:
@@ -502,7 +502,7 @@ class Config:
         Load a file into pandas (or GeoPandas if spatial and available).
         Detects loader by extension.
         """
-        import pandas as pd  # type: ignore[import-untyped]
+        import pandas as pd
 
         base, ext = _basename_and_ext(path)
 
@@ -510,7 +510,7 @@ class Config:
         if ext in (".geojson", ".gpkg", ".shp"):
             if prefer_geopandas:
                 try:
-                    import geopandas as gpd  # type: ignore[import-untyped]  # optional
+                    import geopandas as gpd  # optional
                 except Exception as e:
                     raise RuntimeError(
                         "geopandas required to load spatial formats (.geojson/.gpkg/.shp)"
@@ -522,7 +522,7 @@ class Config:
             else:
                 # Fallback: load geometry as plain JSON/CSV if possible
                 try:
-                    import geopandas as gpd  # type: ignore[import-untyped]
+                    import geopandas as gpd
 
                     return gpd.read_file(path)
                 except Exception:
@@ -694,7 +694,7 @@ def normalize_campus_number_column(
     Find the first existing alias in df columns, normalize it to 9-digit string into `new_col`.
     Leaves original column intact.
     """
-    import pandas as pd  # type: ignore[import-untyped]
+    import pandas as pd
 
     # Case-insensitive lookup
     lower_map = {c.lower(): c for c in df.columns}
@@ -762,7 +762,7 @@ def normalize_district_number_column(
     Find the first existing alias in df columns, normalize it to 6-digit string into `new_col`.
     Leaves original column intact.
     """
-    import pandas as pd  # type: ignore[import-untyped]
+    import pandas as pd
 
     # Case-insensitive lookup
     lower_map = {c.lower(): c for c in df.columns}
@@ -834,7 +834,7 @@ def join_datasets_on_district(
 
     Returns: (resolved_years: dict[str,int], df)
     """
-    import pandas as pd  # type: ignore[import-untyped]
+    import pandas as pd
 
     ds_list = datasets or list(cfg.data_sources.keys())
     resolved_years: Dict[str, int] = {}
@@ -908,7 +908,7 @@ def join_datasets_on_campus(
 
     Returns: (resolved_years: dict[str,int], df)
     """
-    import pandas as pd  # type: ignore[import-untyped]
+    import pandas as pd
 
     ds_list = datasets or list(cfg.data_sources.keys())
     resolved_years: Dict[str, int] = {}

@@ -8,14 +8,13 @@ import urllib.request
 from pathlib import Path
 from typing import Callable
 
-_user_cache_dir: Callable[..., str] | None
-
 try:
-    from platformdirs import user_cache_dir as _user_cache_dir  # type: ignore
+    from platformdirs import user_cache_dir as _platform_user_cache_dir
 except Exception:  # pragma: no cover - optional dependency
-    _user_cache_dir = None
+    def _platform_user_cache_dir(*_args: object, **_kwargs: object) -> str:
+        return str(Path(tempfile.gettempdir()) / "teadata")
 
-user_cache_dir: Callable[..., str] | None = _user_cache_dir
+user_cache_dir: Callable[..., str] = _platform_user_cache_dir
 
 logger = logging.getLogger(__name__)
 

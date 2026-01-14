@@ -6,7 +6,7 @@ from typing import Any, List, Tuple
 import math
 
 try:
-    from shapely.geometry import (  # type: ignore[import-untyped]
+    from shapely.geometry import (
         MultiPolygon,
         Point as ShapelyPoint,
         Polygon as ShapelyPolygon,
@@ -157,7 +157,7 @@ class GeoField:
 
     def __init__(self, geom_type: str):
         self.geom_type = geom_type
-        self.private_name = None
+        self.private_name: str | None = None
 
     def __set_name__(self, owner, name):
         self.private_name = f"_{name}"
@@ -165,9 +165,13 @@ class GeoField:
     def __get__(self, obj, objtype=None):
         if obj is None:
             return self
+        if self.private_name is None:
+            raise AttributeError("GeoField is not initialized")
         return getattr(obj, self.private_name, None)
 
     def __set__(self, obj, value):
+        if self.private_name is None:
+            raise AttributeError("GeoField is not initialized")
         target = None
 
         if self.geom_type == "point":
