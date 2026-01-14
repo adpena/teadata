@@ -6,11 +6,16 @@ import shutil
 import tempfile
 import urllib.request
 from pathlib import Path
+from typing import Callable
+
+_user_cache_dir: Callable[..., str] | None
 
 try:
-    from platformdirs import user_cache_dir  # type: ignore
+    from platformdirs import user_cache_dir as _user_cache_dir  # type: ignore
 except Exception:  # pragma: no cover - optional dependency
-    user_cache_dir = None
+    _user_cache_dir = None
+
+user_cache_dir: Callable[..., str] | None = _user_cache_dir
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +35,7 @@ def _asset_cache_dir() -> Path:
     env = os.getenv("TEADATA_ASSET_CACHE_DIR")
     if env:
         return Path(env)
-    if user_cache_dir:
+    if user_cache_dir is not None:
         return Path(user_cache_dir("teadata", "adpena"))
     return Path(tempfile.gettempdir()) / "teadata"
 

@@ -6,10 +6,10 @@ import re
 from pathlib import Path
 from typing import Iterable
 
-from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font, PatternFill
-from openpyxl.utils import get_column_letter
-from openpyxl.worksheet.table import Table, TableStyleInfo
+from openpyxl import Workbook  # type: ignore[import-untyped]
+from openpyxl.styles import Alignment, Font, PatternFill  # type: ignore[import-untyped]
+from openpyxl.utils import get_column_letter  # type: ignore[import-untyped]
+from openpyxl.worksheet.table import Table, TableStyleInfo  # type: ignore[import-untyped]
 
 RAW_DIR = Path("teadata/data/tapr/raw")
 OUT_DIR = Path("teadata/data/tapr")

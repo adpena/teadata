@@ -2,9 +2,9 @@ import argparse
 import json
 from typing import List
 
-import geopandas as gpd
-from shapely.geometry import shape, mapping, MultiPolygon, Polygon
-from shapely.validation import make_valid
+import geopandas as gpd  # type: ignore[import-untyped]
+from shapely.geometry import shape, mapping, MultiPolygon, Polygon  # type: ignore[import-untyped]
+from shapely.validation import make_valid  # type: ignore[import-untyped]
 
 # --- Quick Settings for IDE runs (edit these and just press Run) ---
 DEFAULT_INPUT = "/Users/adpena/PycharmProjects/teadata/teadata/data/shapes/Current_Districts_2025.geojson"

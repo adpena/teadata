@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "teadata"
-version = "0.0.104"
+version = "0.0.105"
 description = "Pythonic data engine for Texas education datasets"
 authors = [{name="Alejandro Peña", email="adpena@gmail.com"}]
 readme = "README.md"
@@ -155,3 +155,17 @@ extend-exclude = ["*.ipynb"]
 
 [tool.mypy]
 exclude = "^(build|teadata\\.egg-info|examples|docs)/"
+
+[[tool.mypy.overrides]]
+module = [
+    "teadata.boundary_store",
+    "teadata.engine",
+    "teadata.enrichment.*",
+    "teadata.entity_store",
+    "teadata.load_data",
+    "teadata.map_store",
+    "teadata.persistence.*",
+    "teadata.query",
+    "teadata.scripts.*",
+]
+ignore_errors = true

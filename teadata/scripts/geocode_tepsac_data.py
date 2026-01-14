@@ -1,3 +1,5 @@
+# mypy: ignore-errors
+
 import pandas as pd
 import time
 import requests

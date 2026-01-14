@@ -6,7 +6,7 @@ from typing import Any, List, Tuple
 import math
 
 try:
-    from shapely.geometry import (
+    from shapely.geometry import (  # type: ignore[import-untyped]
         MultiPolygon,
         Point as ShapelyPoint,
         Polygon as ShapelyPolygon,

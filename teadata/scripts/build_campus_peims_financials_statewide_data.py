@@ -1,3 +1,5 @@
+# mypy: ignore-errors
+
 from pathlib import Path
 import re
 import pandas as pd

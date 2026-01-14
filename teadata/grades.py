@@ -249,10 +249,10 @@ def grade_value_to_code(spec: Any) -> Optional[int]:
     if isinstance(spec, str):
         tokens = grade_spec_to_tokens(spec)
         codes = [grade_token_to_code(tok) for tok in tokens]
-        codes = [c for c in codes if c is not None]
-        if not codes:
+        codes_int: list[int] = [c for c in codes if c is not None]
+        if not codes_int:
             return None
-        return min(codes)
+        return min(codes_int)
     return grade_token_to_code(spec)
 
 
@@ -268,19 +268,19 @@ def coerce_grade_spans(
             return []
         return [normalize_grade_bounds(low_code, high_code)]
     if hasattr(spec, "grade_range_code_spans"):
-        spans = getattr(spec, "grade_range_code_spans")
-        if spans:
-            return list(spans)
+        range_spans = getattr(spec, "grade_range_code_spans")
+        if range_spans:
+            return list(range_spans)
     if hasattr(spec, "grade_range"):
-        spans = coerce_grade_spans(getattr(spec, "grade_range"))
-        if spans:
-            return spans
+        range_spans = coerce_grade_spans(getattr(spec, "grade_range"))
+        if range_spans:
+            return range_spans
     if isinstance(spec, dict):
         spans_payload = spec.get("grade_range_code_spans")
         if spans_payload is not None:
-            spans = coerce_grade_spans(spans_payload)
-            if spans:
-                return spans
+            payload_spans = coerce_grade_spans(spans_payload)
+            if payload_spans:
+                return payload_spans
         low_val = None
         high_val = None
         for key in ("low", "min", "start", "from", "lower"):
@@ -296,9 +296,9 @@ def coerce_grade_spans(
             if normalized != (None, None):
                 return [normalized]
         if "grade_range" in spec:
-            spans = coerce_grade_spans(spec["grade_range"])
-            if spans:
-                return spans
+            range_spans = coerce_grade_spans(spec["grade_range"])
+            if range_spans:
+                return range_spans
         return []
     if isinstance(spec, (list, tuple)):
         if not spec:
@@ -316,19 +316,19 @@ def coerce_grade_spans(
         return spans
     if isinstance(spec, str):
         segments = grade_spec_to_segments(spec)
-        spans: list[tuple[Optional[int], Optional[int]]] = []
+        segment_spans: list[tuple[Optional[int], Optional[int]]] = []
         for segment in segments:
             span = grade_segment_to_span(segment)
             if span and span != (None, None):
-                spans.append(span)
-        if spans:
-            return spans
+                segment_spans.append(span)
+        if segment_spans:
+            return segment_spans
         tokens = grade_spec_to_tokens(spec)
         codes = [grade_token_to_code(tok) for tok in tokens]
-        codes = [c for c in codes if c is not None]
-        if not codes:
+        codes_int: list[int] = [c for c in codes if c is not None]
+        if not codes_int:
             return []
-        normalized = normalize_grade_bounds(min(codes), max(codes))
+        normalized = normalize_grade_bounds(min(codes_int), max(codes_int))
         return [normalized] if normalized != (None, None) else []
     code = grade_token_to_code(spec)
     if code is None:

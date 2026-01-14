@@ -214,7 +214,7 @@ class District:
     def to_dict(
         self, *, include_meta: bool = True, include_geometry: bool = False
     ) -> dict:
-        out = {
+        out: dict[str, object] = {
             sys.intern("id"): str(self.id),
             sys.intern("name"): self.name,
             sys.intern("enrollment"): self.enrollment,
@@ -398,7 +398,7 @@ class Campus:
         return self.to_dict(include_meta=True, include_geometry=True)
 
     def __lt__(self, other: "Campus") -> bool:
-        return self.enrollment > other.enrollment
+        return (self.enrollment or 0) > (other.enrollment or 0)
 
     def __sub__(self, other: "Campus | Tuple[float, float]") -> float:
         return self.distance_to(other)
@@ -468,17 +468,17 @@ class Campus:
         if baseline is None:
             raise ValueError("Baseline 2015 enrollment is missing or None.")
         try:
-            enrollment = float(enrollment)
-            baseline = float(baseline)
+            enrollment_value = float(enrollment)
+            baseline_value = float(baseline)
         except Exception as exc:  # pragma: no cover - defensive
             raise ValueError(
                 "Enrollment or baseline could not be cast to float."
             ) from exc
-        if baseline == 0:
+        if baseline_value == 0:
             raise ValueError(
                 "Baseline 2015 enrollment is zero, cannot compute percent change."
             )
-        return (enrollment - baseline) / baseline
+        return (enrollment_value - baseline_value) / baseline_value
 
     @property
     def num_charter_transfer_destinations(self) -> int:
@@ -603,7 +603,7 @@ class EntityMap(dict):
             def getter(obj, name=attr):
                 return getattr(obj, name, None)
 
-        counts = {}
+        counts: dict[object, int] = {}
         for obj in self.values():
             try:
                 v = getter(obj)
@@ -680,7 +680,7 @@ class EntityList(list):
             def getter(obj, name=attr):
                 return getattr(obj, name, None)
 
-        counts = {}
+        counts: dict[object, int] = {}
         for obj in self:
             try:
                 v = getter(obj)
@@ -751,4 +751,4 @@ class ReadOnlyEntityView:
 
 
 # Register the Campus-specific overload after class creation to avoid forward references
-Campus._distance_to.register(Campus)(Campus._distance_to_campus)
+Campus._distance_to.register(Campus)(Campus._distance_to_campus)  # type: ignore[attr-defined]
