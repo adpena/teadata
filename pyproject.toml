@@ -48,7 +48,7 @@ speedups = [
 # Development tooling
 dev = [
     "ruff>=0.5",
-    "mypy>=1.8",
+    "ty>=0.0.11",
     "pytest>=7.4",
     "pytest-cov>=4.1",
     "pip-tools>=7.4",
@@ -122,7 +122,7 @@ DEP002 = [
     "pyarrow",
     "pygeos",
     "ruff",
-    "mypy",
+    "ty",
     "pytest",
     "pytest-cov",
     "pip-tools",
@@ -153,19 +153,15 @@ DEP003 = [
 exclude = ["examples", "docs", "build", "teadata.egg-info", ".venv"]
 extend-exclude = ["*.ipynb"]
 
-[tool.mypy]
-exclude = "^(build|teadata\\.egg-info|examples|docs)/"
-
-[[tool.mypy.overrides]]
-module = [
-    "teadata.boundary_store",
-    "teadata.engine",
-    "teadata.enrichment.*",
-    "teadata.entity_store",
-    "teadata.load_data",
-    "teadata.map_store",
-    "teadata.persistence.*",
-    "teadata.query",
-    "teadata.scripts.*",
+[tool.ty.src]
+exclude = [
+    "teadata/boundary_store.py",
+    "teadata/engine.py",
+    "teadata/enrichment/**",
+    "teadata/entity_store.py",
+    "teadata/load_data.py",
+    "teadata/map_store.py",
+    "teadata/persistence/**",
+    "teadata/query.py",
+    "teadata/scripts/**",
 ]
-ignore_errors = true

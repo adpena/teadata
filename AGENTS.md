@@ -3,22 +3,23 @@
 ## Project Structure & Module Organization
 - Core engine lives in `teadata/engine.py`, `entities.py`, `query.py`, and `geometry.py`; they define the `DataEngine`, entity models, query operators, and spatial helpers.
 - Enrichment logic sits in `teadata/enrichment/`; database bridges are under `teadata/persistence/`; utility runners live in `teadata/scripts/`.
-- Config and sample data references are in `teadata/teadata_sources.yaml` and `teadata/data/`. Snapshots are written to `.cache/` (ignored by Git); keep large `.pkl`/spatial files out of commits.
+- Config and sample data references are in `teadata/teadata_sources.yaml` and `teadata/data/`. Snapshots are written to `.cache/` and are committed; keep `.cache` artifacts in version control.
 - Tests reside in `tests/` (e.g., `tests/test_snapshot_loading.py`), and example notebooks/scripts are in `examples/`. Packaging artifacts land in `build/` and `teadata.egg-info/`.
 
 ## Build, Test, and Development Commands
 - Install for iterative work: `uv sync --all-extras` (this handles dev, database, and notebook extras automatically).
+- Always run Python commands through `uv run` and manage packages with `uv`; avoid bare `python` or `pip` to keep environments consistent.
 - Run the suite: `uv run pytest` or target a test (`uv run pytest tests/test_entities.py::test_campus_to_dict_includes_percent_enrollment_change`).
 - Optional: build a fresh snapshot from the configured spatial files with `uv run python -m teadata.load_data` (uses `teadata_sources.yaml` and writes to `.cache/`).
 - When code changes affect anything serialized into the snapshot (pickled data), run `uv run python -m teadata.load_data` as the final task to refresh snapshot artifacts.
 - Packaging sanity check: `uv build` after a clean `git status` if you need a wheel/sdist.
-- Linting and type checking: `uv run ruff check .` and `uv run mypy .`.
+- Linting and type checking: `uv run ruff check .` and `uv run ty check .`.
 
 ## Coding Style & Naming Conventions
 - Python 3.11+, PEP 8 defaults, 4-space indents, and type hints preferred (modules use `from __future__ import annotations`).
 - Modules and functions use `snake_case`; classes use `PascalCase`; keep public attributes stable for pickled snapshots.
 - Keep data loaders/enrichers deterministic: avoid implicit network calls and prefer explicit file paths resolved via config helpers.
-- Use `ruff check .` and `mypy .` when available; keep formatting minimal and readable.
+- Use `uv run ruff check .` and `uv run ty check .` when available; keep formatting minimal and readable.
 
 ## Testing Guidelines
 - Add pytest cases under `tests/` with `test_*.py` naming; exercise both happy paths and failure branches (e.g., gzip/no-extension snapshot handling).
@@ -39,12 +40,12 @@
 ## Commit & Pull Request Guidelines
 - Follow the existing history: short, imperative subject lines (e.g., “Create .gitattributes”, “Adding gzip support of snapshot repo cache”).
 - PRs should state what changed, why, data/config files touched, and the tests/commands run; link related issues.
-- Exclude generated snapshots, local configs (`*.local.*`), and large data files that are covered by `.gitignore`.
+- Exclude local configs (`*.local.*`) and large data files that are covered by `.gitignore`; `.cache` artifacts are tracked and should remain in commits.
 - If behavior changes are user-visible, include a brief reproduction snippet or before/after note in the PR description.
 
 ## Security & Configuration Tips
 - Keep credentials and machine-local paths out of tracked files; rely on `teadata/teadata_sources.yaml` and untracked `*.local.*` overrides.
-- Treat `.cache/` artifacts and enrichment outputs as ephemeral; do not publish them unless explicitly sanitized.
+- Treat `.cache/` artifacts as required repo assets; avoid publishing them outside the repo unless explicitly sanitized.
 - When using optional extras (`[database]`, notebooks), avoid embedding connection strings in code or examples—use env vars or local config instead.
 
 ## Downstream Dependencies

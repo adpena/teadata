@@ -1,4 +1,4 @@
-# mypy: ignore-errors
+# ty: ignore
 
 import pandas as pd
 import time

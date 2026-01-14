@@ -1,4 +1,4 @@
-# mypy: ignore-errors
+# ty: ignore
 
 from pathlib import Path
 import re

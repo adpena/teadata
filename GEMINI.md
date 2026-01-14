@@ -11,7 +11,7 @@ The framework employs a "snapshot-based" architecture: instead of repeatedly pro
 *   **Data Manipulation:** Pandas, NumPy, DuckDB, PyArrow
 *   **Geospatial:** Shapely 2.0+, GeoPandas, PyOgrio, SciPy (KDTree)
 *   **Build System:** `uv` (recommended), `setuptools`
-*   **Testing/Quality:** `pytest`, `ruff`, `mypy`
+*   **Testing/Quality:** `pytest`, `ruff`, `ty`
 
 ## Architecture & Core Concepts
 
@@ -53,6 +53,7 @@ Defines the mapping between logical data keys (e.g., `tapr`, `peims`) and physic
 *   `examples/`: Example scripts and Jupyter notebooks demonstrating usage.
 *   `tests/`: `pytest` test suite.
 *   `docs/`: MkDocs documentation source.
+*   `.cache/`: Snapshot and store artifacts that must be committed.
 
 ## Development Workflow
 
@@ -72,25 +73,22 @@ The project follows a modified Semantic Versioning (SemVer) approach:
 *   Always increment the version when `load_data.py` is executed for a production data refresh.
 
 ### Installation
-The project uses `uv` for dependency management, but supports standard pip.
+The project uses `uv` for dependency management and command execution; do not use bare `python` or `pip`.
 
 ```bash
 # Recommended
 uv sync
-
-# Standard pip
-pip install -e ".[dev,speedups,docs]"
 ```
 
 ### Running Tests
 ```bash
-pytest
+uv run pytest
 ```
 
 ### Linting & Formatting
 ```bash
-ruff check .
-mypy .
+uv run ruff check .
+uv run ty check .
 ```
 
 ### Building Documentation
