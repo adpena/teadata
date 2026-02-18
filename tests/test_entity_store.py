@@ -1,5 +1,7 @@
 import uuid
 
+import pytest
+
 from teadata.classes import Campus, DataEngine, District
 from teadata.persistence.sqlalchemy_store import (
     create_engine,
@@ -10,7 +12,7 @@ from teadata.persistence.sqlalchemy_store import (
 from teadata import entity_store
 
 
-def test_entity_store_round_trip(tmp_path):
+def _build_entity_store(tmp_path):
     repo = DataEngine()
     district = District(
         id=uuid.uuid4(),
@@ -19,7 +21,7 @@ def test_entity_store_round_trip(tmp_path):
         enrollment=1200,
         rating="A",
     )
-    district.meta = {"district_2025_demo": "ok"}
+    district.meta = {"district_2025_demo": "ok", "district_extra": "extra"}
     repo.add_district(district)
 
     campus = Campus(
@@ -42,6 +44,11 @@ def test_entity_store_round_trip(tmp_path):
     with Session.begin() as session:
         export_dataengine(repo, session, replace=True)
     engine.dispose()
+    return path
+
+
+def test_entity_store_round_trip(tmp_path):
+    path = _build_entity_store(tmp_path)
 
     campus_row = entity_store.load_campus("123456789", store_path=path)
     assert campus_row
@@ -57,3 +64,44 @@ def test_entity_store_round_trip(tmp_path):
 
     keys = entity_store.list_meta_keys("campus", store_path=path)
     assert "campus_2025_demo" in keys
+
+
+def test_entity_store_get_meta_after_no_meta_lookup(tmp_path):
+    path = _build_entity_store(tmp_path)
+    store = entity_store.EntityStore(path)
+
+    campus_no_meta = store.get_campus("123456789", include_meta=False)
+    assert campus_no_meta
+    assert campus_no_meta["meta"] == {}
+    campus_with_meta = store.get_campus("123456789", include_meta=True)
+    assert campus_with_meta
+    assert campus_with_meta["meta"]["campus_2025_demo"] == 5
+
+    district_no_meta = store.get_district("123456", include_meta=False)
+    assert district_no_meta
+    assert district_no_meta["meta"] == {}
+    district_with_meta = store.get_district("123456", include_meta=True)
+    assert district_with_meta
+    assert district_with_meta["meta"]["district_2025_demo"] == "ok"
+
+
+def test_entity_store_meta_keys_limit_does_not_truncate_cache(tmp_path):
+    path = _build_entity_store(tmp_path)
+    store = entity_store.EntityStore(path)
+
+    limited = store.list_meta_keys("district", limit=1)
+    full = store.list_meta_keys("district")
+
+    assert len(limited) == 1
+    assert "district_2025_demo" in full
+    assert "district_extra" in full
+
+
+def test_entity_store_load_raises_for_invalid_database(tmp_path):
+    invalid = tmp_path / "invalid.sqlite"
+    invalid.write_text("not a sqlite database", encoding="utf-8")
+
+    with pytest.raises(RuntimeError, match="Failed querying campus"):
+        entity_store.load_campus("123456789", store_path=invalid)
+    with pytest.raises(RuntimeError, match="Failed querying district"):
+        entity_store.load_district("123456", store_path=invalid)

@@ -264,8 +264,8 @@ def load_campus(
                     "district_number": _strip_leading_apostrophe(row[12]),
                     "district_number_canon": row[13] or "",
                 }
-    except Exception:
-        return None
+    except Exception as exc:
+        raise RuntimeError(f"Failed querying campus from entity store '{path}': {exc}") from exc
 
     return None
 
@@ -313,8 +313,10 @@ def load_district(
                     "is_charter": has_charter,
                     "district_type": _district_type_from_flag(has_charter),
                 }
-    except Exception:
-        return None
+    except Exception as exc:
+        raise RuntimeError(
+            f"Failed querying district from entity store '{path}': {exc}"
+        ) from exc
 
     return None
 
@@ -355,6 +357,10 @@ class EntityStore:
     _district_cache: dict[str, dict[str, Any]] = field(
         default_factory=dict, init=False, repr=False
     )
+    _campus_meta_loaded: set[str] = field(default_factory=set, init=False, repr=False)
+    _district_meta_loaded: set[str] = field(
+        default_factory=set, init=False, repr=False
+    )
     _meta_keys_cache: dict[str, list[str]] = field(
         default_factory=dict, init=False, repr=False
     )
@@ -384,11 +390,15 @@ class EntityStore:
             return None
         cached = self._campus_cache.get(key)
         if cached is not None:
-            if include_meta or not cached.get("meta"):
+            if not include_meta or key in self._campus_meta_loaded:
                 return cached
         record = self._load_campus_from_conn(key, include_meta=include_meta)
         if record:
             self._campus_cache[key] = record
+            if include_meta:
+                self._campus_meta_loaded.add(key)
+            else:
+                self._campus_meta_loaded.discard(key)
         return record
 
     def get_district(
@@ -401,11 +411,15 @@ class EntityStore:
             return None
         cached = self._district_cache.get(key)
         if cached is not None:
-            if include_meta or not cached.get("meta"):
+            if not include_meta or key in self._district_meta_loaded:
                 return cached
         record = self._load_district_from_conn(key, include_meta=include_meta)
         if record:
             self._district_cache[key] = record
+            if include_meta:
+                self._district_meta_loaded.add(key)
+            else:
+                self._district_meta_loaded.discard(key)
         return record
 
     def iter_campuses(self, *, include_meta: bool = True) -> Iterable[dict[str, Any]]:
@@ -479,12 +493,10 @@ class EntityStore:
 
     def list_meta_keys(self, entity_type: str, *, limit: int | None = None) -> list[str]:
         cached = self._meta_keys_cache.get(entity_type)
-        if cached:
+        if cached is not None:
             return cached[:limit] if limit else list(cached)
         table = "district_meta" if entity_type == "district" else "campus_meta"
         query = f"SELECT DISTINCT key FROM {table} ORDER BY key"
-        if limit:
-            query = f"{query} LIMIT {int(limit)}"
         conn = self._connect()
         if conn is None:
             return []

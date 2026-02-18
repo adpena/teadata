@@ -36,3 +36,12 @@ def test_query_to_df_filters_tuple_columns():
     df = query.to_df(columns=["campus_name", "distance_miles"])
 
     assert list(df.columns) == ["campus_name", "distance_miles"]
+
+
+def test_query_map_is_chainable():
+    query = Query([1, 2, 3], repo=None)
+
+    out = query >> ("map", lambda x: x + 1) >> ("take", 2)
+
+    assert isinstance(out, Query)
+    assert out.to_list() == [2, 3]

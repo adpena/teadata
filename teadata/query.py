@@ -407,7 +407,8 @@ class Query:
 
     def _op_map(self, op: tuple):
         func = op[1]
-        return [func(o) for o in self._items]
+        self._items = [func(o) for o in self._items]
+        return self
 
     def _op_distinct(self, op: tuple):
         keyfunc = op[1]

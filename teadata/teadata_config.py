@@ -538,11 +538,14 @@ class Config:
         if ext in (".xlsx", ".xls"):
             return pd.read_excel(path, **reader_kwargs)
         if ext == ".json":
-            # Try NDJSON first
+            # Respect explicit caller preference; otherwise try NDJSON first.
+            json_kwargs = dict(reader_kwargs)
+            if "lines" in json_kwargs:
+                return pd.read_json(path, **json_kwargs)
             try:
-                return pd.read_json(path, lines=True, **reader_kwargs)
+                return pd.read_json(path, lines=True, **json_kwargs)
             except ValueError:
-                return pd.read_json(path, **reader_kwargs)
+                return pd.read_json(path, **json_kwargs)
 
         raise ValueError(
             f"Unsupported file extension for loader: {ext} (from '{base}')"
