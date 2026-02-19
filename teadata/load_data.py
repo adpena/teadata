@@ -158,6 +158,38 @@ def parse_date(val: Optional[str]) -> Optional[date]:
     raise ValueError(f"Unrecognized date format: {val}")
 
 
+def _normalize_aea_raw(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    try:
+        if pd.isna(value):
+            return None
+    except TypeError:
+        pass
+    if isinstance(value, bool):
+        return "Y" if value else "N"
+    if isinstance(value, (int, float)):
+        return "Y" if bool(value) else "N"
+    text = str(value).strip()
+    if not text:
+        return None
+    lowered = text.lower()
+    if lowered in {"y", "yes", "true", "t", "1"}:
+        return "Y"
+    if lowered in {"n", "no", "false", "f", "0"}:
+        return "N"
+    return None
+
+
+def _coerce_aea_bool(value: Any) -> Optional[bool]:
+    raw = _normalize_aea_raw(value)
+    if raw == "Y":
+        return True
+    if raw == "N":
+        return False
+    return None
+
+
 def _district_lookup_keys(district_number: Optional[str]) -> list[str]:
     """Return canonical lookup aliases for a district number."""
 
@@ -2613,12 +2645,14 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                 district_number = ""
             rating_val = getattr(row, "RATING", "")
             rating_str = str(rating_val) if rating_val is not None else ""
+            district_aea_raw = _normalize_aea_raw(getattr(row, "AEA", None))
             d = District(
                 id=uuid.uuid4(),
                 name=getattr(row, "NAME", None),
                 enrollment=getattr(row, "ENROLLMENT", 0),
                 rating=rating_str,
-                aea=getattr(row, "AEA", None),
+                aea=_coerce_aea_bool(district_aea_raw),
+                aea_raw=district_aea_raw,
                 boundary=getattr(row, "geometry"),
             )
             # Attach normalized ID as extra attribute
@@ -2786,6 +2820,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
             if district_id is None:
                 district_id = fallback_id
 
+            campus_aea_raw = _normalize_aea_raw(getattr(row, "USER_AEA", None))
             c = Campus(
                 id=uuid.uuid4(),
                 district_id=district_id,
@@ -2795,7 +2830,8 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                 campus_number=canonical_campus_number(
                     getattr(row, "USER_School_Number", None)
                 ),
-                aea=getattr(row, "USER_AEA", None),
+                aea=_coerce_aea_bool(campus_aea_raw),
+                aea_raw=campus_aea_raw,
                 grade_range=getattr(row, "USER_Grade_Range", None),
                 school_type=getattr(row, "School_Type", None),
                 school_status_date=parse_date(

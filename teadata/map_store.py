@@ -104,10 +104,12 @@ def discover_map_store(explicit: str | Path | None = None) -> Optional[Path]:
     except Exception:
         pass
 
-    for base in Path.cwd().parents:
+    cwd = Path.cwd()
+    for idx, base in enumerate((cwd, *cwd.parents)):
         candidate = _newest_sqlite(base / ".cache")
         if candidate:
-            resolved = _resolve_map_store(candidate, "parent-cache")
+            source = "cwd-cache" if idx == 0 else "parent-cache"
+            resolved = _resolve_map_store(candidate, source)
             if resolved:
                 return resolved
 
@@ -197,6 +199,11 @@ def load_map_payload_parts(
                     transfers = _decode_payload(row[1]) or {}
                     return base, transfers
     except Exception:
+        logger.exception(
+            "map_store.load_map_payload_parts_failed path=%s district_number=%s",
+            path,
+            district_number,
+        )
         return None, None
 
     return None, None
@@ -219,6 +226,11 @@ def load_campus_profile_payload(
                 if row:
                     return _decode_payload(row[0])
     except Exception:
+        logger.exception(
+            "map_store.load_campus_profile_payload_failed path=%s campus_number=%s",
+            path,
+            campus_number,
+        )
         return None
 
     return None

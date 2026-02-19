@@ -165,6 +165,7 @@ class DistrictRecord(Base):
     district_number: Mapped[str | None] = mapped_column(String(16), index=True)
     district_number_canon: Mapped[str | None] = mapped_column(String(16), index=True)
     aea: Mapped[bool | None] = mapped_column(Boolean)
+    aea_raw: Mapped[str | None] = mapped_column(String(8))
     rating: Mapped[str | None] = mapped_column(String(16))
     polygon_wkb: Mapped[bytes | None] = mapped_column(LargeBinary)
     polygon_geojson: Mapped[dict[str, Any] | None] = mapped_column(_JSONType)
@@ -193,6 +194,7 @@ class CampusRecord(Base):
     enrollment: Mapped[int | None] = mapped_column(Integer)
     rating: Mapped[str | None] = mapped_column(String(16))
     aea: Mapped[bool | None] = mapped_column(Boolean)
+    aea_raw: Mapped[str | None] = mapped_column(String(8))
     grade_range: Mapped[str | None] = mapped_column(String(64))
     grade_range_low_code: Mapped[int | None] = mapped_column(Integer, index=True)
     grade_range_high_code: Mapped[int | None] = mapped_column(Integer, index=True)
@@ -370,6 +372,35 @@ def _coerce_bool(value: Any) -> bool:
     if text in {"n", "no", "false", "f", "0"}:
         return False
     return bool(text)
+
+
+def _normalize_aea_raw(value: Any) -> str | None:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "Y" if value else "N"
+    if isinstance(value, (int, float)):
+        if value != value:  # NaN
+            return None
+        return "Y" if bool(value) else "N"
+    text = str(value).strip()
+    if not text:
+        return None
+    lowered = text.lower()
+    if lowered in {"y", "yes", "true", "t", "1"}:
+        return "Y"
+    if lowered in {"n", "no", "false", "f", "0"}:
+        return "N"
+    return None
+
+
+def _coerce_nullable_bool(value: Any) -> bool | None:
+    raw = _normalize_aea_raw(value)
+    if raw == "Y":
+        return True
+    if raw == "N":
+        return False
+    return None
 
 
 def _flatten_meta(meta: Mapping[str, Any] | None) -> list[tuple[str, int, Any]]:
@@ -808,7 +839,13 @@ def export_dataengine(
             getattr(district, "district_number_canon", None)
             or canonical_district_number(district.district_number)
         )
-        record.aea = _coerce_bool(district.aea)
+        district_aea_raw = _normalize_aea_raw(
+            getattr(district, "aea_raw", district.aea)
+        )
+        record.aea_raw = district_aea_raw
+        record.aea = _coerce_nullable_bool(
+            district_aea_raw if district_aea_raw is not None else district.aea
+        )
         record.rating = district.rating
         if include_geometry:
             poly_wkb, poly_geojson = _dump_polygon(getattr(district, "polygon", None))
@@ -842,7 +879,11 @@ def export_dataengine(
         record.is_magnet = getattr(campus, "is_magnet", None)
         record.enrollment = campus.enrollment
         record.rating = campus.rating
-        record.aea = _coerce_bool(campus.aea)
+        campus_aea_raw = _normalize_aea_raw(getattr(campus, "aea_raw", campus.aea))
+        record.aea_raw = campus_aea_raw
+        record.aea = _coerce_nullable_bool(
+            campus_aea_raw if campus_aea_raw is not None else campus.aea
+        )
         record.grade_range = campus.grade_range
         record.grade_range_low_code = campus.grade_range_low_code
         record.grade_range_high_code = campus.grade_range_high_code
@@ -977,6 +1018,7 @@ def import_dataengine(
                 enrollment=d.enrollment,
                 district_number=d.district_number or "",
                 aea=d.aea,
+                aea_raw=getattr(d, "aea_raw", None),
                 rating=d.rating,
                 boundary=_load_polygon(d.polygon_wkb, d.polygon_geojson),
                 meta=meta_payload,
@@ -1002,6 +1044,7 @@ def import_dataengine(
                 enrollment=c.enrollment,
                 rating=c.rating,
                 aea=c.aea,
+                aea_raw=getattr(c, "aea_raw", None),
                 grade_range=c.grade_range,
                 school_type=c.school_type,
                 school_status_date=c.school_status_date,

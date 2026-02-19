@@ -101,6 +101,35 @@ logger = logging.getLogger(__name__)
 ENABLE_PROFILING = False
 
 
+def _normalize_aea_raw(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "Y" if value else "N"
+    if isinstance(value, (int, float)):
+        if value != value:  # NaN
+            return None
+        return "Y" if bool(value) else "N"
+    text = str(value).strip()
+    if not text:
+        return None
+    lowered = text.lower()
+    if lowered in {"y", "yes", "true", "t", "1"}:
+        return "Y"
+    if lowered in {"n", "no", "false", "f", "0"}:
+        return "N"
+    return None
+
+
+def _coerce_aea_bool(value: Any) -> Optional[bool]:
+    raw = _normalize_aea_raw(value)
+    if raw == "Y":
+        return True
+    if raw == "N":
+        return False
+    return None
+
+
 def _env_flag(name: str, default: bool = False) -> bool:
     raw = os.getenv(name)
     if raw is None:
@@ -457,7 +486,8 @@ class DataEngine:
             )
             name = _derive_name_from_dict(v) or f"Unknown District {dn or id_}"
             enrollment = v.get("enrollment") or 0
-            aea = v.get("aea")
+            aea_raw = _normalize_aea_raw(v.get("aea_raw", v.get("aea")))
+            aea = _coerce_aea_bool(aea_raw if aea_raw is not None else v.get("aea"))
             rating = v.get("rating")
             # Accept either 'polygon' or 'boundary' for geometry; pass None if absent
             boundary = v.get("polygon", v.get("boundary"))
@@ -470,6 +500,7 @@ class DataEngine:
                 ),
                 district_number=dn or "",
                 aea=aea,
+                aea_raw=aea_raw,
                 rating=rating,
                 boundary=boundary,
                 meta=meta,
@@ -484,7 +515,10 @@ class DataEngine:
         )
         name = _derive_name_from_obj(v) or f"Unknown District {dn or id_}"
         enrollment = getattr(v, "enrollment", 0) or 0
-        aea = getattr(v, "aea", None)
+        aea_raw = _normalize_aea_raw(
+            getattr(v, "aea_raw", getattr(v, "aea", None))
+        )
+        aea = _coerce_aea_bool(aea_raw if aea_raw is not None else getattr(v, "aea", None))
         rating = getattr(v, "rating", None)
         boundary = (
             getattr(v, "polygon", None)
@@ -501,6 +535,7 @@ class DataEngine:
             enrollment=int(enrollment) if isinstance(enrollment, (int, float)) else 0,
             district_number=dn or "",
             aea=aea,
+            aea_raw=aea_raw,
             rating=rating,
             boundary=boundary,
             meta=meta,
@@ -541,7 +576,8 @@ class DataEngine:
             is_private = v.get("is_private", False)
             is_magnet = v.get("is_magnet")
             rating = v.get("rating")
-            aea = v.get("aea")
+            aea_raw = _normalize_aea_raw(v.get("aea_raw", v.get("aea")))
+            aea = _coerce_aea_bool(aea_raw if aea_raw is not None else v.get("aea"))
             grade_range = v.get("grade_range")
             school_type = v.get("school_type")
             school_status_date = v.get("school_status_date")
@@ -562,6 +598,7 @@ class DataEngine:
                 is_magnet=is_magnet,
                 rating=rating,
                 aea=aea,
+                aea_raw=aea_raw,
                 grade_range=grade_range,
                 school_type=school_type,
                 school_status_date=school_status_date,
@@ -597,7 +634,10 @@ class DataEngine:
         is_private = getattr(v, "is_private", False)
         is_magnet = getattr(v, "is_magnet", None)
         rating = getattr(v, "rating", None)
-        aea = getattr(v, "aea", None)
+        aea_raw = _normalize_aea_raw(
+            getattr(v, "aea_raw", getattr(v, "aea", None))
+        )
+        aea = _coerce_aea_bool(aea_raw if aea_raw is not None else getattr(v, "aea", None))
         grade_range = getattr(v, "grade_range", None)
         school_type = getattr(v, "school_type", None)
         school_status_date = getattr(v, "school_status_date", None)
@@ -620,6 +660,7 @@ class DataEngine:
             is_magnet=is_magnet,
             rating=rating,
             aea=aea,
+            aea_raw=aea_raw,
             grade_range=grade_range,
             school_type=school_type,
             school_status_date=school_status_date,
@@ -2252,8 +2293,22 @@ class DataEngine:
         """Return the nearest charter campus of the same school type for each campus."""
         from collections import defaultdict
 
+        def _same_campus(a: Campus, b: Campus) -> bool:
+            aid = getattr(a, "id", None)
+            bid = getattr(b, "id", None)
+            if aid is not None and bid is not None:
+                return aid == bid
+            return a is b
+
         targets_by_type: Dict[str, list[Campus]] = defaultdict(list)
+        results: Dict[str, Dict[str, Any]] = {}
         for campus in campuses:
+            cid = getattr(campus, "id", None)
+            if cid is None:
+                continue
+            results[str(cid)] = {"match": None, "miles": None}
+            if is_private(campus):
+                continue
             st = (getattr(campus, "school_type", None) or "").strip()
             pt = getattr(campus, "point", None) or getattr(campus, "location", None)
             if not st or pt is None:
@@ -2261,7 +2316,7 @@ class DataEngine:
             targets_by_type[st].append(campus)
 
         if not targets_by_type:
-            return {}
+            return results
 
         if not getattr(self, "_indexes_enabled", True):
             candidates_by_type: Dict[str, list[tuple[Campus, tuple[float, float]]]] = (
@@ -2282,34 +2337,32 @@ class DataEngine:
                     continue
                 candidates_by_type[st].append((cand, (lon2, lat2)))
 
-            results: Dict[str, Dict[str, Any]] = {}
             for st, targets in targets_by_type.items():
                 cand_list = candidates_by_type.get(st, [])
                 if not cand_list:
-                    for campus in targets:
-                        results[str(campus.id)] = {"match": None, "miles": None}
                     continue
                 for campus in targets:
                     pt = getattr(campus, "point", None) or getattr(
                         campus, "location", None
                     )
-                    if pt is None:
-                        results[str(campus.id)] = {"match": None, "miles": None}
+                    cid = getattr(campus, "id", None)
+                    if cid is None or pt is None:
                         continue
                     try:
                         lon1, lat1 = float(pt.x), float(pt.y)
                     except Exception:
-                        results[str(campus.id)] = {"match": None, "miles": None}
                         continue
 
                     best_dm: Optional[float] = None
                     best_obj: Optional[Campus] = None
                     for cand, (lon2, lat2) in cand_list:
+                        if _same_campus(campus, cand):
+                            continue
                         dm = haversine_miles(lon1, lat1, lon2, lat2)
                         if best_dm is None or dm < best_dm:
                             best_dm = float(dm)
                             best_obj = cand
-                    results[str(campus.id)] = {"match": best_obj, "miles": best_dm}
+                    results[str(cid)] = {"match": best_obj, "miles": best_dm}
             return results
 
         cache = self._ensure_charter_cache()
@@ -2324,18 +2377,20 @@ class DataEngine:
             else:
                 np_mod = np
 
-        results: Dict[str, Dict[str, Any]] = {}
         R = 3958.7613
 
         for st, targets in targets_by_type.items():
             entry = entries.get(st)
             if entry is None or not entry.objects:
-                for campus in targets:
-                    results[str(campus.id)] = {"match": None, "miles": None}
                 continue
 
             cand_objs = entry.objects
             cand_deg = entry.coords_deg
+            cand_idxs_by_id: Dict[Any, list[int]] = defaultdict(list)
+            for idx, obj in enumerate(cand_objs):
+                oid = getattr(obj, "id", None)
+                if oid is not None:
+                    cand_idxs_by_id[oid].append(idx)
 
             tgt_pairs: list[tuple[float, float]] = []
             tgt_list: list[Campus] = []
@@ -2354,16 +2409,47 @@ class DataEngine:
                 continue
 
             if entry.tree is not None and np_mod is not None:
-                tgt_deg = np_mod.array(tgt_pairs, dtype=float)
-                dists, idx = entry.tree.query(np_mod.radians(tgt_deg), k=1)
-                idx = np_mod.atleast_1d(idx)
-                for (lon1, lat1), j, campus in zip(tgt_deg, idx, tgt_list):
-                    lon2, lat2 = entry.coords_deg[int(j)]
+                for (lon1, lat1), campus in zip(tgt_pairs, tgt_list):
+                    cid = getattr(campus, "id", None)
+                    if cid is None:
+                        continue
+
+                    self_present = bool(cand_idxs_by_id.get(cid))
+                    qk = 2 if self_present and len(cand_objs) > 1 else 1
+                    _d, idx = entry.tree.query(
+                        np_mod.radians([lon1, lat1]), k=qk if qk > 1 else 1
+                    )
+                    idx_vals = np_mod.atleast_1d(idx)
+                    picked: Optional[int] = None
+                    for raw in idx_vals:
+                        j = int(raw)
+                        cand = cand_objs[j]
+                        if _same_campus(campus, cand):
+                            continue
+                        picked = j
+                        break
+
+                    if picked is None:
+                        best_dm: Optional[float] = None
+                        best_obj: Optional[Campus] = None
+                        for (lon2, lat2), cand in zip(cand_deg, cand_objs):
+                            if _same_campus(campus, cand):
+                                continue
+                            dm = haversine_miles(
+                                float(lon1), float(lat1), float(lon2), float(lat2)
+                            )
+                            if best_dm is None or dm < best_dm:
+                                best_dm = float(dm)
+                                best_obj = cand
+                        results[str(cid)] = {"match": best_obj, "miles": best_dm}
+                        continue
+
+                    lon2, lat2 = entry.coords_deg[picked]
                     dm = haversine_miles(
                         float(lon1), float(lat1), float(lon2), float(lat2)
                     )
-                    results[str(campus.id)] = {
-                        "match": cand_objs[int(j)],
+                    results[str(cid)] = {
+                        "match": cand_objs[picked],
                         "miles": float(dm),
                     }
                 continue
@@ -2373,8 +2459,11 @@ class DataEngine:
                     cand_deg
                     if isinstance(cand_deg, np_mod.ndarray)
                     else np_mod.array(cand_deg, dtype=float)
-                )
+                    )
                 for (lon1, lat1), campus in zip(tgt_pairs, tgt_list):
+                    cid = getattr(campus, "id", None)
+                    if cid is None:
+                        continue
                     lon1r, lat1r = np_mod.radians([lon1, lat1])
                     lon2r = np_mod.radians(cand_arr[:, 0])
                     lat2r = np_mod.radians(cand_arr[:, 1])
@@ -2387,8 +2476,12 @@ class DataEngine:
                         * np_mod.sin(dlon / 2) ** 2
                     )
                     miles = R * 2 * np_mod.arctan2(np_mod.sqrt(a), np_mod.sqrt(1 - a))
+                    for self_idx in cand_idxs_by_id.get(cid, []):
+                        miles[self_idx] = np_mod.inf
                     j = int(np_mod.argmin(miles))
-                    results[str(campus.id)] = {
+                    if not bool(np_mod.isfinite(miles[j])):
+                        continue
+                    results[str(cid)] = {
                         "match": cand_objs[j],
                         "miles": float(miles[j]),
                     }
@@ -2396,16 +2489,21 @@ class DataEngine:
 
             cand_list = list(cand_deg)
             for (lon1, lat1), campus in zip(tgt_pairs, tgt_list):
+                cid = getattr(campus, "id", None)
+                if cid is None:
+                    continue
                 best_dm: Optional[float] = None
                 best_obj: Optional[Campus] = None
                 for (lon2, lat2), cand in zip(cand_list, cand_objs):
+                    if _same_campus(campus, cand):
+                        continue
                     dm = haversine_miles(
                         float(lon1), float(lat1), float(lon2), float(lat2)
                     )
                     if best_dm is None or dm < best_dm:
                         best_dm = float(dm)
                         best_obj = cand
-                results[str(campus.id)] = {"match": best_obj, "miles": best_dm}
+                results[str(cid)] = {"match": best_obj, "miles": best_dm}
 
         return results
 

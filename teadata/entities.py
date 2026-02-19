@@ -92,6 +92,7 @@ class District:
     enrollment: Optional[int] = None
     district_number: str = ""
     aea: Optional[bool] = None
+    aea_raw: Optional[str] = None
     rating: Optional[str] = None
 
     _district_number_canon: str = field(init=False, repr=False, compare=False)
@@ -222,6 +223,7 @@ class District:
             sys.intern("enrollment"): self.enrollment,
             sys.intern("district_number"): self.district_number,
             sys.intern("aea"): self.aea,
+            sys.intern("aea_raw"): self.aea_raw,
             sys.intern("rating"): self.rating,
         }
         if include_meta and isinstance(self.meta, dict):
@@ -257,6 +259,7 @@ class Campus:
     rating: Optional[str] = None
 
     aea: Optional[bool] = None
+    aea_raw: Optional[str] = None
     grade_range: Optional[str] = None
     school_type: Optional[str] = None
     school_status_date: Optional[date] = None
@@ -356,6 +359,7 @@ class Campus:
             sys.intern("enrollment"): self.enrollment,
             sys.intern("rating"): self.rating,
             sys.intern("aea"): self.aea,
+            sys.intern("aea_raw"): self.aea_raw,
             sys.intern("grade_range"): self.grade_range,
             sys.intern("school_type"): self.school_type,
             sys.intern("school_status_date"): self.school_status_date,

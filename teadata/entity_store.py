@@ -111,10 +111,12 @@ def discover_entity_store(explicit: str | Path | None = None) -> Optional[Path]:
     except Exception:
         pass
 
-    for base in Path.cwd().parents:
+    cwd = Path.cwd()
+    for idx, base in enumerate((cwd, *cwd.parents)):
         candidate = _newest_sqlite(base / ".cache")
         if candidate:
-            resolved = _resolve_entity_store(candidate, "parent-cache")
+            source = "cwd-cache" if idx == 0 else "parent-cache"
+            resolved = _resolve_entity_store(candidate, source)
             if resolved:
                 return resolved
 
@@ -222,6 +224,12 @@ def _district_type_from_flag(flag: bool | None) -> str:
     return "Charter" if flag else "ISD"
 
 
+def _nullable_bool(value: Any) -> bool | None:
+    if value is None:
+        return None
+    return bool(value)
+
+
 def load_campus(
     campus_number: str,
     *,
@@ -234,7 +242,7 @@ def load_campus(
 
     query = """
         SELECT c.campus_number, c.campus_number_canon, c.name, c.is_charter, c.is_private,
-               c.enrollment, c.rating, c.grade_range, c.lon, c.lat, c.meta,
+               c.enrollment, c.rating, c.aea, c.aea_raw, c.grade_range, c.lon, c.lat, c.meta,
                d.name, d.district_number, d.district_number_canon
         FROM campuses c
         LEFT JOIN districts d ON d.id = c.district_id
@@ -247,7 +255,7 @@ def load_campus(
                 row = conn.execute(query, (key, key)).fetchone()
                 if not row:
                     continue
-                meta = _decode_json(row[10]) if include_meta else {}
+                meta = _decode_json(row[12]) if include_meta else {}
                 return {
                     "campus_number": row[0] or "",
                     "campus_number_canon": row[1] or "",
@@ -256,13 +264,15 @@ def load_campus(
                     "is_private": bool(row[4]),
                     "enrollment": row[5],
                     "rating": row[6],
-                    "grade_range": row[7] or "",
-                    "lon": row[8],
-                    "lat": row[9],
+                    "aea": _nullable_bool(row[7]),
+                    "aea_raw": row[8],
+                    "grade_range": row[9] or "",
+                    "lon": row[10],
+                    "lat": row[11],
                     "meta": meta,
-                    "district_name": row[11] or "",
-                    "district_number": _strip_leading_apostrophe(row[12]),
-                    "district_number_canon": row[13] or "",
+                    "district_name": row[13] or "",
+                    "district_number": _strip_leading_apostrophe(row[14]),
+                    "district_number_canon": row[15] or "",
                 }
     except Exception as exc:
         raise RuntimeError(f"Failed querying campus from entity store '{path}': {exc}") from exc
@@ -281,7 +291,7 @@ def load_district(
         return None
 
     query = """
-        SELECT d.name, d.district_number, d.district_number_canon, d.enrollment, d.rating, d.meta,
+        SELECT d.name, d.district_number, d.district_number_canon, d.enrollment, d.rating, d.aea, d.aea_raw, d.meta,
                COALESCE(counts.campus_count, 0), COALESCE(counts.has_charter, 0)
         FROM districts d
         LEFT JOIN (
@@ -300,16 +310,18 @@ def load_district(
                 row = conn.execute(query, (key, key)).fetchone()
                 if not row:
                     continue
-                has_charter = bool(row[7])
-                meta = _decode_json(row[5]) if include_meta else {}
+                has_charter = bool(row[9])
+                meta = _decode_json(row[7]) if include_meta else {}
                 return {
                     "name": row[0] or "",
                     "district_number": _strip_leading_apostrophe(row[1] or row[2]),
                     "district_number_canon": row[2] or "",
                     "enrollment": row[3],
                     "rating": row[4],
+                    "aea": _nullable_bool(row[5]),
+                    "aea_raw": row[6],
                     "meta": meta,
-                    "campus_count": row[6] or 0,
+                    "campus_count": row[8] or 0,
                     "is_charter": has_charter,
                     "district_type": _district_type_from_flag(has_charter),
                 }
@@ -428,7 +440,7 @@ class EntityStore:
             return []
         query = """
             SELECT c.campus_number, c.campus_number_canon, c.name, c.is_charter, c.is_private,
-                   c.enrollment, c.rating, c.grade_range, c.lon, c.lat, c.meta,
+                   c.enrollment, c.rating, c.aea, c.aea_raw, c.grade_range, c.lon, c.lat, c.meta,
                    d.name, d.district_number, d.district_number_canon
             FROM campuses c
             LEFT JOIN districts d ON d.id = c.district_id
@@ -438,7 +450,7 @@ class EntityStore:
         except Exception:
             return []
         for row in rows:
-            meta = _decode_json(row[10]) if include_meta else {}
+            meta = _decode_json(row[12]) if include_meta else {}
             yield {
                 "campus_number": row[0] or "",
                 "campus_number_canon": row[1] or "",
@@ -447,13 +459,15 @@ class EntityStore:
                 "is_private": bool(row[4]),
                 "enrollment": row[5],
                 "rating": row[6],
-                "grade_range": row[7] or "",
-                "lon": row[8],
-                "lat": row[9],
+                "aea": _nullable_bool(row[7]),
+                "aea_raw": row[8],
+                "grade_range": row[9] or "",
+                "lon": row[10],
+                "lat": row[11],
                 "meta": meta,
-                "district_name": row[11] or "",
-                "district_number": _strip_leading_apostrophe(row[12]),
-                "district_number_canon": row[13] or "",
+                "district_name": row[13] or "",
+                "district_number": _strip_leading_apostrophe(row[14]),
+                "district_number_canon": row[15] or "",
             }
 
     def iter_districts(self, *, include_meta: bool = True) -> Iterable[dict[str, Any]]:
@@ -461,7 +475,7 @@ class EntityStore:
         if conn is None:
             return []
         query = """
-            SELECT d.name, d.district_number, d.district_number_canon, d.enrollment, d.rating, d.meta,
+            SELECT d.name, d.district_number, d.district_number_canon, d.enrollment, d.rating, d.aea, d.aea_raw, d.meta,
                    COALESCE(counts.campus_count, 0), COALESCE(counts.has_charter, 0)
             FROM districts d
             LEFT JOIN (
@@ -477,16 +491,18 @@ class EntityStore:
         except Exception:
             return []
         for row in rows:
-            has_charter = bool(row[7])
-            meta = _decode_json(row[5]) if include_meta else {}
+            has_charter = bool(row[9])
+            meta = _decode_json(row[7]) if include_meta else {}
             yield {
                 "name": row[0] or "",
                 "district_number": _strip_leading_apostrophe(row[1] or row[2]),
                 "district_number_canon": row[2] or "",
                 "enrollment": row[3],
                 "rating": row[4],
+                "aea": _nullable_bool(row[5]),
+                "aea_raw": row[6],
                 "meta": meta,
-                "campus_count": row[6] or 0,
+                "campus_count": row[8] or 0,
                 "is_charter": has_charter,
                 "district_type": _district_type_from_flag(has_charter),
             }
@@ -522,7 +538,7 @@ class EntityStore:
             return None
         query = """
             SELECT c.campus_number, c.campus_number_canon, c.name, c.is_charter, c.is_private,
-                   c.enrollment, c.rating, c.grade_range, c.lon, c.lat, c.meta,
+                   c.enrollment, c.rating, c.aea, c.aea_raw, c.grade_range, c.lon, c.lat, c.meta,
                    d.name, d.district_number, d.district_number_canon
             FROM campuses c
             LEFT JOIN districts d ON d.id = c.district_id
@@ -534,7 +550,7 @@ class EntityStore:
             row = None
         if not row:
             return None
-        meta = _decode_json(row[10]) if include_meta else {}
+        meta = _decode_json(row[12]) if include_meta else {}
         return {
             "campus_number": row[0] or "",
             "campus_number_canon": row[1] or "",
@@ -543,13 +559,15 @@ class EntityStore:
             "is_private": bool(row[4]),
             "enrollment": row[5],
             "rating": row[6],
-            "grade_range": row[7] or "",
-            "lon": row[8],
-            "lat": row[9],
+            "aea": _nullable_bool(row[7]),
+            "aea_raw": row[8],
+            "grade_range": row[9] or "",
+            "lon": row[10],
+            "lat": row[11],
             "meta": meta,
-            "district_name": row[11] or "",
-            "district_number": _strip_leading_apostrophe(row[12]),
-            "district_number_canon": row[13] or "",
+            "district_name": row[13] or "",
+            "district_number": _strip_leading_apostrophe(row[14]),
+            "district_number_canon": row[15] or "",
         }
 
     def _load_district_from_conn(
@@ -559,7 +577,7 @@ class EntityStore:
         if conn is None:
             return None
         query = """
-            SELECT d.name, d.district_number, d.district_number_canon, d.enrollment, d.rating, d.meta,
+            SELECT d.name, d.district_number, d.district_number_canon, d.enrollment, d.rating, d.aea, d.aea_raw, d.meta,
                    COALESCE(counts.campus_count, 0), COALESCE(counts.has_charter, 0)
             FROM districts d
             LEFT JOIN (
@@ -577,16 +595,18 @@ class EntityStore:
             row = None
         if not row:
             return None
-        has_charter = bool(row[7])
-        meta = _decode_json(row[5]) if include_meta else {}
+        has_charter = bool(row[9])
+        meta = _decode_json(row[7]) if include_meta else {}
         return {
             "name": row[0] or "",
             "district_number": _strip_leading_apostrophe(row[1] or row[2]),
             "district_number_canon": row[2] or "",
             "enrollment": row[3],
             "rating": row[4],
+            "aea": _nullable_bool(row[5]),
+            "aea_raw": row[6],
             "meta": meta,
-            "campus_count": row[6] or 0,
+            "campus_count": row[8] or 0,
             "is_charter": has_charter,
             "district_type": _district_type_from_flag(has_charter),
         }

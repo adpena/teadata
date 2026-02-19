@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import shutil
 import tempfile
 import urllib.request
+from hashlib import sha256
 from pathlib import Path
 from typing import Callable
 
@@ -39,6 +41,15 @@ def _asset_cache_dir() -> Path:
     return Path(tempfile.gettempdir()) / "teadata"
 
 
+def _safe_cache_name(*, url: str, label: str) -> str:
+    base = Path(url).name or "asset.bin"
+    clean_label = re.sub(r"[^a-z0-9]+", "_", label.strip().lower()).strip("_")
+    if not clean_label:
+        clean_label = "asset"
+    digest = sha256(url.encode("utf-8")).hexdigest()[:12]
+    return f"{clean_label}_{digest}_{base}"
+
+
 def ensure_local_asset(path: Path, *, url_env: str, label: str) -> Path:
     if path.exists() and not is_lfs_pointer(path):
         return path
@@ -55,7 +66,7 @@ def ensure_local_asset(path: Path, *, url_env: str, label: str) -> Path:
 
     cache_dir = _asset_cache_dir()
     cache_dir.mkdir(parents=True, exist_ok=True)
-    target = cache_dir / Path(url).name
+    target = cache_dir / _safe_cache_name(url=url, label=label)
     if target.exists() and not is_lfs_pointer(target):
         return target
 

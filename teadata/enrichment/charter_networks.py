@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 import pandas as pd
 
@@ -9,6 +9,35 @@ from teadata.teadata_config import load_config
 from teadata.teadata_config import normalize_district_number_value
 
 from teadata.classes import DataEngine, District
+
+
+def _normalize_aea_raw(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return "Y" if value else "N"
+    if isinstance(value, (int, float)):
+        if value != value:  # NaN
+            return None
+        return "Y" if bool(value) else "N"
+    text = str(value).strip()
+    if not text:
+        return None
+    lowered = text.lower()
+    if lowered in {"y", "yes", "true", "t", "1"}:
+        return "Y"
+    if lowered in {"n", "no", "false", "f", "0"}:
+        return "N"
+    return None
+
+
+def _coerce_aea_bool(value: Any) -> Optional[bool]:
+    raw = _normalize_aea_raw(value)
+    if raw == "Y":
+        return True
+    if raw == "N":
+        return False
+    return None
 
 
 def _read_table(path: str | Path) -> pd.DataFrame:
@@ -82,7 +111,8 @@ def add_charter_networks_from_config(
 
             name = str(row.get(name_col, "") or "").strip() or f"Network {dn}"
             rating = str(row.get(rating_col, "") or "").strip() if rating_col else ""
-            aea = row.get(aea_col) if aea_col else None
+            aea_raw = _normalize_aea_raw(row.get(aea_col) if aea_col else None)
+            aea = _coerce_aea_bool(aea_raw)
 
             enrollment = None
             if enrollment_col:
@@ -110,8 +140,10 @@ def add_charter_networks_from_config(
                 exists.name = name
             if rating and not getattr(exists, "rating", None):
                 exists.rating = rating
-            if aea is not None and not getattr(exists, "aea", None):
+            if aea is not None and getattr(exists, "aea", None) is None:
                 exists.aea = aea
+            if aea_raw is not None and not getattr(exists, "aea_raw", None):
+                exists.aea_raw = aea_raw
             if enrollment is not None and getattr(exists, "enrollment", None) is None:
                 exists.enrollment = enrollment
             continue
@@ -125,6 +157,7 @@ def add_charter_networks_from_config(
             enrollment=enrollment if enrollment is not None else 0,
             rating=rating,
             aea=aea,
+            aea_raw=aea_raw,
             boundary=None,  # important: no geometry
         )
         d.district_number = dn  # keep canonical code on the object

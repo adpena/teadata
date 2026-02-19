@@ -116,10 +116,12 @@ def discover_boundary_store(explicit: str | Path | None = None) -> Optional[Path
     except Exception:
         pass
 
-    for base in Path.cwd().parents:
+    cwd = Path.cwd()
+    for idx, base in enumerate((cwd, *cwd.parents)):
         candidate = _newest_sqlite(base / ".cache")
         if candidate:
-            resolved = _resolve_boundary_store(candidate, "parent-cache")
+            source = "cwd-cache" if idx == 0 else "parent-cache"
+            resolved = _resolve_boundary_store(candidate, source)
             if resolved:
                 return resolved
 
@@ -167,6 +169,11 @@ def load_boundary(
                 if row:
                     return shapely_wkb.loads(row[0])
     except Exception:
+        logger.exception(
+            "boundary_store.load_boundary_failed path=%s district_number=%s",
+            path,
+            district_number,
+        )
         return None
     return None
 
