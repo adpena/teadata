@@ -51,6 +51,9 @@ data_sources:
   tepsac:
     2025: data/tepsac/tepsac_geocoded_FINAL.csv
     latest: 2025
+  tefa:
+    2025: data/tefa/tx_efa_finder.xlsx
+    latest: 2025
   all_districts_reference:
     2025: data/all_districts_reference/ALL_DISTRICTS_ACTIVE.xlsx
     latest: 2025
@@ -80,6 +83,7 @@ schema:
     campus_planned_closures: ["xlsx"]
     private_schools: ["csv"]
     tepsac: ["csv"]
+    tefa: ["xlsx"]
     all_districts_reference: ["xlsx"]
     all_districts_reference2: ["xlsx"]
   spatial:

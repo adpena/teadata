@@ -242,6 +242,283 @@ def _latest_year_for_dataset(cfg, dataset: str) -> int:
     return max(years)
 
 
+def _private_clean_number(val: Any) -> Optional[int]:
+    if val is None:
+        return None
+    try:
+        if pd.isna(val):
+            return None
+    except Exception:
+        pass
+    text = str(val).strip()
+    if not text:
+        return None
+    try:
+        return int(float(text.replace(",", "")))
+    except Exception:
+        return None
+
+
+def _private_coerce_int(val: Any) -> Optional[int]:
+    if val is None:
+        return None
+    try:
+        if pd.isna(val):
+            return None
+    except Exception:
+        pass
+    if isinstance(val, bool):
+        return int(val)
+    if isinstance(val, int):
+        return val
+    if isinstance(val, float):
+        if not math.isfinite(val):
+            return None
+        return int(val)
+    text = str(val).strip()
+    if not text:
+        return None
+    try:
+        return int(float(text))
+    except Exception:
+        return None
+
+
+def _private_coerce_float(val: Any) -> Optional[float]:
+    if val is None:
+        return None
+    try:
+        if pd.isna(val):
+            return None
+    except Exception:
+        pass
+    if isinstance(val, (int, float)):
+        out = float(val)
+        if math.isfinite(out):
+            return out
+        return None
+    text = str(val).strip()
+    if not text:
+        return None
+    try:
+        out = float(text)
+    except Exception:
+        return None
+    if math.isfinite(out):
+        return out
+    return None
+
+
+def _private_coerce_bool_flag(val: Any) -> bool:
+    if val is None:
+        return False
+    try:
+        if pd.isna(val):
+            return False
+    except Exception:
+        pass
+    if isinstance(val, bool):
+        return val
+    if isinstance(val, (int, float)):
+        return bool(val)
+    text = str(val).strip().lower()
+    if not text:
+        return False
+    if text in {"1", "y", "yes", "true", "t"}:
+        return True
+    if text in {"0", "n", "no", "false", "f"}:
+        return False
+    return False
+
+
+def _private_tefa_id(val: Any) -> Optional[str]:
+    if val is None:
+        return None
+    try:
+        if pd.isna(val):
+            return None
+    except Exception:
+        pass
+    text = str(val).strip()
+    return text or None
+
+
+def _tefa_grade_label(code: Optional[int]) -> Optional[str]:
+    if code is None:
+        return None
+    if code == -1:
+        return "Pre-K"
+    if code == 0:
+        return "K"
+    if 1 <= code <= 12:
+        return str(code)
+    return None
+
+
+def _normalize_tefa_display_grade(display_grade_range: Any) -> Optional[str]:
+    if display_grade_range is None:
+        return None
+    try:
+        if pd.isna(display_grade_range):
+            return None
+    except Exception:
+        pass
+    text = str(display_grade_range).strip()
+    if not text:
+        return None
+    lowered = text.lower()
+    if lowered.startswith("grades "):
+        text = text[7:].strip()
+    text = text.replace("\N{EN DASH}", "-").replace("\N{EM DASH}", "-")
+    text = text.replace("PreK", "Pre-K").replace("PREK", "Pre-K")
+    text = text.replace("Pre K", "Pre-K")
+    return text or None
+
+
+def _tefa_grade_range(
+    min_grade: Any,
+    max_grade: Any,
+    display_grade_range: Any,
+) -> Optional[str]:
+    low = _private_coerce_int(min_grade)
+    high = _private_coerce_int(max_grade)
+
+    if low is not None and high is not None and low > high:
+        low, high = high, low
+
+    low_label = _tefa_grade_label(low)
+    high_label = _tefa_grade_label(high)
+
+    if low_label and high_label:
+        if low_label == high_label:
+            return low_label
+        return f"{low_label}-{high_label}"
+    if low_label:
+        return low_label
+    if high_label:
+        return high_label
+
+    return _normalize_tefa_display_grade(display_grade_range)
+
+
+def _tefa_school_type(
+    min_grade: Any,
+    max_grade: Any,
+    is_pre_k: Any,
+    is_elementary: Any,
+    is_middle: Any,
+    is_high: Any,
+) -> str:
+    low = _private_coerce_int(min_grade)
+    high = _private_coerce_int(max_grade)
+    if low is not None and high is not None and low > high:
+        low, high = high, low
+
+    pre_k = _private_coerce_bool_flag(is_pre_k)
+    elementary = _private_coerce_bool_flag(is_elementary)
+    middle = _private_coerce_bool_flag(is_middle)
+    high_flag = _private_coerce_bool_flag(is_high)
+    core_flags = sum(int(flag) for flag in (elementary, middle, high_flag))
+
+    if core_flags >= 2:
+        return "Elementary/Secondary"
+    if high_flag:
+        return "High School"
+    if middle:
+        if low is not None and low >= 7:
+            return "Junior High School"
+        return "Middle School"
+    if elementary or pre_k:
+        return "Elementary School"
+
+    if high is not None and high <= 5:
+        return "Elementary School"
+    if low is not None and low >= 9:
+        return "High School"
+    if low is not None and high is not None:
+        if low <= 5 and high >= 6:
+            return "Elementary/Secondary"
+        if low >= 7 and high <= 9:
+            return "Junior High School"
+        if low >= 6 and high <= 8:
+            return "Middle School"
+    return "Other"
+
+
+def _existing_campus_number_digits(repo: DataEngine) -> set[str]:
+    used: set[str] = set()
+    for campus in repo._campuses.values():
+        canonical = canonical_campus_number(getattr(campus, "campus_number", None))
+        if not canonical or len(canonical) <= 1:
+            continue
+        digits = canonical[1:]
+        if not digits.isdigit():
+            continue
+        used.add(digits.zfill(9))
+    return used
+
+
+def _build_tefa_private_campus_number_map(
+    ids: Iterable[Any],
+    used_digits: set[str],
+) -> dict[str, str]:
+    """Build deterministic, collision-free private campus numbers from TEFA IDs."""
+
+    unique_ids: set[str] = set()
+    for raw_id in ids:
+        key = _private_tefa_id(raw_id)
+        if key:
+            unique_ids.add(key)
+
+    mapping: dict[str, str] = {}
+    modulus = 1_000_000_000
+    for key in sorted(unique_ids):
+        digest = hashlib.sha1(key.encode("utf-8")).hexdigest()
+        seed = int(digest[:16], 16) % modulus
+        candidate = seed
+
+        while True:
+            digits = f"{candidate:09d}"
+            if digits not in used_digits:
+                used_digits.add(digits)
+                mapping[key] = f"'{digits}"
+                break
+            candidate = (candidate + 1) % modulus
+            if candidate == seed:
+                raise RuntimeError("Unable to allocate unique private campus number")
+
+    return mapping
+
+
+def _tepsac_grade_span(low: Any, high: Any) -> Optional[str]:
+    try:
+        low_missing = pd.isna(low)
+    except Exception:
+        low_missing = False
+    try:
+        high_missing = pd.isna(high)
+    except Exception:
+        high_missing = False
+
+    low_s = "" if low is None or low_missing else str(low).strip()
+    high_s = "" if high is None or high_missing else str(high).strip()
+    if not low_s and not high_s:
+        return None
+    if not low_s:
+        return high_s or None
+    if not high_s or low_s == high_s:
+        return low_s or None
+    return f"{low_s}-{high_s}"
+
+
+def _tepsac_coords(lon_raw: Any, lat_raw: Any) -> Optional[tuple[float, float]]:
+    lon_val = _private_coerce_float(lon_raw)
+    lat_val = _private_coerce_float(lat_raw)
+    if lon_val is None or lat_val is None:
+        return None
+    return (lon_val, lat_val)
+
+
 def run_enrichments(repo: DataEngine) -> None:
     """Run both district and campus enrichments with sensible fallbacks.
     - Districts from 'accountability' (sheet: 2011-2025 Summary)
@@ -557,6 +834,8 @@ def _compute_extra_signature() -> dict:
             "district_tapr_student_staff_profile",
             "campus_planned_closures",
             "campus_transfer_reports",
+            "tefa",
+            "tepsac",
         ):
             try:
                 _, p = cfg.resolve(ds, YEAR, section="data_sources")
@@ -2851,149 +3130,216 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
         # Optional private school campuses
         private_loaded = 0
         private_year = None
+        private_dataset_name = None
+        private_fp = None
         try:
             cfg_obj = load_config(CFG)
-            private_year, private_fp = cfg_obj.resolve(
-                "tepsac", YEAR, section="data_sources"
-            )
+            private_dataset_name = _first_existing_dataset(cfg_obj, ["tefa", "tepsac"])
+            if private_dataset_name:
+                private_year, private_fp = cfg_obj.resolve(
+                    private_dataset_name, YEAR, section="data_sources"
+                )
         except Exception:
             private_fp = None
 
         if private_fp:
             try:
-                df_private = pd.read_csv(
-                    private_fp,
-                    dtype={
-                        "district_number": "string",
-                        "school_number": "string",
-                    },
-                )
+                if private_dataset_name == "tefa":
+                    df_private = pd.read_excel(private_fp)
+                else:
+                    df_private = pd.read_csv(
+                        private_fp,
+                        dtype={
+                            "district_number": "string",
+                            "school_number": "string",
+                        },
+                    )
             except Exception as exc:
                 print(f"[private] failed to load {private_fp}: {exc}")
             else:
-
-                def _grade_span(low, high):
-                    try:
-                        low_missing = pd.isna(low)
-                    except Exception:
-                        low_missing = False
-                    try:
-                        high_missing = pd.isna(high)
-                    except Exception:
-                        high_missing = False
-
-                    low_s = "" if low is None or low_missing else str(low).strip()
-                    high_s = "" if high is None or high_missing else str(high).strip()
-                    if not low_s and not high_s:
-                        return None
-                    if not low_s:
-                        return high_s or None
-                    if not high_s or low_s == high_s:
-                        return low_s or None
-                    return f"{low_s}–{high_s}"
-
-                def _clean_number(val):
-                    if val is None:
-                        return None
-                    try:
-                        if pd.isna(val):
-                            return None
-                    except Exception:
-                        pass
-                    text = str(val).strip()
-                    if not text:
-                        return None
-                    try:
-                        return int(float(text.replace(",", "")))
-                    except Exception:
-                        return None
-
-                def _coords(row_obj):
-                    lon_raw = getattr(row_obj, "best_lng", None)
-                    lat_raw = getattr(row_obj, "best_lat", None)
-                    try:
-                        if pd.isna(lon_raw) or pd.isna(lat_raw):
-                            return None
-                    except Exception:
-                        pass
-                    if lon_raw is None or lat_raw is None:
-                        return None
-                    try:
-                        lon_val = float(lon_raw)
-                        lat_val = float(lat_raw)
-                    except Exception:
-                        return None
-                    return (lon_val, lat_val)
-
-                for row in df_private.itertuples(index=False):
-                    raw_district = getattr(row, "district_number", None)
-                    district_key = canonical_district_number(raw_district)
-                    lookup_keys: list[str] = []
-                    if district_key:
-                        lookup_keys.append(district_key)
-                        digits = (
-                            district_key[1:]
-                            if isinstance(district_key, str)
-                            and district_key.startswith("'")
-                            else district_key
+                if private_dataset_name == "tefa":
+                    if "Vendor Type" in df_private.columns:
+                        vendor_series = (
+                            df_private["Vendor Type"]
+                            .fillna("")
+                            .astype(str)
+                            .str.strip()
+                            .str.lower()
                         )
-                        if digits:
-                            lookup_keys.append(digits)
-                            if isinstance(digits, str) and digits.isdigit():
-                                lookup_keys.append(str(int(digits)))
-                    elif raw_district:
-                        lookup_keys.append(str(raw_district).strip())
+                        df_private = df_private[vendor_series == "schools"].copy()
 
-                    district_id = next(
-                        (dn_to_id.get(k) for k in lookup_keys if k in dn_to_id),
-                        None,
+                    used_campus_digits = _existing_campus_number_digits(repo)
+                    tefa_id_map = _build_tefa_private_campus_number_map(
+                        df_private.get("ID", pd.Series(dtype="object")),
+                        used_campus_digits,
                     )
-                    if district_id is None:
-                        district_id = fallback_id
 
-                    meta_fields = [
-                        "school_full_address",
-                        "school_website",
-                        "school_accreditations",
-                    ]
-                    meta_payload = {}
-                    for field_name in meta_fields:
-                        val = getattr(row, field_name, None)
-                        try:
-                            if hasattr(pd, "isna") and pd.isna(val):
-                                continue
-                        except Exception:
-                            pass
-                        if val is not None:
-                            meta_payload[field_name] = val
-                    if private_year is not None:
-                        meta_payload["private_school_dataset_year"] = private_year
+                    for record in df_private.to_dict(orient="records"):
+                        raw_district = _get_record_value(
+                            record,
+                            ["School District Number"],
+                        )
+                        district_key = canonical_district_number(raw_district)
+                        lookup_keys = _district_lookup_keys(district_key)
+                        if not lookup_keys and raw_district is not None:
+                            lookup_keys = _district_lookup_keys(str(raw_district).strip())
 
-                    campus = Campus(
-                        id=uuid.uuid4(),
-                        district_id=district_id,
-                        name=getattr(row, "school_name", "Unnamed Private School"),
-                        charter_type="",
-                        is_charter=False,
-                        is_private=True,
-                        enrollment=_clean_number(getattr(row, "enrollment", None)),
-                        grade_range=_grade_span(
-                            getattr(row, "grade_low", None),
-                            getattr(row, "grade_high", None),
-                        ),
-                        district_number=district_key
-                        or (str(raw_district).strip() if raw_district else None),
-                        campus_number=canonical_campus_number(
-                            getattr(row, "school_number", None)
-                        ),
-                        location=_coords(row),
-                        meta=meta_payload,
-                    )
-                    repo.add_campus(campus)
-                    private_loaded += 1
+                        district_id = next(
+                            (dn_to_id.get(k) for k in lookup_keys if k in dn_to_id),
+                            None,
+                        )
+                        if district_id is None:
+                            district_id = fallback_id
+
+                        school_name = _get_record_value(record, ["Name"])
+                        tefa_id = _private_tefa_id(_get_record_value(record, ["ID"]))
+                        campus_number = tefa_id_map.get(tefa_id) if tefa_id else None
+
+                        location = _tepsac_coords(
+                            _get_record_value(record, ["Location Lng"]),
+                            _get_record_value(record, ["Location Lat"]),
+                        )
+
+                        district_name = _get_record_value(
+                            record,
+                            ["School District Name20", "School District Name"],
+                        )
+
+                        meta_payload: dict[str, Any] = {}
+                        school_full_address = _get_record_value(
+                            record,
+                            ["Address Formatted", "Address City State Zip"],
+                        )
+                        if school_full_address is not None:
+                            meta_payload["school_full_address"] = school_full_address
+
+                        school_website = _get_record_value(record, ["Contact Website"])
+                        if school_website is not None:
+                            meta_payload["school_website"] = school_website
+
+                        if district_name is not None:
+                            meta_payload["district_name"] = district_name
+
+                        display_grade_range = _get_record_value(
+                            record, ["Display Grade Range"]
+                        )
+                        if display_grade_range is not None:
+                            meta_payload["display_grade_range"] = display_grade_range
+
+                        if tefa_id is not None:
+                            meta_payload["tefa_id"] = tefa_id
+
+                        if private_year is not None:
+                            meta_payload["private_school_dataset_year"] = private_year
+                        if private_dataset_name:
+                            meta_payload["private_school_dataset"] = private_dataset_name
+
+                        campus = Campus(
+                            id=uuid.uuid4(),
+                            district_id=district_id,
+                            name=school_name or "Unnamed Private School",
+                            charter_type="",
+                            is_charter=False,
+                            is_private=True,
+                            enrollment=None,
+                            grade_range=_tefa_grade_range(
+                                _get_record_value(record, ["Min Grade"]),
+                                _get_record_value(record, ["Max Grade"]),
+                                display_grade_range,
+                            ),
+                            school_type=_tefa_school_type(
+                                _get_record_value(record, ["Min Grade"]),
+                                _get_record_value(record, ["Max Grade"]),
+                                _get_record_value(record, ["Is Pre K", "Is Pre-K"]),
+                                _get_record_value(record, ["Is Elementary"]),
+                                _get_record_value(record, ["Is Middle"]),
+                                _get_record_value(record, ["Is High"]),
+                            ),
+                            district_number=district_key
+                            or (str(raw_district).strip() if raw_district else None),
+                            campus_number=campus_number,
+                            location=location,
+                            meta=meta_payload,
+                        )
+                        repo.add_campus(campus)
+                        private_loaded += 1
+                else:
+                    for row in df_private.itertuples(index=False):
+                        raw_district = getattr(row, "district_number", None)
+                        district_key = canonical_district_number(raw_district)
+                        lookup_keys: list[str] = []
+                        if district_key:
+                            lookup_keys.append(district_key)
+                            digits = (
+                                district_key[1:]
+                                if isinstance(district_key, str)
+                                and district_key.startswith("'")
+                                else district_key
+                            )
+                            if digits:
+                                lookup_keys.append(digits)
+                                if isinstance(digits, str) and digits.isdigit():
+                                    lookup_keys.append(str(int(digits)))
+                        elif raw_district:
+                            lookup_keys.append(str(raw_district).strip())
+
+                        district_id = next(
+                            (dn_to_id.get(k) for k in lookup_keys if k in dn_to_id),
+                            None,
+                        )
+                        if district_id is None:
+                            district_id = fallback_id
+
+                        meta_fields = [
+                            "school_full_address",
+                            "school_website",
+                            "school_accreditations",
+                        ]
+                        meta_payload = {}
+                        for field_name in meta_fields:
+                            val = getattr(row, field_name, None)
+                            try:
+                                if hasattr(pd, "isna") and pd.isna(val):
+                                    continue
+                            except Exception:
+                                pass
+                            if val is not None:
+                                meta_payload[field_name] = val
+                        if private_year is not None:
+                            meta_payload["private_school_dataset_year"] = private_year
+                        if private_dataset_name:
+                            meta_payload["private_school_dataset"] = private_dataset_name
+
+                        campus = Campus(
+                            id=uuid.uuid4(),
+                            district_id=district_id,
+                            name=getattr(row, "school_name", "Unnamed Private School"),
+                            charter_type="",
+                            is_charter=False,
+                            is_private=True,
+                            enrollment=_private_clean_number(
+                                getattr(row, "enrollment", None)
+                            ),
+                            grade_range=_tepsac_grade_span(
+                                getattr(row, "grade_low", None),
+                                getattr(row, "grade_high", None),
+                            ),
+                            district_number=district_key
+                            or (str(raw_district).strip() if raw_district else None),
+                            campus_number=canonical_campus_number(
+                                getattr(row, "school_number", None)
+                            ),
+                            location=_tepsac_coords(
+                                getattr(row, "best_lng", None),
+                                getattr(row, "best_lat", None),
+                            ),
+                            meta=meta_payload,
+                        )
+                        repo.add_campus(campus)
+                        private_loaded += 1
 
                 print(
-                    f"[private] loaded {private_loaded} private campuses from {private_year}"
+                    f"[private] loaded {private_loaded} private campuses from {private_year} (dataset={private_dataset_name})"
                 )
 
     # Run all enrichments once data is loaded
