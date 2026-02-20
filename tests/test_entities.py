@@ -28,7 +28,7 @@ def test_campus_to_dict_includes_percent_enrollment_change():
     result = campus.to_dict()
 
     assert "percent_enrollment_change" in result
-    assert result["percent_enrollment_change"] == pytest.approx(0.1)
+    assert result["percent_enrollment_change"] == pytest.approx(10.0)
 
 
 def test_campus_to_dict_handles_missing_percent_enrollment_change():

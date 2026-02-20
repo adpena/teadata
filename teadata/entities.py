@@ -376,6 +376,8 @@ class Campus:
         percent_change: Optional[float]
         try:
             percent_change = self.enrollment_percent_change_from_2015()
+            if percent_change is not None:
+                percent_change = round(float(percent_change) * 100.0, 1)
         except ValueError:
             percent_change = None
         except Exception:  # pragma: no cover - defensive

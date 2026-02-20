@@ -542,6 +542,8 @@ def _compute_percent_enrollment_change(campus: Optional[Campus]) -> Optional[flo
     if campus is None:
         return None
 
+    ratio_change: Optional[float] = None
+
     compute_change = getattr(campus, "enrollment_percent_change_from_2015", None)
     if callable(compute_change):
         try:
@@ -549,37 +551,46 @@ def _compute_percent_enrollment_change(campus: Optional[Campus]) -> Optional[flo
         except Exception:
             derived = None
         if derived not in (None, ""):
-            return _coerce_numeric(derived)
+            ratio_change = _coerce_numeric(derived)
 
-    meta = getattr(campus, "meta", {}) or {}
+    if ratio_change is None:
+        meta = getattr(campus, "meta", {}) or {}
 
-    enrollment_value = _coerce_numeric(getattr(campus, "enrollment", None))
-    if enrollment_value is None:
+        enrollment_value = _coerce_numeric(getattr(campus, "enrollment", None))
+        if enrollment_value is None:
+            for key in (
+                "campus_2025_student_enrollment_all_students_count",
+                "enrollment",
+                "student_enrollment",
+            ):
+                enrollment_value = _coerce_numeric(meta.get(key))
+                if enrollment_value is not None:
+                    break
+
+        baseline_value = None
         for key in (
-            "campus_2025_student_enrollment_all_students_count",
-            "enrollment",
-            "student_enrollment",
+            "campus_2015_student_enrollment_all_students_count",
+            "campus_2014_student_enrollment_all_students_count",
         ):
-            enrollment_value = _coerce_numeric(meta.get(key))
-            if enrollment_value is not None:
+            baseline_value = _coerce_numeric(meta.get(key))
+            if baseline_value is not None:
                 break
+        if baseline_value is None:
+            baseline_value = _coerce_numeric(
+                getattr(campus, "campus_2015_student_enrollment_all_students_count", None)
+            )
 
-    baseline_value = None
-    for key in (
-        "campus_2015_student_enrollment_all_students_count",
-        "campus_2014_student_enrollment_all_students_count",
-    ):
-        baseline_value = _coerce_numeric(meta.get(key))
-        if baseline_value is not None:
-            break
-    if baseline_value is None:
-        baseline_value = _coerce_numeric(
-            getattr(campus, "campus_2015_student_enrollment_all_students_count", None)
-        )
+        if enrollment_value is None or baseline_value in (None, 0):
+            return None
+        ratio_change = (enrollment_value - baseline_value) / baseline_value
 
-    if enrollment_value is None or baseline_value in (None, 0):
+    if ratio_change is None:
         return None
-    return (enrollment_value - baseline_value) / baseline_value
+
+    percent_change = ratio_change * 100.0
+    if not math.isfinite(percent_change):
+        return None
+    return round(percent_change, 1)
 
 
 def _materialize_percent_enrollment_change(repo: DataEngine) -> int:
