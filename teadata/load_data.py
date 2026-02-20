@@ -524,6 +524,86 @@ def _tepsac_coords(lon_raw: Any, lat_raw: Any) -> Optional[tuple[float, float]]:
     return (lon_val, lat_val)
 
 
+def _coerce_numeric(value: Any) -> Optional[float]:
+    if value in (None, ""):
+        return None
+    try:
+        if pd.isna(value):
+            return None
+    except Exception:
+        pass
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _compute_percent_enrollment_change(campus: Optional[Campus]) -> Optional[float]:
+    if campus is None:
+        return None
+
+    compute_change = getattr(campus, "enrollment_percent_change_from_2015", None)
+    if callable(compute_change):
+        try:
+            derived = compute_change()
+        except Exception:
+            derived = None
+        if derived not in (None, ""):
+            return _coerce_numeric(derived)
+
+    meta = getattr(campus, "meta", {}) or {}
+
+    enrollment_value = _coerce_numeric(getattr(campus, "enrollment", None))
+    if enrollment_value is None:
+        for key in (
+            "campus_2025_student_enrollment_all_students_count",
+            "enrollment",
+            "student_enrollment",
+        ):
+            enrollment_value = _coerce_numeric(meta.get(key))
+            if enrollment_value is not None:
+                break
+
+    baseline_value = None
+    for key in (
+        "campus_2015_student_enrollment_all_students_count",
+        "campus_2014_student_enrollment_all_students_count",
+    ):
+        baseline_value = _coerce_numeric(meta.get(key))
+        if baseline_value is not None:
+            break
+    if baseline_value is None:
+        baseline_value = _coerce_numeric(
+            getattr(campus, "campus_2015_student_enrollment_all_students_count", None)
+        )
+
+    if enrollment_value is None or baseline_value in (None, 0):
+        return None
+    return (enrollment_value - baseline_value) / baseline_value
+
+
+def _materialize_percent_enrollment_change(repo: DataEngine) -> int:
+    materialized = 0
+    for campus in getattr(repo, "_campuses", {}).values():
+        if campus is None:
+            continue
+        meta = getattr(campus, "meta", None)
+        if not isinstance(meta, dict):
+            try:
+                meta = dict(meta or {})
+            except Exception:
+                meta = {}
+            campus.meta = meta
+
+        percent_change = _compute_percent_enrollment_change(campus)
+        if percent_change is None:
+            meta.pop("percent_enrollment_change", None)
+            continue
+        meta["percent_enrollment_change"] = percent_change
+        materialized += 1
+    return materialized
+
+
 def run_enrichments(repo: DataEngine) -> None:
     """Run both district and campus enrichments with sensible fallbacks.
     - Districts from 'accountability' (sheet: 2011-2025 Summary)
@@ -689,6 +769,15 @@ def run_enrichments(repo: DataEngine) -> None:
         print(f"Enriched {n_closure} campuses from planned closures {yr_closure}")
     except Exception as e:
         print(f"[enrich] campus_planned_closures failed: {e}")
+
+    try:
+        materialized = _materialize_percent_enrollment_change(repo)
+        print(
+            "[enrich:derived] materialized percent_enrollment_change for "
+            f"{materialized} campuses"
+        )
+    except Exception as e:
+        print(f"[enrich:derived] percent_enrollment_change materialization failed: {e}")
 
 
 # ------------------ Repo snapshot cache (warm start) ------------------
