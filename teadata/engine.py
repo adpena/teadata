@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+import fnmatch
 import gzip
 import io
 import logging
@@ -742,6 +743,10 @@ class DataEngine:
                 if not hasattr(obj, attr):
                     setattr(obj, attr, None)
             obj._set_indexes_enabled(indexes_enabled)
+            try:
+                obj._rebuild_indexes()
+            except Exception:
+                pass
             if eager_indexes:
                 try:
                     obj.warm_indexes()
@@ -849,6 +854,10 @@ class DataEngine:
                         pass
                     try:
                         p._set_indexes_enabled(indexes_enabled)
+                    except Exception:
+                        pass
+                    try:
+                        p._rebuild_indexes()
                     except Exception:
                         pass
                     try:
@@ -983,6 +992,18 @@ class DataEngine:
                 # Fast name lookups
                 self._district_by_name_lower: Dict[str, uuid.UUID] = {}
                 self._campus_by_name_lower: Dict[str, uuid.UUID] = {}
+                self._districts_by_number_norm: Dict[str, List[uuid.UUID]] = {}
+                self._districts_by_name_lower_multi: Dict[str, List[uuid.UUID]] = {}
+                self._campuses_by_name_lower_multi: Dict[str, List[uuid.UUID]] = {}
+                self._district_name_upper_index: List[Tuple[str, uuid.UUID]] = []
+                self._campus_name_upper_index: List[Tuple[str, uuid.UUID]] = []
+                self._district_wildcard_cache: Dict[
+                    str, Tuple[int, List[uuid.UUID]]
+                ] = {}
+                self._campus_wildcard_cache: Dict[
+                    str, Tuple[int, List[uuid.UUID]]
+                ] = {}
+                self._name_lookup_version = 0
                 self._indexes_enabled = getattr(
                     eng, "_indexes_enabled", DEFAULT_INDEXES_ENABLED
                 )
@@ -1057,6 +1078,14 @@ class DataEngine:
         # Fast name lookups (lowercase exact match)
         self._district_by_name_lower: Dict[str, uuid.UUID] = {}
         self._campus_by_name_lower: Dict[str, uuid.UUID] = {}
+        self._districts_by_number_norm: Dict[str, List[uuid.UUID]] = {}
+        self._districts_by_name_lower_multi: Dict[str, List[uuid.UUID]] = {}
+        self._campuses_by_name_lower_multi: Dict[str, List[uuid.UUID]] = {}
+        self._district_name_upper_index: List[Tuple[str, uuid.UUID]] = []
+        self._campus_name_upper_index: List[Tuple[str, uuid.UUID]] = []
+        self._district_wildcard_cache: Dict[str, Tuple[int, List[uuid.UUID]]] = {}
+        self._campus_wildcard_cache: Dict[str, Tuple[int, List[uuid.UUID]]] = {}
+        self._name_lookup_version = 0
 
         if eager_indexes and self._indexes_enabled:
             try:
@@ -1128,6 +1157,14 @@ class DataEngine:
         self._campus_by_number = {}
         self._campus_by_name_lower = {}
         self._district_by_name_lower = {}
+        self._districts_by_number_norm = {}
+        self._districts_by_name_lower_multi = {}
+        self._campuses_by_name_lower_multi = {}
+        self._district_name_upper_index = []
+        self._campus_name_upper_index = []
+        self._district_wildcard_cache = {}
+        self._campus_wildcard_cache = {}
+        self._name_lookup_version = getattr(self, "_name_lookup_version", 0) + 1
 
         if self._boundary_store:
             self._boundary_store.close()
@@ -1340,11 +1377,18 @@ class DataEngine:
                 if isinstance(raw, int) or (
                     isinstance(raw, str) and any(ch.isdigit() for ch in raw)
                 ):
-                    hits = [
-                        d
-                        for d in self._districts.values()
-                        if self._match_district_number(d, raw)
-                    ]
+                    hits: List[District] = []
+                    norm = normalize_district_number_value(raw)
+                    index = getattr(self, "_districts_by_number_norm", None)
+                    if norm and index:
+                        ids = index.get(norm, [])
+                        hits = [self._districts[did] for did in ids if did in self._districts]
+                    elif norm:
+                        hits = [
+                            d
+                            for d in self._districts.values()
+                            if self._match_district_number(d, raw)
+                        ]
                     return Query(hits, self)
 
                 # 2) Name lookup (supports wildcards); case-insensitive
@@ -1352,22 +1396,45 @@ class DataEngine:
                 if not target:
                     return Query([], self)
 
-                import fnmatch
-
                 # Allow SQL-like '%' and '_' or glob '*' and '?'
                 pattern = target.replace("%", "*").replace("_", "?")
                 pattern_up = pattern.upper()
                 has_glob = any(ch in pattern_up for ch in ("*", "?"))
 
-                matches = []
-                for d in self._districts.values():
-                    name_up = (d.name or "").upper()
-                    if has_glob:
-                        if fnmatch.fnmatchcase(name_up, pattern_up):
-                            matches.append(d)
+                matches: List[District] = []
+                if has_glob:
+                    index = getattr(self, "_district_name_upper_index", None)
+                    cache = getattr(self, "_district_wildcard_cache", {})
+                    version = getattr(self, "_name_lookup_version", 0)
+                    ids: List[uuid.UUID] | None = None
+                    cached = cache.get(pattern_up)
+                    if cached and cached[0] == version:
+                        ids = list(cached[1])
+                    if ids is None:
+                        if index:
+                            ids = [
+                                did
+                                for name_up, did in index
+                                if fnmatch.fnmatchcase(name_up, pattern_up)
+                            ]
+                        else:
+                            ids = [
+                                d.id
+                                for d in self._districts.values()
+                                if fnmatch.fnmatchcase((d.name or "").upper(), pattern_up)
+                            ]
+                        cache[pattern_up] = (version, list(ids))
+                    matches = [self._districts[did] for did in ids if did in self._districts]
+                else:
+                    key_lower = target.lower()
+                    multi = getattr(self, "_districts_by_name_lower_multi", None)
+                    if multi:
+                        ids = multi.get(key_lower, [])
+                        matches = [self._districts[did] for did in ids if did in self._districts]
                     else:
-                        if name_up == pattern_up:
-                            matches.append(d)
+                        for d in self._districts.values():
+                            if (d.name or "").upper() == pattern_up:
+                                matches.append(d)
 
                 return Query(matches, self)
 
@@ -1384,21 +1451,44 @@ class DataEngine:
                 if not target:
                     return Query([], self)
 
-                import fnmatch
-
                 pattern = target.replace("%", "*").replace("_", "?")
                 pattern_up = pattern.upper()
                 has_glob = any(ch in pattern_up for ch in ("*", "?"))
 
-                matches = []
-                for c in self._campuses.values():
-                    name_up = (c.name or "").upper()
-                    if has_glob:
-                        if fnmatch.fnmatchcase(name_up, pattern_up):
-                            matches.append(c)
+                matches: List[Campus] = []
+                if has_glob:
+                    index = getattr(self, "_campus_name_upper_index", None)
+                    cache = getattr(self, "_campus_wildcard_cache", {})
+                    version = getattr(self, "_name_lookup_version", 0)
+                    ids: List[uuid.UUID] | None = None
+                    cached = cache.get(pattern_up)
+                    if cached and cached[0] == version:
+                        ids = list(cached[1])
+                    if ids is None:
+                        if index:
+                            ids = [
+                                cid
+                                for name_up, cid in index
+                                if fnmatch.fnmatchcase(name_up, pattern_up)
+                            ]
+                        else:
+                            ids = [
+                                c.id
+                                for c in self._campuses.values()
+                                if fnmatch.fnmatchcase((c.name or "").upper(), pattern_up)
+                            ]
+                        cache[pattern_up] = (version, list(ids))
+                    matches = [self._campuses[cid] for cid in ids if cid in self._campuses]
+                else:
+                    key_lower = target.lower()
+                    multi = getattr(self, "_campuses_by_name_lower_multi", None)
+                    if multi:
+                        ids = multi.get(key_lower, [])
+                        matches = [self._campuses[cid] for cid in ids if cid in self._campuses]
                     else:
-                        if name_up == pattern_up:
-                            matches.append(c)
+                        for c in self._campuses.values():
+                            if (c.name or "").upper() == pattern_up:
+                                matches.append(c)
 
                 return Query(matches, self)
 
@@ -1773,13 +1863,41 @@ class DataEngine:
             self._campus_by_number = {}
             self._campus_by_name_lower = {}
             self._district_by_name_lower = {}
+            self._districts_by_number_norm = {}
+            self._districts_by_name_lower_multi = {}
+            self._campuses_by_name_lower_multi = {}
+            self._district_name_upper_index = []
+            self._campus_name_upper_index = []
+            self._district_wildcard_cache = {}
+            self._campus_wildcard_cache = {}
+            self._name_lookup_version = getattr(self, "_name_lookup_version", 0) + 1
             for did, d in self._districts.items():
-                key = (d.name or "").lower()
+                dname = d.name or ""
+                key = dname.lower()
                 if key:
                     ikey = sys.intern(key)
                     if ikey not in self._district_by_name_lower:
                         self._district_by_name_lower[ikey] = did
+                    self._districts_by_name_lower_multi.setdefault(ikey, []).append(did)
+                    self._district_name_upper_index.append((dname.upper(), did))
+                norm_dn = normalize_district_number_value(
+                    getattr(d, "district_number", None)
+                    or getattr(d, "_district_number_canon", None)
+                )
+                if norm_dn:
+                    inorm_dn = sys.intern(norm_dn)
+                    self._districts_by_number_norm.setdefault(inorm_dn, []).append(did)
             for cid, c in self._campuses.items():
+                cname = c.name or ""
+                name_key = cname.lower()
+                if name_key:
+                    iname_key = sys.intern(name_key)
+                    if iname_key not in self._campus_by_name_lower:
+                        self._campus_by_name_lower[iname_key] = cid
+                    self._campuses_by_name_lower_multi.setdefault(iname_key, []).append(
+                        cid
+                    )
+                    self._campus_name_upper_index.append((cname.upper(), cid))
                 num = getattr(c, "campus_number", None)
                 if not num:
                     continue
@@ -1795,15 +1913,18 @@ class DataEngine:
                     self._campus_by_number[idigits] = cid
                     if idigits.isdigit():
                         self._campus_by_number[sys.intern(str(int(idigits)))] = cid
-                name_key = (c.name or "").lower()
-                if name_key:
-                    iname_key = sys.intern(name_key)
-                    if iname_key not in self._campus_by_name_lower:
-                        self._campus_by_name_lower[iname_key] = cid
         except Exception:
             self._campus_by_number = {}
             self._campus_by_name_lower = {}
             self._district_by_name_lower = {}
+            self._districts_by_number_norm = {}
+            self._districts_by_name_lower_multi = {}
+            self._campuses_by_name_lower_multi = {}
+            self._district_name_upper_index = []
+            self._campus_name_upper_index = []
+            self._district_wildcard_cache = {}
+            self._campus_wildcard_cache = {}
+            self._name_lookup_version = getattr(self, "_name_lookup_version", 0) + 1
 
         self._charter_cache = None
         try:
@@ -2169,21 +2290,9 @@ class DataEngine:
 
         results: List[Tuple[float, Campus]] = []
 
-        tree = (
-            self._kdtree_charter
-            if charter_only and self._kdtree_charter is not None
-            else self._kdtree
-        )
-        xy_arr = (
-            self._xy_deg_charter
-            if charter_only and self._xy_deg_charter is not None
-            else self._xy_deg
-        )
-        clist = (
-            self._campus_list_charter
-            if charter_only and self._campus_list_charter is not None
-            else self._campus_list
-        )
+        tree = self._kdtree_charter if charter_only else self._kdtree
+        xy_arr = self._xy_deg_charter if charter_only else self._xy_deg
+        clist = self._campus_list_charter if charter_only else self._campus_list
 
         if tree is not None and xy_arr is not None and clist is not None:
             # Query in radians
@@ -2241,21 +2350,9 @@ class DataEngine:
         self._ensure_kdtree()
         results: List[Tuple[float, Campus]] = []
 
-        tree = (
-            self._kdtree_charter
-            if charter_only and self._kdtree_charter is not None
-            else self._kdtree
-        )
-        xy_arr = (
-            self._xy_deg_charter
-            if charter_only and self._xy_deg_charter is not None
-            else self._xy_deg
-        )
-        clist = (
-            self._campus_list_charter
-            if charter_only and self._campus_list_charter is not None
-            else self._campus_list
-        )
+        tree = self._kdtree_charter if charter_only else self._kdtree
+        xy_arr = self._xy_deg_charter if charter_only else self._xy_deg
+        clist = self._campus_list_charter if charter_only else self._campus_list
 
         if tree is not None and xy_arr is not None and clist is not None:
             import numpy as np
@@ -2569,9 +2666,30 @@ class DataEngine:
         if not self._in_bulk:
             if not hasattr(self, "_district_by_name_lower"):
                 self._district_by_name_lower = {}
+            if not hasattr(self, "_districts_by_name_lower_multi"):
+                self._districts_by_name_lower_multi = {}
+            if not hasattr(self, "_district_name_upper_index"):
+                self._district_name_upper_index = []
+            if not hasattr(self, "_districts_by_number_norm"):
+                self._districts_by_number_norm = {}
+            if not hasattr(self, "_district_wildcard_cache"):
+                self._district_wildcard_cache = {}
+            if not hasattr(self, "_name_lookup_version"):
+                self._name_lookup_version = 0
             key = (d.name or "").lower()
             if key and key not in self._district_by_name_lower:
                 self._district_by_name_lower[key] = d.id
+            if key:
+                self._districts_by_name_lower_multi.setdefault(key, []).append(d.id)
+                self._district_name_upper_index.append(((d.name or "").upper(), d.id))
+            norm_dn = normalize_district_number_value(
+                getattr(d, "district_number", None)
+                or getattr(d, "_district_number_canon", None)
+            )
+            if norm_dn:
+                self._districts_by_number_norm.setdefault(norm_dn, []).append(d.id)
+            self._district_wildcard_cache = {}
+            self._name_lookup_version += 1
 
     def add_campus(self, c: Campus):
         c._repo = self  # attach back-reference
@@ -2582,9 +2700,34 @@ class DataEngine:
                 self._campuses_by_district[c.district_id].append(c.id)
             if not hasattr(self, "_campus_by_name_lower"):
                 self._campus_by_name_lower = {}
+            if not hasattr(self, "_campuses_by_name_lower_multi"):
+                self._campuses_by_name_lower_multi = {}
+            if not hasattr(self, "_campus_name_upper_index"):
+                self._campus_name_upper_index = []
+            if not hasattr(self, "_campus_wildcard_cache"):
+                self._campus_wildcard_cache = {}
+            if not hasattr(self, "_campus_by_number"):
+                self._campus_by_number = {}
+            if not hasattr(self, "_name_lookup_version"):
+                self._name_lookup_version = 0
             key = (c.name or "").lower()
             if key and key not in self._campus_by_name_lower:
                 self._campus_by_name_lower[key] = c.id
+            if key:
+                self._campuses_by_name_lower_multi.setdefault(key, []).append(c.id)
+                self._campus_name_upper_index.append(((c.name or "").upper(), c.id))
+            num = getattr(c, "campus_number", None)
+            if num:
+                ckey = canonical_campus_number(num)
+                if ckey:
+                    self._campus_by_number[ckey] = c.id
+                    digits = ckey[1:]
+                    if digits:
+                        self._campus_by_number[digits] = c.id
+                        if digits.isdigit():
+                            self._campus_by_number[str(int(digits))] = c.id
+            self._campus_wildcard_cache = {}
+            self._name_lookup_version += 1
             self._clear_charter_cache()
 
     def campuses_in(self, d: Any) -> "EntityList":
@@ -3005,60 +3148,59 @@ class DataEngine:
         # KDTree fast path (geodesic lon/lat only)
         if use_geodesic and getattr(self, "_indexes_enabled", True):
             self._ensure_kdtree()
-            if (
-                self._kdtree is not None
-                and self._xy_deg is not None
-                and self._campus_list is not None
-            ):
+            try:
                 import numpy as np
+            except Exception:
+                np = None  # type: ignore[assignment]
 
-                tree = (
-                    self._kdtree_charter
-                    if charter_only and self._kdtree_charter is not None
-                    else self._kdtree
-                )
-                xy_arr = (
-                    self._xy_deg_charter
-                    if charter_only and self._xy_deg_charter is not None
-                    else self._xy_deg
-                )
+            if np is not None:
+                tree = self._kdtree_charter if charter_only else self._kdtree
+                xy_arr = self._xy_deg_charter if charter_only else self._xy_deg
                 clist = (
-                    self._campus_list_charter
-                    if charter_only and self._campus_list_charter is not None
-                    else self._campus_list
+                    self._campus_list_charter if charter_only else self._campus_list
                 )
-                if tree is None or xy_arr is None or clist is None:
-                    total = 0
-                else:
+                if tree is not None and xy_arr is not None and clist is not None:
                     total = len(clist)
-                if total == 0:
-                    return []
+                    if total == 0:
+                        return []
 
-                want = (
-                    total
-                    if limit is None or charter_only or max_miles is not None
-                    else max(1, min(int(limit), total))
-                )
-                dists_rad, idxs = tree.query(
-                    np.radians([x, y]), k=want if want > 1 else 1
-                )
-                dists_rad = np.atleast_1d(dists_rad)
-                idxs_arr = np.atleast_1d(idxs)
+                    if max_miles is not None:
+                        R = 3958.7613
+                        idxs = tree.query_ball_point(
+                            np.radians([x, y]), r=(max_miles / R)
+                        )
+                        if not idxs:
+                            return []
+                        for idx in idxs:
+                            c = clist[int(idx)]
+                            x2, y2 = xy_arr[int(idx)]
+                            dm = haversine_miles(x, y, float(x2), float(y2))
+                            if dm <= max_miles:
+                                results.append((dm, c))
+                        results.sort(key=lambda t: t[0])
+                        if limit is not None:
+                            results = results[:limit]
+                        return [c for _, c in results]
 
-                for _dist_rad, idx in zip(dists_rad, idxs_arr):
-                    c = clist[int(idx)]
-                    x2, y2 = xy_arr[int(idx)]
-                    dm = haversine_miles(x, y, float(x2), float(y2))
-                    if max_miles is not None and dm > max_miles:
-                        continue
-                    results.append((dm, c))
-                    if limit is not None and len(results) >= limit:
-                        break
+                    want = total if limit is None else max(1, min(int(limit), total))
+                    dists_rad, idxs = tree.query(
+                        np.radians([x, y]), k=want if want > 1 else 1
+                    )
+                    dists_rad = np.atleast_1d(dists_rad)
+                    idxs_arr = np.atleast_1d(idxs)
 
-                results.sort(key=lambda t: t[0])
-                if limit is not None:
-                    results = results[:limit]
-                return [c for _, c in results]
+                    for _dist_rad, idx in zip(dists_rad, idxs_arr):
+                        c = clist[int(idx)]
+                        x2, y2 = xy_arr[int(idx)]
+                        dm = haversine_miles(x, y, float(x2), float(y2))
+                        results.append((dm, c))
+                        if limit is not None and len(results) >= limit:
+                            break
+
+                    results.sort(key=lambda t: t[0])
+                    if limit is not None:
+                        results = results[:limit]
+                    return [c for _, c in results]
 
             # Vectorized geodesic fallback if NumPy is available
             coords, clist = self._numpy_coords_and_campuses(charter_only)

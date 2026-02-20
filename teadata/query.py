@@ -8,7 +8,15 @@ import uuid
 if TYPE_CHECKING:
     from .engine import DataEngine
 
-from .entities import EntityList, EntityMap, ReadOnlyEntityView, is_charter, is_private
+from .entities import (
+    Campus,
+    District,
+    EntityList,
+    EntityMap,
+    ReadOnlyEntityView,
+    is_charter,
+    is_private,
+)
 from .geometry import point_xy
 from .grades import coerce_grade_bounds, coerce_grade_spans
 
@@ -455,9 +463,9 @@ class Query:
     def _op_campuses_in(self, op: tuple):
         campuses: List[Any] = []
         for item in self._items:
-            if getattr(item.__class__, "__name__", "") == "District":
+            if isinstance(item, District):
                 campuses.extend(self._repo.campuses_in(item))
-            elif getattr(item.__class__, "__name__", "") == "Campus":
+            elif isinstance(item, Campus):
                 campuses.append(item)
         self._items = campuses
         return self
@@ -465,35 +473,32 @@ class Query:
     def _op_private_campuses_in(self, op: tuple):
         max_m = float(op[1]) if len(op) >= 2 and op[1] is not None else None
 
+        allowed_cache: Dict[uuid.UUID, set[uuid.UUID]] = {}
+
+        def _allowed_ids_for_district(district: District) -> set[uuid.UUID]:
+            did = district.id
+            allowed = allowed_cache.get(did)
+            if allowed is None:
+                allowed = {
+                    c.id for c in self._repo.private_campuses_in(district, max_miles=max_m)
+                }
+                allowed_cache[did] = allowed
+            return allowed
+
         campuses: List[Any] = []
         for item in self._items:
-            if getattr(item.__class__, "__name__", "") == "District":
-                campuses.extend(self._repo.private_campuses_in(item, max_miles=max_m))
-            elif getattr(item.__class__, "__name__", "") == "Campus" and is_private(
-                item
-            ):
-                campuses.append(item)
-
-        if max_m is not None and campuses:
-            allowed_cache: Dict[uuid.UUID, set[uuid.UUID]] = {}
-            filtered: List[Any] = []
-            for campus in campuses:
-                district = campus.district
-                if district is None:
-                    continue
-                did = district.id
-                allowed = allowed_cache.get(did)
-                if allowed is None:
-                    allowed = {
-                        c.id
-                        for c in self._repo.private_campuses_in(
-                            district, max_miles=max_m
-                        )
-                    }
-                    allowed_cache[did] = allowed
-                if campus.id in allowed:
-                    filtered.append(campus)
-            campuses = filtered
+            if isinstance(item, District):
+                districts_private = self._repo.private_campuses_in(item, max_miles=max_m)
+                campuses.extend(districts_private)
+            elif isinstance(item, Campus) and is_private(item):
+                if max_m is None:
+                    campuses.append(item)
+                else:
+                    district = item.district
+                    if district is None:
+                        continue
+                    if item.id in _allowed_ids_for_district(district):
+                        campuses.append(item)
 
         self._items = campuses
         return self
@@ -607,9 +612,9 @@ class Query:
         k = int(op[1]) if len(op) >= 2 else 1
         campuses: List[Any] = []
         for item in self._items:
-            if getattr(item.__class__, "__name__", "") == "Campus":
+            if isinstance(item, Campus):
                 campuses.append(item)
-            elif getattr(item.__class__, "__name__", "") == "District":
+            elif isinstance(item, District):
                 campuses.extend(self._repo.campuses_in(item))
         if not campuses:
             self._items = []
@@ -625,9 +630,9 @@ class Query:
     def _op_nearest_charter_transfer_destination(self, op: tuple):
         campuses: List[Any] = []
         for item in self._items:
-            if getattr(item.__class__, "__name__", "") == "Campus":
+            if isinstance(item, Campus):
                 campuses.append(item)
-            elif getattr(item.__class__, "__name__", "") == "District":
+            elif isinstance(item, District):
                 campuses.extend(self._repo.campuses_in(item))
         if not campuses:
             self._items = []
@@ -653,7 +658,7 @@ class Query:
         campuses = [
             it
             for it in self._items
-            if getattr(it.__class__, "__name__", "") == "Campus"
+            if isinstance(it, Campus)
         ]
         rows = []
         for c in campuses:
@@ -674,7 +679,7 @@ class Query:
         campuses = [
             it
             for it in self._items
-            if getattr(it.__class__, "__name__", "") == "Campus"
+            if isinstance(it, Campus)
         ]
         rows = []
         for c in campuses:
