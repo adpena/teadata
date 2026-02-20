@@ -3014,30 +3014,25 @@ class DataEngine:
         dst_series = df[dst_col].map(norm)
         counts = df[count_col].to_numpy()
 
-        # Local cache to avoid repeated lookups against _campus_by_number
+        # Precompute campus-id lookups for all observed normalized keys
         id_cache: Dict[str, Optional[uuid.UUID]] = {}
-
-        def _lookup(normed: str | None) -> Optional[uuid.UUID]:
-            if normed is None:
-                return None
-            hit = id_cache.get(normed)
-            if hit is not None or normed in id_cache:
-                return hit
+        observed_keys = set(src_series.dropna())
+        observed_keys.update(dst_series.dropna())
+        for normed in observed_keys:
             digits = normed[1:] if normed.startswith("'") else normed
-            cid = self._campus_by_number.get(normed) or self._campus_by_number.get(
-                digits
-            )
-            id_cache[normed] = cid
-            return cid
+            id_cache[normed] = self._campus_by_number.get(
+                normed
+            ) or self._campus_by_number.get(digits)
 
-        for src_key, dst_key, raw in zip(
-            src_series.to_numpy(), dst_series.to_numpy(), counts
+        src_ids = src_series.map(id_cache).to_numpy()
+        dst_ids = dst_series.map(id_cache).to_numpy()
+
+        for src_key, dst_key, src_id, dst_id, raw in zip(
+            src_series.to_numpy(), dst_series.to_numpy(), src_ids, dst_ids, counts
         ):
             if not src_key or not dst_key:
                 continue
 
-            src_id = _lookup(src_key)
-            dst_id = _lookup(dst_key)
             if src_id is None or dst_id is None:
                 if src_id is None and dst_id is None:
                     self._xfers_missing["either"] = (
@@ -3072,9 +3067,6 @@ class DataEngine:
 
         for k in list(self._xfers_in.keys()):
             # for transfers_in sort by the incoming count, same logic
-            from_id, cnt, _ = (
-                self._xfers_in[k][0] if self._xfers_in[k] else (None, None, None)
-            )
             self._xfers_in[k].sort(
                 key=lambda ed: (
                     -(ed[1] or -1),

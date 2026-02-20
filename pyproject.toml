@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "teadata"
-version = "0.0.112"
+version = "0.0.113"
 description = "Pythonic data engine for Texas education datasets"
 authors = [{name="Alejandro Peña", email="adpena@gmail.com"}]
 readme = "README.md"
@@ -42,6 +42,7 @@ classifiers = [
 # Faster I/O / performance add-ons
 speedups = [
     "pyogrio>=0.7",
+    "polars>=1.0",
     "pygeos; python_version<'3.11'",  # no-op on modern, left for legacy envs
 ]
 

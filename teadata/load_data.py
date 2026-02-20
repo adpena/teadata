@@ -45,6 +45,11 @@ from teadata.enrichment.campuses import (
 )
 from teadata.enrichment.charter_networks import add_charter_networks_from_config
 
+try:  # optional performance dependency
+    import polars as pl
+except Exception:  # pragma: no cover - optional dependency
+    pl = None  # type: ignore[assignment]
+
 CFG = str(Path(__file__).resolve().with_name("teadata_sources.yaml"))
 YEAR = 2025
 
@@ -1186,6 +1191,35 @@ def _coerce_masked(value: Any) -> bool:
     return False
 
 
+def _group_transfer_rows(
+    working_df: pd.DataFrame,
+) -> pd.DataFrame:
+    group_columns = ["campus_campus_number", "to_campus_number"]
+    aggregate_columns = group_columns + ["count", "masked"]
+    aggregate_df = working_df[aggregate_columns]
+
+    if pl is not None:
+        try:
+            grouped_polars = (
+                pl.from_pandas(aggregate_df, include_index=False)
+                .group_by(group_columns)
+                .agg(
+                    pl.col("count").sum().alias("count"),
+                    pl.col("masked").max().alias("masked"),
+                )
+            )
+            grouped_pdf = grouped_polars.to_pandas(use_pyarrow_extension_array=True)
+            return grouped_pdf[group_columns + ["count", "masked"]]
+        except Exception:
+            pass
+
+    return (
+        aggregate_df.groupby(group_columns, dropna=False)
+        .agg({"count": "sum", "masked": "max"})
+        .reset_index()
+    )
+
+
 def _collect_charter_transfer_entries(
     repo: DataEngine, district: District, *, only_closures: bool = False
 ) -> list[dict]:
@@ -1720,11 +1754,7 @@ def build_closures_map_payload(
     else:
         working_df["masked"] = False
 
-    grouped = (
-        working_df.groupby(["campus_campus_number", "to_campus_number"], dropna=False)
-        .agg({"count": "sum", "masked": "max"})
-        .reset_index()
-    )
+    grouped = _group_transfer_rows(working_df)
 
     campus_numbers = set(working_df["campus_campus_number"].dropna())
     campus_numbers.update(working_df["to_campus_number"].dropna())
@@ -1786,12 +1816,14 @@ def build_closures_map_payload(
             campus_name = getattr(campus_obj, "campus_name_long", None)
         return _clean_text(campus_name)
 
-    def _collect_stats(row: dict, field_map: dict[str, str]) -> list[dict]:
+    def _collect_stats(row: Any, field_map: dict[str, str]) -> list[dict]:
         stats = []
         for column, label in field_map.items():
-            if column not in row:
-                continue
-            value = _format_stat_value(row[column])
+            value = None
+            if isinstance(row, dict):
+                value = _format_stat_value(row.get(column))
+            else:
+                value = _format_stat_value(getattr(row, column, None))
             if value is not None and value != "nan":
                 stats.append({"label": label, "value": value})
         return stats
@@ -1855,8 +1887,8 @@ def build_closures_map_payload(
 
     all_latlons: list[tuple[float, float]] = []
 
-    for record in origin_details.to_dict(orient="records"):
-        campus_number = record.get("campus_campus_number")
+    for record in origin_details.itertuples(index=False):
+        campus_number = getattr(record, "campus_campus_number", None)
         campus_obj = campus_lookup.get(campus_number)
         if campus_obj is None:
             campus_obj = campus_lookup.get(f"'{campus_number}")
@@ -1875,16 +1907,18 @@ def build_closures_map_payload(
                 "campusNumber": campus_number,
                 "campusNumberDisplay": _display_campus_number(campus_number),
                 "name": _get_campus_name(
-                    record.get("campus_name"), campus_obj, campus_number
+                    getattr(record, "campus_name", None), campus_obj, campus_number
                 ),
                 "profileUrl": _campus_profile_url(campus_number),
                 "districtName": _get_district_name(campus_obj),
                 "lat": lat,
                 "lon": lon,
                 "facingClosure": facing_closure,
-                "gradeRange": _format_stat_value(record.get("campus_grade_range")),
-                "isCharter": bool(record.get("campus_is_charter")),
-                "is_charter": bool(record.get("campus_is_charter")),
+                "gradeRange": _format_stat_value(
+                    getattr(record, "campus_grade_range", None)
+                ),
+                "isCharter": bool(getattr(record, "campus_is_charter", False)),
+                "is_charter": bool(getattr(record, "campus_is_charter", False)),
                 "stats": _collect_stats(record, origin_field_map),
                 "transfersOut": sorted(
                     transfers_out.get(campus_number, []),
@@ -1897,8 +1931,8 @@ def build_closures_map_payload(
             }
         )
 
-    for record in charter_details.to_dict(orient="records"):
-        campus_number = record.get("to_campus_number")
+    for record in charter_details.itertuples(index=False):
+        campus_number = getattr(record, "to_campus_number", None)
         campus_obj = campus_lookup.get(campus_number)
         if campus_obj is None:
             campus_obj = campus_lookup.get(f"'{campus_number}")
@@ -1916,15 +1950,15 @@ def build_closures_map_payload(
                 "campusNumber": campus_number,
                 "campusNumberDisplay": _display_campus_number(campus_number),
                 "name": _get_campus_name(
-                    record.get("to_name"), campus_obj, campus_number
+                    getattr(record, "to_name", None), campus_obj, campus_number
                 ),
                 "profileUrl": _campus_profile_url(campus_number),
                 "districtName": _get_district_name(campus_obj),
                 "lat": lat,
                 "lon": lon,
-                "gradeRange": _format_stat_value(record.get("to_grade_range")),
-                "isCharter": bool(record.get("to_is_charter", True)),
-                "is_charter": bool(record.get("to_is_charter", True)),
+                "gradeRange": _format_stat_value(getattr(record, "to_grade_range", None)),
+                "isCharter": bool(getattr(record, "to_is_charter", True)),
+                "is_charter": bool(getattr(record, "to_is_charter", True)),
                 "stats": _collect_stats(record, charter_field_map),
                 "transfersIn": sorted(
                     campus_transfers_in,

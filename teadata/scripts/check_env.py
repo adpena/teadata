@@ -10,6 +10,7 @@ mods = [
     "pyogrio",
     "pyarrow",
     "duckdb",
+    "polars",
     "yaml",
     "openpyxl",
 ]
