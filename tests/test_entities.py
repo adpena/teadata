@@ -37,4 +37,4 @@ def test_campus_to_dict_handles_missing_percent_enrollment_change():
     result = campus.to_dict()
 
     assert "percent_enrollment_change" in result
-    assert result["percent_enrollment_change"] is None
+    assert result["percent_enrollment_change"] == "N/A"

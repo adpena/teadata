@@ -50,7 +50,7 @@ def test_materialize_percent_enrollment_change_rounds_to_tenths():
     assert campus.meta["percent_enrollment_change"] == pytest.approx(15.1)
 
 
-def test_materialize_percent_enrollment_change_clears_stale_value_when_missing_inputs():
+def test_materialize_percent_enrollment_change_writes_na_when_missing_inputs():
     campus = _make_campus(
         enrollment=110,
         meta={"percent_enrollment_change": 123.0},
@@ -60,4 +60,4 @@ def test_materialize_percent_enrollment_change_clears_stale_value_when_missing_i
     updated = _materialize_percent_enrollment_change(repo)
 
     assert updated == 0
-    assert "percent_enrollment_change" not in campus.meta
+    assert campus.meta["percent_enrollment_change"] == "N/A"

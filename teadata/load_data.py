@@ -608,7 +608,7 @@ def _materialize_percent_enrollment_change(repo: DataEngine) -> int:
 
         percent_change = _compute_percent_enrollment_change(campus)
         if percent_change is None:
-            meta.pop("percent_enrollment_change", None)
+            meta["percent_enrollment_change"] = "N/A"
             continue
         meta["percent_enrollment_change"] = percent_change
         materialized += 1

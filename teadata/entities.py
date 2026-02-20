@@ -384,7 +384,9 @@ class Campus:
             percent_change = None
 
         derived_attrs = {
-            "percent_enrollment_change": percent_change,
+            "percent_enrollment_change": (
+                percent_change if percent_change is not None else "N/A"
+            ),
             "num_charter_transfer_destinations": self.num_charter_transfer_destinations,
             "num_charter_transfer_destinations_masked": self.num_charter_transfer_destinations_masked,
             "total_unmasked_charter_transfers_out": self.total_unmasked_charter_transfers_out,
