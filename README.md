@@ -1,97 +1,201 @@
-# TEA Data Engine
+# TEA Data Engine (`teadata`)
 
-**A high-performance, spatially-aware Python framework for the analysis and modeling of Texas public education data.**
+`teadata` is a snapshot-first Python engine for Texas education data.
+It provides:
 
-`teadata` provides a robust, object-oriented interface for large-scale geographic and demographic datasets. By utilizing a high-speed, snapshot-based architecture, the engine enables rapid data integration and sophisticated spatial querying through an intuitive, Pythonic DSL.
+- `District` and `Campus` domain models
+- a fluent query DSL using `>>`
+- geospatial lookups (nearest charter, campuses in district boundaries, private-school overlap)
+- config-driven enrichment from TAPR, accountability, transfers, PEIMS financials, and closure datasets
+- sidecar sqlite stores for fast boundary/map/entity lookup
 
----
+## Installation
 
-## 📚 Documentation
-
-**[Read the full documentation here](docs/index.md)** (or run `mkdocs serve` to browse locally).
-
----
-
-## Quick Start
-
-### Installation
-
-**Using `uv` (Recommended for development)**
-
-```bash
-git clone https://github.com/adpena/teadata.git
-cd teadata
-uv sync
-```
-
-**Using `pip`**
+### PyPI
 
 ```bash
 pip install teadata
 ```
 
-When adding a new library or tool, update `pyproject.toml` (dependencies or
-extras), refresh the lockfile, and adjust test/tooling configuration so CI and
-local environments stay in sync.
-
-**Installing from GitHub (for Render or other CI/CD)**
-
-If you are using this in a Django application deployed on **Render**, add it to your `requirements.txt`:
-
-```text
-teadata @ git+https://github.com/adpena/teadata.git
-```
-
-Or install it directly via CLI:
+### Development (recommended)
 
 ```bash
-pip install git+https://github.com/adpena/teadata.git
+git clone https://github.com/adpena/teadata.git
+cd teadata
+uv sync --all-extras
 ```
 
-### Snapshot assets (Git LFS)
-
-Production deployments that install from GitHub often receive Git LFS pointer files instead of
-the large snapshot assets. Set these URLs so the engine can download the real files on demand:
-
-- `TEADATA_SNAPSHOT_URL` (e.g., a GitHub release asset for `repo_*.pkl.gz`)
-- `TEADATA_MAP_STORE_URL` (for `map_payloads_*.sqlite`)
-- `TEADATA_BOUNDARY_STORE_URL` (for `boundaries_*.sqlite`)
-- Optional: `TEADATA_ASSET_CACHE_DIR` to control where downloads are cached
-
-### Usage
+## Quick Start
 
 ```python
 from teadata import DataEngine
 
-# Fast-path: load the latest discovered snapshot
+# Preferred runtime path: load the latest discovered snapshot.
 engine = DataEngine.from_snapshot(search=True)
 
-# Retrieve district by TEA campus number
+# District lookup by district number, campus number, or name.
 aldine = engine.get_district("101902")
-print(aldine.name)  # -> "Aldine ISD"
+print(aldine.name)
 
-# Iterate campuses inside the district
-for c in aldine.campuses:
-    print(c.name)
+# Campuses physically inside district boundaries.
+for campus in aldine.campuses[:5]:
+    print(campus.name, campus.campus_number)
 ```
+
+## Public API Surface
+
+Primary imports:
+
+```python
+from teadata import DataEngine, District, Campus
+```
+
+Core behaviors:
+
+- `DataEngine.from_snapshot(...)` supports `.pkl` and `.pkl.gz` snapshots and multiple payload shapes.
+- Snapshot discovery checks explicit paths, env vars, package `.cache`, and parent `.cache` directories.
+- `District` and `Campus` support dynamic metadata attributes through `meta`.
+- `Campus.to_dict()` always includes `percent_enrollment_change` (numeric when available, otherwise `"N/A"`).
+
+## Snapshot and Asset Behavior
+
+`teadata` is intentionally cache-first.
+
+Artifacts typically used at runtime:
+
+- `repo_*.pkl` / `repo_*.pkl.gz` (engine snapshot)
+- `boundaries_*.sqlite` (boundary WKB sidecar)
+- `map_payloads_*.sqlite` (map payload sidecar)
+- `entities_*.sqlite` (entity lookup sidecar)
+
+If snapshot/store files are Git LFS pointers or missing locally, runtime asset resolvers can fetch real files when URL env vars are provided.
+
+### Environment Variables
+
+- `TEADATA_SNAPSHOT`: explicit snapshot path.
+- `TEADATA_SNAPSHOT_URL`: URL used when snapshot candidate is missing or a Git LFS pointer.
+- `TEADATA_BOUNDARY_STORE`: explicit boundary sqlite path.
+- `TEADATA_BOUNDARY_STORE_URL`: URL fallback for boundary store.
+- `TEADATA_MAP_STORE`: explicit map sqlite path.
+- `TEADATA_MAP_STORE_URL`: URL fallback for map store.
+- `TEADATA_ENTITY_STORE`: explicit entity sqlite path.
+- `TEADATA_ENTITY_STORE_URL`: URL fallback for entity store.
+- `TEADATA_ASSET_CACHE_DIR`: override cache directory used for downloaded assets.
+- `TEADATA_DISABLE_INDEXES`: disable default spatial acceleration indexes.
+- `TEADATA_LOG_MEMORY`: enable memory snapshot logging.
+
+## Query DSL
+
+`DataEngine` and `Query` chains use `>>`.
+
+```python
+# Resolve district then expand to district-operated campuses.
+q = engine >> ("district", "ALDINE ISD") >> ("campuses_in",)
+
+# Filter, sort, and take.
+top = (
+    q
+    >> ("filter", lambda c: (c.enrollment or 0) > 1000)
+    >> ("sort", lambda c: c.enrollment or 0, True)
+    >> ("take", 10)
+)
+
+rows = top.to_df(columns=["name", "campus_number", "enrollment"])
+```
+
+Supported lookup semantics include:
+
+- case-insensitive district and campus name matching
+- wildcard patterns (`*`, `?`, SQL-like `%`/`_`)
+- normalized district number handling (for example `"123"` and `"'000123"`)
+
+Spatial and transfer helpers include:
+
+- nearest-campus/nearest-charter queries
+- `nearest_charter_same_type(...)`
+- transfer graph methods such as `transfers_out(...)` / `transfers_in(...)`
+
+## Enrichment Pipeline
+
+`teadata/enrichment` provides registered enrichers for district and campus datasets.
+
+Included enrichers cover:
+
+- district accountability and district TAPR profile data
+- campus accountability, TAPR profile/historical enrollment, PEIMS financials
+- planned closure overlays
+- charter network augmentation
+
+Pipeline behavior is fault-tolerant by design: dataset-level failures are generally logged and do not hard-stop the full build.
+
+## Data Build Pipeline
+
+`teadata/load_data.py` builds a full `DataEngine` and updates cached artifacts.
+
+```bash
+uv run python -m teadata.load_data
+```
+
+At a high level, it:
+
+1. resolves year-aware source paths from `teadata/teadata_sources.yaml`
+2. warm-loads compatible snapshot cache when signatures match
+3. otherwise builds districts/campuses from spatial files
+4. applies enrichment datasets
+5. writes snapshot + sqlite sidecars back to `.cache/`
+
+## Config and CLI (`teadata-config`)
+
+`teadata/teadata_config.py` provides YAML/TOML config loading, year resolution, schema checks, and dataset joins.
+
+CLI entrypoint:
+
+```bash
+uv run teadata-config --help
+```
+
+Subcommands:
+
+- `init <out.yaml>`
+- `resolve <cfg> <section> <dataset> <year>`
+- `report <cfg> [--json] [--min N] [--max N]`
+- `join <cfg> <year> [--datasets a,b,c] [--parquet out.parquet] [--duckdb out.duckdb --table t]`
+
+## Testing
+
+```bash
+uv run pytest
+```
+
+Current tests cover:
+
+- snapshot gzip and fallback loading
+- query DSL semantics and chaining
+- nearest charter behavior and transfer grouping
+- store discovery and asset-cache behavior
+- entity serialization invariants (`percent_enrollment_change`)
+
+## PyPI Size Limits and Current Packaging Status
+
+PyPI defaults currently documented at:
+
+- per-file upload limit: `100 MB`
+- total project limit: `10 GB`
+
+Reference: <https://docs.pypi.org/project-management/storage-limits/>
+
+Current `teadata` release artifacts for `0.0.118` are above the per-file limit:
+
+- wheel: `dist/teadata-0.0.118-py3-none-any.whl` about `448 MB`
+- sdist: `dist/teadata-0.0.118.tar.gz` about `446 MB`
+
+These exceed the default 100 MB file cap because large `.cache` snapshot/store artifacts are packaged into both distributions.
 
 ## Release Policy
 
-- Tags always use the thousandths place (e.g., `v0.0.101`, `v0.0.102`). If no tags exist, start at `v0.0.101`.
-- Keep only the three most recent tags/releases; delete older tags and their GitHub release assets.
-
-## Features
-
-- **Rich domain objects**: `District` and `Campus` with geometry.
-- **Fluent query language**: Chain filters like `engine >> ("district", "101902") >> ("campuses_in",)`.
-- **Spatial acceleration**: Nearest neighbors, containment checks.
-- **Enrichment**: Attach external datasets (finance, accountability) easily.
+- Versioning uses thousandths-place tags (`v0.0.101`, `v0.0.102`, ...).
+- Keep only the 3 most recent release tags/assets.
 
 ## License
 
-This project is licensed under the **Business Source License 1.1**.
-
-- **Personal & Educational Use**: You may use, copy, modify, and distribute this software for personal, educational, or non-commercial research purposes.
-- **Commercial & Production Use**: Prohibited without obtaining a separate commercial license from the Licensor.
-
-See the [LICENSE](LICENSE) file for the full text.
+Business Source License 1.1. See [LICENSE](LICENSE).

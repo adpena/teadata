@@ -1265,5 +1265,9 @@ def main(argv: List[str]) -> None:
     sys.exit(2)
 
 
-if __name__ == "__main__":
+def cli() -> None:
     main(sys.argv)
+
+
+if __name__ == "__main__":
+    cli()
