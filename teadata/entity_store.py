@@ -72,10 +72,16 @@ def _resolve_entity_store(path: Path, source: str) -> Optional[Path]:
     return resolved
 
 
+def _should_attempt_entity_resolution(path: Path) -> bool:
+    if path.exists() and path.is_file():
+        return True
+    return bool(os.environ.get("TEADATA_ENTITY_STORE_URL"))
+
+
 def discover_entity_store(explicit: str | Path | None = None) -> Optional[Path]:
     if explicit:
         p = Path(explicit)
-        if p.exists() and p.is_file():
+        if _should_attempt_entity_resolution(p):
             resolved = _resolve_entity_store(p, "explicit")
             if resolved:
                 return resolved
@@ -83,7 +89,7 @@ def discover_entity_store(explicit: str | Path | None = None) -> Optional[Path]:
     env = os.environ.get("TEADATA_ENTITY_STORE")
     if env:
         p = Path(env)
-        if p.exists() and p.is_file():
+        if _should_attempt_entity_resolution(p):
             resolved = _resolve_entity_store(p, "env")
             if resolved:
                 return resolved
@@ -93,7 +99,7 @@ def discover_entity_store(explicit: str | Path | None = None) -> Optional[Path]:
             snap = _discover_snapshot()
             if snap:
                 candidate = entity_store_path_for_snapshot(Path(snap))
-                if candidate and candidate.exists():
+                if candidate and _should_attempt_entity_resolution(candidate):
                     resolved = _resolve_entity_store(candidate, "snapshot")
                     if resolved:
                         return resolved

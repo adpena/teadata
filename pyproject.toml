@@ -98,10 +98,10 @@ include = ["teadata*"]
 exclude = ["tests*", "docs*", "examples*"]
 
 [tool.setuptools.package-data]
-teadata = [".cache/*.pkl", ".cache/*.pkl.gz", ".cache/*.sqlite"]
+teadata = [".cache/*.pkl.gz", ".cache/boundaries_*.sqlite", ".cache/entities_*.sqlite"]
 
 [tool.setuptools]
-include-package-data = true
+include-package-data = false
 
 [project.urls]
 "Homepage" = "https://github.com/adpena/teadata"

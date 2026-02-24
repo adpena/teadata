@@ -1,4 +1,6 @@
-recursive-include teadata/.cache *.pkl
 recursive-include teadata/.cache *.pkl.gz
-recursive-include teadata/.cache *.sqlite
+recursive-include teadata/.cache boundaries_*.sqlite
+recursive-include teadata/.cache entities_*.sqlite
 recursive-include data/private_schools *.csv
+global-exclude *.pkl
+exclude teadata/.cache/map_payloads_*.sqlite

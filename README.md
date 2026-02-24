@@ -184,12 +184,22 @@ PyPI defaults currently documented at:
 
 Reference: <https://docs.pypi.org/project-management/storage-limits/>
 
-Current `teadata` release artifacts for `0.0.118` are above the per-file limit:
+Before packaging trim, `0.0.118` artifacts were above the per-file limit:
 
-- wheel: `dist/teadata-0.0.118-py3-none-any.whl` about `448 MB`
-- sdist: `dist/teadata-0.0.118.tar.gz` about `446 MB`
+- wheel: about `448 MB`
+- sdist: about `446 MB`
 
-These exceed the default 100 MB file cap because large `.cache` snapshot/store artifacts are packaged into both distributions.
+Current slimmed artifacts are below the limit:
+
+- wheel: `dist/teadata-0.0.118-py3-none-any.whl` about `74 MB`
+- sdist: `dist/teadata-0.0.118.tar.gz` about `72 MB`
+
+To stay under PyPI file limits while preserving runtime behavior:
+
+- PyPI package data now includes compressed snapshots (`.pkl.gz`) and selected sidecars (`boundaries_*.sqlite`, `entities_*.sqlite`).
+- Uncompressed `.pkl` files are excluded from distributions.
+- `map_payloads_*.sqlite` is excluded from distributions; provide it at runtime via `TEADATA_MAP_STORE` or `TEADATA_MAP_STORE_URL`.
+- URL-based store discovery supports snapshot-derived sidecar paths, so `TEADATA_*_URL` can hydrate missing local sidecars automatically.
 
 ## Release Policy
 
