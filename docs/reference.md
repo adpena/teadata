@@ -28,6 +28,6 @@ A: Yes — use `>>` to compose: `engine >> ("within", d, "campuses") >> (lambda 
 
 ## License
 
-This project is licensed under the **Business Source License 1.1**. It allows for personal, educational, and non-commercial research use. Production or commercial use requires a separate license.
+This project is licensed under the **Apache License 2.0**.
 
 See the `LICENSE` file in the repository root for the full terms.

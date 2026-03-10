@@ -208,4 +208,4 @@ To stay under PyPI file limits while preserving runtime behavior:
 
 ## License
 
-Business Source License 1.1. See [LICENSE](LICENSE).
+Apache License 2.0. See [LICENSE](LICENSE).
