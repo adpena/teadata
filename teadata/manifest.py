@@ -188,6 +188,15 @@ class DatasetCatalog:
             key: ValuePolicy.from_dict(value) for key, value in policies.items()
         }
         self._sources = sources
+        self._read_columns = {
+            dataset: frozenset(column for read in source.get("reads", [])
+                               for column in read.get("columns", []))
+            for dataset, source in sources.items()
+        }
+        self._field_resolutions: dict[
+            tuple[str, str],
+            tuple[MetricBinding, str, str, MetricDefinition | None] | None,
+        ] = {}
         if "metric_bindings" not in document:
             raise ContractError("Catalog lacks release-bound metric interpretation")
         try:
@@ -299,8 +308,7 @@ class DatasetCatalog:
         key = self.field(dataset, selector, scope=scope) if binding.field_mode == "metric" else selector
         if definition is None:
             definition = next((value for value in metadata.metrics.values() if value.field == key), None)
-        declared_columns = {column for read in self._sources[dataset].get("reads", []) for column in read.get("columns", [])}
-        if key not in declared_columns:
+        if key not in self._read_columns[dataset]:
             raise ContractError(f"Metric {metric} is not a declared field in this release")
         return binding, dataset, key, definition
 
@@ -385,24 +393,21 @@ class DatasetCatalog:
         return self._contextual_measurement(raw, binding, dataset, key, definition, entity=entity,
                                    input_binding="release_entity" if known_build is not None else "caller_supplied")
 
-    def measure_field(self, raw: Any, field: str, *, scope: str = "campus", entity=None) -> Measurement | None:
-        """Decode a bound raw value, optionally checking entity population and origin.
-
-        The supplied raw value remains caller-supplied; entity context alone does
-        not prove that arbitrary input bytes came from the release's entity store.
-        """
-        if entity is not None:
-            self._entity_build_id(entity)
+    def _resolve_field(self, field: str, scope: str) -> tuple[MetricBinding, str, str, MetricDefinition | None] | None:
+        """Compile only release-invariant interpretation, including opaque fields."""
         if scope not in {"campus", "district"}:
             raise ContractError("Unknown field scope")
+        identity = (scope, field)
+        if identity in self._field_resolutions:
+            return self._field_resolutions[identity]
         if field in {"campus_number", "district_number", "campus_name", "district_name"}:
+            self._field_resolutions[identity] = None
             return None
         candidates = []
-        for dataset, source in self._sources.items():
+        for dataset in self._sources:
             metadata = self._metadata[dataset]
             definition_items = [(name, definition) for name, definition in metadata.metrics.items() if definition.field == field]
-            columns = {column for read in source.get("reads", []) for column in read.get("columns", [])}
-            if field not in columns and not definition_items:
+            if field not in self._read_columns[dataset] and not definition_items:
                 continue
             for name, binding in self._bindings.items():
                 if not isinstance(binding, MetricBinding) or scope not in binding.scopes or binding.dataset.replace("{scope}", scope) != dataset:
@@ -421,8 +426,26 @@ class DatasetCatalog:
                 if resolved_field == field:
                     candidates.append((dataset, resolved_binding, definition, not name.endswith(".*")))
         if len({item[0] for item in candidates}) != 1:
+            self._field_resolutions[identity] = None
             return None
         dataset, binding, definition, _ = max(candidates, key=lambda item: item[3])
+        resolved = (binding, dataset, field, definition)
+        self._field_resolutions[identity] = resolved
+        return resolved
+
+    def measure_field(self, raw: Any, field: str, *, scope: str = "campus", entity=None) -> Measurement | None:
+        """Decode a bound raw value, optionally checking entity population and origin.
+
+        The supplied raw value remains caller-supplied; entity context alone does
+        not prove that arbitrary input bytes came from the release's entity store.
+        Field contracts are reused; raw values and entity context are never cached.
+        """
+        if entity is not None:
+            self._entity_build_id(entity)
+        resolved = self._resolve_field(field, scope)
+        if resolved is None:
+            return None
+        binding, dataset, _, definition = resolved
         value = self._contextual_measurement(raw, binding, dataset, field, definition, entity=entity)
         if value.unit == "text" or (value.unit is None and isinstance(raw, bool)):
             return None

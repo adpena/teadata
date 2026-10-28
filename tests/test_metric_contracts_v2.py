@@ -294,6 +294,115 @@ def test_same_field_semantic_metrics_keep_their_distinct_effective_periods(catal
     assert current.source["period"] == {"kind": "calendar_year", "year": 2025}
 
 
+def test_physical_field_contract_is_resolved_once_for_repeated_values(catalog, monkeypatch):
+    _, field = catalog.source_for_metric("enrollment", "campus")
+    original = catalog._resolve_metric
+    calls = []
+
+    def resolving(metric, scope):
+        calls.append((metric, scope))
+        return original(metric, scope)
+
+    monkeypatch.setattr(catalog, "_resolve_metric", resolving)
+    assert catalog.measure_field(12, field).numeric == 12
+    first_calls = len(calls)
+    assert first_calls > 0
+    for raw in range(200):
+        value = catalog.measure_field(raw, field)
+        assert value.numeric == raw
+        assert value.source["input_binding"] == "caller_supplied"
+    assert len(calls) == first_calls
+    assert catalog.measure_field(-1, field).status == ValueStatus.SUPPRESSED
+    assert catalog.measure_field(None, field).status == ValueStatus.MISSING
+    assert catalog.measure_field(1.5, field).status == ValueStatus.INVALID
+    assert len(calls) == first_calls
+
+
+def test_field_contract_reuse_does_not_cache_opaque_raw_values(catalog):
+    _, field = catalog.source_for_metric("financials.operating_payroll_gf", "campus")
+    assert catalog.measure_field("not numeric", field) is None
+    assert catalog.measure_field(True, field) is None
+    assert catalog.measure_field(0, field).numeric == 0
+    assert catalog.measure_field(-1, field).numeric == -1
+    assert catalog.measure_field(None, field).status == ValueStatus.MISSING
+
+
+def test_warmed_field_contract_still_checks_every_entity_and_measurement(catalog):
+    _, field = catalog.source_for_metric("enrollment", "campus")
+    public = entity(catalog, 12, bound=True)
+    private = SimpleNamespace(is_private=True, source_build_id=catalog.build_id)
+    assert catalog.measure_field(12, field, entity=private).reason == "outside_metric_population"
+    observed = catalog.measure_field(12, field, entity=public)
+    assert observed.numeric == 12
+    assert observed.source["input_binding"] == "caller_supplied"
+    assert catalog.measure_field(0, field, entity=private).status == ValueStatus.NOT_APPLICABLE
+    different = revised(catalog, lambda document: document.update(processor_sha256="9" * 64))
+    foreign = entity(different, 12, bound=True)
+    with pytest.raises(ContractError, match="another data release"):
+        catalog.measure_field(12, field, entity=foreign)
+    with pytest.raises(ContractError, match="another release or field"):
+        catalog.measure_field(different.measurement(foreign, "enrollment"), field, entity=public)
+    assert catalog.measure_field(13, field, entity=public).numeric == 13
+
+
+def test_physical_field_resolution_is_isolated_by_scope(catalog):
+    def change(document):
+        document["datasets"]["accountability"]["reads"][0]["columns"].append("shared_scope_field")
+        for scope, unit, maximum in [("campus", "count", None), ("district", "percent", 100)]:
+            document["metric_bindings"][f"scope_{scope}"] = {
+                "dataset": "accountability", "field": "shared_scope_field",
+                "scopes": [scope], "unit": unit, "minimum": 0, "maximum": maximum,
+            }
+
+    changed = revised(catalog, change)
+    assert changed.measure_field(150, "shared_scope_field", scope="campus").numeric == 150
+    district = changed.measure_field(150, "shared_scope_field", scope="district")
+    assert district.unit == "percent" and district.status == ValueStatus.INVALID
+    assert changed.measure_field(12, "shared_scope_field", scope="district").numeric == 12
+    assert changed.measure_field(150, "shared_scope_field", scope="campus").unit == "count"
+
+
+def test_ambiguous_physical_field_remains_opaque_after_reuse(catalog):
+    _, field = catalog.source_for_metric("enrollment", "campus")
+
+    def change(document):
+        document["datasets"]["accountability"]["reads"][0]["columns"].append(field)
+        document["metric_bindings"]["other_source_count"] = {
+            "dataset": "accountability", "field": field, "scopes": ["campus"], "unit": "count",
+        }
+
+    changed = revised(catalog, change)
+    assert changed.measure_field(12, field) is None
+    assert changed.measure_field(-1, field) is None
+    assert changed.measurement(entity(changed, 12), "enrollment").numeric == 12
+    assert catalog.measure_field(12, field).numeric == 12
+    with pytest.raises(ContractError, match="Unknown field scope"):
+        changed.measure_field(12, field, scope="school")
+
+
+def test_warmed_field_contract_is_release_specific_and_defensive(catalog):
+    dataset, field = catalog.source_for_metric("enrollment", "campus")
+    original = catalog.measure_field(150, field)
+
+    def change(document):
+        definition = document["datasets"][dataset]["metadata"]["metrics"]["student_enrollment_all_students_count"]
+        definition.update(unit="percent", period={"kind": "unknown"})
+        document["metric_bindings"]["enrollment"]["maximum"] = 100
+
+    changed = revised(catalog, change)
+    percent = changed.measure_field(150, field)
+    assert percent.status == ValueStatus.INVALID and percent.unit == "percent"
+    assert percent.source["period"] == {"kind": "unknown"}
+    public_metadata = catalog.metadata(dataset)
+    public_metadata.metrics["student_enrollment_all_students_count"] = MetricDefinition(field=field, unit="text")
+    public_document = catalog.to_dict()
+    public_document["datasets"][dataset]["reads"][0]["columns"].clear()
+    repeated = catalog.measure_field(151, field)
+    assert repeated.numeric == 151 and repeated.unit == original.unit == "count"
+    assert repeated.source["period"] == original.source["period"]
+    assert repeated.source["build_id"] != percent.source["build_id"]
+
+
 @pytest.mark.parametrize("status", ["unreviewed", "not_found"])
 def test_suppression_requires_available_exact_reviewed_methodology(catalog, status):
     def change(document):
