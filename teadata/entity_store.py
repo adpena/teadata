@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import closing
 import json
 import logging
 import sqlite3
@@ -134,7 +135,7 @@ def load_campus(
     """
 
     try:
-        with sqlite3.connect(path) as conn:
+        with closing(sqlite3.connect(path)) as conn:
             for key in _campus_lookup_keys(campus_number):
                 row = conn.execute(query, (key, key)).fetchone()
                 if not row:
@@ -189,7 +190,7 @@ def load_district(
     """
 
     try:
-        with sqlite3.connect(path) as conn:
+        with closing(sqlite3.connect(path)) as conn:
             for key in _district_lookup_keys(district_number):
                 row = conn.execute(query, (key, key)).fetchone()
                 if not row:
@@ -228,7 +229,7 @@ def list_meta_keys(
     if limit:
         query = f"{query} LIMIT {int(limit)}"
     try:
-        with sqlite3.connect(path) as conn:
+        with closing(sqlite3.connect(path)) as conn:
             rows = conn.execute(query).fetchall()
             keys = [row[0] for row in rows if row and row[0]]
             if keys:
@@ -244,6 +245,13 @@ def list_meta_keys(
 
 @dataclass
 class EntityStore:
+    """A reusable catalog-bound reader; scoped use closes all owned resources.
+
+    Lookups memoize by default. Streaming consumers can use ``cache=False``
+    inside ``with EntityStore(path) as store`` to retain only caller-owned rows.
+    A closed store cannot be reopened; create another reader for another scope.
+    """
+
     path: Path
     max_cache: int = 64
     _conn: Optional[sqlite3.Connection] = field(default=None, init=False, repr=False)
@@ -260,12 +268,47 @@ class EntityStore:
     _meta_keys_cache: dict[str, list[str]] = field(
         default_factory=dict, init=False, repr=False
     )
+    _closed: bool = field(default=False, init=False, repr=False)
+
+    def _ensure_open(self) -> None:
+        if self._closed:
+            raise RuntimeError("EntityStore is closed")
+
+    def close(self) -> None:
+        """Close the SQLite connection and release every store-owned cache."""
+        conn, self._conn = self._conn, None
+        self._closed = True
+        try:
+            if conn is not None:
+                conn.close()
+        finally:
+            self._campus_cache.clear()
+            self._district_cache.clear()
+            self._campus_meta_loaded.clear()
+            self._district_meta_loaded.clear()
+            self._meta_keys_cache.clear()
+            self.__dict__.pop("catalog", None)
+
+    def __enter__(self) -> EntityStore:
+        self._ensure_open()
+        try:
+            self.catalog
+            self._connect()
+        except BaseException:
+            self.close()
+            raise
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        self.close()
 
     @cached_property
     def catalog(self):
+        self._ensure_open()
         return read_sqlite_catalog(self.path)
 
     def _connect(self) -> Optional[sqlite3.Connection]:
+        self._ensure_open()
         if self._conn is not None:
             return self._conn
         if not self.path.exists():
@@ -278,46 +321,50 @@ class EntityStore:
     def cache_key(self) -> str:
         return self.catalog.build_id
 
-    def get_campus(self, campus_number: str, *, include_meta: bool = True) -> Optional[dict[str, Any]]:
+    def get_campus(self, campus_number: str, *, include_meta: bool = True, cache: bool = True) -> Optional[dict[str, Any]]:
+        self._ensure_open()
         if not campus_number:
             return None
         key = canonical_campus_number(campus_number) or str(campus_number).strip()
         if not key:
             return None
-        cached = self._campus_cache.get(key)
+        cached = self._campus_cache.get(key) if cache else None
         if cached is not None:
             if not include_meta or key in self._campus_meta_loaded:
                 return cached
         record = self._load_campus_from_conn(key, include_meta=include_meta)
         if record:
             record["source_build_id"] = self.catalog.build_id
-            self._campus_cache[key] = record
-            if include_meta:
-                self._campus_meta_loaded.add(key)
-            else:
-                self._campus_meta_loaded.discard(key)
+            if cache:
+                self._campus_cache[key] = record
+                if include_meta:
+                    self._campus_meta_loaded.add(key)
+                else:
+                    self._campus_meta_loaded.discard(key)
         return record
 
     def get_district(
-        self, district_number: str, *, include_meta: bool = True
+        self, district_number: str, *, include_meta: bool = True, cache: bool = True
     ) -> Optional[dict[str, Any]]:
+        self._ensure_open()
         if not district_number:
             return None
         key = canonical_district_number(district_number) or str(district_number).strip()
         if not key:
             return None
-        cached = self._district_cache.get(key)
+        cached = self._district_cache.get(key) if cache else None
         if cached is not None:
             if not include_meta or key in self._district_meta_loaded:
                 return cached
         record = self._load_district_from_conn(key, include_meta=include_meta)
         if record:
             record["source_build_id"] = self.catalog.build_id
-            self._district_cache[key] = record
-            if include_meta:
-                self._district_meta_loaded.add(key)
-            else:
-                self._district_meta_loaded.discard(key)
+            if cache:
+                self._district_cache[key] = record
+                if include_meta:
+                    self._district_meta_loaded.add(key)
+                else:
+                    self._district_meta_loaded.discard(key)
         return record
 
     def iter_campuses(self, *, include_meta: bool = True) -> Iterable[dict[str, Any]]:
@@ -396,6 +443,7 @@ class EntityStore:
             }
 
     def list_meta_keys(self, entity_type: str, *, limit: int | None = None) -> list[str]:
+        self._ensure_open()
         cached = self._meta_keys_cache.get(entity_type)
         if cached is not None:
             return cached[:limit] if limit else list(cached)

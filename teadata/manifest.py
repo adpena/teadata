@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextvars import ContextVar
+from contextlib import closing
 from copy import deepcopy
 from dataclasses import replace
 from hashlib import sha256
@@ -523,7 +524,7 @@ def write_sqlite_catalog(
 def read_sqlite_catalog(path: str | Path) -> DatasetCatalog:
     path = Path(path).resolve()
     try:
-        with sqlite3.connect(path.as_uri() + "?mode=ro", uri=True) as connection:
+        with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as connection:
             rows = connection.execute(
                 f"SELECT document FROM {CATALOG_TABLE} WHERE singleton=1"
             ).fetchall()
