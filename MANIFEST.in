@@ -4,13 +4,14 @@ include scripts/check
 recursive-include tests *.py
 recursive-include examples *.py
 recursive-include docs *.md
+recursive-include provenance/records *.json
 
 # Retained data bundles and raw inputs travel separately from Python packages.
 prune data
 prune teadata/data
 prune .cache
 prune teadata/.cache
-prune provenance
+prune provenance/objects
 prune .local
 prune .venv
 prune build
