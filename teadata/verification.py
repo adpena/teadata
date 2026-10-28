@@ -122,7 +122,7 @@ def default_checks(kind: str, *, release: str | None = None) -> list[Check]:
         checks = [
             Check("ruff", ("@python", "-m", "ruff", "check", ".")),
             Check("migrations", ("@python", "manage.py", "makemigrations", "--check", "--dry-run")),
-            Check("map-javascript", ("node", "--test", "static/js/tests/profile_map_shared.test.cjs")),
+            Check("frontend-javascript", ("node", "--test", "static/js/tests/profile_map_shared.test.cjs", "static/js/tests/workspace_preview.test.cjs")),
             Check("pytest", ("@python", "-m", "pytest")),
         ]
     else:
@@ -271,6 +271,24 @@ def _try_environment_identity(python: str, kind: str, root: Path) -> dict[str, A
         return None
 
 
+def _controller_python_version() -> str:
+    return ".".join(str(part) for part in sys.version_info[:3])
+
+
+def _check_runtime(root: Path, *, paired: bool) -> tuple[str, str, Path | None, list[Check]]:
+    """One interpreter/setup authority for executing and verifying checks."""
+    version = _controller_python_version()
+    if not paired:
+        return version, sys.executable, None, []
+    environment = root / ".local" / f"check-env-{version}"
+    python = environment / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+    setup = [
+        Check("setup-locked", ("uv", "sync", "--locked", "--python", version)),
+        Check("setup-paired", ("uv", "pip", "install", "--python", "@python", "--no-deps", "--editable", "@library")),
+    ]
+    return version, str(python), environment, setup
+
+
 def run_checks(
     root: Path,
     *,
@@ -291,16 +309,9 @@ def run_checks(
     directory = checks_root / run_id
     directory.mkdir(parents=True, mode=0o700)
     environment = _test_environment()
-    python = sys.executable
-    setup = []
-    if paired_library is not None:
-        check_python = Path(".local/check-env") / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
-        python = str(root / check_python)
-        environment["UV_PROJECT_ENVIRONMENT"] = str(root / ".local/check-env")
-        setup = [
-            Check("setup-locked", ("uv", "sync", "--locked", "--python", "3.12")),
-            Check("setup-paired", ("uv", "pip", "install", "--python", "@python", "--no-deps", "--editable", "@library")),
-        ]
+    version, python, project_environment, setup = _check_runtime(root, paired=paired_library is not None)
+    if project_environment is not None:
+        environment["UV_PROJECT_ENVIRONMENT"] = str(project_environment)
     replacements = {"@python": python, "@library": str(paired_library or "")}
     results = []
     environment_before = None
@@ -320,14 +331,14 @@ def run_checks(
     actual_environment = _try_environment_identity(python, kind, root)
     passed = len(results) == len(setup) + len(policy) and all(item["returncode"] == 0 for item in results)
     receipt = {
-        "schema_version": SCHEMA_VERSION, "run_id": run_id,
+        "schema_version": SCHEMA_VERSION, "run_id": run_id, "python_version": version,
         "recorded_at": datetime.now(timezone.utc).isoformat(),
         "scope": "code-and-selected-release" if release else "code-only; raw inputs and data artifacts are not certified",
         "policy": [check.to_dict() for check in policy], "setup_policy": [check.to_dict() for check in setup],
         "inputs": before, "inputs_after": after, "source_stable": before == after,
         "environment": environment_before, "environment_after": actual_environment,
         "checks": results,
-        "status": "passed" if passed and before == after and environment_before is not None and environment_before == actual_environment else "failed",
+        "status": "passed" if passed and before == after and environment_before is not None and environment_before == actual_environment and environment_before.get("python") == version else "failed",
     }
     document = {**receipt, "record_id": sha256(_canonical(receipt)).hexdigest()}
     path = directory / "receipt.json"
@@ -361,12 +372,13 @@ def verify_receipt(
         raise ReceiptError("Receipt integrity or schema mismatch")
     if record.get("status") != "passed" or not record.get("source_stable") or record.get("inputs") != record.get("inputs_after"):
         raise ReceiptError("Receipt does not contain a complete stable passing run")
+    version, python, _, setup = _check_runtime(root, paired=paired_library is not None)
+    if record.get("python_version") != version:
+        raise ReceiptError("Receipt was checked with a different Python runtime")
     current = _input_identity(root, kind=kind, paired_library=paired_library, release=release)
     if record.get("inputs") != current:
         raise ReceiptError("Receipt is stale for this revision, source, lockfile, runner, or release")
     policy = list(checks) if checks is not None else default_checks(kind, release=release)
-    setup = [Check("setup-locked", ("uv", "sync", "--locked", "--python", "3.12")),
-             Check("setup-paired", ("uv", "pip", "install", "--python", "@python", "--no-deps", "--editable", "@library"))] if paired_library else []
     if record.get("policy") != [item.to_dict() for item in policy] or record.get("setup_policy") != [item.to_dict() for item in setup]:
         raise ReceiptError("Receipt does not match the current check policy")
     expected = [*setup, *policy]
@@ -382,9 +394,11 @@ def verify_receipt(
         log = path.parent / name
         if log.is_symlink() or not log.is_file() or _digest(log) != result.get("log_sha256"):
             raise ReceiptError("Check log is missing or changed")
-    python = str(root / ".local/check-env" / ("Scripts/python.exe" if os.name == "nt" else "bin/python")) if paired_library else sys.executable
-    if record.get("environment") != _environment_identity(python, kind, root):
+    current_environment = _environment_identity(python, kind, root)
+    if record.get("environment") != current_environment:
         raise ReceiptError("Dependency or tool environment changed since the run")
+    if current_environment.get("python") != version:
+        raise ReceiptError("Check environment uses a different Python runtime")
     if record.get("environment") != record.get("environment_after"):
         raise ReceiptError("Dependency or tool environment changed during checks")
     return document

@@ -35,7 +35,7 @@ The TAPR profile policy distinguishes primary suppression (`-1`), complementary 
 
 ## Charter transfer estimates
 
-The model remains `observed sum + 5 × suppressed flow count`, at origin-campus/destination-campus grain. Observed totals, protected counts, modeled contributions, and the model identifier stay separate. Five is the historical midpoint scenario, not a TEA disclosure bound or a confidence interval. Larger counts may also be masked. Missing, invalid, or unresolved flows are not silently assigned five. See the [canonical methodology](../teadata/methodologies/charter-transfer-midpoint.md).
+The model remains `observed sum + 5 × suppressed flow count`, at origin-campus/destination-campus grain. Observed totals, protected counts, modeled contributions, and the model identifier stay separate. Five is the historical midpoint scenario, not a TEA disclosure bound or a confidence interval. Larger counts may also be masked. Missing, invalid, or unresolved flows are not silently assigned five. See the [versioned methodology](https://github.com/adpena/teadata/blob/c5cd4fe8b24d61bdcfe0f92faad3e7074f1d34d2/teadata/methodologies/charter-transfer-midpoint.md).
 
 Unresolved entity joins are retained for investigation and block release publication. Affected complete totals and estimates are unavailable; the observed partial sum remains inspectable. The initial migration found 59 transfer rows for Rocketship Explore EL (`220820102`) absent from the spatial roster despite a matching TAPR record. The reporting roster now supplies historical entity identity and classification independently of geometry. Missing geometry does not discard analytical rows or invent coordinates. This repair does not establish an active/closed date or complete the dataset refresh.
 

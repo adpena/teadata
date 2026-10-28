@@ -1,18 +1,19 @@
 import json
+from hashlib import sha256
 import subprocess
 import sys
 
 import pytest
 
 from teadata.verification import Check, GIT_LFS_PRE_PUSH, ReceiptError, install_pre_push_hook, run_checks, source_identity, verify_receipt
-from teadata.verification import _environment_identity, _test_environment
+from teadata.verification import _controller_python_version, _environment_identity, _test_environment
 
 
 @pytest.fixture
 def project(tmp_path, monkeypatch):
     # Keep receipt-policy tests independent of concurrent package development.
     # The paired integration smoke exercises the real environment capture.
-    monkeypatch.setattr("teadata.verification._environment_identity", lambda *args: {"python": "test-runtime"})
+    monkeypatch.setattr("teadata.verification._environment_identity", lambda *args: {"python": _controller_python_version()})
     subprocess.run(["git", "init", "--quiet", str(tmp_path)], check=True)
     subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "Local verification test"], check=True)
     subprocess.run(["git", "-C", str(tmp_path), "config", "user.email", "verification@example.invalid"], check=True)
@@ -26,6 +27,63 @@ def project(tmp_path, monkeypatch):
 
 def passing():
     return [Check("example", ("@python", "-c", "print('checked')"))]
+
+
+def paired_routing(monkeypatch, version, *, environment_version=None):
+    """Capture setup routing without provisioning a product environment."""
+    monkeypatch.setattr("teadata.verification._controller_python_version", lambda: version)
+    probes = []
+    calls = []
+
+    def identity(python, kind, root):
+        probes.append(python)
+        return {"python": environment_version or version}
+
+    def check(check, root, log, replacements, environment, timeout):
+        calls.append((check, replacements.copy(), environment.copy()))
+        log.write_text("owned setup-policy fixture\n")
+        return {**check.to_dict(), "returncode": 0, "duration_seconds": 0,
+                "timed_out": False, "interrupted": False,
+                "log": log.name, "log_sha256": sha256(log.read_bytes()).hexdigest()}
+
+    monkeypatch.setattr("teadata.verification._environment_identity", identity)
+    monkeypatch.setattr("teadata.verification._run_check", check)
+    return calls, probes
+
+
+@pytest.mark.parametrize("version", ["3.14.9", "3.14.10", "3.15.1"])
+def test_paired_setup_and_verification_share_actual_controller_runtime(project, monkeypatch, version):
+    calls, probes = paired_routing(monkeypatch, version)
+    receipt = run_checks(project, kind="app", paired_library=project, checks=passing())
+    result = verify_receipt(receipt, project, kind="app", paired_library=project, checks=passing())
+    assert result["status"] == "passed" and result["python_version"] == version
+    assert calls[0][0].argv == ("uv", "sync", "--locked", "--python", version)
+    environment = project / ".local" / f"check-env-{version}"
+    import os
+    python = str(environment / ("Scripts/python.exe" if os.name == "nt" else "bin/python"))
+    assert all(call[1]["@python"] == python for call in calls)
+    assert all(call[2]["UV_PROJECT_ENVIRONMENT"] == str(environment) for call in calls)
+    assert probes == [python, python, python]
+    assert str(project) not in receipt.read_text()
+    assert sys.executable not in receipt.read_text()
+
+
+def test_paired_setup_cannot_pass_when_uv_uses_the_wrong_runtime(project, monkeypatch):
+    paired_routing(monkeypatch, "3.15.1", environment_version="3.12.15")
+    receipt = run_checks(project, kind="app", paired_library=project, checks=passing())
+    result = json.loads(receipt.read_text())
+    assert all(check["returncode"] == 0 for check in result["checks"])
+    assert result["status"] == "failed"
+    with pytest.raises(ReceiptError, match="passing"):
+        verify_receipt(receipt, project, kind="app", paired_library=project, checks=passing())
+
+
+def test_a_different_controller_runtime_cannot_reuse_a_paired_receipt(project, monkeypatch):
+    paired_routing(monkeypatch, "3.14.9")
+    receipt = run_checks(project, kind="app", paired_library=project, checks=passing())
+    monkeypatch.setattr("teadata.verification._controller_python_version", lambda: "3.15.1")
+    with pytest.raises(ReceiptError, match="different Python runtime"):
+        verify_receipt(receipt, project, kind="app", paired_library=project, checks=passing())
 
 
 def test_passing_receipt_is_bound_to_source_logs_and_policy(project):

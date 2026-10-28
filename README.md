@@ -11,6 +11,13 @@ It provides:
 
 ## Installation
 
+Python 3.11 through 3.15 are supported. Python 3.15 uses conditional minimum
+versions for the scientific stack; earlier interpreters retain their existing
+locked dependencies. On macOS 3.15, the optional documentation tools build
+Watchdog's native FSEvents extension and require the
+[documented Xcode tools](https://pypi.org/project/watchdog/#dependencies).
+PyYAML's supported pure Python implementation is tested on 3.15.
+
 ### PyPI
 
 ```bash
@@ -25,7 +32,7 @@ cd teadata
 uv sync --all-extras
 ```
 
-Source datasets are separate from the checkout; an existing snapshot is enough
+Source datasets are separate from the checkout; a verified release bundle is enough
 for runtime use. Maintenance scripts default to `teadata/data/` beside the
 installed package, independent of the current working directory. Set
 `TEADATA_DATA_DIR` to use another dataset tree, or pass the scripts' explicit
@@ -37,8 +44,8 @@ for examples and onboarding details.
 ```python
 from teadata import DataEngine
 
-# Preferred runtime path: load the latest discovered snapshot.
-engine = DataEngine.from_snapshot(search=True)
+# Load the configured, hash-verified release.
+engine = DataEngine.load_default()
 
 # District lookup by district number, campus number, or name.
 aldine = engine.get_district("101902")

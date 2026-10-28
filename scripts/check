@@ -3,4 +3,4 @@ set -euo pipefail
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$project_root"
 exec uv run --isolated --locked --extra dev --extra database --extra scripts --extra speedups --python "${TEADATA_CHECK_PYTHON:-3.12}" \
-  python -m teadata.verification --kind library --root "$project_root" "$@"
+  python -I -m teadata.verification --kind library --root "$project_root" "$@"
