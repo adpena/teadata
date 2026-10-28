@@ -122,7 +122,11 @@ def default_checks(kind: str, *, release: str | None = None) -> list[Check]:
         checks = [
             Check("ruff", ("@python", "-m", "ruff", "check", ".")),
             Check("migrations", ("@python", "manage.py", "makemigrations", "--check", "--dry-run")),
-            Check("frontend-javascript", ("node", "--test", "static/js/tests/profile_map_shared.test.cjs", "static/js/tests/workspace_preview.test.cjs")),
+            Check("frontend-javascript", (
+                "node", "--test", "static/js/tests/profile_map_shared.test.cjs",
+                "static/js/tests/workspace_preview.test.cjs", "frontend/tests/adapter.test.mjs",
+                "frontend/tests/build.test.mjs",
+            )),
             Check("pytest", ("@python", "-m", "pytest")),
         ]
     else:
