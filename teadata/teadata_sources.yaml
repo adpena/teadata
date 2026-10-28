@@ -1,95 +1,711 @@
+contract_version: 1
 year_min: 2009
-
+value_policies:
+  numeric:
+    tokens:
+      .:
+        status: missing
+        reason: source_missing_value
+      n/a:
+        status: not_applicable
+        reason: source_not_applicable
+  tapr_profile:
+    reference_id: masking
+    tokens:
+      '-1':
+        status: suppressed
+        reason: primary_disclosure_control
+      '-3':
+        status: suppressed
+        reason: complementary_disclosure_control
+      '-2':
+        status: invalid
+        reason: source_reports_statistically_improbable_or_outside_reasonable_range
+      .:
+        status: missing
+        reason: source_data_unavailable
+      •:
+        status: missing
+        reason: source_data_unavailable
+      n/a:
+        status: not_applicable
+        reason: source_not_applicable
+  campus_transfers:
+    reference_id: masking
+    tokens:
+      '-999':
+        status: suppressed
+        reason: ferpa_primary_or_complementary_mask_no_documented_count_bounds
+      .:
+        status: missing
+        reason: report_separator_or_missing_count
 data_sources:
-  tapr:
-    2009: data/tapr/2009.csv
-    2013: data/tapr/2013.csv
-    2017: data/tapr/2017.parquet
-    2021: data/tapr/2021.parquet
-    2023: https://example.org/tapr/2023.parquet
-    latest: 2023
-  peims:
-    2009: data/peims/2009.csv
-    2012: data/peims/2012.csv
-    2016: data/peims/2016.parquet
-    2020: data/peims/2020.parquet
-    2024: data/peims/2024.parquet
-  askted:
-    2010: data/askted/2010.json
-    2018: data/askted/2018.json
-    current: https://example.org/askted/current.json
-  finance:
-    2009: data/finance/2009.xlsx
-    2015: data/finance/2015.parquet
-    2022: data/finance/2022.parquet
   accountability:
-    2025: data/accountability/2025-enhanced-statewide-summary-after-2023-appeal.xlsx
-    latest: 2025
+    2025:
+      path: data/accountability/2025-enhanced-statewide-summary-after-2023-appeal.xlsx
+      metadata:
+        title: 2025 Enhanced Statewide Accountability Summary After 2023 Appeal
+        publisher: Texas Education Agency
+        version: '2025'
+        period:
+          kind: calendar_year
+          year: 2025
+        identifiers: []
+        notes: Migrated local input. Original download timestamp and acquisition URL
+          are unknown; local observation must not be presented as an original download.
+        provenance_ids:
+        - e87ba7172177f83a1f0223d969ab1ba792a784953e41a2ca7a999257c8f93379
+        references:
+        - reference_id: dictionary
+          role: data_dictionary
+          status: unreviewed
+          provenance_ids: []
+        - reference_id: masking
+          role: masking_methodology
+          status: unreviewed
+          provenance_ids: []
+        field_year: 2025
+        value_policy: numeric
+        metrics:
+          rating:
+            field: rating
+            period:
+              kind: calendar_year
+              year: 2025
+            unit: text
+          enrollment:
+            field: enrollment
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: count
+      reader:
+        profiles:
+          ratings:
+            sheet_name: 2011-{field_year} Summary
+            columns:
+              overall_rating: '{field_year} Overall Rating'
+            required_columns:
+            - overall_rating
+            expected_columns_sha256: 0ef54242f45d7082eb2978daf7020b5e4460638ed33452e33baba0cab2b69fb8
+          enrollment:
+            sheet_name: '{field_year} State Summary'
+            columns:
+              number_of_students: Number of Students
+            required_columns:
+            - number_of_students
+            expected_columns_sha256: 4f78a4d994ab350375587b69f7ccdba340f81fbd17aceede05a87c81dd0e6450
   charter_reference:
-    2025: data/charter_reference/AskTED Directory_09.30.2025.xlsx
-    latest: 2025
+    2025:
+      path: data/charter_reference/AskTED Directory_09.30.2025.xlsx
+      metadata:
+        title: Charter Reference
+        publisher: Texas Education Agency
+        version: '2025'
+        period:
+          kind: as_of
+          as_of: '2025-09-30'
+        identifiers: []
+        notes: Migrated local input. Original download timestamp and acquisition URL
+          are unknown; local observation must not be presented as an original download.
+          The as-of reference date follows the maintained source filename; it is not
+          a verified original download or publication date.
+        provenance_ids:
+        - cf5575ed8b603239e6d5206cfad6a5aac40e7b48bfae2bb5e41b3bb0b9f6bb85
+        references:
+        - reference_id: dictionary
+          role: data_dictionary
+          status: unreviewed
+          provenance_ids: []
+        - reference_id: masking
+          role: masking_methodology
+          status: unreviewed
+          provenance_ids: []
+        value_policy: numeric
+        metrics: {}
+      reader:
+        expected_columns_sha256: 7d713f06e1f85157731234e4c302415c14ab7a328c49fea08e7eb995b2f0e498
   campus_transfer_reports:
-    2025: data/transfer_reports/xfers_campus_2024_25.csv
-    latest: 2025
+    2025:
+      path: data/transfer_reports/xfers_campus_2024_25.csv
+      metadata:
+        title: 2024-2025 Campus Transfer Report
+        publisher: Texas Education Agency
+        version: '2025'
+        period:
+          kind: school_year
+          start_year: 2024
+          end_year: 2025
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/campus_transfer_report.html
+        identifiers: []
+        notes: Migrated local input. Original download timestamp and acquisition URL
+          are unknown; local observation must not be presented as an original download.
+        provenance_ids:
+        - d8fb8c735fdc89749c1593c494c8f73f6c8ef966ab885771af68717650e3871b
+        references:
+        - reference_id: methodology
+          role: methodology
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/about_transfer_reports.html
+          title: About Transfer Reports
+          status: available
+          provenance_ids:
+          - e853850f4f9931afc5e755de31ff3f78cfd2fa5c1f9b21f6049152d3728f40c1
+        - reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.download_transfer_report.sas&school_year=2025&report_format=csv&agg_level=district&scope=District&district=101902+ALDINE+ISD&_debug=0
+          title: '2024-25 TEA transfer CSV: masking notes and row definitions'
+          status: available
+          provenance_ids:
+          - e3e2f6bca13894474b210d2d8b84849f84330f2c5e6e72b96ca9379d89548346
+        - reference_id: estimate_methodology
+          role: methodology
+          url: https://github.com/adpena/teadata/blob/main/teadata/methodologies/charter-transfer-midpoint.md
+          path: methodologies/charter-transfer-midpoint.md
+          title: TEA Data charter transfer midpoint scenario, version 1
+          status: available
+          provenance_ids:
+          - 2d78b38ec7fe38d5cfb96a8a9c73e9d5784ee13ff758c04b5d0f58501677f029
+        value_policy: campus_transfers
+        metrics: {}
+        estimation:
+          model_id: charter_cost_tracker_midpoint_v1
+          value_per_suppressed: 5
+          grain: origin_campus_destination_campus
+          description: 'Legacy Charter Cost Tracker midpoint scenario: add five students
+            for each suppressed origin-campus/destination-campus flow. Larger values
+            can also be masked by TEA; this assumption is not a documented disclosure
+            bound or confidence interval. Aggregate estimates from this grain without
+            imputing a second time.'
+          reference_id: estimate_methodology
+      reader:
+        dtype: str
+        keep_default_na: false
+        required_columns:
+        - REPORT_CAMPUS
+        - CAMPUS_RES_OR_ATTEND
+        - TRANSFERS_IN_OR_OUT
+        - REPORT_TYPE
+        expected_columns_sha256: feeaa0a10a45844495b0aa9b0584757446533db97af7bd6500bc7098146b0fd5
   campus_peims_financials:
-    2024: data/campus_peims_financials/2023-2024 Campus PEIMS Actual Financials Statewide.csv
-    latest: 2024
+    2024:
+      path: data/campus_peims_financials/2023-2024 Campus PEIMS Actual Financials
+        Statewide.csv
+      metadata:
+        title: 2023-2024 Campus PEIMS Actual Financials
+        publisher: Texas Education Agency
+        version: '2024'
+        period:
+          kind: fiscal_year
+          start_year: 2023
+          end_year: 2024
+        identifiers: []
+        notes: Migrated local input. Original download timestamp and acquisition URL
+          are unknown; local observation must not be presented as an original download.
+        provenance_ids:
+        - 9f2a5991359e7ec284ec747a7785025101c2184636336953b478fec5a6b8fe99
+        references:
+        - reference_id: dictionary
+          role: data_dictionary
+          status: unreviewed
+          provenance_ids: []
+        - reference_id: masking
+          role: masking_methodology
+          status: unreviewed
+          provenance_ids: []
+        value_policy: numeric
+        metrics: {}
+      reader:
+        dtype: str
+        keep_default_na: false
+        required_columns:
+        - campus_number
+        expected_columns_sha256: 8062716f35d7afa119baf5a18625f117b5261c9d7a087c1c3b33c89207c396d3
   campus_tapr_student_staff_profile:
-    2024: data/tapr/CAMPPROF_2023-2024_FINAL.xlsx
-    2025: data/tapr/CAMPPROF_2024-2025_FINAL.xlsx
-    latest: 2025
+    2024:
+      path: data/tapr/CAMPPROF_2023-2024_FINAL.xlsx
+      metadata:
+        title: 2023-2024 TAPR Campus Profile
+        publisher: Texas Education Agency
+        version: '2024'
+        period:
+          kind: school_year
+          start_year: 2023
+          end_year: 2024
+        value_policy: tapr_profile
+        notes: Migrated local input. Original download timestamp and acquisition URL
+          are unknown; local observation must not be presented as an original download.
+        field_year: 2024
+        source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/index.html
+        metrics:
+          student_membership_attrition_all_students_percent:
+            field: campus_2024_student_membership_2022_23_attrition_all_students_percent
+            period:
+              kind: school_year
+              start_year: 2022
+              end_year: 2023
+            unit: percent
+          student_membership_mobility_all_students_percent:
+            field: campus_2024_student_membership_2023_mobility_all_students_percent
+            period:
+              kind: school_year
+              start_year: 2022
+              end_year: 2023
+            unit: percent
+        references:
+        - reference_id: glossary
+          role: glossary
+          status: unreviewed
+        - reference_id: dictionary
+          role: data_dictionary
+          status: unreviewed
+        - reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+          title: 2023-2024 TAPR Masking Rules
+          status: unreviewed
+      reader:
+        dtype: str
+        keep_default_na: false
+        expected_columns_sha256: 3f3abef7b6b085bbe9af43feee8efbcdc87707d2d7e5f4e83a5b8758a344e686
+    2025:
+      path: data/tapr/CAMPPROF_2024-2025_FINAL.xlsx
+      metadata:
+        title: 2024-2025 TAPR Campus Profile
+        publisher: Texas Education Agency
+        version: '2025'
+        period:
+          kind: school_year
+          start_year: 2024
+          end_year: 2025
+        source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html
+        identifiers: []
+        notes: Migrated local input. Original download timestamp and acquisition URL
+          are unknown; local observation must not be presented as an original download.
+        provenance_ids:
+        - e372be5cf18af4f445c6e39bdf14a1cb01a14052509ba5f33dd8b98892c1b6ee
+        references:
+        - reference_id: glossary
+          role: glossary
+          url: https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf
+          title: 2024-25 Comprehensive TAPR Glossary
+          status: available
+          provenance_ids:
+          - e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db
+        - reference_id: dictionary
+          role: data_dictionary
+          status: unreviewed
+          provenance_ids: []
+        - reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html
+          title: 2024-2025 TAPR Masking Rules
+          status: available
+          provenance_ids:
+          - 6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554
+        field_year: 2025
+        value_policy: tapr_profile
+        metrics:
+          student_membership_attrition_all_students_percent:
+            field: campus_2025_student_membership_2023_24_attrition_all_students_percent
+            period:
+              kind: school_year
+              start_year: 2023
+              end_year: 2024
+            unit: percent
+          student_membership_mobility_all_students_percent:
+            field: campus_2025_student_membership_2024_mobility_all_students_percent
+            period:
+              kind: school_year
+              start_year: 2023
+              end_year: 2024
+            unit: percent
+      reader:
+        dtype: str
+        keep_default_na: false
+        expected_columns_sha256: 563a7225939fc582d1231f60a3f5b7c28fa20c90cf77310d72d0e68a2230e58d
   campus_tapr_historical_enrollment:
-    2014: data/tapr/CAMPPROF_2014-2015_FINAL.xlsx
-    latest: 2014
+    2014:
+      path: data/tapr/CAMPPROF_2014-2015_FINAL.xlsx
+      metadata:
+        title: 2014-2015 TAPR Campus Profile
+        publisher: Texas Education Agency
+        version: '2014'
+        period:
+          kind: school_year
+          start_year: 2014
+          end_year: 2015
+        source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2015/index.html
+        identifiers: []
+        notes: Migrated local input. Original download timestamp and acquisition URL
+          are unknown; local observation must not be presented as an original download.
+        provenance_ids:
+        - ba35ba689f64bbb2e1032f8c8b757c21e5f6fd1669bcfa81e3049c162e91e596
+        references:
+        - reference_id: glossary
+          role: glossary
+          status: unreviewed
+          provenance_ids: []
+        - reference_id: dictionary
+          role: data_dictionary
+          status: unreviewed
+          provenance_ids: []
+        - reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2015/masking.html
+          title: 2014-2015 TAPR Masking Rules
+          status: available
+          provenance_ids:
+          - a21ab80812dc465642be50f51bddcaeed49abcb2bd2dbbded86d805b332d08fc
+        field_year: 2015
+        value_policy: tapr_profile
+        metrics: {}
+      reader:
+        dtype: str
+        keep_default_na: false
+        expected_columns_sha256: 4363586dbf516e792f11c1490b058d64099561dd50a8fd1638d83e1037a5acb0
   district_tapr_student_staff_profile:
-    2024: data/tapr/DISTPROF_2023-2024_FINAL.xlsx
-    2025: data/tapr/DISTPROF_2024-2025_FINAL.xlsx
-    latest: 2025
+    2024:
+      path: data/tapr/DISTPROF_2023-2024_FINAL.xlsx
+      metadata:
+        title: 2023-2024 TAPR District Profile
+        publisher: Texas Education Agency
+        version: '2024'
+        period:
+          kind: school_year
+          start_year: 2023
+          end_year: 2024
+        value_policy: tapr_profile
+        notes: Migrated local input. Original download timestamp and acquisition URL
+          are unknown; local observation must not be presented as an original download.
+        field_year: 2024
+        source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/index.html
+        metrics:
+          student_membership_attrition_all_students_percent:
+            field: district_2024_student_membership_2022_23_attrition_all_students_percent
+            period:
+              kind: school_year
+              start_year: 2022
+              end_year: 2023
+            unit: percent
+          student_membership_mobility_all_students_percent:
+            field: district_2024_student_membership_2023_mobility_all_students_percent
+            period:
+              kind: school_year
+              start_year: 2022
+              end_year: 2023
+            unit: percent
+        references:
+        - reference_id: glossary
+          role: glossary
+          status: unreviewed
+        - reference_id: dictionary
+          role: data_dictionary
+          status: unreviewed
+        - reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+          title: 2023-2024 TAPR Masking Rules
+          status: unreviewed
+      reader:
+        dtype: str
+        keep_default_na: false
+        expected_columns_sha256: db81a35ca8fa64e2ba25b4a6df775b1cc3b7e2179d37782507d8083885277c1a
+    2025:
+      path: data/tapr/DISTPROF_2024-2025_FINAL.xlsx
+      metadata:
+        title: 2024-2025 TAPR District Profile
+        publisher: Texas Education Agency
+        version: '2025'
+        period:
+          kind: school_year
+          start_year: 2024
+          end_year: 2025
+        source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html
+        identifiers: []
+        notes: Migrated local input. Original download timestamp and acquisition URL
+          are unknown; local observation must not be presented as an original download.
+        provenance_ids:
+        - 15f0551abeda2ffc4c4e6f26c2ab3a4d7092516cdffb383d363068a56cedec2d
+        references:
+        - reference_id: glossary
+          role: glossary
+          url: https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf
+          title: 2024-25 Comprehensive TAPR Glossary
+          status: available
+          provenance_ids:
+          - e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db
+        - reference_id: dictionary
+          role: data_dictionary
+          status: unreviewed
+          provenance_ids: []
+        - reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html
+          title: 2024-2025 TAPR Masking Rules
+          status: available
+          provenance_ids:
+          - 6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554
+        field_year: 2025
+        value_policy: tapr_profile
+        metrics:
+          student_membership_attrition_all_students_percent:
+            field: district_2025_student_membership_2023_24_attrition_all_students_percent
+            period:
+              kind: school_year
+              start_year: 2023
+              end_year: 2024
+            unit: percent
+          student_membership_mobility_all_students_percent:
+            field: district_2025_student_membership_2024_mobility_all_students_percent
+            period:
+              kind: school_year
+              start_year: 2023
+              end_year: 2024
+            unit: percent
+      reader:
+        dtype: str
+        keep_default_na: false
+        expected_columns_sha256: ea485ffb933bd7f9d3292eacae23b28b139da7bfc8061f6ff257ba4efa639d2a
   campus_planned_closures:
-    2025: data/closures/Planned School Closures_10.03.2025.xlsx
-    latest: 2025
+    2025:
+      path: data/closures/Planned School Closures_10.03.2025.xlsx
+      metadata:
+        title: Campus Planned Closures
+        version: '2025'
+        period:
+          kind: as_of
+          as_of: '2025-10-03'
+        identifiers: []
+        notes: Migrated local input. Original download timestamp and acquisition URL
+          are unknown; local observation must not be presented as an original download.
+          The as-of reference date follows the maintained source filename; it is not
+          a verified original download or publication date.
+        provenance_ids:
+        - f9ba6e5a14a68797b63e6ba8c2ec17382fbe290c0ea6d62070b1b718afd2edc7
+        references:
+        - reference_id: dictionary
+          role: data_dictionary
+          status: unreviewed
+          provenance_ids: []
+        - reference_id: masking
+          role: masking_methodology
+          status: unreviewed
+          provenance_ids: []
+        value_policy: numeric
+        metrics: {}
+      reader:
+        expected_columns_sha256: 44c283e517a26e7a709da0de1a2a316aea7f4cc33b911332ab3043a884ccb9cf
   tepsac:
-    2025: data/tepsac/tepsac_geocoded_FINAL.csv
-    latest: 2025
+    2025:
+      path: data/tepsac/tepsac_geocoded_FINAL.csv
+      metadata:
+        title: Tepsac
+        publisher: Texas Private School Accreditation Commission
+        version: '2025'
+        period:
+          kind: unknown
+        identifiers: []
+        notes: Migrated local input. Original download timestamp and acquisition URL
+          are unknown; local observation must not be presented as an original download.
+        provenance_ids:
+        - f28b6ae19f550a8243d84adb50f8bc63a974d6ecdfac72b8bf897d8b568b5611
+        references:
+        - reference_id: dictionary
+          role: data_dictionary
+          status: unreviewed
+          provenance_ids: []
+        - reference_id: masking
+          role: masking_methodology
+          status: unreviewed
+          provenance_ids: []
+        value_policy: numeric
+        metrics: {}
+      reader:
+        dtype:
+          district_number: str
+          school_number: str
+        expected_columns_sha256: c43f28b730a9c1bd0f386f574f2525e156183ccfb9dd0d4ca438204b8cb17f3d
   tefa:
-    2025: data/tefa/tx_efa_finder.xlsx
-    latest: 2025
+    2025:
+      path: data/tefa/tx_efa_finder.xlsx
+      metadata:
+        title: Tefa
+        version: '2025'
+        period:
+          kind: unknown
+        identifiers: []
+        notes: Migrated local input. Original download timestamp and acquisition URL
+          are unknown; local observation must not be presented as an original download.
+        provenance_ids:
+        - 8351630b431017956599320de27d4b0254fc65a95583a0931d50c4ca79cdaabf
+        references:
+        - reference_id: dictionary
+          role: data_dictionary
+          status: unreviewed
+          provenance_ids: []
+        - reference_id: masking
+          role: masking_methodology
+          status: unreviewed
+          provenance_ids: []
+        value_policy: numeric
+        metrics: {}
+      reader:
+        expected_columns_sha256: 404621f0a90bc8cc8563ead202ee2b203436b329e10f425fb12f3dd0c15da7de
   all_districts_reference:
-    2025: data/all_districts_reference/ALL_DISTRICTS_ACTIVE.xlsx
-    latest: 2025
+    2025:
+      path: data/all_districts_reference/ALL_DISTRICTS_ACTIVE.xlsx
+      metadata:
+        title: All Districts Reference
+        publisher: Texas Education Agency
+        version: '2025'
+        period:
+          kind: unknown
+        identifiers: []
+        notes: Migrated local input. Original download timestamp and acquisition URL
+          are unknown; local observation must not be presented as an original download.
+        provenance_ids:
+        - 213f5f4174dd4fac2e7198c61f437db110fdbe774f71cc19cc725f528574582d
+        references:
+        - reference_id: dictionary
+          role: data_dictionary
+          status: unreviewed
+          provenance_ids: []
+        - reference_id: masking
+          role: masking_methodology
+          status: unreviewed
+          provenance_ids: []
+        value_policy: numeric
+        metrics: {}
+      reader:
+        columns:
+          enrollment: Enrollment as of Oct 2024
+        expected_columns_sha256: f7cec2f00304334b95ec04f8af0460dacc626540af57ff34442fd21a7ba605b6
   all_districts_reference2:
-    2025: data/all_districts_reference/DREF.xlsx
-    latest: 2025
-
+    2025:
+      path: data/all_districts_reference/DREF.xlsx
+      metadata:
+        title: All Districts Reference2
+        publisher: Texas Education Agency
+        version: '2025'
+        period:
+          kind: unknown
+        identifiers: []
+        notes: Migrated local input. Original download timestamp and acquisition URL
+          are unknown; local observation must not be presented as an original download.
+        provenance_ids:
+        - 29491e87049bc2ff75251f9b2c4613e7f7ee74f5b163c47c3a96b0d206931e00
+        references:
+        - reference_id: dictionary
+          role: data_dictionary
+          status: unreviewed
+          provenance_ids: []
+        - reference_id: masking
+          role: masking_methodology
+          status: unreviewed
+          provenance_ids: []
+        value_policy: numeric
+        metrics: {}
+      reader:
+        expected_columns_sha256: 46307b03a775a50809d0424a784ddff7e2cec578ad172228726226fd23d3212c
 spatial:
   districts:
-    2025: data/shapes/Current_Districts_2025.geojson
-    latest: 2025
+    2025:
+      path: data/shapes/Current_Districts_2025.geojson
+      metadata:
+        title: Districts
+        publisher: Texas Education Agency
+        version: '2025'
+        period:
+          kind: unknown
+        identifiers: []
+        notes: Migrated local input. Original download timestamp and acquisition URL
+          are unknown; local observation must not be presented as an original download.
+        provenance_ids:
+        - 496db5c6864c6ccfc177b875afcded8b9afcbab980681867e6a5d179ab86437a
+        references:
+        - reference_id: dictionary
+          role: data_dictionary
+          status: unreviewed
+          provenance_ids: []
+        - reference_id: masking
+          role: masking_methodology
+          status: unreviewed
+          provenance_ids: []
+        value_policy: numeric
+        metrics: {}
+      reader:
+        required_columns:
+        - DISTRICT_C
+        - geometry
+        expected_columns_sha256: 3f7d41b3849589cb2df0a29b8f113e3b75ccd94657cf154822478a8cde8008ff
   campuses:
-    2025: data/shapes/Schools_2024_to_2025.geojson
-    latest: 2025
-
+    2025:
+      path: data/shapes/Schools_2024_to_2025.geojson
+      metadata:
+        title: Campuses
+        publisher: Texas Education Agency
+        version: '2025'
+        period:
+          kind: school_year
+          start_year: 2024
+          end_year: 2025
+        identifiers: []
+        notes: Migrated local input. Original download timestamp and acquisition URL
+          are unknown; local observation must not be presented as an original download.
+        provenance_ids:
+        - b781fe9fd52b060b9336814df0932a22ec07ce47801998b7a24f7160adbc571a
+        references:
+        - reference_id: dictionary
+          role: data_dictionary
+          status: unreviewed
+          provenance_ids: []
+        - reference_id: masking
+          role: masking_methodology
+          status: unreviewed
+          provenance_ids: []
+        value_policy: numeric
+        metrics: {}
+      reader:
+        required_columns:
+        - geometry
+        expected_columns_sha256: e66b5049f5bcb605f217d362ae78a3027221e7d1164992763c27ab8a4ba68a2c
 schema:
   data_sources:
-    tapr: ["parquet","csv"]
-    accountability: ["parquet","csv", "xlsx"]
-    finance: ["parquet","csv","xlsx"]
-    charter_reference: ["xlsx"]
-    campus_transfer_reports: ["csv"]
-    campus_peims_financials: ["csv"]
-    campus_tapr_student_staff_profile: ["xlsx"]
-    campus_tapr_historical_enrollment: ["xlsx"]
-    district_tapr_student_staff_profile: ["xlsx"]
-    campus_planned_closures: ["xlsx"]
-    private_schools: ["csv"]
-    tepsac: ["csv"]
-    tefa: ["xlsx"]
-    all_districts_reference: ["xlsx"]
-    all_districts_reference2: ["xlsx"]
+    accountability:
+    - parquet
+    - csv
+    - xlsx
+    charter_reference:
+    - xlsx
+    campus_transfer_reports:
+    - csv
+    campus_peims_financials:
+    - csv
+    campus_tapr_student_staff_profile:
+    - xlsx
+    campus_tapr_historical_enrollment:
+    - xlsx
+    district_tapr_student_staff_profile:
+    - xlsx
+    campus_planned_closures:
+    - xlsx
+    tepsac:
+    - csv
+    tefa:
+    - xlsx
+    all_districts_reference:
+    - xlsx
+    all_districts_reference2:
+    - xlsx
   spatial:
-    districts: ["geojson","gpkg","parquet"]
-    campuses: ["geojson","gpkg","parquet"]
-
+    districts:
+    - geojson
+    - gpkg
+    - parquet
+    campuses:
+    - geojson
+    - gpkg
+    - parquet
 options:
-  cache: true
-  log_level: INFO
+  private_dataset: tefa

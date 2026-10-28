@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 import csv
 import math
 import re
@@ -11,18 +12,7 @@ from openpyxl.styles import Alignment, Font, PatternFill  # type: ignore[import-
 from openpyxl.utils import get_column_letter  # type: ignore[import-untyped]
 from openpyxl.worksheet.table import Table, TableStyleInfo  # type: ignore[import-untyped]
 
-RAW_DIR = Path("teadata/data/tapr/raw")
-OUT_DIR = Path("teadata/data/tapr")
-
-CAMPUS_STUDENT = RAW_DIR / "2025 Campus Student Information.csv"
-CAMPUS_STAFF = RAW_DIR / "2025 Campus Staff Information.csv"
-DISTRICT_STUDENT = RAW_DIR / "2025 District Student Information.csv"
-DISTRICT_STAFF = RAW_DIR / "2025 District Staff Information.csv"
-
-CAMPUS_OUT = OUT_DIR / "CAMPPROF_2024-2025_FINAL.xlsx"
-DISTRICT_OUT = OUT_DIR / "DISTPROF_2024-2025_FINAL.xlsx"
-CAMPUS_ELEMENTS_OUT = OUT_DIR / "CAMPPROF_2024-2025_data_elements.xlsx"
-DISTRICT_ELEMENTS_OUT = OUT_DIR / "DISTPROF_2024-2025_data_elements.xlsx"
+from teadata.scripts.paths import data_path
 
 
 def sanitize_header(s: str) -> str:
@@ -353,23 +343,41 @@ def _write_elements_workbook(
     )
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description="Build 2025 TAPR campus and district profiles."
+    )
+    parser.add_argument("--input-dir", type=Path, default=data_path("tapr", "raw"))
+    parser.add_argument("--output-dir", type=Path, default=data_path("tapr"))
+    args = parser.parse_args(argv)
+    campus_student = args.input_dir / "2025 Campus Student Information.csv"
+    campus_staff = args.input_dir / "2025 Campus Staff Information.csv"
+    district_student = args.input_dir / "2025 District Student Information.csv"
+    district_staff = args.input_dir / "2025 District Staff Information.csv"
+    campus_out = args.output_dir / "CAMPPROF_2024-2025_FINAL.xlsx"
+    district_out = args.output_dir / "DISTPROF_2024-2025_FINAL.xlsx"
+    campus_elements_out = args.output_dir / "CAMPPROF_2024-2025_data_elements.xlsx"
+    district_elements_out = args.output_dir / "DISTPROF_2024-2025_data_elements.xlsx"
     rename_map = {
         "6_digit_county_district_number": "district_number",
         "9_digit_campus_number": "campus_number",
     }
 
-    campus_student_headers, campus_student_rows, campus_student_elements = _read_tapr_csv(
-        CAMPUS_STUDENT, rename_map=rename_map, key_field="campus_number"
+    campus_student_headers, campus_student_rows, campus_student_elements = (
+        _read_tapr_csv(campus_student, rename_map=rename_map, key_field="campus_number")
     )
     campus_staff_headers, campus_staff_rows, campus_staff_elements = _read_tapr_csv(
-        CAMPUS_STAFF, rename_map=rename_map, key_field="campus_number"
+        campus_staff, rename_map=rename_map, key_field="campus_number"
     )
-    district_student_headers, district_student_rows, district_student_elements = _read_tapr_csv(
-        DISTRICT_STUDENT, rename_map=rename_map, key_field="district_number"
+    district_student_headers, district_student_rows, district_student_elements = (
+        _read_tapr_csv(
+            district_student, rename_map=rename_map, key_field="district_number"
+        )
     )
-    district_staff_headers, district_staff_rows, district_staff_elements = _read_tapr_csv(
-        DISTRICT_STAFF, rename_map=rename_map, key_field="district_number"
+    district_staff_headers, district_staff_rows, district_staff_elements = (
+        _read_tapr_csv(
+            district_staff, rename_map=rename_map, key_field="district_number"
+        )
     )
 
     campus_headers, campus_records = _merge_tables(
@@ -378,7 +386,12 @@ def main() -> None:
         campus_staff_headers,
         campus_staff_rows,
         key_field="campus_number",
-        preferred_cols=("campus_number", "campus_name", "district_number", "district_name"),
+        preferred_cols=(
+            "campus_number",
+            "campus_name",
+            "district_number",
+            "district_name",
+        ),
     )
     district_headers, district_records = _merge_tables(
         district_student_headers,
@@ -393,14 +406,14 @@ def main() -> None:
     district_rows = _rows_for_headers(district_headers, district_records)
 
     _write_workbook(
-        CAMPUS_OUT,
+        campus_out,
         sheet_name="campus_tapr_2025",
         headers=campus_headers,
         rows=campus_rows,
         table_name="campus_tapr_2025",
     )
     _write_workbook(
-        DISTRICT_OUT,
+        district_out,
         sheet_name="district_tapr_2025",
         headers=district_headers,
         rows=district_rows,
@@ -417,13 +430,13 @@ def main() -> None:
         el["source"] = "district_staff"
 
     _write_elements_workbook(
-        CAMPUS_ELEMENTS_OUT,
+        campus_elements_out,
         sheet_name="campus_tapr_elements_2025",
         elements=campus_student_elements + campus_staff_elements,
         table_name="campus_tapr_elements_2025",
     )
     _write_elements_workbook(
-        DISTRICT_ELEMENTS_OUT,
+        district_elements_out,
         sheet_name="district_tapr_elements_2025",
         elements=district_student_elements + district_staff_elements,
         table_name="district_tapr_elements_2025",

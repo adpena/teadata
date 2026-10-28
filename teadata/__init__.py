@@ -66,5 +66,28 @@ except PackageNotFoundError:
     __version__ = "0.0.0"
 
 from .classes import DataEngine, District, Campus  # noqa: E402
+from .dataset_metadata import DataPeriod, DatasetMetadata, ResolvedDataset  # noqa: E402
+from .provenance import ProvenanceStore  # noqa: E402
+from .manifest import DatasetCatalog  # noqa: E402
+from .release import DataRelease, current_release  # noqa: E402
+from .values import Measurement, ValueStatus, ValuePolicy, EstimationPolicy, measure, aggregate  # noqa: E402
 
-__all__ = ["DataEngine", "District", "Campus", "__version__"]
+__all__ = [
+    "DataEngine",
+    "District",
+    "Campus",
+    "__version__",
+    "DataPeriod",
+    "DatasetMetadata",
+    "ResolvedDataset",
+    "ProvenanceStore",
+    "DatasetCatalog",
+    "DataRelease",
+    "current_release",
+    "Measurement",
+    "ValueStatus",
+    "ValuePolicy",
+    "EstimationPolicy",
+    "measure",
+    "aggregate",
+]

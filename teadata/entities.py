@@ -375,7 +375,7 @@ class Campus:
 
         percent_change: Optional[float]
         try:
-            percent_change = self.enrollment_percent_change_from_2015()
+            percent_change = self.enrollment_percent_change()
             if percent_change is not None:
                 percent_change = round(float(percent_change) * 100.0, 1)
         except ValueError:
@@ -461,34 +461,23 @@ class Campus:
             return self.point.distance(ShapelyPoint(*other))
         return euclidean((self.point.x, self.point.y), other)
 
-    def enrollment_percent_change_from_2015(self) -> float:
-        enrollment = self.enrollment
-        baseline = None
-        if (
-            isinstance(self.meta, dict)
-            and "campus_2015_student_enrollment_all_students_count" in self.meta
-        ):
-            baseline = self.meta["campus_2015_student_enrollment_all_students_count"]
-        elif hasattr(self, "campus_2015_student_enrollment_all_students_count"):
-            baseline = getattr(
-                self, "campus_2015_student_enrollment_all_students_count"
-            )
-        if enrollment is None:
-            raise ValueError("Current enrollment is missing or None.")
-        if baseline is None:
-            raise ValueError("Baseline 2015 enrollment is missing or None.")
-        try:
-            enrollment_value = float(enrollment)
-            baseline_value = float(baseline)
-        except Exception as exc:  # pragma: no cover - defensive
-            raise ValueError(
-                "Enrollment or baseline could not be cast to float."
-            ) from exc
-        if baseline_value == 0:
-            raise ValueError(
-                "Baseline 2015 enrollment is zero, cannot compute percent change."
-            )
-        return (enrollment_value - baseline_value) / baseline_value
+    @property
+    def dataset_catalog(self):
+        from .manifest import ContractError
+        catalog = getattr(self._repo, "catalog", None)
+        if catalog is None:
+            raise ContractError("Entity is not bound to a data release")
+        return catalog
+
+    def metric(self, name: str):
+        return self.dataset_catalog.measurement(self, name, scope="campus")
+
+    def enrollment_percent_change(self) -> float:
+        current = self.metric("tapr.student_enrollment_all_students_count").numeric
+        baseline = self.metric("baseline.student_enrollment_all_students_count").numeric
+        if current is None or baseline is None or baseline <= 0:
+            raise ValueError("Enrollment change requires observed current and positive baseline enrollment")
+        return (current - baseline) / baseline
 
     @property
     def num_charter_transfer_destinations(self) -> int:

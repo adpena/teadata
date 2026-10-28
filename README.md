@@ -25,6 +25,13 @@ cd teadata
 uv sync --all-extras
 ```
 
+Source datasets are separate from the checkout; an existing snapshot is enough
+for runtime use. Maintenance scripts default to `teadata/data/` beside the
+installed package, independent of the current working directory. Set
+`TEADATA_DATA_DIR` to use another dataset tree, or pass the scripts' explicit
+input/output options. See [Configuration & Resolution](docs/config.md#maintenance-script-paths)
+for examples and onboarding details.
+
 ## Quick Start
 
 ```python
@@ -52,8 +59,8 @@ from teadata import DataEngine, District, Campus
 
 Core behaviors:
 
-- `DataEngine.from_snapshot(...)` supports `.pkl` and `.pkl.gz` snapshots and multiple payload shapes.
-- Snapshot discovery checks explicit paths, env vars, package `.cache`, and parent `.cache` directories.
+- `DataEngine.from_snapshot(...)` loads catalog-bound snapshots with verified release framing.
+- One release manifest selects and verifies every artifact; independent discovery is retired.
 - `District` and `Campus` support dynamic metadata attributes through `meta`.
 - `Campus.to_dict()` always includes `percent_enrollment_change` (numeric when available, otherwise `"N/A"`).
 
@@ -61,28 +68,30 @@ Core behaviors:
 
 `teadata` is intentionally cache-first.
 
+Source definitions can include dataset-specific reference periods, publisher
+details, URLs, citations, and provenance record identifiers. Use
+`cfg.resolve_dataset(...)` to query configured metadata; use `ProvenanceStore`
+to preserve immutable acquisition and processing history with archived file
+bytes. Unknown historical download dates remain unknown. See
+[dataset metadata and provenance](docs/config.md#dataset-metadata-and-provenance).
+
 Artifacts typically used at runtime:
 
-- `repo_*.pkl` / `repo_*.pkl.gz` (engine snapshot)
+- `snapshot_<build-id>.pkl.gz` (engine snapshot)
 - `boundaries_*.sqlite` (boundary WKB sidecar)
-- `map_payloads_*.sqlite` (map payload sidecar)
+- `maps_<build-id>.sqlite` (map payload sidecar)
 - `entities_*.sqlite` (entity lookup sidecar)
 
-If snapshot/store files are Git LFS pointers or missing locally, runtime asset resolvers can fetch real files when URL env vars are provided.
+The authoritative `release.json` binds the snapshot and sidecars to one catalog and verified hashes. Hydrate tracked assets with Git LFS, or configure an immutable remote release URL. Metadata, provenance, masking, estimates, and rebuild instructions are documented in [Dataset contracts and data releases](docs/data-releases.md).
 
 ### Environment Variables
 
-- `TEADATA_SNAPSHOT`: explicit snapshot path.
-- `TEADATA_SNAPSHOT_URL`: URL used when snapshot candidate is missing or a Git LFS pointer.
-- `TEADATA_BOUNDARY_STORE`: explicit boundary sqlite path.
-- `TEADATA_BOUNDARY_STORE_URL`: URL fallback for boundary store.
-- `TEADATA_MAP_STORE`: explicit map sqlite path.
-- `TEADATA_MAP_STORE_URL`: URL fallback for map store.
-- `TEADATA_ENTITY_STORE`: explicit entity sqlite path.
-- `TEADATA_ENTITY_STORE_URL`: URL fallback for entity store.
-- `TEADATA_ASSET_CACHE_DIR`: override cache directory used for downloaded assets.
-- `TEADATA_DISABLE_INDEXES`: disable default spatial acceleration indexes.
-- `TEADATA_LOG_MEMORY`: enable memory snapshot logging.
+- `TEADATA_RELEASE`: local release manifest.
+- `TEADATA_RELEASE_URL`: immutable remote release manifest.
+- `TEADATA_DATA_DIR`: source data root for scripts and configured `data/...` inputs.
+- `TEADATA_CONFIG`, `TEADATA_PROVENANCE_DIR`, `TEADATA_OUTPUT_DIR`: build locations.
+- `TEADATA_DISABLE_INDEXES`: disable spatial acceleration indexes.
+- `TEADATA_LOG_MEMORY`: log memory snapshots.
 
 ## Query DSL
 
@@ -139,10 +148,10 @@ uv run python -m teadata.load_data
 At a high level, it:
 
 1. resolves year-aware source paths from `teadata/teadata_sources.yaml`
-2. warm-loads compatible snapshot cache when signatures match
-3. otherwise builds districts/campuses from spatial files
+2. verifies and records selected source files and schema contracts
+3. builds districts/campuses from verified inputs
 4. applies enrichment datasets
-5. writes snapshot + sqlite sidecars back to `.cache/`
+5. validates a staged snapshot and sidecars, then activates `teadata/.cache/release.json`
 
 ## Config and CLI (`teadata-config`)
 
@@ -194,12 +203,7 @@ Current slimmed artifacts are below the limit:
 - wheel: `dist/teadata-0.0.118-py3-none-any.whl` about `74 MB`
 - sdist: `dist/teadata-0.0.118.tar.gz` about `72 MB`
 
-To stay under PyPI file limits while preserving runtime behavior:
-
-- PyPI package data now includes compressed snapshots (`.pkl.gz`) and selected sidecars (`boundaries_*.sqlite`, `entities_*.sqlite`).
-- Uncompressed `.pkl` files are excluded from distributions.
-- `map_payloads_*.sqlite` is excluded from distributions; provide it at runtime via `TEADATA_MAP_STORE` or `TEADATA_MAP_STORE_URL`.
-- URL-based store discovery supports snapshot-derived sidecar paths, so `TEADATA_*_URL` can hydrate missing local sidecars automatically.
+The Python distribution includes code, source contracts, and local methodology documents. Large data artifacts are versioned separately in Git LFS and selected through a release manifest. Source checkouts can use their hydrated `teadata/.cache/release.json`; installed wheels require `TEADATA_RELEASE` or `TEADATA_RELEASE_URL` pointing to an available bundle. Publishing code does not refresh production data.
 
 ## Release Policy
 

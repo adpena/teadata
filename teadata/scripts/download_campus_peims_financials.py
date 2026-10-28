@@ -1,5 +1,4 @@
-from teadata import DataEngine
-
+import argparse
 import requests
 from pathlib import Path
 from typing import Iterable
@@ -7,36 +6,7 @@ import time
 
 import pandas as pd
 
-# Instantiate DataEngine object, a layer over the District and Campus objects
-repo = DataEngine.from_snapshot(search=True)
-
-# Build a simple list of campus numbers (strip the stray apostrophes some have)
-campus_numbers = [c.campus_number.replace("'", "") for c in repo._campuses.values()]
-
-df = pd.read_csv(
-    "/Users/adpena/PycharmProjects/teadata/teadata/data/campus_peims_financials/2023-2024 Campus PEIMS Actual Financials Statewide.csv"
-)
-
-print(df.columns)
-
-df = df[df["operating_payroll_gf"].isnull()]
-
-print(df.shape[0])
-
-df["campus_number"] = (
-    df["campus_number"]
-    .astype(str)  # ensure it's a string
-    .str.extract(r"(\d+)")[0]  # strip out any stray non-digits
-    .str.zfill(9)  # left pad with zeros up to 9 characters
-)
-# As a pandas Index (array-like)
-campus_numbers = df["campus_number"].unique()
-
-# Where to save the downloaded Excel files
-DOWNLOAD_DIR = Path(
-    "/Users/adpena/PycharmProjects/teadata/teadata/data/campus_peims_financials/campus_reports"
-)
-DOWNLOAD_DIR.mkdir(parents=True, exist_ok=True)
+from teadata.scripts.paths import data_path
 
 
 def build_url(campus_number: str) -> str:
@@ -61,8 +31,17 @@ def download_file(
 
 
 def main(
-    nums: Iterable[str], force: bool = False, rate_limit_delay: float = 0.5
+    nums: Iterable[str],
+    force: bool = False,
+    rate_limit_delay: float = 0.5,
+    download_dir: Path | None = None,
 ) -> None:
+    download_dir = (
+        download_dir
+        if download_dir is not None
+        else data_path("campus_peims_financials", "campus_reports")
+    )
+    download_dir.mkdir(parents=True, exist_ok=True)
     session = requests.Session()
     total = len(nums)
     successes = 0
@@ -73,7 +52,7 @@ def main(
 
     for i, camp_num in enumerate(nums, start=1):
         url = build_url(camp_num)
-        output_file = DOWNLOAD_DIR / f"2023-2024 PEIMS_Campus_Data_{camp_num}.xlsx"
+        output_file = download_dir / f"2023-2024 PEIMS_Campus_Data_{camp_num}.xlsx"
 
         # Skip if already downloaded and non-empty, unless force is True
         if output_file.exists() and output_file.stat().st_size > 0 and not force:
@@ -94,5 +73,34 @@ def main(
     print(f"Done. {successes} succeeded, {failures} failed out of {total}.")
 
 
+def cli(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description="Download missing campus PEIMS financial reports."
+    )
+    parser.add_argument(
+        "--input",
+        type=Path,
+        default=data_path(
+            "campus_peims_financials",
+            "2023-2024 Campus PEIMS Actual Financials Statewide.csv",
+        ),
+    )
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=data_path("campus_peims_financials", "campus_reports"),
+    )
+    parser.add_argument(
+        "--force", action="store_true", help="Download reports even if already present."
+    )
+    args = parser.parse_args(argv)
+    df = pd.read_csv(args.input)
+    df = df[df["operating_payroll_gf"].isnull()].copy()
+    df["campus_number"] = (
+        df["campus_number"].astype(str).str.extract(r"(\d+)")[0].str.zfill(9)
+    )
+    main(df["campus_number"].unique(), force=args.force, download_dir=args.output_dir)
+
+
 if __name__ == "__main__":
-    main(campus_numbers)
+    cli()

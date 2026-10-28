@@ -3,11 +3,8 @@
 from __future__ import annotations
 
 from .engine import (
-    DEFAULT_REPO_PKL_RELATIVE,
-    DEFAULT_REPO_PKL_URL,
     ENABLE_PROFILING,
     DataEngine as _DataEngine,
-    _compat_pickle_load,
     _discover_snapshot,
     timeit,
 )
@@ -74,9 +71,6 @@ __all__ = [
     "unwrap_query",
     "ENABLE_PROFILING",
     "timeit",
-    "DEFAULT_REPO_PKL_RELATIVE",
-    "DEFAULT_REPO_PKL_URL",
-    "_compat_pickle_load",
     "_discover_snapshot",
     "GeoField",
     "SHAPELY",

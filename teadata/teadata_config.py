@@ -28,6 +28,9 @@ import sys
 import json
 import re
 
+from teadata.dataset_metadata import DatasetDefinition, DatasetMetadata, ResolvedDataset
+from teadata.values import ValuePolicy
+
 YEAR_MIN_DEFAULT = 2009
 
 # ------------------------------
@@ -98,6 +101,11 @@ def _rewrite_relative_paths(raw: dict, base_dir: Path) -> dict:
     """Rewrite relative file paths in data_sources/spatial to be relative to base_dir."""
 
     def rewrite_value(val: Any) -> Any:
+        if isinstance(val, dict):
+            updated = dict(val)
+            if "path" in updated:
+                updated["path"] = rewrite_value(updated["path"])
+            return updated
         if not isinstance(val, str):
             return val
         stripped = val.strip()
@@ -107,6 +115,16 @@ def _rewrite_relative_paths(raw: dict, base_dir: Path) -> dict:
         path = Path(expanded)
         if path.is_absolute():
             return str(path)
+        if (
+            path.parts
+            and path.parts[0] == "data"
+            and os.environ.get("TEADATA_DATA_DIR")
+        ):
+            return str(
+                Path(_expand_path(os.environ["TEADATA_DATA_DIR"]))
+                .resolve()
+                .joinpath(*path.parts[1:])
+            )
         return str(base_dir / path)
 
     def rewrite_section(section: dict) -> dict:
@@ -155,7 +173,7 @@ def _basename_and_ext(path_or_url: str) -> tuple[str, str]:
 class YearMap:
     """Mapping of year -> location (path or URL)."""
 
-    entries: Dict[int, str] = field(default_factory=dict)
+    entries: Dict[int, DatasetDefinition] = field(default_factory=dict)
     year_min: int = YEAR_MIN_DEFAULT
 
     @staticmethod
@@ -166,36 +184,55 @@ class YearMap:
             raise ValueError(
                 f"[{section}.{dataset}] must be a mapping of year->path/url"
             )
-        entries: Dict[int, str] = {}
+        entries: Dict[int, DatasetDefinition] = {}
         for k, v in raw.items():
             y = _coerce_year_key(k)
             if y is None:
-                # allow sugar: 'latest' (int year) or 'current' (direct path/URL)
-                if k in {"latest", "current"}:
-                    if isinstance(v, (int, str)) and str(v).isdigit():
-                        y2 = int(v)
-                        if y2 < year_min:
-                            raise ValueError(
-                                f"[{section}.{dataset}] year {y2} < {year_min}"
-                            )
-                        entries[y2] = entries.get(y2, "")
-                    else:
-                        entries[9999] = _expand_path(str(v))  # synthetic latest path
+                if k not in {"latest", "current"}:
+                    raise ValueError(
+                        f"[{section}.{dataset}] invalid key '{k}' (expected year like '2017')"
+                    )
+                if isinstance(v, (int, str)) and str(v).isdigit():
+                    y2 = int(v)
+                    if y2 < year_min:
+                        raise ValueError(
+                            f"[{section}.{dataset}] year {y2} < {year_min}"
+                        )
                     continue
-                raise ValueError(
-                    f"[{section}.{dataset}] invalid key '{k}' (expected year like '2017')"
-                )
+                # A floating current source has no known catalog year.
+                y = 9999
             if y < year_min:
                 raise ValueError(f"[{section}.{dataset}] year {y} < {year_min}")
-            if not isinstance(v, (str, int, float)):
+            if isinstance(v, dict):
+                unknown = set(v) - {"path", "metadata", "reader"}
+                if (
+                    unknown
+                    or not isinstance(v.get("path"), str)
+                    or not v["path"].strip()
+                ):
+                    raise ValueError(
+                        f"[{section}.{dataset}.{y}] requires path and optional metadata/reader"
+                    )
+                reader = v.get("reader", {})
+                if not isinstance(reader, dict):
+                    raise ValueError("reader must be a mapping")
+                entries[y] = DatasetDefinition(
+                    _expand_path(v["path"]),
+                    DatasetMetadata.from_dict(v.get("metadata")),
+                    reader,
+                )
+            elif isinstance(v, (str, int, float)):
+                entries[y] = DatasetDefinition(_expand_path(str(v)))
+            else:
                 raise ValueError(
                     f"[{section}.{dataset}.{y}] value must be a path or URL string"
                 )
-            entries[y] = _expand_path(str(v))
-        entries = {y: p for y, p in entries.items() if p}
         if not entries:
             raise ValueError(f"[{section}.{dataset}] has no valid year entries")
         return YearMap(entries=entries, year_min=year_min)
+
+    def to_dict(self) -> Dict[int, Any]:
+        return {year: definition.to_dict() for year, definition in self.entries.items()}
 
     def available_years(self) -> List[int]:
         return sorted(y for y in self.entries.keys() if y != 9999)
@@ -206,15 +243,15 @@ class YearMap:
                 raise KeyError(f"Requested year {year} < {self.year_min}")
             return None
         if year in self.entries:
-            return year, self.entries[year]
+            return year, self.entries[year].path
         prior_years = [
             y for y in self.entries.keys() if isinstance(y, int) and y <= year
         ]
         if prior_years:
             best = max(prior_years)
-            return best, self.entries[best]
+            return best, self.entries[best].path
         if not strict and 9999 in self.entries:
-            return 9999, self.entries[9999]
+            return 9999, self.entries[9999].path
         if strict:
             raise KeyError(
                 f"No data available for {year} (and no prior years) in this dataset."
@@ -313,11 +350,15 @@ class Config:
     options: Dict[str, Any] = field(default_factory=dict)
     schema: SchemaHints = field(default_factory=SchemaHints)
     year_min: int = YEAR_MIN_DEFAULT
+    value_policies: Dict[str, ValuePolicy] = field(default_factory=dict)
+    base_dir: Path | None = field(default=None, repr=False)
 
     @staticmethod
     def from_dict(d: Dict[str, Any]) -> "Config":
         if not isinstance(d, dict):
             raise ValueError("Config must be a mapping at the top level.")
+        if d.get("contract_version", 1) != 1:
+            raise ValueError("Unsupported dataset contract version")
 
         year_min = int(d.get("year_min", YEAR_MIN_DEFAULT))
         data_sources_raw = d.get("data_sources", {})
@@ -346,7 +387,25 @@ class Config:
                 yearmap_raw, section="spatial", dataset=layer, year_min=year_min
             )
 
+        if set(data_sources) & set(spatial):
+            raise ValueError(
+                "Dataset identifiers must be unique across data_sources and spatial"
+            )
         schema = SchemaHints.from_dict(schema_raw)
+
+        policies_raw = d.get("value_policies", {})
+        if not isinstance(policies_raw, dict):
+            raise ValueError("value_policies must be a mapping")
+        policies = {}
+        for name, definition in policies_raw.items():
+            if (
+                not isinstance(definition, dict)
+                or definition.get("policy_id", name) != name
+            ):
+                raise ValueError(
+                    "Value-policy identifiers must match their registry keys"
+                )
+            policies[name] = ValuePolicy.from_dict({"policy_id": name, **definition})
 
         cfg = Config(
             data_sources=data_sources,
@@ -354,8 +413,23 @@ class Config:
             options=options,
             schema=schema,
             year_min=year_min,
+            value_policies=policies,
         )
         cfg.validate_file_types()  # fail fast
+        for catalog in (cfg.data_sources, cfg.spatial):
+            for year_map in catalog.values():
+                for definition in year_map.entries.values():
+                    policy_id = definition.metadata.value_policy
+                    if policy_id and policy_id not in cfg.value_policies:
+                        raise ValueError(f"Unknown dataset value policy: {policy_id}")
+                    if policy_id:
+                        reference = cfg.value_policies[policy_id].reference_id
+                        if reference and reference not in {
+                            ref.reference_id for ref in definition.metadata.references
+                        }:
+                            raise ValueError(
+                                f"Value policy {policy_id} refers to missing source document {reference}"
+                            )
         return cfg
 
     # ---------- Sugar ----------
@@ -403,7 +477,7 @@ class Config:
     def resolve(
         self,
         dataset: str,
-        year: int,
+        year: int | None,
         *,
         strict: bool = False,
         section: str = "data_sources",
@@ -411,6 +485,9 @@ class Config:
         catalog = self.data_sources if section == "data_sources" else self.spatial
         if dataset not in catalog:
             raise KeyError(f"{section} does not contain dataset '{dataset}'.")
+        if year is None:
+            years = catalog[dataset].available_years()
+            year = max(years) if years else 9999
         resolved = catalog[dataset].resolve(year, strict=strict)
         if not resolved:
             raise KeyError(
@@ -422,8 +499,13 @@ class Config:
         return json.dumps(
             {
                 "year_min": self.year_min,
-                "data_sources": {k: v.entries for k, v in self.data_sources.items()},
-                "spatial": {k: v.entries for k, v in self.spatial.items()},
+                "contract_version": 1,
+                "value_policies": {
+                    name: policy.to_dict()
+                    for name, policy in self.value_policies.items()
+                },
+                "data_sources": {k: v.to_dict() for k, v in self.data_sources.items()},
+                "spatial": {k: v.to_dict() for k, v in self.spatial.items()},
                 "options": self.options,
                 "schema": {
                     "data_sources": self.schema.data_sources,
@@ -432,6 +514,42 @@ class Config:
             },
             indent=2,
             sort_keys=True,
+        )
+
+    def resolve_dataset(
+        self,
+        dataset: str,
+        year: int | None = None,
+        *,
+        strict: bool = False,
+        section: str = "data_sources",
+    ) -> ResolvedDataset:
+        """Describe a configured source, preserving the actual resolved catalog year.
+
+        This describes configuration, not evidence that a dataset was loaded into
+        an engine or snapshot. Legacy entries have an unknown reference period.
+        """
+        if section not in {"data_sources", "spatial"}:
+            raise ValueError("section must be data_sources or spatial")
+        catalog = self.data_sources if section == "data_sources" else self.spatial
+        if dataset not in catalog:
+            raise KeyError(f"Unknown {section} dataset: {dataset}")
+        selection_year = year
+        if selection_year is None:
+            years = catalog[dataset].available_years()
+            selection_year = max(years) if years else 9999
+        resolved_year, path = self.resolve(
+            dataset, selection_year, strict=strict, section=section
+        )
+        definition = catalog[dataset].entries[resolved_year]
+        return ResolvedDataset(
+            dataset=dataset,
+            section=section,
+            requested_year=year,
+            resolved_year=None if resolved_year == 9999 else resolved_year,
+            path=path,
+            metadata=definition.metadata,
+            reader=definition.reader,
         )
 
     # ---------- Validation ----------
@@ -443,8 +561,8 @@ class Config:
                 allowed = self.schema.allowed_exts_for(section, ds)
                 if not allowed:
                     continue
-                for y, path in ymap.entries.items():
-                    base, ext = _basename_and_ext(path)
+                for y, definition in ymap.entries.items():
+                    base, ext = _basename_and_ext(definition.path)
                     tag = "latest" if y == 9999 else str(y)
                     if ext not in allowed:
                         problems.append(
@@ -552,17 +670,72 @@ class Config:
         )
 
     def load_df(
-        self, dataset: str, year: int, *, section: str = "data_sources", **reader_kwargs
+        self,
+        dataset: str,
+        year: int | None = None,
+        *,
+        section: str = "data_sources",
+        reader_profile: str | None = None,
+        **reader_kwargs,
     ):
         """
         Resolve the dataset for the year and load as DataFrame (or GeoDataFrame if spatial).
         For CSV loads, you can pass dtype=... etc through reader_kwargs.
         """
-        resolved_year, path = self.resolve(dataset, year, section=section)
+        from .manifest import ACTIVE_BUILD, ContractError, schema_fingerprint
+
+        source = self.resolve_dataset(dataset, year, section=section)
+        options = dict(source.reader)
+        profiles = options.pop("profiles", {})
+        if reader_profile is not None:
+            if reader_profile not in profiles:
+                raise ContractError(
+                    f"Reader profile {reader_profile} is not declared for {dataset}"
+                )
+            options.update(profiles[reader_profile])
+        expected_schema = options.pop("expected_columns_sha256", None)
+        columns = options.pop("columns", {})
+        required = options.pop("required_columns", [])
+        options.update(reader_kwargs)
+        field_year = source.metadata.field_year
+        options = {
+            key: value.format(field_year=field_year)
+            if isinstance(value, str) and "{field_year}" in value
+            else value
+            for key, value in options.items()
+        }
+        build = ACTIVE_BUILD.get()
+        identity = build.before_read(source) if build is not None else None
         prefer_geo = section == "spatial"
-        return resolved_year, self._load_table(
-            path, prefer_geopandas=prefer_geo, **reader_kwargs
-        )
+        frame = self._load_table(source.path, prefer_geopandas=prefer_geo, **options)
+        rename = {
+            raw.format(field_year=field_year): name for name, raw in columns.items()
+        }
+        if rename:
+            frame = frame.rename(columns=rename)
+        if (
+            expected_schema is not None
+            and schema_fingerprint(frame.columns) != expected_schema
+        ):
+            raise ContractError(
+                f"Source schema changed for {dataset}; review its dictionary, parser, and contract"
+            )
+        missing = set(required) - set(frame.columns)
+        if missing or frame.columns.duplicated().any():
+            raise ContractError(
+                f"Source schema mismatch for {dataset}; missing={sorted(missing)}, duplicate_columns={bool(frame.columns.duplicated().any())}"
+            )
+        if build is not None:
+            assert identity is not None
+            build.after_read(
+                source,
+                identity,
+                len(frame),
+                reader_profile,
+                {"options": options, "columns": columns, "required_columns": required},
+                list(frame.columns),
+            )
+        return source.resolved_year, frame
 
 
 # ---------- Decorator: auto-resolve + auto-load ----------
@@ -986,6 +1159,7 @@ def load_config(path: str | Path) -> Config:
     raw = _detect_and_load(p)
     raw = _rewrite_relative_paths(raw, p.resolve().parent)
     cfg = Config.from_dict(raw)
+    cfg.base_dir = p.resolve().parent
     return cfg
 
 
@@ -995,7 +1169,9 @@ def load_config(path: str | Path) -> Config:
 
 _TEMPLATE_YAML = """\
 # TEA Data configuration (YAML)
-# Each dataset/layer maps school years (2009+) to a file path or URL.
+# Each dataset/layer maps catalog years (2009+) to a file path or URL.
+# Entries can also be mappings with path and metadata; reference periods must be
+# declared explicitly. A catalog key alone does not establish a school year.
 # 'schema' declares expected file types per dataset/layer for validation.
 
 year_min: 2009
@@ -1158,7 +1334,7 @@ def main(argv: List[str]) -> None:
         _cmd_init(argv[2])
         return
 
-    if len(argv) >= 2 and argv[1] == "resolve":
+    if len(argv) >= 2 and argv[1] in {"resolve", "describe"}:
         if len(argv) != 6:
             print(
                 "Usage: teadata_config.py resolve <config.(yaml|toml)> <section> <dataset> <year>",
@@ -1175,7 +1351,17 @@ def main(argv: List[str]) -> None:
         except ValueError:
             print("year must be an integer like 2021", file=sys.stderr)
             sys.exit(2)
-        _cmd_resolve(cfg_path, section, dataset, year)
+        if argv[1] == "describe":
+            print(
+                json.dumps(
+                    load_config(cfg_path)
+                    .resolve_dataset(dataset, year, section=section)
+                    .to_dict(),
+                    indent=2,
+                )
+            )
+        else:
+            _cmd_resolve(cfg_path, section, dataset, year)
         return
 
     if len(argv) >= 2 and argv[1] == "report":
@@ -1252,6 +1438,10 @@ def main(argv: List[str]) -> None:
     print("  teadata_config.py init <output.yaml>", file=sys.stderr)
     print(
         "  teadata_config.py resolve <config.(yaml|toml)> <section> <dataset> <year>",
+        file=sys.stderr,
+    )
+    print(
+        "  teadata_config.py describe <config.(yaml|toml)> <section> <dataset> <year>",
         file=sys.stderr,
     )
     print(

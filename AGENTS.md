@@ -50,3 +50,7 @@
 
 ## Downstream Dependencies
 - `teadata-app` consumes the public `DataEngine`/`Query` APIs and snapshot loading behavior directly; avoid breaking signatures, return types, or query semantics, and coordinate any behavioral changes with that app before merging.
+
+## Landing Review Gate
+
+Adversarial review of the final diff is required before landing. Resolve findings and run the applicable checks against the exact revision to be landed. Draft review branches are permitted; a prior review of an earlier revision does not satisfy this gate.

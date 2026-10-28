@@ -509,12 +509,11 @@ class CampusEnrichmentTable(Enricher):
         year_resolved, updated = _apply_campus_enrichment_table(
             repo,
             cfg_path,
-            "campus_accountability",
+            "accountability",
             year,
-            select=["overall_rating_2025"],
-            rename={"2025 Overall Rating": "overall_rating_2025"},
-            aliases={"overall_rating_2025": "rating"},
-            reader_kwargs={"sheet_name": "2011-2025 Summary"},
+            select=["overall_rating"],
+                        aliases={"overall_rating": "rating"},
+            reader_kwargs={"reader_profile": "ratings"},
         )
         return {"updated": updated, "year": year_resolved}
 

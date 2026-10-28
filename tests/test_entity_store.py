@@ -12,7 +12,7 @@ from teadata.persistence.sqlalchemy_store import (
 from teadata import entity_store
 
 
-def _build_entity_store(tmp_path):
+def _build_entity_store(tmp_path, catalog):
     repo = DataEngine()
     district = District(
         id=uuid.uuid4(),
@@ -44,11 +44,15 @@ def _build_entity_store(tmp_path):
     with Session.begin() as session:
         export_dataengine(repo, session, replace=True)
     engine.dispose()
+    import sqlite3
+    from teadata.manifest import write_sqlite_catalog
+    with sqlite3.connect(path) as conn:
+        write_sqlite_catalog(conn, catalog)
     return path
 
 
-def test_entity_store_round_trip(tmp_path):
-    path = _build_entity_store(tmp_path)
+def test_entity_store_round_trip(tmp_path, catalog):
+    path = _build_entity_store(tmp_path, catalog)
 
     campus_row = entity_store.load_campus("123456789", store_path=path)
     assert campus_row
@@ -66,8 +70,8 @@ def test_entity_store_round_trip(tmp_path):
     assert "campus_2025_demo" in keys
 
 
-def test_entity_store_get_meta_after_no_meta_lookup(tmp_path):
-    path = _build_entity_store(tmp_path)
+def test_entity_store_get_meta_after_no_meta_lookup(tmp_path, catalog):
+    path = _build_entity_store(tmp_path, catalog)
     store = entity_store.EntityStore(path)
 
     campus_no_meta = store.get_campus("123456789", include_meta=False)
@@ -85,8 +89,8 @@ def test_entity_store_get_meta_after_no_meta_lookup(tmp_path):
     assert district_with_meta["meta"]["district_2025_demo"] == "ok"
 
 
-def test_entity_store_meta_keys_limit_does_not_truncate_cache(tmp_path):
-    path = _build_entity_store(tmp_path)
+def test_entity_store_meta_keys_limit_does_not_truncate_cache(tmp_path, catalog):
+    path = _build_entity_store(tmp_path, catalog)
     store = entity_store.EntityStore(path)
 
     limited = store.list_meta_keys("district", limit=1)
@@ -97,11 +101,11 @@ def test_entity_store_meta_keys_limit_does_not_truncate_cache(tmp_path):
     assert "district_extra" in full
 
 
-def test_entity_store_load_raises_for_invalid_database(tmp_path):
+def test_entity_store_load_raises_for_invalid_database(tmp_path, catalog):
     invalid = tmp_path / "invalid.sqlite"
     invalid.write_text("not a sqlite database", encoding="utf-8")
 
-    with pytest.raises(RuntimeError, match="Failed querying campus"):
+    with pytest.raises(RuntimeError, match="required dataset catalog"):
         entity_store.load_campus("123456789", store_path=invalid)
-    with pytest.raises(RuntimeError, match="Failed querying district"):
+    with pytest.raises(RuntimeError, match="required dataset catalog"):
         entity_store.load_district("123456", store_path=invalid)

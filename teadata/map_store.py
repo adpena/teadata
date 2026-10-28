@@ -1,125 +1,30 @@
 import gzip
 import json
 import logging
-import os
 import sqlite3
 from pathlib import Path
 from typing import Any, Iterable, Optional, Tuple
 
-from .assets import ensure_local_asset, is_lfs_pointer
+from .manifest import read_sqlite_catalog
+from .release import current_release
 from .teadata_config import canonical_campus_number, canonical_district_number
 
-try:
-    from .engine import _discover_snapshot  # type: ignore
-except Exception:  # pragma: no cover - defensive import
-    _discover_snapshot = None
-
-
 _GZIP_MAGIC = b"\x1f\x8b"
-_MAP_PREFIX = "map_payloads_"
-_LAST_LOGGED_MAP_STORE: Optional[str] = None
 
 logger = logging.getLogger(__name__)
 
 
-def map_store_path_for_snapshot(snapshot_path: Path) -> Optional[Path]:
-    name = snapshot_path.name
-    if name.startswith("repo_"):
-        base = name[len("repo_") :]
-        if base.endswith(".pkl.gz"):
-            base = base[: -len(".pkl.gz")]
-        elif base.endswith(".pkl"):
-            base = base[: -len(".pkl")]
-        return snapshot_path.with_name(f"{_MAP_PREFIX}{base}.sqlite")
-    return None
+def map_store_path_for_snapshot(snapshot_path: Path) -> Path:
+    base = snapshot_path.name.removeprefix("repo_").removesuffix(".gz").removesuffix(".pkl")
+    return snapshot_path.with_name(f"map_payloads_{base}.sqlite")
 
 
-def _newest_sqlite(folder: Path) -> Optional[Path]:
-    try:
-        if not folder.exists() or not folder.is_dir():
-            return None
-        picks = sorted(folder.glob(f"{_MAP_PREFIX}*.sqlite"), key=lambda p: p.stat().st_mtime, reverse=True)
-        return picks[0] if picks else None
-    except Exception:
-        return None
-
-
-def _log_map_store(path: Path, source: str) -> None:
-    global _LAST_LOGGED_MAP_STORE
-    try:
-        path_str = str(path)
-    except Exception:
-        return
-    if _LAST_LOGGED_MAP_STORE == path_str:
-        return
-    _LAST_LOGGED_MAP_STORE = path_str
-    logger.info("map_store.discovered source=%s path=%s", source, path_str)
-
-
-def _resolve_map_store(path: Path, source: str) -> Optional[Path]:
-    resolved = ensure_local_asset(path, url_env="TEADATA_MAP_STORE_URL", label="map store")
-    if not resolved.exists() or is_lfs_pointer(resolved):
-        logger.warning("map_store.unavailable source=%s path=%s", source, path)
-        return None
-    _log_map_store(resolved, source)
-    return resolved
-
-
-def _should_attempt_map_resolution(path: Path) -> bool:
-    if path.exists() and path.is_file():
-        return True
-    return bool(os.environ.get("TEADATA_MAP_STORE_URL"))
-
-
-def discover_map_store(explicit: str | Path | None = None) -> Optional[Path]:
-    if explicit:
-        p = Path(explicit)
-        if _should_attempt_map_resolution(p):
-            resolved = _resolve_map_store(p, "explicit")
-            if resolved:
-                return resolved
-
-    env = os.environ.get("TEADATA_MAP_STORE")
-    if env:
-        p = Path(env)
-        if _should_attempt_map_resolution(p):
-            resolved = _resolve_map_store(p, "env")
-            if resolved:
-                return resolved
-
-    if _discover_snapshot:
-        try:
-            snap = _discover_snapshot()
-            if snap:
-                candidate = map_store_path_for_snapshot(Path(snap))
-                if candidate and _should_attempt_map_resolution(candidate):
-                    resolved = _resolve_map_store(candidate, "snapshot")
-                    if resolved:
-                        return resolved
-        except Exception:
-            pass
-
-    try:
-        package_dir = Path(__file__).resolve().parent
-        pkg_cache = package_dir / ".cache"
-        candidate = _newest_sqlite(pkg_cache)
-        if candidate:
-            resolved = _resolve_map_store(candidate, "package-cache")
-            if resolved:
-                return resolved
-    except Exception:
-        pass
-
-    cwd = Path.cwd()
-    for idx, base in enumerate((cwd, *cwd.parents)):
-        candidate = _newest_sqlite(base / ".cache")
-        if candidate:
-            source = "cwd-cache" if idx == 0 else "parent-cache"
-            resolved = _resolve_map_store(candidate, source)
-            if resolved:
-                return resolved
-
-    return None
+def discover_map_store(explicit: str | Path | None = None) -> Path:
+    if explicit is not None:
+        path = Path(explicit)
+        read_sqlite_catalog(path)
+        return path
+    return current_release().artifact("maps")
 
 
 def _district_lookup_keys(district_number: Optional[str]) -> Iterable[str]:

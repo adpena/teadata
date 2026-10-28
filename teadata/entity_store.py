@@ -2,152 +2,30 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 import sqlite3
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
-from .assets import ensure_local_asset, is_lfs_pointer
+from .manifest import read_sqlite_catalog
+from .release import current_release
 from .teadata_config import canonical_campus_number, canonical_district_number
-
-try:
-    from .engine import _discover_snapshot  # type: ignore
-except Exception:  # pragma: no cover - defensive import
-    _discover_snapshot = None
-
-
-_ENTITY_PREFIX = "entities_"
-_LAST_LOGGED_ENTITY_STORE: Optional[str] = None
 
 logger = logging.getLogger(__name__)
 
 
-def entity_store_path_for_snapshot(snapshot_path: Path) -> Optional[Path]:
-    name = snapshot_path.name
-    if name.startswith("repo_"):
-        base = name[len("repo_") :]
-        if base.endswith(".pkl.gz"):
-            base = base[: -len(".pkl.gz")]
-        elif base.endswith(".pkl"):
-            base = base[: -len(".pkl")]
-        return snapshot_path.with_name(f"{_ENTITY_PREFIX}{base}.sqlite")
-    return None
+def entity_store_path_for_snapshot(snapshot_path: Path) -> Path:
+    base = snapshot_path.name.removeprefix("repo_").removesuffix(".gz").removesuffix(".pkl")
+    return snapshot_path.with_name(f"entities_{base}.sqlite")
 
 
-def _newest_sqlite(folder: Path) -> Optional[Path]:
-    try:
-        if not folder.exists() or not folder.is_dir():
-            return None
-        picks = sorted(
-            folder.glob(f"{_ENTITY_PREFIX}*.sqlite"),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True,
-        )
-        return picks[0] if picks else None
-    except Exception:
-        return None
-
-
-def _log_entity_store(path: Path, source: str) -> None:
-    global _LAST_LOGGED_ENTITY_STORE
-    try:
-        path_str = str(path)
-    except Exception:
-        return
-    if _LAST_LOGGED_ENTITY_STORE == path_str:
-        return
-    _LAST_LOGGED_ENTITY_STORE = path_str
-    logger.info("entity_store.discovered source=%s path=%s", source, path_str)
-
-
-def _resolve_entity_store(path: Path, source: str) -> Optional[Path]:
-    resolved = ensure_local_asset(
-        path, url_env="TEADATA_ENTITY_STORE_URL", label="entity store"
-    )
-    if not resolved.exists() or is_lfs_pointer(resolved):
-        logger.warning("entity_store.unavailable source=%s path=%s", source, path)
-        return None
-    _log_entity_store(resolved, source)
-    return resolved
-
-
-def _should_attempt_entity_resolution(path: Path) -> bool:
-    if path.exists() and path.is_file():
-        return True
-    return bool(os.environ.get("TEADATA_ENTITY_STORE_URL"))
-
-
-def discover_entity_store(explicit: str | Path | None = None) -> Optional[Path]:
-    if explicit:
-        p = Path(explicit)
-        if _should_attempt_entity_resolution(p):
-            resolved = _resolve_entity_store(p, "explicit")
-            if resolved:
-                return resolved
-
-    env = os.environ.get("TEADATA_ENTITY_STORE")
-    if env:
-        p = Path(env)
-        if _should_attempt_entity_resolution(p):
-            resolved = _resolve_entity_store(p, "env")
-            if resolved:
-                return resolved
-
-    if _discover_snapshot:
-        try:
-            snap = _discover_snapshot()
-            if snap:
-                candidate = entity_store_path_for_snapshot(Path(snap))
-                if candidate and _should_attempt_entity_resolution(candidate):
-                    resolved = _resolve_entity_store(candidate, "snapshot")
-                    if resolved:
-                        return resolved
-        except Exception:
-            pass
-
-    try:
-        package_dir = Path(__file__).resolve().parent
-        pkg_cache = package_dir / ".cache"
-        candidate = _newest_sqlite(pkg_cache)
-        if candidate:
-            resolved = _resolve_entity_store(candidate, "package-cache")
-            if resolved:
-                return resolved
-    except Exception:
-        pass
-
-    cwd = Path.cwd()
-    for idx, base in enumerate((cwd, *cwd.parents)):
-        candidate = _newest_sqlite(base / ".cache")
-        if candidate:
-            source = "cwd-cache" if idx == 0 else "parent-cache"
-            resolved = _resolve_entity_store(candidate, source)
-            if resolved:
-                return resolved
-
-    return None
-
-
-def _district_lookup_keys(district_number: Optional[str]) -> Iterable[str]:
-    if not district_number:
-        return ()
-    keys = []
-    canonical = canonical_district_number(district_number)
-    if canonical:
-        keys.append(canonical)
-    raw = str(district_number).strip()
-    if raw and raw not in keys:
-        keys.append(raw)
-    if raw.startswith("'") and len(raw) > 1:
-        digits = raw[1:]
-        if digits not in keys:
-            keys.append(digits)
-        if digits.isdigit():
-            normalized = str(int(digits))
-            if normalized not in keys:
-                keys.append(normalized)
-    return keys
+def discover_entity_store(explicit: str | Path | None = None) -> Path:
+    if explicit is not None:
+        path = Path(explicit)
+        read_sqlite_catalog(path)
+        return path
+    return current_release().artifact("entities")
 
 
 def _strip_leading_apostrophe(value: Optional[str]) -> str:
@@ -383,6 +261,10 @@ class EntityStore:
         default_factory=dict, init=False, repr=False
     )
 
+    @cached_property
+    def catalog(self):
+        return read_sqlite_catalog(self.path)
+
     def _connect(self) -> Optional[sqlite3.Connection]:
         if self._conn is not None:
             return self._conn
@@ -394,11 +276,7 @@ class EntityStore:
 
     @property
     def cache_key(self) -> str:
-        try:
-            stat = self.path.stat()
-            return f"{self.path}:{stat.st_mtime_ns}"
-        except Exception:
-            return str(self.path)
+        return self.catalog.build_id
 
     def get_campus(self, campus_number: str, *, include_meta: bool = True) -> Optional[dict[str, Any]]:
         if not campus_number:
@@ -616,3 +494,24 @@ class EntityStore:
             "is_charter": has_charter,
             "district_type": _district_type_from_flag(has_charter),
         }
+
+
+def _district_lookup_keys(district_number: Optional[str]) -> Iterable[str]:
+    if not district_number:
+        return ()
+    keys = []
+    canonical = canonical_district_number(district_number)
+    if canonical:
+        keys.append(canonical)
+    raw = str(district_number).strip()
+    if raw and raw not in keys:
+        keys.append(raw)
+    if raw.startswith("'") and len(raw) > 1:
+        digits = raw[1:]
+        if digits not in keys:
+            keys.append(digits)
+        if digits.isdigit():
+            normalized = str(int(digits))
+            if normalized not in keys:
+                keys.append(normalized)
+    return keys

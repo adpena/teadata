@@ -1,19 +1,14 @@
 # ty: ignore
 
 from pathlib import Path
+import argparse
 import re
 import pandas as pd
 from concurrent.futures import ProcessPoolExecutor, as_completed
 from tqdm import tqdm
 
 from teadata.teadata_config import normalize_campus_number_value
-
-# ---- CONFIG ----
-# Directory containing the Excel workbooks
-directory_url = "/Users/adpena/PycharmProjects/teadata/teadata/data/campus_peims_financials/campus_reports"
-
-# Output (optional): set to None to skip saving
-OUTPUT_CSV = "/Users/adpena/PycharmProjects/teadata/teadata/data/campus_peims_financials/2023-2024 Campus PEIMS Actual Financials Statewide.csv"
+from teadata.scripts.paths import data_path
 
 # Mapping of base variable name -> 1-based Excel row number
 BASE_ROW_MAP = {
@@ -157,9 +152,28 @@ def scrape_file_safe(fp: Path) -> dict:
         }
 
 
-def main() -> None:
-    base = Path(directory_url)
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description="Build statewide campus PEIMS data from Excel reports."
+    )
+    parser.add_argument(
+        "--input-dir",
+        type=Path,
+        default=data_path("campus_peims_financials", "campus_reports"),
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=data_path(
+            "campus_peims_financials",
+            "2023-2024 Campus PEIMS Actual Financials Statewide.csv",
+        ),
+    )
+    args = parser.parse_args(argv)
+    base = args.input_dir
     files = sorted(base.glob("*.xlsx"))
+    if not files:
+        parser.error(f"No .xlsx files found in {base}")
 
     records: list[dict] = []
 
@@ -175,17 +189,14 @@ def main() -> None:
         print("No .xlsx files found.")
 
     df = pd.DataFrame(records)
-    df = pd.DataFrame(records)
     df["campus_number"] = df["campus_number"].map(normalize_campus_number_value)
 
     print(df.head())
     print(f"\nRows: {len(df)}  Columns: {len(df.columns)}")
 
-    if OUTPUT_CSV:
-        outp = Path(OUTPUT_CSV)
-        outp.parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(outp, index=False)
-        print(f"Saved -> {outp}")
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(args.output, index=False)
+    print(f"Saved -> {args.output}")
 
 
 if __name__ == "__main__":

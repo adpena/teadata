@@ -48,9 +48,11 @@ from sqlalchemy import (
     create_engine as _sa_create_engine,
     delete,
     func,
+    inspect,
     select,
 )
 from sqlalchemy import Index
+from sqlalchemy.schema import CreateTable
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
@@ -329,7 +331,18 @@ def create_sessionmaker(engine, *, expire_on_commit: bool = False, **kwargs):
 def ensure_schema(engine) -> None:
     """Create the database schema if it does not already exist."""
 
-    Base.metadata.create_all(engine)
+    if engine.dialect.name != "sqlite":
+        Base.metadata.create_all(engine)
+        return
+    # SQLAlchemy stores indexes in a set of identity-hashed objects. Its default
+    # creation order changes between processes, changing SQLite root pages and
+    # release checksums even when every row is identical.
+    with engine.begin() as connection:
+        for table in Base.metadata.sorted_tables:
+            if not inspect(connection).has_table(table.name, schema=table.schema):
+                connection.execute(CreateTable(table))
+                for index in sorted(table.indexes, key=lambda item: str(item.name)):
+                    index.create(connection)
 
 
 # ---------------------------------------------------------------------------

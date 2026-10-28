@@ -1,3 +1,4 @@
+from teadata.teadata_config import load_config
 import uuid
 
 import pandas as pd
@@ -111,7 +112,7 @@ def test_apply_transfers_from_dataframe_preserves_masked_and_missing_counts():
                 "REPORT_TYPE": "Transfers Out To",
                 "REPORT_CAMPUS": 11901001,
                 "CAMPUS_RES_OR_ATTEND": 11901002,
-                "TRANSFERS_IN_OR_OUT": "not-a-number",
+                "TRANSFERS_IN_OR_OUT": None,
             },
             {
                 "REPORT_TYPE": "Transfers Out To",
@@ -146,7 +147,7 @@ def test_apply_transfers_from_dataframe_preserves_masked_and_missing_counts():
         ]
     )
 
-    updated = repo.apply_transfers_from_dataframe(df)
+    updated = repo.apply_transfers_from_dataframe(df, value_policy=load_config("teadata/teadata_sources.yaml").value_policies["campus_transfers"])
 
     assert updated == 1
     assert repo._xfers_missing == {"src": 1, "dst": 1, "either": 1}

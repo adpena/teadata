@@ -19,11 +19,15 @@ def _make_campus(*, enrollment=100, meta=None):
     return campus
 
 
-def test_campus_to_dict_includes_percent_enrollment_change():
+def test_campus_to_dict_includes_percent_enrollment_change(catalog):
     campus = _make_campus(
         enrollment=110,
         meta={"campus_2015_student_enrollment_all_students_count": 100},
     )
+
+    from types import SimpleNamespace
+    campus._repo = SimpleNamespace(catalog=catalog)
+    campus.meta["campus_2025_student_enrollment_all_students_count"] = campus.enrollment
 
     result = campus.to_dict()
 

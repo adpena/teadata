@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "teadata"
-version = "0.0.118"
+version = "0.0.119"
 description = "Pythonic data engine for Texas education datasets"
 authors = [{name="Alejandro Peña", email="adpena@gmail.com"}]
 readme = "README.md"
@@ -99,7 +99,7 @@ include = ["teadata*"]
 exclude = ["tests*", "docs*", "examples*"]
 
 [tool.setuptools.package-data]
-teadata = [".cache/*.pkl.gz", ".cache/boundaries_*.sqlite", ".cache/entities_*.sqlite"]
+teadata = ["teadata_sources.yaml", "methodologies/*.md"]
 
 [tool.setuptools]
 include-package-data = false
