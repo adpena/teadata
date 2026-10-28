@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
+import json
 import math
 import numbers
 import re
@@ -20,6 +21,13 @@ class ValueStatus(str, Enum):
     MISSING = "missing"
     NOT_APPLICABLE = "not_applicable"
     INVALID = "invalid"
+
+
+def _finite_number(value: Any) -> bool:
+    try:
+        return math.isfinite(value)
+    except (OverflowError, TypeError, ValueError):
+        return False
 
 
 @dataclass(frozen=True)
@@ -122,6 +130,12 @@ class Measurement:
     lower: float | None = None
     upper: float | None = None
     unit: str | None = None
+    _source_json: str | None = None
+
+    @property
+    def source(self) -> dict | None:
+        """A defensive copy of the release-bound field provenance, when known."""
+        return json.loads(self._source_json) if self._source_json is not None else None
 
     @property
     def numeric(self) -> int | float | None:
@@ -129,7 +143,7 @@ class Measurement:
             self.status == ValueStatus.OBSERVED
             and isinstance(self.value, numbers.Real)
             and not isinstance(self.value, bool)
-            and math.isfinite(self.value)
+            and _finite_number(self.value)
         ):
             return (
                 int(self.value)
@@ -173,6 +187,7 @@ class Measurement:
             "lower": self.lower,
             "upper": self.upper,
             "unit": self.unit,
+            **({"source": self.source} if self._source_json is not None else {}),
         }
 
 
@@ -204,10 +219,19 @@ def measure(
     suppressed. No point estimate is produced for a protected value.
     """
     if isinstance(raw, Measurement):
-        return raw
+        if raw.raw is not None:
+            raw = raw.raw
+        elif raw.status == ValueStatus.OBSERVED:
+            raw = raw.value
+        elif raw.status == ValueStatus.MISSING:
+            raw = None
+        elif raw.policy_id == policy.policy_id and (unit is None or unit == raw.unit):
+            return raw
+        else:
+            raise ValueError("Cannot rebind an interpreted value without its source token")
     if (
         raw is None
-        or (isinstance(raw, numbers.Real) and not math.isfinite(raw))
+        or (isinstance(raw, numbers.Real) and not isinstance(raw, numbers.Integral) and math.isnan(raw))
         or str(raw).strip() in {"", "<NA>"}
     ):
         return Measurement(
@@ -265,7 +289,8 @@ def measure(
         int(normalized) if re.fullmatch(r"[+-]?\d+", normalized) else float(normalized)
     )
     if (
-        not math.isfinite(number)
+        not _finite_number(number)
+        or (unit == "count" and number != int(number))
         or (minimum is not None and number < minimum)
         or (maximum is not None and number > maximum)
     ):

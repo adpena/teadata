@@ -1,9 +1,7 @@
-name: CI
+name: Optional hosted checks
 
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   test:
@@ -25,14 +23,7 @@ jobs:
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
-      - name: Install dependencies
-        run: uv sync --all-extras --dev
-
-      - name: Verify Shapely version
-        run: uv run python -c "import shapely, sys; print(shapely.__version__); assert shapely.__version__.split('.')[0] == '2'"
-
-      - name: Run dependency check
-        run: uv run deptry .
-
-      - name: Run tests
-        run: uv run pytest
+      - name: Run the local check command
+        run: scripts/check
+        env:
+          TEADATA_CHECK_PYTHON: ${{ matrix.python-version }}

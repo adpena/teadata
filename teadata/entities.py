@@ -159,7 +159,8 @@ class District:
 
     def __format__(self, spec: str) -> str:
         if spec == "brief":
-            return f"{self.name} (enr={self.enrollment:,}, rating={self.rating or '-'})"
+            enrollment = f"{self.enrollment:,}" if self.enrollment is not None else "unknown"
+            return f"{self.name} (enr={enrollment}, rating={self.rating or '-'})"
         return f"District<{self.name}>"
 
     __match_args__ = ("name", "enrollment")
@@ -481,51 +482,18 @@ class Campus:
 
     @property
     def num_charter_transfer_destinations(self) -> int:
-        if not hasattr(self, "_repo") or self._repo is None:
-            return 0
-        try:
-            edges = self._repo.transfers_out(self)
-        except Exception:
-            return 0
-        ids = set()
-        for to_campus, _count, _masked in ((e[0], e[1], e[2]) for e in edges):
-            if to_campus is not None and is_charter(to_campus):
-                ids.add(getattr(to_campus, "id", None))
-        return len(ids)
+        from .transfer_summary import charter_transfer_observations
+        return charter_transfer_observations(self).destination_count
 
     @property
     def num_charter_transfer_destinations_masked(self) -> int:
-        if not hasattr(self, "_repo") or self._repo is None:
-            return 0
-        try:
-            edges = self._repo.transfers_out(self)
-        except Exception:
-            return 0
-        masked_ids = set()
-        for to_campus, _count, masked in ((e[0], e[1], e[2]) for e in edges):
-            if to_campus is not None and is_charter(to_campus) and bool(masked):
-                masked_ids.add(getattr(to_campus, "id", None))
-        return len(masked_ids)
+        from .transfer_summary import charter_transfer_observations
+        return charter_transfer_observations(self).aggregate.suppressed_count
 
     @property
     def total_unmasked_charter_transfers_out(self) -> int:
-        if not hasattr(self, "_repo") or self._repo is None:
-            return 0
-        try:
-            edges = self._repo.transfers_out(self)
-        except Exception:
-            return 0
-        total = 0
-        for to_campus, count, masked in ((e[0], e[1], e[2]) for e in edges):
-            if to_campus is None or not is_charter(to_campus):
-                continue
-            if count is None:
-                continue
-            try:
-                total += int(count)
-            except Exception:
-                continue
-        return total
+        from .transfer_summary import charter_transfer_observations
+        return int(charter_transfer_observations(self).aggregate.observed_sum)
 
 
 class EntityMap(dict):

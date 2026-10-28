@@ -148,6 +148,7 @@ class ProvenanceStore:
                 "content-type",
                 "content-encoding",
                 "content-length",
+                "content-disposition",
             }
         }
         return self._record(

@@ -2,9 +2,11 @@ from teadata.teadata_config import load_config
 import uuid
 
 import pandas as pd
+import pytest
 
 from teadata.classes import Campus, DataEngine, District
 from teadata.load_data import _group_transfer_rows
+from teadata.manifest import ContractError
 
 
 def _make_district(name: str, district_number: str) -> District:
@@ -37,40 +39,47 @@ def _make_campus(
     )
 
 
-def test_group_transfer_rows_matches_pandas_groupby():
+def test_transfer_projection_preserves_missing_zero_and_suppression():
     df = pd.DataFrame(
         {
             "campus_campus_number": [
                 "'011901001",
                 "'011901001",
                 "'011901001",
-                "'011901002",
+                "'011901001",
             ],
             "to_campus_number": [
                 "'011901101",
-                "'011901101",
                 "'011901102",
-                "'011901101",
+                "'011901103",
+                "'011901104",
             ],
-            "count": [10, 5, 1, 3],
+            "count": [10, None, 0, None],
             "masked": [False, True, False, False],
         }
     )
 
-    expected = (
-        df.groupby(["campus_campus_number", "to_campus_number"], dropna=False)
-        .agg({"count": "sum", "masked": "max"})
-        .reset_index()
-        .sort_values(["campus_campus_number", "to_campus_number"], kind="stable")
-        .reset_index(drop=True)
-    )
-    actual = (
-        _group_transfer_rows(df)
-        .sort_values(["campus_campus_number", "to_campus_number"], kind="stable")
-        .reset_index(drop=True)
-    )
+    actual = _group_transfer_rows(df)
+    assert actual["count"].tolist() == [10, None, 0, None]
+    assert actual["status"].tolist() == [
+        "observed",
+        "suppressed",
+        "observed",
+        "missing",
+    ]
 
-    assert actual.to_dict(orient="records") == expected.to_dict(orient="records")
+
+def test_transfer_projection_rejects_duplicate_pair_grain():
+    frame = pd.DataFrame(
+        {
+            "campus_campus_number": ["123456001"] * 2,
+            "to_campus_number": ["123456002"] * 2,
+            "count": [12, 12],
+            "masked": [False, False],
+        }
+    )
+    with pytest.raises(ContractError, match="Duplicate transfer pair"):
+        _group_transfer_rows(frame)
 
 
 def test_apply_transfers_from_dataframe_preserves_masked_and_missing_counts():
@@ -93,6 +102,22 @@ def test_apply_transfers_from_dataframe_preserves_masked_and_missing_counts():
     )
     repo.add_campus(src)
     repo.add_campus(dst)
+    suppressed_destination = _make_campus(
+        district,
+        name="Suppressed destination",
+        campus_number="11901003",
+        lon=-97.2,
+        lat=30.2,
+    )
+    missing_destination = _make_campus(
+        district,
+        name="Missing destination",
+        campus_number="11901004",
+        lon=-97.3,
+        lat=30.3,
+    )
+    repo.add_campus(suppressed_destination)
+    repo.add_campus(missing_destination)
 
     df = pd.DataFrame(
         [
@@ -105,13 +130,13 @@ def test_apply_transfers_from_dataframe_preserves_masked_and_missing_counts():
             {
                 "REPORT_TYPE": "Transfers Out To",
                 "REPORT_CAMPUS": 11901001,
-                "CAMPUS_RES_OR_ATTEND": 11901002,
+                "CAMPUS_RES_OR_ATTEND": 11901003,
                 "TRANSFERS_IN_OR_OUT": -999,
             },
             {
                 "REPORT_TYPE": "Transfers Out To",
                 "REPORT_CAMPUS": 11901001,
-                "CAMPUS_RES_OR_ATTEND": 11901002,
+                "CAMPUS_RES_OR_ATTEND": 11901004,
                 "TRANSFERS_IN_OR_OUT": None,
             },
             {
@@ -133,12 +158,6 @@ def test_apply_transfers_from_dataframe_preserves_masked_and_missing_counts():
                 "TRANSFERS_IN_OR_OUT": 2,
             },
             {
-                "REPORT_TYPE": "Transfers Out To",
-                "REPORT_CAMPUS": "invalid",
-                "CAMPUS_RES_OR_ATTEND": 11901002,
-                "TRANSFERS_IN_OR_OUT": 4,
-            },
-            {
                 "REPORT_TYPE": "Transfers In From",
                 "REPORT_CAMPUS": 11901001,
                 "CAMPUS_RES_OR_ATTEND": 11901002,
@@ -147,17 +166,27 @@ def test_apply_transfers_from_dataframe_preserves_masked_and_missing_counts():
         ]
     )
 
-    updated = repo.apply_transfers_from_dataframe(df, value_policy=load_config("teadata/teadata_sources.yaml").value_policies["campus_transfers"])
+    updated = repo.apply_transfers_from_dataframe(
+        df,
+        value_policy=load_config("teadata/teadata_sources.yaml").value_policies[
+            "campus_transfers"
+        ],
+    )
 
     assert updated == 1
     assert repo._xfers_missing == {"src": 1, "dst": 1, "either": 1}
 
     out_edges = repo.transfers_out(src)
     assert len(out_edges) == 3
-    assert [count for _, count, _ in out_edges] == [10, None, None]
-    assert [masked for _, _, masked in out_edges] == [False, True, False]
+    assert {
+        campus.campus_number: (count, masked) for campus, count, masked in out_edges
+    } == {
+        "'011901002": (10, False),
+        "'011901003": (None, True),
+        "'011901004": (None, False),
+    }
 
     in_edges = repo.transfers_in(dst)
-    assert len(in_edges) == 3
-    assert [count for _, count, _ in in_edges] == [10, None, None]
-    assert [masked for _, _, masked in in_edges] == [False, True, False]
+    assert len(in_edges) == 1
+    assert [count for _, count, _ in in_edges] == [10]
+    assert [masked for _, _, masked in in_edges] == [False]

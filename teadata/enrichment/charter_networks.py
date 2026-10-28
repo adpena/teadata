@@ -132,7 +132,7 @@ def add_charter_networks_from_config(
         d = District(
             id=uuid.uuid5(uuid.NAMESPACE_URL, "teadata:district:" + str(dn)),
             name=name,
-            enrollment=enrollment if enrollment is not None else 0,
+            enrollment=enrollment,
             rating=rating,
             aea=aea,
             aea_raw=aea_raw,

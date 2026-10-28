@@ -54,3 +54,7 @@
 ## Landing Review Gate
 
 Adversarial review of the final diff is required before landing. Resolve findings and run the applicable checks against the exact revision to be landed. Draft review branches are permitted; a prior review of an earlier revision does not satisfy this gate.
+
+## Local Verification
+
+`scripts/check` is the primary verification entry point; it runs locked isolated local Ruff, ty, deptry, and pytest checks and records receipts/logs in ignored `.local/checks/`. Use `scripts/check --verify-latest` to verify evidence for the current exact revision. After serialized-code or data changes, rebuild the bundle and run `scripts/check --release teadata/.cache/release.json`. Code-only receipts do not certify raw data or artifacts, and all receipts remain separate from adversarial review. `TEADATA_CHECK_PYTHON` selects another supported Python version for compatibility checks. Hosted workflows are manual only; do not restore automatic hosted triggers without a user request. Optional hook installation must preserve Git LFS and refuse custom hooks/configuration.

@@ -101,6 +101,9 @@ Supported metadata fields:
 | `license`, `citation`, `identifiers` | Verified reuse/citation information and identifiers such as DOIs |
 | `notes` | Source-specific definitions, caveats, suppression rules, or other research context |
 | `provenance_ids` | SHA-256 identifiers of immutable acquisition/processing receipts |
+| `references` | Per-version dictionary, glossary, masking, column schema, or other documentation with URL, availability/review status, exact review hash, and acquisition receipts |
+| `metrics` | Physical field, unit, and optional per-metric reference period |
+| `value_policy`, `estimation` | Source token interpretation and a separately versioned estimation assumption |
 
 Omit facts that are unknown. Do not infer download dates from file modification
 times, today's date, filenames, or a deployment date. HTTP `Last-Modified` is an
@@ -160,7 +163,7 @@ supply its observed, timezone-aware `downloaded_at`, requested/final URLs, and
 response headers. Receipts record the actual byte count and SHA-256, declared
 source metadata at that time, selected catalog year, request parameters, and
 an observation timestamp. Only ETag, Last-Modified, Content-Type,
-Content-Encoding, and Content-Length headers are retained.
+Content-Encoding, Content-Length, and Content-Disposition headers are retained.
 
 Transformations link to their input receipts, retaining the processing code
 version, parameters, validation results, and each output artifact:

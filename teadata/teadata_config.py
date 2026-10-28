@@ -30,6 +30,7 @@ import re
 
 from teadata.dataset_metadata import DatasetDefinition, DatasetMetadata, ResolvedDataset
 from teadata.values import ValuePolicy
+from teadata.metric_bindings import MetricBinding, parse_bindings, bindings_document
 
 YEAR_MIN_DEFAULT = 2009
 
@@ -351,6 +352,7 @@ class Config:
     schema: SchemaHints = field(default_factory=SchemaHints)
     year_min: int = YEAR_MIN_DEFAULT
     value_policies: Dict[str, ValuePolicy] = field(default_factory=dict)
+    metric_bindings: Dict[str, MetricBinding | str] = field(default_factory=dict)
     base_dir: Path | None = field(default=None, repr=False)
 
     @staticmethod
@@ -414,6 +416,7 @@ class Config:
             schema=schema,
             year_min=year_min,
             value_policies=policies,
+            metric_bindings=parse_bindings(d.get("metric_bindings")),
         )
         cfg.validate_file_types()  # fail fast
         for catalog in (cfg.data_sources, cfg.spatial):
@@ -504,6 +507,7 @@ class Config:
                     name: policy.to_dict()
                     for name, policy in self.value_policies.items()
                 },
+                "metric_bindings": bindings_document(self.metric_bindings),
                 "data_sources": {k: v.to_dict() for k, v in self.data_sources.items()},
                 "spatial": {k: v.to_dict() for k, v in self.spatial.items()},
                 "options": self.options,
@@ -515,6 +519,18 @@ class Config:
             indent=2,
             sort_keys=True,
         )
+
+    def resolved_metric_bindings(self) -> dict:
+        """Freeze build-time source choices before embedding the metric registry."""
+        bindings = bindings_document(self.metric_bindings)
+        for name, binding in list(bindings.items()):
+            if isinstance(binding, dict) and "{private_dataset}" in binding["dataset"]:
+                selected = self.options.get("private_dataset")
+                if not selected:
+                    del bindings[name]
+                else:
+                    binding["dataset"] = binding["dataset"].replace("{private_dataset}", str(selected))
+        return bindings
 
     def resolve_dataset(
         self,
@@ -669,6 +685,45 @@ class Config:
             f"Unsupported file extension for loader: {ext} (from '{base}')"
         )
 
+    def column_schema(
+        self,
+        dataset: str,
+        year: int | None = None,
+        *,
+        section: str = "data_sources",
+        reader_profile: str | None = None,
+    ) -> list[str] | None:
+        """Return the reviewed ordered reader columns without loading source rows."""
+        from .column_schema import load_column_schema, reader_options
+        from .manifest import ContractError
+
+        source = self.resolve_dataset(dataset, year, section=section)
+        try:
+            options = reader_options(source.reader, reader_profile)
+            resource = options.get("column_schema")
+            if resource is None:
+                return None
+            references = [
+                reference
+                for reference in source.metadata.references
+                if reference.role == "schema" and reference.path == resource
+            ]
+            if (
+                len(references) != 1
+                or references[0].status != "available"
+                or references[0].reviewed_sha256 is None
+            ):
+                raise ValueError(
+                    "Column schema requires one available byte-reviewed schema reference"
+                )
+            if self.base_dir is None:
+                raise ValueError("Column schema requires a source contract directory")
+            return load_column_schema(
+                self.base_dir, resource, references[0].reviewed_sha256
+            )
+        except (OSError, ValueError) as error:
+            raise ContractError(f"Invalid column schema for {dataset}: {error}") from error
+
     def load_df(
         self,
         dataset: str,
@@ -682,18 +737,26 @@ class Config:
         Resolve the dataset for the year and load as DataFrame (or GeoDataFrame if spatial).
         For CSV loads, you can pass dtype=... etc through reader_kwargs.
         """
-        from .manifest import ACTIVE_BUILD, ContractError, schema_fingerprint
+        from .column_schema import reader_options
+        from .manifest import ACTIVE_BUILD, ContractError
 
         source = self.resolve_dataset(dataset, year, section=section)
-        options = dict(source.reader)
-        profiles = options.pop("profiles", {})
-        if reader_profile is not None:
-            if reader_profile not in profiles:
-                raise ContractError(
-                    f"Reader profile {reader_profile} is not declared for {dataset}"
-                )
-            options.update(profiles[reader_profile])
-        expected_schema = options.pop("expected_columns_sha256", None)
+        try:
+            options = reader_options(source.reader, reader_profile)
+        except ValueError as error:
+            raise ContractError(f"Invalid reader contract for {dataset}: {error}") from error
+        expected_schema = self.column_schema(
+            dataset, year, section=section, reader_profile=reader_profile
+        )
+        if (
+            reader_profile is None
+            and source.reader.get("profiles")
+            and expected_schema is None
+        ):
+            raise ContractError(
+                f"Reader profile is required for {dataset}; no default column schema is declared"
+            )
+        options.pop("column_schema", None)
         columns = options.pop("columns", {})
         required = options.pop("required_columns", [])
         options.update(reader_kwargs)
@@ -713,10 +776,7 @@ class Config:
         }
         if rename:
             frame = frame.rename(columns=rename)
-        if (
-            expected_schema is not None
-            and schema_fingerprint(frame.columns) != expected_schema
-        ):
+        if expected_schema is not None and list(frame.columns) != expected_schema:
             raise ContractError(
                 f"Source schema changed for {dataset}; review its dictionary, parser, and contract"
             )

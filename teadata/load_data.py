@@ -14,7 +14,9 @@ from contextvars import ContextVar
 
 from teadata.manifest import BuildRecorder, ContractError, write_sqlite_catalog
 from teadata.provenance import ProvenanceStore
+from teadata.identifiers import canonical_source_identifier
 from teadata.release import publish_release, SNAPSHOT_MAGIC
+from teadata.transfer_summary import transfer_measurement, normalized_transfer_measurement
 
 from datetime import datetime, date
 from typing import Any, Iterable, Mapping, Optional, List
@@ -573,17 +575,6 @@ def run_enrichments(repo: DataEngine) -> None:
         _, count = enrich(repo, CFG, f"{scope}_tapr_student_staff_profile", YEAR)
         if count == 0:
             raise ContractError(f"No {scope} TAPR records matched")
-    _, count = enrich_districts_from_config(
-        repo,
-        CFG,
-        "accountability",
-        YEAR,
-        select=["number_of_students"],
-        aliases={"number_of_students": "enrollment"},
-        reader_kwargs={"reader_profile": "enrollment"},
-    )
-    if count == 0:
-        raise ContractError("No district enrollment records matched")
     _, frame = cfg.load_df("campus_transfer_reports", YEAR)
     count = repo.apply_transfers_from_dataframe(
         frame, value_policy=cfg.value_policies["campus_transfers"]
@@ -967,48 +958,32 @@ def _format_stat_value(value: Any) -> Optional[str]:
     return text or None
 
 
-def _coerce_masked(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    if value is None:
-        return False
-    if isinstance(value, float) and pd.isna(value):
-        return False
-    text = str(value).strip().lower()
-    if text in {"true", "yes", "y"}:
-        return True
-    if text in {"false", "no", "n"}:
-        return False
-    return False
-
-
 def _group_transfer_rows(
     working_df: pd.DataFrame,
 ) -> pd.DataFrame:
+    """Validate the declared pair grain without summing or inventing counts."""
+    from teadata.identifiers import canonical_source_identifier
+
     group_columns = ["campus_campus_number", "to_campus_number"]
-    aggregate_columns = group_columns + ["count", "masked"]
-    aggregate_df = working_df[aggregate_columns]
-
-    if pl is not None:
+    columns = group_columns + ["count", "masked"]
+    if not set(columns).issubset(working_df.columns):
+        raise ContractError("Transfer projection lacks required pair/count columns")
+    result = working_df[columns].copy()
+    for column in group_columns:
         try:
-            grouped_polars = (
-                pl.from_pandas(aggregate_df, include_index=False)
-                .group_by(group_columns)
-                .agg(
-                    pl.col("count").sum().alias("count"),
-                    pl.col("masked").max().alias("masked"),
-                )
-            )
-            grouped_pdf = grouped_polars.to_pandas(use_pyarrow_extension_array=True)
-            return grouped_pdf[group_columns + ["count", "masked"]]
-        except Exception:
-            pass
-
-    return (
-        aggregate_df.groupby(group_columns, dropna=False)
-        .agg({"count": "sum", "masked": "max"})
-        .reset_index()
-    )
+            result[column] = result[column].map(lambda value: canonical_source_identifier(value, width=9))
+        except ValueError as error:
+            raise ContractError("Transfer projection has an invalid campus identifier") from error
+        if result[column].isna().any():
+            raise ContractError("Transfer projection has a missing campus identifier")
+    if result.duplicated(group_columns).any():
+        raise ContractError("Duplicate transfer pair in map projection")
+    values = [normalized_transfer_measurement(row["count"], row["masked"])
+              for row in result.to_dict(orient="records")]
+    result["count"] = pd.Series([value.numeric for value in values], index=result.index, dtype=object)
+    result["status"] = [value.status.value for value in values]
+    result["measurement"] = [value.to_dict() for value in values]
+    return result
 
 
 def _collect_charter_transfer_entries(
@@ -1018,10 +993,7 @@ def _collect_charter_transfer_entries(
     origin_candidates: list[Campus] = []
     campus_numbers: set[str] = set()
 
-    try:
-        district_campuses = list(repo.campuses_in(district))
-    except Exception:
-        district_campuses = list(getattr(district, "campuses", None) or [])
+    district_campuses = list(repo.campuses_in(district))
 
     for campus in district_campuses:
         if campus is None or not getattr(campus, "is_charter", False):
@@ -1033,14 +1005,7 @@ def _collect_charter_transfer_entries(
             getattr(campus, "campus_number", None)
         )
         inbound_edges = []
-        try:
-            edge_rows = [
-                edge
-                for edge in repo.transfers_in(campus)
-                if edge and edge[0] is not None
-            ]
-        except Exception:
-            edge_rows = []
+        edge_rows = [edge for edge in repo.transfers_in(campus) if edge and edge[0] is not None]
         for origin_campus, count, masked in edge_rows:
             if origin_campus is None:
                 continue
@@ -1053,6 +1018,7 @@ def _collect_charter_transfer_entries(
                     "campus": origin_campus,
                     "count": count,
                     "masked": bool(masked),
+                    "measurement": transfer_measurement(repo, origin_campus, campus, count, masked),
                 }
             )
             origin_candidates.append(origin_campus)
@@ -1085,13 +1051,8 @@ def _collect_charter_transfer_entries(
             )
             origin_latlon = _extract_latlon(campus_lookup, origin_number)
             distance = _haversine_distance(latlon, origin_latlon)
-            count_value = None
-            if not edge.get("masked"):
-                try:
-                    if edge.get("count") is not None:
-                        count_value = int(round(float(edge.get("count"))))
-                except (TypeError, ValueError):
-                    count_value = None
+            value = edge["measurement"]
+            count_value = value.numeric
             processed_edges.append(
                 {
                     "campus": origin_campus,
@@ -1100,6 +1061,8 @@ def _collect_charter_transfer_entries(
                     "distance": distance,
                     "count": count_value,
                     "masked": bool(edge.get("masked")),
+                    "status": value.status.value,
+                    "measurement": value.to_dict(),
                 }
             )
         entry["edges"] = processed_edges
@@ -1261,6 +1224,8 @@ def _build_charter_map_payload(repo: DataEngine, district: District) -> dict:
                     "from_name": _get_campus_name(None, origin, origin_number),
                     "count": None if edge.get("masked") else count_value,
                     "masked": bool(edge.get("masked")),
+                    "status": edge["status"],
+                    "measurement": edge["measurement"],
                 }
             )
 
@@ -1296,6 +1261,8 @@ def _build_charter_map_payload(repo: DataEngine, district: District) -> dict:
                         "to_name": _get_campus_name(None, campus, canonical_number),
                         "count": None if edge.get("masked") else count_value,
                         "masked": bool(edge.get("masked")),
+                        "status": edge["status"],
+                        "measurement": edge["measurement"],
                     }
                 )
 
@@ -1345,20 +1312,8 @@ def _build_charter_map_payload(repo: DataEngine, district: District) -> dict:
         raw_grade_range = getattr(campus, "grade_range", None) or getattr(
             campus, "gradeRange", None
         )
-        enrollment_raw = getattr(campus, "enrollment", None)
-        stats = []
         grade_range = _format_stat_value(raw_grade_range)
-        if grade_range:
-            stats.append({"label": "Grade Range", "value": grade_range})
-        enrollment_value = _format_stat_value(enrollment_raw)
-        if enrollment_value:
-            stats.append(
-                {
-                    "id": "enrollment",
-                    "label": catalog.metric_label("enrollment", "Enrollment"),
-                    "value": enrollment_value,
-                }
-            )
+        stats = _map_stats_for_campus(campus)
         all_private_entries.append(
             {
                 "campusNumber": canonical_number,
@@ -1443,44 +1398,33 @@ def build_closures_map_payload(
         except Exception:
             payload["bounds"] = None
 
-    try:
-        transfer_rows = (
-            repo
-            >> ("campuses_in", district)
-            >> ("where", lambda x: (x.enrollment or 0) > 0)
-            >> ("transfers_out", True)
-        )
-        required_columns = {
-            "campus_campus_number",
-            "campus_name",
-            "to_campus_number",
-            "to_name",
-            "count",
-            "masked",
-            "campus_num_charter_transfer_destinations",
-            "campus_num_charter_transfer_destinations_masked",
-            "campus_total_unmasked_charter_transfers_out",
-            "campus_total_estimated_masked_charter_transfers_out",
-            "campus_total_estimated_charter_transfers_out",
-            "to_is_charter",
-            "campus_is_charter",
+    transfer_rows = repo >> ("campuses_in", district) >> ("transfers_out", True)
+    required_columns = {
+        "campus_campus_number",
+        "campus_name",
+        "to_campus_number",
+        "to_name",
+        "count",
+        "masked",
+        "campus_num_charter_transfer_destinations",
+        "campus_num_charter_transfer_destinations_masked",
+        "campus_total_unmasked_charter_transfers_out",
+        "campus_total_estimated_masked_charter_transfers_out",
+        "campus_total_estimated_charter_transfers_out",
+        "to_is_charter",
+        "campus_is_charter",
+    }
+    required_columns.update(
+        {
+            "campus_grade_range",
+            "campus_enrollment",
+            "campus_overall_rating",
+            "to_grade_range",
+            "to_enrollment",
+            "to_overall_rating",
         }
-        required_columns.update(
-            {
-                "campus_grade_range",
-                "campus_enrollment",
-                "campus_overall_rating",
-                "to_grade_range",
-                "to_enrollment",
-                "to_overall_rating",
-            }
-        )
-        try:
-            transfer_df = transfer_rows.to_df(columns=sorted(required_columns))
-        except TypeError:
-            transfer_df = transfer_rows.to_df()
-    except Exception:
-        return payload
+    )
+    transfer_df = transfer_rows.to_df(columns=sorted(required_columns))
 
     if transfer_df.empty:
         return payload
@@ -1509,21 +1453,9 @@ def build_closures_map_payload(
         "campus_campus_number" not in available_columns
         or "to_campus_number" not in available_columns
     ):
-        return payload
+        raise ContractError("Transfer projection lacks required campus identifiers")
 
     working_df = transfer_df[available_columns].copy()
-
-    working_df["campus_campus_number"] = working_df["campus_campus_number"].map(
-        _canonical_campus_number
-    )
-    working_df["to_campus_number"] = working_df["to_campus_number"].map(
-        _canonical_campus_number
-    )
-
-    working_df = working_df.dropna(subset=["campus_campus_number", "to_campus_number"])
-
-    if working_df.empty:
-        return payload
 
     for column in (
         "campus_num_charter_transfer_destinations",
@@ -1533,19 +1465,9 @@ def build_closures_map_payload(
         if column in working_df.columns:
             working_df[column] = pd.to_numeric(working_df[column], errors="coerce")
 
-    if "count" in working_df.columns:
-        working_df["count"] = pd.to_numeric(
-            working_df["count"], errors="coerce"
-        ).fillna(0)
-    else:
-        working_df["count"] = 0
-
-    if "masked" in working_df.columns:
-        working_df["masked"] = working_df["masked"].map(_coerce_masked)
-    else:
-        working_df["masked"] = False
-
     grouped = _group_transfer_rows(working_df)
+    working_df["campus_campus_number"] = grouped["campus_campus_number"]
+    working_df["to_campus_number"] = grouped["to_campus_number"]
 
     campus_numbers = set(working_df["campus_campus_number"].dropna())
     campus_numbers.update(working_df["to_campus_number"].dropna())
@@ -1635,17 +1557,14 @@ def build_closures_map_payload(
         origin = row.campus_campus_number
         dest = row.to_campus_number
         masked = bool(row.masked)
-        count_value = None if masked else row.count
-        if count_value is not None:
-            try:
-                count_value = int(round(float(count_value)))
-            except (TypeError, ValueError):
-                count_value = None
-        if count_value and count_value > max_transfer:
-            max_transfer = count_value
-
         destination_obj = campus_lookup.get(dest)
         origin_obj = campus_lookup.get(origin)
+        if destination_obj is None or origin_obj is None:
+            raise ContractError("Transfer projection refers to a missing campus entity")
+        value = transfer_measurement(repo, origin_obj, destination_obj, row.count, masked)
+        count_value = value.numeric
+        if count_value is not None and count_value > max_transfer:
+            max_transfer = count_value
 
         transfers_out.setdefault(origin, []).append(
             {
@@ -1653,6 +1572,8 @@ def build_closures_map_payload(
                 "to_name": _get_campus_name(None, destination_obj, dest),
                 "count": count_value,
                 "masked": masked,
+                "status": value.status.value,
+                "measurement": value.to_dict(),
             }
         )
         transfers_in.setdefault(dest, []).append(
@@ -1661,6 +1582,8 @@ def build_closures_map_payload(
                 "from_name": _get_campus_name(None, origin_obj, origin),
                 "count": count_value,
                 "masked": masked,
+                "status": value.status.value,
+                "measurement": value.to_dict(),
             }
         )
 
@@ -1794,18 +1717,7 @@ def build_closures_map_payload(
             raw_grade_range = getattr(campus, "gradeRange", None)
         grade_range = _format_stat_value(raw_grade_range)
 
-        enrollment_raw = getattr(campus, "enrollment", None)
-        enrollment_value = _format_stat_value(enrollment_raw)
-
-        stats = []
-        if enrollment_value:
-            stats.append(
-                {
-                    "id": "enrollment",
-                    "label": catalog.metric_label("enrollment", "Enrollment"),
-                    "value": enrollment_value,
-                }
-            )
+        stats = _map_stats_for_campus(campus)
 
         payload["privateCampuses"].append(
             {
@@ -1970,21 +1882,16 @@ def _serialize_transfer_destination(
     campus: Optional[Campus],
     count: Any,
     masked: Any,
+    *, measurement=None,
 ) -> dict[str, object]:
     payload = _serialize_map_campus(campus)
-    numeric_count: Optional[int] = None
-    if not masked and count is not None:
-        try:
-            numeric_count = int(count)
-        except Exception:
-            try:
-                numeric_count = int(float(count))
-            except Exception:
-                numeric_count = None
+    value = measurement or normalized_transfer_measurement(count, masked)
     payload.update(
         {
-            "count": numeric_count,
-            "masked": bool(masked),
+            "count": value.numeric,
+            "masked": value.is_suppressed,
+            "status": value.status.value,
+            "measurement": value.to_dict(),
         }
     )
     return payload
@@ -2227,7 +2134,8 @@ def _build_isd_profile_map_payload(repo: DataEngine, campus: Campus) -> dict:
     for to_campus, count, masked in repo.transfers_out(campus):
         if to_campus is None:
             continue
-        entry = _serialize_transfer_destination(to_campus, count, masked)
+        entry = _serialize_transfer_destination(to_campus, count, masked,
+            measurement=transfer_measurement(repo, campus, to_campus, count, masked))
         dest_lat, dest_lon = entry.get("lat"), entry.get("lon")
         if dest_lat is not None and dest_lon is not None:
             points.append((dest_lat, dest_lon))
@@ -2242,7 +2150,8 @@ def _build_isd_profile_map_payload(repo: DataEngine, campus: Campus) -> dict:
     for from_campus, count, masked in repo.transfers_in(campus):
         if from_campus is None or getattr(from_campus, "is_charter", False):
             continue
-        entry = _serialize_transfer_destination(from_campus, count, masked)
+        entry = _serialize_transfer_destination(from_campus, count, masked,
+            measurement=transfer_measurement(repo, from_campus, campus, count, masked))
         entry["charter"] = False
         entry["isDistrict"] = True
         origin_lat, origin_lon = entry.get("lat"), entry.get("lon")
@@ -2294,7 +2203,8 @@ def _build_charter_profile_map_payload(repo: DataEngine, campus: Campus) -> dict
         if from_campus is None:
             continue
         origin_campuses.append(from_campus)
-        entry = _serialize_transfer_destination(from_campus, count, masked)
+        entry = _serialize_transfer_destination(from_campus, count, masked,
+            measurement=transfer_measurement(repo, from_campus, campus, count, masked))
         entry["charter"] = False
         entry["isDistrict"] = True
         origin_lat, origin_lon = entry.get("lat"), entry.get("lon")
@@ -2640,6 +2550,90 @@ def sanity_probe_charters(
             print("  only_slow:", [c.name for c in only_slow])
 
 
+def _add_reporting_entities(repo: DataEngine, frame: pd.DataFrame) -> dict[str, int]:
+    """Preserve reporting entities even when a later spatial snapshot omits them.
+
+    Identity, grades, classification, and accountability population come from the
+    declared report. No location or active/closed status is inferred. Enrollment
+    is populated separately from the TAPR enrollment field after enrichment.
+    """
+    districts = {canonical_district_number(d.district_number): d for d in repo._districts.values()}
+    campuses = {canonical_campus_number(c.campus_number): c for c in repo._campuses.values()}
+    seen = set()
+    added = {"districts": 0, "campuses": 0}
+    for row in frame.to_dict(orient="records"):
+        try:
+            district_number = canonical_source_identifier(row.get("district_number"), width=6)
+            campus_number = canonical_source_identifier(row.get("campus_number"), width=9)
+        except ValueError as error:
+            raise ContractError("Reporting roster has an invalid source identifier") from error
+        if district_number is None:
+            raise ContractError("Reporting roster has an invalid district identifier")
+        if campus_number is None and (
+            any(not _record_value_is_missing(row.get(field)) for field in ("campus_name", "grade_range", "charter_type"))
+            or (not _record_value_is_missing(row.get("school_type")) and str(row["school_type"]).strip().lower() != "district")
+        ):
+            raise ContractError("Reporting campus row is missing its campus identifier")
+        identity = (district_number, campus_number)
+        if identity in seen:
+            raise ContractError("Reporting roster has duplicate entity identifiers")
+        seen.add(identity)
+        if campus_number and campus_number.lstrip("'")[:6] != district_number.lstrip("'"):
+            raise ContractError("Reporting campus identifier does not belong to its district")
+        district = districts.get(district_number)
+        if district is None:
+            name = row.get("district_name")
+            if not isinstance(name, str) or not name.strip():
+                raise ContractError("Reporting district has no name")
+            district = District(id=uuid.uuid5(uuid.NAMESPACE_URL, "teadata:district:" + district_number),
+                                district_number=district_number, name=name, enrollment=None,
+                                meta={"identity_source": "accountability"})
+            repo.add_district(district)
+            districts[district_number] = district
+            added["districts"] += 1
+        if campus_number is None:
+            district.meta["accountability_student_count"] = row.get("accountability_student_count")
+            continue
+        campus = campuses.get(campus_number)
+        if campus is None:
+            name = row.get("campus_name")
+            charter = str(row.get("charter_status", "")).strip().lower()
+            if not isinstance(name, str) or not name.strip() or charter not in {"yes", "no"}:
+                raise ContractError("Reporting campus lacks a name or explicit charter classification")
+            campus = Campus(id=uuid.uuid5(uuid.NAMESPACE_URL, "teadata:campus:" + campus_number),
+                district_id=district.id, district_number=district_number, campus_number=campus_number,
+                name=name, enrollment=None, is_charter=charter == "yes",
+                charter_type=str(row.get("charter_type") or ""),
+                grade_range=row.get("grade_range"), school_type=row.get("school_type"),
+                aea=_coerce_aea_bool(row.get("aea")), aea_raw=_normalize_aea_raw(row.get("aea")),
+                location=None, meta={"identity_source": "accountability", "location_status": "unavailable"})
+            repo.add_campus(campus)
+            campuses[campus_number] = campus
+            added["campuses"] += 1
+        campus.meta["accountability_student_count"] = row.get("accountability_student_count")
+    if not seen:
+        raise ContractError("Reporting roster is empty")
+    return added
+
+
+def _release_validation(repo: DataEngine) -> dict[str, Any]:
+    """Gate structural completeness while keeping source review explicitly pending."""
+    if any(repo._xfers_missing.values()) or getattr(repo, "_xfers_unresolved", ()):
+        raise ContractError("Release has unresolved transfer endpoints; review the reporting roster before publication")
+    return {
+        "source_coverage": "passed",
+        "referential_integrity": "passed",
+        "artifact_binding": "passed",
+        "quality_status": "needs_review",
+        "source_review_status": "pending",
+        "district_count": len(repo._districts),
+        "campus_count": len(repo._campuses),
+        "reporting_only_campus_count": sum(c.meta.get("identity_source") == "accountability" for c in repo._campuses.values()),
+        "public_campuses_without_location": sum(not c.is_private and c.location is None for c in repo._campuses.values()),
+        "unmatched_transfer_endpoints": dict(repo._xfers_missing),
+    }
+
+
 def _build_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
     repo = DataEngine()
 
@@ -2670,7 +2664,7 @@ def _build_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                     uuid.NAMESPACE_URL, "teadata:district:" + district_number
                 ),
                 name=getattr(row, "NAME", None),
-                enrollment=getattr(row, "ENROLLMENT", 0),
+                enrollment=None,
                 rating=rating_str,
                 aea=_coerce_aea_bool(district_aea_raw),
                 aea_raw=district_aea_raw,
@@ -2727,29 +2721,12 @@ def _build_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                     or "Unnamed District"
                 )
 
-                enrollment_val = record.get("enrollment")
-                enrollment = 0
-                if isinstance(enrollment_val, (int, float)) and not pd.isna(
-                    enrollment_val
-                ):
-                    try:
-                        enrollment = int(float(enrollment_val))
-                    except (TypeError, ValueError):
-                        enrollment = 0
-                elif isinstance(enrollment_val, str):
-                    cleaned = enrollment_val.replace(",", "").strip()
-                    if cleaned:
-                        try:
-                            enrollment = int(float(cleaned))
-                        except ValueError:
-                            enrollment = 0
-
                 district = District(
                     id=uuid.uuid5(
                         uuid.NAMESPACE_URL, "teadata:district:" + district_number
                     ),
                     name=name,
-                    enrollment=enrollment,
+                    enrollment=None,
                     boundary=None,
                 )
                 district.district_number = district_number
@@ -2795,7 +2772,7 @@ def _build_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                         uuid.NAMESPACE_URL, "teadata:district:" + district_number
                     ),
                     name=name,
-                    enrollment=0,
+                    enrollment=None,
                     boundary=None,
                 )
                 district.district_number = district_number
@@ -2816,7 +2793,7 @@ def _build_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
         fallback_district = District(
             id=uuid.uuid5(uuid.NAMESPACE_URL, "teadata:district:unknown"),
             name="Unknown District",
-            enrollment=0,
+            enrollment=None,
             rating="",
             boundary=None,
         )
@@ -2853,7 +2830,7 @@ def _build_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                 ),
                 district_id=district_id,
                 name=getattr(row, "USER_School_Name", "Unnamed Campus"),
-                enrollment=getattr(row, "USER_School_Enrollment_as_of_Oc", None),
+                enrollment=None,
                 district_number=district_key,
                 campus_number=canonical_campus_number(
                     getattr(row, "USER_School_Number", None)
@@ -2875,6 +2852,13 @@ def _build_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                 location=getattr(row, "geometry"),
             )
             repo.add_campus(c)
+
+        _, reporting = cfg_obj.load_df("accountability", YEAR, reader_profile="population")
+        _add_reporting_entities(repo, reporting)
+        dn_to_id = {
+            key: district.id for district in repo._districts.values()
+            for key in _district_lookup_keys(district.district_number) if key
+        }
 
         # Optional private school campuses
         private_loaded = 0
@@ -3143,9 +3127,15 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                     f"Build source coverage mismatch: {sorted(expected - set(build.datasets))}"
                 )
             repo.catalog = build.catalog()
+            for scope, entities in (("district", repo._districts.values()), ("campus", repo._campuses.values())):
+                for entity in entities:
+                    if scope == "campus" and entity.is_private:
+                        continue
+                    entity.enrollment = repo.catalog.measurement(entity, "enrollment", scope=scope).numeric
             _materialize_percent_enrollment_change(repo)
             for campus in repo._campuses.values():
                 campus.meta.update(repo.catalog.charter_transfer_summary(campus))
+            validation = _release_validation(repo)
             boundaries = _save_boundary_store(repo, districts_fp, campuses_fp)
             maps = _save_map_store(repo, districts_fp, campuses_fp)
             entities = _save_entity_store(repo, districts_fp, campuses_fp)
@@ -3173,16 +3163,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                 processor="teadata.load_data",
                 parameters={"build_id": repo.catalog.build_id},
                 code_version=repo.catalog.to_dict()["processor_sha256"],
-                validation={
-                    "source_coverage": "passed",
-                    "quality_status": "needs_review"
-                    if any(repo._xfers_missing.values())
-                    else "passed",
-                    "artifact_binding": "passed",
-                    "district_count": len(repo._districts),
-                    "campus_count": len(repo._campuses),
-                    "unmatched_transfer_endpoints": repo._xfers_missing,
-                },
+                validation=validation,
             )
             publish_release(
                 output,

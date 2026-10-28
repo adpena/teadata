@@ -8,22 +8,23 @@ from __future__ import annotations
 
 import argparse
 from dataclasses import replace
-from datetime import datetime, timezone
 import os
 from pathlib import Path
 import tempfile
-from urllib.request import urlopen
+from urllib.parse import urlparse
 
 import yaml
 
 from .dataset_metadata import DatasetMetadata, ResolvedDataset
-from .manifest import verify_source_receipts
+from .acquisition import AcquisitionClient
+from .manifest import verify_reference_receipts, verify_source_receipts
 from .provenance import ProvenanceStore
 from .teadata_config import load_config
 
 
 def observe_sources(
-    config: str | Path, store: str | Path, *, fetch_references: bool = False
+    config: str | Path, store: str | Path, *, fetch_references: bool = False,
+    all_versions: bool = False, datasets: set[str] | None = None,
 ) -> dict[str, str]:
     """Record selected local sources and, explicitly, fetch their documentation.
 
@@ -34,12 +35,20 @@ def observe_sources(
     cfg = load_config(config)
     raw = yaml.safe_load(config.read_text())
     archive = ProvenanceStore(store)
+    client = AcquisitionClient(archive, max_bytes=64 * 1024 * 1024)
     references = {}
     observed = {}
+    if datasets is not None and datasets - (set(cfg.data_sources) | set(cfg.spatial)):
+        raise ValueError("Unknown dataset selection")
     for section in ("data_sources", "spatial"):
         catalog = getattr(cfg, section)
-        for dataset in catalog:
-            source = cfg.resolve_dataset(dataset, section=section)
+        selections = [(dataset, year) for dataset, versions in catalog.items()
+                      if datasets is None or dataset in datasets
+                      for year in (sorted(versions.entries) if all_versions else [None])]
+        for dataset, year in selections:
+            source = cfg.resolve_dataset(dataset, year, section=section)
+            if year == 9999:
+                source = replace(source, requested_year=None)
             entry = raw[section][dataset][
                 source.resolved_year if source.resolved_year is not None else "current"
             ]
@@ -97,30 +106,20 @@ def observe_sources(
                         f"Reference {reference.reference_id} needs explicit --fetch-references"
                     )
                 if reference.url not in references:
-                    with urlopen(reference.url, timeout=60) as response:
-                        with tempfile.NamedTemporaryFile() as temporary:
-                            while block := response.read(1024 * 1024):
-                                temporary.write(block)
-                            temporary.flush()
-                            now = datetime.now(timezone.utc)
-                            document = ResolvedDataset(
-                                dataset=f"reference:{reference.reference_id}",
-                                section="reference",
-                                requested_year=None,
-                                resolved_year=source.resolved_year,
-                                path=temporary.name,
-                                metadata=DatasetMetadata(
-                                    title=reference.title, source_url=reference.url
-                                ),
-                            )
-                            references[reference.url] = archive.record_acquisition(
-                                temporary.name,
-                                document,
-                                downloaded_at=now,
-                                requested_url=reference.url,
-                                resolved_url=response.url,
-                                response_headers=dict(response.headers),
-                            )
+                    document = ResolvedDataset(
+                        dataset=f"reference:{reference.reference_id}",
+                        section="reference",
+                        requested_year=None,
+                        resolved_year=source.resolved_year,
+                        path="",
+                        metadata=DatasetMetadata(title=reference.title, source_url=reference.url),
+                    )
+                    extension = Path(urlparse(reference.url).path).suffix
+                    if extension not in {".pdf", ".html", ".csv", ".xlsx"}:
+                        extension = ".html"
+                    references[reference.url] = client.fetch(
+                        reference.url, document, filename=reference.reference_id + extension
+                    ).record_id
                 updated_refs.append(
                     replace(reference, provenance_ids=(references[reference.url],))
                 )
@@ -128,21 +127,30 @@ def observe_sources(
                 source,
                 metadata=replace(source.metadata, references=tuple(updated_refs)),
             )
-            archive.retain_artifact(source.path)
+            # Observing source files cannot approve changed methodology bytes.
+            verify_reference_receipts(source, archive, reference_base=config.parent)
+            identity = archive.retain_artifact(source.path)
             try:
                 verify_source_receipts(source, archive, reference_base=config.parent)
             except (OSError, ValueError, RuntimeError):
                 # Existing receipts remain in history; this contract selects the new observation.
+                retained = tuple(
+                    identifier for identifier in source.metadata.provenance_ids
+                    if archive.read_record(identifier).get("kind") == "acquisition"
+                    and archive.read_record(identifier).get("dataset") == source.dataset
+                    and archive.read_record(identifier).get("section") == source.section
+                    and archive.read_record(identifier)["artifact"]["sha256"] == identity["sha256"]
+                )
                 source = replace(
                     source, metadata=replace(source.metadata, provenance_ids=())
                 )
                 record_id = archive.record_acquisition(source.path, source)
                 source = replace(
                     source,
-                    metadata=replace(source.metadata, provenance_ids=(record_id,)),
+                    metadata=replace(source.metadata, provenance_ids=(*retained, record_id)),
                 )
             entry["metadata"] = source.metadata.to_dict()
-            observed[dataset] = source.metadata.provenance_ids[-1]
+            observed[f"{dataset}:{source.resolved_year or 'current'}" if all_versions else dataset] = source.metadata.provenance_ids[-1]
     with tempfile.NamedTemporaryFile(
         mode="w", dir=config.parent, delete=False
     ) as target:
@@ -160,9 +168,12 @@ def main() -> None:
     parser.add_argument("config", type=Path)
     parser.add_argument("--store", type=Path, default=Path("provenance"))
     parser.add_argument("--fetch-references", action="store_true")
+    parser.add_argument("--all-versions", action="store_true", help="Observe every declared version, including historical inputs")
+    parser.add_argument("--dataset", action="append", help="Restrict observation to named datasets")
     args = parser.parse_args()
     for name, receipt in observe_sources(
-        args.config, args.store, fetch_references=args.fetch_references
+        args.config, args.store, fetch_references=args.fetch_references,
+        all_versions=args.all_versions, datasets=set(args.dataset) if args.dataset else None,
     ).items():
         print(f"{name}: {receipt}")
 

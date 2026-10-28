@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextvars import ContextVar
+from copy import deepcopy
 from dataclasses import replace
 from hashlib import sha256
 from importlib.metadata import version
@@ -13,12 +14,14 @@ import os
 import sqlite3
 from typing import Any, Mapping
 
-from .dataset_metadata import DataPeriod, DatasetMetadata, ResolvedDataset
+from .dataset_metadata import DataPeriod, DatasetMetadata, MetricDefinition, ResolvedDataset
+from .metric_bindings import MetricBinding, parse_bindings
 from .provenance import ProvenanceStore
-from .values import Measurement, ValuePolicy, aggregate, measure
+from .values import Measurement, ValuePolicy, ValueStatus, measure
+from .transfer_summary import charter_transfer_observations
 
 
-CATALOG_SCHEMA = 1
+CATALOG_SCHEMA = 2
 CATALOG_TABLE = "teadata_catalog"
 
 
@@ -57,9 +60,14 @@ def processor_identity() -> str:
     root = Path(__file__).resolve().parent
     digest = sha256()
     for path in sorted(root.rglob("*.py")):
+        relative = path.relative_to(root)
         if any(
             part in {"data", ".cache", "__pycache__"}
             for part in path.relative_to(root).parts
+        ):
+            continue
+        if relative.as_posix() in {"verification.py", "acquisition.py", "sources.py"} or (
+            relative.parts[0] == "scripts" and relative.name != "paths.py"
         ):
             continue
         digest.update(path.relative_to(root).as_posix().encode())
@@ -69,6 +77,24 @@ def processor_identity() -> str:
     if lockfile.exists():
         digest.update(b"uv.lock\0" + lockfile.read_bytes())
     return digest.hexdigest()
+
+
+def _metadata_content(metadata: DatasetMetadata) -> dict[str, Any]:
+    document = metadata.to_dict()
+    document.pop("provenance_ids", None)
+    return document
+
+
+def _verify_input_receipt(record: Mapping[str, Any], *, dataset: str,
+                          section: str, artifact: Mapping[str, Any]) -> None:
+    if (record.get("kind") != "acquisition" or record.get("dataset") != dataset
+            or record.get("section") != section):
+        raise ContractError("Source receipt belongs to a different dataset, section, or event kind")
+    recorded = record.get("artifact", {})
+    if (not isinstance(recorded, dict) or recorded.get("sha256") != artifact["sha256"]
+            or type(recorded.get("size_bytes")) is not int
+            or recorded["size_bytes"] != artifact["size_bytes"]):
+        raise ContractError(f"Input bytes do not match declared provenance for {dataset}")
 
 
 class DatasetCatalog:
@@ -95,39 +121,87 @@ class DatasetCatalog:
                 != identifier
             ):
                 raise ContractError("Provenance receipt identity mismatch")
+        self._metadata = {}
+        self._origin_cache: dict[tuple[str, str, str, str], str] = {}
         for key, value in sources.items():
             if not isinstance(value, dict) or value.get("status") != "loaded":
                 raise ContractError(f"Dataset {key} was not successfully loaded")
             metadata = DatasetMetadata.from_dict(value.get("metadata"))
+            self._metadata[key] = metadata
             policy = metadata.value_policy
             if policy and policy not in policies:
                 raise ContractError(
                     f"Dataset {key} refers to missing value policy {policy}"
                 )
+            if policy:
+                selected_policy = ValuePolicy.from_dict(policies[policy])
+                if any(rule.status == ValueStatus.SUPPRESSED for rule in selected_policy.tokens.values()) and not selected_policy.reference_id:
+                    raise ContractError("Suppression policies require an exact reviewed methodology reference")
             artifact = value.get("artifact", {})
             if (
-                not isinstance(artifact.get("sha256"), str)
+                not isinstance(artifact, dict)
+                or not isinstance(artifact.get("sha256"), str)
                 or len(artifact["sha256"]) != 64
                 or any(c not in "0123456789abcdef" for c in artifact["sha256"])
+                or type(artifact.get("size_bytes")) is not int
+                or artifact["size_bytes"] < 0
             ):
                 raise ContractError(f"Dataset {key} has no input checksum")
+            section = value.get("section")
+            if section not in {"data_sources", "spatial"}:
+                raise ContractError(f"Dataset {key} has no valid source section")
             if not metadata.provenance_ids:
                 raise ContractError(f"Dataset {key} has no acquisition observation")
+            metadata_matched = False
             for identifier in metadata.provenance_ids:
                 record = records.get(identifier, {})
-                if (
-                    record.get("dataset") != key
-                    or record.get("artifact", {}).get("sha256") != artifact["sha256"]
-                ):
-                    raise ContractError(
-                        f"Dataset {key} does not match its acquisition receipt"
-                    )
+                _verify_input_receipt(record, dataset=key, section=section, artifact=artifact)
+                metadata_matched |= _metadata_content(metadata) == _metadata_content(DatasetMetadata.from_dict(record.get("source_metadata")))
+            if not metadata_matched:
+                raise ContractError(f"Source metadata differs from its receipt: {key}")
+            references = {reference.reference_id: reference for reference in metadata.references}
+            required_reviews = set()
+            if policy and ValuePolicy.from_dict(policies[policy]).reference_id:
+                required_reviews.add(ValuePolicy.from_dict(policies[policy]).reference_id)
+            if metadata.estimation is not None:
+                required_reviews.add(metadata.estimation.reference_id)
+            for identifier in required_reviews:
+                reference = references.get(identifier)
+                if reference is None or reference.status != "available" or reference.reviewed_sha256 is None:
+                    raise ContractError(f"Dataset {key} requires a review of exact methodology bytes")
+            for reference in references.values():
+                if reference.status != "available":
+                    continue
+                if not reference.provenance_ids:
+                    raise ContractError("Available reference has no acquisition receipt")
+                for identifier in reference.provenance_ids:
+                    record = records.get(identifier, {})
+                    if record.get("kind") != "acquisition" or reference.url not in {
+                        record.get("requested_url"), record.get("resolved_url"), record.get("source_metadata", {}).get("source_url")
+                    }:
+                        raise ContractError("Reference receipt belongs to a different document")
+                    if reference.reviewed_sha256 is not None and record.get("artifact", {}).get("sha256") != reference.reviewed_sha256:
+                        raise ContractError("Reference bytes differ from reviewed methodology")
         self._build_id = identity
         self._serialized = canonical_json(document)
         self._policies = {
             key: ValuePolicy.from_dict(value) for key, value in policies.items()
         }
         self._sources = sources
+        if "metric_bindings" not in document:
+            raise ContractError("Catalog lacks release-bound metric interpretation")
+        try:
+            self._bindings = parse_bindings(document["metric_bindings"])
+        except ValueError as error:
+            raise ContractError(str(error)) from error
+        for binding in self._bindings.values():
+            if not isinstance(binding, MetricBinding):
+                continue
+            for scope in binding.scopes:
+                if binding.dataset.replace("{scope}", scope) not in sources:
+                    raise ContractError("Metric binding refers to a source not loaded in this release")
+                if self._metadata[binding.dataset.replace("{scope}", scope)].value_policy not in self._policies:
+                    raise ContractError("Metric binding requires a loaded value policy")
 
     @classmethod
     def create(
@@ -138,6 +212,7 @@ class DatasetCatalog:
         processor: str,
         records: Mapping[str, Any] | None = None,
         environment: Mapping[str, Any] | None = None,
+        metric_bindings: Mapping[str, Any] | None = None,
     ) -> DatasetCatalog:
         content = {
             "schema_version": CATALOG_SCHEMA,
@@ -146,6 +221,7 @@ class DatasetCatalog:
             "value_policies": dict(value_policies),
             "provenance": dict(records or {}),
             "build_environment": dict(environment or {}),
+            "metric_bindings": dict(metric_bindings or {}),
         }
         return cls(
             {
@@ -201,29 +277,39 @@ class DatasetCatalog:
             raise ContractError(f"Dataset {dataset} has no value policy")
         return ValuePolicy.from_dict(self._policies[policy_id].to_dict())
 
-    def source_for_metric(self, metric: str, scope: str) -> tuple[str, str]:
+    def _resolve_metric(self, metric: str, scope: str) -> tuple[MetricBinding, str, str, MetricDefinition | None]:
         if scope not in {"campus", "district"}:
             raise ContractError(f"Unknown entity scope: {scope}")
-        if metric.startswith("tapr."):
-            dataset = f"{scope}_tapr_student_staff_profile"
-            return dataset, self.field(dataset, metric[5:], scope=scope)
-        if metric.startswith("baseline."):
-            if scope != "campus":
-                raise ContractError("Historical campus enrollment is a campus metric")
-            dataset = "campus_tapr_historical_enrollment"
-            return dataset, self.field(dataset, metric[9:], scope=scope)
-        if metric.startswith("financials."):
-            return "campus_peims_financials", metric[11:]
-        if metric in {"rating", "overall_rating"}:
-            return "accountability", "rating"
-        if metric == "enrollment":
-            return ("campuses" if scope == "campus" else "accountability"), "enrollment"
-        if metric.startswith("transfer."):
-            return "campus_transfer_reports", metric[9:]
-        raise ContractError(f"Unknown canonical metric: {metric}")
+        selected = metric if metric in self._bindings else next((
+            key for key in sorted(self._bindings, key=lambda item: len(item), reverse=True)
+            if key.endswith(".*") and metric.startswith(key[:-1])
+        ), None)
+        if selected is None:
+            raise ContractError(f"Unknown canonical metric: {metric}")
+        suffix = metric[len(selected) - 1:] if selected.endswith(".*") else ""
+        binding = self._bindings[selected]
+        while isinstance(binding, str):
+            binding = self._bindings[binding]
+        if scope not in binding.scopes:
+            raise ContractError(f"Metric {metric} is not defined for {scope}")
+        dataset = binding.dataset.replace("{scope}", scope)
+        selector = binding.field.replace("{metric}", suffix)
+        metadata = self._metadata[dataset]
+        definition = metadata.metrics.get(selector)
+        key = self.field(dataset, selector, scope=scope) if binding.field_mode == "metric" else selector
+        if definition is None:
+            definition = next((value for value in metadata.metrics.values() if value.field == key), None)
+        declared_columns = {column for read in self._sources[dataset].get("reads", []) for column in read.get("columns", [])}
+        if key not in declared_columns:
+            raise ContractError(f"Metric {metric} is not a declared field in this release")
+        return binding, dataset, key, definition
+
+    def source_for_metric(self, metric: str, scope: str) -> tuple[str, str]:
+        _, dataset, key, _ = self._resolve_metric(metric, scope)
+        return dataset, key
 
     def field(self, dataset: str, metric: str, *, scope: str = "campus") -> str:
-        metadata = self.metadata(dataset)
+        metadata = self._metadata[dataset]
         definition = metadata.metrics.get(metric)
         return (
             definition.field
@@ -232,38 +318,135 @@ class DatasetCatalog:
         )
 
     def metric_period(self, metric: str, *, scope: str = "campus") -> DataPeriod:
-        dataset, _ = self.source_for_metric(metric, scope)
-        metadata = self.metadata(dataset)
-        definition = metadata.metrics.get(metric.partition(".")[2] or metric)
-        return definition.period if definition else metadata.period
+        _, dataset, _, definition = self._resolve_metric(metric, scope)
+        return definition.period if definition and definition.period is not None else self._metadata[dataset].period
+
+    def _measure_bound(self, raw: Any, binding: MetricBinding, dataset: str, key: str,
+                       definition: MetricDefinition | None, *, input_binding="caller_supplied") -> Measurement:
+        if isinstance(raw, Measurement) and raw.source is not None:
+            origin = raw.source
+            if origin.get("build_id") != self.build_id or origin.get("dataset") != dataset or origin.get("field") != key:
+                raise ContractError("Interpreted value belongs to another release or field")
+        unit = self._metric_unit(binding, key, definition)
+        minimum, maximum = binding.bounds(unit)
+        value = measure(raw, self._policies[self._metadata[dataset].value_policy], unit=unit,
+                        minimum=minimum, maximum=maximum)
+        return self._with_origin(value, dataset, key, definition, input_binding=input_binding)
+
+    @staticmethod
+    def _metric_unit(binding: MetricBinding, key: str, definition: MetricDefinition | None) -> str | None:
+        unit = definition.unit if definition and definition.unit is not None else binding.unit
+        if unit is None:
+            unit = next((binding.unit_suffixes[suffix] for suffix in sorted(binding.unit_suffixes, key=lambda item: len(item), reverse=True)
+                         if key.endswith(suffix)), None)
+        return unit
+
+    def _entity_build_id(self, entity: Any) -> str | None:
+        repo_catalog = getattr(getattr(entity, "_repo", None), "catalog", None)
+        origins = [getattr(entity, "source_build_id", None), repo_catalog.build_id if repo_catalog is not None else None]
+        if any(origin is not None and origin != self.build_id for origin in origins):
+            raise ContractError("Entity belongs to another data release")
+        return next((origin for origin in origins if origin is not None), None)
+
+    def _contextual_measurement(self, raw: Any, binding: MetricBinding, dataset: str, key: str,
+                               definition: MetricDefinition | None, *, entity=None,
+                               input_binding="caller_supplied") -> Measurement:
+        private = bool(getattr(entity, "is_private", False))
+        if entity is not None and ((binding.population == "public" and private) or (binding.population == "private" and not private)):
+            return self._with_origin(Measurement(None, ValueStatus.NOT_APPLICABLE,
+                reason="outside_metric_population", unit=self._metric_unit(binding, key, definition)),
+                dataset, key, definition, input_binding=input_binding)
+        return self._measure_bound(raw, binding, dataset, key, definition, input_binding=input_binding)
+
+    def _with_origin(self, value: Measurement, dataset: str, key: str,
+                     definition: MetricDefinition | None, *, input_binding="caller_supplied") -> Measurement:
+        metadata = self._metadata[dataset]
+        period = definition.period if definition and definition.period is not None else metadata.period
+        identity = (dataset, key, input_binding, canonical_json(period.to_dict()))
+        if identity not in self._origin_cache:
+            self._origin_cache[identity] = canonical_json({
+                "dataset": dataset, "field": key, "period": period.to_dict(),
+                "catalog_year": self._sources[dataset].get("resolved_year"),
+                "build_id": self.build_id, "provenance_ids": list(metadata.provenance_ids),
+                "input_binding": input_binding,
+            })
+        return replace(value, _source_json=self._origin_cache[identity])
 
     def measurement(
         self, entity: Any, metric: str, *, scope: str | None = None
     ) -> Measurement:
         scope = scope or ("campus" if hasattr(entity, "campus_number") else "district")
-        dataset, key = self.source_for_metric(metric, scope)
-        raw = getattr(entity, "meta", {}).get(key)
-        if metric in {"rating", "overall_rating", "enrollment"}:
-            raw = getattr(entity, key, None)
-        unit = "percent" if key.endswith("_percent") else None
-        if metric.startswith("financials.") and key.endswith("_per_student"):
-            unit = "currency"
-        definition = self.metadata(dataset).metrics.get(
-            metric.partition(".")[2] or metric
-        )
-        if definition and definition.unit is not None:
-            unit = definition.unit
-        if metric in {"rating", "overall_rating"}:
-            unit = "text"
-        return measure(
-            raw,
-            self.policy(dataset),
-            unit=unit,
-            minimum=None
-            if metric.startswith("financials.") or unit in {"currency", "text"}
-            else 0,
-            maximum=100 if unit == "percent" else None,
-        )
+        known_build = self._entity_build_id(entity)
+        binding, dataset, key, definition = self._resolve_metric(metric, scope)
+        meta = getattr(entity, "meta", {}) or {}
+        raw = meta.get(key)
+        if key not in meta and binding.attribute is not None:
+            raw = getattr(entity, binding.attribute, None)
+        return self._contextual_measurement(raw, binding, dataset, key, definition, entity=entity,
+                                   input_binding="release_entity" if known_build is not None else "caller_supplied")
+
+    def measure_field(self, raw: Any, field: str, *, scope: str = "campus", entity=None) -> Measurement | None:
+        """Decode a bound raw value, optionally checking entity population and origin.
+
+        The supplied raw value remains caller-supplied; entity context alone does
+        not prove that arbitrary input bytes came from the release's entity store.
+        """
+        if entity is not None:
+            self._entity_build_id(entity)
+        if scope not in {"campus", "district"}:
+            raise ContractError("Unknown field scope")
+        if field in {"campus_number", "district_number", "campus_name", "district_name"}:
+            return None
+        candidates = []
+        for dataset, source in self._sources.items():
+            metadata = self._metadata[dataset]
+            definition_items = [(name, definition) for name, definition in metadata.metrics.items() if definition.field == field]
+            columns = {column for read in source.get("reads", []) for column in read.get("columns", [])}
+            if field not in columns and not definition_items:
+                continue
+            for name, binding in self._bindings.items():
+                if not isinstance(binding, MetricBinding) or scope not in binding.scopes or binding.dataset.replace("{scope}", scope) != dataset:
+                    continue
+                if name.endswith(".*"):
+                    selector = definition_items[0][0] if definition_items else field
+                    prefix = f"{scope}_{metadata.field_year}_"
+                    if binding.field_mode == "metric" and not definition_items:
+                        if not field.startswith(prefix):
+                            continue
+                        selector = field[len(prefix):]
+                    metric = name[:-1] + selector
+                else:
+                    metric = name
+                resolved_binding, _, resolved_field, definition = self._resolve_metric(metric, scope)
+                if resolved_field == field:
+                    candidates.append((dataset, resolved_binding, definition, not name.endswith(".*")))
+        if len({item[0] for item in candidates}) != 1:
+            return None
+        dataset, binding, definition, _ = max(candidates, key=lambda item: item[3])
+        value = self._contextual_measurement(raw, binding, dataset, field, definition, entity=entity)
+        if value.unit == "text" or (value.unit is None and isinstance(raw, bool)):
+            return None
+        if value.unit is None and value.status == ValueStatus.INVALID and value.reason == "unrecognized_numeric_token":
+            return None
+        return value
+
+    def measurements_frame(self, entities, metrics: list[str], *, scope: str | None = None):
+        """Long-form, status-preserving analytical values with field provenance."""
+        import pandas as pd
+        rows = []
+        for entity in entities:
+            identity = getattr(entity, "campus_number", None) or getattr(entity, "district_number", None)
+            for metric in metrics:
+                value = self.measurement(entity, metric, scope=scope)
+                origin = value.source or {}
+                rows.append({"entity_id": identity, "metric": metric, "value": value.value,
+                             "status": value.status.value, "raw": value.to_dict()["raw"],
+                             "reason": value.reason, "unit": value.unit, "dataset": origin.get("dataset"),
+                             "field": origin.get("field"), "period": origin.get("period"), "build_id": self.build_id,
+                             "input_binding": origin.get("input_binding")})
+        frame = pd.DataFrame(rows, columns=pd.Index(["entity_id", "metric", "value", "status", "raw", "reason", "unit", "dataset", "field", "period", "build_id", "input_binding"]))
+        frame.attrs["teadata"] = self.to_dict()
+        return frame
 
     def metric_label(
         self, metric: str, label: str, *, scope: str = "campus", short: bool = True
@@ -283,35 +466,14 @@ class DatasetCatalog:
             raise ContractError(
                 "Campus transfer estimates require a model at campus-pair grain"
             )
-        destinations = {}
-        for destination, count, masked in campus._repo.transfers_out(campus):
-            if (
-                destination is None
-                or not destination.is_charter
-                or destination.is_private
-            ):
-                continue
-            value = measure(
-                "-999" if masked else count, policy, unit="count", minimum=0
-            )
-            old = destinations.get(destination.id)
-            if old is not None and old != value:
-                raise ContractError("Conflicting duplicate campus transfer flow")
-            destinations[destination.id] = value
-        summary = aggregate(destinations.values())
-        unresolved = [
-            row
-            for row in getattr(campus._repo, "_xfers_unresolved", [])
-            if row["source_campus"] == campus.campus_number
-        ]
-        summary = replace(
-            summary, missing_count=summary.missing_count + len(unresolved)
-        )
+        observations = charter_transfer_observations(campus, policy=policy)
+        summary = observations.aggregate
+        unresolved = list(observations.unresolved)
         estimate = model.estimate(summary)
         return {
             "unresolved_transfers": unresolved,
             "unresolved_transfer_count": len(unresolved),
-            "num_charter_transfer_destinations": len(destinations),
+            "num_charter_transfer_destinations": observations.destination_count,
             "num_charter_transfer_destinations_masked": summary.suppressed_count,
             "total_unmasked_charter_transfers_out": summary.observed_sum,
             "total_estimated_masked_charter_transfers_out": estimate[
@@ -360,7 +522,8 @@ class BuildRecorder:
     """Bind successful source reads to verified acquisition receipts."""
 
     def __init__(self, cfg: Any, store: ProvenanceStore):
-        self.cfg = cfg
+        self.cfg = deepcopy(cfg)
+        self.processor_sha256 = processor_identity()
         self.store = store
         self.datasets: dict[str, Any] = {}
         self._token = None
@@ -376,6 +539,8 @@ class BuildRecorder:
             ACTIVE_BUILD.reset(self._token)
 
     def before_read(self, source: ResolvedDataset) -> dict[str, Any]:
+        if processor_identity() != self.processor_sha256:
+            raise ContractError("Processing source changed during the build")
         expected = self.cfg.resolve_dataset(
             source.dataset, source.requested_year, section=source.section
         )
@@ -388,10 +553,17 @@ class BuildRecorder:
                 for reference in source.metadata.references
             }
             reference = references.get(policy.reference_id)
-            if reference is None or reference.status != "available":
+            if reference is None or reference.status != "available" or reference.reviewed_sha256 is None:
                 raise ContractError(
                     f"Value policy requires reviewed methodology: {source.dataset}"
                 )
+        if policy is not None and any(rule.status == ValueStatus.SUPPRESSED for rule in policy.tokens.values()) and not policy.reference_id:
+            raise ContractError("Suppression policies require a reviewed methodology reference")
+        model = source.metadata.estimation
+        if model is not None:
+            reference = next((item for item in source.metadata.references if item.reference_id == model.reference_id), None)
+            if reference is None or reference.status != "available" or reference.reviewed_sha256 is None:
+                raise ContractError("Estimation requires reviewed methodology bytes")
         return verify_source_receipts(
             source, self.store, reference_base=self.cfg.base_dir
         )
@@ -440,6 +612,8 @@ class BuildRecorder:
         self.datasets[source.dataset] = document
 
     def catalog(self) -> DatasetCatalog:
+        if processor_identity() != self.processor_sha256:
+            raise ContractError("Processing source changed during the build")
         identifiers = set()
         for source in self.datasets.values():
             identifiers.update(source["metadata"]["provenance_ids"])
@@ -450,7 +624,8 @@ class BuildRecorder:
             value_policies={
                 key: value.to_dict() for key, value in self.cfg.value_policies.items()
             },
-            processor=processor_identity(),
+            processor=self.processor_sha256,
+            metric_bindings=self.cfg.resolved_metric_bindings(),
             records={
                 identifier: self.store.read_record(identifier)
                 for identifier in sorted(identifiers)
@@ -491,31 +666,22 @@ def verify_source_receipts(
         raise ContractError(
             f"Source {source.dataset} needs an acquisition receipt; run the source-observation stage"
         )
-    matched = False
+    metadata_matched = False
     for record_id in source.metadata.provenance_ids:
         record = store.read_record(record_id)
-        if (
-            record.get("kind") != "acquisition"
-            or record.get("dataset") != source.dataset
-        ):
-            raise ContractError("Source receipt belongs to a different dataset")
-        if record["artifact"]["sha256"] == identity["sha256"]:
-            current_metadata = source.metadata.to_dict()
-            recorded_metadata = DatasetMetadata.from_dict(
-                record["source_metadata"]
-            ).to_dict()
-            current_metadata.pop("provenance_ids", None)
-            recorded_metadata.pop("provenance_ids", None)
-            if current_metadata != recorded_metadata:
-                raise ContractError(
-                    f"Source metadata differs from its receipt: {source.dataset}"
-                )
-            store.verify_artifact(identity["sha256"])
-            matched = True
-    if not matched:
-        raise ContractError(
-            f"Input bytes do not match declared provenance for {source.dataset}"
-        )
+        _verify_input_receipt(record, dataset=source.dataset, section=source.section, artifact=identity)
+        metadata_matched |= _metadata_content(source.metadata) == _metadata_content(DatasetMetadata.from_dict(record["source_metadata"]))
+    store.verify_artifact(identity["sha256"])
+    if not metadata_matched:
+        raise ContractError(f"Source metadata differs from its receipt: {source.dataset}")
+    verify_reference_receipts(source, store, reference_base=reference_base)
+    return identity
+
+
+def verify_reference_receipts(
+    source: ResolvedDataset, store: ProvenanceStore, *, reference_base: Path | None = None
+) -> None:
+    """Verify archived documentation without confounding it with source observations."""
     for reference in source.metadata.references:
         if reference.status != "available":
             continue
@@ -525,6 +691,10 @@ def verify_source_receipts(
             )
         for record_id in reference.provenance_ids:
             record = store.read_record(record_id)
+            if record.get("kind") != "acquisition":
+                raise ContractError("Reference receipt is not an acquisition")
+            if reference.reviewed_sha256 is not None and record["artifact"]["sha256"] != reference.reviewed_sha256:
+                raise ContractError("Reference bytes differ from reviewed methodology")
             if reference.url not in {
                 record.get("requested_url"),
                 record.get("resolved_url"),
@@ -543,4 +713,3 @@ def verify_source_receipts(
                     or file_identity(path)["sha256"] != record["artifact"]["sha256"]
                 ):
                     raise ContractError("Local methodology differs from its receipt")
-    return identity

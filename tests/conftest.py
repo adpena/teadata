@@ -24,10 +24,16 @@ def catalog():
             source = cfg.resolve_dataset(name, section=section)
             for identifier in source.metadata.provenance_ids:
                 records[identifier] = store.read_record(identifier)
+            for reference in source.metadata.references:
+                for identifier in reference.provenance_ids:
+                    records[identifier] = store.read_record(identifier)
             datasets[name] = {
+                "section": section,
                 "metadata": source.metadata.to_dict(),
                 "status": "loaded",
                 "artifact": records[source.metadata.provenance_ids[-1]]["artifact"],
+                "reads": [{"columns": cfg.column_schema(name, reader_profile=profile, section=section) or []}
+                          for profile in (source.reader.get("profiles") or {None: {}})],
             }
     return DatasetCatalog.create(
         datasets=datasets,
@@ -36,4 +42,5 @@ def catalog():
         },
         processor="2" * 64,
         records=records,
+        metric_bindings=cfg.resolved_metric_bindings(),
     )

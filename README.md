@@ -135,7 +135,9 @@ Included enrichers cover:
 - planned closure overlays
 - charter network augmentation
 
-Pipeline behavior is fault-tolerant by design: dataset-level failures are generally logged and do not hard-stop the full build.
+Required source, schema, methodology, and transfer-join failures stop publication.
+The previous release remains active when a staged build fails. Geometry coverage
+and pending source review remain explicit in the processing receipt.
 
 ## Data Build Pipeline
 
@@ -173,16 +175,44 @@ Subcommands:
 ## Testing
 
 ```bash
-uv run pytest
+scripts/check
+scripts/check --verify-latest
 ```
 
-Current tests cover:
+Local checks are the primary verification path. They run Ruff, ty, deptry, and
+pytest in a locked, isolated uv environment without replacing the development
+`.venv`. Logs and immutable per-run JSON receipts stay in ignored `.local/checks/`.
+Verification rejects receipts after the Git revision, source, lockfile, check
+policy, tool/dependency environment, or captured logs change. A commit requires
+a fresh run even when it contains previously checked working-tree contents.
 
-- snapshot gzip and fallback loading
-- query DSL semantics and chaining
-- nearest charter behavior and transfer grouping
-- store discovery and asset-cache behavior
-- entity serialization invariants (`percent_enrollment_change`)
+After rebuilding changed serialized data, also verify the retained release:
+
+```bash
+scripts/check --release teadata/.cache/release.json
+scripts/check --release teadata/.cache/release.json --verify-latest
+TEADATA_CHECK_PYTHON=3.11 scripts/check
+```
+
+Code-only receipts do not certify raw inputs, data quality, or data artifacts.
+Release checks verify all selected artifact hashes and bindings and reject a
+manifest built from different processing code or lockfile. Use the same Python
+selection when verifying an earlier run. Checks make no implicit data refresh.
+
+An optional `scripts/check --install-hook` installs a pre-push code-check guard.
+It verifies a current passing receipt or runs checks and then preserves Git LFS
+pre-push processing. The guard requires a clean checkout so an uncommitted fix
+cannot qualify a different pushed revision. Pushed branches/tags must point to
+the checked HEAD; check out other revisions before pushing them. Custom hooks or `core.hooksPath` are left untouched; compose
+the check command with those hooks manually. Check subprocesses cannot consume
+the Git LFS ref updates from the hook's stdin. Inherited pytest control variables
+are removed so shell settings cannot silently reduce the required suite.
+
+Hosted checks remain available through manual GitHub Actions dispatch; pushes,
+pull requests, and schedules do not consume hosted minutes automatically. A
+passing local receipt is command evidence, not a signed attestation or an
+independent review approval. Adversarial review of the final diff remains
+required before landing.
 
 ## PyPI Size Limits and Current Packaging Status
 

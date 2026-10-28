@@ -122,6 +122,7 @@ class ReferenceDocument:
     status: str = "available"
     published_at: str | None = None
     provenance_ids: tuple[str, ...] = ()
+    reviewed_sha256: str | None = None
 
     @classmethod
     def from_dict(cls, raw: Mapping[str, Any]) -> ReferenceDocument:
@@ -166,6 +167,9 @@ class ReferenceDocument:
                 )
         validate_http_url(raw.get("url"))
         values = dict(raw)
+        reviewed = values.get("reviewed_sha256")
+        if reviewed is not None and (not isinstance(reviewed, str) or len(reviewed) != 64 or any(c not in "0123456789abcdef" for c in reviewed)):
+            raise ValueError("Reference review must identify exact SHA-256 document bytes")
         values["published_at"] = _date_text(values.get("published_at"))
         ids = values.get("provenance_ids", ())
         if not isinstance(ids, (list, tuple)) or any(
@@ -191,7 +195,7 @@ class MetricDefinition:
     """A semantic field whose reference period can differ from the report."""
 
     field: str
-    period: DataPeriod = field(default_factory=DataPeriod)
+    period: DataPeriod | None = None
     unit: str | None = None
 
     @classmethod
@@ -212,11 +216,12 @@ class MetricDefinition:
         }:
             raise ValueError("Unknown metric unit")
         return cls(
-            raw["field"], DataPeriod.from_dict(raw.get("period")), raw.get("unit")
+            raw["field"], DataPeriod.from_dict(raw["period"]) if raw.get("period") is not None else None, raw.get("unit")
         )
 
     def to_dict(self) -> dict[str, Any]:
-        return {"field": self.field, "period": self.period.to_dict(), "unit": self.unit}
+        return {"field": self.field, "unit": self.unit,
+                **({"period": self.period.to_dict()} if self.period is not None else {})}
 
 
 @dataclass(frozen=True)

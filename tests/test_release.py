@@ -168,26 +168,38 @@ def test_policy_mutation_does_not_change_catalog(catalog):
 
 
 def test_schema_drift_is_rejected_before_publication(tmp_path):
-    from teadata.manifest import schema_fingerprint
+    from hashlib import sha256
 
     source = tmp_path / "changed.csv"
     source.write_text("renamed_column\n1\n")
+    schema = tmp_path / "columns.json"
+    schema.write_text(json.dumps({"schema_version": 1, "columns": ["expected_column"]}))
     cfg = Config.from_dict(
         {
             "data_sources": {
                 "example": {
                     2025: {
                         "path": str(source),
+                        "metadata": {
+                            "references": [
+                                {
+                                    "reference_id": "columns",
+                                    "role": "schema",
+                                    "path": "columns.json",
+                                    "status": "available",
+                                    "reviewed_sha256": sha256(schema.read_bytes()).hexdigest(),
+                                }
+                            ],
+                        },
                         "reader": {
-                            "expected_columns_sha256": schema_fingerprint(
-                                ["expected_column"]
-                            )
+                            "column_schema": "columns.json",
                         },
                     }
                 }
             }
         }
     )
+    cfg.base_dir = tmp_path
     with pytest.raises(ContractError, match="schema changed"):
         cfg.load_df("example")
 

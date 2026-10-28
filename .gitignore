@@ -205,6 +205,9 @@ data/
 # Keep provenance JSON receipts in Git; archive raw content objects separately.
 /provenance/objects/
 
+# Machine-local check environments, logs, and receipts.
+/.local/
+
 # =========================
 # Project-specific: config samples vs. real configs
 # =========================

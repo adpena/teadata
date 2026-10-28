@@ -290,6 +290,7 @@ class EntityStore:
                 return cached
         record = self._load_campus_from_conn(key, include_meta=include_meta)
         if record:
+            record["source_build_id"] = self.catalog.build_id
             self._campus_cache[key] = record
             if include_meta:
                 self._campus_meta_loaded.add(key)
@@ -311,6 +312,7 @@ class EntityStore:
                 return cached
         record = self._load_district_from_conn(key, include_meta=include_meta)
         if record:
+            record["source_build_id"] = self.catalog.build_id
             self._district_cache[key] = record
             if include_meta:
                 self._district_meta_loaded.add(key)
@@ -336,6 +338,7 @@ class EntityStore:
         for row in rows:
             meta = _decode_json(row[12]) if include_meta else {}
             yield {
+                "source_build_id": self.catalog.build_id,
                 "campus_number": row[0] or "",
                 "campus_number_canon": row[1] or "",
                 "name": row[2] or "",
@@ -378,6 +381,7 @@ class EntityStore:
             has_charter = bool(row[9])
             meta = _decode_json(row[7]) if include_meta else {}
             yield {
+                "source_build_id": self.catalog.build_id,
                 "name": row[0] or "",
                 "district_number": _strip_leading_apostrophe(row[1] or row[2]),
                 "district_number_canon": row[2] or "",

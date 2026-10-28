@@ -3,6 +3,7 @@ import uuid
 import pytest
 
 from teadata.entities import Campus
+from teadata.engine import DataEngine
 
 
 def _make_campus(*, enrollment=100, meta=None):
@@ -25,9 +26,11 @@ def test_campus_to_dict_includes_percent_enrollment_change(catalog):
         meta={"campus_2015_student_enrollment_all_students_count": 100},
     )
 
-    from types import SimpleNamespace
-    campus._repo = SimpleNamespace(catalog=catalog)
-    campus.meta["campus_2025_student_enrollment_all_students_count"] = campus.enrollment
+    repo = DataEngine()
+    repo.catalog = catalog
+    repo.add_campus(campus)
+    _, enrollment_field = catalog.source_for_metric("enrollment", "campus")
+    campus.meta[enrollment_field] = campus.enrollment
 
     result = campus.to_dict()
 

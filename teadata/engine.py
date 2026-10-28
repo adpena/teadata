@@ -17,7 +17,8 @@ import sys
 import time
 import uuid
 
-from .manifest import ContractError, DatasetCatalog
+from .manifest import ContractError, DatasetCatalog, read_sqlite_catalog
+from .identifiers import canonical_source_identifier
 from .release import current_release, snapshot_build_id
 from .boundary_store import BoundaryStore
 from teadata.teadata_config import (
@@ -261,6 +262,8 @@ class _CharterCache:
 
 
 class DataEngine:
+    catalog: DatasetCatalog
+
     @staticmethod
     def _match_district_number(d: "District", key) -> bool:
         canon = normalize_district_number_value(key)
@@ -288,8 +291,12 @@ class DataEngine:
         """
         if snapshot is None and not search:
             raise ContractError("Select a release or supply an explicit snapshot")
-        release = current_release() if snapshot is None else None
-        path = release.artifact("snapshot") if release else Path(snapshot)
+        if snapshot is None:
+            release = current_release()
+            path = release.artifact("snapshot")
+        else:
+            release = None
+            path = Path(snapshot)
         obj = _load_snapshot_payload(path)
         if not isinstance(obj, cls) or not isinstance(
             getattr(obj, "catalog", None), DatasetCatalog
@@ -340,103 +347,23 @@ class DataEngine:
                 eager_indexes=eager_indexes,
                 indexes_enabled=indexes_enabled,
             )
-            # If we got a different instance, copy its state into self
-            if eng is not self:
-                # Initialize empty containers first (will be re-assigned below)
-                self._districts = EntityMap()
-                self._campuses = EntityMap()
-                self._campuses_by_district = defaultdict(list)
-
-                # Transfer enrichment diagnostics: counts of rows skipped due to missing campuses
-                self._xfers_missing = {"src": 0, "dst": 0, "either": 0}
-
-                # Copy over the dictionaries
-                try:
-                    self._districts.update(eng._districts)
-                    self._campuses.update(eng._campuses)
-                    self._campuses_by_district.update(eng._campuses_by_district)
-
-                    # Copy enrichment maps if present
-                    self._xfers_out = getattr(eng, "_xfers_out", defaultdict(list))  # type: ignore
-                    self._xfers_in = getattr(eng, "_xfers_in", defaultdict(list))  # type: ignore
-                    self._campus_by_number = getattr(eng, "_campus_by_number", {})
-
-                    self._xfers_missing = getattr(
-                        eng, "_xfers_missing", {"src": 0, "dst": 0, "either": 0}
-                    )
-
-                except Exception:
-                    pass
-                # Initialize indexes as empty; they will rebuild on demand
-                self._in_bulk = False
-                self._kdtree = None
-                self._kdtree_charter = None
-                self._xy_deg = None
-                self._xy_rad = None
-                self._campus_list = None
-                self._xy_deg_charter = None
-                self._xy_rad_charter = None
-                self._campus_list_charter = None
-                self._point_tree = None
-                self._point_geoms = None
-                self._point_ids = None
-                self._geom_id_to_index = None
-                self._xy_deg_np = None
-                self._campus_list_np = None
-                self._xy_deg_np_charter = None
-                self._campus_list_np_charter = None
-                self._all_xy_np = None
-                self._all_campuses_np = None
-                self._xy_to_index = None
-                self._charter_cache = None
-
-                # Fast name lookups
-                self._district_by_name_lower: Dict[str, uuid.UUID] = {}
-                self._campus_by_name_lower: Dict[str, uuid.UUID] = {}
-                self._districts_by_number_norm: Dict[str, List[uuid.UUID]] = {}
-                self._districts_by_name_lower_multi: Dict[str, List[uuid.UUID]] = {}
-                self._campuses_by_name_lower_multi: Dict[str, List[uuid.UUID]] = {}
-                self._district_name_upper_index: List[Tuple[str, uuid.UUID]] = []
-                self._campus_name_upper_index: List[Tuple[str, uuid.UUID]] = []
-                self._district_wildcard_cache: Dict[
-                    str, Tuple[int, List[uuid.UUID]]
-                ] = {}
-                self._campus_wildcard_cache: Dict[str, Tuple[int, List[uuid.UUID]]] = {}
-                self._name_lookup_version = 0
-                self._indexes_enabled = getattr(
-                    eng, "_indexes_enabled", DEFAULT_INDEXES_ENABLED
-                )
-                self._boundary_store = getattr(eng, "_boundary_store", None)
-                self._boundary_store_path = getattr(eng, "_boundary_store_path", None)
-
-                # Student transfer edges (optional enrichment).
-                # _xfers_out: campus_id -> list[(to_campus_id, count:int|None, masked:bool)]
-                # _xfers_in:  campus_id -> list[(from_campus_id, count:int|None, masked:bool)]
-                self._xfers_out: Dict[
-                    uuid.UUID, List[Tuple[uuid.UUID, Optional[int], bool]]
-                ] = defaultdict(list)  # type: ignore
-                self._xfers_in: Dict[
-                    uuid.UUID, List[Tuple[uuid.UUID, Optional[int], bool]]
-                ] = defaultdict(list)  # type: ignore
-
-                # Fast lookup by normalized campus number (e.g., "'101902001")
-                self._campus_by_number: Dict[str, uuid.UUID] = {}
-
-                self._rebuild_indexes()
-                try:
-                    self._rehydrate_geometries()
-                except Exception:
-                    pass
-                if eager_indexes and self._indexes_enabled:
-                    try:
-                        self.warm_indexes()
-                    except Exception:
-                        pass
-                return
+            # Adopt the complete validated state, including catalog, measurements,
+            # unresolved facts, and attached boundary store. There is one loader.
+            self.__dict__.update(eng.__dict__)
+            for district in self._districts.values():
+                district._repo = self
+            for campus in self._campuses.values():
+                campus._repo = self
+            return
         # Normal cold init (no snapshot)
-        self._districts: Dict[uuid.UUID, District] = EntityMap()
-        self._campuses: Dict[uuid.UUID, Campus] = EntityMap()
+        self._districts: EntityMap = EntityMap()
+        self._campuses: EntityMap = EntityMap()
         self._campuses_by_district: Dict[uuid.UUID, List[uuid.UUID]] = defaultdict(list)
+        self._xfers_out: Dict[uuid.UUID, List[Tuple[uuid.UUID, Optional[int], bool]]] = defaultdict(list)
+        self._xfers_in: Dict[uuid.UUID, List[Tuple[uuid.UUID, Optional[int], bool]]] = defaultdict(list)
+        self._xfers_missing = {"src": 0, "dst": 0, "either": 0}
+        self._xfers_unresolved = []
+        self._transfer_measurements = {}
         self._in_bulk = False
         # Spatial/attribute indexes (optional, built on demand)
         self._kdtree = None
@@ -1013,10 +940,11 @@ class DataEngine:
             self._rebuild_indexes()
 
     def attach_boundary_store(self, path: str | Path, *, max_cache: int = 16) -> None:
-        try:
-            store = BoundaryStore(Path(path), max_cache=max_cache)
-        except Exception:
-            return
+        catalog = read_sqlite_catalog(path)
+        expected = getattr(self, "catalog", None)
+        if expected is not None and catalog.build_id != expected.build_id:
+            raise ContractError("Boundary store belongs to a different data release")
+        store = BoundaryStore(Path(path), max_cache=max_cache)
         self._boundary_store = store
         self._boundary_store_path = str(path)
 
@@ -1038,8 +966,8 @@ class DataEngine:
         if reason:
             parts.append(f"{reason}.")
         parts.append(
-            "Ensure a boundary store is available: set TEADATA_BOUNDARY_STORE to the "
-            "boundaries_*.sqlite path or place it next to the snapshot (TEADATA_SNAPSHOT)."
+            "Select a complete verified release with TEADATA_RELEASE or "
+            "TEADATA_RELEASE_URL, or attach a boundary store with the same catalog."
         )
         parts.append(
             "If you want boundaries embedded in the snapshot, rebuild with "
@@ -2377,24 +2305,22 @@ class DataEngine:
         if type_col in df.columns:
             df = df[df[type_col] == want_type]
 
-        # Missing required columns → nothing to do (match previous no-op behavior)
+        # A required source schema cannot degrade into a successful empty load.
         if (
             src_col not in df.columns
             or dst_col not in df.columns
             or count_col not in df.columns
         ):
-            return 0
+            raise ContractError("Transfer source lacks required identifier/count columns")
 
         def norm(x):
-            if x is None:
-                return None
-            # keep ints, int-like floats, and strings robustly
-            s = str(int(x)) if isinstance(x, float) and x == int(x) else str(x)
-            s = s.strip()
-            key = canonical_campus_number(s)
-            if not key:
-                return None
-            return key
+            try:
+                value = canonical_source_identifier(x, width=9)
+            except ValueError as error:
+                raise ContractError("Invalid campus identifier in transfer source") from error
+            if value is None:
+                raise ContractError("Missing campus identifier in transfer source")
+            return value
 
         # Reset maps
         outgoing = defaultdict(list)  # type: ignore
@@ -2404,6 +2330,8 @@ class DataEngine:
         missing = {"src": 0, "dst": 0, "either": 0}
 
         unresolved = []
+        measurements = {}
+        pairs = set()
         updated_sources = set()
 
         # Vectorized normalization of campus numbers
@@ -2427,11 +2355,12 @@ class DataEngine:
         for src_key, dst_key, src_id, dst_id, raw in zip(
             src_series.to_numpy(), dst_series.to_numpy(), src_ids, dst_ids, counts
         ):
-            if not src_key or not dst_key:
-                continue
-
-            from .manifest import ContractError
             from .values import ValueStatus, measure, PLAIN_NUMERIC
+
+            pair = (src_key, dst_key)
+            if pair in pairs:
+                raise ContractError(f"Duplicate transfer pair: {src_key} -> {dst_key}")
+            pairs.add(pair)
 
             value = measure(raw, value_policy or PLAIN_NUMERIC, minimum=0, unit="count")
             if value.status == ValueStatus.INVALID or (
@@ -2462,6 +2391,7 @@ class DataEngine:
 
             outgoing[src_id].append((dst_id, cnt, bool(masked)))
             incoming[dst_id].append((src_id, cnt, bool(masked)))
+            measurements[(src_id, dst_id)] = value
             updated_sources.add(src_id)
 
         # Sort edges deterministically: largest counts first, then by campus name
@@ -2490,6 +2420,7 @@ class DataEngine:
         self._xfers_in = incoming
         self._xfers_missing = missing
         self._xfers_unresolved = unresolved
+        self._transfer_measurements = measurements
         return len(updated_sources)
 
     def transfers_out(
