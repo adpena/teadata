@@ -12,8 +12,8 @@ It provides:
 ## Installation
 
 Python 3.11 through 3.15 are supported. Python 3.15 uses conditional minimum
-versions for the scientific stack; earlier interpreters retain their existing
-locked dependencies. On macOS 3.15, the optional documentation tools build
+versions for the scientific stack; unaffected locked versions remain stable
+across dependency security updates. On macOS 3.15, the optional documentation tools build
 Watchdog's native FSEvents extension and require the
 [documented Xcode tools](https://pypi.org/project/watchdog/#dependencies).
 PyYAML's supported pure Python implementation is tested on 3.15.
@@ -38,6 +38,21 @@ installed package, independent of the current working directory. Set
 `TEADATA_DATA_DIR` to use another dataset tree, or pass the scripts' explicit
 input/output options. See [Configuration & Resolution](docs/config.md#maintenance-script-paths)
 for examples and onboarding details.
+
+### Dependency security
+
+`pyproject.toml` publishes security floors for the core and each optional extra;
+`uv.lock` retains the reviewed versions across supported interpreters. Validate
+the selected environment with `scripts/check`; changing the lock also requires
+a new producer-bound data release before publishing replacement artifacts.
+
+The notebook extra uses Bleach 6.4 for its published fixes. Its opt-in
+`parse_email=True` linkifier still has a known
+[regex denial-of-service issue](https://github.com/mozilla/bleach/security/advisories/GHSA-g75f-g53v-794x).
+TEA Data does not enable that path, and its nbconvert dependency uses Bleach's
+HTML/CSS sanitization. The upstream limitation remains relevant to notebook
+code that explicitly enables email linkification; upgrading Bleach alone does
+not resolve it.
 
 ## Quick Start
 
