@@ -1,4 +1,3 @@
-from contextlib import closing
 import sqlite3
 import uuid
 
@@ -16,6 +15,7 @@ from teadata import entity_store
 
 def _build_entity_store(tmp_path, catalog):
     repo = DataEngine()
+    repo.catalog = catalog
     district = District(
         id=uuid.uuid4(),
         name="Test ISD",
@@ -46,10 +46,6 @@ def _build_entity_store(tmp_path, catalog):
     with Session.begin() as session:
         export_dataengine(repo, session, replace=True)
     engine.dispose()
-    from teadata.manifest import write_sqlite_catalog
-    with closing(sqlite3.connect(path)) as conn:
-        write_sqlite_catalog(conn, catalog)
-        conn.commit()
     return path
 
 
@@ -156,10 +152,9 @@ def test_scoped_store_reuses_connection_and_catalog_without_implicit_memoization
             assert district["district_type"] == "Charter" and district["campus_count"] == 1
             assert campus["meta"] == ({"campus_2025_demo": 5} if include_meta else {})
             assert district["meta"] == ({"district_2025_demo": "ok", "district_extra": "extra"} if include_meta else {})
-        # One transient catalog reader and one persistent query connection.
-        assert len(connections_opened) == 2
-        assert_connections_closed(connections_opened[:1])
-        assert connections_opened[1].execute("SELECT 1").fetchone() == (1,)
+        # Catalog and source queries share exactly one owned reader.
+        assert len(connections_opened) == 1
+        assert connections_opened[0].execute("SELECT 1").fetchone() == (1,)
         assert bool(reader._campus_cache) is cache
         assert bool(reader._district_cache) is cache
         assert bool(reader._campus_meta_loaded) is (cache and include_meta)

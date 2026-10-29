@@ -16,6 +16,7 @@ from urllib.request import urlopen
 
 from platformdirs import user_cache_path
 
+from .analytical import ANALYTICAL_DATASETS, ANALYTICAL_ROLES, analytical_dataset, validate_artifact
 from .dataset_metadata import validate_http_url
 from .manifest import (
     ContractError,
@@ -27,6 +28,7 @@ from .manifest import (
 
 
 ROLES = frozenset({"snapshot", "entities", "maps", "boundaries"})
+ANALYTICAL_RELEASE_ROLES = ROLES | ANALYTICAL_ROLES
 SNAPSHOT_MAGIC = b"TEADATA_SNAPSHOT_V1 "
 _ACTIVE_RELEASE: ContextVar[DataRelease | None] = ContextVar(
     "teadata_active_release", default=None
@@ -93,13 +95,10 @@ class DataRelease:
         if len(raw) > 4 * 1024 * 1024:
             raise ContractError("Release manifest is too large")
         document = json.loads(raw)
-        if (
-            document.get("schema_version") != 1
-            or set(document.get("artifacts", {})) != ROLES
-        ):
-            raise ContractError(
-                "A release requires exactly snapshot, entities, maps, and boundaries"
-            )
+        version = document.get("schema_version")
+        expected_roles = {1: ROLES, 2: ANALYTICAL_RELEASE_ROLES}.get(version) if type(version) is int else None
+        if expected_roles is None or set(document.get("artifacts", {})) != expected_roles:
+            raise ContractError("A release requires the complete artifact set for its schema version")
         self.catalog = DatasetCatalog(document["catalog"])
         processing = document.get("processing", {})
         record = processing.get("record", {})
@@ -146,8 +145,10 @@ class DataRelease:
         return self.catalog.build_id
 
     def artifact(self, role: str) -> Path:
-        if role not in ROLES:
+        if role not in ANALYTICAL_RELEASE_ROLES:
             raise ContractError(f"Unknown artifact role: {role}")
+        if role not in self._artifacts:
+            raise ContractError("This release has no analytical read model; select a rebuilt release")
         expected = self._artifacts[role]
         if self.remote:
             path = self.cache / "objects" / expected["sha256"]
@@ -164,15 +165,31 @@ class DataRelease:
         identity = file_identity(path)
         if any(identity[key] != expected[key] for key in ("sha256", "size_bytes")):
             raise ContractError(f"Release artifact checksum or size mismatch: {role}")
-        if role != "snapshot" and read_sqlite_catalog(path).build_id != self.build_id:
+        if role in ROLES - {"snapshot"} and read_sqlite_catalog(path).build_id != self.build_id:
             raise ContractError(f"Artifact belongs to a different data build: {role}")
+        if role in ANALYTICAL_ROLES:
+            validate_artifact(path, self.catalog, role, entities_sha256=self._artifacts["entities"]["sha256"])
         if role == "snapshot" and snapshot_build_id(path) != self.build_id:
             raise ContractError("Snapshot belongs to a different data build")
         self._verified[role] = (path, signature)
         return path
 
     def verify(self) -> dict[str, Path]:
-        return {role: self.artifact(role) for role in sorted(ROLES)}
+        return {role: self.artifact(role) for role in sorted(self._artifacts)}
+
+    def analytical_dataset(self, name: str):
+        """Return a standard Arrow Dataset for campus, district, attributes or sources.
+
+        Use Arrow's native columns/filter/to_batches APIs or pass the dataset to
+        another Arrow consumer. An older release refuses this explicit request;
+        it never silently computes a different read model at request time.
+        """
+        try:
+            role = ANALYTICAL_DATASETS[name]
+        except KeyError as error:
+            raise ContractError(f"Unknown analytical dataset: {name}") from error
+        return analytical_dataset(self.artifact(role), self.catalog, role,
+                                  entities_sha256=self._artifacts["entities"]["sha256"])
 
 
 @lru_cache(maxsize=4)
@@ -220,19 +237,21 @@ def publish_release(
     processing: dict,
 ) -> Path:
     """Activate only a complete validated bundle; keep the previous pointer on failure."""
-    if set(artifacts) != ROLES:
+    if set(artifacts) not in (ROLES, ANALYTICAL_RELEASE_ROLES):
         raise ContractError("Cannot publish an incomplete release")
     directory.mkdir(parents=True, exist_ok=True)
     names = {}
     for role, source in artifacts.items():
-        suffix = ".pkl.gz" if role == "snapshot" else ".sqlite"
+        suffix = ".parquet" if role in ANALYTICAL_ROLES else ".pkl.gz" if role == "snapshot" else ".sqlite"
         name = f"{role}_{catalog.build_id}{suffix}"
         destination = directory / name
         if (
-            role != "snapshot"
+            role in ROLES - {"snapshot"}
             and read_sqlite_catalog(source).build_id != catalog.build_id
         ):
             raise ContractError(f"Cannot publish mixed data builds: {role}")
+        if role in ANALYTICAL_ROLES:
+            validate_artifact(source, catalog, role, entities_sha256=file_identity(artifacts["entities"])["sha256"])
         identity = file_identity(source)
         if destination.exists():
             if file_identity(destination)["sha256"] != identity["sha256"]:
@@ -244,7 +263,7 @@ def publish_release(
             os.link(source, destination)
         names[role] = {**identity, "filename": name}
     document = {
-        "schema_version": 1,
+        "schema_version": 2 if set(artifacts) == ANALYTICAL_RELEASE_ROLES else 1,
         "catalog": catalog.to_dict(),
         "artifacts": names,
         "processing": processing,

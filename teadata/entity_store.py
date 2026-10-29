@@ -3,13 +3,14 @@ from __future__ import annotations
 from contextlib import closing
 import json
 import logging
+import math
 import sqlite3
 from dataclasses import dataclass, field
 from functools import cached_property
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
-from .manifest import read_sqlite_catalog
+from .manifest import ContractError, read_sqlite_catalog, read_sqlite_catalog_connection
 from .release import current_release
 from .teadata_config import canonical_campus_number, canonical_district_number
 
@@ -60,31 +61,42 @@ def _campus_lookup_keys(campus_number: Optional[str]) -> Iterable[str]:
 
 
 def _decode_json(payload: Any) -> dict[str, Any]:
+    """Decode SQLite metadata without replacing malformed/unsupported data.
+
+    SQL NULL and JSON null represent empty nullable metadata. All other values
+    must be UTF-8 JSON objects; parser security limits remain in force.
+    """
     if payload is None:
         return {}
     if isinstance(payload, memoryview):
         payload = payload.tobytes()
     if isinstance(payload, (bytes, bytearray)):
         try:
-            text = payload.decode("utf-8")
-        except Exception:
-            return {}
-        if not text:
-            return {}
-        try:
-            return json.loads(text)
-        except Exception:
-            return {}
-    if isinstance(payload, str):
-        if not payload:
-            return {}
-        try:
-            return json.loads(payload)
-        except Exception:
-            return {}
-    if isinstance(payload, dict):
-        return payload
-    return {}
+            payload = payload.decode("utf-8")
+        except UnicodeError as error:
+            raise ContractError("Entity metadata must be UTF-8 JSON") from error
+    if not isinstance(payload, str):
+        raise ContractError("Entity metadata storage must be JSON text or SQL NULL")
+    try:
+        value = json.loads(payload, parse_constant=_reject_json_constant, parse_float=_finite_json_float)
+    except (ValueError, RecursionError) as error:
+        raise ContractError(f"Entity metadata contains malformed or unsupported JSON: {error}") from error
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ContractError("Entity metadata must be a JSON object or null")
+    return value
+
+
+def _reject_json_constant(value: str):
+    raise ValueError(f"non-finite JSON constant {value}")
+
+
+def _finite_json_float(value: str) -> float:
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError("JSON number exceeds the finite Float64 range")
+    return number
 
 
 def _collect_meta_keys_from_json(
@@ -159,6 +171,8 @@ def load_campus(
                     "district_number": _strip_leading_apostrophe(row[14]),
                     "district_number_canon": row[15] or "",
                 }
+    except ContractError:
+        raise
     except Exception as exc:
         raise RuntimeError(f"Failed querying campus from entity store '{path}': {exc}") from exc
 
@@ -210,6 +224,8 @@ def load_district(
                     "is_charter": has_charter,
                     "district_type": _district_type_from_flag(has_charter),
                 }
+    except ContractError:
+        raise
     except Exception as exc:
         raise RuntimeError(
             f"Failed querying district from entity store '{path}': {exc}"
@@ -239,6 +255,8 @@ def list_meta_keys(
                 "districts" if entity_type == "district" else "campuses",
                 limit=limit,
             )
+    except ContractError:
+        raise
     except Exception:
         return []
 
@@ -254,6 +272,7 @@ class EntityStore:
 
     path: Path
     max_cache: int = 64
+    immutable: bool = False
     _conn: Optional[sqlite3.Connection] = field(default=None, init=False, repr=False)
     _campus_cache: dict[str, dict[str, Any]] = field(
         default_factory=dict, init=False, repr=False
@@ -269,6 +288,11 @@ class EntityStore:
         default_factory=dict, init=False, repr=False
     )
     _closed: bool = field(default=False, init=False, repr=False)
+
+    def __post_init__(self):
+        self.path = Path(self.path)
+        if type(self.immutable) is not bool:
+            raise ValueError("EntityStore immutable mode must be boolean")
 
     def _ensure_open(self) -> None:
         if self._closed:
@@ -305,7 +329,20 @@ class EntityStore:
     @cached_property
     def catalog(self):
         self._ensure_open()
-        return read_sqlite_catalog(self.path)
+        return read_sqlite_catalog_connection(self.connection)
+
+    @property
+    def connection(self) -> sqlite3.Connection:
+        """The store-owned read-only SQLite connection; closed with this store.
+
+        Immutable mode reads only the exact checkpointed main-file artifact,
+        including its catalog. Callers may execute projections on this same
+        connection rather than opening a reader with different WAL semantics.
+        """
+        connection = self._connect()
+        if connection is None:
+            raise ContractError(f"Entity artifact does not exist: {self.path.name}")
+        return connection
 
     def _connect(self) -> Optional[sqlite3.Connection]:
         self._ensure_open()
@@ -313,7 +350,7 @@ class EntityStore:
             return self._conn
         if not self.path.exists():
             return None
-        uri = f"file:{self.path}?mode=ro"
+        uri = self.path.resolve().as_uri() + "?mode=ro" + ("&immutable=1" if self.immutable else "")
         self._conn = sqlite3.connect(uri, uri=True, check_same_thread=False)
         return self._conn
 

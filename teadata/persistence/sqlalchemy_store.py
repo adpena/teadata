@@ -2,8 +2,7 @@
 
 The goal of this module is to bridge the in-memory :class:`~teadata.classes.DataEngine`
 container with a relational database so that large snapshots can be stored in a
-PostgreSQL (or PostgreSQL-compatible) database and queried efficiently without
-loading a 75MB pickle into every web request.
+PostgreSQL or SQLite database and queried without loading a complete snapshot.
 
 The design favors round-tripping the canonical :class:`~teadata.classes.District`
 and :class:`~teadata.classes.Campus` objects without changing their public API.
@@ -16,9 +15,8 @@ A few guiding principles:
 * Store campus-to-campus transfer edges in a dedicated association table so the
   :class:`~teadata.classes.DataEngine` graph APIs keep functioning after
   hydration from SQL.
-* Capture geometry as both WKB (for geospatial tooling) and GeoJSON-ish
-  fallbacks so we can recreate shapely objects when available while remaining
-  resilient when Shapely is not installed in the consumer environment.
+* Capture geometry as WKB and GeoJSON and hydrate it with the library's existing
+  Shapely dependency; callers can omit geometry when it is unnecessary.
 
 The module is intentionally lightweight and does **not** require a Django
 settings module.  It can therefore be reused inside a Django project (via
@@ -28,11 +26,23 @@ Python application that can provide a SQLAlchemy engine/Session.
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import UserDict, defaultdict
 from datetime import date, datetime, timezone
+from itertools import islice
 import json
+import math
 import uuid
-from typing import Any, Callable, Iterable, Literal, Mapping, MutableMapping
+from typing import (
+    Any,
+    Callable,
+    Iterable,
+    Iterator,
+    Literal,
+    Mapping,
+    MutableMapping,
+    TypeVar,
+    cast,
+)
 
 from sqlalchemy import (
     Boolean,
@@ -45,40 +55,34 @@ from sqlalchemy import (
     MetaData,
     String,
     Text,
+    Table,
+    Uuid,
     create_engine as _sa_create_engine,
+    column as sql_column,
     delete,
     func,
     inspect,
+    insert,
     select,
+    text,
+    table as sql_table,
 )
 from sqlalchemy import Index
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.dialects.postgresql import insert as pg_insert
+from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.schema import CreateTable
 from sqlalchemy.orm import (
     DeclarativeBase,
     Mapped,
+    MappedColumn,
     Session,
-    defer,
     mapped_column,
     relationship,
     sessionmaker,
 )
 
-from sqlalchemy import JSON as _BaseJSON  # type: ignore
-
-try:  # JSON type that degrades gracefully outside PostgreSQL
-    from sqlalchemy.dialects.postgresql import JSONB as _PGJSONB
-except Exception:  # pragma: no cover - fallback for non-Postgres backends
-    _PGJSONB = None
-
-try:  # PostgreSQL-optimized UUID type; otherwise fall back to generic UUID/CHAR
-    from sqlalchemy.dialects.postgresql import UUID as _PGUUID
-except Exception:  # pragma: no cover
-    _PGUUID = None
-
-try:  # SQLAlchemy 2.0 native UUID type (works across backends)
-    from sqlalchemy import Uuid as _GenericUUID  # type: ignore[attr-defined]
-except Exception:  # pragma: no cover
-    _GenericUUID = None
+from sqlalchemy import JSON as _BaseJSON
 
 from ..classes import (
     Campus,
@@ -88,24 +92,28 @@ from ..classes import (
     _spans_to_bounds,
 )
 from ..teadata_config import canonical_campus_number, canonical_district_number
+from ..manifest import (
+    CATALOG_TABLE,
+    CATALOG_TABLE_DDL,
+    ContractError,
+    DatasetCatalog,
+    canonical_json,
+)
 
-try:  # Optional Shapely helpers for geometry round-tripping
-    from shapely import wkb as _shapely_wkb
-    from shapely.geometry import shape as _shapely_shape
-    from shapely.geometry.base import BaseGeometry as _BaseGeometry
-    from shapely.geometry import mapping as _shapely_mapping
+from shapely import wkb as _shapely_wkb
+from shapely.geometry import shape as _shapely_shape
+from shapely.geometry.base import BaseGeometry as _BaseGeometry
+from shapely.geometry import mapping as _shapely_mapping
 
-    _SHAPELY_AVAILABLE = True
-except Exception:  # pragma: no cover - Shapely intentionally optional
-    _shapely_wkb = None
-    _shapely_shape = None
-    _BaseGeometry = None
-    _shapely_mapping = None
-    _SHAPELY_AVAILABLE = False
-
-_JSONType = _BaseJSON
-if _PGJSONB is not None:
-    _JSONType = _PGJSONB().with_variant(_BaseJSON(), "sqlite")
+# PostgreSQL JSONB normalizes signed zero. JSON retains the source document
+# just as SQLite's JSON text does; denormalized lookup columns remain separate.
+_JSONType = _BaseJSON()
+_CATALOG_RELATION = sql_table(
+    CATALOG_TABLE,
+    sql_column("singleton", Integer),
+    sql_column("build_id", Text),
+    sql_column("document", Text),
+)
 
 # ---------------------------------------------------------------------------
 # SQLAlchemy ORM models
@@ -124,38 +132,9 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=_naming_convention)
 
 
-def _uuid_column(*args, **kwargs) -> mapped_column[Any]:
-    """Return a mapped column configured for UUID primary/foreign keys."""
-
-    if _PGUUID is not None:  # Prefer PostgreSQL UUID implementation
-        return mapped_column(_PGUUID(as_uuid=True), *args, **kwargs)
-    if _GenericUUID is not None:  # SQLAlchemy 2.0 portable UUID
-        return mapped_column(_GenericUUID(as_uuid=True), *args, **kwargs)  # type: ignore[misc]
-
-    # Fallback: store UUIDs as CHAR(36) while still returning uuid.UUID objects
-    class _UUIDString(String):
-        def __init__(self):
-            super().__init__(length=36)
-
-        def bind_processor(self, dialect):  # pragma: no cover - simple conversion
-            def process(value: Any):
-                if value is None:
-                    return None
-                if isinstance(value, uuid.UUID):
-                    return str(value)
-                return str(uuid.UUID(str(value)))
-
-            return process
-
-        def result_processor(self, dialect, coltype):  # pragma: no cover
-            def process(value: Any):
-                if value is None:
-                    return None
-                return uuid.UUID(str(value))
-
-            return process
-
-    return mapped_column(_UUIDString(), *args, **kwargs)
+def _uuid_column(*args, **kwargs) -> MappedColumn[uuid.UUID]:
+    """Use SQLAlchemy's native UUID/portable CHAR(32) implementation."""
+    return mapped_column(Uuid[uuid.UUID](), *args, **kwargs)
 
 
 class DistrictRecord(Base):
@@ -332,17 +311,64 @@ def ensure_schema(engine) -> None:
     """Create the database schema if it does not already exist."""
 
     if engine.dialect.name != "sqlite":
+        with engine.connect() as connection:
+            _validate_storage(connection)
         Base.metadata.create_all(engine)
+        with engine.begin() as connection:
+            connection.exec_driver_sql(CATALOG_TABLE_DDL)
         return
     # SQLAlchemy stores indexes in a set of identity-hashed objects. Its default
     # creation order changes between processes, changing SQLite root pages and
     # release checksums even when every row is identical.
     with engine.begin() as connection:
+        _validate_storage(connection)
         for table in Base.metadata.sorted_tables:
             if not inspect(connection).has_table(table.name, schema=table.schema):
                 connection.execute(CreateTable(table))
                 for index in sorted(table.indexes, key=lambda item: str(item.name)):
                     index.create(connection)
+        connection.exec_driver_sql(CATALOG_TABLE_DDL)
+
+
+def _validate_storage(connection) -> None:
+    """Refuse legacy lossy physical types before reading or writing data."""
+    inspector = inspect(connection)
+    if inspector.has_table(CATALOG_TABLE):
+        columns = {
+            column["name"]: column for column in inspector.get_columns(CATALOG_TABLE)
+        }
+        build_column = columns.get("build_id")
+        if (
+            build_column is None
+            or not isinstance(build_column["type"], String)
+            or build_column["nullable"]
+        ):
+            raise ContractError(
+                "Legacy database catalog lacks its bounded build ID fence; recreate and refill from source"
+            )
+    for table in Base.metadata.sorted_tables:
+        if not inspector.has_table(table.name):
+            continue
+        uuid_names = {
+            column.name for column in table.columns if isinstance(column.type, Uuid)
+        }
+        for column in inspector.get_columns(table.name):
+            if connection.dialect.name == "sqlite" and column["name"] in uuid_names:
+                storage = column["type"]
+                if not isinstance(storage, String) or storage.length != 32:
+                    raise ContractError(
+                        "Legacy SQLite UUID storage is unsafe; rebuild this database "
+                        "from its catalog-bound source. Numeric coercion cannot be repaired reliably."
+                    )
+            if (
+                column["name"] in table.c
+                and isinstance(table.c[column["name"]].type, _BaseJSON)
+                and isinstance(column["type"], JSONB)
+            ):
+                raise ContractError(
+                    "Legacy JSONB storage normalizes source values; rebuild this database "
+                    "from its catalog-bound source using JSON columns."
+                )
 
 
 # ---------------------------------------------------------------------------
@@ -444,87 +470,72 @@ def _flatten_meta(meta: Mapping[str, Any] | None) -> list[tuple[str, int, Any]]:
     return flattened
 
 
-class LazyMetaDict(dict):
-    """Dictionary-like wrapper that loads values on demand via a callback."""
+class LazyMetaDict(UserDict[str, Any]):
+    """A standard mutable mapping with one source-bound lazy data boundary.
+
+    Sparse prefetched reads may use the seed. Every whole-mapping operation or
+    mutation first loads the complete current payload. UserDict supplies mapping
+    equality, unions, updates, deletion, and copying without dict C fast paths.
+    """
 
     def __init__(
         self,
-        loader: Callable[[], Mapping[str, Any] | None],
+        loader: Callable[[], Mapping[str, Any] | None]
+        | Mapping[str, Any]
+        | None = None,
         *,
         seed: Mapping[str, Any] | None = None,
     ):
-        super().__init__()
-        self._loader = loader
-        self._loaded = False
-        if seed:
-            super().update(seed)
-
-    def _ensure_loaded(self) -> None:
-        if self._loaded:
-            return
-        if self._loader is None:  # pragma: no cover - safety net
+        if callable(loader):
+            self._loader: Callable[[], Mapping[str, Any] | None] | None = loader
+            self._loaded = False
+            self._payload = dict(seed or {})
+        else:
+            self._loader = None
             self._loaded = True
-            return
-        payload = self._loader() or {}
-        super().update(payload)
+            self._payload = dict(loader or {})
+
+    @property
+    def data(self) -> dict[str, Any]:
+        if not self._loaded:
+            assert self._loader is not None
+            # Replace, rather than merge: a prefetched key may have been deleted.
+            payload = dict(self._loader() or {})
+            self._payload = payload
+            self._loaded = True
+            self._loader = None
+        return self._payload
+
+    @data.setter
+    def data(self, payload: dict[str, Any]) -> None:
+        self._payload = payload
         self._loaded = True
-        self._loader = None  # release references for GC
+        self._loader = None
 
-    def __getitem__(self, key):  # type: ignore[override]
-        if not dict.__contains__(self, key):
-            self._ensure_loaded()
-        return dict.__getitem__(self, key)
+    def __getitem__(self, key: str) -> Any:
+        if key in self._payload:
+            return self._payload[key]
+        return self.data[key]
 
-    def get(self, key, default=None):  # type: ignore[override]
-        if not dict.__contains__(self, key):
-            self._ensure_loaded()
-        return dict.get(self, key, default)
+    def __contains__(self, key: object) -> bool:
+        return key in self._payload or key in self.data
 
-    def __contains__(self, key):  # type: ignore[override]
-        if dict.__contains__(self, key):
-            return True
-        self._ensure_loaded()
-        return dict.__contains__(self, key)
+    def pop(self, key: str, *default) -> Any:
+        return self.data.pop(key, *default)
 
-    def keys(self):  # type: ignore[override]
-        self._ensure_loaded()
-        return super().keys()
+    def popitem(self) -> tuple[str, Any]:
+        return self.data.popitem()
 
-    def values(self):  # type: ignore[override]
-        self._ensure_loaded()
-        return super().values()
+    def setdefault(self, key: str, default: Any = None) -> Any:
+        return self.data.setdefault(key, default)
 
-    def items(self):  # type: ignore[override]
-        self._ensure_loaded()
-        return super().items()
+    def __copy__(self):
+        # UserDict's default implementation assumes data is an instance slot.
+        return type(self)(self.data.copy())
 
-    def update(self, *args, **kwargs):  # type: ignore[override]
-        self._ensure_loaded()
-        return super().update(*args, **kwargs)
-
-    def setdefault(self, key, default=None):  # type: ignore[override]
-        self._ensure_loaded()
-        return super().setdefault(key, default)
-
-    def pop(self, key, default=None):  # type: ignore[override]
-        self._ensure_loaded()
-        return super().pop(key, default)
-
-    def __iter__(self):  # type: ignore[override]
-        self._ensure_loaded()
-        return super().__iter__()
-
-    def __len__(self):  # type: ignore[override]
-        self._ensure_loaded()
-        return super().__len__()
-
-    def copy(self):  # type: ignore[override]
-        self._ensure_loaded()
-        return super().copy()
-
-    def clear(self):  # type: ignore[override]
-        self._ensure_loaded()
-        return super().clear()
+    def __reduce__(self):
+        # A persisted graph must contain values, never Session/loader closures.
+        return type(self), (dict(self.data),)
 
 
 def _meta_loader(
@@ -532,16 +543,31 @@ def _meta_loader(
     session_factory: Callable[[], Session] | None,
     record_cls: type[DistrictRecord] | type[CampusRecord],
     pk_value: uuid.UUID,
+    build_id: str,
 ) -> Callable[[], Mapping[str, Any] | None]:
     column = record_cls.id
 
     def _load() -> Mapping[str, Any] | None:
-        active = session_factory() if session_factory is not None else default_session
-        close_after = session_factory is not None
+        # Reuse an active caller transaction, including its uncommitted writes.
+        # Closing a second Session on SQLite's shared in-memory connection would
+        # roll that transaction back. Only factory-created Sessions are owned.
+        if not default_session.in_transaction() and session_factory is not None:
+            active = session_factory()
+            close_after = True
+        else:
+            active = default_session
+            close_after = False
         try:
-            result = active.execute(
-                select(record_cls.meta).where(column == pk_value)
-            ).scalar_one_or_none()
+            row = active.execute(
+                select(record_cls.meta)
+                .join(_CATALOG_RELATION, _CATALOG_RELATION.c.singleton == 1)
+                .where(column == pk_value, _CATALOG_RELATION.c.build_id == build_id)
+            ).one_or_none()
+            if row is None:
+                raise ContractError(
+                    "Lazy metadata source was deleted or its dataset catalog changed"
+                )
+            result = row[0]
             return result if isinstance(result, Mapping) else {}
         finally:
             if close_after:
@@ -564,7 +590,16 @@ def _meta_value_payload(value: Any) -> dict[str, Any]:
 
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         payload["value_type"] = "number"
-        payload["value_numeric"] = float(value)
+        try:
+            numeric = float(value)
+        except OverflowError:
+            numeric = None
+        if (
+            numeric is not None
+            and math.isfinite(numeric)
+            and (not isinstance(value, int) or int(numeric) == value)
+        ):
+            payload["value_numeric"] = numeric
         return payload
 
     parsed_dt: datetime | None = None
@@ -575,7 +610,10 @@ def _meta_value_payload(value: Any) -> dict[str, Any]:
         parsed_dt = datetime.combine(value, datetime.min.time())
         payload["value_text"] = value.isoformat()
     elif isinstance(value, str):
-        payload["value_text"] = value
+        # PostgreSQL TEXT cannot index NUL; its JSON column retains the exact
+        # escaped raw string, including NUL, without inventing a replacement.
+        if "\x00" not in value:
+            payload["value_text"] = value
         try:
             parsed_dt = datetime.fromisoformat(value)
         except ValueError:
@@ -592,27 +630,7 @@ def _meta_value_payload(value: Any) -> dict[str, Any]:
     if parsed_dt.tzinfo is not None:
         parsed_dt = parsed_dt.astimezone(timezone.utc).replace(tzinfo=None)
     payload["value_datetime"] = parsed_dt
-    if "value_text" not in payload and isinstance(value, str):
-        payload["value_text"] = value
     return payload
-
-
-def _build_meta_records(
-    meta: Mapping[str, Any] | None,
-    record_cls: type[DistrictMetaRecord] | type[CampusMetaRecord],
-    *,
-    assume_clean: bool = False,
-) -> list[DistrictMetaRecord | CampusMetaRecord]:
-    if assume_clean and isinstance(meta, Mapping):
-        clean = dict(meta)
-    else:
-        clean = _clean_meta(meta) or {}
-    flattened = _flatten_meta(clean)
-    records: list[DistrictMetaRecord | CampusMetaRecord] = []
-    for key, ordinal, value in flattened:
-        payload = _meta_value_payload(value)
-        records.append(record_cls(key=key, ordinal=ordinal, **payload))
-    return records
 
 
 def _meta_record_for(entity: Literal["district", "campus"]):
@@ -700,7 +718,7 @@ def _dump_polygon(polygon: Any) -> tuple[bytes | None, dict[str, Any] | None]:
     if polygon is None:
         return None, None
 
-    if _SHAPELY_AVAILABLE and isinstance(polygon, _BaseGeometry):
+    if isinstance(polygon, _BaseGeometry):
         try:
             return polygon.wkb, _shapely_mapping(polygon)
         except Exception:  # pragma: no cover - shapely serialization failure
@@ -709,7 +727,7 @@ def _dump_polygon(polygon: Any) -> tuple[bytes | None, dict[str, Any] | None]:
     # Fallback: attempt to coerce to GeoJSON-like mapping from coordinates
     coords: list[list[float]] = []
     try:
-        for pt in polygon:  # type: ignore[assignment]
+        for pt in polygon:
             if isinstance(pt, (list, tuple)) and len(pt) >= 2:
                 x, y = float(pt[0]), float(pt[1])
                 coords.append([x, y])
@@ -731,7 +749,7 @@ def _dump_point(
     if point is None:
         return None, None, None, None
 
-    if _SHAPELY_AVAILABLE and isinstance(point, _BaseGeometry):
+    if isinstance(point, _BaseGeometry):
         try:
             mapping = _shapely_mapping(point)
             lon = float(mapping["coordinates"][0])
@@ -750,18 +768,17 @@ def _dump_point(
 
 
 def _load_polygon(wkb_bytes: bytes | None, geojson: Mapping[str, Any] | None) -> Any:
-    if wkb_bytes and _SHAPELY_AVAILABLE:
+    if wkb_bytes:
         try:
             return _shapely_wkb.loads(wkb_bytes)
         except Exception:  # pragma: no cover
             pass
 
     if geojson:
-        if _SHAPELY_AVAILABLE:
-            try:
-                return _shapely_shape(geojson)
-            except Exception:  # pragma: no cover
-                pass
+        try:
+            return _shapely_shape(geojson)
+        except Exception:  # pragma: no cover
+            pass
         coords = geojson.get("coordinates")
         if isinstance(coords, list) and coords:
             try:
@@ -778,18 +795,17 @@ def _load_point(
     lon: float | None,
     lat: float | None,
 ) -> Any:
-    if wkb_bytes and _SHAPELY_AVAILABLE:
+    if wkb_bytes:
         try:
             return _shapely_wkb.loads(wkb_bytes)
         except Exception:  # pragma: no cover
             pass
 
     if geojson:
-        if _SHAPELY_AVAILABLE:
-            try:
-                return _shapely_shape(geojson)
-            except Exception:  # pragma: no cover
-                pass
+        try:
+            return _shapely_shape(geojson)
+        except Exception:  # pragma: no cover
+            pass
         coords = geojson.get("coordinates")
         if isinstance(coords, (list, tuple)) and len(coords) >= 2:
             try:
@@ -807,162 +823,355 @@ def _load_point(
 # ---------------------------------------------------------------------------
 
 
+_T = TypeVar("_T")
+
+
+def _batches(values: Iterable[_T], size: int) -> Iterator[list[_T]]:
+    iterator = iter(values)
+    while batch := list(islice(iterator, size)):
+        yield batch
+
+
+def _checked_batch_size(size: int) -> int:
+    if type(size) is not int or size <= 0:
+        raise ValueError("batch_size must be a positive integer")
+    return size
+
+
+def _catalog_row(session: Session) -> tuple[str, str] | None:
+    rows = session.execute(
+        select(
+            _CATALOG_RELATION.c.singleton,
+            _CATALOG_RELATION.c.document,
+            _CATALOG_RELATION.c.build_id,
+        ).limit(2)
+    ).all()
+    if not rows:
+        return None
+    if len(rows) != 1 or rows[0][0] != 1:
+        raise ContractError(
+            "Database must contain exactly one dataset catalog at singleton 1"
+        )
+    return rows[0][1], rows[0][2]
+
+
+def _index_key(key: str) -> str:
+    try:
+        key.encode("utf-8")
+    except UnicodeEncodeError as error:
+        raise ValueError(
+            "Metadata index keys must be valid UTF-8; use include_meta_entries=False to retain raw JSON only"
+        ) from error
+    if "\x00" in key or len(key) > 255:
+        raise ValueError(
+            "Metadata index keys must contain at most 255 characters and no NUL; "
+            "use include_meta_entries=False to retain raw JSON only"
+        )
+    return key
+
+
+def _bind_catalog(repo: DataEngine, session: Session, *, replace: bool) -> None:
+    catalog = getattr(repo, "catalog", None)
+    if not isinstance(catalog, DatasetCatalog):
+        raise ContractError("Database exports require a catalog-bound DataEngine")
+    document = canonical_json(DatasetCatalog(catalog.to_dict()).to_dict())
+    previous = _catalog_row(session)
+    if previous is None:
+        occupied = select(
+            *(
+                select(1).select_from(table).limit(1).exists()
+                for table in Base.metadata.sorted_tables
+            )
+        )
+        if not replace and any(session.execute(occupied).one()):
+            raise ContractError(
+                "An unbound populated database requires explicit replace=True"
+            )
+        session.execute(
+            text(
+                f"INSERT INTO {CATALOG_TABLE} (singleton,build_id,document) VALUES (1,:build_id,:document)"
+            ),
+            {"build_id": catalog.build_id, "document": document},
+        )
+        return
+    existing = DatasetCatalog(json.loads(previous[0]), expected_build_id=previous[1])
+    if existing.build_id != catalog.build_id and not replace:
+        raise ContractError(
+            "A partial export cannot mix dataset catalogs; use explicit replace=True"
+        )
+    # Acquire the destination's write lock before entity DML. The predicate also
+    # refuses a catalog changed by a concurrent writer while this call waited.
+    result = session.connection().execute(
+        text(
+            f"UPDATE {CATALOG_TABLE} SET document=:document,build_id=:build_id WHERE singleton=1 AND build_id=:previous"
+        ),
+        {
+            "document": document,
+            "build_id": catalog.build_id,
+            "previous": existing.build_id,
+        },
+    )
+    if result.rowcount != 1:
+        raise ContractError(
+            "The destination catalog changed concurrently; roll back and retry"
+        )
+
+
+def _write_rows(
+    session: Session,
+    table,
+    rows: Iterable[dict[str, Any]],
+    *,
+    replace: bool,
+    batch_size: int,
+) -> None:
+    if replace:
+        statement = insert(table)
+    else:
+        dialect = session.get_bind().dialect.name
+        factory = {"sqlite": sqlite_insert, "postgresql": pg_insert}.get(dialect)
+        if factory is None:
+            raise NotImplementedError(
+                "Partial database exports support SQLite and PostgreSQL"
+            )
+        statement = factory(table)
+        statement = statement.on_conflict_do_update(
+            index_elements=list(table.primary_key.columns),
+            set_={
+                column.name: statement.excluded[column.name]
+                for column in table.columns
+                if not column.primary_key
+            },
+        )
+    connection = session.connection()
+    for batch in _batches(rows, batch_size):
+        connection.execute(statement, batch)
+
+
+def _district_payload(district: District, *, include_geometry: bool) -> dict[str, Any]:
+    aea_raw = _normalize_aea_raw(getattr(district, "aea_raw", district.aea))
+    wkb, geojson = (
+        _dump_polygon(getattr(district, "polygon", None))
+        if include_geometry
+        else (None, None)
+    )
+    return {
+        "id": district.id,
+        "name": district.name,
+        "enrollment": district.enrollment,
+        "district_number": district.district_number or None,
+        "district_number_canon": getattr(district, "district_number_canon", None)
+        or canonical_district_number(district.district_number),
+        "aea_raw": aea_raw,
+        "aea": _coerce_nullable_bool(aea_raw if aea_raw is not None else district.aea),
+        "rating": district.rating,
+        "polygon_wkb": wkb,
+        "polygon_geojson": geojson,
+        "meta": _clean_meta(district.meta),
+    }
+
+
+def _campus_payload(campus: Campus, *, include_geometry: bool) -> dict[str, Any]:
+    aea_raw = _normalize_aea_raw(getattr(campus, "aea_raw", campus.aea))
+    wkb, geojson, lon, lat = _dump_point(getattr(campus, "point", None))
+    spans = [[low, high] for low, high in campus.grade_range_code_spans]
+    return {
+        "id": campus.id,
+        "district_id": campus.district_id,
+        "name": campus.name,
+        "charter_type": campus.charter_type,
+        "is_charter": _coerce_bool(campus.is_charter),
+        "is_private": _coerce_bool(campus.is_private),
+        "is_magnet": campus.is_magnet,
+        "enrollment": campus.enrollment,
+        "rating": campus.rating,
+        "aea_raw": aea_raw,
+        "aea": _coerce_nullable_bool(aea_raw if aea_raw is not None else campus.aea),
+        "grade_range": campus.grade_range,
+        "grade_range_low_code": campus.grade_range_low_code,
+        "grade_range_high_code": campus.grade_range_high_code,
+        "grade_range_code_spans": spans or None,
+        "school_type": campus.school_type,
+        "school_status_date": campus.school_status_date,
+        "update_date": campus.update_date,
+        "district_number": campus.district_number,
+        "district_number_canon": getattr(campus, "district_number_canon", None)
+        or canonical_district_number(campus.district_number),
+        "campus_number": campus.campus_number,
+        "campus_number_canon": getattr(campus, "campus_number_canon", None)
+        or canonical_campus_number(campus.campus_number),
+        "point_wkb": wkb if include_geometry else None,
+        "point_geojson": geojson if include_geometry else None,
+        "lon": lon,
+        "lat": lat,
+        "meta": _clean_meta(campus.meta),
+    }
+
+
+def _write_entities(
+    session: Session,
+    model,
+    meta_model,
+    rows: Iterable[dict[str, Any]],
+    *,
+    replace: bool,
+    include_meta_entries: bool,
+    batch_size: int,
+) -> None:
+    parent_column = (
+        meta_model.__table__.c.district_id
+        if model is DistrictRecord
+        else meta_model.__table__.c.campus_id
+    )
+    for batch in _batches(rows, batch_size):
+        _write_rows(
+            session, model.__table__, batch, replace=replace, batch_size=batch_size
+        )
+        if not replace:
+            session.connection().execute(
+                delete(meta_model.__table__).where(
+                    parent_column.in_([row["id"] for row in batch])
+                )
+            )
+        if include_meta_entries:
+            entries = (
+                {
+                    parent_column.name: row["id"],
+                    "key": _index_key(key),
+                    "ordinal": ordinal,
+                    **_meta_value_payload(value),
+                }
+                for row in batch
+                for key, ordinal, value in _flatten_meta(row["meta"])
+            )
+            # Fill every physical column: Core executemany uses one stable
+            # parameter shape, preserving explicit nulls across mixed values.
+            complete = (
+                {
+                    column.name: entry.get(column.name)
+                    for column in meta_model.__table__.columns
+                }
+                for entry in entries
+            )
+            _write_rows(
+                session,
+                meta_model.__table__,
+                complete,
+                replace=True,
+                batch_size=batch_size,
+            )
+
+
 def export_dataengine(
     repo: DataEngine,
     session: Session,
     *,
-    replace: bool = True,
+    replace: bool = False,
     include_meta_entries: bool = True,
     include_geometry: bool = True,
+    batch_size: int = 256,
 ) -> None:
-    """Persist the contents of ``repo`` into the database bound to ``session``.
+    """Persist a catalog-bound graph in the caller's transaction.
 
-    Parameters
-    ----------
-    repo:
-        The populated :class:`~teadata.classes.DataEngine` instance.
-    session:
-        A live SQLAlchemy :class:`~sqlalchemy.orm.Session`.
-    replace:
-        When ``True`` (default) the destination tables are truncated prior to
-        inserting fresh rows.  Set to ``False`` to perform in-place upserts.
-    include_meta_entries:
-        When ``True`` (default) populate the denormalized meta tables.
-    include_geometry:
-        When ``True`` (default) store geometry payloads alongside lon/lat.
+    The default upserts only supplied entities and transfer edges; unrelated
+    rows remain. ``replace=True`` explicitly replaces the entire destination.
+    One destination contains one dataset catalog; partial writes from another
+    release are refused. The caller must roll back on any failure and owns commit.
+    SQLAlchemy Core batches avoid ORM hydration, per-entity queries, and loading
+    existing transfer history. ``batch_size`` bounds additional row buffers.
     """
-
+    batch_size = _checked_batch_size(batch_size)
+    if type(replace) is not bool:
+        raise TypeError("replace must be an explicit boolean")
+    if not replace and session.get_bind().dialect.name not in {"sqlite", "postgresql"}:
+        raise NotImplementedError(
+            "Partial database exports support SQLite and PostgreSQL"
+        )
+    _validate_storage(session.connection())
+    _bind_catalog(repo, session, replace=replace)
+    session.flush()
     if replace:
-        session.execute(delete(CampusTransferRecord))
-        session.execute(delete(CampusRecord))
-        session.execute(delete(DistrictRecord))
-        session.flush()
+        for model in (
+            CampusMetaRecord,
+            DistrictMetaRecord,
+            CampusTransferRecord,
+            CampusRecord,
+            DistrictRecord,
+        ):
+            session.connection().execute(delete(cast(Table, model.__table__)))
+    _write_entities(
+        session,
+        DistrictRecord,
+        DistrictMetaRecord,
+        (
+            _district_payload(entity, include_geometry=include_geometry)
+            for entity in repo._districts.values()
+        ),
+        replace=replace,
+        include_meta_entries=include_meta_entries,
+        batch_size=batch_size,
+    )
+    _write_entities(
+        session,
+        CampusRecord,
+        CampusMetaRecord,
+        (
+            _campus_payload(entity, include_geometry=include_geometry)
+            for entity in repo._campuses.values()
+        ),
+        replace=replace,
+        include_meta_entries=include_meta_entries,
+        batch_size=batch_size,
+    )
+    edges = (
+        {
+            "source_id": source_id,
+            "destination_id": destination_id,
+            "student_count": count,
+            "masked": bool(masked),
+        }
+        for source_id, destinations in repo._xfers_out.items()
+        for destination_id, count, masked in destinations
+        if source_id is not None and destination_id is not None
+    )
+    _write_rows(
+        session,
+        CampusTransferRecord.__table__,
+        edges,
+        replace=replace,
+        batch_size=batch_size,
+    )
+    session.expire_all()
 
-    # Districts -------------------------------------------------------------
-    for district in repo._districts.values():
-        record = session.get(DistrictRecord, district.id)
-        if record is None:
-            record = DistrictRecord(id=district.id)
-            session.add(record)
 
-        record.name = district.name
-        record.enrollment = district.enrollment
-        record.district_number = district.district_number or None
-        record.district_number_canon = (
-            getattr(district, "district_number_canon", None)
-            or canonical_district_number(district.district_number)
+def _read_catalog(session: Session) -> tuple[DatasetCatalog, str]:
+    if not inspect(session.connection()).has_table(CATALOG_TABLE):
+        raise ContractError(
+            "Database lacks its required dataset catalog; rebuild from source"
         )
-        district_aea_raw = _normalize_aea_raw(
-            getattr(district, "aea_raw", district.aea)
+    row = _catalog_row(session)
+    if row is None:
+        raise ContractError(
+            "Database lacks its required dataset catalog; rebuild from source"
         )
-        record.aea_raw = district_aea_raw
-        record.aea = _coerce_nullable_bool(
-            district_aea_raw if district_aea_raw is not None else district.aea
-        )
-        record.rating = district.rating
-        if include_geometry:
-            poly_wkb, poly_geojson = _dump_polygon(getattr(district, "polygon", None))
-        else:
-            poly_wkb, poly_geojson = (None, None)
-        record.polygon_wkb = poly_wkb
-        record.polygon_geojson = poly_geojson
-        clean_meta = _clean_meta(district.meta)
-        record.meta = clean_meta
-        if include_meta_entries:
-            record.meta_entries = _build_meta_records(
-                clean_meta, DistrictMetaRecord, assume_clean=True
-            )
-        else:
-            record.meta_entries = []
+    return DatasetCatalog(json.loads(row[0]), expected_build_id=row[1]), row[1]
 
-    session.flush()
 
-    # Campuses --------------------------------------------------------------
-    for campus in repo._campuses.values():
-        record = session.get(CampusRecord, campus.id)
-        if record is None:
-            record = CampusRecord(id=campus.id)
-            session.add(record)
-
-        record.district_id = campus.district_id
-        record.name = campus.name
-        record.charter_type = campus.charter_type
-        record.is_charter = _coerce_bool(campus.is_charter)
-        record.is_private = _coerce_bool(getattr(campus, "is_private", False))
-        record.is_magnet = getattr(campus, "is_magnet", None)
-        record.enrollment = campus.enrollment
-        record.rating = campus.rating
-        campus_aea_raw = _normalize_aea_raw(getattr(campus, "aea_raw", campus.aea))
-        record.aea_raw = campus_aea_raw
-        record.aea = _coerce_nullable_bool(
-            campus_aea_raw if campus_aea_raw is not None else campus.aea
-        )
-        record.grade_range = campus.grade_range
-        record.grade_range_low_code = campus.grade_range_low_code
-        record.grade_range_high_code = campus.grade_range_high_code
-        spans_payload = [
-            [low, high] for (low, high) in getattr(campus, "grade_range_code_spans", ())
-        ]
-        record.grade_range_code_spans = spans_payload or None
-        record.school_type = campus.school_type
-        record.school_status_date = campus.school_status_date
-        record.update_date = campus.update_date
-        record.district_number = campus.district_number
-        record.district_number_canon = (
-            getattr(campus, "district_number_canon", None)
-            or canonical_district_number(campus.district_number)
-        )
-        record.campus_number = campus.campus_number
-        record.campus_number_canon = (
-            getattr(campus, "campus_number_canon", None)
-            or canonical_campus_number(campus.campus_number)
-        )
-        pt_wkb, pt_geojson, lon, lat = _dump_point(getattr(campus, "point", None))
-        if not include_geometry:
-            pt_wkb = None
-            pt_geojson = None
-        record.point_wkb = pt_wkb
-        record.point_geojson = pt_geojson
-        record.lon = lon
-        record.lat = lat
-        clean_meta = _clean_meta(campus.meta)
-        record.meta = clean_meta
-        if include_meta_entries:
-            record.meta_entries = _build_meta_records(
-                clean_meta, CampusMetaRecord, assume_clean=True
-            )
-        else:
-            record.meta_entries = []
-
-    session.flush()
-
-    # Transfers -------------------------------------------------------------
-    existing: dict[tuple[uuid.UUID, uuid.UUID], CampusTransferRecord] = {}
-    if not replace:
-        result = session.execute(select(CampusTransferRecord))
-        for row in result.scalars():
-            existing[(row.source_id, row.destination_id)] = row
-
-    for source_id, edges in getattr(repo, "_xfers_out", {}).items():
-        for dest_id, count, masked in edges:
-            if source_id is None or dest_id is None:
-                continue
-            key = (source_id, dest_id)
-            record = existing.get(key)
-            if record is None:
-                record = CampusTransferRecord(
-                    source_id=source_id,
-                    destination_id=dest_id,
-                    student_count=count,
-                    masked=bool(masked),
-                )
-                session.add(record)
-                existing[key] = record
-            else:
-                record.student_count = count
-                record.masked = bool(masked)
-
-    session.flush()
+def _prefetch_raw_meta(
+    session: Session, model, keys: Iterable[str] | None, batch_size: int
+) -> dict[uuid.UUID, dict[str, Any]]:
+    selected = tuple(dict.fromkeys(keys or ()))
+    if not selected:
+        return {}
+    seeds: dict[uuid.UUID, dict[str, Any]] = {}
+    statement = select(model.id, model.meta).execution_options(yield_per=batch_size)
+    with session.execute(statement) as rows:
+        for identifier, raw in rows:
+            if isinstance(raw, Mapping):
+                seed = {key: raw[key] for key in selected if key in raw}
+                if seed:
+                    seeds[identifier] = seed
+    return seeds
 
 
 def import_dataengine(
@@ -972,124 +1181,137 @@ def import_dataengine(
     prefetch_district_meta_keys: Iterable[str] | None = None,
     prefetch_campus_meta_keys: Iterable[str] | None = None,
     meta_session_factory: Callable[[], Session] | None = None,
+    batch_size: int = 256,
 ) -> DataEngine:
-    """Hydrate a :class:`~teadata.classes.DataEngine` from the SQL database."""
+    """Hydrate a catalog-bound graph without an additional full ORM graph.
 
+    The returned DataEngine itself contains the complete entity/transfer graph;
+    database row buffers are bounded by ``batch_size``. Eager metadata is selected
+    with its entity, and lazy metadata refuses a different source release.
+    Prefetch keys refer to exact top-level raw keys, preserving nested values.
+    The caller controls transaction isolation for a consistent read while other
+    clients mutate the database. Lazy reads observe that release's current rows.
+    """
+    batch_size = _checked_batch_size(batch_size)
+    _validate_storage(session.connection())
+    catalog, build_id = _read_catalog(session)
     repo = DataEngine()
-
+    repo.catalog = catalog
     if lazy_meta and meta_session_factory is None:
-        try:
-            bind = session.get_bind()
-        except Exception:  # pragma: no cover - Session without bind
-            bind = None
-        if bind is not None:
-            meta_session_factory = sessionmaker(
-                bind=bind, future=True, expire_on_commit=False
-            )
-
-    district_stmt = select(DistrictRecord).options(defer(DistrictRecord.meta))
-    campus_stmt = select(CampusRecord).options(defer(CampusRecord.meta))
-
-    districts = session.execute(district_stmt).scalars().all()
-    campuses = session.execute(campus_stmt).scalars().all()
-    transfers = session.execute(select(CampusTransferRecord)).scalars().all()
-
-    district_ids = [d.id for d in districts]
-    campus_ids = [c.id for c in campuses]
-
-    district_seed: dict[uuid.UUID, dict[str, Any]] = {}
-    campus_seed: dict[uuid.UUID, dict[str, Any]] = {}
-    if prefetch_district_meta_keys:
-        district_seed = fetch_meta_values(
-            session,
-            entity="district",
-            keys=prefetch_district_meta_keys,
-            ids=district_ids,
+        meta_session_factory = sessionmaker(
+            bind=session.get_bind(), expire_on_commit=False
         )
-    if prefetch_campus_meta_keys:
-        campus_seed = fetch_meta_values(
-            session,
-            entity="campus",
-            keys=prefetch_campus_meta_keys,
-            ids=campus_ids,
+    district_seed = (
+        _prefetch_raw_meta(
+            session, DistrictRecord, prefetch_district_meta_keys, batch_size
         )
+        if lazy_meta
+        else {}
+    )
+    campus_seed = (
+        _prefetch_raw_meta(session, CampusRecord, prefetch_campus_meta_keys, batch_size)
+        if lazy_meta
+        else {}
+    )
+
+    def statement(model):
+        columns = [
+            column
+            for column in model.__table__.columns
+            if not lazy_meta or column.name != "meta"
+        ]
+        return select(*columns).execution_options(yield_per=batch_size)
 
     with repo.bulk():
-        for d in districts:
-            if lazy_meta:
-                loader = _meta_loader(
-                    session, meta_session_factory, DistrictRecord, d.id
+        with session.execute(statement(DistrictRecord)) as rows:
+            for d in rows.mappings():
+                meta = (
+                    LazyMetaDict(
+                        _meta_loader(
+                            session,
+                            meta_session_factory,
+                            DistrictRecord,
+                            d["id"],
+                            build_id,
+                        ),
+                        seed=district_seed.pop(d["id"], None),
+                    )
+                    if lazy_meta
+                    else dict(d["meta"] or {})
                 )
-                seed = district_seed.get(d.id) if district_seed else None
-                meta_payload = LazyMetaDict(loader, seed=seed)
-            else:
-                meta_payload = dict(d.meta or {})
-
-            district = District(
-                id=d.id,
-                name=d.name,
-                enrollment=d.enrollment,
-                district_number=d.district_number or "",
-                aea=d.aea,
-                aea_raw=getattr(d, "aea_raw", None),
-                rating=d.rating,
-                boundary=_load_polygon(d.polygon_wkb, d.polygon_geojson),
-                meta=meta_payload,
-            )
-            repo.add_district(district)
-
-        for c in campuses:
-            if lazy_meta:
-                loader = _meta_loader(session, meta_session_factory, CampusRecord, c.id)
-                seed = campus_seed.get(c.id) if campus_seed else None
-                meta_payload = LazyMetaDict(loader, seed=seed)
-            else:
-                meta_payload = dict(c.meta or {})
-
-            campus = Campus(
-                id=c.id,
-                district_id=c.district_id,
-                name=c.name,
-                charter_type=c.charter_type or "",
-                is_charter=bool(c.is_charter),
-                is_private=bool(getattr(c, "is_private", False)),
-                is_magnet=getattr(c, "is_magnet", None),
-                enrollment=c.enrollment,
-                rating=c.rating,
-                aea=c.aea,
-                aea_raw=getattr(c, "aea_raw", None),
-                grade_range=c.grade_range,
-                school_type=c.school_type,
-                school_status_date=c.school_status_date,
-                update_date=c.update_date,
-                district_number=c.district_number,
-                campus_number=c.campus_number,
-                location=_load_point(c.point_wkb, c.point_geojson, c.lon, c.lat),
-                meta=meta_payload,
-            )
-            spans_payload = getattr(c, "grade_range_code_spans", None)
-            if spans_payload:
-                spans_list = _coerce_grade_spans(spans_payload)
-                if spans_list:
-                    spans_tuple = tuple(spans_list)
-                    object.__setattr__(campus, "grade_range_code_spans", spans_tuple)
-                    low_val, high_val = _spans_to_bounds(spans_tuple)
-                    object.__setattr__(campus, "grade_range_low_code", low_val)
-                    object.__setattr__(campus, "grade_range_high_code", high_val)
-            repo.add_campus(campus)
-
-    repo._rebuild_indexes()
-
+                repo.add_district(
+                    District(
+                        id=d["id"],
+                        name=d["name"],
+                        enrollment=d["enrollment"],
+                        district_number=d["district_number"] or "",
+                        aea=d["aea"],
+                        aea_raw=d["aea_raw"],
+                        rating=d["rating"],
+                        boundary=_load_polygon(d["polygon_wkb"], d["polygon_geojson"]),
+                        meta=meta,
+                    )
+                )
+        with session.execute(statement(CampusRecord)) as rows:
+            for c in rows.mappings():
+                meta = (
+                    LazyMetaDict(
+                        _meta_loader(
+                            session,
+                            meta_session_factory,
+                            CampusRecord,
+                            c["id"],
+                            build_id,
+                        ),
+                        seed=campus_seed.pop(c["id"], None),
+                    )
+                    if lazy_meta
+                    else dict(c["meta"] or {})
+                )
+                campus = Campus(
+                    id=c["id"],
+                    district_id=c["district_id"],
+                    name=c["name"],
+                    charter_type=c["charter_type"] or "",
+                    is_charter=bool(c["is_charter"]),
+                    is_private=bool(c["is_private"]),
+                    is_magnet=c["is_magnet"],
+                    enrollment=c["enrollment"],
+                    rating=c["rating"],
+                    aea=c["aea"],
+                    aea_raw=c["aea_raw"],
+                    grade_range=c["grade_range"],
+                    school_type=c["school_type"],
+                    school_status_date=c["school_status_date"],
+                    update_date=c["update_date"],
+                    district_number=c["district_number"],
+                    campus_number=c["campus_number"],
+                    location=_load_point(
+                        c["point_wkb"], c["point_geojson"], c["lon"], c["lat"]
+                    ),
+                    meta=meta,
+                )
+                if c["grade_range_code_spans"]:
+                    spans = tuple(_coerce_grade_spans(c["grade_range_code_spans"]))
+                    if spans:
+                        object.__setattr__(campus, "grade_range_code_spans", spans)
+                        low, high = _spans_to_bounds(spans)
+                        object.__setattr__(campus, "grade_range_low_code", low)
+                        object.__setattr__(campus, "grade_range_high_code", high)
+                repo.add_campus(campus)
     repo._xfers_out = defaultdict(list)
     repo._xfers_in = defaultdict(list)
     repo._xfers_missing = {"src": 0, "dst": 0, "either": 0}
-
-    for edge in transfers:
-        repo._xfers_out[edge.source_id].append(
-            (edge.destination_id, edge.student_count, edge.masked)
+    with session.execute(statement(CampusTransferRecord)) as rows:
+        for edge in rows.mappings():
+            repo._xfers_out[edge["source_id"]].append(
+                (edge["destination_id"], edge["student_count"], edge["masked"])
+            )
+            repo._xfers_in[edge["destination_id"]].append(
+                (edge["source_id"], edge["student_count"], edge["masked"])
+            )
+    if _read_catalog(session)[1] != build_id:
+        raise ContractError(
+            "The dataset catalog changed during hydration; retry in a consistent read transaction"
         )
-        repo._xfers_in[edge.destination_id].append(
-            (edge.source_id, edge.student_count, edge.masked)
-        )
-
     return repo

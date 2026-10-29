@@ -180,6 +180,7 @@ class ProvenanceStore:
         code_version: str,
         parameters: Mapping[str, Any] | None = None,
         validation: Mapping[str, Any] | None = None,
+        diagnostics: Mapping[str, Any] | None = None,
         recorded_at: datetime | None = None,
     ) -> str:
         """Link one transformation to its input receipts, code, and output artifacts."""
@@ -204,6 +205,7 @@ class ProvenanceStore:
                 "code_version": code_version,
                 "parameters": dict(parameters or {}),
                 "validation": dict(validation) if validation is not None else None,
+                **({"diagnostics": dict(diagnostics)} if diagnostics is not None else {}),
                 "outputs": {
                     role: self._archive(path) for role, path in outputs.items()
                 },

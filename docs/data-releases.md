@@ -2,7 +2,7 @@
 
 TEA Data keeps one source contract in `teadata/teadata_sources.yaml`. Each version has a path, declared reference period, reader settings, an ordered column schema, a value policy, and documentation references. Reviewed, column-only JSON resources under `teadata/schemas/` define the expected headers; their hashes bind the reviewed documentation bytes. A catalog year selects a version; it does not establish its reference period. TAPR fields such as attrition and mobility can refer to an earlier period than the report. Their field definitions carry explicit overrides.
 
-A build records the files it actually reads. The runtime catalog is embedded in the snapshot and SQLite sidecars. `release.json` selects all four artifacts by content hash and one build identity. Runtime consumers use that catalog, rather than interpreting an old snapshot with the current YAML. Independent asset URLs, newest-file discovery, legacy pickle formats, and cache rebuilds that leave partial changes on failure have been retired.
+A build records the files it actually reads. The runtime catalog is embedded in the snapshot and SQLite sidecars. `release.json` selects the source and analytical artifacts by content hash and one build identity. Runtime consumers use that catalog, rather than interpreting an old snapshot with the current YAML. Independent asset URLs, newest-file discovery, legacy pickle formats, and cache rebuilds that leave partial changes on failure have been retired.
 
 ## Researcher API
 
@@ -30,6 +30,75 @@ Values carry `observed`, `suppressed`, `missing`, `not_applicable`, or `invalid`
 Catalog schema 2 stores `metric_bindings` with the release: canonical names and aliases resolve to source fields, populations, units, and bounds without consulting current configuration. Old schema-1 bundles require a producer rebuild; they are never relabeled under new rules. `measure_field(raw, physical_field, scope="campus", entity=campus)` applies the same source rules and population check to a governed metadata field, returning `None` for opaque or ambiguous fields. `measurements_frame()` retains value, status, raw token, reason, unit, period, source, and build identity in separate columns.
 
 Canonical public enrollment uses the TAPR student enrollment field for both campuses and districts. The accountability report's Number of Students is a separate `accountability.student_count` population and must not replace enrollment. Public-source metrics are not applicable to private schools. A metric without its own period inherits the dataset period; an explicitly unknown period stays unknown.
+
+## Arrow analytical datasets
+
+New schema-2 releases materialize the canonical scalar catalog once, from the
+completed immutable entities SQLite artifact. They add campus and district
+Parquet cells, named entity attributes, and a source/definition table. Source
+hydration, canonical evaluation, and Arrow writing are timed separately in the
+processing receipt's `diagnostics.analytical`. Stable source/count checks remain
+in `validation.analytical`; measured runtime durations are per-run evidence,
+not deterministic scientific validation. No second masking interpreter runs
+during a scan.
+
+```python
+import pyarrow.dataset as ds
+from teadata import current_release
+from teadata.analytical import measurement_from_row
+
+release = current_release()
+cells = release.analytical_dataset("campus")  # ordinary Arrow Dataset
+selection = (ds.field("kind") == "metric") & (ds.field("name") == "enrollment")
+for batch in cells.to_batches(
+    columns=["entity_id", "value_integer", "status", "reason", "dataset", "period"],
+    filter=selection, batch_size=4096,
+):
+    pass  # pass a standard Arrow batch to pandas, Polars or a database loader
+sources = release.analytical_dataset("sources")
+attributes = release.analytical_dataset("campus_attributes")
+path = release.artifact("campus_analytics")  # standard Parquet path
+catalog.field_metadata(catalog.source_for_metric("enrollment", "campus")[1])
+```
+
+Cells use named `field`/`metric`, `dataset`, report `dataset_period`, effective
+field `period`, `field_year`, `status`, `reason`, policy and unit columns. Source
+rows include acquisition dates and URLs, dictionaries, glossaries and masking
+references as native Arrow structs/lists, plus complete archival receipt JSON.
+Known opaque fields retain catalog provenance; an unbound field has an unknown
+period rather than a year inferred from its name. Derived attributes bind the
+entities artifact, without inventing per-attribute source periods.
+
+Raw, interpreted value, and presentation columns have explicit typed lanes.
+Integers fitting Int64 remain native integers; wider integers use a separately
+tagged canonical decimal lane, never a float. Raw dict/list JSON preserves
+insertion order and nested types. Signed floating zero and integer versus float
+disclosure bounds survive transport. `raw_present` means actual source-key
+membership for field rows and is null for metric rows, whose absent-key
+attribute fallback is evaluated by the canonical scalar API. Private-school
+not-applicable results can retain the actual source raw cell while their sparse
+Measurement keeps its canonical null raw value. `measurement_from_row()`
+materializes that scalar object only when requested; it does not reclassify.
+
+Source-boundary values must be normalized JSON types accepted by EntityStore.
+Arbitrary Python objects remain supported only through the scalar APIs. There
+is no object-dtype column or request-time scalar fallback for a missing read
+model. Older four-artifact schema-1 releases remain readable through source
+APIs; explicit analytical requests require a rebuilt release.
+
+Each Parquet footer binds schema version, role, build ID, catalog checksum,
+entities checksum and actual producer code/lock/runtime inputs, separately from
+the source catalog's processor ancestry. Catalog, enumeration and hydration use
+one store-owned immutable SQLite connection with percent-safe file URIs. Before
+publication the producer refuses WAL/journal sidecars or changed main-file
+signatures/checksums. EntityStore uses one strict JSON decoder everywhere:
+nullable SQL/JSON null becomes empty metadata, while malformed/nonobject JSON,
+nonfinite numbers and unsupported integer conversion limits raise ContractError
+rather than silently dropping source keys. The final manifest owns child checksums;
+children do not contain their final manifest checksum, avoiding a hash cycle.
+Verification rejects mixed sources, schemas, roles and row counts before
+returning a standard Arrow Dataset. Release-local ordinals are optimization
+columns; named public columns suffice for ordinary research queries.
 
 The TAPR profile policy distinguishes primary suppression (`-1`), complementary suppression (`-3`), and invalid or unreasonable reported results (`-2`). There are no universal numeric bounds for those tokens. Year-specific masking references are retained with the contract. Unreviewed masking methodology blocks a build using that policy. Generic dataset reference periods describe the report; complete field-level dictionary review remains part of each dataset intake.
 

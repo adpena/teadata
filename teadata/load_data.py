@@ -19,7 +19,7 @@ from teadata.release import publish_release, SNAPSHOT_MAGIC
 from teadata.transfer_summary import transfer_measurement, normalized_transfer_measurement
 
 from datetime import datetime, date
-from typing import Any, Iterable, Mapping, Optional, List
+from typing import Any, Iterable, Mapping, MutableMapping, Optional, List
 
 from teadata import teadata_config as _cfg_mod
 from teadata.classes import (
@@ -538,11 +538,8 @@ def _materialize_percent_enrollment_change(repo: DataEngine) -> int:
         if campus is None:
             continue
         meta = getattr(campus, "meta", None)
-        if not isinstance(meta, dict):
-            try:
-                meta = dict(meta or {})
-            except Exception:
-                meta = {}
+        if not isinstance(meta, MutableMapping):
+            meta = dict(meta) if meta is not None else {}
             campus.meta = meta
 
         percent_change = _compute_percent_enrollment_change(campus)
@@ -2461,8 +2458,6 @@ def _save_entity_store(
                 include_geometry=False,
             )
         engine.dispose()
-        with sqlite3.connect(tmp_path) as conn:
-            write_sqlite_catalog(conn, repo.catalog)
         tmp_path.replace(path)
         return path
     except Exception:
@@ -3086,9 +3081,9 @@ def _build_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
 
 
 def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
-    if os.environ.get("PYTHONHASHSEED") != "0":
+    if os.environ.get("PYTHONHASHSEED") != "0" or sys.flags.hash_randomization != 0:
         raise ContractError(
-            "Reproducible builds require PYTHONHASHSEED=0; the module CLI sets it automatically"
+            "Reproducible builds require PYTHONHASHSEED=0 and actual hash_randomization=0; the module CLI sets both automatically"
         )
     cfg = load_config(CFG)
     for dataset, path in (("districts", districts_fp), ("campuses", campuses_fp)):
@@ -3151,6 +3146,15 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                 "maps": maps,
                 "entities": entities,
             }
+            # Derive from the exact normalized entities bytes that serve source
+            # reads, rather than the engine's richer in-memory Python metadata.
+            from teadata.analytical_build import build_analytical_artifacts
+
+            analytical, analytical_report = build_analytical_artifacts(
+                entities, repo.catalog, Path(temporary)
+            )
+            artifacts.update(analytical)
+            validation["analytical"] = {key: analytical_report[key] for key in ("source", "scopes")}
             inputs = [
                 receipt
                 for value in build.datasets.values()
@@ -3164,6 +3168,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                 parameters={"build_id": repo.catalog.build_id},
                 code_version=repo.catalog.to_dict()["processor_sha256"],
                 validation=validation,
+                diagnostics={"analytical": analytical_report["runtime"]},
             )
             publish_release(
                 output,
@@ -3183,11 +3188,12 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
 
 
 if __name__ == "__main__":
-    if os.environ.get("PYTHONHASHSEED") != "0":
+    if os.environ.get("PYTHONHASHSEED") != "0" or sys.flags.hash_randomization != 0:
+        environment = {key: value for key, value in os.environ.items() if not key.startswith("PYTHON")}
         os.execve(
             sys.executable,
-            [sys.executable, "-m", "teadata.load_data"],
-            {**os.environ, "PYTHONHASHSEED": "0"},
+            [sys.executable, "-s", "-P", "-m", "teadata.load_data"],
+            {**environment, "PYTHONHASHSEED": "0"},
         )
     cfg = load_config(CFG)
     repo = load_repo(

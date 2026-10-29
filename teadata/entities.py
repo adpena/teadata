@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
 from datetime import date
 from functools import cached_property, singledispatchmethod
@@ -103,7 +104,7 @@ class District:
 
     polygon = GeoField("polygon")
 
-    meta: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
+    meta: MutableMapping[str, Any] = field(default_factory=dict, repr=False, compare=False)
     _repo: Any = field(default=None, repr=False, compare=False)
 
     def __post_init__(self):
@@ -204,14 +205,14 @@ class District:
 
     def __getattr__(self, name: str):
         meta = object.__getattribute__(self, "meta")
-        if isinstance(meta, dict) and name in meta:
+        if isinstance(meta, Mapping) and name in meta:
             return meta[name]
         raise AttributeError(f"{self.__class__.__name__} has no attribute {name!r}")
 
     def __dir__(self):
-        base = list(super().__dir__())
+        base = list(object.__dir__(self))
         m = object.__getattribute__(self, "meta")
-        if isinstance(m, dict):
+        if isinstance(m, Mapping):
             base.extend(k for k in m.keys() if isinstance(k, str))
         return sorted(set(base))
 
@@ -227,7 +228,7 @@ class District:
             sys.intern("aea_raw"): self.aea_raw,
             sys.intern("rating"): self.rating,
         }
-        if include_meta and isinstance(self.meta, dict):
+        if include_meta and isinstance(self.meta, Mapping):
             for k, v in self.meta.items():
                 ik = _intern_key(k)
                 if ik not in out:
@@ -289,7 +290,7 @@ class Campus:
 
     point = GeoField("point")
 
-    meta: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
+    meta: MutableMapping[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
     def __setattr__(self, name: str, value: Any) -> None:
         if name == "grade_range":
@@ -335,14 +336,14 @@ class Campus:
 
     def __getattr__(self, name: str):
         meta = object.__getattribute__(self, "meta")
-        if isinstance(meta, dict) and name in meta:
+        if isinstance(meta, Mapping) and name in meta:
             return meta[name]
         raise AttributeError(f"{self.__class__.__name__} has no attribute {name!r}")
 
     def __dir__(self):
-        base = list(super().__dir__())
+        base = list(object.__dir__(self))
         m = object.__getattribute__(self, "meta")
-        if isinstance(m, dict):
+        if isinstance(m, Mapping):
             base.extend(k for k in m.keys() if isinstance(k, str))
         return sorted(set(base))
 
@@ -368,7 +369,7 @@ class Campus:
             sys.intern("district_number"): self.district_number,
             sys.intern("campus_number"): self.campus_number,
         }
-        if include_meta and isinstance(self.meta, dict):
+        if include_meta and isinstance(self.meta, Mapping):
             for k, v in self.meta.items():
                 ik = _intern_key(k)
                 if ik not in out:

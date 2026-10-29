@@ -23,6 +23,26 @@ def source_definition(path: Path) -> ResolvedDataset:
     )
 
 
+def test_processing_diagnostics_are_explicit_per_run_receipt_evidence(tmp_path):
+    source = tmp_path / "source.csv"
+    source.write_text("value\n42\n")
+    output = tmp_path / "model.parquet"
+    output.write_bytes(b"owned synthetic output")
+    store = ProvenanceStore(tmp_path / "provenance")
+    acquired = store.record_acquisition(source, source_definition(source), recorded_at=NOW)
+    common = dict(dataset="derived", inputs=[acquired], outputs={"model": output},
+                  processor="canonical", code_version="reviewed", recorded_at=NOW,
+                  validation={"cells": 1})
+    without = store.record_processing(**common)
+    first = store.record_processing(**common, diagnostics={"analytical": {"seconds": 1.0}})
+    second = store.record_processing(**common, diagnostics={"analytical": {"seconds": 2.0}})
+    a, b, c = [store.read_record(identifier) for identifier in (without, first, second)]
+    assert "diagnostics" not in a
+    assert b["validation"] == c["validation"] == {"cells": 1}
+    assert b["outputs"] == c["outputs"]
+    assert b["diagnostics"] != c["diagnostics"] and first != second
+
+
 def test_local_observation_preserves_bytes_without_inventing_download_history(tmp_path):
     source = tmp_path / "raw.csv"
     source.write_bytes(b"value\n42\n")

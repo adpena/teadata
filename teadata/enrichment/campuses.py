@@ -1,3 +1,4 @@
+from collections.abc import MutableMapping
 from typing import Dict, Any, Callable
 
 import teadata.classes as classes_mod
@@ -270,8 +271,8 @@ def _apply_campus_enrichment_table(
             if _profile_enabled() and len(sample_missing) < 10:
                 sample_missing.append(str(cn))
             continue
-        if getattr(cobj, "meta", None) is None or not isinstance(cobj.meta, dict):
-            cobj.meta = {}
+        if not isinstance(cobj.meta, MutableMapping):
+            cobj.meta = dict(cobj.meta) if cobj.meta is not None else {}
 
         attrs_for_meta = attrs
         if record_hook:
@@ -441,8 +442,8 @@ def _apply_campus_planned_closures(
     # shared helper overwrite matches with real values.
     default_columns = ("facing_closure", "closure_date")
     for campus in repo._campuses.values():
-        if getattr(campus, "meta", None) is None or not isinstance(campus.meta, dict):
-            campus.meta = {}
+        if not isinstance(campus.meta, MutableMapping):
+            campus.meta = dict(campus.meta) if campus.meta is not None else {}
         for col in default_columns:
             campus.meta.setdefault(col, None)
 

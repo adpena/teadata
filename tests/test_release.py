@@ -92,6 +92,8 @@ def test_release_binds_all_artifacts(release, catalog):
     assert set(selected.verify()) == {"entities", "maps", "boundaries", "snapshot"}
     engine = DataEngine.from_snapshot(selected.artifact("snapshot"))
     assert engine.catalog.build_id == selected.build_id
+    with pytest.raises(ContractError, match="no analytical read model"):
+        selected.analytical_dataset("campus")
 
 
 def test_tampered_artifact_is_rejected_even_after_a_successful_read(release):

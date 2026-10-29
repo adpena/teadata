@@ -191,6 +191,17 @@ class Measurement:
         }
 
 
+def presentation_value(value: Any) -> Any:
+    """Return the exact observed value or the canonical status label.
+
+    Raw opaque values pass through unchanged. Formatting and spreadsheet text
+    escaping belong to the consumer, separate from source interpretation.
+    """
+    if not isinstance(value, Measurement):
+        return value
+    return value.value if value.status == ValueStatus.OBSERVED else value.display()
+
+
 PLAIN_NUMERIC = ValuePolicy("numeric")
 
 

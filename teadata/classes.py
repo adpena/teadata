@@ -9,6 +9,7 @@ from .engine import (
     timeit,
 )
 from collections import OrderedDict
+from collections.abc import Mapping
 from dataclasses import fields, is_dataclass
 from typing import Any
 
@@ -149,7 +150,7 @@ def inspect_object(obj: Any) -> OrderedDict[str, Any]:
             _maybe_add(name, value)
 
     meta = getattr(obj, "meta", None)
-    if isinstance(meta, dict):
+    if isinstance(meta, Mapping):
         for key, value in meta.items():
             _maybe_add(f"meta.{key}", value)
 

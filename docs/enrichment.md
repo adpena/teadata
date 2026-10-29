@@ -49,7 +49,7 @@ Snapshots are versioned with a content signature. The loader can discover and pi
 Prefer a shared database over large pickle blobs? Install the optional extra and use the SQLAlchemy bridge:
 
 ```bash
-pip install "teadata[database]"
+uv add "teadata[database]"
 ```
 
 ### Export to SQL
@@ -66,16 +66,28 @@ from teadata.persistence import (
 # 1. Build or load an in-memory repo as usual
 repo = DataEngine.from_snapshot(search=True)
 
-# 2. Connect to PostgreSQL (any SQLAlchemy URL works)
-engine = create_engine("postgresql+psycopg://user:pass@host:5432/teadata")
+# 2. Connect to PostgreSQL or SQLite using your configured connection URL.
+import os
+engine = create_engine(os.environ["TEADATA_DATABASE_URL"])
 ensure_schema(engine)  # creates tables on first run
 Session = create_sessionmaker(engine)
 
 # 3. Persist everything: districts, campuses, enrichment meta, transfers, geometry
-with Session() as session:
-    export_dataengine(repo, session)
-    session.commit()
+with Session.begin() as session:
+    export_dataengine(repo, session, batch_size=256)
 ```
+
+The default upserts the supplied entities and transfer edges and preserves
+unrelated rows. Use `replace=True` explicitly to replace the entire destination,
+including its metadata index rows. A destination is bound to one validated
+dataset catalog. Partial exports from another release are refused; the catalog,
+entity rows, metadata, and transfers commit or roll back together. Exports require
+a catalog-bound `DataEngine`; loading a retained snapshot provides one.
+
+Writes use bounded SQLAlchemy Core batches and native SQLite/PostgreSQL upserts.
+They do not hydrate ORM records, query every entity, or read the destination's
+entire transfer history. `batch_size` controls additional row buffers; the input
+`DataEngine` itself still contains its object graph.
 
 ### Import from SQL
 
@@ -87,11 +99,40 @@ with Session() as session:
     repo_from_db = import_dataengine(
         session,
         lazy_meta=True,  # defer meta JSON until accessed (saves RAM per request)
-        prefetch_campus_meta_keys=["accountability.rating"],  # optional targeted warm-up
+        prefetch_campus_meta_keys=["source_field_name"],  # optional exact raw key
+        batch_size=256,
     )
 ```
 
-`import_dataengine` now keeps enrichment payloads lazy by default: districts and campuses hydrate with lightweight `meta` dictionaries that fetch their JSON only when a request accesses an enrichment key.
+`import_dataengine` streams database mappings directly into the returned graph
+without building a second full ORM graph. Eager metadata is read with each entity;
+lazy metadata loads when needed and refuses a changed source release or deleted
+entity. Prefetch preserves complete nested raw values; flattened metadata index
+keys are a separate query API. The caller controls transaction isolation for a
+consistent import while other clients write. Lazy reads observe the current rows
+of the bound release and do not retain a database snapshot indefinitely.
+Lazy metadata is a standard mutable mapping. Use `dict(entity.meta)` or
+`entity.to_dict()` at a JSON boundary; a custom JSON encoder is unnecessary.
+An active caller Session is reused for lazy reads, including uncommitted writes.
+After that transaction ends, each deferred read owns and closes its new Session.
+The catalog document remains authoritative; a validated 64-byte build ID column
+fences lazy reads without retransmitting the full provenance catalog each time.
+Older two-column database catalog layouts must be recreated and refilled. Reading
+historical immutable release artifacts remains supported.
+
+Raw metadata uses JSON rather than PostgreSQL JSONB so signed zero and integer
+values survive round trips. Approximate numeric lookup columns are populated only
+when a value can be represented exactly; raw JSON remains authoritative. Strings
+containing NUL retain their exact JSON value and have no PostgreSQL TEXT lookup
+projection. Optional flattened metadata index keys must be valid UTF-8, have at
+most 255 characters, and contain no NUL. An unsupported key raises an actionable
+error; roll back the export and use `include_meta_entries=False` to preserve
+arbitrary raw JSON without that optional index. Keys are never silently dropped
+or encoded into a different name. SQLite UUID columns use SQLAlchemy's
+portable `Uuid` type with text affinity. Older databases with NUMERIC-affinity
+UUIDs or JSONB columns must be recreated and refilled from the catalog-bound
+source: those representations may already have lost information. `ensure_schema`
+refuses those layouts and does not silently alter or repair existing databases.
 
 ### Querying Metadata in SQL
 

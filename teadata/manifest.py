@@ -24,6 +24,11 @@ from .transfer_summary import charter_transfer_observations
 
 CATALOG_SCHEMA = 2
 CATALOG_TABLE = "teadata_catalog"
+CATALOG_TABLE_DDL = (
+    f"CREATE TABLE IF NOT EXISTS {CATALOG_TABLE} "
+    "(singleton INTEGER PRIMARY KEY CHECK(singleton=1), "
+    "build_id TEXT NOT NULL CHECK(length(build_id)=64), document TEXT NOT NULL)"
+)
 
 
 class ContractError(RuntimeError):
@@ -101,7 +106,7 @@ def _verify_input_receipt(record: Mapping[str, Any], *, dataset: str,
 class DatasetCatalog:
     """Validated, read-only metadata describing sources actually used in a build."""
 
-    def __init__(self, document: Mapping[str, Any]):
+    def __init__(self, document: Mapping[str, Any], *, expected_build_id: str | None = None):
         document = json.loads(canonical_json(document))
         if document.get("schema_version") != CATALOG_SCHEMA:
             raise ContractError(
@@ -111,6 +116,8 @@ class DatasetCatalog:
         content = {k: v for k, v in document.items() if k != "build_id"}
         if identity != sha256(canonical_json(content).encode()).hexdigest():
             raise ContractError("Dataset catalog identity mismatch")
+        if expected_build_id is not None and identity != expected_build_id:
+            raise ContractError("Dataset catalog build ID projection mismatch")
         sources = document.get("datasets")
         if not isinstance(sources, dict) or not sources:
             raise ContractError("A data release requires loaded dataset metadata")
@@ -317,6 +324,32 @@ class DatasetCatalog:
         _, dataset, key, _ = self._resolve_metric(metric, scope)
         return dataset, key
 
+    def _field_metadata(self, binding: MetricBinding, dataset: str, key: str,
+                        definition: MetricDefinition | None) -> dict[str, Any]:
+        metadata = self._metadata[dataset]
+        period = definition.period if definition and definition.period is not None else metadata.period
+        return {
+            "dataset": dataset, "field": key, "period": period.to_dict(),
+            "field_year": metadata.field_year, "version": metadata.version,
+            "unit": self._metric_unit(binding, key, definition),
+            "population": binding.population, "policy_id": metadata.value_policy,
+            "metadata": metadata.to_dict(), "acquisitions": self.acquisitions(dataset),
+        }
+
+    def field_metadata(self, field: str, *, scope: str = "campus") -> dict[str, Any] | None:
+        """Describe a known source field without interpreting its values.
+
+        Opaque text can still have known provenance. A null result means this
+        catalog cannot establish the field's source; names are never guessed.
+        Returned metadata is detached from the catalog's immutable authority.
+        """
+        resolved = self._resolve_field(field, scope)
+        return self._field_metadata(*resolved) if resolved is not None else None
+
+    def metric_metadata(self, metric: str, *, scope: str = "campus") -> dict[str, Any]:
+        """Describe the exact canonical binding, including metric period overrides."""
+        return self._field_metadata(*self._resolve_metric(metric, scope))
+
     def field(self, dataset: str, metric: str, *, scope: str = "campus") -> str:
         metadata = self._metadata[dataset]
         definition = metadata.metrics.get(metric)
@@ -512,12 +545,10 @@ class DatasetCatalog:
 def write_sqlite_catalog(
     connection: sqlite3.Connection, catalog: DatasetCatalog
 ) -> None:
+    connection.execute(CATALOG_TABLE_DDL)
     connection.execute(
-        f"CREATE TABLE {CATALOG_TABLE} (singleton INTEGER PRIMARY KEY CHECK(singleton=1), document TEXT NOT NULL)"
-    )
-    connection.execute(
-        f"INSERT INTO {CATALOG_TABLE} VALUES (1, ?)",
-        (canonical_json(catalog.to_dict()),),
+        f"INSERT INTO {CATALOG_TABLE} (singleton,build_id,document) VALUES (1, ?, ?)",
+        (catalog.build_id, canonical_json(catalog.to_dict())),
     )
 
 
@@ -525,16 +556,28 @@ def read_sqlite_catalog(path: str | Path) -> DatasetCatalog:
     path = Path(path).resolve()
     try:
         with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as connection:
-            rows = connection.execute(
-                f"SELECT document FROM {CATALOG_TABLE} WHERE singleton=1"
-            ).fetchall()
+            return read_sqlite_catalog_connection(connection)
     except sqlite3.Error as exc:
         raise ContractError(
             f"Artifact lacks the required dataset catalog: {path.name}"
         ) from exc
-    if len(rows) != 1:
+
+
+def read_sqlite_catalog_connection(connection: sqlite3.Connection) -> DatasetCatalog:
+    """Read the canonical catalog using an existing caller-owned SQLite reader."""
+    try:
+        columns = {row[1] for row in connection.execute(f"PRAGMA table_info({CATALOG_TABLE})")}
+        projection = ",build_id" if "build_id" in columns else ""
+        rows = connection.execute(
+            f"SELECT singleton,document{projection} FROM {CATALOG_TABLE} LIMIT 2"
+        ).fetchall()
+    except sqlite3.Error as error:
+        raise ContractError("Artifact lacks the required dataset catalog") from error
+    if len(rows) != 1 or rows[0][0] != 1:
         raise ContractError("Artifact must contain exactly one dataset catalog")
-    return DatasetCatalog(json.loads(rows[0][0]))
+    if projection and rows[0][2] is None:
+        raise ContractError("Dataset catalog build ID projection is missing")
+    return DatasetCatalog(json.loads(rows[0][1]), expected_build_id=rows[0][2] if projection else None)
 
 
 ACTIVE_BUILD: ContextVar[BuildRecorder | None] = ContextVar(

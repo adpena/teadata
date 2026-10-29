@@ -16,6 +16,6 @@ prune .local
 prune .venv
 prune build
 prune dist
-global-exclude __pycache__ *.py[cod] *.pkl *.pkl.gz *.pickle *.sqlite* *.db
+global-exclude __pycache__ *.py[cod] *.pkl *.pkl.gz *.pickle *.sqlite* *.db *.parquet
 global-exclude *.so *.pyd *.dll *.dylib *.exe .DS_Store
 global-exclude .env .env.* *.key *.pem *.pfx *.p12 *.secrets*
