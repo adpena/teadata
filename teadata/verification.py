@@ -27,7 +27,7 @@ IGNORED_SOURCE_PARTS = frozenset({
     ".git", ".local", ".venv", ".cache", "__pycache__", ".pytest_cache", ".ruff_cache",
 })
 TEST_ENVIRONMENT = {
-    "DATABASE_URL": "", "DEBUG": "1", "SECRET_KEY": "local-verification-only",
+    "DATABASE_URL": "", "DEBUG": "0", "SECRET_KEY": "local-verification-only",
     "PYTHON_DOTENV_DISABLED": "1", "PYTHONDONTWRITEBYTECODE": "1", "PYTHONHASHSEED": "0", "TZ": "UTC",
     "PYTHONOPTIMIZE": "0", "PYTHONNOUSERSITE": "1",
 }

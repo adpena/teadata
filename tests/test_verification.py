@@ -332,11 +332,13 @@ def test_inherited_python_optimization_cannot_disable_required_helper_assertions
 
 
 def test_runtime_startup_injection_is_removed_and_assertions_enabled(monkeypatch):
+    monkeypatch.setenv("DEBUG", "1")
     for name in ("PYTHONPATH", "PYTHONHOME", "PYTHONOPTIMIZE", "PYTHONWARNINGS", "NODE_OPTIONS", "NODE_PATH"):
         monkeypatch.setenv(name, "caller startup control")
     environment = _test_environment()
     assert environment["PYTHONOPTIMIZE"] == "0"
     assert environment["PYTHONNOUSERSITE"] == "1"
+    assert environment["DEBUG"] == "0"
     assert not {"PYTHONPATH", "PYTHONHOME", "PYTHONWARNINGS", "NODE_OPTIONS", "NODE_PATH"} & environment.keys()
 
 
