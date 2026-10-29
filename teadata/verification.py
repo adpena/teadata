@@ -289,6 +289,7 @@ def _check_runtime(root: Path, *, paired: bool) -> tuple[str, str, Path | None, 
     setup = [
         Check("setup-locked", ("uv", "sync", "--locked", "--python", version)),
         Check("setup-paired", ("uv", "pip", "install", "--python", "@python", "--no-deps", "--editable", "@library")),
+        Check("setup-dependencies", ("uv", "pip", "check", "--python", "@python")),
     ]
     return version, str(python), environment, setup
 
@@ -327,6 +328,8 @@ def run_checks(
         results.append(result)
         print(f"[{check.name}] {'passed' if result['returncode'] == 0 else 'FAILED'} ({result['duration_seconds']}s)", flush=True)
         if result["returncode"] != 0:
+            if check.name == "setup-dependencies":
+                print("Paired dependency check failed. Coordinate the app lockfile and sibling library metadata before running checks again; inspect the setup-dependencies log.", file=sys.stderr)
             break
     try:
         after = _input_identity(root, kind=kind, paired_library=paired_library, release=release)

@@ -78,6 +78,29 @@ def test_paired_setup_cannot_pass_when_uv_uses_the_wrong_runtime(project, monkey
         verify_receipt(receipt, project, kind="app", paired_library=project, checks=passing())
 
 
+def test_incompatible_paired_dependencies_stop_before_application_checks(project, monkeypatch, capsys):
+    from teadata import verification
+
+    calls, _ = paired_routing(monkeypatch, "3.15.1")
+    original = verification._run_check
+
+    def incompatible(check, *args, **kwargs):
+        result = original(check, *args, **kwargs)
+        if check.name == "setup-dependencies":
+            result["returncode"] = 1
+        return result
+
+    monkeypatch.setattr(verification, "_run_check", incompatible)
+    receipt = run_checks(project, kind="app", paired_library=project, checks=passing())
+    result = json.loads(receipt.read_text())
+    assert result["status"] == "failed"
+    assert result["checks"][-1]["name"] == "setup-dependencies"
+    assert all(check.name != "example" for check, *_ in calls)
+    assert "Coordinate the app lockfile and sibling library metadata" in capsys.readouterr().err
+    with pytest.raises(ReceiptError, match="passing"):
+        verify_receipt(receipt, project, kind="app", paired_library=project, checks=passing())
+
+
 def test_a_different_controller_runtime_cannot_reuse_a_paired_receipt(project, monkeypatch):
     paired_routing(monkeypatch, "3.14.9")
     receipt = run_checks(project, kind="app", paired_library=project, checks=passing())
