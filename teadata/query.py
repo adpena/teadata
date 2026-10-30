@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, TYPE_CHECKING
-import uuid
 
 if TYPE_CHECKING:
     from .engine import DataEngine
@@ -15,7 +14,6 @@ from .entities import (
     EntityMap,
     ReadOnlyEntityView,
     is_charter,
-    is_private,
 )
 from .geometry import point_xy
 from .grades import coerce_grade_bounds, coerce_grade_spans
@@ -470,37 +468,12 @@ class Query:
         self._items = campuses
         return self
 
-    def _op_private_campuses_in(self, op: tuple):
-        max_m = float(op[1]) if len(op) >= 2 and op[1] is not None else None
-
-        allowed_cache: Dict[uuid.UUID, set[uuid.UUID]] = {}
-
-        def _allowed_ids_for_district(district: District) -> set[uuid.UUID]:
-            did = district.id
-            allowed = allowed_cache.get(did)
-            if allowed is None:
-                allowed = {
-                    c.id for c in self._repo.private_campuses_in(district, max_miles=max_m)
-                }
-                allowed_cache[did] = allowed
-            return allowed
-
-        campuses: List[Any] = []
-        for item in self._items:
-            if isinstance(item, District):
-                districts_private = self._repo.private_campuses_in(item, max_miles=max_m)
-                campuses.extend(districts_private)
-            elif isinstance(item, Campus) and is_private(item):
-                if max_m is None:
-                    campuses.append(item)
-                else:
-                    district = item.district
-                    if district is None:
-                        continue
-                    if item.id in _allowed_ids_for_district(district):
-                        campuses.append(item)
-
-        self._items = campuses
+    def _op_privates_within(self, op: tuple):
+        if len(op) != 1 or any(not isinstance(item, District) for item in self._items):
+            raise ValueError("privates_within requires a district query")
+        campuses = {campus.id: campus for district in self._items
+                    for campus in self._repo.private_campuses_within(district)}
+        self._items = list(campuses.values())
         return self
 
     def _resolve_seed_coords(
@@ -714,7 +687,7 @@ _register("map", Query._op_map)
 _register("distinct", Query._op_distinct)
 _register("grade_overlap", Query._op_grade_overlap)
 _register("campuses_in", Query._op_campuses_in)
-_register("private_campuses_in", Query._op_private_campuses_in)
+_register("privates_within", Query._op_privates_within)
 _register("nearest", Query._op_nearest)
 _register("nearest_charter", Query._op_nearest)
 _register("radius", Query._op_radius)

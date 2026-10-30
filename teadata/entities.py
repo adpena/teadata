@@ -26,6 +26,7 @@ from .geometry import (
     polygon_area,
 )
 from .grades import coerce_grade_spans, spans_to_bounds
+from .identifiers import campus_lookup_key
 
 __all__ = [
     "District",
@@ -251,7 +252,7 @@ class District:
 @dataclass(slots=True)
 class Campus:
     id: uuid.UUID
-    district_id: uuid.UUID
+    district_id: uuid.UUID | None
     name: str
     charter_type: str
     is_charter: bool
@@ -279,6 +280,8 @@ class Campus:
 
     district_number: Optional[str] = None
     campus_number: Optional[str] = None
+    source_namespace: str | None = None
+    source_id: str | None = None
 
     _district_number_canon: Optional[str] = field(init=False, repr=False, compare=False)
     _campus_number_canon: Optional[str] = field(init=False, repr=False, compare=False)
@@ -307,6 +310,7 @@ class Campus:
         self.name = self.name.upper()
         self.is_charter = bool(self.is_charter)
         self.is_private = bool(self.is_private)
+        self.lookup_key  # Validate explicit identity fields before normalization.
         if self.location is not None:
             self.point = self.location
 
@@ -333,8 +337,11 @@ class Campus:
                 self.campus_number = canonical_campus_number(raw_cn) or raw_cn
         else:
             self._campus_number_canon = None
+            self.campus_number = None
 
     def __getattr__(self, name: str):
+        if name in {"lookup_key", "source_namespace", "source_id", "campus_number", "district_id", "district_number", "district_name"}:
+            raise AttributeError(f"Missing explicit campus identity field: {name}")
         meta = object.__getattribute__(self, "meta")
         if isinstance(meta, Mapping) and name in meta:
             return meta[name]
@@ -350,9 +357,14 @@ class Campus:
     def to_dict(
         self, *, include_meta: bool = True, include_geometry: bool = False
     ) -> dict:
+        lookup_key = self.lookup_key
         out = {
             sys.intern("id"): str(self.id),
-            sys.intern("district_id"): str(self.district_id),
+            sys.intern("district_id"): str(self.district_id) if self.district_id is not None else None,
+            sys.intern("district_name"): self.district_name,
+            sys.intern("lookup_key"): lookup_key,
+            sys.intern("source_namespace"): object.__getattribute__(self, "source_namespace"),
+            sys.intern("source_id"): object.__getattribute__(self, "source_id"),
             sys.intern("name"): self.name,
             sys.intern("charter_type"): self.charter_type,
             sys.intern("is_charter"): bool(self.is_charter),
@@ -432,10 +444,31 @@ class Campus:
             return None
 
     @property
+    def district_name(self) -> str | None:
+        from .attributes import campus_district_name
+
+        return campus_district_name(self)
+
+    @property
     def district(self) -> Optional[District]:
+        if self.is_private:
+            self.lookup_key  # Refuse a mutated invalid governing relation.
+            return None
         if self._repo is None:
             return None
         return self._repo._districts.get(self.district_id)
+
+    @property
+    def lookup_key(self) -> str | None:
+        if self.is_private and (self.district_id is not None or self.district_number is not None):
+            raise ValueError("Private schools have no governing public district; preserve directory claims separately")
+        try:
+            namespace = object.__getattribute__(self, "source_namespace")
+            identifier = object.__getattribute__(self, "source_id")
+        except AttributeError as error:
+            raise ValueError("Legacy campus identity requires a source-bound rebuild") from error
+        return campus_lookup_key(campus_number=self.campus_number,
+            source_namespace=namespace, source_id=identifier, is_private=self.is_private)
 
     def distance_to(self, other: Any) -> float:
         return self._distance_to(other)
@@ -449,6 +482,7 @@ class Campus:
             return float("inf")
         if (
             SHAPELY
+            and ShapelyPoint is not None
             and isinstance(self.point, ShapelyPoint)
             and isinstance(other.point, ShapelyPoint)
         ):
@@ -459,7 +493,7 @@ class Campus:
     def _(self, other: tuple) -> float:
         if self.point is None:
             return float("inf")
-        if SHAPELY and isinstance(self.point, ShapelyPoint):
+        if SHAPELY and ShapelyPoint is not None and isinstance(self.point, ShapelyPoint):
             return self.point.distance(ShapelyPoint(*other))
         return euclidean((self.point.x, self.point.y), other)
 
@@ -545,7 +579,7 @@ class EntityMap(dict):
             def getter(obj, name=attr):
                 return getattr(obj, name, None)
 
-        vals = set()
+        vals: set[Any] = set()
         for obj in self.values():
             try:
                 v = getter(obj)
@@ -719,4 +753,4 @@ class ReadOnlyEntityView:
 
 
 # Register the Campus-specific overload after class creation to avoid forward references
-Campus._distance_to.register(Campus)(Campus._distance_to_campus)  # type: ignore[attr-defined]
+Campus.__dict__["_distance_to"].register(Campus)(Campus._distance_to_campus)

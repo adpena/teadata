@@ -21,8 +21,8 @@ from .manifest import ContractError, DatasetCatalog, read_sqlite_catalog
 from .identifiers import canonical_source_identifier
 from .release import current_release, snapshot_build_id
 from .boundary_store import BoundaryStore
+from teadata.identifiers import normalize_campus_lookup_key
 from teadata.teadata_config import (
-    canonical_campus_number,
     normalize_district_number_value,
 )
 
@@ -40,7 +40,6 @@ from .geometry import (
     MultiPolygon,
     ShapelyPoint,
     ShapelyPolygon,
-    district_centroid_xy,
     euclidean,
     haversine_miles,
     point_in_polygon,
@@ -306,6 +305,12 @@ class DataEngine:
             )
         # Revalidate serialized catalogs; pickle construction bypasses __init__.
         obj.catalog = DatasetCatalog(obj.catalog.to_dict())
+        try:
+            for campus in obj._campuses.values():
+                if not campus.lookup_key:
+                    raise ValueError("Missing campus identity")
+        except (ValueError, TypeError, AttributeError) as error:
+            raise ContractError("Snapshot uses a legacy or invalid campus identity; rebuild it from source") from error
         if release and obj.catalog.build_id != release.build_id:
             raise ContractError("Snapshot belongs to a different data build")
         obj._set_indexes_enabled(
@@ -454,6 +459,7 @@ class DataEngine:
         Force-clear all spatial, vectorized, and name-lookup caches to free up memory.
         The engine remains fully functional; caches will be rebuilt lazily on demand.
         """
+        self._district_cover_index = None
         self._kdtree = None
         self._kdtree_charter = None
         self._xy_deg = None
@@ -476,7 +482,7 @@ class DataEngine:
         self._charter_cache = None
 
         # Name lookups are small but we clear them for completeness; they rebuild via _rebuild_indexes()
-        self._campus_by_number = {}
+        self._campus_by_key = {}
         self._campus_by_name_lower = {}
         self._district_by_name_lower = {}
         self._districts_by_number_norm = {}
@@ -553,58 +559,20 @@ class DataEngine:
                 return c
         return None
 
-    def campus_by_number(self, campus_number: Any) -> Optional["Campus"]:
-        """Return a campus by its TEA campus number in any common format."""
-
-        if campus_number is None:
+    def campus_by_key(self, lookup_key: str | None) -> Optional["Campus"]:
+        """Find a public TEA campus or a source-qualified private school."""
+        key = normalize_campus_lookup_key(lookup_key)
+        if key is None:
             return None
+        if not getattr(self, "_campus_by_key", None):
+            self._rebuild_indexes()
+        return self._campuses.get(self._campus_by_key.get(key))
 
-        index = getattr(self, "_campus_by_number", None)
-        if not index:
-            # Ensure the lookup table is populated (e.g., after bulk loads)
-            try:
-                self._rebuild_indexes()
-            except Exception:
-                index = {}
-            else:
-                index = getattr(self, "_campus_by_number", {})
-
-        candidates: list[str] = []
-
-        canonical = canonical_campus_number(campus_number)
-        if canonical:
-            candidates.append(canonical)
-            digits = canonical[1:]
-            if digits:
-                candidates.append(digits)
-                if digits.isdigit():
-                    candidates.append(str(int(digits)))
-
-        raw = str(campus_number).strip()
-        if raw:
-            candidates.append(raw)
-            if raw.startswith(("'", "’", "`")):
-                trimmed = raw[1:].lstrip()
-                if trimmed:
-                    candidates.append(trimmed)
-            try:
-                candidates.append(str(int(raw)))
-            except Exception:
-                pass
-
-        seen: set[str] = set()
-        for key in candidates:
-            if not key or key in seen:
-                continue
-            seen.add(key)
-            cid = index.get(key) if index is not None else None
-            if cid is None:
-                continue
-            campus = self._campuses.get(cid)
-            if campus is not None:
-                return campus
-
-        return None
+    def campus_by_number(self, campus_number: Any) -> Optional["Campus"]:
+        """Find only a real TEA campus number; private keys are separate."""
+        if campus_number is None or ":" in str(campus_number):
+            return None
+        return self.campus_by_key(str(campus_number))
 
     def __len__(self) -> int:
         return len(self._districts) + len(self._campuses)
@@ -681,7 +649,6 @@ class DataEngine:
              repo >> ("privates_within", district)
              -> Query[Campus]
 
-             repo >> ("private_campuses_in", district, max_miles?)
              -> Query[Campus]
         """
         # 1) Existing behavior: predicate filter
@@ -775,6 +742,10 @@ class DataEngine:
             if key == "campus":
                 raw = query[1]
 
+                if isinstance(raw, str) and raw.startswith("tefa:"):
+                    campus = self.campus_by_key(raw)
+                    return Query([campus] if campus is not None else [], self)
+
                 if isinstance(raw, int) or (
                     isinstance(raw, str) and any(ch.isdigit() for ch in raw)
                 ):
@@ -838,17 +809,6 @@ class DataEngine:
                 if district is None:
                     return Query([], self)
                 return Query(self.campuses_in(district), self)
-
-            if key == "private_campuses_in":
-                district = unwrap_query(query[1])
-                if district is None:
-                    return Query([], self)
-                max_m = (
-                    float(query[2])
-                    if len(query) >= 3 and query[2] is not None
-                    else None
-                )
-                return Query(self.private_campuses_in(district, max_miles=max_m), self)
 
             if key == "charters_within":
                 district = unwrap_query(query[1])
@@ -947,6 +907,7 @@ class DataEngine:
         store = BoundaryStore(Path(path), max_cache=max_cache)
         self._boundary_store = store
         self._boundary_store_path = str(path)
+        self._district_cover_index = None
 
     def _missing_boundary_message(
         self,
@@ -1052,6 +1013,7 @@ class DataEngine:
         self._charter_cache = None
 
     def _clear_spatial_indexes(self) -> None:
+        self._district_cover_index = None
         for attr in (
             "_kdtree",
             "_kdtree_charter",
@@ -1156,9 +1118,11 @@ class DataEngine:
         return cache
 
     def _rebuild_indexes(self):
+        self._district_cover_index = None
         self._campuses_by_district.clear()
         for c in self._campuses.values():
-            self._campuses_by_district[c.district_id].append(c.id)
+            if c.district_id in self._districts:
+                self._campuses_by_district[c.district_id].append(c.id)
         # Invalidate spatial index; rebuilt lazily
         self._kdtree = None
         self._kdtree_charter = None
@@ -1183,7 +1147,7 @@ class DataEngine:
 
         # Rebuild campus-number index (supports enrichment joins by campus_number)
         try:
-            self._campus_by_number = {}
+            self._campus_by_key = {}
             self._campus_by_name_lower = {}
             self._district_by_name_lower = {}
             self._districts_by_number_norm = {}
@@ -1221,23 +1185,15 @@ class DataEngine:
                         cid
                     )
                     self._campus_name_upper_index.append((cname.upper(), cid))
-                num = getattr(c, "campus_number", None)
-                if not num:
-                    continue
-
-                key = canonical_campus_number(num)
-                if not key:
-                    continue
-                ikey = sys.intern(key)
-                self._campus_by_number[ikey] = cid
-                digits = ikey[1:]
-                if digits:
-                    idigits = sys.intern(digits)
-                    self._campus_by_number[idigits] = cid
-                    if idigits.isdigit():
-                        self._campus_by_number[sys.intern(str(int(idigits)))] = cid
+                key = c.lookup_key
+                if key is not None:
+                    if key in self._campus_by_key and self._campus_by_key[key] != cid:
+                        raise ValueError("Duplicate canonical campus lookup key")
+                    self._campus_by_key[sys.intern(key)] = cid
+        except (ValueError, TypeError, AttributeError):
+            raise
         except Exception:
-            self._campus_by_number = {}
+            self._campus_by_key = {}
             self._campus_by_name_lower = {}
             self._district_by_name_lower = {}
             self._districts_by_number_norm = {}
@@ -1984,6 +1940,7 @@ class DataEngine:
 
     # --- CRUD ---
     def add_district(self, d: District):
+        self._district_cover_index = None
         d._repo = self
         self._districts[d.id] = d
         if not self._in_bulk:
@@ -2015,6 +1972,10 @@ class DataEngine:
             self._name_lookup_version += 1
 
     def add_campus(self, c: Campus):
+        lookup_key = c.lookup_key
+        existing = getattr(self, "_campus_by_key", {}).get(lookup_key)
+        if lookup_key is not None and existing is not None and existing != c.id:
+            raise ValueError("Duplicate canonical campus lookup key")
         c._repo = self  # attach back-reference
         self._campuses[c.id] = c
         # Only append to _campuses_by_district if the district exists
@@ -2029,8 +1990,8 @@ class DataEngine:
                 self._campus_name_upper_index = []
             if not hasattr(self, "_campus_wildcard_cache"):
                 self._campus_wildcard_cache = {}
-            if not hasattr(self, "_campus_by_number"):
-                self._campus_by_number = {}
+            if not hasattr(self, "_campus_by_key"):
+                self._campus_by_key = {}
             if not hasattr(self, "_name_lookup_version"):
                 self._name_lookup_version = 0
             key = (c.name or "").lower()
@@ -2039,16 +2000,8 @@ class DataEngine:
             if key:
                 self._campuses_by_name_lower_multi.setdefault(key, []).append(c.id)
                 self._campus_name_upper_index.append(((c.name or "").upper(), c.id))
-            num = getattr(c, "campus_number", None)
-            if num:
-                ckey = canonical_campus_number(num)
-                if ckey:
-                    self._campus_by_number[ckey] = c.id
-                    digits = ckey[1:]
-                    if digits:
-                        self._campus_by_number[digits] = c.id
-                        if digits.isdigit():
-                            self._campus_by_number[str(int(digits))] = c.id
+            if lookup_key is not None:
+                self._campus_by_key[lookup_key] = c.id
             self._campus_wildcard_cache = {}
             self._name_lookup_version += 1
             self._clear_charter_cache()
@@ -2070,58 +2023,6 @@ class DataEngine:
 
         return EntityList([c for c in campuses if not is_private(c)])
 
-    def private_campuses_in(
-        self, d: Any, *, max_miles: Optional[float] = None
-    ) -> "EntityList":
-        """Return private-school campuses attached to a district by membership.
-
-        When ``max_miles`` is provided the results are limited to campuses whose
-        coordinates fall within that many miles of the district's centroid. Campuses
-        without point geometry (or districts without usable geometry) are omitted
-        from the radius-filtered result.
-        """
-
-        d = unwrap_query(d)
-        if d is None or not hasattr(d, "id"):
-            raise ValueError(
-                "private_campuses_in expects a District or a Query[District]"
-            )
-
-        campuses = [
-            self._campuses[cid]
-            for cid in self._campuses_by_district.get(d.id, [])
-            if cid in self._campuses and is_private(self._campuses[cid])
-        ]
-
-        if max_miles is None:
-            return EntityList(campuses)
-
-        self.ensure_boundary(d, required=True, context="private_campuses_in")
-        centroid = district_centroid_xy(d)
-        if centroid is None:
-            return EntityList([])
-
-        cx, cy = centroid
-        filtered: List[Campus] = []
-        for campus in campuses:
-            pt = getattr(campus, "point", None) or getattr(campus, "location", None)
-            xy = point_xy(pt)
-            if xy is None:
-                continue
-            if probably_lonlat(cx, cy) and probably_lonlat(*xy):
-                dist = haversine_miles(cx, cy, xy[0], xy[1])
-            elif SHAPELY and pt is not None and hasattr(pt, "distance"):
-                try:
-                    dist = pt.distance(ShapelyPoint(cx, cy))
-                except Exception:
-                    dist = euclidean((cx, cy), xy)
-            else:
-                dist = euclidean((cx, cy), xy)
-
-            if dist <= max_miles:
-                filtered.append(campus)
-
-        return EntityList(filtered)
 
     def _campuses_within_filtered(
         self,
@@ -2262,10 +2163,38 @@ class DataEngine:
             label="charter_campuses_within",
         )
 
+    def _districts_covering(self, campus: "Campus") -> "EntityList":
+        """All reported district geometries covering a point, never governance.
+
+        A cached native polygon index avoids scanning all polygons per school.
+        Boundary points can have multiple results; callers must not choose one.
+        """
+        point = getattr(campus, "point", None)
+        if point is None:
+            return EntityList([])
+        if not SHAPELY or ShapelyPoint is None:
+            raise RuntimeError("Indexed geographic containment requires Shapely")
+        if not isinstance(point, ShapelyPoint):
+            point = ShapelyPoint(*point)
+        cached = getattr(self, "_district_cover_index", None)
+        if cached is None:
+            from shapely.strtree import STRtree
+            districts, geometries = [], []
+            for district in self._districts.values():
+                geometry = self.ensure_boundary(district)
+                if geometry is not None and hasattr(geometry, "is_empty") and not geometry.is_empty:
+                    districts.append(district)
+                    geometries.append(geometry)
+            cached = (STRtree(geometries), districts)
+            self._district_cover_index = cached
+        tree, districts = cached
+        return EntityList(sorted((districts[int(index)] for index in tree.query(point, predicate="covered_by")),
+                                 key=lambda district: district.district_number))
+
     def private_campuses_within(self, district: Any):
         """
-        Return a list of Campus objects that are physically located *within*
-        the given district's boundary and are private schools (Campus.is_private is True).
+        Return private schools inside or on the given district's boundary.
+        The boundary-inclusive predicate is polygon.covers(point).
         Uses pure spatial containment; district_id membership is ignored.
         Accepts a District or a Query[District].
         """
@@ -2299,7 +2228,7 @@ class DataEngine:
           - `type_col`: when provided, only rows with `type_col == want_type` are used.
 
         Campus numbers are normalized to canonical 9-digit apostrophe-prefixed strings
-        and mapped to repo campus UUIDs via `_campus_by_number`.
+        and mapped to repo campus UUIDs via `_campus_by_key`.
         """
         # Filter to the requested report type if present
         if type_col in df.columns:
@@ -2345,9 +2274,7 @@ class DataEngine:
         observed_keys.update(dst_series.dropna())
         for normed in observed_keys:
             digits = normed[1:] if normed.startswith("'") else normed
-            id_cache[normed] = self._campus_by_number.get(
-                normed
-            ) or self._campus_by_number.get(digits)
+            id_cache[normed] = self._campus_by_key.get(digits)
 
         src_ids = src_series.map(id_cache).to_numpy()
         dst_ids = dst_series.map(id_cache).to_numpy()

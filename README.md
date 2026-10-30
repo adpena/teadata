@@ -11,9 +11,11 @@ It provides:
 
 ## Installation
 
-Python 3.11 through 3.15 are supported. Python 3.15 uses conditional minimum
-versions for the scientific stack; unaffected locked versions remain stable
-across dependency security updates. On macOS 3.15, the optional documentation tools build
+Python 3.11 through 3.15 are supported. Development and local checks default to
+the exact Python version in `.python-version` (currently 3.14.10).
+`TEADATA_CHECK_PYTHON` overrides that default for compatibility checks. The lock
+retains interpreter-specific versions where dependency compatibility requires
+them. On macOS 3.15, the optional documentation tools build
 Watchdog's native FSEvents extension and require the
 [documented Xcode tools](https://pypi.org/project/watchdog/#dependencies).
 PyYAML's supported pure Python implementation is tested on 3.15.
@@ -53,6 +55,48 @@ TEA Data does not enable that path, and its nbconvert dependency uses Bleach's
 HTML/CSS sanitization. The upstream limitation remains relevant to notebook
 code that explicitly enables email linkification; upgrading Bleach alone does
 not resolve it.
+
+### Existing relational stores
+
+Publisher rating categories are stored as `TEXT`, including full labels such as
+`Not Rated: Minimum Size rules`. Existing PostgreSQL stores with `VARCHAR(16)`
+rating columns need a caller-owned schema migration widening **both**
+`districts.rating` and `campuses.rating` to `TEXT`, or a fresh destination.
+`ensure_schema()` creates missing tables; it does not alter existing columns.
+TEA Data does not migrate user databases automatically or truncate these labels.
+Exports leave transaction commit and rollback to the caller.
+
+### Campus identity and affiliation
+
+`Campus.lookup_key` and `DataEngine.campus_by_key()` use nine-digit TEA campus
+numbers for public schools and source-qualified keys such as
+`tefa:rec1kXXvIucG7UkoA` for private schools. Private source IDs retain their exact
+case and prefixes; URI-component encoding preserves other characters. The
+shared identifiers helper validates the encoded ASCII key's 1024-byte limit.
+`campus_number` is null for private schools. Their `source_namespace` and
+`source_id` are explicit fields, and their governing `district_id` and
+`district_number` are null. A directory's reported district is retained separately
+as an unverified directory claim, never as governance.
+
+Public campus UUIDs, numbers, and URLs remain unchanged. Private UUIDs derive
+from their source-qualified identity. Existing entity, map, and snapshot bundles
+using fabricated private TEA numbers require a source-bound rebuild; no numeric
+alias is provided. Analytical schema 2 uses the exact campus lookup key as
+`entity_id`, with separate nullable TEA-number and source-identity attributes.
+Existing relational destinations also need the caller-owned identity-schema
+migration or a fresh destination; `ensure_schema()` does not alter old tables.
+
+Private comparisons use `private_campuses_within()`, which includes points inside
+or on district boundaries. The former private district-membership operator is
+retired. Private profile maps report every covering traditional public district
+(`INDEPENDENT` or `COMMON`) and the boundary dataset/version; overlaps are not
+collapsed to a chosen parent. Charter service areas are not attendance-boundary
+comparators. Schools without coordinates remain queryable, with no geographic
+comparison or guessed district.
+
+The optional native PostgreSQL regression uses `TEADATA_TEST_POSTGRES_URL`
+pointing to a fresh empty `teadata_test_*` database. It is separate from the
+default SQLite checks because SQLite does not enforce declared `VARCHAR` widths.
 
 ## Quick Start
 

@@ -9,6 +9,7 @@
 ## Build, Test, and Development Commands
 - Install for iterative work: `uv sync --all-extras` (this handles dev, database, and notebook extras automatically).
 - Always run Python commands through `uv run` and manage packages with `uv`; avoid bare `python` or `pip` to keep environments consistent.
+- `.python-version` is the default development and `scripts/check` interpreter authority; `TEADATA_CHECK_PYTHON` selects a compatibility-check override.
 - Run the suite: `uv run pytest` or target a test (`uv run pytest tests/test_entities.py::test_campus_to_dict_includes_percent_enrollment_change`).
 - Optional: build a fresh snapshot from the configured spatial files with `uv run python -m teadata.load_data` (uses `teadata_sources.yaml` and writes to `.cache/`).
 - When code changes affect anything serialized into the snapshot (pickled data), run `uv run python -m teadata.load_data` as the final task to refresh snapshot artifacts.

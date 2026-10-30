@@ -20,7 +20,7 @@ if TYPE_CHECKING:
     import pyarrow.dataset as ds
 
 
-ANALYTICAL_SCHEMA_VERSION = 1
+ANALYTICAL_SCHEMA_VERSION = 2
 ANALYTICAL_METADATA = b"teadata.analytical"
 ANALYTICAL_TABLES = {
     "campus_analytics": ("cells", "campus"),
@@ -112,6 +112,8 @@ def analytical_schema(role: str) -> pa.Schema:
         fields = [
             ("scope", pa.string()), ("entity_id", pa.string()), ("entity_index", pa.uint32()),
             ("campus_name", pa.string()), ("campus_number", pa.string()),
+            ("campus_lookup_key", pa.string()), ("campus_source_namespace", pa.string()),
+            ("campus_source_id", pa.string()),
             ("district_name", pa.string()), ("district_number", pa.string()),
             ("campus_grade_range", pa.string()), ("campus_latitude", pa.float64()),
             ("campus_longitude", pa.float64()), ("district_type", pa.string()),

@@ -18,8 +18,11 @@ import subprocess
 import sys
 import tempfile
 import time
-from typing import Any, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Mapping, Sequence
 import uuid
+
+if TYPE_CHECKING:
+    from teadata.release import DataRelease
 
 
 SCHEMA_VERSION = 1
@@ -489,15 +492,84 @@ test "$head_revision" = "$(git rev-parse HEAD)"
     return path
 
 
+def _publisher_reference() -> dict[str, Any]:
+    from importlib.resources import files
+
+    return json.loads(files("teadata").joinpath("reference_cases/publisher_2025.json").read_text())
+
+
+def _validate_publisher_cases(release: DataRelease) -> dict[str, Any]:
+    """Compare a small reviewed publisher baseline with actual stored records."""
+    from types import SimpleNamespace
+
+    from teadata.entity_store import EntityStore
+
+    reference = _publisher_reference()
+    coverage = reference["release_validation"]
+    selected = {case["case_id"]: case for case in reference["cases"]}
+    cases = [selected[key] for key in coverage["case_ids"]]
+    if not cases:
+        raise ReceiptError("Publisher reference coverage is empty")
+    datasets = release.catalog.datasets
+    source_ids = {fact["source"]["source_id"] for case in cases for fact in case["facts"]}
+    for source_id in sorted(source_ids):
+        source = reference["sources"][source_id]
+        selected_input = source["release_input"]
+        artifact = datasets.get(selected_input["dataset"], {}).get("artifact", {})
+        if artifact.get("sha256") != selected_input["sha256"]:
+            raise ReceiptError(f"Publisher reference source changed: {selected_input['dataset']}; manually review its cases")
+    facts_checked = attributes_checked = 0
+    with EntityStore(release.artifact("entities"), immutable=True) as store:
+        for case in cases:
+            scope = case["entity"]["type"]
+            getter = store.get_campus if scope == "campus" else store.get_district
+            record = getter(case["entity"]["number"], include_meta=True, cache=False)
+            if record is None:
+                raise ReceiptError(f"Publisher reference entity is absent: {case['case_id']}")
+            context = SimpleNamespace(**record)
+            expected_by_metric = {fact["expected"]["metric"]: fact["expected"] for fact in case["facts"]}
+            for attribute, metric in coverage["attribute_metrics"].items():
+                expected = expected_by_metric[metric]["value"]
+                if record.get(attribute) != expected or type(record.get(attribute)) is not type(expected):
+                    raise ReceiptError(f"Publisher reference {case['case_id']} attribute {attribute} differs")
+                attributes_checked += 1
+            for fact in case["facts"]:
+                expected = fact["expected"]
+                metric = expected["metric"]
+                value = release.catalog.measurement(context, metric, scope=scope)
+                origin = value.source or {}
+                components = {
+                    "value": value.value == expected["value"] and type(value.value) is type(expected["value"]),
+                    "status": value.status.value == expected["status"],
+                    "raw": value.raw == fact["source"]["raw_token"],
+                    "period": origin.get("period") == expected["period"],
+                    "dataset": origin.get("dataset") == reference["sources"][fact["source"]["source_id"]]["release_input"]["dataset"],
+                    "field": origin.get("field") == fact["field"],
+                }
+                if metric in coverage["unit_metrics"]:
+                    components["unit"] = value.unit == expected["unit"]
+                for component in ("reason", "lower", "upper"):
+                    if component in expected:
+                        components[component] = getattr(value, component) == expected[component]
+                for component, matches in components.items():
+                    if not matches:
+                        raise ReceiptError(f"Publisher reference {case['case_id']} metric {metric} {component} differs")
+                facts_checked += 1
+    return {"cases": len(cases), "measurements": facts_checked, "attributes": attributes_checked,
+            "uncovered": coverage["uncovered"]}
+
+
 def _validate_release(path: str, kind: str) -> None:
     from teadata.release import DataRelease
     release = DataRelease(Path(path).expanduser())
     release.verify()
+    publisher_checks = _validate_publisher_cases(release)
     if kind == "library":
         from teadata.manifest import processor_identity
         if release.catalog.to_dict()["processor_sha256"] != processor_identity():
             raise ReceiptError("Release was built from different processing code or lockfile; rebuild it")
     print(f"Verified data release {release.build_id}")
+    print("Publisher example coverage: " + json.dumps(publisher_checks, sort_keys=True))
 
 
 def main() -> None:
@@ -512,9 +584,6 @@ def main() -> None:
     parser.add_argument("--timeout", type=float, default=900, help="Maximum seconds for each check")
     parser.add_argument("--validate-release", help=argparse.SUPPRESS)
     args = parser.parse_args()
-    if args.validate_release:
-        _validate_release(args.validate_release, args.kind)
-        return
     if args.timeout <= 0:
         parser.error("--timeout must be positive")
     if args.paired_library and args.kind != "app":
@@ -524,6 +593,9 @@ def main() -> None:
     if args.install_hook and (args.verify or args.verify_latest or args.release):
         parser.error("Install the hook separately from verification or release checks")
     try:
+        if args.validate_release:
+            _validate_release(args.validate_release, args.kind)
+            return
         if args.install_hook:
             path = install_pre_push_hook(args.root, kind=args.kind, paired=args.paired_library is not None)
             print(f"Installed local check hook: {path}")

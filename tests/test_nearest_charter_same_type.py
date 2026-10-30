@@ -15,11 +15,12 @@ def _campus(
 ) -> Campus:
     campus = Campus(
         id=uuid.uuid4(),
-        district_id=uuid.uuid4(),
+        district_id=None if is_private else uuid.uuid4(),
         name=name,
         charter_type="Charter" if is_charter else "None",
         is_charter=is_charter,
         is_private=is_private,
+        source_namespace="tefa" if is_private else None, source_id="nearest:" + name if is_private else None,
         school_type=school_type,
     )
     campus.point = point

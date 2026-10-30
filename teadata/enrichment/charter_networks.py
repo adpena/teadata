@@ -114,7 +114,7 @@ def add_charter_networks_from_config(
         )
         if exists:
             # optionally fill in missing basics without overriding real data
-            if name and (not exists.name or exists.name == "Unknown District"):
+            if name and not exists.name:
                 exists.name = name
             if rating and not getattr(exists, "rating", None):
                 exists.rating = rating

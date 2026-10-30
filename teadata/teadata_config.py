@@ -20,7 +20,7 @@ Features:
 
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Dict, Any, Optional, Tuple, List, Sequence, Mapping, Iterable
+from typing import Dict, Any, Optional, Tuple, List, Sequence, Mapping, Iterable, Literal
 from pathlib import Path
 from urllib.parse import urlparse
 import os
@@ -1055,7 +1055,7 @@ def join_datasets_on_district(
     *,
     datasets: Optional[List[str]] = None,
     aliases: Iterable[str] = _DEFAULT_DISTRICT_ALIASES,
-    how: str = "outer",
+    how: Literal["left", "right", "inner", "outer", "left_anti", "right_anti"] = "outer",
     keep: Optional[Dict[str, List[str]]] = None,
     reader_overrides: Optional[Dict[str, dict]] = None,
 ):
@@ -1129,7 +1129,7 @@ def join_datasets_on_campus(
     *,
     datasets: Optional[List[str]] = None,
     aliases: Iterable[str] = _DEFAULT_CAMPUS_ALIASES,
-    how: str = "outer",
+    how: Literal["left", "right", "inner", "outer", "left_anti", "right_anti"] = "outer",
     keep: Optional[Dict[str, List[str]]] = None,
     reader_overrides: Optional[Dict[str, dict]] = None,
 ):

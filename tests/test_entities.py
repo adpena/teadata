@@ -45,3 +45,13 @@ def test_campus_to_dict_handles_missing_percent_enrollment_change():
 
     assert "percent_enrollment_change" in result
     assert result["percent_enrollment_change"] == "N/A"
+
+
+def test_distance_dispatch_preserves_campus_and_coordinate_overloads():
+    origin, destination = _make_campus(), _make_campus()
+    origin.point = (0, 0)
+    destination.point = (3, 4)
+    assert origin.distance_to(destination) == pytest.approx(5.0)
+    assert origin.distance_to((3, 4)) == pytest.approx(5.0)
+    with pytest.raises(TypeError, match="Cannot compute distance"):
+        origin.distance_to("unsupported")

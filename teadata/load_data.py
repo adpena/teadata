@@ -5,16 +5,17 @@ from pathlib import Path
 import gzip
 import json
 import pandas as pd
-import hashlib
 import os
 import sqlite3
 import sys
 import tempfile
 from contextvars import ContextVar
+from urllib.parse import quote
+from teadata.attributes import campus_district_name, is_traditional_district
 
 from teadata.manifest import BuildRecorder, ContractError, write_sqlite_catalog
 from teadata.provenance import ProvenanceStore
-from teadata.identifiers import canonical_source_identifier
+from teadata.identifiers import canonical_source_identifier, campus_lookup_key, normalize_campus_lookup_key
 from teadata.release import publish_release, SNAPSHOT_MAGIC
 from teadata.transfer_summary import transfer_measurement, normalized_transfer_measurement
 
@@ -232,21 +233,6 @@ def _district_lookup_keys(district_number: Optional[str]) -> list[str]:
     return keys
 
 
-def _private_clean_number(val: Any) -> Optional[int]:
-    if val is None:
-        return None
-    try:
-        if pd.isna(val):
-            return None
-    except Exception:
-        pass
-    text = str(val).strip()
-    if not text:
-        return None
-    try:
-        return int(float(text.replace(",", "")))
-    except Exception:
-        return None
 
 
 def _private_coerce_int(val: Any) -> Optional[int]:
@@ -321,16 +307,6 @@ def _private_coerce_bool_flag(val: Any) -> bool:
     return False
 
 
-def _private_tefa_id(val: Any) -> Optional[str]:
-    if val is None:
-        return None
-    try:
-        if pd.isna(val):
-            return None
-    except Exception:
-        pass
-    text = str(val).strip()
-    return text or None
 
 
 def _tefa_grade_label(code: Optional[int]) -> Optional[str]:
@@ -435,73 +411,13 @@ def _tefa_school_type(
     return "Other"
 
 
-def _existing_campus_number_digits(repo: DataEngine) -> set[str]:
-    used: set[str] = set()
-    for campus in repo._campuses.values():
-        canonical = canonical_campus_number(getattr(campus, "campus_number", None))
-        if not canonical or len(canonical) <= 1:
-            continue
-        digits = canonical[1:]
-        if not digits.isdigit():
-            continue
-        used.add(digits.zfill(9))
-    return used
 
 
-def _build_tefa_private_campus_number_map(
-    ids: Iterable[Any],
-    used_digits: set[str],
-) -> dict[str, str]:
-    """Build deterministic, collision-free private campus numbers from TEFA IDs."""
-
-    unique_ids: set[str] = set()
-    for raw_id in ids:
-        key = _private_tefa_id(raw_id)
-        if key:
-            unique_ids.add(key)
-
-    mapping: dict[str, str] = {}
-    modulus = 1_000_000_000
-    for key in sorted(unique_ids):
-        digest = hashlib.sha1(key.encode("utf-8")).hexdigest()
-        seed = int(digest[:16], 16) % modulus
-        candidate = seed
-
-        while True:
-            digits = f"{candidate:09d}"
-            if digits not in used_digits:
-                used_digits.add(digits)
-                mapping[key] = f"'{digits}"
-                break
-            candidate = (candidate + 1) % modulus
-            if candidate == seed:
-                raise RuntimeError("Unable to allocate unique private campus number")
-
-    return mapping
 
 
-def _tepsac_grade_span(low: Any, high: Any) -> Optional[str]:
-    try:
-        low_missing = pd.isna(low)
-    except Exception:
-        low_missing = False
-    try:
-        high_missing = pd.isna(high)
-    except Exception:
-        high_missing = False
-
-    low_s = "" if low is None or low_missing else str(low).strip()
-    high_s = "" if high is None or high_missing else str(high).strip()
-    if not low_s and not high_s:
-        return None
-    if not low_s:
-        return high_s or None
-    if not high_s or low_s == high_s:
-        return low_s or None
-    return f"{low_s}-{high_s}"
 
 
-def _tepsac_coords(lon_raw: Any, lat_raw: Any) -> Optional[tuple[float, float]]:
+def _private_coords(lon_raw: Any, lat_raw: Any) -> Optional[tuple[float, float]]:
     lon_val = _private_coerce_float(lon_raw)
     lat_val = _private_coerce_float(lat_raw)
     if lon_val is None or lat_val is None:
@@ -634,6 +550,7 @@ def _entity_store_path(districts_fp: str, campuses_fp: str) -> Path:
 def _prepare_repo_for_pickle(repo: DataEngine) -> None:
     """Drop transient spatial indexes so the pickle is small and portable."""
     for attr in (
+        "_district_cover_index",
         "_kdtree",
         "_kdtree_charter",
         "_xy_deg",
@@ -660,16 +577,9 @@ def _prepare_repo_for_pickle(repo: DataEngine) -> None:
 
 def _strip_repo_boundaries(repo: DataEngine) -> None:
     for district in repo._districts.values():
-        try:
-            district.boundary = None
-        except Exception:
-            pass
-        try:
-            district.polygon = None
-        except Exception:
-            pass
-        if hasattr(district, "_prepared"):
-            district._prepared = None
+        district.boundary = None
+        district._polygon = None
+        district._prepared = None
 
 
 def _save_boundary_store(
@@ -736,31 +646,44 @@ TEXAS_BOUNDS = (
 )
 
 
-def _canonical_campus_number(value: Any) -> Optional[str]:
-    if value is None:
-        return None
-    text = str(value).strip()
-    if not text:
-        return None
-    return text.lstrip("'")
 
 
 def _display_campus_number(value: Any) -> str:
-    number = _canonical_campus_number(value)
+    number = normalize_campus_lookup_key(value)
     return number or ""
 
 
 def _campus_profile_url(campus_number: Any) -> str:
-    slug = _canonical_campus_number(campus_number)
+    slug = normalize_campus_lookup_key(campus_number)
     if not slug:
         return ""
-    return f"/campuses/profiles/{slug}/"
+    return f"/campuses/profiles/{quote(slug, safe='')}/"
+
+
+def _map_campus_name(record_name: Any, campus: Optional[Campus], campus_number: Any = None) -> str:
+    """Preserve human labels; strict key parsing only detects ID-shaped labels."""
+    name = record_name.strip() if isinstance(record_name, str) else ""
+    if name:
+        if campus_number:
+            try:
+                record_key = normalize_campus_lookup_key(name)
+            except ValueError:
+                record_key = None
+            if record_key and record_key == normalize_campus_lookup_key(campus_number):
+                name = ""
+        if name and name.isdigit() and len(name) >= 6:
+            name = ""
+    if name:
+        return name
+    if campus is None:
+        return ""
+    value = (getattr(campus, "name", None) or getattr(campus, "campus_name", None)
+             or getattr(campus, "campus_name_long", None))
+    return value.strip() if isinstance(value, str) else ""
 
 
 def _is_charter_district(district: District) -> bool:
-    campuses = getattr(district, "campuses", None) or []
-    first = campuses[0] if campuses else None
-    return bool(first and getattr(first, "is_charter", False))
+    return district.meta.get("organization_sub_type") == "CHARTER"
 
 
 def _resolve_district_type(
@@ -782,20 +705,18 @@ def _build_campus_lookup(
     campus_index: dict = {}
     campus_numbers = campus_numbers or set()
     campus_numbers = {
-        _canonical_campus_number(number)
+        normalize_campus_lookup_key(number)
         for number in campus_numbers
-        if _canonical_campus_number(number)
+        if normalize_campus_lookup_key(number)
     }
 
     def _store_campus(campus: Campus) -> None:
-        campus_number = getattr(campus, "campus_number", None)
-        canonical = _canonical_campus_number(campus_number)
+        canonical = campus.lookup_key
         if not canonical:
             return
         if canonical in campus_index:
             return
         campus_index[canonical] = campus
-        campus_index[f"'{canonical}"] = campus
 
     campus_iter = list(getattr(district, "campuses", None) or [])
     if extra_campuses:
@@ -805,11 +726,11 @@ def _build_campus_lookup(
 
     missing_numbers = campus_numbers.difference(campus_index.keys())
     for campus_number in missing_numbers:
-        candidates = (campus_number, f"'{campus_number}")
+        candidates = (campus_number,)
         campus_obj = None
         for candidate in candidates:
             try:
-                campus_obj = (repo >> ("campus", candidate)).first()
+                campus_obj = repo.campus_by_key(candidate)
             except Exception:
                 campus_obj = None
             if campus_obj is not None:
@@ -902,7 +823,7 @@ def _extract_latlon(
 ) -> Optional[tuple[float, float]]:
     if campus_number is None:
         return None
-    campus = campus_index.get(_canonical_campus_number(campus_number))
+    campus = campus_index.get(normalize_campus_lookup_key(campus_number))
     if not campus:
         campus = campus_index.get(str(campus_number))
     if not campus:
@@ -968,7 +889,7 @@ def _group_transfer_rows(
     result = working_df[columns].copy()
     for column in group_columns:
         try:
-            result[column] = result[column].map(lambda value: canonical_source_identifier(value, width=9))
+            result[column] = result[column].map(lambda value: normalize_campus_lookup_key(canonical_source_identifier(value, width=9)))
         except ValueError as error:
             raise ContractError("Transfer projection has an invalid campus identifier") from error
         if result[column].isna().any():
@@ -998,7 +919,7 @@ def _collect_charter_transfer_entries(
         if only_closures and not getattr(campus, "facing_closure", False):
             continue
 
-        canonical_number = _canonical_campus_number(
+        canonical_number = normalize_campus_lookup_key(
             getattr(campus, "campus_number", None)
         )
         inbound_edges = []
@@ -1043,7 +964,7 @@ def _collect_charter_transfer_entries(
         processed_edges = []
         for edge in entry.get("edges", []):
             origin_campus = edge.get("campus")
-            origin_number = _canonical_campus_number(
+            origin_number = normalize_campus_lookup_key(
                 getattr(origin_campus, "campus_number", None)
             )
             origin_latlon = _extract_latlon(campus_lookup, origin_number)
@@ -1093,7 +1014,7 @@ def _build_charter_map_payload(repo: DataEngine, district: District) -> dict:
         return payload
 
     try:
-        private_candidates = list(repo.private_campuses_in(district))
+        private_candidates = list(repo.private_campuses_within(district)) if is_traditional_district(district) else []
     except Exception:
         private_candidates = []
 
@@ -1109,42 +1030,6 @@ def _build_charter_map_payload(repo: DataEngine, district: District) -> dict:
             if cleaned:
                 return cleaned
         return ""
-
-    def _get_district_name(campus_obj: Optional[Campus]) -> str:
-        if campus_obj is None:
-            return ""
-        district_obj = getattr(campus_obj, "district", None)
-        name = getattr(district_obj, "name", None)
-        if not name:
-            name = getattr(campus_obj, "district_name", None)
-        return _clean_text(name)
-
-    def _get_campus_name(
-        record_name: Any, campus_obj: Optional[Campus], campus_number: Any = None
-    ) -> str:
-        name = _clean_text(record_name)
-        if name:
-            if campus_number:
-                canonical_record = _canonical_campus_number(name)
-                canonical_number = _canonical_campus_number(campus_number)
-                if (
-                    canonical_record
-                    and canonical_number
-                    and canonical_record == canonical_number
-                ):
-                    name = ""
-            if name and name.isdigit() and len(name) >= 6:
-                name = ""
-        if name:
-            return name
-        if campus_obj is None:
-            return ""
-        campus_name = getattr(campus_obj, "name", None)
-        if not campus_name:
-            campus_name = getattr(campus_obj, "campus_name", None)
-        if not campus_name:
-            campus_name = getattr(campus_obj, "campus_name_long", None)
-        return _clean_text(campus_name)
 
     def _get_school_type(campus_obj: Optional[Campus]) -> str:
         if campus_obj is None:
@@ -1218,7 +1103,7 @@ def _build_charter_map_payload(repo: DataEngine, district: District) -> dict:
             transfers_in.append(
                 {
                     "from": origin_number,
-                    "from_name": _get_campus_name(None, origin, origin_number),
+                    "from_name": _map_campus_name(None, origin, origin_number),
                     "count": None if edge.get("masked") else count_value,
                     "masked": bool(edge.get("masked")),
                     "status": edge["status"],
@@ -1236,9 +1121,9 @@ def _build_charter_map_payload(repo: DataEngine, district: District) -> dict:
                     {
                         "campusNumber": origin_number,
                         "campusNumberDisplay": _display_campus_number(origin_number),
-                        "name": _get_campus_name(None, origin, origin_number),
+                        "name": _map_campus_name(None, origin, origin_number),
                         "profileUrl": _campus_profile_url(origin_number),
-                        "districtName": _get_district_name(origin),
+                        "districtName": campus_district_name(origin),
                         "lat": origin_lat,
                         "lon": origin_lon,
                         "schoolType": _get_school_type(origin),
@@ -1255,7 +1140,7 @@ def _build_charter_map_payload(repo: DataEngine, district: District) -> dict:
                 origin_entry["transfersOut"].append(
                     {
                         "to": canonical_number,
-                        "to_name": _get_campus_name(None, campus, canonical_number),
+                        "to_name": _map_campus_name(None, campus, canonical_number),
                         "count": None if edge.get("masked") else count_value,
                         "masked": bool(edge.get("masked")),
                         "status": edge["status"],
@@ -1267,9 +1152,9 @@ def _build_charter_map_payload(repo: DataEngine, district: District) -> dict:
             {
                 "campusNumber": canonical_number,
                 "campusNumberDisplay": _display_campus_number(canonical_number),
-                "name": _get_campus_name(None, campus, canonical_number),
+                "name": _map_campus_name(None, campus, canonical_number),
                 "profileUrl": _campus_profile_url(canonical_number),
-                "districtName": _get_district_name(campus),
+                "districtName": campus_district_name(campus),
                 "lat": lat,
                 "lon": lon,
                 "schoolType": _get_school_type(campus),
@@ -1300,8 +1185,8 @@ def _build_charter_map_payload(repo: DataEngine, district: District) -> dict:
     all_private_entries = []
     for campus in private_candidates:
         campus_number = getattr(campus, "campus_number", None)
-        canonical_number = _canonical_campus_number(campus_number)
-        latlon = _extract_latlon(campus_lookup, campus_number)
+        canonical_number = normalize_campus_lookup_key(campus_number)
+        latlon = _extract_latlon(campus_lookup, campus.lookup_key)
         if not latlon or not _valid_latlon(*latlon):
             continue
         all_latlons.append(latlon)
@@ -1314,15 +1199,16 @@ def _build_charter_map_payload(repo: DataEngine, district: District) -> dict:
         all_private_entries.append(
             {
                 "campusNumber": canonical_number,
-                "campusNumberDisplay": _display_campus_number(canonical_number),
-                "name": _get_campus_name(
+                "campusNumberDisplay": None,
+                "name": _map_campus_name(
                     getattr(campus, "name", None), campus, campus_number
                 ),
-                "profileUrl": _campus_profile_url(canonical_number),
-                "districtName": _get_district_name(campus),
+                "profileUrl": _campus_profile_url(campus.lookup_key),
+                "districtName": campus_district_name(campus),
                 "lat": lat,
                 "lon": lon,
                 "gradeRange": grade_range,
+                "lookupKey": campus.lookup_key, "sourceNamespace": campus.source_namespace, "sourceId": campus.source_id,
                 "isPrivate": True,
                 "stats": stats,
             }
@@ -1470,7 +1356,7 @@ def build_closures_map_payload(
     campus_numbers.update(working_df["to_campus_number"].dropna())
 
     try:
-        private_candidates = list(repo.private_campuses_in(district))
+        private_candidates = list(repo.private_campuses_within(district)) if is_traditional_district(district) else []
     except Exception:
         private_candidates = []
 
@@ -1488,45 +1374,6 @@ def build_closures_map_payload(
             if cleaned:
                 return cleaned
         return ""
-
-    def _get_district_name(campus_obj: Optional[Campus]) -> str:
-        if campus_obj is None:
-            return ""
-
-        district_obj = getattr(campus_obj, "district", None)
-        name = getattr(district_obj, "name", None)
-        if not name:
-            name = getattr(campus_obj, "district_name", None)
-        return _clean_text(name)
-
-    def _get_campus_name(
-        record_name: Any, campus_obj: Optional[Campus], campus_number: Any = None
-    ) -> str:
-        name = _clean_text(record_name)
-        if name:
-            if campus_number:
-                canonical_record = _canonical_campus_number(name)
-                canonical_number = _canonical_campus_number(campus_number)
-                if (
-                    canonical_record
-                    and canonical_number
-                    and canonical_record == canonical_number
-                ):
-                    name = ""
-            if name and name.isdigit() and len(name) >= 6:
-                name = ""
-        if name:
-            return name
-
-        if campus_obj is None:
-            return ""
-
-        campus_name = getattr(campus_obj, "name", None)
-        if not campus_name:
-            campus_name = getattr(campus_obj, "campus_name", None)
-        if not campus_name:
-            campus_name = getattr(campus_obj, "campus_name_long", None)
-        return _clean_text(campus_name)
 
     def _collect_stats(row: Any, field_map: dict[str, str]) -> list[dict]:
         stats = []
@@ -1566,7 +1413,7 @@ def build_closures_map_payload(
         transfers_out.setdefault(origin, []).append(
             {
                 "to": dest,
-                "to_name": _get_campus_name(None, destination_obj, dest),
+                "to_name": _map_campus_name(None, destination_obj, dest),
                 "count": count_value,
                 "masked": masked,
                 "status": value.status.value,
@@ -1576,7 +1423,7 @@ def build_closures_map_payload(
         transfers_in.setdefault(dest, []).append(
             {
                 "from": origin,
-                "from_name": _get_campus_name(None, origin_obj, origin),
+                "from_name": _map_campus_name(None, origin_obj, origin),
                 "count": count_value,
                 "masked": masked,
                 "status": value.status.value,
@@ -1609,8 +1456,6 @@ def build_closures_map_payload(
     for record in origin_details.itertuples(index=False):
         campus_number = getattr(record, "campus_campus_number", None)
         campus_obj = campus_lookup.get(campus_number)
-        if campus_obj is None:
-            campus_obj = campus_lookup.get(f"'{campus_number}")
         latlon = _extract_latlon(campus_lookup, campus_number)
         if latlon:
             all_latlons.append(latlon)
@@ -1625,11 +1470,11 @@ def build_closures_map_payload(
             {
                 "campusNumber": campus_number,
                 "campusNumberDisplay": _display_campus_number(campus_number),
-                "name": _get_campus_name(
+                "name": _map_campus_name(
                     getattr(record, "campus_name", None), campus_obj, campus_number
                 ),
                 "profileUrl": _campus_profile_url(campus_number),
-                "districtName": _get_district_name(campus_obj),
+                "districtName": campus_district_name(campus_obj),
                 "lat": lat,
                 "lon": lon,
                 "facingClosure": facing_closure,
@@ -1653,8 +1498,6 @@ def build_closures_map_payload(
     for record in charter_details.itertuples(index=False):
         campus_number = getattr(record, "to_campus_number", None)
         campus_obj = campus_lookup.get(campus_number)
-        if campus_obj is None:
-            campus_obj = campus_lookup.get(f"'{campus_number}")
         latlon = _extract_latlon(campus_lookup, campus_number)
         if latlon:
             all_latlons.append(latlon)
@@ -1668,11 +1511,11 @@ def build_closures_map_payload(
             {
                 "campusNumber": campus_number,
                 "campusNumberDisplay": _display_campus_number(campus_number),
-                "name": _get_campus_name(
+                "name": _map_campus_name(
                     getattr(record, "to_name", None), campus_obj, campus_number
                 ),
                 "profileUrl": _campus_profile_url(campus_number),
-                "districtName": _get_district_name(campus_obj),
+                "districtName": campus_district_name(campus_obj),
                 "lat": lat,
                 "lon": lon,
                 "gradeRange": _format_stat_value(
@@ -1701,8 +1544,8 @@ def build_closures_map_payload(
 
     for campus in private_campuses:
         campus_number = getattr(campus, "campus_number", None)
-        canonical_number = _canonical_campus_number(campus_number)
-        latlon = _extract_latlon(campus_lookup, campus_number)
+        canonical_number = normalize_campus_lookup_key(campus_number)
+        latlon = _extract_latlon(campus_lookup, campus.lookup_key)
         if not latlon:
             continue
 
@@ -1719,15 +1562,16 @@ def build_closures_map_payload(
         payload["privateCampuses"].append(
             {
                 "campusNumber": canonical_number,
-                "campusNumberDisplay": _display_campus_number(canonical_number),
-                "name": _get_campus_name(
+                "campusNumberDisplay": None,
+                "name": _map_campus_name(
                     getattr(campus, "name", None), campus, campus_number
                 ),
-                "profileUrl": _campus_profile_url(canonical_number),
-                "districtName": _get_district_name(campus),
+                "profileUrl": _campus_profile_url(campus.lookup_key),
+                "districtName": campus_district_name(campus),
                 "lat": lat,
                 "lon": lon,
                 "gradeRange": grade_range,
+                "lookupKey": campus.lookup_key, "sourceNamespace": campus.source_namespace, "sourceId": campus.source_id,
                 "isPrivate": True,
                 "stats": stats,
             }
@@ -1758,16 +1602,6 @@ def _clean_text(value: Any) -> str:
     if value is None:
         return ""
     return str(value).strip()
-
-
-def _campus_district_name(campus: Optional[Campus]) -> str:
-    if campus is None:
-        return ""
-    district = getattr(campus, "district", None)
-    name = getattr(district, "name", None)
-    if not name:
-        name = getattr(campus, "district_name", None)
-    return _clean_text(name)
 
 
 def _campus_rating_value(campus: Optional[Campus]) -> Optional[str]:
@@ -1859,16 +1693,18 @@ def _serialize_map_campus(campus: Optional[Campus]) -> dict[str, object]:
     if campus is None:
         return {}
     campus_number = getattr(campus, "campus_number", None)
-    canonical_number = _canonical_campus_number(campus_number)
+    canonical_number = normalize_campus_lookup_key(campus_number)
     lat, lon = _extract_campus_latlon(campus)
     return {
-        "campusNumber": _display_campus_number(canonical_number),
+        "lookupKey": campus.lookup_key,
+        "sourceNamespace": campus.source_namespace, "sourceId": campus.source_id,
+        "campusNumber": _display_campus_number(canonical_number) if canonical_number is not None else None,
         "canonicalCampusNumber": canonical_number,
         "name": _clean_text(getattr(campus, "name", "")),
-        "districtName": _campus_district_name(campus),
+        "districtName": campus_district_name(campus),
         "lat": lat,
         "lon": lon,
-        "profileUrl": _campus_profile_url(canonical_number),
+        "profileUrl": _campus_profile_url(campus.lookup_key),
         "charter": bool(getattr(campus, "is_charter", False)),
         "isPrivate": bool(getattr(campus, "is_private", False)),
         "stats": _map_stats_for_campus(campus),
@@ -2050,7 +1886,7 @@ def _collect_private_campuses(
     for campus in base_campuses:
         district = getattr(campus, "district", None)
         district_id = getattr(district, "id", None)
-        if district is None or district_id in district_ids:
+        if district is None or district_id in district_ids or not is_traditional_district(district):
             continue
         district_ids.add(district_id)
         districts.append(district)
@@ -2059,7 +1895,7 @@ def _collect_private_campuses(
 
     for district in districts:
         try:
-            candidates = list(repo.private_campuses_in(district))
+            candidates = list(repo.private_campuses_within(district))
         except Exception:
             candidates = []
         for private_campus in candidates:
@@ -2086,7 +1922,7 @@ def _collect_private_campuses(
             if not overlaps:
                 continue
 
-            key = getattr(private_campus, "id", None) or _canonical_campus_number(
+            key = getattr(private_campus, "id", None) or normalize_campus_lookup_key(
                 getattr(private_campus, "campus_number", None)
             )
             if key in results:
@@ -2159,7 +1995,7 @@ def _build_isd_profile_map_payload(repo: DataEngine, campus: Campus) -> dict:
     charter_destinations.sort(key=lambda item: (item.get("name", "")))
     district_destinations.sort(key=lambda item: (item.get("name", "")))
     isd_origins.sort(
-        key=lambda item: (item.get("districtName", ""), item.get("name", ""))
+        key=lambda item: (item.get("districtName") or "", item.get("name", ""))
     )
 
     district = getattr(campus, "district", None)
@@ -2214,7 +2050,7 @@ def _build_charter_profile_map_payload(repo: DataEngine, campus: Campus) -> dict
 
     isd_origins.sort(
         key=lambda item: (
-            item.get("districtName", ""),
+            item.get("districtName") or "",
             item.get("name", ""),
         )
     )
@@ -2241,8 +2077,29 @@ def _build_private_profile_map_payload(repo: DataEngine, campus: Campus) -> dict
     private_entry = _serialize_map_campus(campus)
     private_entry["isPrivateCampus"] = True
 
-    district = getattr(campus, "district", None)
-    boundary_geojson, boundary_bounds = _district_boundary_payload(repo, district)
+    containing = [district for district in repo._districts_covering(campus) if is_traditional_district(district)]
+    metadata = repo.catalog.metadata("districts")
+    relations = [{"district_number": district.district_number, "name": district.name,
+                  "boundary_dataset": "districts", "boundary_version": metadata.version,
+                  "relation": "point_covered_by", "boundary_predicate": "covers"}
+                 for district in containing]
+    boundary_geojson, boundary_bounds = None, None
+    features, boundary_points = [], []
+    for district, relation in zip(containing, relations, strict=True):
+        geometry, bounds = _district_boundary_payload(repo, district)
+        if geometry:
+            if geometry.get("type") == "FeatureCollection":
+                features.extend({**feature, "properties": {**feature.get("properties", {}), **relation}}
+                                for feature in geometry.get("features", []))
+            elif geometry.get("type") == "Feature":
+                features.append({**geometry, "properties": {**geometry.get("properties", {}), **relation}})
+            else:
+                features.append({"type": "Feature", "properties": relation, "geometry": geometry})
+        if bounds:
+            boundary_points.extend(bounds)
+    if features:
+        boundary_geojson = {"type": "FeatureCollection", "features": features}
+    boundary_bounds = _bounds_from_points(boundary_points)
 
     nearby_public = []
     points = []
@@ -2251,10 +2108,8 @@ def _build_private_profile_map_payload(repo: DataEngine, campus: Campus) -> dict
     if priv_lat is not None and priv_lon is not None:
         points.append((priv_lat, priv_lon))
 
-    try:
-        district_campuses = list(repo.campuses_in(district)) if district else []
-    except Exception:
-        district_campuses = []
+    district_campuses = {candidate.id: candidate for district in containing
+                         for candidate in repo.campuses_in(district)}.values()
 
     for candidate in district_campuses:
         if getattr(candidate, "is_charter", False) or getattr(
@@ -2272,7 +2127,7 @@ def _build_private_profile_map_payload(repo: DataEngine, campus: Campus) -> dict
 
     nearby_public.sort(
         key=lambda item: (
-            item.get("districtName", ""),
+            item.get("districtName") or "",
             item.get("name", ""),
         )
     )
@@ -2281,6 +2136,8 @@ def _build_private_profile_map_payload(repo: DataEngine, campus: Campus) -> dict
     focus_bounds = _bounds_from_radius(priv_lat, priv_lon, 3.0)
 
     return {
+        "containingDistricts": relations,
+        "comparisonAvailable": bool(containing),
         "private": private_entry,
         "publicCampuses": nearby_public,
         "privateCampuses": [],
@@ -2309,7 +2166,7 @@ def _split_map_payload(payload: dict) -> tuple[dict, dict]:
         campus_copy = dict(campus)
         transfers_out = campus_copy.pop("transfersOut", None)
         if transfers_out is not None:
-            key = _canonical_campus_number(campus_copy.get("campusNumber"))
+            key = normalize_campus_lookup_key(campus_copy.get("campusNumber"))
             if key:
                 transfers["transfersOut"][key] = transfers_out
         base["aisdCampuses"].append(campus_copy)
@@ -2319,7 +2176,7 @@ def _split_map_payload(payload: dict) -> tuple[dict, dict]:
         campus_copy = dict(campus)
         transfers_in = campus_copy.pop("transfersIn", None)
         if transfers_in is not None:
-            key = _canonical_campus_number(campus_copy.get("campusNumber"))
+            key = normalize_campus_lookup_key(campus_copy.get("campusNumber"))
             if key:
                 transfers["transfersIn"][key] = transfers_in
         base["charterCampuses"].append(campus_copy)
@@ -2337,6 +2194,7 @@ def _save_map_store(
 ) -> Optional[Path]:
     if not BUILD_MAP_STORE:
         return None
+    print(f"[maps] district classification {_district_classification_counts(repo)}")
     path = _map_store_path(districts_fp, campuses_fp)
     tmp_path = path.with_suffix(".sqlite.tmp")
     try:
@@ -2352,7 +2210,7 @@ def _save_map_store(
             "CREATE TABLE closures_map (district_number TEXT PRIMARY KEY, payload_base BLOB, payload_transfers BLOB)"
         )
         conn.execute(
-            "CREATE TABLE campus_profile (campus_number TEXT PRIMARY KEY, payload BLOB)"
+            "CREATE TABLE campus_profile (lookup_key TEXT PRIMARY KEY, payload BLOB)"
         )
         rows = []
         for district in repo._districts.values():
@@ -2389,11 +2247,9 @@ def _save_map_store(
 
         rows = []
         for campus in repo._campuses.values():
-            campus_number = canonical_campus_number(
-                getattr(campus, "campus_number", None)
-            )
+            campus_number = campus.lookup_key
             if not campus_number:
-                continue
+                raise ContractError("Map source campus lacks its canonical identity")
             try:
                 payload = build_campus_profile_map_payload(repo, campus)
             except Exception as exc:
@@ -2406,14 +2262,14 @@ def _save_map_store(
             )
             if len(rows) >= 100:
                 conn.executemany(
-                    "INSERT OR REPLACE INTO campus_profile (campus_number, payload) VALUES (?, ?)",
+                    "INSERT OR REPLACE INTO campus_profile (lookup_key, payload) VALUES (?, ?)",
                     rows,
                 )
                 conn.commit()
                 rows = []
         if rows:
             conn.executemany(
-                "INSERT OR REPLACE INTO campus_profile (campus_number, payload) VALUES (?, ?)",
+                "INSERT OR REPLACE INTO campus_profile (lookup_key, payload) VALUES (?, ?)",
                 rows,
             )
         conn.commit()
@@ -2611,6 +2467,63 @@ def _add_reporting_entities(repo: DataEngine, frame: pd.DataFrame) -> dict[str, 
     return added
 
 
+def _add_tefa_entities(repo: DataEngine, frame: pd.DataFrame, *, version: int | None) -> int:
+    """Retain the selected legacy source's exact private listing identities.
+
+    Directory district enrichment is a raw claim, never public governance.
+    This does not reconcile old IDs with a different roster or infer locations.
+    """
+    required = {"ID", "Name", "Vendor Type"}
+    if not required.issubset(frame.columns):
+        raise ContractError("Private TEFA source lacks required identity/type columns")
+    selected = frame[frame["Vendor Type"].fillna("").astype(str).str.strip().str.lower() == "schools"]
+    records = selected.to_dict(orient="records")
+    seen: set[str] = set()
+    for record in records:
+        source_id = record["ID"]
+        try:
+            key = campus_lookup_key(source_namespace="tefa", source_id=source_id, is_private=True)
+        except (ValueError, TypeError) as error:
+            raise ContractError("Private TEFA listing has an invalid opaque source ID") from error
+        if key in seen:
+            raise ContractError("Private TEFA source has duplicate listing IDs")
+        seen.add(key)
+        if not isinstance(record["Name"], str) or not record["Name"].strip():
+            raise ContractError("Private TEFA listing has no source name")
+    for record in records:
+        source_id = record["ID"]
+        key = campus_lookup_key(source_namespace="tefa", source_id=source_id, is_private=True)
+        meta = {
+            "private_source_dataset": "tefa", "private_source_version": str(version) if version is not None else None,
+            "reported_directory_district_number": _get_record_value(record, ["School District Number"]),
+            "reported_directory_district_name": _get_record_value(record, ["School District Name20", "School District Name"]),
+            "directory_affiliation_origin": "unverified_legacy_enrichment",
+        }
+        for output, candidates in (
+            ("school_full_address", ["Address Formatted", "Address City State Zip"]),
+            ("school_website", ["Contact Website"]),
+            ("display_grade_range", ["Display Grade Range"]),
+        ):
+            value = _get_record_value(record, candidates)
+            if value is not None:
+                meta[output] = value
+        campus = Campus(
+            id=uuid.uuid5(uuid.NAMESPACE_URL, "teadata:private:" + key),
+            district_id=None, district_number=None, campus_number=None,
+            source_namespace="tefa", source_id=source_id,
+            name=record["Name"], charter_type="", is_charter=False, is_private=True,
+            enrollment=None,
+            grade_range=_tefa_grade_range(record.get("Min Grade"), record.get("Max Grade"), record.get("Display Grade Range")),
+            school_type=_tefa_school_type(record.get("Min Grade"), record.get("Max Grade"),
+                record.get("Is Pre K", record.get("Is Pre-K")), record.get("Is Elementary"),
+                record.get("Is Middle"), record.get("Is High")),
+            location=_private_coords(record.get("Location Lng"), record.get("Location Lat")),
+            meta=meta,
+        )
+        repo.add_campus(campus)
+    return len(records)
+
+
 def _release_validation(repo: DataEngine) -> dict[str, Any]:
     """Gate structural completeness while keeping source review explicitly pending."""
     if any(repo._xfers_missing.values()) or getattr(repo, "_xfers_unresolved", ()):
@@ -2626,6 +2539,14 @@ def _release_validation(repo: DataEngine) -> dict[str, Any]:
         "reporting_only_campus_count": sum(c.meta.get("identity_source") == "accountability" for c in repo._campuses.values()),
         "public_campuses_without_location": sum(not c.is_private and c.location is None for c in repo._campuses.values()),
         "unmatched_transfer_endpoints": dict(repo._xfers_missing),
+        **_district_classification_counts(repo),
+    }
+
+
+def _district_classification_counts(repo: DataEngine) -> dict[str, int]:
+    return {
+        "traditional_boundary_count": sum(is_traditional_district(d) and d.polygon is not None for d in repo._districts.values()),
+        "district_missing_subtype_count": sum(not d.meta.get("organization_sub_type") for d in repo._districts.values()),
     }
 
 
@@ -2705,7 +2626,14 @@ def _build_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
 
                 lookup_keys = _district_lookup_keys(district_number)
 
-                if any(key in dn_to_id for key in lookup_keys if key):
+                classification = {
+                    "organization_sub_type": record.get("Organization Sub Type"),
+                    "district_type_source": "all_districts_reference",
+                    "district_type_source_version": str(ref_year),
+                }
+                existing_id = next((dn_to_id[key] for key in lookup_keys if key in dn_to_id), None)
+                if existing_id is not None:
+                    repo._districts[existing_id].meta.update(classification)
                     continue
 
                 name = (
@@ -2723,6 +2651,7 @@ def _build_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                     name=name,
                     enrollment=None,
                     boundary=None,
+                    meta=classification,
                 )
                 district.district_number = district_number
                 repo.add_district(district)
@@ -2784,20 +2713,6 @@ def _build_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
         except Exception as e:
             raise ContractError(f"[districts_ref2] add failed: {e}") from e
 
-        # Add default fallback District object
-        fallback_district = District(
-            id=uuid.uuid5(uuid.NAMESPACE_URL, "teadata:district:unknown"),
-            name="Unknown District",
-            enrollment=None,
-            rating="",
-            boundary=None,
-        )
-        fallback_district.district_number = (
-            canonical_district_number("000000") or "'000000"
-        )
-        repo.add_district(fallback_district)
-        fallback_id = fallback_district.id
-
         # Campuses
         for row in gdf_campuses.itertuples(index=False):
             raw_district = getattr(row, "USER_District_Number")
@@ -2814,8 +2729,6 @@ def _build_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
             district_id = next(
                 (dn_to_id.get(k) for k in lookup_keys if k in dn_to_id), None
             )
-            if district_id is None:
-                district_id = fallback_id
 
             campus_aea_raw = _normalize_aea_raw(getattr(row, "USER_AEA", None))
             c = Campus(
@@ -2826,7 +2739,7 @@ def _build_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                 district_id=district_id,
                 name=getattr(row, "USER_School_Name", "Unnamed Campus"),
                 enrollment=None,
-                district_number=district_key,
+                district_number=district_key if district_id is not None else None,
                 campus_number=canonical_campus_number(
                     getattr(row, "USER_School_Number", None)
                 ),
@@ -2845,6 +2758,7 @@ def _build_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                 ),
                 is_magnet=getattr(row, "USER_Magnet_Status", None),
                 location=getattr(row, "geometry"),
+                meta={"reported_district_number": raw_district, "identity_source": "campus_geometry"},
             )
             repo.add_campus(c)
 
@@ -2863,10 +2777,14 @@ def _build_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
         try:
             cfg_obj = load_config(CFG)
             private_dataset_name = cfg_obj.options["private_dataset"]
+            if private_dataset_name and private_dataset_name != "tefa":
+                raise ContractError("Selected private source lacks a supported opaque identity contract")
             if private_dataset_name:
                 private_year, private_fp = cfg_obj.resolve(
                     private_dataset_name, YEAR, section="data_sources"
                 )
+        except ContractError:
+            raise
         except Exception as exc:
             raise ContractError("Private school source is not configured") from exc
 
@@ -2876,199 +2794,7 @@ def _build_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
             except Exception as exc:
                 raise ContractError("Private school source failed to load") from exc
             else:
-                if private_dataset_name == "tefa":
-                    if "Vendor Type" in df_private.columns:
-                        vendor_series = (
-                            df_private["Vendor Type"]
-                            .fillna("")
-                            .astype(str)
-                            .str.strip()
-                            .str.lower()
-                        )
-                        df_private = df_private[vendor_series == "schools"].copy()
-
-                    used_campus_digits = _existing_campus_number_digits(repo)
-                    tefa_id_map = _build_tefa_private_campus_number_map(
-                        df_private.get("ID", pd.Series(dtype="object")),
-                        used_campus_digits,
-                    )
-
-                    for record in df_private.to_dict(orient="records"):
-                        raw_district = _get_record_value(
-                            record,
-                            ["School District Number"],
-                        )
-                        district_key = canonical_district_number(raw_district)
-                        lookup_keys = _district_lookup_keys(district_key)
-                        if not lookup_keys and raw_district is not None:
-                            lookup_keys = _district_lookup_keys(
-                                str(raw_district).strip()
-                            )
-
-                        district_id = next(
-                            (dn_to_id.get(k) for k in lookup_keys if k in dn_to_id),
-                            None,
-                        )
-                        if district_id is None:
-                            district_id = fallback_id
-
-                        school_name = _get_record_value(record, ["Name"])
-                        tefa_id = _private_tefa_id(_get_record_value(record, ["ID"]))
-                        campus_number = tefa_id_map.get(tefa_id) if tefa_id else None
-
-                        location = _tepsac_coords(
-                            _get_record_value(record, ["Location Lng"]),
-                            _get_record_value(record, ["Location Lat"]),
-                        )
-
-                        district_name = _get_record_value(
-                            record,
-                            ["School District Name20", "School District Name"],
-                        )
-
-                        meta_payload: dict[str, Any] = {}
-                        school_full_address = _get_record_value(
-                            record,
-                            ["Address Formatted", "Address City State Zip"],
-                        )
-                        if school_full_address is not None:
-                            meta_payload["school_full_address"] = school_full_address
-
-                        school_website = _get_record_value(record, ["Contact Website"])
-                        if school_website is not None:
-                            meta_payload["school_website"] = school_website
-
-                        if district_name is not None:
-                            meta_payload["district_name"] = district_name
-
-                        display_grade_range = _get_record_value(
-                            record, ["Display Grade Range"]
-                        )
-                        if display_grade_range is not None:
-                            meta_payload["display_grade_range"] = display_grade_range
-
-                        if tefa_id is not None:
-                            meta_payload["tefa_id"] = tefa_id
-
-                        if private_year is not None:
-                            meta_payload["private_school_dataset_year"] = private_year
-                        if private_dataset_name:
-                            meta_payload["private_school_dataset"] = (
-                                private_dataset_name
-                            )
-
-                        campus = Campus(
-                            id=uuid.uuid5(
-                                uuid.NAMESPACE_URL,
-                                "teadata:private:" + str(campus_number),
-                            ),
-                            district_id=district_id,
-                            name=school_name or "Unnamed Private School",
-                            charter_type="",
-                            is_charter=False,
-                            is_private=True,
-                            enrollment=None,
-                            grade_range=_tefa_grade_range(
-                                _get_record_value(record, ["Min Grade"]),
-                                _get_record_value(record, ["Max Grade"]),
-                                display_grade_range,
-                            ),
-                            school_type=_tefa_school_type(
-                                _get_record_value(record, ["Min Grade"]),
-                                _get_record_value(record, ["Max Grade"]),
-                                _get_record_value(record, ["Is Pre K", "Is Pre-K"]),
-                                _get_record_value(record, ["Is Elementary"]),
-                                _get_record_value(record, ["Is Middle"]),
-                                _get_record_value(record, ["Is High"]),
-                            ),
-                            district_number=district_key
-                            or (str(raw_district).strip() if raw_district else None),
-                            campus_number=campus_number,
-                            location=location,
-                            meta=meta_payload,
-                        )
-                        repo.add_campus(campus)
-                        private_loaded += 1
-                else:
-                    for row in df_private.itertuples(index=False):
-                        raw_district = getattr(row, "district_number", None)
-                        district_key = canonical_district_number(raw_district)
-                        lookup_keys: list[str] = []
-                        if district_key:
-                            lookup_keys.append(district_key)
-                            digits = (
-                                district_key[1:]
-                                if isinstance(district_key, str)
-                                and district_key.startswith("'")
-                                else district_key
-                            )
-                            if digits:
-                                lookup_keys.append(digits)
-                                if isinstance(digits, str) and digits.isdigit():
-                                    lookup_keys.append(str(int(digits)))
-                        elif raw_district:
-                            lookup_keys.append(str(raw_district).strip())
-
-                        district_id = next(
-                            (dn_to_id.get(k) for k in lookup_keys if k in dn_to_id),
-                            None,
-                        )
-                        if district_id is None:
-                            district_id = fallback_id
-
-                        meta_fields = [
-                            "school_full_address",
-                            "school_website",
-                            "school_accreditations",
-                        ]
-                        meta_payload = {}
-                        for field_name in meta_fields:
-                            val = getattr(row, field_name, None)
-                            try:
-                                if hasattr(pd, "isna") and pd.isna(val):
-                                    continue
-                            except Exception:
-                                pass
-                            if val is not None:
-                                meta_payload[field_name] = val
-                        if private_year is not None:
-                            meta_payload["private_school_dataset_year"] = private_year
-                        if private_dataset_name:
-                            meta_payload["private_school_dataset"] = (
-                                private_dataset_name
-                            )
-
-                        campus = Campus(
-                            id=uuid.uuid5(
-                                uuid.NAMESPACE_URL,
-                                "teadata:tepsac:"
-                                + str(getattr(row, "school_number", None)),
-                            ),
-                            district_id=district_id,
-                            name=getattr(row, "school_name", "Unnamed Private School"),
-                            charter_type="",
-                            is_charter=False,
-                            is_private=True,
-                            enrollment=_private_clean_number(
-                                getattr(row, "enrollment", None)
-                            ),
-                            grade_range=_tepsac_grade_span(
-                                getattr(row, "grade_low", None),
-                                getattr(row, "grade_high", None),
-                            ),
-                            district_number=district_key
-                            or (str(raw_district).strip() if raw_district else None),
-                            campus_number=canonical_campus_number(
-                                getattr(row, "school_number", None)
-                            ),
-                            location=_tepsac_coords(
-                                getattr(row, "best_lng", None),
-                                getattr(row, "best_lat", None),
-                            ),
-                            meta=meta_payload,
-                        )
-                        repo.add_campus(campus)
-                        private_loaded += 1
+                private_loaded = _add_tefa_entities(repo, df_private, version=private_year)
 
                 print(
                     f"[private] loaded {private_loaded} private campuses from {private_year} (dataset={private_dataset_name})"

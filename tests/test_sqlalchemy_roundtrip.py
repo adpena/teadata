@@ -1,12 +1,16 @@
 """Lossless source custody and bounded database I/O for the graph bridge."""
 
 from hashlib import sha256
+from importlib.resources import files
+import json
 import math
+import os
 import sqlite3
 import uuid
 
 import pytest
-from sqlalchemy import event, func, inspect, select, text
+from sqlalchemy import Text, event, func, inspect, select, text
+from sqlalchemy.engine import make_url
 
 from teadata.classes import Campus, DataEngine, District
 from teadata.manifest import (
@@ -216,6 +220,131 @@ def test_missing_source_catalog_is_refused(database):
         )
         with pytest.raises(ContractError, match="required dataset catalog"):
             import_dataengine(session)
+
+
+@pytest.mark.parametrize("operation", ["write", "read"])
+def test_catalog_refusal_does_not_autoflush_pending_caller_entities(database, catalog, operation):
+    engine, factory = database
+    with factory.begin() as session:
+        export_dataengine(graph(catalog), session)
+        if operation == "read":
+            session.connection().execute(
+                text(f"UPDATE {CATALOG_TABLE} SET build_id=:identity"),
+                {"identity": "f" * 64},
+            )
+    statements = []
+
+    def observe(connection, cursor, statement, parameters, context, executemany):
+        statements.append(statement.lstrip().upper())
+
+    with factory() as session:
+        pending = DistrictRecord(id=uuid.UUID(int=99), name="Caller pending district")
+        session.add(pending)
+        event.listen(engine, "before_cursor_execute", observe)
+        try:
+            with pytest.raises(ContractError, match="cannot mix|projection mismatch"):
+                if operation == "write":
+                    export_dataengine(graph(changed_catalog(catalog), 1), session)
+                else:
+                    import_dataengine(session)
+        finally:
+            event.remove(engine, "before_cursor_execute", observe)
+        assert pending in session.new
+        assert inspect(pending).pending
+        assert not any(sql.startswith(("INSERT", "UPDATE", "DELETE")) for sql in statements)
+        assert session.connection().execute(
+            select(func.count()).select_from(DistrictRecord)
+        ).scalar_one() == 2
+        session.rollback()
+
+
+@pytest.mark.parametrize("already_bound", [False, True])
+def test_accepted_catalog_still_flushes_caller_work_and_leaves_commit_to_caller(database, catalog, already_bound):
+    _, factory = database
+    if already_bound:
+        with factory.begin() as session:
+            export_dataengine(graph(catalog), session)
+    with factory() as session:
+        pending = DistrictRecord(id=uuid.UUID(int=99), name="Caller pending district")
+        session.add(pending)
+        export_dataengine(graph(catalog, 1), session)
+        assert pending not in session.new
+        assert inspect(pending).persistent
+        assert session.connection().execute(
+            select(func.count()).select_from(DistrictRecord)
+        ).scalar_one() == (3 if already_bound else 2)
+        session.rollback()
+    with factory() as session:
+        assert session.connection().execute(
+            select(func.count()).select_from(DistrictRecord)
+        ).scalar_one() == (2 if already_bound else 0)
+
+
+def test_postgresql_roundtrip_preserves_full_publisher_rating(catalog):
+    """Opt-in native PostgreSQL check: SQLite does not enforce VARCHAR widths."""
+    url = os.environ.get("TEADATA_TEST_POSTGRES_URL")
+    if not url:
+        pytest.skip("Set TEADATA_TEST_POSTGRES_URL to a fresh empty teadata_test_* database")
+    destination = make_url(url)
+    if destination.get_backend_name() != "postgresql" or not (
+        destination.database and destination.database.startswith("teadata_test_")
+    ):
+        pytest.fail("Publisher-label integration requires an explicitly owned PostgreSQL test database")
+    excerpts = json.loads(
+        files("teadata").joinpath("reference_cases/publisher_2025.json").read_text()
+    )
+    case = next(c for c in excerpts["cases"] if c["entity"].get("number") == "220820102")
+    label = "Not Rated: Minimum Size rules"  # Retained Summary!G8507, not a generated oracle.
+    engine = create_engine(url)
+    try:
+        with engine.connect() as connection:
+            assert inspect(connection).get_table_names() == [], "Test database must be empty"
+        ensure_schema(engine)
+        factory = create_sessionmaker(engine)
+        repo = DataEngine()
+        repo.catalog = catalog
+        district = District(
+            id=uuid.uuid5(uuid.NAMESPACE_URL, "publisher-test:220820"),
+            name="ROCKETSHIP PUBLIC SCHOOLS",  # Campus Student record 7474, DISTNAME.
+            district_number="220820",
+        )
+        campus = Campus(
+            id=uuid.uuid5(uuid.NAMESPACE_URL, "publisher-test:220820102"),
+            district_id=district.id,
+            district_number="220820",
+            campus_number="220820102",
+            name=case["entity"]["name"],
+            charter_type="OPEN ENROLLMENT CHARTER",
+            is_charter=True,
+            rating=label,
+            meta={fact["field"]: fact["source"]["raw_token"] for fact in case["facts"]},
+        )
+        repo.add_district(district)
+        repo.add_campus(campus)
+        with factory.begin() as session:
+            export_dataengine(repo, session)
+        with engine.connect() as connection:
+            stored, length = connection.execute(
+                select(CampusRecord.rating, func.char_length(CampusRecord.rating))
+            ).one()
+            assert stored == label and length == 29
+            for table in ("districts", "campuses"):
+                rating_column = next(c for c in inspect(connection).get_columns(table) if c["name"] == "rating")
+                assert isinstance(rating_column["type"], Text)
+        for lazy in (False, True):
+            with factory() as session:
+                restored = import_dataengine(session, lazy_meta=lazy)
+                actual = restored._campuses[campus.id]
+                assert restored.catalog.build_id == catalog.build_id
+                assert actual.rating == label
+                assert actual.meta["overall_rating"] == label
+                value = restored.catalog.measurement(actual, "overall_rating")
+                assert value.value == value.raw == label
+                assert value.status.value == "observed"
+                assert value.source["period"] == {"kind": "calendar_year", "year": 2025}
+                assert value.source["build_id"] == catalog.build_id
+    finally:
+        engine.dispose()
 
 
 def test_unsafe_legacy_uuid_schema_is_refused_without_ddl_changes():

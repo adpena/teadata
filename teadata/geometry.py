@@ -14,7 +14,7 @@ try:
 
     SHAPELY = True
 except Exception:  # pragma: no cover - optional dependency
-    MultiPolygon = ShapelyPoint = ShapelyPolygon = None  # type: ignore
+    MultiPolygon = ShapelyPoint = ShapelyPolygon = None
     SHAPELY = False
 
 
@@ -175,7 +175,7 @@ class GeoField:
         target = None
 
         if self.geom_type == "point":
-            if SHAPELY:
+            if SHAPELY and ShapelyPoint is not None:
                 if isinstance(value, ShapelyPoint):
                     target = value
                 elif (
@@ -196,7 +196,7 @@ class GeoField:
                     target = (float(value[0]), float(value[1]))
 
         elif self.geom_type == "polygon":
-            if SHAPELY:
+            if SHAPELY and ShapelyPolygon is not None and MultiPolygon is not None:
                 if isinstance(value, (ShapelyPolygon, MultiPolygon)):
                     target = value
                 elif isinstance(value, list) and all(

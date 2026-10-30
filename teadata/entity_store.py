@@ -12,9 +12,41 @@ from typing import Any, Iterable, Optional
 
 from .manifest import ContractError, read_sqlite_catalog, read_sqlite_catalog_connection
 from .release import current_release
-from .teadata_config import canonical_campus_number, canonical_district_number
+from .teadata_config import canonical_district_number
+from .identifiers import campus_lookup_key, normalize_campus_lookup_key
 
 logger = logging.getLogger(__name__)
+
+
+_CAMPUS_SELECT = """
+    SELECT c.campus_number, c.campus_number_canon, c.name, c.is_charter, c.is_private,
+           c.enrollment, c.rating, c.aea, c.aea_raw, c.grade_range, c.lon, c.lat, c.meta,
+           d.name, d.district_number, d.district_number_canon,
+           c.lookup_key,c.source_namespace,c.source_id,c.id,c.district_id
+    FROM campuses c LEFT JOIN districts d ON d.id = c.district_id
+"""
+
+
+def _campus_record(row, *, include_meta: bool, build_id: str) -> dict[str, Any]:
+    try:
+        key = campus_lookup_key(campus_number=row[0], source_namespace=row[17], source_id=row[18], is_private=bool(row[4]))
+    except (ValueError, TypeError) as error:
+        raise ContractError("Stored campus has an invalid source identity") from error
+    if key is None or key != row[16]:
+        raise ContractError("Stored campus key differs from its source identity")
+    if bool(row[4]) and (row[20] is not None or row[14] is not None):
+        raise ContractError("Private school cannot have public governing affiliation")
+    return {
+        "id": row[19], "lookup_key": key, "source_namespace": row[17], "source_id": row[18],
+        "district_id": row[20], "source_build_id": build_id,
+        "campus_number": row[0], "campus_number_canon": row[1],
+        "name": row[2] or "", "is_charter": bool(row[3]), "is_private": bool(row[4]),
+        "enrollment": row[5], "rating": row[6], "aea": _nullable_bool(row[7]), "aea_raw": row[8],
+        "grade_range": row[9] or "", "lon": row[10], "lat": row[11],
+        "meta": _decode_json(row[12]) if include_meta else {}, "district_name": row[13],
+        "district_number": _strip_leading_apostrophe(row[14]) if row[14] is not None else None,
+        "district_number_canon": row[15],
+    }
 
 
 def entity_store_path_for_snapshot(snapshot_path: Path) -> Path:
@@ -38,26 +70,6 @@ def _strip_leading_apostrophe(value: Optional[str]) -> str:
         return text[1:]
     return text
 
-
-def _campus_lookup_keys(campus_number: Optional[str]) -> Iterable[str]:
-    if not campus_number:
-        return ()
-    keys = []
-    canonical = canonical_campus_number(campus_number)
-    if canonical:
-        keys.append(canonical)
-    raw = str(campus_number).strip()
-    if raw and raw not in keys:
-        keys.append(raw)
-    if raw.startswith("'") and len(raw) > 1:
-        digits = raw[1:]
-        if digits not in keys:
-            keys.append(digits)
-        if digits.isdigit():
-            normalized = str(int(digits)).rjust(9, "0")
-            if normalized not in keys:
-                keys.append(normalized)
-    return keys
 
 
 def _decode_json(payload: Any) -> dict[str, Any]:
@@ -128,55 +140,13 @@ def _nullable_bool(value: Any) -> bool | None:
 
 
 def load_campus(
-    campus_number: str,
-    *,
-    store_path: str | Path | None = None,
+    campus_number: str, *, store_path: str | Path | None = None,
     include_meta: bool = True,
 ) -> Optional[dict[str, Any]]:
+    """Read one public or source-qualified campus through the canonical store."""
     path = discover_entity_store(store_path)
-    if not path:
-        return None
-
-    query = """
-        SELECT c.campus_number, c.campus_number_canon, c.name, c.is_charter, c.is_private,
-               c.enrollment, c.rating, c.aea, c.aea_raw, c.grade_range, c.lon, c.lat, c.meta,
-               d.name, d.district_number, d.district_number_canon
-        FROM campuses c
-        LEFT JOIN districts d ON d.id = c.district_id
-        WHERE c.campus_number_canon = ? OR c.campus_number = ?
-    """
-
-    try:
-        with closing(sqlite3.connect(path)) as conn:
-            for key in _campus_lookup_keys(campus_number):
-                row = conn.execute(query, (key, key)).fetchone()
-                if not row:
-                    continue
-                meta = _decode_json(row[12]) if include_meta else {}
-                return {
-                    "campus_number": row[0] or "",
-                    "campus_number_canon": row[1] or "",
-                    "name": row[2] or "",
-                    "is_charter": bool(row[3]),
-                    "is_private": bool(row[4]),
-                    "enrollment": row[5],
-                    "rating": row[6],
-                    "aea": _nullable_bool(row[7]),
-                    "aea_raw": row[8],
-                    "grade_range": row[9] or "",
-                    "lon": row[10],
-                    "lat": row[11],
-                    "meta": meta,
-                    "district_name": row[13] or "",
-                    "district_number": _strip_leading_apostrophe(row[14]),
-                    "district_number_canon": row[15] or "",
-                }
-    except ContractError:
-        raise
-    except Exception as exc:
-        raise RuntimeError(f"Failed querying campus from entity store '{path}': {exc}") from exc
-
-    return None
+    with EntityStore(path) as store:
+        return store.get_campus(campus_number, include_meta=include_meta)
 
 
 def load_district(
@@ -329,7 +299,11 @@ class EntityStore:
     @cached_property
     def catalog(self):
         self._ensure_open()
-        return read_sqlite_catalog_connection(self.connection)
+        catalog = read_sqlite_catalog_connection(self.connection)
+        columns = {row[1] for row in self.connection.execute("PRAGMA table_info(campuses)")}
+        if not {"lookup_key", "source_namespace", "source_id"}.issubset(columns):
+            raise ContractError("Legacy entity store campus identity schema requires a source-bound rebuild")
+        return catalog
 
     @property
     def connection(self) -> sqlite3.Connection:
@@ -362,7 +336,7 @@ class EntityStore:
         self._ensure_open()
         if not campus_number:
             return None
-        key = canonical_campus_number(campus_number) or str(campus_number).strip()
+        key = normalize_campus_lookup_key(campus_number)
         if not key:
             return None
         cached = self._campus_cache.get(key) if cache else None
@@ -407,39 +381,12 @@ class EntityStore:
     def iter_campuses(self, *, include_meta: bool = True) -> Iterable[dict[str, Any]]:
         conn = self._connect()
         if conn is None:
-            return []
-        query = """
-            SELECT c.campus_number, c.campus_number_canon, c.name, c.is_charter, c.is_private,
-                   c.enrollment, c.rating, c.aea, c.aea_raw, c.grade_range, c.lon, c.lat, c.meta,
-                   d.name, d.district_number, d.district_number_canon
-            FROM campuses c
-            LEFT JOIN districts d ON d.id = c.district_id
-        """
+            return
         try:
-            rows = conn.execute(query)
-        except Exception:
-            return []
-        for row in rows:
-            meta = _decode_json(row[12]) if include_meta else {}
-            yield {
-                "source_build_id": self.catalog.build_id,
-                "campus_number": row[0] or "",
-                "campus_number_canon": row[1] or "",
-                "name": row[2] or "",
-                "is_charter": bool(row[3]),
-                "is_private": bool(row[4]),
-                "enrollment": row[5],
-                "rating": row[6],
-                "aea": _nullable_bool(row[7]),
-                "aea_raw": row[8],
-                "grade_range": row[9] or "",
-                "lon": row[10],
-                "lat": row[11],
-                "meta": meta,
-                "district_name": row[13] or "",
-                "district_number": _strip_leading_apostrophe(row[14]),
-                "district_number_canon": row[15] or "",
-            }
+            for row in conn.execute(_CAMPUS_SELECT):
+                yield _campus_record(row, include_meta=include_meta, build_id=self.catalog.build_id)
+        except sqlite3.OperationalError as error:
+            raise ContractError("Entity store requires the source-qualified campus identity schema; rebuild it") from error
 
     def iter_districts(self, *, include_meta: bool = True) -> Iterable[dict[str, Any]]:
         conn = self._connect()
@@ -503,45 +450,15 @@ class EntityStore:
         self._meta_keys_cache[entity_type] = keys
         return keys[:limit] if limit else keys
 
-    def _load_campus_from_conn(
-        self, key: str, *, include_meta: bool = True
-    ) -> Optional[dict[str, Any]]:
+    def _load_campus_from_conn(self, key: str, *, include_meta: bool = True) -> Optional[dict[str, Any]]:
         conn = self._connect()
         if conn is None:
             return None
-        query = """
-            SELECT c.campus_number, c.campus_number_canon, c.name, c.is_charter, c.is_private,
-                   c.enrollment, c.rating, c.aea, c.aea_raw, c.grade_range, c.lon, c.lat, c.meta,
-                   d.name, d.district_number, d.district_number_canon
-            FROM campuses c
-            LEFT JOIN districts d ON d.id = c.district_id
-            WHERE c.campus_number_canon = ? OR c.campus_number = ?
-        """
         try:
-            row = conn.execute(query, (key, key)).fetchone()
-        except Exception:
-            row = None
-        if not row:
-            return None
-        meta = _decode_json(row[12]) if include_meta else {}
-        return {
-            "campus_number": row[0] or "",
-            "campus_number_canon": row[1] or "",
-            "name": row[2] or "",
-            "is_charter": bool(row[3]),
-            "is_private": bool(row[4]),
-            "enrollment": row[5],
-            "rating": row[6],
-            "aea": _nullable_bool(row[7]),
-            "aea_raw": row[8],
-            "grade_range": row[9] or "",
-            "lon": row[10],
-            "lat": row[11],
-            "meta": meta,
-            "district_name": row[13] or "",
-            "district_number": _strip_leading_apostrophe(row[14]),
-            "district_number_canon": row[15] or "",
-        }
+            row = conn.execute(_CAMPUS_SELECT + " WHERE c.lookup_key = ?", (key,)).fetchone()
+        except sqlite3.OperationalError as error:
+            raise ContractError("Entity store requires the source-qualified campus identity schema; rebuild it") from error
+        return _campus_record(row, include_meta=include_meta, build_id=self.catalog.build_id) if row else None
 
     def _load_district_from_conn(
         self, key: str, *, include_meta: bool = True

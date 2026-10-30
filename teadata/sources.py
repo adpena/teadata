@@ -105,23 +105,26 @@ def observe_sources(
                     raise ValueError(
                         f"Reference {reference.reference_id} needs explicit --fetch-references"
                     )
-                if reference.url not in references:
+                url = reference.url
+                if url is None:
+                    raise ValueError(f"Reference {reference.reference_id} has no remote URL")
+                if url not in references:
                     document = ResolvedDataset(
                         dataset=f"reference:{reference.reference_id}",
                         section="reference",
                         requested_year=None,
                         resolved_year=source.resolved_year,
                         path="",
-                        metadata=DatasetMetadata(title=reference.title, source_url=reference.url),
+                        metadata=DatasetMetadata(title=reference.title, source_url=url),
                     )
-                    extension = Path(urlparse(reference.url).path).suffix
+                    extension = Path(urlparse(url).path).suffix
                     if extension not in {".pdf", ".html", ".csv", ".xlsx"}:
                         extension = ".html"
-                    references[reference.url] = client.fetch(
-                        reference.url, document, filename=reference.reference_id + extension
+                    references[url] = client.fetch(
+                        url, document, filename=reference.reference_id + extension
                     ).record_id
                 updated_refs.append(
-                    replace(reference, provenance_ids=(references[reference.url],))
+                    replace(reference, provenance_ids=(references[url],))
                 )
             source = replace(
                 source,

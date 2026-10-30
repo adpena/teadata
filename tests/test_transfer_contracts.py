@@ -60,6 +60,18 @@ def frame(destination="123456002", count=12):
     )
 
 
+@pytest.mark.parametrize("district_type", ["isd", "charter"])
+def test_map_human_labels_with_colons_are_not_identity_inputs(transfer_repo, catalog, district_type):
+    repo, district, campuses = transfer_repo
+    repo.catalog = catalog
+    campuses[0].name = "Example: East Campus"
+    campuses[1].name = "Example: Charter Campus"
+    repo.apply_transfers_from_dataframe(frame(), value_policy=catalog.policy("campus_transfer_reports"))
+    payload = build_closures_map_payload(repo, district, district_type=district_type)
+    assert payload["aisdCampuses"][0]["name"] == "Example: East Campus"
+    assert payload["charterCampuses"][0]["name"] == "Example: Charter Campus"
+
+
 @pytest.mark.parametrize(
     "value,expected",
     [

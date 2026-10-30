@@ -4,7 +4,7 @@ from typing import Dict, Any, Callable
 import teadata.classes as classes_mod
 import pandas as pd
 from . import enricher
-from .base import Enricher
+from .base import Enricher, clean_value_columns
 
 from teadata.teadata_config import load_config
 
@@ -12,11 +12,6 @@ from teadata.teadata_config import (
     canonical_campus_number,
     normalize_campus_number_column,
 )
-
-try:  # optional performance dependency
-    import polars as pl
-except Exception:  # pragma: no cover - optional dependency
-    pl = None  # type: ignore[assignment]
 
 DEFAULT_PEIMS_FINANCIAL_COLUMNS: list[str] = [
     "instruction_af_perc",
@@ -48,59 +43,6 @@ def _canon_campus_number(x) -> str | None:
 def _canon_series(series: pd.Series) -> pd.Series:
     """Vectorized canonicalization for a pandas Series of campus numbers."""
     return series.map(canonical_campus_number)
-
-
-def _is_text_series(series: pd.Series, *, sample_size: int = 64) -> bool:
-    if pd.api.types.is_string_dtype(series):
-        return True
-    if series.dtype != object:
-        return False
-    non_null = series[series.notna()]
-    if non_null.empty:
-        return False
-    sample = non_null.head(sample_size)
-    return bool(len(sample)) and all(isinstance(v, str) for v in sample)
-
-
-def _clean_value_columns(df: pd.DataFrame, columns: list[str]) -> None:
-    text_cols = [col for col in columns if col in df.columns and _is_text_series(df[col])]
-    if text_cols:
-        if pl is not None:
-            try:
-                text_frame = pl.from_pandas(df[text_cols], include_index=False)
-                cleaned = text_frame.with_columns(
-                    [
-                        pl.when(pl.col(col).is_null())
-                        .then(None)
-                        .otherwise(pl.col(col).str.strip_chars())
-                        .alias(col)
-                        for col in text_cols
-                    ]
-                ).with_columns(
-                    [
-                        pl.when(pl.col(col) == "").then(None).otherwise(pl.col(col)).alias(
-                            col
-                        )
-                        for col in text_cols
-                    ]
-                )
-                cleaned_pdf = cleaned.to_pandas(use_pyarrow_extension_array=True)
-                for col in text_cols:
-                    df[col] = cleaned_pdf[col]
-            except Exception:
-                for col in text_cols:
-                    cleaned = df[col].astype("string").str.strip()
-                    cleaned = cleaned.replace("", pd.NA)
-                    df[col] = cleaned.where(cleaned.notna(), None)
-        else:
-            for col in text_cols:
-                cleaned = df[col].astype("string").str.strip()
-                cleaned = cleaned.replace("", pd.NA)
-                df[col] = cleaned.where(cleaned.notna(), None)
-
-    for col in columns:
-        if col in df.columns:
-            df[col] = df[col].where(pd.notna(df[col]), None)
 
 
 def _build_mapping(sub: pd.DataFrame, use_cols: list[str]) -> dict[str, dict[str, Any]]:
@@ -236,7 +178,7 @@ def _apply_campus_enrichment_table(
                 "campus enrichment requires a non-empty `select` collection of column names"
             )
 
-    _clean_value_columns(df, use_cols)
+    clean_value_columns(df, use_cols)
 
     # Build mapping from canonical campus_number -> selected attrs
     sub = df[["campus_number"] + use_cols].drop_duplicates("campus_number")
@@ -374,7 +316,7 @@ def _apply_campus_peims_financials(
             + ", ".join(sorted(missing))
         )
 
-    _clean_value_columns(df, use_cols)
+    clean_value_columns(df, use_cols)
     sub = df[["campus_number"] + use_cols].drop_duplicates("campus_number")
     mapping = _build_mapping(sub, use_cols)
 

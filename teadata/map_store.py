@@ -5,9 +5,10 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Iterable, Optional, Tuple
 
-from .manifest import read_sqlite_catalog
+from .manifest import ContractError, read_sqlite_catalog
 from .release import current_release
-from .teadata_config import canonical_campus_number, canonical_district_number
+from .teadata_config import canonical_district_number
+from .identifiers import normalize_campus_lookup_key
 
 _GZIP_MAGIC = b"\x1f\x8b"
 
@@ -20,11 +21,13 @@ def map_store_path_for_snapshot(snapshot_path: Path) -> Path:
 
 
 def discover_map_store(explicit: str | Path | None = None) -> Path:
-    if explicit is not None:
-        path = Path(explicit)
-        read_sqlite_catalog(path)
-        return path
-    return current_release().artifact("maps")
+    path = Path(explicit) if explicit is not None else current_release().artifact("maps")
+    read_sqlite_catalog(path)
+    with sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True) as connection:
+        columns = {row[1] for row in connection.execute("PRAGMA table_info(campus_profile)")}
+    if "lookup_key" not in columns:
+        raise ContractError("Legacy map campus identity schema requires a source-bound rebuild")
+    return path
 
 
 def _district_lookup_keys(district_number: Optional[str]) -> Iterable[str]:
@@ -48,25 +51,6 @@ def _district_lookup_keys(district_number: Optional[str]) -> Iterable[str]:
     return keys
 
 
-def _campus_lookup_keys(campus_number: Optional[str]) -> Iterable[str]:
-    if not campus_number:
-        return ()
-    keys = []
-    canonical = canonical_campus_number(campus_number)
-    if canonical:
-        keys.append(canonical)
-    raw = str(campus_number).strip()
-    if raw and raw not in keys:
-        keys.append(raw)
-    if raw.startswith("'") and len(raw) > 1:
-        digits = raw[1:]
-        if digits not in keys:
-            keys.append(digits)
-        if digits.isdigit():
-            normalized = str(int(digits)).rjust(9, "0")
-            if normalized not in keys:
-                keys.append(normalized)
-    return keys
 
 
 def _decode_payload(payload: Any) -> Optional[dict]:
@@ -123,25 +107,13 @@ def load_map_payload_parts(
 def load_campus_profile_payload(
     campus_number: str, *, store_path: str | Path | None = None
 ) -> Optional[dict]:
-    path = discover_map_store(store_path)
-    if not path:
+    key = normalize_campus_lookup_key(campus_number)
+    if key is None:
         return None
-
+    path = discover_map_store(store_path)
     try:
         with sqlite3.connect(path) as conn:
-            for key in _campus_lookup_keys(campus_number):
-                row = conn.execute(
-                    "SELECT payload FROM campus_profile WHERE campus_number = ?",
-                    (key,),
-                ).fetchone()
-                if row:
-                    return _decode_payload(row[0])
-    except Exception:
-        logger.exception(
-            "map_store.load_campus_profile_payload_failed path=%s campus_number=%s",
-            path,
-            campus_number,
-        )
-        return None
-
-    return None
+            row = conn.execute("SELECT payload FROM campus_profile WHERE lookup_key = ?", (key,)).fetchone()
+            return _decode_payload(row[0]) if row else None
+    except sqlite3.OperationalError as error:
+        raise ContractError("Legacy map campus identity schema requires a source-bound rebuild") from error

@@ -91,11 +91,11 @@ def parse_bindings(raw: Mapping[str, Any] | None) -> dict[str, MetricBinding | s
     for key in result:
         seen = set()
         target = key
-        while isinstance(result.get(target), str):
+        while isinstance(alias := result.get(target), str):
             if target in seen:
                 raise ValueError("Cyclic canonical metric alias")
             seen.add(target)
-            target = result[target]
+            target = alias
         if target not in result:
             raise ValueError("Canonical metric alias has no binding")
     return result

@@ -66,10 +66,12 @@ def _source_columns(scope: str, name: str, kind: str, index: int,
 
 def _context(record: dict[str, Any], scope: str) -> SimpleNamespace:
     entity = SimpleNamespace(**record)
-    if scope == "campus":
+    if scope == "campus" and record.get("district_id") is not None:
         entity.district = SimpleNamespace(
             name=record.get("district_name", ""), district_number=record.get("district_number"),
         )
+    elif scope == "campus":
+        entity.district = None
     return entity
 
 
@@ -142,8 +144,9 @@ def build_analytical_artifacts(
                 fields = tuple(row[0] for row in connection.execute(
                     f"SELECT DISTINCT j.key FROM {table} c,json_each(c.meta) j WHERE json_type(c.meta)='object' ORDER BY j.key"
                 ))
+                key_column = "lookup_key" if scope == "campus" else "COALESCE(NULLIF(district_number_canon,''),district_number)"
                 identifiers = [row[0] for row in connection.execute(
-                    f"SELECT COALESCE(NULLIF({scope}_number_canon,''),{scope}_number) AS public_id FROM {table} ORDER BY public_id"
+                    f"SELECT {key_column} AS entity_key FROM {table} ORDER BY entity_key"
                 )]
                 if (any(not isinstance(value, str) or not value for value in identifiers)
                         or len(set(identifiers)) != len(identifiers)):
@@ -180,7 +183,8 @@ def build_analytical_artifacts(
                                 raise ContractError("An analytical source entity is missing")
                             entity = _context(record, scope)
                             entity_index = start + offset
-                            if (record[f"{scope}_number_canon"] or record[f"{scope}_number"]) != identifier:
+                            actual_key = record["lookup_key"] if scope == "campus" else (record["district_number_canon"] or record["district_number"])
+                            if actual_key != identifier:
                                 raise ContractError("Analytical source identity changed during hydration")
                             attributes.append({"scope": scope, "entity_id": identifier,
                                                "entity_index": entity_index, **entity_attributes(entity, scope=scope)})

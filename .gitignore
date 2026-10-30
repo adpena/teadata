@@ -13,7 +13,6 @@ __pycache__/
 
 # Byte-compiled / optimized / DLL files
 .Python
-.python-version
 
 # Virtual environments
 .venv/

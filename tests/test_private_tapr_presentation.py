@@ -10,8 +10,8 @@ def test_private_map_stats_use_public_metric_applicability_not_private_raw_count
     district = District(id=uuid.uuid4(), name="Home district")
     repo.add_district(district)
     field = catalog.source_for_metric("enrollment", "campus")[1]
-    campus = Campus(id=uuid.uuid4(), district_id=district.id, name="Private school",
-                    charter_type="", is_charter=False, is_private=True, enrollment=37, meta={field: -1})
+    campus = Campus(id=uuid.uuid4(), district_id=None, name="Private school",
+                    charter_type="", is_charter=False, is_private=True, source_namespace="tefa", source_id="recPresentation", enrollment=37, meta={field: -1})
     repo.add_campus(campus)
     stats = {item["id"]: item for item in _map_stats_for_campus(campus)}
     for name in ("enrollment", "overall_rating"):
@@ -28,7 +28,7 @@ def test_public_missing_and_suppressed_map_enrollment_are_distinct(catalog):
     district = District(id=uuid.uuid4(), name="Home district")
     repo.add_district(district)
     field = catalog.source_for_metric("enrollment", "campus")[1]
-    campus = Campus(id=uuid.uuid4(), district_id=district.id, name="Public school",
+    campus = Campus(id=uuid.uuid4(), district_id=None, name="Public school",
                     charter_type="", is_charter=False, meta={field: -1})
     repo.add_campus(campus)
     stats = {item["id"]: item for item in _map_stats_for_campus(campus)}

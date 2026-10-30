@@ -78,7 +78,7 @@ def _entities(path, catalog):
                 district_number_canon TEXT, enrollment, rating, aea, aea_raw, meta TEXT);
             CREATE TABLE campuses (id TEXT PRIMARY KEY, district_id TEXT, campus_number TEXT,
                 campus_number_canon TEXT, name TEXT, is_charter, is_private, enrollment,
-                rating, aea, aea_raw, grade_range TEXT, lon, lat, meta TEXT);
+                rating, aea, aea_raw, grade_range TEXT, lon, lat, meta TEXT, lookup_key TEXT, source_namespace TEXT, source_id TEXT);
         """)
         connection.execute("INSERT INTO districts VALUES (?,?,?,?,?,?,?,?,?)", (
             "d", " ISD ", "012345", canonical_district_number("012345"), 50, "A", None, None,
@@ -88,9 +88,10 @@ def _entities(path, catalog):
             ("012345678", False, {enrollment: -999, rating: "A", "opaque": {"z": [0, False], "a": -0.0}, "explicit_null": None}),
             ("012345679", True, {enrollment: 50, rating: "B", "wide": 2**80}),
         ):
-            connection.execute("INSERT INTO campuses VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
-                number, "d", number, canonical_campus_number(number), " Campus ", False, private, 50,
+            connection.execute("INSERT INTO campuses VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)", (
+                number, None if private else "d", None if private else number, None if private else canonical_campus_number(number), " Campus ", False, private, 50,
                 "C", None, None, " KG–12 ", -97.1, 30.2, json.dumps(meta),
+                "tefa:recAnalytical" if private else number, "tefa" if private else None, "recAnalytical" if private else None,
             ))
         write_sqlite_catalog(connection, catalog)
         connection.commit()

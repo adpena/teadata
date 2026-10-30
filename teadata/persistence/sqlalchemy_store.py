@@ -147,7 +147,7 @@ class DistrictRecord(Base):
     district_number_canon: Mapped[str | None] = mapped_column(String(16), index=True)
     aea: Mapped[bool | None] = mapped_column(Boolean)
     aea_raw: Mapped[str | None] = mapped_column(String(8))
-    rating: Mapped[str | None] = mapped_column(String(16))
+    rating: Mapped[str | None] = mapped_column(Text)
     polygon_wkb: Mapped[bytes | None] = mapped_column(LargeBinary)
     polygon_geojson: Mapped[dict[str, Any] | None] = mapped_column(_JSONType)
     meta: Mapped[dict[str, Any] | None] = mapped_column(_JSONType)
@@ -167,13 +167,16 @@ class CampusRecord(Base):
     district_id: Mapped[uuid.UUID | None] = _uuid_column(
         ForeignKey("districts.id", ondelete="SET NULL"), index=True, nullable=True
     )
+    lookup_key: Mapped[str] = mapped_column(Text, unique=True, nullable=False)
+    source_namespace: Mapped[str | None] = mapped_column(Text)
+    source_id: Mapped[str | None] = mapped_column(Text)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     charter_type: Mapped[str | None] = mapped_column(String(64))
     is_charter: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_private: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_magnet: Mapped[str | None] = mapped_column(String(64))
     enrollment: Mapped[int | None] = mapped_column(Integer)
-    rating: Mapped[str | None] = mapped_column(String(16))
+    rating: Mapped[str | None] = mapped_column(Text)
     aea: Mapped[bool | None] = mapped_column(Boolean)
     aea_raw: Mapped[str | None] = mapped_column(String(8))
     grade_range: Mapped[str | None] = mapped_column(String(64))
@@ -369,6 +372,10 @@ def _validate_storage(connection) -> None:
                     "Legacy JSONB storage normalizes source values; rebuild this database "
                     "from its catalog-bound source using JSON columns."
                 )
+        if table.name == "campuses":
+            names = {column["name"] for column in inspector.get_columns(table.name)}
+            if not {"lookup_key", "source_namespace", "source_id"}.issubset(names):
+                raise ContractError("Legacy campus identity schema requires a source-bound rebuild")
 
 
 # ---------------------------------------------------------------------------
@@ -972,11 +979,17 @@ def _district_payload(district: District, *, include_geometry: bool) -> dict[str
 
 
 def _campus_payload(campus: Campus, *, include_geometry: bool) -> dict[str, Any]:
+    lookup_key = campus.lookup_key
+    if not lookup_key:
+        raise ContractError("Released campuses require a canonical lookup identity")
     aea_raw = _normalize_aea_raw(getattr(campus, "aea_raw", campus.aea))
     wkb, geojson, lon, lat = _dump_point(getattr(campus, "point", None))
     spans = [[low, high] for low, high in campus.grade_range_code_spans]
     return {
         "id": campus.id,
+        "lookup_key": lookup_key,
+        "source_namespace": campus.source_namespace,
+        "source_id": campus.source_id,
         "district_id": campus.district_id,
         "name": campus.name,
         "charter_type": campus.charter_type,
@@ -1088,7 +1101,10 @@ def export_dataengine(
             "Partial database exports support SQLite and PostgreSQL"
         )
     _validate_storage(session.connection())
-    _bind_catalog(repo, session, replace=replace)
+    # SQLAlchemy 2.1 autoflushes Core statements too. Refuse an incompatible
+    # catalog before flushing any pending work owned by the caller.
+    with session.no_autoflush:
+        _bind_catalog(repo, session, replace=replace)
     session.flush()
     if replace:
         for model in (
@@ -1149,7 +1165,8 @@ def _read_catalog(session: Session) -> tuple[DatasetCatalog, str]:
         raise ContractError(
             "Database lacks its required dataset catalog; rebuild from source"
         )
-    row = _catalog_row(session)
+    with session.no_autoflush:
+        row = _catalog_row(session)
     if row is None:
         raise ContractError(
             "Database lacks its required dataset catalog; rebuild from source"
@@ -1286,11 +1303,15 @@ def import_dataengine(
                     update_date=c["update_date"],
                     district_number=c["district_number"],
                     campus_number=c["campus_number"],
+                    source_namespace=c["source_namespace"],
+                    source_id=c["source_id"],
                     location=_load_point(
                         c["point_wkb"], c["point_geojson"], c["lon"], c["lat"]
                     ),
                     meta=meta,
                 )
+                if campus.lookup_key != c["lookup_key"]:
+                    raise ContractError("Stored campus lookup key differs from its source identity")
                 if c["grade_range_code_spans"]:
                     spans = tuple(_coerce_grade_spans(c["grade_range_code_spans"]))
                     if spans:

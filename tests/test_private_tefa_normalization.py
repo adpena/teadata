@@ -1,7 +1,6 @@
 import pytest
 
 from teadata.load_data import (
-    _build_tefa_private_campus_number_map,
     _tefa_grade_range,
     _tefa_school_type,
 )
@@ -56,19 +55,3 @@ def test_tefa_school_type_mapping(
         )
         == expected
     )
-
-
-def test_build_tefa_private_campus_number_map_is_collision_free():
-    ids = ["recA", "recB", "recC", "recA", None, ""]
-    reserved = {"000000001", "123456789", "999999999"}
-
-    first = _build_tefa_private_campus_number_map(ids, set(reserved))
-    second = _build_tefa_private_campus_number_map(ids, set(reserved))
-
-    assert first == second
-    assert set(first.keys()) == {"recA", "recB", "recC"}
-
-    assigned = {value[1:] for value in first.values()}
-    assert len(assigned) == 3
-    assert assigned.isdisjoint(reserved)
-    assert all(len(number) == 9 and number.isdigit() for number in assigned)

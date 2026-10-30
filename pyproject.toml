@@ -4,11 +4,12 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "teadata"
-version = "0.0.125"
+version = "0.0.126"
 description = "Pythonic data engine for Texas education datasets"
 authors = [{name="Alejandro Peña", email="adpena@gmail.com"}]
 readme = "README.md"
-license = {file = "LICENSE"}
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 dependencies = [
     "python-dateutil>=2.8.2",
     "numpy>=1.26,!=2.4.0; python_version < '3.15'",
@@ -37,7 +38,6 @@ dependencies = [
 ]
 requires-python = ">=3.11"
 classifiers = [
-    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
@@ -147,7 +147,7 @@ include = ["teadata*"]
 exclude = ["tests*", "docs*", "examples*"]
 
 [tool.setuptools.package-data]
-teadata = ["teadata_sources.yaml", "methodologies/*.md", "schemas/*.json"]
+teadata = ["teadata_sources.yaml", "methodologies/*.md", "schemas/*.json", "reference_cases/*.json"]
 
 [tool.setuptools]
 include-package-data = false
@@ -229,6 +229,10 @@ DEP003 = [
 [tool.ruff]
 exclude = ["examples", "docs", "build", "teadata.egg-info", ".venv"]
 extend-exclude = ["*.ipynb"]
+
+[tool.ruff.lint]
+# Preserve the project's pre-upgrade rule set explicitly as Ruff defaults evolve.
+select = ["E4", "E7", "E9", "F"]
 
 [tool.ty.src]
 include = ["teadata"]

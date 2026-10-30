@@ -6,6 +6,7 @@ moved from the app so its scalar and materialized attribute paths share rules.
 from __future__ import annotations
 
 from .teadata_config import normalize_campus_number_value, normalize_district_number_value
+from .identifiers import campus_lookup_key
 
 def clean_text(value: object) -> str:
     if value is None:
@@ -17,16 +18,18 @@ def clean_text(value: object) -> str:
         return ""
     return str(value)
 
-def campus_district_name(campus) -> str:
+def campus_district_name(campus) -> str | None:
     district = getattr(campus, "district", None)
     if district is not None:
         name = getattr(district, "name", None)
         if name:
             return str(name)
-    meta_name = getattr(campus, "meta", {}).get("district_name")
-    if meta_name:
-        return str(meta_name)
-    return ""
+    return None
+
+
+def is_traditional_district(district) -> bool:
+    """AskTED organization subtype, never campus flags or polygon presence."""
+    return getattr(district, "meta", {}).get("organization_sub_type") in {"INDEPENDENT", "COMMON"}
 
 def valid_latlon(lat: float, lon: float) -> bool:
     try:
@@ -121,7 +124,13 @@ def attribute_value(entity, name: str, *, scope: str) -> object:
         if name in {"campus_name", "campus_grade_range"}:
             return clean_text(getattr(entity, "name" if name == "campus_name" else "grade_range", ""))
         if name == "campus_number":
-            return normalize_campus_number_value(getattr(entity, "campus_number", None)) or ""
+            return None if bool(getattr(entity, "is_private", False)) else normalize_campus_number_value(getattr(entity, "campus_number", None))
+        if name == "campus_lookup_key":
+            return campus_lookup_key(campus_number=getattr(entity, "campus_number", None),
+                source_namespace=getattr(entity, "source_namespace", None),
+                source_id=getattr(entity, "source_id", None), is_private=bool(getattr(entity, "is_private", False)))
+        if name in {"campus_source_namespace", "campus_source_id"}:
+            return getattr(entity, name.removeprefix("campus_"), None)
         if name == "is_private":
             return bool(getattr(entity, "is_private", False))
         if name in {"campus_latitude", "campus_longitude"}:
@@ -143,7 +152,8 @@ def entity_attributes(entity, *, scope: str) -> dict[str, object]:
     if scope == "campus":
         latitude, longitude = campus_coordinates(entity)
         values.update({name: attribute_value(entity, name, scope=scope)
-                       for name in ("campus_name", "campus_number", "campus_grade_range")})
+                       for name in ("campus_name", "campus_number", "campus_grade_range",
+                                    "campus_lookup_key", "campus_source_namespace", "campus_source_id")})
         values.update(
             campus_latitude=latitude, campus_longitude=longitude,
             is_private=attribute_value(entity, "is_private", scope=scope),

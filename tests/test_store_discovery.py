@@ -1,5 +1,7 @@
 import pytest
+import sqlite3
 from teadata import boundary_store, entity_store, map_store
+from teadata.manifest import write_sqlite_catalog
 
 
 @pytest.mark.parametrize(
@@ -10,7 +12,12 @@ from teadata import boundary_store, entity_store, map_store
         (map_store, "discover_map_store", "maps"),
     ],
 )
-def test_sidecars_select_one_release(monkeypatch, tmp_path, module, method, role):
+def test_sidecars_select_one_release(monkeypatch, tmp_path, catalog, module, method, role):
+    with sqlite3.connect(tmp_path / (role + ".sqlite")) as connection:
+        write_sqlite_catalog(connection, catalog)
+        if role == "maps":
+            connection.execute("CREATE TABLE campus_profile (lookup_key TEXT PRIMARY KEY, payload BLOB)")
+
     class Release:
         def artifact(self, selected):
             assert selected == role
