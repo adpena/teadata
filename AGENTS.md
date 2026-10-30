@@ -38,7 +38,7 @@ Python 3.14 and 3.15 are required compatibility targets alongside supported earl
 - **Standard SemVer (X.Y.Z):** Used for Major, Minor, and Patch updates to the codebase.
 - **Data Refreshes (X.Y.Zy):** Append an additional digit for data-only updates (e.g., `0.0.71` implies a refresh of version `0.0.7`).
 - **Release Process:** Increment the version in `pyproject.toml` prior to executing a production `load_data.py` run or distributing new snapshots.
-- **Tag retention:** Keep only the three most recent tags/releases; delete older tags and their GitHub release assets everywhere.
+- **Published history:** Preserve published tags, releases, and assets for reproducibility. Retire obsolete code and active cache artifacts instead. Never move a released tag or replace published assets.
 
 ## Commit & Pull Request Guidelines
 - Follow the existing history: short, imperative subject lines (e.g., “Create .gitattributes”, “Adding gzip support of snapshot repo cache”).

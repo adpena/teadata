@@ -294,17 +294,12 @@ Before packaging trim, `0.0.118` artifacts were above the per-file limit:
 - wheel: about `448 MB`
 - sdist: about `446 MB`
 
-Current slimmed artifacts are below the limit:
-
-- wheel: `dist/teadata-0.0.118-py3-none-any.whl` about `74 MB`
-- sdist: `dist/teadata-0.0.118.tar.gz` about `72 MB`
-
-The Python distribution includes code, source contracts, and local methodology documents. Large data artifacts are versioned separately in Git LFS and selected through a release manifest. Source checkouts can use their hydrated `teadata/.cache/release.json`; installed wheels require `TEADATA_RELEASE` or `TEADATA_RELEASE_URL` pointing to an available bundle. Publishing code does not refresh production data.
+The Python distribution includes code, source contracts, and local methodology documents. Data artifacts are distributed separately and selected through one release manifest. Source checkouts hydrate Git LFS; HTTP deployments use a complete adjacent bundle as described in [data releases](docs/data-releases.md#runtime-and-rollout). Installed wheels require `TEADATA_RELEASE` or `TEADATA_RELEASE_URL`. Publishing code does not refresh production data.
 
 ## Release Policy
 
 - Versioning uses thousandths-place tags (`v0.0.101`, `v0.0.102`, ...).
-- Keep only the 3 most recent release tags/assets.
+- Preserve published tags, releases, and assets for reproducibility; see the release policy in `AGENTS.md`.
 
 ## License
 

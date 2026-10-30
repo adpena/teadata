@@ -66,7 +66,7 @@ The project follows a modified Semantic Versioning (SemVer) approach:
 
 **Release tag policy:**
 *   Tags always use the thousandths place (e.g., `v0.0.101`, `v0.0.102`). If no tags exist, start at `v0.0.101`.
-*   Keep only the three most recent tags/releases; delete older tags and their release assets everywhere (GitHub releases included).
+*   Preserve published tags, releases, and assets for reproducibility under the release policy in `AGENTS.md`.
 
 **When to increment:**
 *   Increment the version BEFORE running a release build or distributing a new snapshot.
