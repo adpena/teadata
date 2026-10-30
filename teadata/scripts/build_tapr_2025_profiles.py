@@ -3,9 +3,11 @@ from __future__ import annotations
 import argparse
 import csv
 import math
+import os
 import re
+from itertools import chain
 from pathlib import Path
-from typing import Iterable
+from typing import Any, Iterable
 
 from openpyxl import Workbook  # type: ignore[import-untyped]
 from openpyxl.styles import Alignment, Font, PatternFill  # type: ignore[import-untyped]
@@ -13,92 +15,108 @@ from openpyxl.utils import get_column_letter  # type: ignore[import-untyped]
 from openpyxl.worksheet.table import Table, TableStyleInfo  # type: ignore[import-untyped]
 
 from teadata.scripts.paths import data_path
-
-
-def sanitize_header(s: str) -> str:
-    """Convert a column header to a Python-safe identifier."""
-    s = str(s)
-    s = s.lower()
-    s = s.replace(":", "").replace("(", "").replace(")", "")
-    s = s.replace("&", " and ")
-    s = s.replace("%", " percent ")
-    s = s.replace("#", " number ")
-    s = s.replace(">", " gt ")
-    s = s.replace("<", " lt ")
-    s = re.sub(r"[\\/–—\-]+", "_", s)
-    s = re.sub(r"[.]", "_", s)
-    s = re.sub(r"\s+", "_", s)
-    s = re.sub(r"[^a-z0-9_]+", "_", s)
-    s = re.sub(r"__+", "_", s)
-    return s.strip("_")
-
-
-def _dedupe_headers(headers: list[str]) -> list[str]:
-    seen: dict[str, int] = {}
-    out: list[str] = []
-    for header in headers:
-        if header not in seen:
-            seen[header] = 1
-            out.append(header)
-            continue
-        seen[header] += 1
-        out.append(f"{header}_{seen[header]}")
-    return out
-
-
-def _normalize_row(row: list[str], width: int) -> list[str]:
-    if len(row) < width:
-        row = row + [""] * (width - len(row))
-    elif len(row) > width:
-        row = row[:width]
-    return row
+from teadata.identifiers import canonical_source_identifier
+from teadata.column_schema import parse_column_schema, crosswalk_dataset, validate_header_table
+from teadata.manifest import file_identity
+from teadata.teadata_config import load_config
 
 
 def _read_tapr_csv(
-    path: Path, *, rename_map: dict[str, str], key_field: str
-):
-    with path.open(newline="", encoding="utf-8-sig") as fh:
-        reader = csv.reader(fh)
-        labels = next(reader)
-        codes = next(reader)
+    path: Path, *, mapping: dict[str, Any], key_field: str
+) -> tuple[list[str], dict[str, dict[str, str]], list[dict[str, str]]]:
+    """Read this two-header layout without repairing ambiguous source records.
 
-        headers = [
-            rename_map.get(sanitize_header(label), sanitize_header(label))
-            for label in labels
-        ]
-        headers = _dedupe_headers(headers)
+    Human labels and publisher codes are returned verbatim as metadata. Body
+    tokens retain the existing whitespace normalization; masking is interpreted
+    elsewhere by the dataset's value policy.
+    """
+    widths = {"campus_number": 9, "district_number": 6}
+    if key_field not in widths:
+        raise ValueError(f"Unsupported TAPR key field: {key_field}")
+    try:
+        validate_header_table(mapping)
+    except ValueError as error:
+        raise ValueError(f"{path}: invalid header crosswalk: {error}") from error
+    if file_identity(path)["sha256"] != mapping["input_sha256"]:
+        raise ValueError(f"{path}: input differs from the reviewed header crosswalk")
+    fields = mapping["fields"]
+    headers = [field["field"] for field in fields]
+    with path.open(newline="", encoding="utf-8-sig") as fh:
+        reader = csv.reader(fh, strict=True)
+        try:
+            labels = next(reader)
+            codes = next(reader)
+        except (StopIteration, csv.Error) as error:
+            raise ValueError(f"{path}: expected human-label and source-code header records") from error
+        if not labels or len(labels) != len(codes):
+            raise ValueError(f"{path}: header width mismatch: {len(labels)} labels, {len(codes)} codes")
+
+        if key_field not in headers:
+            raise ValueError(f"{path}: missing key header {key_field!r}")
+        if len(codes) != len(fields):
+            raise ValueError(f"{path}: human-label/code headers differ from the reviewed crosswalk")
+        key_code = "CAMPUS" if key_field == "campus_number" else "DISTRICT"
+        key_column = headers.index(key_field)
+        if codes[key_column].strip() != key_code:
+            raise ValueError(f"{path}: expected source-code header {key_code!r} in record 2, column {key_column + 1}")
+        if labels != [field["label"] for field in fields] or codes != [field["code"] for field in fields]:
+            raise ValueError(f"{path}: human-label/code headers differ from the reviewed crosswalk")
 
         elements = []
-        for code, label, header in zip(codes, labels, headers):
-            code_text = str(code).strip()
-            label_text = str(label).strip()
+        for code, label, header in zip(codes, labels, headers, strict=True):
             elements.append(
                 {
-                    "code": code_text,
-                    "label": label_text,
+                    "code": code,
+                    "label": label,
                     "sanitized_label": header,
                 }
             )
 
         rows: dict[str, dict[str, str]] = {}
+        seen_keys: dict[str, int] = {}
         header_len = len(headers)
-        for row in reader:
-            if not row or not any(cell.strip() for cell in row):
-                continue
-            row = _normalize_row(row, header_len)
-            record = {
-                header: (value.strip() if isinstance(value, str) else value)
-                for header, value in zip(headers, row)
-            }
-            key = record.get(key_field)
-            if key is None:
-                continue
-            key = str(key).strip()
-            if not key:
-                continue
-            rows[key] = record
+        try:
+            for number, row in enumerate(reader, 3):
+                if len(row) != header_len:
+                    raise ValueError(f"{path}: record {number} has {len(row)} fields; expected {header_len}")
+                record = {header: value.strip() for header, value in zip(headers, row, strict=True)}
+                key = record[key_field]
+                try:
+                    identity = canonical_source_identifier(key, width=widths[key_field])
+                    if identity is None:
+                        raise ValueError("missing source identifier")
+                    if key_field == "campus_number" and "district_number" in record:
+                        district = canonical_source_identifier(record["district_number"], width=6)
+                        if district is None or identity[1:7] != district[1:]:
+                            raise ValueError("campus and district identifiers disagree")
+                except ValueError as error:
+                    raise ValueError(f"{path}: record {number} has invalid {key_field}: {key!r} ({error})") from error
+                if identity in seen_keys:
+                    raise ValueError(f"{path}: duplicate {key_field} at records {seen_keys[identity]} and {number}: {key!r}")
+                seen_keys[identity] = number
+                rows[key] = record
+        except csv.Error as error:
+            raise ValueError(f"{path}: invalid CSV near physical line {reader.line_num}: {error}") from error
+        if not rows:
+            raise ValueError(f"{path}: no TAPR data records")
+    if file_identity(path)["sha256"] != mapping["input_sha256"]:
+        raise ValueError(f"{path}: input changed while reading the reviewed header crosswalk")
 
     return headers, rows, elements
+
+
+def _header_tables(cfg, dataset: str) -> dict[str, dict[str, Any]]:
+    source = cfg.resolve_dataset(dataset, 2025)
+    if source.resolved_year != 2025 or source.metadata.version != "2025":
+        raise ValueError(f"No selected 2025 header crosswalk for {dataset}")
+    contract = cfg.column_contract(dataset, 2025)
+    if contract is None:
+        raise ValueError(f"Header crosswalk unavailable for {dataset}")
+    selected = crosswalk_dataset(parse_column_schema(contract["text"].encode()), dataset, "2025")
+    tables = {table["table"]: table for table in selected["tables"]}
+    if set(tables) != {"student", "staff"}:
+        raise ValueError(f"Student/staff header crosswalk required for {dataset}")
+    return tables
 
 
 def _merge_tables(
@@ -110,6 +128,21 @@ def _merge_tables(
     key_field: str,
     preferred_cols: Iterable[str],
 ):
+    """Outer-merge available sources, retaining the existing blank-fill policy.
+
+    One-sided entities are retained, and a blank primary token may be filled
+    from the secondary source. Two nonblank tokens for a shared field must
+    agree; this does not assert complete or identical source coverage.
+    """
+    width = {"campus_number": 9, "district_number": 6}[key_field]
+    representations: dict[str, str] = {}
+    for key in chain(primary_rows, secondary_rows):
+        identity = canonical_source_identifier(key, width=width)
+        if identity is None:
+            raise ValueError(f"Missing TAPR {key_field}")
+        previous = representations.setdefault(identity, key)
+        if previous != key:
+            raise ValueError(f"Inconsistent TAPR {key_field} representations: {previous!r}, {key!r}")
     keys = sorted(set(primary_rows) | set(secondary_rows))
     merged_rows: list[dict[str, str]] = []
     for key in keys:
@@ -117,22 +150,18 @@ def _merge_tables(
         record.update(primary_rows.get(key, {}))
         for k, v in secondary_rows.get(key, {}).items():
             if k in record and record[k] not in (None, ""):
+                if v not in (None, "") and record[k] != v:
+                    raise ValueError(f"Conflicting TAPR values for {key_field} {key!r}, field {k!r}: {record[k]!r} and {v!r}")
                 continue
             record[k] = v
         merged_rows.append(record)
 
-    ordered_headers: list[str] = []
-    for col in preferred_cols:
-        if col in primary_headers or col in secondary_headers:
-            if col not in ordered_headers:
-                ordered_headers.append(col)
-
-    for col in primary_headers:
-        if col not in ordered_headers:
-            ordered_headers.append(col)
-    for col in secondary_headers:
-        if col not in ordered_headers:
-            ordered_headers.append(col)
+    present = set(primary_headers) | set(secondary_headers)
+    ordered_headers = list(dict.fromkeys([
+        *(col for col in preferred_cols if col in present),
+        *primary_headers,
+        *secondary_headers,
+    ]))
 
     if key_field not in ordered_headers:
         ordered_headers.insert(0, key_field)
@@ -358,25 +387,24 @@ def main(argv: list[str] | None = None) -> None:
     district_out = args.output_dir / "DISTPROF_2024-2025_FINAL.xlsx"
     campus_elements_out = args.output_dir / "CAMPPROF_2024-2025_data_elements.xlsx"
     district_elements_out = args.output_dir / "DISTPROF_2024-2025_data_elements.xlsx"
-    rename_map = {
-        "6_digit_county_district_number": "district_number",
-        "9_digit_campus_number": "campus_number",
-    }
+    cfg = load_config(os.environ.get("TEADATA_CONFIG") or Path(__file__).resolve().parents[1] / "teadata_sources.yaml")
+    campus_mappings = _header_tables(cfg, "campus_tapr_student_staff_profile")
+    district_mappings = _header_tables(cfg, "district_tapr_student_staff_profile")
 
     campus_student_headers, campus_student_rows, campus_student_elements = (
-        _read_tapr_csv(campus_student, rename_map=rename_map, key_field="campus_number")
+        _read_tapr_csv(campus_student, mapping=campus_mappings["student"], key_field="campus_number")
     )
     campus_staff_headers, campus_staff_rows, campus_staff_elements = _read_tapr_csv(
-        campus_staff, rename_map=rename_map, key_field="campus_number"
+        campus_staff, mapping=campus_mappings["staff"], key_field="campus_number"
     )
     district_student_headers, district_student_rows, district_student_elements = (
         _read_tapr_csv(
-            district_student, rename_map=rename_map, key_field="district_number"
+            district_student, mapping=district_mappings["student"], key_field="district_number"
         )
     )
     district_staff_headers, district_staff_rows, district_staff_elements = (
         _read_tapr_csv(
-            district_staff, rename_map=rename_map, key_field="district_number"
+            district_staff, mapping=district_mappings["staff"], key_field="district_number"
         )
     )
 

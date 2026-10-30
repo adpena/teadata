@@ -288,7 +288,7 @@ def test_every_packaged_version_and_declared_profile_has_an_offline_schema(monke
                     path = config_path.parent / options["column_schema"]
                     document = json.loads(path.read_bytes())
                     assert path.read_text() == canonical_json(document) + "\n"
-                    assert set(document) == {"schema_version", "columns"}
+                    assert document["schema_version"] in {1, 2}
                     paths.add(path)
                     count += 1
     assert count > 0

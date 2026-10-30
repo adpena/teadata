@@ -685,16 +685,16 @@ class Config:
             f"Unsupported file extension for loader: {ext} (from '{base}')"
         )
 
-    def column_schema(
+    def column_contract(
         self,
         dataset: str,
         year: int | None = None,
         *,
         section: str = "data_sources",
         reader_profile: str | None = None,
-    ) -> list[str] | None:
-        """Return the reviewed ordered reader columns without loading source rows."""
-        from .column_schema import load_column_schema, reader_options
+    ) -> dict[str, str] | None:
+        """Load the exact reviewed reader resource without source-row I/O."""
+        from .column_schema import load_column_contract, reader_options
         from .manifest import ContractError
 
         source = self.resolve_dataset(dataset, year, section=section)
@@ -718,11 +718,68 @@ class Config:
                 )
             if self.base_dir is None:
                 raise ValueError("Column schema requires a source contract directory")
-            return load_column_schema(
+            return load_column_contract(
                 self.base_dir, resource, references[0].reviewed_sha256
             )
         except (OSError, ValueError) as error:
             raise ContractError(f"Invalid column schema for {dataset}: {error}") from error
+
+    def column_schema(
+        self, dataset: str, year: int | None = None, *, section: str = "data_sources",
+        reader_profile: str | None = None,
+    ) -> list[str] | None:
+        """Derive ordered reader columns from the same reviewed resource."""
+        from .column_schema import parse_column_schema, schema_columns
+        from .manifest import ContractError
+
+        contract = self.column_contract(dataset, year, section=section, reader_profile=reader_profile)
+        if contract is None:
+            return None
+        source = self.resolve_dataset(dataset, year, section=section)
+        try:
+            return schema_columns(parse_column_schema(contract["text"].encode()),
+                                  dataset=source.dataset, edition=source.metadata.version)
+        except ValueError as error:
+            raise ContractError(f"Invalid column schema for {dataset}: {error}") from error
+
+    def header_records(self, dataset: str, *, edition: str,
+                       table: str | None = None) -> list[dict[str, Any]]:
+        """Return reviewed source-contract mappings without any dataset reads.
+
+        This explicitly selects this configuration's contract, independently of
+        a data release. Editions are exact metadata versions, never prior-year
+        fallbacks or guesses from filenames.
+        """
+        from .column_schema import parse_column_schema, header_records
+        from .manifest import ContractError
+
+        choices = [(section, year) for section in ("data_sources", "spatial")
+                   for name, versions in getattr(self, section).items() if name == dataset
+                   for year, definition in versions.entries.items() if definition.metadata.version == edition]
+        if len(choices) != 1:
+            raise ContractError(f"Source-contract header crosswalk edition unavailable or ambiguous: {dataset!r}, {edition!r}")
+        section, year = choices[0]
+        contract = self.column_contract(dataset, year, section=section)
+        if contract is None:
+            raise ContractError(f"Source-contract header crosswalk unavailable: {dataset!r}")
+        try:
+            return header_records(parse_column_schema(contract["text"].encode()),
+                                  dataset=dataset, edition=edition, table=table)
+        except ValueError as error:
+            raise ContractError(str(error)) from error
+
+    def header_mapping(self, dataset: str, *, edition: str, table: str,
+                       from_: str = "code", to: str = "field",
+                       columns: Iterable[str] | None = None) -> dict[str, str]:
+        """Return an ordinary rename map from this explicit source contract."""
+        from .column_schema import header_rename_map
+        from .manifest import ContractError
+
+        try:
+            return header_rename_map(self.header_records(dataset, edition=edition, table=table),
+                                     from_=from_, to=to, columns=columns)
+        except ValueError as error:
+            raise ContractError(str(error)) from error
 
     def load_df(
         self,
@@ -1212,8 +1269,13 @@ def save_duckdb(df, db_path: str, *, table: str = "teadata_year"):
 # ------------------------------
 
 
-def load_config(path: str | Path) -> Config:
-    p = Path(path)
+def load_config(path: str | Path | None = None) -> Config:
+    """Load an explicit source contract, defaulting to the packaged metadata.
+
+    This never selects or fetches a data release. Source files need not exist
+    for schema/crosswalk discovery; rows are read only by load_df.
+    """
+    p = Path(path) if path is not None else Path(__file__).with_name("teadata_sources.yaml")
     if not p.exists():
         raise FileNotFoundError(p)
     raw = _detect_and_load(p)

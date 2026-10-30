@@ -204,8 +204,10 @@ def test_geocoder_uses_explicit_paths_with_stubbed_providers(monkeypatch, tmp_pa
     assert result.loc[0, "Best Lat"] == 30.0
 
 
-def test_tapr_builder_accepts_external_input_and_output_dirs(tmp_path):
-    from teadata.scripts.build_tapr_2025_profiles import main
+def test_tapr_builder_accepts_external_input_and_output_dirs(tmp_path, monkeypatch):
+    from hashlib import sha256
+    from teadata.column_schema import source_schema_fingerprint
+    from teadata.scripts import build_tapr_2025_profiles as script
 
     raw = tmp_path / "raw"
     raw.mkdir()
@@ -214,11 +216,25 @@ def test_tapr_builder_accepts_external_input_and_output_dirs(tmp_path):
         ("District", "000456", "6 Digit County District Number"),
     ]:
         for group in ("Student", "Staff"):
+            code = "CAMPUS" if kind == "Campus" else "DISTRICT"
             (raw / f"2025 {kind} {group} Information.csv").write_text(
-                f"{label},Example Value\nNUMBER,VALUE\n{number},42\n"
+                f"{label},Example Value\n{code},VALUE\n{number},42\n"
             )
+    def mappings(_cfg, dataset):
+        campus = dataset.startswith("campus_")
+        kind = "Campus" if campus else "District"
+        labels = ["9 Digit Campus Number" if campus else "6 Digit County District Number", "Example Value"]
+        codes = ["CAMPUS" if campus else "DISTRICT", "VALUE"]
+        fields = ["campus_number" if campus else "district_number", "example_value"]
+        return {group.lower(): {"table": group.lower(),
+                "input_sha256": sha256((raw / f"2025 {kind} {group} Information.csv").read_bytes()).hexdigest(),
+                "source_schema_sha256": source_schema_fingerprint(labels, codes),
+                "fields": [{"position": i, "code": code, "label": label, "field": field}
+                           for i, (code, label, field) in enumerate(zip(codes, labels, fields, strict=True), 1)]}
+                for group in ("Student", "Staff")}
+    monkeypatch.setattr(script, "_header_tables", mappings)
     output_dir = tmp_path / "output"
-    main(["--input-dir", str(raw), "--output-dir", str(output_dir)])
+    script.main(["--input-dir", str(raw), "--output-dir", str(output_dir)])
 
     campus = pd.read_excel(output_dir / "CAMPPROF_2024-2025_FINAL.xlsx")
     district = pd.read_excel(output_dir / "DISTPROF_2024-2025_FINAL.xlsx")

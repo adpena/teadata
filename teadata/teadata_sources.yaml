@@ -422,6 +422,7 @@ data_sources:
         provenance_ids:
         - e372be5cf18af4f445c6e39bdf14a1cb01a14052509ba5f33dd8b98892c1b6ee
         - 32986a342b0c30566defbbccc99e5e22c36a179c21f049431630e83c6680751c
+        - a4fd3db96bc747077ec46c3b6a3b90596606cbfa71aeaaf540cc82c29d2a0639
         references:
         - reference_id: glossary
           role: glossary
@@ -444,13 +445,13 @@ data_sources:
           reviewed_sha256: 7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8
         - reference_id: columns_default
           role: schema
-          path: schemas/data_sources--campus_tapr_student_staff_profile--2025--default.json
-          title: TEA Data campus_tapr_student_staff_profile 2025 default reader column
-            baseline; not a publisher dictionary
+          path: schemas/tapr--2025--header-crosswalk.json
+          title: TEA Data 2025 TAPR audited source-code, human-label and canonical-field
+            crosswalk; not a publisher dictionary or historical processing receipt
           status: available
           provenance_ids:
-          - 809d6a6f53f9d02b10919410385789a21cb2d8564d555c6427d9a71b0b3fbbc8
-          reviewed_sha256: 24be6c5ea593c030744987b9ee9651d9f9cb1aaab593e6652d592eaccf1c46a5
+          - bbd46b5ce3dcfb521ae7b2156e9340accc45accf084e940fef3de3d30123a63f
+          reviewed_sha256: fdbdbb24ab218063d46cb5d4781ef9cca55b9e448020f01b8b7264e8c292e339
         field_year: 2025
         value_policy: tapr_profile
         metrics:
@@ -474,7 +475,7 @@ data_sources:
       reader:
         dtype: str
         keep_default_na: false
-        column_schema: schemas/data_sources--campus_tapr_student_staff_profile--2025--default.json
+        column_schema: schemas/tapr--2025--header-crosswalk.json
   campus_tapr_historical_enrollment:
     2015:
       path: data/tapr/CAMPPROF_2014-2015_FINAL.xlsx
@@ -613,6 +614,7 @@ data_sources:
         provenance_ids:
         - 15f0551abeda2ffc4c4e6f26c2ab3a4d7092516cdffb383d363068a56cedec2d
         - 10cd059048171993c80e9b81fe42870f43b18e8bd5ae1fd8cc015b81a48db69d
+        - 819e8d1701c1e74b9419a62b9ae1b37fc9957eaadcc3ac936d49180bddac5ba6
         references:
         - reference_id: glossary
           role: glossary
@@ -635,13 +637,13 @@ data_sources:
           reviewed_sha256: 7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8
         - reference_id: columns_default
           role: schema
-          path: schemas/data_sources--district_tapr_student_staff_profile--2025--default.json
-          title: TEA Data district_tapr_student_staff_profile 2025 default reader
-            column baseline; not a publisher dictionary
+          path: schemas/tapr--2025--header-crosswalk.json
+          title: TEA Data 2025 TAPR audited source-code, human-label and canonical-field
+            crosswalk; not a publisher dictionary or historical processing receipt
           status: available
           provenance_ids:
-          - c9dc1305eabcb7e036ceac3f70aefdbb9b472794ef4ada70d2c8acdfb1d8dea6
-          reviewed_sha256: 24942c016ba6559a67761248c35b3da56dde23daca0cb83a19f301ebecfb72a9
+          - bbd46b5ce3dcfb521ae7b2156e9340accc45accf084e940fef3de3d30123a63f
+          reviewed_sha256: fdbdbb24ab218063d46cb5d4781ef9cca55b9e448020f01b8b7264e8c292e339
         field_year: 2025
         value_policy: tapr_profile
         metrics:
@@ -665,7 +667,7 @@ data_sources:
       reader:
         dtype: str
         keep_default_na: false
-        column_schema: schemas/data_sources--district_tapr_student_staff_profile--2025--default.json
+        column_schema: schemas/tapr--2025--header-crosswalk.json
   campus_planned_closures:
     2025:
       path: data/closures/Planned School Closures_10.03.2025.xlsx

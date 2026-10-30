@@ -197,6 +197,64 @@ not gain verified provenance merely because their configuration is extended.
 
 ## Maintenance Script Paths
 
+Catalogs that bind a reviewed header crosswalk expose the publisher's source
+codes, exact human labels and canonical Python field names without reading
+source datasets or current YAML:
+
+```python
+records = catalog.header_records(
+    "campus_tapr_student_staff_profile", edition="2025", table="student"
+)
+rename = catalog.header_mapping(
+    "campus_tapr_student_staff_profile", edition="2025", table="student",
+    from_="code", to="field", columns=df.columns,
+)
+renamed = df.rename(columns=rename)
+```
+
+For renaming your own data without a data release, use the explicit packaged
+source-contract entry point instead. No raw datasets or cache artifacts are
+required, and `TEADATA_RELEASE` is not consulted:
+
+```python
+from teadata import load_config
+
+contract = load_config()  # Packaged teadata_sources.yaml; an explicit path is also accepted.
+records = contract.header_records(
+    "district_tapr_student_staff_profile", edition="2025", table="student"
+)
+rename = contract.header_mapping(
+    "district_tapr_student_staff_profile", edition="2025", table="student",
+    from_="code", to="field", columns=df.columns,
+)
+```
+
+This selects the packaged source contract's reviewed mapping, which identifies
+the exact edition and retained raw input SHA. It does not claim that those
+facts belong to an installed data release. Release-bound catalog queries stay
+independent and never fall back to this configuration.
+
+Records are detached ordinary dictionaries suitable for a pandas/Polars table
+or `pyarrow.Table.from_pylist(records)`. They include dataset, selected edition,
+table, position, exact code/label, canonical field, input and header-schema
+hashes, and mapping version. Rename dictionaries also support `label` and
+reverse directions. Ambiguous mappings, duplicate external headers and
+collisions with unchanged destination columns raise errors. Source codes are
+recorded metadata, not alternate canonical query-field authorities.
+Passing `columns` also limits the dictionary to headers actually present, so
+partial tables work with libraries that reject unknown rename keys.
+
+The same reviewed resource in `DatasetDefinition.reader.column_schema` drives
+ETL and derives prepared column order. `BuildRecorder` binds its exact bytes
+once into the catalog, together with the selected input, edition and read
+schema. Lookup never falls back to package files or a newer configuration.
+Older catalogs, including published 0.0.126, explicitly report the crosswalk
+unavailable; the new contract requires a separately qualified future bundle.
+Unreviewed years/datasets are not inferred. A retained-input comparison and a
+new local observation do not establish an original download or historical
+transformation event. Source layout and naming remain separate from masking
+policies and measurement interpretation.
+
 Maintenance scripts use the package-adjacent `teadata/data/` directory by
 default. Moving a checkout or invoking a script from another working directory
 does not change that default. Raw source datasets are ignored by Git and must
