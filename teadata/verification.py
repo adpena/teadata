@@ -65,8 +65,17 @@ def _digest(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _git_environment() -> dict[str, str]:
+    # Git hooks export repository-local context that overrides an explicit -C.
+    # Git owns this list; preserve unrelated transport and global settings.
+    local = set(subprocess.check_output(["git", "rev-parse", "--local-env-vars"],
+                                       stdin=subprocess.DEVNULL, stderr=subprocess.PIPE).decode().splitlines())
+    return {key: value for key, value in os.environ.items() if key not in local}
+
+
 def _git(root: Path, *arguments: str) -> bytes:
-    return subprocess.check_output(["git", "-C", str(root), *arguments], stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    return subprocess.check_output(["git", "-C", str(root), *arguments], env=_git_environment(),
+                                   stdin=subprocess.DEVNULL, stderr=subprocess.PIPE)
 
 
 def source_identity(root: Path) -> dict[str, Any]:
@@ -262,7 +271,7 @@ def _run_check(check: Check, root: Path, log: Path, replacements: Mapping[str, s
 def _test_environment() -> dict[str, str]:
     excluded = ("TEADATA_", "GOOGLE_", "RESEARCH_GOOGLE_", "EMAIL_", "REPROQ_", "PYTEST_", "PYTHON")
     environment = {
-        key: value for key, value in os.environ.items()
+        key: value for key, value in _git_environment().items()
         if not key.startswith(excluded) and key not in {
             "DATABASE_URL", "DJANGO_SETTINGS_MODULE", "PYTHONPATH", "PYTHONHOME", "PYTHONSTARTUP", "VIRTUAL_ENV",
             "NODE_OPTIONS", "NODE_PATH",
@@ -422,7 +431,7 @@ def install_pre_push_hook(root: Path, *, kind: str, paired: bool = False) -> Pat
     """
     root = root.resolve()
     configured = subprocess.run(["git", "-C", str(root), "config", "--get", "core.hooksPath"],
-                                stdin=subprocess.DEVNULL, capture_output=True)
+                                env=_git_environment(), stdin=subprocess.DEVNULL, capture_output=True)
     if configured.returncode == 0:
         raise ReceiptError("A custom core.hooksPath is configured; retain it and chain scripts/check manually")
     if configured.returncode != 1:

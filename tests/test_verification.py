@@ -1,5 +1,9 @@
 import json
 from hashlib import sha256
+import os
+from pathlib import Path
+import shlex
+import shutil
 import subprocess
 import sys
 
@@ -27,6 +31,97 @@ def project(tmp_path, monkeypatch):
 
 def passing():
     return [Check("example", ("@python", "-c", "print('checked')"))]
+
+
+def test_real_push_hook_checks_foreign_repositories_without_mutating_owner(tmp_path):
+    from teadata import verification
+
+    def git(root, *args):
+        return subprocess.check_output(["git", "-C", str(root), *args], stderr=subprocess.PIPE)
+
+    def repository(name):
+        root = tmp_path / name
+        subprocess.run(["git", "init", "--quiet", str(root)], check=True)
+        git(root, "config", "user.name", name)
+        git(root, "config", "user.email", f"{name}@example.invalid")
+        (root / ".gitignore").write_text(".local/\n")
+        (root / "marker.py").write_text(f"ROLE = {name!r}\n")
+        (root / "uv.lock").write_text("version = 1\n")
+        git(root, "add", ".")
+        git(root, "commit", "--quiet", "-m", name)
+        return root
+
+    base = repository("hook-base")
+    owner = tmp_path / "hook-worktree"
+    git(base, "worktree", "add", "--quiet", "--detach", str(owner), "HEAD")
+    foreign, library = repository("foreign-app"), repository("paired-library")
+    mutation, protected = repository("fixture-mutation"), repository("custom-hook-owner")
+    git(protected, "config", "core.hooksPath", "retain-custom-hooks")
+    expected = {"project": source_identity(foreign), "library": source_identity(library)}
+    destination = tmp_path / "destination.git"
+    subprocess.run(["git", "init", "--bare", "--quiet", str(destination)], check=True)
+    capture = tmp_path / "hook-result.json"
+    probe = tmp_path / "hook-probe.py"
+    child = f'''import os, subprocess
+assert os.environ['GIT_SSH_COMMAND'] == 'preserved-transport-fixture'
+assert os.environ['GIT_LFS_SKIP_SMUDGE'] == '1'
+assert os.environ['GIT_CONFIG_GLOBAL'] == {str(tmp_path / 'global-config')!r}
+names = subprocess.check_output(['git', 'rev-parse', '--local-env-vars'], text=True).splitlines()
+assert not set(names).intersection(os.environ)
+for args in [('config', 'user.name', 'owned child fixture'),
+             ('config', 'user.email', 'child@example.invalid'),
+             ('update-index', '--assume-unchanged', 'marker.py'),
+             ('commit', '--quiet', '--allow-empty', '-m', 'owned child mutation')]:
+    subprocess.run(['git', '-C', {str(mutation)!r}, *args], check=True)
+'''
+    probe.write_text(f'''import importlib.util, json, os, sys
+from pathlib import Path
+spec = importlib.util.spec_from_file_location('hook_verification', {verification.__file__!r})
+module = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = module
+spec.loader.exec_module(module)
+original = dict(os.environ)
+assert 'GIT_DIR' in original, 'Git itself must supply the real linked-worktree hook context'
+inputs = module._input_identity(Path({str(foreign)!r}), kind='app', paired_library=Path({str(library)!r}), release=None)
+checks = [module.Check('foreign-git-fixture', ('@python', '-c', {child!r}))]
+receipt = module.run_checks(Path({str(foreign)!r}), kind='library', checks=checks)
+result = module.verify_receipt(receipt, Path({str(foreign)!r}), kind='library', checks=checks)
+try:
+    module.install_pre_push_hook(Path({str(protected)!r}), kind='app')
+except module.ReceiptError as error:
+    assert 'custom core.hooksPath' in str(error)
+else:
+    raise AssertionError('Foreign custom-hook protection used the hook owner repository')
+assert os.environ == original, 'Sanitization must not change the parent hook context'
+Path({str(capture)!r}).write_text(json.dumps({{'inputs': inputs, 'status': result['status'], 'hook_git_dir': original['GIT_DIR']}}))
+''')
+    hook = Path(git(owner, "rev-parse", "--git-path", "hooks/pre-push").decode().strip())
+    uv = shutil.which("uv")
+    assert uv is not None
+    hook.write_text("#!/bin/sh\nexec " + shlex.join([
+        uv, "run", "--no-project", "--offline", "--python", sys.executable,
+        sys.executable, str(probe),
+    ]) + "\n")
+    hook.chmod(0o755)
+    guarded = [Path(git(owner, "rev-parse", "--git-path", name).decode().strip())
+               for name in ("HEAD", "index", "config")] + [hook]
+    before = {path: path.read_bytes() for path in guarded}
+    parent_environment = dict(os.environ)
+    (tmp_path / "global-config").write_text("")
+    environment = {**os.environ, "GIT_CONFIG_GLOBAL": str(tmp_path / "global-config"),
+                   "GIT_SSH_COMMAND": "preserved-transport-fixture", "GIT_LFS_SKIP_SMUDGE": "1"}
+    result = subprocess.run(["git", "-C", str(owner), "push", str(destination), "HEAD:refs/heads/main"],
+                            env=environment, capture_output=True, text=True, timeout=60)
+    assert {path: path.read_bytes() for path in guarded} == before, result.stderr
+    assert os.environ == parent_environment
+    assert result.returncode == 0, result.stdout + result.stderr
+    observed = json.loads(capture.read_text())
+    assert observed["status"] == "passed"
+    assert observed["inputs"]["project"] == expected["project"]
+    assert observed["inputs"]["library"] == expected["library"]
+    assert Path(observed["hook_git_dir"]).resolve() == guarded[0].parent.resolve()
+    assert git(mutation, "config", "user.name").strip() == b"owned child fixture"
+    assert git(mutation, "ls-files", "-v", "marker.py").startswith(b"h ")
 
 
 def paired_routing(monkeypatch, version, *, environment_version=None):
