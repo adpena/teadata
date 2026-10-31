@@ -1,5 +1,8 @@
 # ty: ignore
 
+import argparse
+from pathlib import Path
+
 import pandas as pd
 import time
 import requests
@@ -9,6 +12,8 @@ from geopy.exc import GeocoderTimedOut, GeocoderServiceError
 
 import asyncio
 
+from teadata.scripts.paths import data_path
+
 try:
     import aiohttp  # async HTTP client for Census
 except ImportError:
@@ -17,25 +22,6 @@ try:
     from tqdm.auto import tqdm  # progress bar
 except ImportError:
     tqdm = None
-
-tepsac_fp = (
-    "/Users/adpena/PycharmProjects/teadata/teadata/data/tepsac/allSchoolData.xlsx"
-)
-
-tepsac_df = pd.read_excel(tepsac_fp)
-
-tepsac_df = tepsac_df[~tepsac_df["Closed"]]
-
-
-tepsac_df["School Full Address"] = (
-    tepsac_df["School Street"].fillna("").astype(str)
-    + ", "
-    + tepsac_df["School City"].fillna("").astype(str)
-    + ", "
-    + tepsac_df["School State"].fillna("").astype(str)
-    + " "
-    + tepsac_df["School Zip"].fillna("").astype(str)
-).str.strip(", ")
 
 # ----------------------------
 # Geocoding helpers (Census, ArcGIS, Nominatim/OSM)
@@ -383,12 +369,7 @@ def pick_best(
     return None, None, "none"
 
 
-# Perform geocoding on unique addresses to minimize requests
-unique_addrs = tepsac_df["School Full Address"].dropna().astype(str).unique().tolist()
-
 address_cache: Dict[str, Dict[str, Dict[str, Any]]] = {}
-
-results_map: Dict[str, Dict[str, Dict[str, Any]]] = {}
 
 
 # Helper for async geocoding with address included
@@ -403,6 +384,7 @@ async def _geocode_with_addr(
 
 
 async def build_results_map_with_progress(addresses):
+    results_map: Dict[str, Dict[str, Dict[str, Any]]] = {}
     sem_arc = asyncio.Semaphore(5)
     sem_osm = asyncio.Semaphore(1)
     session_cm = aiohttp.ClientSession() if aiohttp is not None else None
@@ -427,63 +409,98 @@ async def build_results_map_with_progress(addresses):
             pbar.close()
         if session_cm:
             await session_cm.close()
+    return results_map
 
 
-# Run the async builder
-asyncio.run(build_results_map_with_progress(unique_addrs))
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description="Geocode TEPSAC school addresses using Census, ArcGIS, and OSM."
+    )
+    parser.add_argument(
+        "--input", type=Path, default=data_path("tepsac", "allSchoolData.xlsx")
+    )
+    parser.add_argument(
+        "--output", type=Path, default=data_path("tepsac", "tepsac_geocoded.csv")
+    )
+    args = parser.parse_args(argv)
+    tepsac_df = pd.read_excel(args.input)
 
-# Write provider-specific columns
-tepsac_df["Census Lat"] = tepsac_df["School Full Address"].map(
-    lambda a: results_map.get(a, {}).get("census", {}).get("lat")
-)
-tepsac_df["Census Lng"] = tepsac_df["School Full Address"].map(
-    lambda a: results_map.get(a, {}).get("census", {}).get("lng")
-)
-tepsac_df["Census Match Type"] = tepsac_df["School Full Address"].map(
-    lambda a: results_map.get(a, {}).get("census", {}).get("match_type")
-)
-tepsac_df["Census Match Score"] = tepsac_df["School Full Address"].map(
-    lambda a: results_map.get(a, {}).get("census", {}).get("match_score")
-)
+    tepsac_df = tepsac_df[~tepsac_df["Closed"]]
 
-tepsac_df["ArcGIS Lat"] = tepsac_df["School Full Address"].map(
-    lambda a: results_map.get(a, {}).get("arcgis", {}).get("lat")
-)
-tepsac_df["ArcGIS Lng"] = tepsac_df["School Full Address"].map(
-    lambda a: results_map.get(a, {}).get("arcgis", {}).get("lng")
-)
-tepsac_df["ArcGIS Score"] = tepsac_df["School Full Address"].map(
-    lambda a: results_map.get(a, {}).get("arcgis", {}).get("score")
-)
+    tepsac_df["School Full Address"] = (
+        tepsac_df["School Street"].fillna("").astype(str)
+        + ", "
+        + tepsac_df["School City"].fillna("").astype(str)
+        + ", "
+        + tepsac_df["School State"].fillna("").astype(str)
+        + " "
+        + tepsac_df["School Zip"].fillna("").astype(str)
+    ).str.strip(", ")
 
-tepsac_df["OSM Lat"] = tepsac_df["School Full Address"].map(
-    lambda a: results_map.get(a, {}).get("osm", {}).get("lat")
-)
-tepsac_df["OSM Lng"] = tepsac_df["School Full Address"].map(
-    lambda a: results_map.get(a, {}).get("osm", {}).get("lng")
-)
-tepsac_df["OSM Importance"] = tepsac_df["School Full Address"].map(
-    lambda a: results_map.get(a, {}).get("osm", {}).get("importance")
-)
-tepsac_df["OSM Class"] = tepsac_df["School Full Address"].map(
-    lambda a: results_map.get(a, {}).get("osm", {}).get("cls")
-)
-tepsac_df["OSM Type"] = tepsac_df["School Full Address"].map(
-    lambda a: results_map.get(a, {}).get("osm", {}).get("typ")
-)
+    unique_addrs = (
+        tepsac_df["School Full Address"].dropna().astype(str).unique().tolist()
+    )
 
-# Best-pick coordinates with provenance
-best_triplets = tepsac_df["School Full Address"].map(
-    lambda a: pick_best(results_map.get(a, {"arcgis": {}, "census": {}, "osm": {}}))
-)
-tepsac_df["Best Lat"] = best_triplets.map(lambda t: t[0])
-tepsac_df["Best Lng"] = best_triplets.map(lambda t: t[1])
-tepsac_df["Best Provider"] = best_triplets.map(lambda t: t[2])
+    # Run the async builder
+    results_map = asyncio.run(build_results_map_with_progress(unique_addrs))
 
-# Optional: save out for inspection
-tepsac_df.to_csv(
-    "/Users/adpena/PycharmProjects/teadata/teadata/data/tepsac/tepsac_geocoded.csv",
-    index=False,
-)
+    # Write provider-specific columns
+    tepsac_df["Census Lat"] = tepsac_df["School Full Address"].map(
+        lambda a: results_map.get(a, {}).get("census", {}).get("lat")
+    )
+    tepsac_df["Census Lng"] = tepsac_df["School Full Address"].map(
+        lambda a: results_map.get(a, {}).get("census", {}).get("lng")
+    )
+    tepsac_df["Census Match Type"] = tepsac_df["School Full Address"].map(
+        lambda a: results_map.get(a, {}).get("census", {}).get("match_type")
+    )
+    tepsac_df["Census Match Score"] = tepsac_df["School Full Address"].map(
+        lambda a: results_map.get(a, {}).get("census", {}).get("match_score")
+    )
 
-print(f"Geocoded {len(results_map)} unique addresses. Saved tepsac_geocoded.csv.")
+    tepsac_df["ArcGIS Lat"] = tepsac_df["School Full Address"].map(
+        lambda a: results_map.get(a, {}).get("arcgis", {}).get("lat")
+    )
+    tepsac_df["ArcGIS Lng"] = tepsac_df["School Full Address"].map(
+        lambda a: results_map.get(a, {}).get("arcgis", {}).get("lng")
+    )
+    tepsac_df["ArcGIS Score"] = tepsac_df["School Full Address"].map(
+        lambda a: results_map.get(a, {}).get("arcgis", {}).get("score")
+    )
+
+    tepsac_df["OSM Lat"] = tepsac_df["School Full Address"].map(
+        lambda a: results_map.get(a, {}).get("osm", {}).get("lat")
+    )
+    tepsac_df["OSM Lng"] = tepsac_df["School Full Address"].map(
+        lambda a: results_map.get(a, {}).get("osm", {}).get("lng")
+    )
+    tepsac_df["OSM Importance"] = tepsac_df["School Full Address"].map(
+        lambda a: results_map.get(a, {}).get("osm", {}).get("importance")
+    )
+    tepsac_df["OSM Class"] = tepsac_df["School Full Address"].map(
+        lambda a: results_map.get(a, {}).get("osm", {}).get("cls")
+    )
+    tepsac_df["OSM Type"] = tepsac_df["School Full Address"].map(
+        lambda a: results_map.get(a, {}).get("osm", {}).get("typ")
+    )
+
+    # Best-pick coordinates with provenance
+    best_triplets = tepsac_df["School Full Address"].map(
+        lambda a: pick_best(results_map.get(a, {"arcgis": {}, "census": {}, "osm": {}}))
+    )
+    tepsac_df["Best Lat"] = best_triplets.map(lambda t: t[0])
+    tepsac_df["Best Lng"] = best_triplets.map(lambda t: t[1])
+    tepsac_df["Best Provider"] = best_triplets.map(lambda t: t[2])
+
+    # Optional: save out for inspection
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    tepsac_df.to_csv(
+        args.output,
+        index=False,
+    )
+
+    print(f"Geocoded {len(results_map)} unique addresses. Saved {args.output}.")
+
+
+if __name__ == "__main__":
+    main()

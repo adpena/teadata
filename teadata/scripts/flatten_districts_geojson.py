@@ -6,9 +6,10 @@ import geopandas as gpd  # type: ignore[import-untyped]
 from shapely.geometry import shape, mapping, MultiPolygon, Polygon  # type: ignore[import-untyped]
 from shapely.validation import make_valid  # type: ignore[import-untyped]
 
-# --- Quick Settings for IDE runs (edit these and just press Run) ---
-DEFAULT_INPUT = "/Users/adpena/PycharmProjects/teadata/teadata/data/shapes/Current_Districts_2025.geojson"
-DEFAULT_OUTPUT = "/Users/adpena/PycharmProjects/teadata/teadata/data/shapes/Current_Districts_2025_flat.geojson"
+from teadata.scripts.paths import data_path
+
+DEFAULT_INPUT = str(data_path("shapes", "Current_Districts_2025.geojson"))
+DEFAULT_OUTPUT = str(data_path("shapes", "Current_Districts_2025_flat.geojson"))
 DEFAULT_FILTER_FIELD = "NAME"
 DEFAULT_FILTER_VALUE = "AUSTIN ISD"
 

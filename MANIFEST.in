@@ -1,6 +1,21 @@
-recursive-include teadata/.cache *.pkl.gz
-recursive-include teadata/.cache boundaries_*.sqlite
-recursive-include teadata/.cache entities_*.sqlite
-recursive-include data/private_schools *.csv
-global-exclude *.pkl
-exclude teadata/.cache/map_payloads_*.sqlite
+# Runtime Python and package resources come from pyproject.toml's package policy.
+include LICENSE README.md AGENTS.md pyproject.toml uv.lock mkdocs.yml
+include scripts/check
+recursive-include tests *.py
+recursive-include examples *.py
+recursive-include docs *.md
+recursive-include provenance/records *.json
+
+# Retained data bundles and raw inputs travel separately from Python packages.
+prune data
+prune teadata/data
+prune .cache
+prune teadata/.cache
+prune provenance/objects
+prune .local
+prune .venv
+prune build
+prune dist
+global-exclude __pycache__ *.py[cod] *.pkl *.pkl.gz *.pickle *.sqlite* *.db *.parquet
+global-exclude *.so *.pyd *.dll *.dylib *.exe .DS_Store
+global-exclude .env .env.* *.key *.pem *.pfx *.p12 *.secrets*

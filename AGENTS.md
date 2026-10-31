@@ -7,8 +7,10 @@
 - Tests reside in `tests/` (e.g., `tests/test_snapshot_loading.py`), and example notebooks/scripts are in `examples/`. Packaging artifacts land in `build/` and `teadata.egg-info/`.
 
 ## Build, Test, and Development Commands
+- Code-only clones and worktrees must set `GIT_LFS_SKIP_SMUDGE=1` during checkout. Hydrate only explicitly selected retained-release artifacts when an artifact check requires them.
 - Install for iterative work: `uv sync --all-extras` (this handles dev, database, and notebook extras automatically).
 - Always run Python commands through `uv run` and manage packages with `uv`; avoid bare `python` or `pip` to keep environments consistent.
+- `.python-version` is the default development and `scripts/check` interpreter authority; `TEADATA_CHECK_PYTHON` selects a compatibility-check override.
 - Run the suite: `uv run pytest` or target a test (`uv run pytest tests/test_entities.py::test_campus_to_dict_includes_percent_enrollment_change`).
 - Optional: build a fresh snapshot from the configured spatial files with `uv run python -m teadata.load_data` (uses `teadata_sources.yaml` and writes to `.cache/`).
 - When code changes affect anything serialized into the snapshot (pickled data), run `uv run python -m teadata.load_data` as the final task to refresh snapshot artifacts.
@@ -16,6 +18,8 @@
 - Linting and type checking: `uv run ruff check .` and `uv run ty check .`.
 
 ## Coding Style & Naming Conventions
+
+Python 3.14 and 3.15 are required compatibility targets alongside supported earlier versions. Dependency and compatibility changes require isolated checks and real retained-bundle loading on those interpreters; classifiers alone do not establish support.
 - Python 3.11+, PEP 8 defaults, 4-space indents, and type hints preferred (modules use `from __future__ import annotations`).
 - Modules and functions use `snake_case`; classes use `PascalCase`; keep public attributes stable for pickled snapshots.
 - Keep data loaders/enrichers deterministic: avoid implicit network calls and prefer explicit file paths resolved via config helpers.
@@ -35,7 +39,7 @@
 - **Standard SemVer (X.Y.Z):** Used for Major, Minor, and Patch updates to the codebase.
 - **Data Refreshes (X.Y.Zy):** Append an additional digit for data-only updates (e.g., `0.0.71` implies a refresh of version `0.0.7`).
 - **Release Process:** Increment the version in `pyproject.toml` prior to executing a production `load_data.py` run or distributing new snapshots.
-- **Tag retention:** Keep only the three most recent tags/releases; delete older tags and their GitHub release assets everywhere.
+- **Published history:** Preserve published tags, releases, and assets for reproducibility. Retire obsolete code and active cache artifacts instead. Never move a released tag or replace published assets.
 
 ## Commit & Pull Request Guidelines
 - Follow the existing history: short, imperative subject lines (e.g., “Create .gitattributes”, “Adding gzip support of snapshot repo cache”).
@@ -50,3 +54,11 @@
 
 ## Downstream Dependencies
 - `teadata-app` consumes the public `DataEngine`/`Query` APIs and snapshot loading behavior directly; avoid breaking signatures, return types, or query semantics, and coordinate any behavioral changes with that app before merging.
+
+## Landing Review Gate
+
+Adversarial review of the final diff is required before landing. Resolve findings and run the applicable checks against the exact revision to be landed. Draft review branches are permitted; a prior review of an earlier revision does not satisfy this gate.
+
+## Local Verification
+
+`scripts/check` is the primary verification entry point; it runs locked isolated local Ruff, ty, deptry, and pytest checks and records receipts/logs in ignored `.local/checks/`. Use `scripts/check --verify-latest` to verify evidence for the current exact revision. After serialized-code or data changes, rebuild the bundle and run `scripts/check --release teadata/.cache/release.json`. Code-only receipts do not certify raw data or artifacts, and all receipts remain separate from adversarial review. `TEADATA_CHECK_PYTHON` selects another supported Python version for compatibility checks. Hosted workflows are manual only; do not restore automatic hosted triggers without a user request. Optional hook installation must preserve Git LFS and refuse custom hooks/configuration.

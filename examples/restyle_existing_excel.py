@@ -19,7 +19,7 @@ pd.set_option("display.max_columns", None)
 
 
 import pandas as pd
-import xlwings as xw
+import argparse
 from pathlib import Path
 
 
@@ -41,6 +41,8 @@ def style_existing_excel(
       - autofit columns then cap/min widths
       - apply simple number formats (ints, floats, percents by name)
     """
+    import xlwings as xw
+
     path = str(Path(path).resolve())
 
     # Optional: use pandas just to infer number formats by dtype
@@ -404,9 +406,13 @@ if __name__ == "__main__":
     except Exception as e:
         print("[warn] Could not verify saved headers:", e)"""
 
+    parser = argparse.ArgumentParser(description="Style an existing Excel workbook with xlwings.")
+    parser.add_argument("path", help="Path to the workbook to style.")
+    parser.add_argument("--sheet-name", default="Sheet1")
+    args = parser.parse_args()
     style_existing_excel(
-        "/Users/adpena/PycharmProjects/CharterCostTracker/reports/transfer reports/charter_flow_analysis/AISD 2014-2025 Charter Transfer Flow.xlsx",  # use the same absolute path we just wrote
-        sheet_name="AISD 2014-2025 Charter Transfer",
+        args.path,
+        sheet_name=args.sheet_name,
         table_name="",
         table_style="TableStyleMedium2",
         open_after=False,

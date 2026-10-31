@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 import fnmatch
 import gzip
-import io
 import logging
 import os
 import pickle
@@ -18,10 +17,12 @@ import sys
 import time
 import uuid
 
-from .assets import ensure_local_asset, is_lfs_pointer
+from .manifest import ContractError, DatasetCatalog, read_sqlite_catalog
+from .identifiers import canonical_source_identifier
+from .release import current_release, snapshot_build_id
 from .boundary_store import BoundaryStore
+from teadata.identifiers import normalize_campus_lookup_key
 from teadata.teadata_config import (
-    canonical_campus_number,
     normalize_district_number_value,
 )
 
@@ -39,7 +40,6 @@ from .geometry import (
     MultiPolygon,
     ShapelyPoint,
     ShapelyPolygon,
-    district_centroid_xy,
     euclidean,
     haversine_miles,
     point_in_polygon,
@@ -48,53 +48,7 @@ from .geometry import (
 )
 from .query import Query, unwrap_query
 
-try:
-    from platformdirs import user_cache_dir  # type: ignore
-except Exception:  # pragma: no cover - optional dependency
-    user_cache_dir = None
-
-DEFAULT_REPO_PKL_RELATIVE = (
-    ".cache/repo_Current_Districts_2025_Schools_2024_to_2025.pkl"
-)
-DEFAULT_REPO_PKL_URL = (
-    "https://raw.githubusercontent.com/adpena/teadata/"
-    "bddeb222dd579542453ae47163ebe39cc3a07081/teadata/.cache/"
-    "repo_Current_Districts_2025_Schools_2024_to_2025.pkl"
-)
 GZIP_MAGIC = b"\x1f\x8b"
-
-
-class _ModuleMappingUnpickler(pickle.Unpickler):
-    """Remap legacy module names when loading snapshots."""
-
-    def __init__(self, file, module_map: dict[str, str] | None = None):
-        super().__init__(file)
-        self._module_map = module_map or {}
-
-    def find_class(self, module, name):  # pragma: no cover - exercised indirectly
-        remapped = self._module_map.get(module, module)
-        return super().find_class(remapped, name)
-
-
-def _compat_pickle_load(fobj) -> object:
-    try:
-        return pickle.load(fobj)
-    except ModuleNotFoundError as e:  # pragma: no cover - compatibility path
-        try:
-            try:
-                fobj.seek(0)
-                bio = fobj  # type: ignore
-            except Exception:
-                data = fobj.read()
-                bio = io.BytesIO(data)
-            current_mod = __name__
-            module_map = {
-                "classes": current_mod,
-                "__main__": current_mod,
-            }
-            return _ModuleMappingUnpickler(bio, module_map).load()
-        except Exception as ee:
-            raise ee from e
 
 
 logger = logging.getLogger(__name__)
@@ -264,50 +218,6 @@ def timeit(func):
     return wrapper
 
 
-def _iter_parents(start: Path):
-    cur = start.resolve()
-    yielded = set()
-    while True:
-        if cur in yielded:
-            break
-        yielded.add(cur)
-        yield cur
-        if cur.parent == cur:
-            break
-        cur = cur.parent
-
-
-def _newest_pickle(folder: Path) -> Optional[Path]:
-    try:
-        if not folder.exists() or not folder.is_dir():
-            return None
-
-        picks = []
-        for pattern in ("*.pkl", "*.pkl.gz"):
-            picks.extend(folder.glob(pattern))
-        if not picks:
-            return None
-
-        def score(path: Path) -> tuple[int, float]:
-            support = 0
-            boundary = _boundary_store_path_for_snapshot(path)
-            if boundary and boundary.exists():
-                support += 2
-            map_store = _map_store_path_for_snapshot(path)
-            if map_store and map_store.exists():
-                support += 1
-            try:
-                mtime = path.stat().st_mtime
-            except Exception:
-                mtime = 0.0
-            return (support, mtime)
-
-        picks.sort(key=score, reverse=True)
-        return picks[0]
-    except Exception:
-        return None
-
-
 def _is_gzip_file(path: Path) -> bool:
     try:
         with path.open("rb") as f:
@@ -317,77 +227,24 @@ def _is_gzip_file(path: Path) -> bool:
 
 
 def _load_snapshot_payload(path: Path):
-    path = ensure_local_asset(path, url_env="TEADATA_SNAPSHOT_URL", label="snapshot")
-    if is_lfs_pointer(path):
-        raise RuntimeError(
-            "Snapshot file is a git-lfs pointer; set TEADATA_SNAPSHOT_URL to a real asset."
-        )
     opener = gzip.open if _is_gzip_file(path) else open
-    with opener(path, "rb") as f:
-        return _compat_pickle_load(f)
+    expected = snapshot_build_id(path)
+    with opener(path, "rb") as stream:
+        stream.readline(100)
+        result = pickle.load(stream)
+    if getattr(getattr(result, "catalog", None), "build_id", None) != expected:
+        raise ContractError(
+            "Snapshot payload and header have different build identities"
+        )
+    return result
 
 
-def _discover_snapshot(explicit: str | Path | None = None) -> Optional[Path]:
-
-    if explicit:
-        p = Path(explicit)
-        if p.exists() and p.is_file():
-            return p
-
-    env = os.environ.get("TEADATA_SNAPSHOT")
-    if env:
-        p = Path(env)
-        if p.exists() and p.is_file():
-            return p
-
-    try:
-        package_dir = Path(__file__).resolve().parent
-        pkg_cache = package_dir / ".cache"
-        p = _newest_pickle(pkg_cache)
-        if p is not None:
-            return p
-    except Exception:
-        pass
-
-    for base in _iter_parents(Path.cwd()):
-        p = _newest_pickle(base / ".cache")
-        if p is not None:
-            return p
-
-    if user_cache_dir:
-        try:
-            ucache = Path(user_cache_dir("teadata", "adpena"))
-            p = _newest_pickle(ucache)
-            if p is not None:
-                return p
-        except Exception:
-            pass
-
-    return None
-
-
-def _boundary_store_path_for_snapshot(snapshot_path: Path) -> Optional[Path]:
-    name = snapshot_path.name
-    if name.startswith("repo_"):
-        base = name[len("repo_") :]
-        if base.endswith(".pkl.gz"):
-            base = base[: -len(".pkl.gz")]
-        elif base.endswith(".pkl"):
-            base = base[: -len(".pkl")]
-        return snapshot_path.with_name(f"boundaries_{base}.sqlite")
-    return None
-
-
-def _map_store_path_for_snapshot(snapshot_path: Path) -> Optional[Path]:
-    name = snapshot_path.name
-    if name.startswith("repo_"):
-        base = name[len("repo_") :]
-        if base.endswith(".pkl.gz"):
-            base = base[: -len(".pkl.gz")]
-        elif base.endswith(".pkl"):
-            base = base[: -len(".pkl")]
-        return snapshot_path.with_name(f"map_payloads_{base}.sqlite")
-    return None
+def _discover_snapshot(explicit: str | Path | None = None) -> Path:
+    return (
+        Path(explicit)
+        if explicit is not None
+        else current_release().artifact("snapshot")
+    )
 
 
 @dataclass
@@ -404,6 +261,8 @@ class _CharterCache:
 
 
 class DataEngine:
+    catalog: DatasetCatalog
+
     @staticmethod
     def _match_district_number(d: "District", key) -> bool:
         canon = normalize_district_number_value(key)
@@ -415,263 +274,6 @@ class DataEngine:
         canon_uns = canon[1:] if canon.startswith("'") else canon
         return stored == canon or stored_uns == canon_uns
 
-    def _as_district(self, v):
-        """
-        Coerce v to a District instance if possible.
-        Handles District, dict, or foreign class with attributes.
-        Guarantees a non-empty name by deriving from common fields or using a fallback.
-        """
-
-        def _coerce_uuid_safe(x):
-            try:
-                return (
-                    uuid.UUID(x)
-                    if (x is not None and not isinstance(x, uuid.UUID))
-                    else x
-                )
-            except Exception:
-                return uuid.uuid4()
-
-        def _derive_name_from_dict(m: dict) -> Optional[str]:
-            for key in (
-                "name",
-                "district_name",
-                "DISTNAME",
-                "District",
-                "DISTRICT",
-                "DISTRICT_NAME",
-            ):
-                val = m.get(key)
-                if isinstance(val, str) and val.strip():
-                    return val.strip()
-            meta = m.get("meta")
-            if isinstance(meta, dict):
-                for key in ("name", "district_name", "DISTNAME"):
-                    val = meta.get(key)
-                    if isinstance(val, str) and val.strip():
-                        return val.strip()
-            return None
-
-        def _derive_name_from_obj(obj) -> Optional[str]:
-            candidates = [
-                getattr(obj, "name", None),
-                getattr(obj, "district_name", None),
-                getattr(obj, "DISTNAME", None),
-            ]
-            meta = getattr(obj, "meta", None)
-            if isinstance(meta, dict):
-                candidates.extend(
-                    [meta.get("name"), meta.get("district_name"), meta.get("DISTNAME")]
-                )
-            for val in candidates:
-                if isinstance(val, str) and val.strip():
-                    return val.strip()
-            return None
-
-        # 1) Already a District
-        if isinstance(v, District):
-            # Ensure the name isn't empty; fix-up in place if needed
-            if not (isinstance(v.name, str) and v.name.strip()):
-                dn = getattr(v, "district_number", None)
-                v.name = f"Unknown District {dn or v.id}"
-            return v
-
-        # 2) Mapping input
-        if isinstance(v, dict):
-            id_ = _coerce_uuid_safe(v.get("id"))
-            dn = (
-                v.get("district_number")
-                or v.get("cdn")
-                or v.get("CDN")
-                or v.get("District Number")
-            )
-            name = _derive_name_from_dict(v) or f"Unknown District {dn or id_}"
-            enrollment = v.get("enrollment") or 0
-            aea_raw = _normalize_aea_raw(v.get("aea_raw", v.get("aea")))
-            aea = _coerce_aea_bool(aea_raw if aea_raw is not None else v.get("aea"))
-            rating = v.get("rating")
-            # Accept either 'polygon' or 'boundary' for geometry; pass None if absent
-            boundary = v.get("polygon", v.get("boundary"))
-            meta = v.get("meta", {}) if isinstance(v.get("meta", {}), dict) else {}
-            return District(
-                id=id_,
-                name=name,
-                enrollment=(
-                    int(enrollment) if isinstance(enrollment, (int, float)) else 0
-                ),
-                district_number=dn or "",
-                aea=aea,
-                aea_raw=aea_raw,
-                rating=rating,
-                boundary=boundary,
-                meta=meta,
-            )
-
-        # 3) Foreign object with attributes
-        id_ = _coerce_uuid_safe(getattr(v, "id", None))
-        dn = (
-            getattr(v, "district_number", None)
-            or getattr(v, "cdn", None)
-            or getattr(v, "CDN", None)
-        )
-        name = _derive_name_from_obj(v) or f"Unknown District {dn or id_}"
-        enrollment = getattr(v, "enrollment", 0) or 0
-        aea_raw = _normalize_aea_raw(
-            getattr(v, "aea_raw", getattr(v, "aea", None))
-        )
-        aea = _coerce_aea_bool(aea_raw if aea_raw is not None else getattr(v, "aea", None))
-        rating = getattr(v, "rating", None)
-        boundary = (
-            getattr(v, "polygon", None)
-            or getattr(v, "boundary", None)
-            or getattr(v, "geometry", None)
-        )
-        meta = (
-            getattr(v, "meta", {}) if isinstance(getattr(v, "meta", {}), dict) else {}
-        )
-
-        return District(
-            id=id_,
-            name=name,
-            enrollment=int(enrollment) if isinstance(enrollment, (int, float)) else 0,
-            district_number=dn or "",
-            aea=aea,
-            aea_raw=aea_raw,
-            rating=rating,
-            boundary=boundary,
-            meta=meta,
-        )
-
-    def _as_campus(self, v):
-        """
-        Coerce v to a Campus instance if possible.
-        Handles Campus, dict, or foreign class with attributes.
-        """
-        if isinstance(v, Campus):
-            return v
-        # Dict input
-        if isinstance(v, dict):
-            id = v.get("id")
-            try:
-                id = (
-                    uuid.UUID(id)
-                    if not isinstance(id, uuid.UUID) and id is not None
-                    else id
-                )
-            except Exception:
-                pass
-            district_id = v.get("district_id")
-            try:
-                district_id = (
-                    uuid.UUID(district_id)
-                    if not isinstance(district_id, uuid.UUID)
-                    and district_id is not None
-                    else district_id
-                )
-            except Exception:
-                pass
-            name = v.get("name")
-            enrollment = v.get("enrollment")
-            charter_type = v.get("charter_type")
-            is_charter = v.get("is_charter")
-            is_private = v.get("is_private", False)
-            is_magnet = v.get("is_magnet")
-            rating = v.get("rating")
-            aea_raw = _normalize_aea_raw(v.get("aea_raw", v.get("aea")))
-            aea = _coerce_aea_bool(aea_raw if aea_raw is not None else v.get("aea"))
-            grade_range = v.get("grade_range")
-            school_type = v.get("school_type")
-            school_status_date = v.get("school_status_date")
-            update_date = v.get("update_date")
-            district_number = v.get("district_number", "")
-            campus_number = v.get("campus_number", "")
-            # Accept either 'point' or 'location' for geometry
-            location = v.get("point", v.get("location"))
-            meta = v.get("meta", {})
-            return Campus(
-                id=id,
-                district_id=district_id,
-                name=name,
-                enrollment=enrollment,
-                charter_type=charter_type,
-                is_charter=is_charter,
-                is_private=is_private,
-                is_magnet=is_magnet,
-                rating=rating,
-                aea=aea,
-                aea_raw=aea_raw,
-                grade_range=grade_range,
-                school_type=school_type,
-                school_status_date=school_status_date,
-                update_date=update_date,
-                district_number=district_number,
-                campus_number=campus_number,
-                location=location,
-                meta=meta,
-            )
-        # Foreign class/object with attributes
-        id = getattr(v, "id", None)
-        try:
-            id = (
-                uuid.UUID(id)
-                if not isinstance(id, uuid.UUID) and id is not None
-                else id
-            )
-        except Exception:
-            pass
-        district_id = getattr(v, "district_id", None)
-        try:
-            district_id = (
-                uuid.UUID(district_id)
-                if not isinstance(district_id, uuid.UUID) and district_id is not None
-                else district_id
-            )
-        except Exception:
-            pass
-        name = getattr(v, "name", None)
-        enrollment = getattr(v, "enrollment", None)
-        charter_type = getattr(v, "charter_type", None)
-        is_charter = getattr(v, "is_charter", None)
-        is_private = getattr(v, "is_private", False)
-        is_magnet = getattr(v, "is_magnet", None)
-        rating = getattr(v, "rating", None)
-        aea_raw = _normalize_aea_raw(
-            getattr(v, "aea_raw", getattr(v, "aea", None))
-        )
-        aea = _coerce_aea_bool(aea_raw if aea_raw is not None else getattr(v, "aea", None))
-        grade_range = getattr(v, "grade_range", None)
-        school_type = getattr(v, "school_type", None)
-        school_status_date = getattr(v, "school_status_date", None)
-        update_date = getattr(v, "update_date", None)
-        district_number = getattr(v, "district_number", "")
-        campus_number = getattr(v, "campus_number", "")
-        # Prefer 'point', else 'location'
-        location = getattr(v, "point", None)
-        if location is None:
-            location = getattr(v, "location", None)
-        meta = getattr(v, "meta", {}) if hasattr(v, "meta") else {}
-        return Campus(
-            id=id,
-            district_id=district_id,
-            name=name,
-            enrollment=enrollment,
-            charter_type=charter_type,
-            is_charter=is_charter,
-            is_private=is_private,
-            is_magnet=is_magnet,
-            rating=rating,
-            aea=aea,
-            aea_raw=aea_raw,
-            grade_range=grade_range,
-            school_type=school_type,
-            school_status_date=school_status_date,
-            update_date=update_date,
-            district_number=district_number,
-            campus_number=campus_number,
-            location=location,
-            meta=meta,
-        )
-
     @classmethod
     def from_snapshot(
         cls,
@@ -681,240 +283,51 @@ class DataEngine:
         eager_indexes: bool = False,
         indexes_enabled: bool | None = None,
     ) -> "DataEngine":
-        """
-        Load a DataEngine from a pickled snapshot (.pkl or .pkl.gz). This method **never** returns None.
-        It either returns a valid DataEngine instance or raises a clear RuntimeError/TypeError.
+        """Load a catalog-bound engine; default loading verifies the complete release.
 
-        Snapshot discovery prioritizes the package's own `.cache` folder over outer repo folders.
-        Accepts snapshot payloads saved by different builder scripts, including:
-          - a full DataEngine instance
-          - a dict with keys like "_districts"/"districts" and "_campuses"/"campuses"
-          - a tuple produced by load_data2.py such as:
-                (districts_dict, campuses_dict)
-            or  (districts_dict, campuses_dict, meta_dict)
-            or  lists of District/Campus instead of dicts
-        indexes_enabled overrides TEADATA_DISABLE_INDEXES for this engine instance.
+        Explicit paths are for trusted locally built snapshots. Legacy tuple,
+        dictionary, and module-remapping formats must be rebuilt from source.
         """
-        if indexes_enabled is None:
-            indexes_enabled = DEFAULT_INDEXES_ENABLED
-
-        # Resolve the path to open
-        path: Optional[Path]
-        if snapshot is not None:
-            path = Path(snapshot)
+        if snapshot is None and not search:
+            raise ContractError("Select a release or supply an explicit snapshot")
+        if snapshot is None:
+            release = current_release()
+            path = release.artifact("snapshot")
         else:
-            path = _discover_snapshot(None) if search else None
-
-        if path is None:
-            eng = cls(indexes_enabled=indexes_enabled)  # empty engine (no snapshot found)
-            eng._maybe_attach_boundary_store(None)
-            _log_memory(
-                "snapshot.none",
-                {
-                    "indexes_enabled": getattr(eng, "_indexes_enabled", None),
-                    "districts": len(getattr(eng, "_districts", {})),
-                    "campuses": len(getattr(eng, "_campuses", {})),
-                },
+            release = None
+            path = Path(snapshot)
+        obj = _load_snapshot_payload(path)
+        if not isinstance(obj, cls) or not isinstance(
+            getattr(obj, "catalog", None), DatasetCatalog
+        ):
+            raise ContractError(
+                "Snapshot lacks a dataset catalog; rebuild it from source"
             )
-            return eng
-
-        if not path.exists() or not path.is_file():
-            raise RuntimeError(f"Snapshot not found or not a file: {path}")
-
+        # Revalidate serialized catalogs; pickle construction bypasses __init__.
+        obj.catalog = DatasetCatalog(obj.catalog.to_dict())
         try:
-            obj = _load_snapshot_payload(path)
-        except Exception as e:
-            raise RuntimeError(f"Failed to unpickle snapshot {path}: {e}") from e
-
-        # Case 1: the snapshot already contains a DataEngine
-        if isinstance(obj, cls):
-            try:
-                obj._rehydrate_geometries()
-            except Exception:
-                pass
-            for attr in (
-                "_kdtree_charter",
-                "_xy_deg_charter",
-                "_xy_rad_charter",
-                "_campus_list_charter",
-                "_xy_deg_np_charter",
-                "_campus_list_np_charter",
-            ):
-                if not hasattr(obj, attr):
-                    setattr(obj, attr, None)
-            obj._set_indexes_enabled(indexes_enabled)
-            try:
-                obj._rebuild_indexes()
-            except Exception:
-                pass
-            if eager_indexes:
-                try:
-                    obj.warm_indexes()
-                except Exception:
-                    pass
-            obj._maybe_attach_boundary_store(path)
-            _log_memory(
-                "snapshot.engine",
-                {
-                    "path": path,
-                    "indexes_enabled": getattr(obj, "_indexes_enabled", None),
-                    "districts": len(getattr(obj, "_districts", {})),
-                    "campuses": len(getattr(obj, "_campuses", {})),
-                },
-            )
-            return obj
-
-        # Create an instance early so we can use instance coercers
-        eng = cls(indexes_enabled=indexes_enabled)
-
-        # Helper to coerce various container shapes into {uuid -> District/Campus}
-        def _coerce_entity_map(x, kind: str):
-            """
-            Accept a dict or list/tuple and return a dict keyed by entity.id, coercing to District or Campus.
-            kind: "district" or "campus"
-            """
-            out = {}
-            if isinstance(x, dict):
-                values = list(x.values())
-            elif isinstance(x, (list, tuple)):
-                values = list(x)
-            else:
-                return out
-            for v in values:
-                try:
-                    obj2 = (
-                        eng._as_district(v) if kind == "district" else eng._as_campus(v)
-                    )
-                except Exception:
-                    obj2 = None
-                if getattr(obj2, "id", None) is not None:
-                    out[obj2.id] = obj2
-            return out
-
-        # Case 2: dict payload with districts/campuses inside
-        if isinstance(obj, dict):
-            dmap = None
-            cmap = None
-            for k in ("_districts", "districts"):
-                if k in obj:
-                    dmap = _coerce_entity_map(obj.get(k), kind="district")
-                    break
-            if dmap is None:
-                dmap = {}
-            for k in ("_campuses", "campuses"):
-                if k in obj:
-                    cmap = _coerce_entity_map(obj.get(k), kind="campus")
-                    break
-            if cmap is None:
-                cmap = {}
-
-            with eng.bulk():
-                for d in dmap.values():
-                    eng.add_district(d)
-                for c in cmap.values():
-                    if c.district_id in eng._districts:
-                        eng.add_campus(c)
-            eng._rebuild_indexes()
-            try:
-                eng._rehydrate_geometries()
-            except Exception:
-                pass
-            if os.environ.get("TEADATA_DEBUG"):
-                print(
-                    f"[snapshot] loaded districts={len(eng._districts)} campuses={len(eng._campuses)} from {path}"
-                )
-            eng._maybe_attach_boundary_store(path)
-            _log_memory(
-                "snapshot.dict",
-                {
-                    "path": path,
-                    "indexes_enabled": getattr(eng, "_indexes_enabled", None),
-                    "districts": len(getattr(eng, "_districts", {})),
-                    "campuses": len(getattr(eng, "_campuses", {})),
-                },
-            )
-            return eng
-
-        # Case 3: tuple/list payloads emitted by loader scripts (e.g., load_data2.py)
-        # Case: tuple/list payloads (various shapes)
-        if isinstance(obj, (tuple, list)):
-            parts = list(obj)
-
-            # (A) If any element is already a DataEngine instance, just use it.
-            for p in parts:
-                if isinstance(p, cls):
-                    if os.environ.get("TEADATA_DEBUG"):
-                        print(
-                            f"[snapshot] tuple contains DataEngine; returning embedded engine "
-                            f"with {len(p._districts)} districts / {len(p._campuses)} campuses"
-                        )
-                    try:
-                        p._rehydrate_geometries()
-                    except Exception:
-                        pass
-                    try:
-                        p._set_indexes_enabled(indexes_enabled)
-                    except Exception:
-                        pass
-                    try:
-                        p._rebuild_indexes()
-                    except Exception:
-                        pass
-                    try:
-                        p._maybe_attach_boundary_store(path)
-                    except Exception:
-                        pass
-                    _log_memory(
-                        "snapshot.tuple.engine",
-                        {
-                            "path": path,
-                            "indexes_enabled": getattr(p, "_indexes_enabled", None),
-                            "districts": len(getattr(p, "_districts", {})),
-                            "campuses": len(getattr(p, "_campuses", {})),
-                        },
-                    )
-                    return p
-
-            # (B) Otherwise try to coerce “(district_map, campus_map)” style payloads
-            if len(parts) >= 2:
-                dmap = _coerce_entity_map(parts[0], kind="district")
-                cmap = _coerce_entity_map(parts[1], kind="campus")
-                with eng.bulk():
-                    for d in dmap.values():
-                        eng.add_district(d)
-                    for c in cmap.values():
-                        if c.district_id in eng._districts:
-                            eng.add_campus(c)
-                eng._rebuild_indexes()
-                try:
-                    eng._rehydrate_geometries()
-                except Exception:
-                    pass
-                if os.environ.get("TEADATA_DEBUG"):
-                    print(
-                        f"[snapshot] tuple->coerced maps: districts={len(eng._districts)} "
-                        f"campuses={len(eng._campuses)} from {path}"
-                    )
-                eng._maybe_attach_boundary_store(path)
-                _log_memory(
-                    "snapshot.tuple",
-                    {
-                        "path": path,
-                        "indexes_enabled": getattr(eng, "_indexes_enabled", None),
-                        "districts": len(getattr(eng, "_districts", {})),
-                        "campuses": len(getattr(eng, "_campuses", {})),
-                    },
-                )
-                return eng
-
-        # Unsupported payload type
-        raise TypeError(f"Unsupported snapshot payload type: {type(obj)!r} in {path}")
+            for campus in obj._campuses.values():
+                if not campus.lookup_key:
+                    raise ValueError("Missing campus identity")
+        except (ValueError, TypeError, AttributeError) as error:
+            raise ContractError("Snapshot uses a legacy or invalid campus identity; rebuild it from source") from error
+        if release and obj.catalog.build_id != release.build_id:
+            raise ContractError("Snapshot belongs to a different data build")
+        obj._set_indexes_enabled(
+            DEFAULT_INDEXES_ENABLED if indexes_enabled is None else indexes_enabled
+        )
+        obj._rehydrate_geometries()
+        obj._rebuild_indexes()
+        if eager_indexes:
+            obj.warm_indexes()
+        if release:
+            obj.attach_boundary_store(release.artifact("boundaries"))
+        return obj
 
     @classmethod
     def load_default(cls, *, indexes_enabled: bool | None = None) -> "DataEngine":
         """
-        Convenience: try to load a snapshot discovered from common locations; otherwise return a fresh engine.
-        Never returns None.
+        Load the configured verified release; missing artifacts raise an error.
         """
         return cls.from_snapshot(None, search=True, indexes_enabled=indexes_enabled)
 
@@ -939,109 +352,23 @@ class DataEngine:
                 eager_indexes=eager_indexes,
                 indexes_enabled=indexes_enabled,
             )
-            # If we got a different instance, copy its state into self
-            if eng is not self:
-                # Initialize empty containers first (will be re-assigned below)
-                self._districts = EntityMap()
-                self._campuses = EntityMap()
-                self._campuses_by_district = defaultdict(list)
-
-                # Transfer enrichment diagnostics: counts of rows skipped due to missing campuses
-                self._xfers_missing = {"src": 0, "dst": 0, "either": 0}
-
-                # Copy over the dictionaries
-                try:
-                    self._districts.update(eng._districts)
-                    self._campuses.update(eng._campuses)
-                    self._campuses_by_district.update(eng._campuses_by_district)
-
-                    # Copy enrichment maps if present
-                    self._xfers_out = getattr(eng, "_xfers_out", defaultdict(list))  # type: ignore
-                    self._xfers_in = getattr(eng, "_xfers_in", defaultdict(list))  # type: ignore
-                    self._campus_by_number = getattr(eng, "_campus_by_number", {})
-
-                    self._xfers_missing = getattr(
-                        eng, "_xfers_missing", {"src": 0, "dst": 0, "either": 0}
-                    )
-
-                except Exception:
-                    pass
-                # Initialize indexes as empty; they will rebuild on demand
-                self._in_bulk = False
-                self._kdtree = None
-                self._kdtree_charter = None
-                self._xy_deg = None
-                self._xy_rad = None
-                self._campus_list = None
-                self._xy_deg_charter = None
-                self._xy_rad_charter = None
-                self._campus_list_charter = None
-                self._point_tree = None
-                self._point_geoms = None
-                self._point_ids = None
-                self._geom_id_to_index = None
-                self._xy_deg_np = None
-                self._campus_list_np = None
-                self._xy_deg_np_charter = None
-                self._campus_list_np_charter = None
-                self._all_xy_np = None
-                self._all_campuses_np = None
-                self._xy_to_index = None
-                self._charter_cache = None
-
-                # Fast name lookups
-                self._district_by_name_lower: Dict[str, uuid.UUID] = {}
-                self._campus_by_name_lower: Dict[str, uuid.UUID] = {}
-                self._districts_by_number_norm: Dict[str, List[uuid.UUID]] = {}
-                self._districts_by_name_lower_multi: Dict[str, List[uuid.UUID]] = {}
-                self._campuses_by_name_lower_multi: Dict[str, List[uuid.UUID]] = {}
-                self._district_name_upper_index: List[Tuple[str, uuid.UUID]] = []
-                self._campus_name_upper_index: List[Tuple[str, uuid.UUID]] = []
-                self._district_wildcard_cache: Dict[
-                    str, Tuple[int, List[uuid.UUID]]
-                ] = {}
-                self._campus_wildcard_cache: Dict[
-                    str, Tuple[int, List[uuid.UUID]]
-                ] = {}
-                self._name_lookup_version = 0
-                self._indexes_enabled = getattr(
-                    eng, "_indexes_enabled", DEFAULT_INDEXES_ENABLED
-                )
-                self._boundary_store = getattr(eng, "_boundary_store", None)
-                self._boundary_store_path = getattr(eng, "_boundary_store_path", None)
-
-                # Student transfer edges (optional enrichment).
-                # _xfers_out: campus_id -> list[(to_campus_id, count:int|None, masked:bool)]
-                # _xfers_in:  campus_id -> list[(from_campus_id, count:int|None, masked:bool)]
-                self._xfers_out: Dict[
-                    uuid.UUID, List[Tuple[uuid.UUID, Optional[int], bool]]
-                ] = defaultdict(
-                    list
-                )  # type: ignore
-                self._xfers_in: Dict[
-                    uuid.UUID, List[Tuple[uuid.UUID, Optional[int], bool]]
-                ] = defaultdict(
-                    list
-                )  # type: ignore
-
-                # Fast lookup by normalized campus number (e.g., "'101902001")
-                self._campus_by_number: Dict[str, uuid.UUID] = {}
-
-                self._rebuild_indexes()
-                try:
-                    self._rehydrate_geometries()
-                except Exception:
-                    pass
-                if eager_indexes and self._indexes_enabled:
-                    try:
-                        self.warm_indexes()
-                    except Exception:
-                        pass
-                return
+            # Adopt the complete validated state, including catalog, measurements,
+            # unresolved facts, and attached boundary store. There is one loader.
+            self.__dict__.update(eng.__dict__)
+            for district in self._districts.values():
+                district._repo = self
+            for campus in self._campuses.values():
+                campus._repo = self
+            return
         # Normal cold init (no snapshot)
-        self._districts: Dict[uuid.UUID, District] = EntityMap()
-        self._campuses: Dict[uuid.UUID, Campus] = EntityMap()
+        self._districts: EntityMap = EntityMap()
+        self._campuses: EntityMap = EntityMap()
         self._campuses_by_district: Dict[uuid.UUID, List[uuid.UUID]] = defaultdict(list)
+        self._xfers_out: Dict[uuid.UUID, List[Tuple[uuid.UUID, Optional[int], bool]]] = defaultdict(list)
+        self._xfers_in: Dict[uuid.UUID, List[Tuple[uuid.UUID, Optional[int], bool]]] = defaultdict(list)
+        self._xfers_missing = {"src": 0, "dst": 0, "either": 0}
+        self._xfers_unresolved = []
+        self._transfer_measurements = {}
         self._in_bulk = False
         # Spatial/attribute indexes (optional, built on demand)
         self._kdtree = None
@@ -1132,6 +459,7 @@ class DataEngine:
         Force-clear all spatial, vectorized, and name-lookup caches to free up memory.
         The engine remains fully functional; caches will be rebuilt lazily on demand.
         """
+        self._district_cover_index = None
         self._kdtree = None
         self._kdtree_charter = None
         self._xy_deg = None
@@ -1154,7 +482,7 @@ class DataEngine:
         self._charter_cache = None
 
         # Name lookups are small but we clear them for completeness; they rebuild via _rebuild_indexes()
-        self._campus_by_number = {}
+        self._campus_by_key = {}
         self._campus_by_name_lower = {}
         self._district_by_name_lower = {}
         self._districts_by_number_norm = {}
@@ -1231,58 +559,20 @@ class DataEngine:
                 return c
         return None
 
-    def campus_by_number(self, campus_number: Any) -> Optional["Campus"]:
-        """Return a campus by its TEA campus number in any common format."""
-
-        if campus_number is None:
+    def campus_by_key(self, lookup_key: str | None) -> Optional["Campus"]:
+        """Find a public TEA campus or a source-qualified private school."""
+        key = normalize_campus_lookup_key(lookup_key)
+        if key is None:
             return None
+        if not getattr(self, "_campus_by_key", None):
+            self._rebuild_indexes()
+        return self._campuses.get(self._campus_by_key.get(key))
 
-        index = getattr(self, "_campus_by_number", None)
-        if not index:
-            # Ensure the lookup table is populated (e.g., after bulk loads)
-            try:
-                self._rebuild_indexes()
-            except Exception:
-                index = {}
-            else:
-                index = getattr(self, "_campus_by_number", {})
-
-        candidates: list[str] = []
-
-        canonical = canonical_campus_number(campus_number)
-        if canonical:
-            candidates.append(canonical)
-            digits = canonical[1:]
-            if digits:
-                candidates.append(digits)
-                if digits.isdigit():
-                    candidates.append(str(int(digits)))
-
-        raw = str(campus_number).strip()
-        if raw:
-            candidates.append(raw)
-            if raw.startswith(("'", "’", "`")):
-                trimmed = raw[1:].lstrip()
-                if trimmed:
-                    candidates.append(trimmed)
-            try:
-                candidates.append(str(int(raw)))
-            except Exception:
-                pass
-
-        seen: set[str] = set()
-        for key in candidates:
-            if not key or key in seen:
-                continue
-            seen.add(key)
-            cid = index.get(key) if index is not None else None
-            if cid is None:
-                continue
-            campus = self._campuses.get(cid)
-            if campus is not None:
-                return campus
-
-        return None
+    def campus_by_number(self, campus_number: Any) -> Optional["Campus"]:
+        """Find only a real TEA campus number; private keys are separate."""
+        if campus_number is None or ":" in str(campus_number):
+            return None
+        return self.campus_by_key(str(campus_number))
 
     def __len__(self) -> int:
         return len(self._districts) + len(self._campuses)
@@ -1359,7 +649,6 @@ class DataEngine:
              repo >> ("privates_within", district)
              -> Query[Campus]
 
-             repo >> ("private_campuses_in", district, max_miles?)
              -> Query[Campus]
         """
         # 1) Existing behavior: predicate filter
@@ -1382,7 +671,11 @@ class DataEngine:
                     index = getattr(self, "_districts_by_number_norm", None)
                     if norm and index:
                         ids = index.get(norm, [])
-                        hits = [self._districts[did] for did in ids if did in self._districts]
+                        hits = [
+                            self._districts[did]
+                            for did in ids
+                            if did in self._districts
+                        ]
                     elif norm:
                         hits = [
                             d
@@ -1421,16 +714,24 @@ class DataEngine:
                             ids = [
                                 d.id
                                 for d in self._districts.values()
-                                if fnmatch.fnmatchcase((d.name or "").upper(), pattern_up)
+                                if fnmatch.fnmatchcase(
+                                    (d.name or "").upper(), pattern_up
+                                )
                             ]
                         cache[pattern_up] = (version, list(ids))
-                    matches = [self._districts[did] for did in ids if did in self._districts]
+                    matches = [
+                        self._districts[did] for did in ids if did in self._districts
+                    ]
                 else:
                     key_lower = target.lower()
                     multi = getattr(self, "_districts_by_name_lower_multi", None)
                     if multi:
                         ids = multi.get(key_lower, [])
-                        matches = [self._districts[did] for did in ids if did in self._districts]
+                        matches = [
+                            self._districts[did]
+                            for did in ids
+                            if did in self._districts
+                        ]
                     else:
                         for d in self._districts.values():
                             if (d.name or "").upper() == pattern_up:
@@ -1440,6 +741,10 @@ class DataEngine:
 
             if key == "campus":
                 raw = query[1]
+
+                if isinstance(raw, str) and raw.startswith("tefa:"):
+                    campus = self.campus_by_key(raw)
+                    return Query([campus] if campus is not None else [], self)
 
                 if isinstance(raw, int) or (
                     isinstance(raw, str) and any(ch.isdigit() for ch in raw)
@@ -1475,16 +780,22 @@ class DataEngine:
                             ids = [
                                 c.id
                                 for c in self._campuses.values()
-                                if fnmatch.fnmatchcase((c.name or "").upper(), pattern_up)
+                                if fnmatch.fnmatchcase(
+                                    (c.name or "").upper(), pattern_up
+                                )
                             ]
                         cache[pattern_up] = (version, list(ids))
-                    matches = [self._campuses[cid] for cid in ids if cid in self._campuses]
+                    matches = [
+                        self._campuses[cid] for cid in ids if cid in self._campuses
+                    ]
                 else:
                     key_lower = target.lower()
                     multi = getattr(self, "_campuses_by_name_lower_multi", None)
                     if multi:
                         ids = multi.get(key_lower, [])
-                        matches = [self._campuses[cid] for cid in ids if cid in self._campuses]
+                        matches = [
+                            self._campuses[cid] for cid in ids if cid in self._campuses
+                        ]
                     else:
                         for c in self._campuses.values():
                             if (c.name or "").upper() == pattern_up:
@@ -1498,17 +809,6 @@ class DataEngine:
                 if district is None:
                     return Query([], self)
                 return Query(self.campuses_in(district), self)
-
-            if key == "private_campuses_in":
-                district = unwrap_query(query[1])
-                if district is None:
-                    return Query([], self)
-                max_m = (
-                    float(query[2])
-                    if len(query) >= 3 and query[2] is not None
-                    else None
-                )
-                return Query(self.private_campuses_in(district, max_miles=max_m), self)
 
             if key == "charters_within":
                 district = unwrap_query(query[1])
@@ -1600,30 +900,14 @@ class DataEngine:
             self._rebuild_indexes()
 
     def attach_boundary_store(self, path: str | Path, *, max_cache: int = 16) -> None:
-        try:
-            store = BoundaryStore(Path(path), max_cache=max_cache)
-        except Exception:
-            return
+        catalog = read_sqlite_catalog(path)
+        expected = getattr(self, "catalog", None)
+        if expected is not None and catalog.build_id != expected.build_id:
+            raise ContractError("Boundary store belongs to a different data release")
+        store = BoundaryStore(Path(path), max_cache=max_cache)
         self._boundary_store = store
         self._boundary_store_path = str(path)
-
-    def _maybe_attach_boundary_store(self, snapshot_path: Optional[Path] = None) -> None:
-        env_path = os.environ.get("TEADATA_BOUNDARY_STORE")
-        if env_path:
-            p = Path(env_path)
-            if p.exists() and p.is_file():
-                self.attach_boundary_store(p)
-                logger.info("boundary_store.attached source=env path=%s", p)
-                return
-            logger.warning("boundary_store.missing source=env path=%s", p)
-        if snapshot_path is None:
-            return
-        p = _boundary_store_path_for_snapshot(snapshot_path)
-        if p is not None and p.exists() and p.is_file():
-            self.attach_boundary_store(p)
-            logger.info("boundary_store.attached source=snapshot path=%s", p)
-        elif p is not None:
-            logger.info("boundary_store.missing source=snapshot path=%s", p)
+        self._district_cover_index = None
 
     def _missing_boundary_message(
         self,
@@ -1643,8 +927,8 @@ class DataEngine:
         if reason:
             parts.append(f"{reason}.")
         parts.append(
-            "Ensure a boundary store is available: set TEADATA_BOUNDARY_STORE to the "
-            "boundaries_*.sqlite path or place it next to the snapshot (TEADATA_SNAPSHOT)."
+            "Select a complete verified release with TEADATA_RELEASE or "
+            "TEADATA_RELEASE_URL, or attach a boundary store with the same catalog."
         )
         parts.append(
             "If you want boundaries embedded in the snapshot, rebuild with "
@@ -1729,6 +1013,7 @@ class DataEngine:
         self._charter_cache = None
 
     def _clear_spatial_indexes(self) -> None:
+        self._district_cover_index = None
         for attr in (
             "_kdtree",
             "_kdtree_charter",
@@ -1833,9 +1118,11 @@ class DataEngine:
         return cache
 
     def _rebuild_indexes(self):
+        self._district_cover_index = None
         self._campuses_by_district.clear()
         for c in self._campuses.values():
-            self._campuses_by_district[c.district_id].append(c.id)
+            if c.district_id in self._districts:
+                self._campuses_by_district[c.district_id].append(c.id)
         # Invalidate spatial index; rebuilt lazily
         self._kdtree = None
         self._kdtree_charter = None
@@ -1860,7 +1147,7 @@ class DataEngine:
 
         # Rebuild campus-number index (supports enrichment joins by campus_number)
         try:
-            self._campus_by_number = {}
+            self._campus_by_key = {}
             self._campus_by_name_lower = {}
             self._district_by_name_lower = {}
             self._districts_by_number_norm = {}
@@ -1898,23 +1185,15 @@ class DataEngine:
                         cid
                     )
                     self._campus_name_upper_index.append((cname.upper(), cid))
-                num = getattr(c, "campus_number", None)
-                if not num:
-                    continue
-
-                key = canonical_campus_number(num)
-                if not key:
-                    continue
-                ikey = sys.intern(key)
-                self._campus_by_number[ikey] = cid
-                digits = ikey[1:]
-                if digits:
-                    idigits = sys.intern(digits)
-                    self._campus_by_number[idigits] = cid
-                    if idigits.isdigit():
-                        self._campus_by_number[sys.intern(str(int(idigits)))] = cid
+                key = c.lookup_key
+                if key is not None:
+                    if key in self._campus_by_key and self._campus_by_key[key] != cid:
+                        raise ValueError("Duplicate canonical campus lookup key")
+                    self._campus_by_key[sys.intern(key)] = cid
+        except (ValueError, TypeError, AttributeError):
+            raise
         except Exception:
-            self._campus_by_number = {}
+            self._campus_by_key = {}
             self._campus_by_name_lower = {}
             self._district_by_name_lower = {}
             self._districts_by_number_norm = {}
@@ -2556,7 +1835,7 @@ class DataEngine:
                     cand_deg
                     if isinstance(cand_deg, np_mod.ndarray)
                     else np_mod.array(cand_deg, dtype=float)
-                    )
+                )
                 for (lon1, lat1), campus in zip(tgt_pairs, tgt_list):
                     cid = getattr(campus, "id", None)
                     if cid is None:
@@ -2661,6 +1940,7 @@ class DataEngine:
 
     # --- CRUD ---
     def add_district(self, d: District):
+        self._district_cover_index = None
         d._repo = self
         self._districts[d.id] = d
         if not self._in_bulk:
@@ -2692,6 +1972,10 @@ class DataEngine:
             self._name_lookup_version += 1
 
     def add_campus(self, c: Campus):
+        lookup_key = c.lookup_key
+        existing = getattr(self, "_campus_by_key", {}).get(lookup_key)
+        if lookup_key is not None and existing is not None and existing != c.id:
+            raise ValueError("Duplicate canonical campus lookup key")
         c._repo = self  # attach back-reference
         self._campuses[c.id] = c
         # Only append to _campuses_by_district if the district exists
@@ -2706,8 +1990,8 @@ class DataEngine:
                 self._campus_name_upper_index = []
             if not hasattr(self, "_campus_wildcard_cache"):
                 self._campus_wildcard_cache = {}
-            if not hasattr(self, "_campus_by_number"):
-                self._campus_by_number = {}
+            if not hasattr(self, "_campus_by_key"):
+                self._campus_by_key = {}
             if not hasattr(self, "_name_lookup_version"):
                 self._name_lookup_version = 0
             key = (c.name or "").lower()
@@ -2716,16 +2000,8 @@ class DataEngine:
             if key:
                 self._campuses_by_name_lower_multi.setdefault(key, []).append(c.id)
                 self._campus_name_upper_index.append(((c.name or "").upper(), c.id))
-            num = getattr(c, "campus_number", None)
-            if num:
-                ckey = canonical_campus_number(num)
-                if ckey:
-                    self._campus_by_number[ckey] = c.id
-                    digits = ckey[1:]
-                    if digits:
-                        self._campus_by_number[digits] = c.id
-                        if digits.isdigit():
-                            self._campus_by_number[str(int(digits))] = c.id
+            if lookup_key is not None:
+                self._campus_by_key[lookup_key] = c.id
             self._campus_wildcard_cache = {}
             self._name_lookup_version += 1
             self._clear_charter_cache()
@@ -2747,58 +2023,6 @@ class DataEngine:
 
         return EntityList([c for c in campuses if not is_private(c)])
 
-    def private_campuses_in(
-        self, d: Any, *, max_miles: Optional[float] = None
-    ) -> "EntityList":
-        """Return private-school campuses attached to a district by membership.
-
-        When ``max_miles`` is provided the results are limited to campuses whose
-        coordinates fall within that many miles of the district's centroid. Campuses
-        without point geometry (or districts without usable geometry) are omitted
-        from the radius-filtered result.
-        """
-
-        d = unwrap_query(d)
-        if d is None or not hasattr(d, "id"):
-            raise ValueError(
-                "private_campuses_in expects a District or a Query[District]"
-            )
-
-        campuses = [
-            self._campuses[cid]
-            for cid in self._campuses_by_district.get(d.id, [])
-            if cid in self._campuses and is_private(self._campuses[cid])
-        ]
-
-        if max_miles is None:
-            return EntityList(campuses)
-
-        self.ensure_boundary(d, required=True, context="private_campuses_in")
-        centroid = district_centroid_xy(d)
-        if centroid is None:
-            return EntityList([])
-
-        cx, cy = centroid
-        filtered: List[Campus] = []
-        for campus in campuses:
-            pt = getattr(campus, "point", None) or getattr(campus, "location", None)
-            xy = point_xy(pt)
-            if xy is None:
-                continue
-            if probably_lonlat(cx, cy) and probably_lonlat(*xy):
-                dist = haversine_miles(cx, cy, xy[0], xy[1])
-            elif SHAPELY and pt is not None and hasattr(pt, "distance"):
-                try:
-                    dist = pt.distance(ShapelyPoint(cx, cy))
-                except Exception:
-                    dist = euclidean((cx, cy), xy)
-            else:
-                dist = euclidean((cx, cy), xy)
-
-            if dist <= max_miles:
-                filtered.append(campus)
-
-        return EntityList(filtered)
 
     def _campuses_within_filtered(
         self,
@@ -2939,10 +2163,38 @@ class DataEngine:
             label="charter_campuses_within",
         )
 
+    def _districts_covering(self, campus: "Campus") -> "EntityList":
+        """All reported district geometries covering a point, never governance.
+
+        A cached native polygon index avoids scanning all polygons per school.
+        Boundary points can have multiple results; callers must not choose one.
+        """
+        point = getattr(campus, "point", None)
+        if point is None:
+            return EntityList([])
+        if not SHAPELY or ShapelyPoint is None:
+            raise RuntimeError("Indexed geographic containment requires Shapely")
+        if not isinstance(point, ShapelyPoint):
+            point = ShapelyPoint(*point)
+        cached = getattr(self, "_district_cover_index", None)
+        if cached is None:
+            from shapely.strtree import STRtree
+            districts, geometries = [], []
+            for district in self._districts.values():
+                geometry = self.ensure_boundary(district)
+                if geometry is not None and hasattr(geometry, "is_empty") and not geometry.is_empty:
+                    districts.append(district)
+                    geometries.append(geometry)
+            cached = (STRtree(geometries), districts)
+            self._district_cover_index = cached
+        tree, districts = cached
+        return EntityList(sorted((districts[int(index)] for index in tree.query(point, predicate="covered_by")),
+                                 key=lambda district: district.district_number))
+
     def private_campuses_within(self, district: Any):
         """
-        Return a list of Campus objects that are physically located *within*
-        the given district's boundary and are private schools (Campus.is_private is True).
+        Return private schools inside or on the given district's boundary.
+        The boundary-inclusive predicate is polygon.covers(point).
         Uses pure spatial containment; district_id membership is ignored.
         Accepts a District or a Query[District].
         """
@@ -2963,6 +2215,7 @@ class DataEngine:
         count_col: str = "TRANSFERS_IN_OR_OUT",
         type_col: str = "REPORT_TYPE",
         want_type: str = "Transfers Out To",
+        value_policy=None,
     ) -> int:
         """
         Ingest a campus-to-campus transfer table and build bidirectional edge maps.
@@ -2975,38 +2228,39 @@ class DataEngine:
           - `type_col`: when provided, only rows with `type_col == want_type` are used.
 
         Campus numbers are normalized to canonical 9-digit apostrophe-prefixed strings
-        and mapped to repo campus UUIDs via `_campus_by_number`.
+        and mapped to repo campus UUIDs via `_campus_by_key`.
         """
         # Filter to the requested report type if present
         if type_col in df.columns:
             df = df[df[type_col] == want_type]
 
-        # Missing required columns → nothing to do (match previous no-op behavior)
+        # A required source schema cannot degrade into a successful empty load.
         if (
             src_col not in df.columns
             or dst_col not in df.columns
             or count_col not in df.columns
         ):
-            return 0
+            raise ContractError("Transfer source lacks required identifier/count columns")
 
         def norm(x):
-            if x is None:
-                return None
-            # keep ints, int-like floats, and strings robustly
-            s = str(int(x)) if isinstance(x, float) and x == int(x) else str(x)
-            s = s.strip()
-            key = canonical_campus_number(s)
-            if not key:
-                return None
-            return key
+            try:
+                value = canonical_source_identifier(x, width=9)
+            except ValueError as error:
+                raise ContractError("Invalid campus identifier in transfer source") from error
+            if value is None:
+                raise ContractError("Missing campus identifier in transfer source")
+            return value
 
         # Reset maps
-        self._xfers_out = defaultdict(list)  # type: ignore
-        self._xfers_in = defaultdict(list)  # type: ignore
+        outgoing = defaultdict(list)  # type: ignore
+        incoming = defaultdict(list)  # type: ignore
 
         # Reset diagnostics
-        self._xfers_missing = {"src": 0, "dst": 0, "either": 0}
+        missing = {"src": 0, "dst": 0, "either": 0}
 
+        unresolved = []
+        measurements = {}
+        pairs = set()
         updated_sources = set()
 
         # Vectorized normalization of campus numbers
@@ -3020,9 +2274,7 @@ class DataEngine:
         observed_keys.update(dst_series.dropna())
         for normed in observed_keys:
             digits = normed[1:] if normed.startswith("'") else normed
-            id_cache[normed] = self._campus_by_number.get(
-                normed
-            ) or self._campus_by_number.get(digits)
+            id_cache[normed] = self._campus_by_key.get(digits)
 
         src_ids = src_series.map(id_cache).to_numpy()
         dst_ids = dst_series.map(id_cache).to_numpy()
@@ -3030,30 +2282,43 @@ class DataEngine:
         for src_key, dst_key, src_id, dst_id, raw in zip(
             src_series.to_numpy(), dst_series.to_numpy(), src_ids, dst_ids, counts
         ):
-            if not src_key or not dst_key:
-                continue
+            from .values import ValueStatus, measure, PLAIN_NUMERIC
+
+            pair = (src_key, dst_key)
+            if pair in pairs:
+                raise ContractError(f"Duplicate transfer pair: {src_key} -> {dst_key}")
+            pairs.add(pair)
+
+            value = measure(raw, value_policy or PLAIN_NUMERIC, minimum=0, unit="count")
+            if value.status == ValueStatus.INVALID or (
+                value.numeric is not None and int(value.numeric) != value.numeric
+            ):
+                raise ContractError(
+                    f"Invalid transfer count for {src_key} -> {dst_key}: {raw!r}"
+                )
+            masked = value.is_suppressed
+            cnt = int(value.numeric) if value.numeric is not None else None
 
             if src_id is None or dst_id is None:
+                unresolved.append(
+                    {
+                        "source_campus": src_key,
+                        "destination_campus": dst_key,
+                        "measurement": value.to_dict(),
+                        "reason": "unmatched_entity",
+                    }
+                )
                 if src_id is None and dst_id is None:
-                    self._xfers_missing["either"] = (
-                        self._xfers_missing.get("either", 0) + 1
-                    )
+                    missing["either"] = missing.get("either", 0) + 1
                 elif src_id is None:
-                    self._xfers_missing["src"] = self._xfers_missing.get("src", 0) + 1
+                    missing["src"] = missing.get("src", 0) + 1
                 else:
-                    self._xfers_missing["dst"] = self._xfers_missing.get("dst", 0) + 1
+                    missing["dst"] = missing.get("dst", 0) + 1
                 continue
 
-            try:
-                cnt = int(raw)
-            except Exception:
-                cnt = None
-
-            masked = cnt is not None and cnt < 0
-            cnt = None if masked else cnt
-
-            self._xfers_out[src_id].append((dst_id, cnt, bool(masked)))
-            self._xfers_in[dst_id].append((src_id, cnt, bool(masked)))
+            outgoing[src_id].append((dst_id, cnt, bool(masked)))
+            incoming[dst_id].append((src_id, cnt, bool(masked)))
+            measurements[(src_id, dst_id)] = value
             updated_sources.add(src_id)
 
         # Sort edges deterministically: largest counts first, then by campus name
@@ -3062,12 +2327,12 @@ class DataEngine:
             cobj = self._campuses.get(to_id)
             return (-(cnt or -1), (cobj.name if cobj else ""))
 
-        for k in list(self._xfers_out.keys()):
-            self._xfers_out[k].sort(key=_sort_key)
+        for k in list(outgoing.keys()):
+            outgoing[k].sort(key=_sort_key)
 
-        for k in list(self._xfers_in.keys()):
+        for k in list(incoming.keys()):
             # for transfers_in sort by the incoming count, same logic
-            self._xfers_in[k].sort(
+            incoming[k].sort(
                 key=lambda ed: (
                     -(ed[1] or -1),
                     (
@@ -3078,6 +2343,11 @@ class DataEngine:
                 )
             )
 
+        self._xfers_out = outgoing
+        self._xfers_in = incoming
+        self._xfers_missing = missing
+        self._xfers_unresolved = unresolved
+        self._transfer_measurements = measurements
         return len(updated_sources)
 
     def transfers_out(
@@ -3148,9 +2418,7 @@ class DataEngine:
             if np is not None:
                 tree = self._kdtree_charter if charter_only else self._kdtree
                 xy_arr = self._xy_deg_charter if charter_only else self._xy_deg
-                clist = (
-                    self._campus_list_charter if charter_only else self._campus_list
-                )
+                clist = self._campus_list_charter if charter_only else self._campus_list
                 if tree is not None and xy_arr is not None and clist is not None:
                     total = len(clist)
                     if total == 0:

@@ -1,137 +1,33 @@
 from __future__ import annotations
 
+from contextlib import closing
 import logging
-import os
 import sqlite3
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
-from .assets import ensure_local_asset, is_lfs_pointer
+from .manifest import read_sqlite_catalog
+from .release import current_release
 from .teadata_config import canonical_district_number
 
-try:
-    from .engine import _discover_snapshot  # type: ignore
-except Exception:  # pragma: no cover - defensive import
-    _discover_snapshot = None
-
-try:
-    from shapely import wkb as shapely_wkb  # type: ignore
-except Exception:  # pragma: no cover - optional dependency
-    shapely_wkb = None
-
-
-_BOUNDARY_PREFIX = "boundaries_"
-_LAST_LOGGED_BOUNDARY_STORE: Optional[str] = None
+from shapely import wkb as shapely_wkb
 
 logger = logging.getLogger(__name__)
 
 
-def boundary_store_path_for_snapshot(snapshot_path: Path) -> Optional[Path]:
-    name = snapshot_path.name
-    if name.startswith("repo_"):
-        base = name[len("repo_") :]
-        if base.endswith(".pkl.gz"):
-            base = base[: -len(".pkl.gz")]
-        elif base.endswith(".pkl"):
-            base = base[: -len(".pkl")]
-        return snapshot_path.with_name(f"{_BOUNDARY_PREFIX}{base}.sqlite")
-    return None
+def boundary_store_path_for_snapshot(snapshot_path: Path) -> Path:
+    base = snapshot_path.name.removeprefix("repo_").removesuffix(".gz").removesuffix(".pkl")
+    return snapshot_path.with_name(f"boundaries_{base}.sqlite")
 
 
-def _newest_sqlite(folder: Path) -> Optional[Path]:
-    try:
-        if not folder.exists() or not folder.is_dir():
-            return None
-        picks = sorted(
-            folder.glob(f"{_BOUNDARY_PREFIX}*.sqlite"),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True,
-        )
-        return picks[0] if picks else None
-    except Exception:
-        return None
-
-
-def _log_boundary_store(path: Path, source: str) -> None:
-    global _LAST_LOGGED_BOUNDARY_STORE
-    try:
-        path_str = str(path)
-    except Exception:
-        return
-    if _LAST_LOGGED_BOUNDARY_STORE == path_str:
-        return
-    _LAST_LOGGED_BOUNDARY_STORE = path_str
-    logger.info("boundary_store.discovered source=%s path=%s", source, path_str)
-
-
-def _resolve_boundary_store(path: Path, source: str) -> Optional[Path]:
-    resolved = ensure_local_asset(
-        path, url_env="TEADATA_BOUNDARY_STORE_URL", label="boundary store"
-    )
-    if not resolved.exists() or is_lfs_pointer(resolved):
-        logger.warning("boundary_store.unavailable source=%s path=%s", source, path)
-        return None
-    _log_boundary_store(resolved, source)
-    return resolved
-
-
-def _should_attempt_boundary_resolution(path: Path) -> bool:
-    if path.exists() and path.is_file():
-        return True
-    return bool(os.environ.get("TEADATA_BOUNDARY_STORE_URL"))
-
-
-def discover_boundary_store(explicit: str | Path | None = None) -> Optional[Path]:
-    if explicit:
-        p = Path(explicit)
-        if _should_attempt_boundary_resolution(p):
-            resolved = _resolve_boundary_store(p, "explicit")
-            if resolved:
-                return resolved
-
-    env = os.environ.get("TEADATA_BOUNDARY_STORE")
-    if env:
-        p = Path(env)
-        if _should_attempt_boundary_resolution(p):
-            resolved = _resolve_boundary_store(p, "env")
-            if resolved:
-                return resolved
-
-    if _discover_snapshot:
-        try:
-            snap = _discover_snapshot()
-            if snap:
-                candidate = boundary_store_path_for_snapshot(Path(snap))
-                if candidate and _should_attempt_boundary_resolution(candidate):
-                    resolved = _resolve_boundary_store(candidate, "snapshot")
-                    if resolved:
-                        return resolved
-        except Exception:
-            pass
-
-    try:
-        package_dir = Path(__file__).resolve().parent
-        pkg_cache = package_dir / ".cache"
-        candidate = _newest_sqlite(pkg_cache)
-        if candidate:
-            resolved = _resolve_boundary_store(candidate, "package-cache")
-            if resolved:
-                return resolved
-    except Exception:
-        pass
-
-    cwd = Path.cwd()
-    for idx, base in enumerate((cwd, *cwd.parents)):
-        candidate = _newest_sqlite(base / ".cache")
-        if candidate:
-            source = "cwd-cache" if idx == 0 else "parent-cache"
-            resolved = _resolve_boundary_store(candidate, source)
-            if resolved:
-                return resolved
-
-    return None
+def discover_boundary_store(explicit: str | Path | None = None) -> Path:
+    if explicit is not None:
+        path = Path(explicit)
+        read_sqlite_catalog(path)
+        return path
+    return current_release().artifact("boundaries")
 
 
 def _district_lookup_keys(district_number: Optional[str]) -> Iterable[str]:
@@ -166,7 +62,7 @@ def load_boundary(
     if not path:
         return None
     try:
-        with sqlite3.connect(path) as conn:
+        with closing(sqlite3.connect(path)) as conn:
             for key in _district_lookup_keys(district_number):
                 row = conn.execute(
                     "SELECT wkb FROM boundaries WHERE district_number = ?",

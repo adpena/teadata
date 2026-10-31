@@ -40,22 +40,6 @@ def _coerce_aea_bool(value: Any) -> Optional[bool]:
     return None
 
 
-def _read_table(path: str | Path) -> pd.DataFrame:
-    p = Path(path)
-    suf = p.suffix.lower()
-    if suf in {".parquet", ".pq"}:
-        return pd.read_parquet(p)
-    if suf in {".csv"}:
-        return pd.read_csv(p)
-    if suf in {".xlsx", ".xls"}:
-        return pd.read_excel(p)
-    # Fallback: try CSV then Excel
-    try:
-        return pd.read_csv(p)
-    except Exception:
-        return pd.read_excel(p)
-
-
 def add_charter_networks_from_config(
     repo: DataEngine,
     cfg_path: str | Path,
@@ -75,14 +59,8 @@ def add_charter_networks_from_config(
 
     Returns the number of Districts created.
     """
-    try:
-        cfg = load_config(cfg_path)
-        _, src = cfg.resolve(dataset_name, year, section=section)
-    except Exception:
-        # not configured = nothing to add
-        return 0
-
-    df = _read_table(src)
+    cfg = load_config(cfg_path)
+    _, df = cfg.load_df(dataset_name, year, section=section)
 
     # column access (case-insensitive convenience)
     cols = {str(c).lower(): c for c in df.columns if c is not None}
@@ -136,7 +114,7 @@ def add_charter_networks_from_config(
         )
         if exists:
             # optionally fill in missing basics without overriding real data
-            if name and (not exists.name or exists.name == "Unknown District"):
+            if name and not exists.name:
                 exists.name = name
             if rating and not getattr(exists, "rating", None):
                 exists.rating = rating
@@ -152,9 +130,9 @@ def add_charter_networks_from_config(
         import uuid
 
         d = District(
-            id=uuid.uuid4(),
+            id=uuid.uuid5(uuid.NAMESPACE_URL, "teadata:district:" + str(dn)),
             name=name,
-            enrollment=enrollment if enrollment is not None else 0,
+            enrollment=enrollment,
             rating=rating,
             aea=aea,
             aea_raw=aea_raw,

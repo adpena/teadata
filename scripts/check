@@ -1,0 +1,7 @@
+#!/usr/bin/env bash
+set -euo pipefail
+project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$project_root"
+python_version="${TEADATA_CHECK_PYTHON:-$(<"$project_root/.python-version")}"
+exec uv run --isolated --locked --extra dev --extra database --extra scripts --extra speedups --python "$python_version" \
+  python -I -m teadata.verification --kind library --root "$project_root" "$@"

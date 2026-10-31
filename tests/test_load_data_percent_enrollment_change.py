@@ -20,16 +20,20 @@ def _make_campus(*, enrollment=100, meta=None):
     return campus
 
 
-def _make_repo(*campuses):
-    return SimpleNamespace(_campuses={campus.id: campus for campus in campuses})
+def _make_repo(catalog, *campuses):
+    repo = SimpleNamespace(catalog=catalog, _campuses={campus.id: campus for campus in campuses})
+    for campus in campuses:
+        campus._repo = repo
+        campus.meta["campus_2025_student_enrollment_all_students_count"] = campus.enrollment
+    return repo
 
 
-def test_materialize_percent_enrollment_change_persists_in_meta():
+def test_materialize_percent_enrollment_change_persists_in_meta(catalog):
     campus = _make_campus(
         enrollment=110,
         meta={"campus_2015_student_enrollment_all_students_count": 100},
     )
-    repo = _make_repo(campus)
+    repo = _make_repo(catalog, campus)
 
     updated = _materialize_percent_enrollment_change(repo)
 
@@ -37,12 +41,12 @@ def test_materialize_percent_enrollment_change_persists_in_meta():
     assert campus.meta["percent_enrollment_change"] == pytest.approx(10.0)
 
 
-def test_materialize_percent_enrollment_change_rounds_to_tenths():
+def test_materialize_percent_enrollment_change_rounds_to_tenths(catalog):
     campus = _make_campus(
         enrollment=107,
         meta={"campus_2015_student_enrollment_all_students_count": 93},
     )
-    repo = _make_repo(campus)
+    repo = _make_repo(catalog, campus)
 
     updated = _materialize_percent_enrollment_change(repo)
 
@@ -50,12 +54,12 @@ def test_materialize_percent_enrollment_change_rounds_to_tenths():
     assert campus.meta["percent_enrollment_change"] == pytest.approx(15.1)
 
 
-def test_materialize_percent_enrollment_change_writes_na_when_missing_inputs():
+def test_materialize_percent_enrollment_change_writes_na_when_missing_inputs(catalog):
     campus = _make_campus(
         enrollment=110,
         meta={"percent_enrollment_change": 123.0},
     )
-    repo = _make_repo(campus)
+    repo = _make_repo(catalog, campus)
 
     updated = _materialize_percent_enrollment_change(repo)
 

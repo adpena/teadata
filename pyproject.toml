@@ -1,39 +1,50 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools>=84.1.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "teadata"
-version = "0.0.118"
+version = "0.0.126"
 description = "Pythonic data engine for Texas education datasets"
 authors = [{name="Alejandro Peña", email="adpena@gmail.com"}]
 readme = "README.md"
-license = {file = "LICENSE"}
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 dependencies = [
     "python-dateutil>=2.8.2",
-    "numpy>=1.26",
-    "pandas>=2.1",
-    "shapely>=2.0",
+    "numpy>=1.26,!=2.4.0; python_version < '3.15'",
+    "numpy>=2.5.2; python_version >= '3.15'",
+    "pandas>=2.1; python_version < '3.15'",
+    "pandas>=3.0.6; python_version >= '3.15'",
+    "shapely>=2.0; python_version < '3.15'",
+    "shapely>=2.2.0; python_version >= '3.15'",
     "geopandas>=0.14",
-    "pyogrio>=0.7",
+    "pyproj>=3.8.0; python_version >= '3.15'",
+    # PyProj's CA bundle is part of the core runtime trust boundary.
+    "certifi>=2026.10.19",
+    "pyogrio>=0.7; python_version < '3.15'",
+    "pyogrio>=0.13.0; python_version >= '3.15'",
     "pyyaml>=6.0",
     "openpyxl>=3.1",
-    "duckdb>=0.10",
-    "pyarrow>=14.0",
+    "duckdb>=0.10; python_version < '3.15'",
+    "duckdb>=2.0.0; python_version >= '3.15'",
+    "pyarrow>=23.0.1; python_version < '3.15'",
+    "pyarrow>=26.0.0; python_version >= '3.15'",
     "packaging>=23.2",
-    "scipy>=1.10",
+    "scipy>=1.10; python_version < '3.15'",
+    "scipy>=1.18.1; python_version >= '3.15'",
     "platformdirs>=3.7",
     "tomli>=2.0",
 ]
 requires-python = ">=3.11"
 classifiers = [
-    "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "Operating System :: OS Independent",
     "Intended Audience :: Developers",
     "Topic :: Scientific/Engineering :: Information Analysis",
@@ -43,51 +54,88 @@ classifiers = [
 [project.optional-dependencies]
 # Faster I/O / performance add-ons
 speedups = [
-    "pyogrio>=0.7",
     "polars>=1.0",
-    "pygeos; python_version<'3.11'",  # no-op on modern, left for legacy envs
 ]
 
 # Development tooling
 dev = [
     "ruff>=0.5",
     "ty>=0.0.11",
-    "pytest>=7.4",
+    "pytest>=9.0.3",
     "pytest-cov>=4.1",
     "pip-tools>=7.4",
     "pip-audit>=2.7",
     "deptry>=0.16",
+    # Portable security floors for the audit/build tools' transitive dependencies.
+    "msgpack>=1.2.3",
+    "requests>=2.33.0",
+    "idna>=3.15",
+    "urllib3>=2.8.0",
+    "filelock>=4.2.1",
+    "pip>=26.2.0",
+    "pygments>=2.20.0",
+    "setuptools>=84.1.0",
+    "wheel>=0.46.2",
 ]
 
 # Documentation generation
 docs = [
-    "mkdocs-material>=9.5",
+    "mkdocs-material>=9.7.7",
     "mkdocstrings[python]>=0.24",
+    "markupsafe>=3.0.4; python_version >= '3.15'",
+    "pygments>=2.20.0",
+    "pymdown-extensions>=11.0.1",
+    "requests>=2.33.0",
+    "idna>=3.15",
+    "urllib3>=2.8.0",
 ]
 
 # Notebook-only dependencies used in .ipynb files
 notebooks = [
-    "jupyterlab>=4.0",
+    "jupyterlab>=4.5.11",
     "ipython>=8.0",
     "ipywidgets>=8.0",
     "ipyleaflet>=0.18",
     "itables>=1.6",
     "google-auth>=2.0",
     "google-api-python-client>=2.0",
+    "cffi>=2.1.0; python_version >= '3.15'",
+    "markupsafe>=3.0.4; python_version >= '3.15'",
+    "rpds-py>=2026.5.1; python_version >= '3.15'",
+    # These downstream floors apply to notebook consumers, not the core install.
+    "jupyter-server>=2.21.0",
+    "nbconvert>=7.17.2",
+    "mistune>=3.3.3",
+    "bleach>=6.4.0",
+    "soupsieve>=2.9.0",
+    "anyio>=4.14.2",
+    "tornado>=6.6",
+    "requests>=2.33.0",
+    "idna>=3.15",
+    "urllib3>=2.8.0",
+    "httplib2>=0.32.0",
+    "pyasn1>=0.6.4",
+    "protobuf>=6.33.5",
+    "pygments>=2.20.0",
+    "setuptools>=84.1.0",
 ]
 
 # Relational database connectivity helpers
 database = [
     "sqlalchemy>=2.0",
-    "psycopg[binary]>=3.1",
+    "psycopg[binary]>=3.1; python_version < '3.15'",
+    "psycopg[binary]>=3.3.6; python_version >= '3.15'",
 ]
 
 # Dependencies used by maintenance/utility scripts under teadata/scripts
 scripts = [
-    "requests>=2.31",
+    "requests>=2.33.0",
     "tqdm>=4.66",
-    "geopy>=2.4",
-    "aiohttp>=3.9",
+    "geopy>=2.5.0",
+    "aiohttp>=3.14.4",
+    "multidict>=6.9.1",
+    "idna>=3.15",
+    "urllib3>=2.8.0",
 ]
 
 [project.scripts]
@@ -99,7 +147,7 @@ include = ["teadata*"]
 exclude = ["tests*", "docs*", "examples*"]
 
 [tool.setuptools.package-data]
-teadata = [".cache/*.pkl.gz", ".cache/boundaries_*.sqlite", ".cache/entities_*.sqlite"]
+teadata = ["teadata_sources.yaml", "methodologies/*.md", "schemas/*.json", "reference_cases/*.json"]
 
 [tool.setuptools]
 include-package-data = false
@@ -114,16 +162,42 @@ addopts = "-ra"
 
 [tool.deptry]
 # Optional: folders to skip
-exclude = ["tests", "docs", "examples", ".ipynb_checkpoints", ".venv", "build", "dist"]
+exclude = ['^\.local(?:/|$)', "tests", "docs", "examples", ".ipynb_checkpoints", ".venv", "build", "dist"]
 known_first_party = ["teadata"]
 
 # Per-rule ignores by code
 [tool.deptry.per_rule_ignores]
 DEP002 = [
+    # Indirect dependencies deliberately declared to publish secure extra graphs.
+    "certifi",
+    "filelock",
+    "pip",
+    "pygments",
+    "setuptools",
+    "wheel",
+    "idna",
+    "urllib3",
+    "anyio",
+    "tornado",
+    "jupyter-server",
+    "nbconvert",
+    "soupsieve",
+    "bleach",
+    "mistune",
+    "pyasn1",
+    "protobuf",
+    "httplib2",
+    "multidict",
+    "pymdown-extensions",
+    # Published 3.15 floors for dependencies used by CRS, audit, docs and notebooks.
+    "pyproj",
+    "msgpack",
+    "cffi",
+    "markupsafe",
+    "rpds-py",
     "openpyxl",
     "pyogrio",
     "pyarrow",
-    "pygeos",
     "ruff",
     "ty",
     "pytest",
@@ -155,6 +229,10 @@ DEP003 = [
 [tool.ruff]
 exclude = ["examples", "docs", "build", "teadata.egg-info", ".venv"]
 extend-exclude = ["*.ipynb"]
+
+[tool.ruff.lint]
+# Preserve the project's pre-upgrade rule set explicitly as Ruff defaults evolve.
+select = ["E4", "E7", "E9", "F"]
 
 [tool.ty.src]
 include = ["teadata"]

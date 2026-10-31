@@ -1,7 +1,11 @@
 from pprint import pprint
+import argparse
+from pathlib import Path
 
 import pandas as pd  # type: ignore[import-untyped]
 import re
+
+from teadata.scripts.paths import data_path
 
 
 def sanitize_header(s: str) -> str:
@@ -51,21 +55,32 @@ def restore_labels_from_reference(
     return [lookup.get(c, c) for c in cols]
 
 
-INPUT_FILE = (
-    "/Users/adpena/PycharmProjects/teadata/teadata/data/tapr/OLD/CAMPPROF_2014-2015.csv"
-)
-REFERENCE_FILE = "/Users/adpena/PycharmProjects/teadata/teadata/data/tapr/OLD/CAMPPROF_2014-2015_data_elements.xlsx"
-OUTPUT_FILE = "/Users/adpena/PycharmProjects/teadata/teadata/data/tapr/CAMPPROF_2014-2015_FINAL.xlsx"
-
-
-def main():
+def main(argv: list[str] | None = None):
+    parser = argparse.ArgumentParser(
+        description="Normalize campus TAPR column headers."
+    )
+    parser.add_argument(
+        "--input", type=Path, default=data_path("tapr", "OLD", "CAMPPROF_2014-2015.csv")
+    )
+    parser.add_argument(
+        "--reference",
+        type=Path,
+        default=data_path("tapr", "OLD", "CAMPPROF_2014-2015_data_elements.xlsx"),
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        default=data_path("tapr", "CAMPPROF_2014-2015_FINAL.xlsx"),
+    )
+    args = parser.parse_args(argv)
     # Options to control workflow
     DO_SANITIZE = True
     DO_RESTORE = False
     FILTER = True
 
-    tapr_df = pd.read_csv(INPUT_FILE)
-    tapr_reference_df = pd.read_excel(REFERENCE_FILE)
+    tapr_df = pd.read_csv(args.input)
+    tapr_reference_df = pd.read_excel(args.reference)
+    args.output.parent.mkdir(parents=True, exist_ok=True)
 
     rename_dict = {
         "CAMPUS": "campus_number",
@@ -96,14 +111,14 @@ def main():
         # Normalize column names to be Python-safe identifiers (using the same logic as sanitize_header)
         tapr_df.columns = [sanitize_header(c) for c in tapr_df.columns]
         pprint(list(tapr_df.columns))
-        tapr_df.to_excel(OUTPUT_FILE, index=False)
+        tapr_df.to_excel(args.output, index=False)
     elif DO_RESTORE:
         # Restore human-friendly Labels from the sanitized headers
         tapr_df.columns = restore_labels_from_reference(
             list(tapr_df.columns), tapr_reference_df
         )
         pprint(list(tapr_df.columns))
-        tapr_df.to_excel(OUTPUT_FILE, index=False)
+        tapr_df.to_excel(args.output, index=False)
 
 
 if __name__ == "__main__":

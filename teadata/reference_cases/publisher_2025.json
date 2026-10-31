@@ -1,0 +1,711 @@
+{
+  "accountability_rows": [
+    {
+      "2025 Overall Rating": "A",
+      "Campus Number": "015834001",
+      "District Number": "015834",
+      "excel_row": 448
+    },
+    {
+      "2025 Overall Rating": "Not Rated: Minimum Size rules",
+      "Campus Number": "220820102",
+      "District Number": "220820",
+      "excel_row": 8507
+    },
+    {
+      "2025 Overall Rating": "C",
+      "Campus Number": null,
+      "District Number": "227901",
+      "excel_row": 9333
+    },
+    {
+      "2025 Overall Rating": "A",
+      "Campus Number": "227901180",
+      "District Number": "227901",
+      "excel_row": 9440
+    }
+  ],
+  "cases": [
+    {
+      "case_id": "austin-isd-2025",
+      "entity": {
+        "name": "AUSTIN ISD",
+        "number": "227901",
+        "type": "district"
+      },
+      "facts": [
+        {
+          "expected": {
+            "metric": "enrollment",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 72272
+          },
+          "field": "district_2025_student_enrollment_all_students_count",
+          "note": "Independent publisher Student Enrollment cell, not copied from current library/page. Membership and accountability population are separate.",
+          "source": {
+            "code": "DPNTALLC",
+            "code_header_row": 2,
+            "column_1_based": 138,
+            "header_row1": "District 2025 Student Enrollment: All Students Count",
+            "raw_token": "72272",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_all_students_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 72175
+          },
+          "field": "district_2025_student_membership_all_students_count",
+          "note": "This cell is membership, not the separately published enrollment count. Both concepts remain distinct.",
+          "source": {
+            "code": "DPETALLC",
+            "code_header_row": 2,
+            "column_1_based": 30,
+            "header_row1": "District 2025 Student Membership: All Students Count",
+            "raw_token": "72175",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "overall_rating",
+            "period": {
+              "kind": "calendar_year",
+              "year": 2025
+            },
+            "status": "observed",
+            "unit": "text",
+            "value": "C"
+          },
+          "field": "overall_rating",
+          "source": {
+            "cell": "G9333",
+            "identifier_cells": {
+              "campus": "C9333",
+              "district": "A9333"
+            },
+            "raw_token": "C",
+            "sheet": "2011-2025 Summary",
+            "source_id": "accountability_2025"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "kiker-disclosure-and-five-model",
+      "entity": {
+        "governing_district": "227901",
+        "name": "KIKER EL",
+        "number": "227901180",
+        "type": "campus"
+      },
+      "facts": [
+        {
+          "expected": {
+            "metric": "enrollment",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 750
+          },
+          "field": "campus_2025_student_enrollment_all_students_count",
+          "note": "Independent publisher Student Enrollment cell, not copied from current library/page. Membership and accountability population are separate.",
+          "source": {
+            "code": "CPNTALLC",
+            "code_header_row": 2,
+            "column_1_based": 139,
+            "header_row1": "Campus 2025 Student Enrollment: All Students Count",
+            "raw_token": "750",
+            "record_row_1_based": 8350,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_all_students_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 748
+          },
+          "field": "campus_2025_student_membership_all_students_count",
+          "note": "This cell is membership, not the separately published enrollment count. Both concepts remain distinct.",
+          "source": {
+            "code": "CPETALLC",
+            "code_header_row": 2,
+            "column_1_based": 62,
+            "header_row1": "Campus 2025 Student Membership: All Students Count",
+            "raw_token": "748",
+            "record_row_1_based": 8350,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "lower": null,
+            "metric": "tapr.student_membership_autism_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "reason": "complementary_disclosure_control",
+            "status": "suppressed",
+            "unit": "count",
+            "upper": null,
+            "value": null
+          },
+          "field": "campus_2025_student_membership_autism_count",
+          "source": {
+            "code": "CPETSAUC",
+            "code_header_row": 2,
+            "column_1_based": 41,
+            "header_row1": "Campus 2025 Student Membership: Autism Count",
+            "raw_token": "-3",
+            "record_row_1_based": 8350,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "lower": null,
+            "metric": "tapr.student_membership_non_categorical_early_childhood_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "reason": "primary_disclosure_control",
+            "status": "suppressed",
+            "unit": "count",
+            "upper": null,
+            "value": null
+          },
+          "field": "campus_2025_student_membership_non_categorical_early_childhood_count",
+          "source": {
+            "code": "CPETSNOC",
+            "code_header_row": 2,
+            "column_1_based": 42,
+            "header_row1": "Campus 2025 Student Membership: Non-Categorical Early Childhood Count",
+            "raw_token": "-1",
+            "record_row_1_based": 8350,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "overall_rating",
+            "period": {
+              "kind": "calendar_year",
+              "year": 2025
+            },
+            "status": "observed",
+            "unit": "text",
+            "value": "A"
+          },
+          "field": "overall_rating",
+          "source": {
+            "cell": "G9440",
+            "identifier_cells": {
+              "campus": "C9440",
+              "district": "A9440"
+            },
+            "raw_token": "A",
+            "sheet": "2011-2025 Summary",
+            "source_id": "accountability_2025"
+          }
+        }
+      ],
+      "flows": [
+        {
+          "charter_directory_row": 24,
+          "charter_directory_type_cell": "H24",
+          "charter_type_raw": "CHARTER",
+          "column_1_based": 14,
+          "column_name": "TRANSFERS_IN_OR_OUT",
+          "csv_row_1_based": 18581,
+          "destination_governing_district": "015834",
+          "destination_name": "BASIS SAN ANTONIO- SHAVANO CAMPUS",
+          "destination_number": "015834001",
+          "raw_token": "-999"
+        },
+        {
+          "charter_directory_row": 24,
+          "charter_directory_type_cell": "H24",
+          "charter_type_raw": "CHARTER",
+          "column_1_based": 14,
+          "column_name": "TRANSFERS_IN_OR_OUT",
+          "csv_row_1_based": 18582,
+          "destination_governing_district": "015834",
+          "destination_name": "BASIS PFLUGERVILLE",
+          "destination_number": "015834005",
+          "raw_token": "-999"
+        },
+        {
+          "charter_directory_row": 24,
+          "charter_directory_type_cell": "H24",
+          "charter_type_raw": "CHARTER",
+          "column_1_based": 14,
+          "column_name": "TRANSFERS_IN_OR_OUT",
+          "csv_row_1_based": 18583,
+          "destination_governing_district": "015834",
+          "destination_name": "BASIS CEDAR PARK",
+          "destination_number": "015834007",
+          "raw_token": "-999"
+        },
+        {
+          "charter_directory_row": 182,
+          "charter_directory_type_cell": "H182",
+          "charter_type_raw": "CHARTER",
+          "column_1_based": 14,
+          "column_name": "TRANSFERS_IN_OR_OUT",
+          "csv_row_1_based": 18584,
+          "destination_governing_district": "227829",
+          "destination_name": "VALOR SOUTH AUSTIN",
+          "destination_number": "227829001",
+          "raw_token": "52"
+        }
+      ],
+      "manual_calculation": {
+        "arithmetic": "52 + 5 + 5 + 5 = 67",
+        "coefficient": 5,
+        "counterexample": "Three suppressed BASIS campus flows share one charter district. Grouping first by district would incorrectly produce57. Do not add five again to district aggregates.",
+        "destination_count": 4,
+        "estimated_total": 67,
+        "grain": "origin campus/destination campus pair",
+        "model_id": "charter_cost_tracker_midpoint_v1",
+        "modeled_contribution": 15,
+        "observed_flow_count": 1,
+        "observed_sum": 52,
+        "period": {
+          "end_year": 2025,
+          "kind": "school_year",
+          "start_year": 2024
+        },
+        "raw_status_rule": "All three -999 cells remain suppressed;5 is only a labeled scenario, not an inferred bound.",
+        "suppressed_flow_count": 3
+      }
+    },
+    {
+      "case_id": "basis-san-antonio-year-and-spatial",
+      "entity": {
+        "governing_district": "015834",
+        "name": "BASIS SAN ANTONIO- SHAVANO CAMPUS",
+        "number": "015834001",
+        "type": "campus"
+      },
+      "facts": [
+        {
+          "expected": {
+            "metric": "enrollment",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 1057
+          },
+          "field": "campus_2025_student_enrollment_all_students_count",
+          "note": "Independent publisher Student Enrollment cell, not copied from current library/page. Membership and accountability population are separate.",
+          "source": {
+            "code": "CPNTALLC",
+            "code_header_row": 2,
+            "column_1_based": 139,
+            "header_row1": "Campus 2025 Student Enrollment: All Students Count",
+            "raw_token": "1057",
+            "record_row_1_based": 379,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_all_students_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 1057
+          },
+          "field": "campus_2025_student_membership_all_students_count",
+          "note": "This cell is membership, not the separately published enrollment count. Both concepts remain distinct.",
+          "source": {
+            "code": "CPETALLC",
+            "code_header_row": 2,
+            "column_1_based": 62,
+            "header_row1": "Campus 2025 Student Membership: All Students Count",
+            "raw_token": "1057",
+            "record_row_1_based": 379,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "context_count": {
+            "code": "CPETATTC",
+            "code_header_row": 2,
+            "column_1_based": 50,
+            "header_row1": "Campus 2025 Student Membership: 2023-24 Attrition All Students Count",
+            "raw_token": "206",
+            "record_row_1_based": 379,
+            "source_id": "tapr_campus_csv"
+          },
+          "expected": {
+            "metric": "tapr.student_membership_attrition_all_students_percent",
+            "period": {
+              "end_year": 2024,
+              "kind": "school_year",
+              "start_year": 2023
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 21.2
+          },
+          "field": "campus_2025_student_membership_2023_24_attrition_all_students_percent",
+          "note": "Source human header explicitly names2023-24 inside a2025 report. Do not derive the21.2 percent using current membership1057 as denominator.",
+          "source": {
+            "code": "CPETATTP",
+            "code_header_row": 2,
+            "column_1_based": 51,
+            "header_row1": "Campus 2025 Student Membership: 2023-24 Attrition All Students Percent",
+            "raw_token": "21.2",
+            "record_row_1_based": 379,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "overall_rating",
+            "period": {
+              "kind": "calendar_year",
+              "year": 2025
+            },
+            "status": "observed",
+            "unit": "text",
+            "value": "A"
+          },
+          "field": "overall_rating",
+          "source": {
+            "cell": "G448",
+            "identifier_cells": {
+              "campus": "C448",
+              "district": "A448"
+            },
+            "raw_token": "A",
+            "sheet": "2011-2025 Summary",
+            "source_id": "accountability_2025"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "rocketship-reporting-only-notrated",
+      "entity": {
+        "governing_district": "220820",
+        "name": "ROCKETSHIP EXPLORE EL",
+        "number": "220820102",
+        "type": "campus"
+      },
+      "facts": [
+        {
+          "expected": {
+            "metric": "enrollment",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 289
+          },
+          "field": "campus_2025_student_enrollment_all_students_count",
+          "note": "Independent publisher Student Enrollment cell, not copied from current library/page. Membership and accountability population are separate.",
+          "source": {
+            "code": "CPNTALLC",
+            "code_header_row": 2,
+            "column_1_based": 139,
+            "header_row1": "Campus 2025 Student Enrollment: All Students Count",
+            "raw_token": "289",
+            "record_row_1_based": 7474,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_all_students_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 288
+          },
+          "field": "campus_2025_student_membership_all_students_count",
+          "note": "This cell is membership, not the separately published enrollment count. Both concepts remain distinct.",
+          "source": {
+            "code": "CPETALLC",
+            "code_header_row": 2,
+            "column_1_based": 62,
+            "header_row1": "Campus 2025 Student Membership: All Students Count",
+            "raw_token": "288",
+            "record_row_1_based": 7474,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "overall_rating",
+            "period": {
+              "kind": "calendar_year",
+              "year": 2025
+            },
+            "status": "observed",
+            "unit": "text",
+            "value": "Not Rated: Minimum Size rules"
+          },
+          "field": "overall_rating",
+          "note": "Published public rating category is retained verbatim. It is not private-population Not applicable, numericzero or missing.",
+          "source": {
+            "cell": "G8507",
+            "identifier_cells": {
+              "campus": "C8507",
+              "district": "A8507"
+            },
+            "raw_token": "Not Rated: Minimum Size rules",
+            "sheet": "2011-2025 Summary",
+            "source_id": "accountability_2025"
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "ace-private-na-affiliation-regression",
+      "entity": {
+        "name": "Ace Academy",
+        "source": "legacy_tefa",
+        "source_id": "rec1kXXvIucG7UkoA",
+        "type": "private_school"
+      },
+      "expected": {
+        "enrollment": {
+          "reason": "outside_metric_population",
+          "status": "not_applicable",
+          "value": null
+        },
+        "geographic_containment_in_austin": true,
+        "governing_public_district": null,
+        "legacy_source_period": {
+          "kind": "unknown"
+        },
+        "overall_rating": {
+          "reason": "outside_metric_population",
+          "status": "not_applicable",
+          "value": null
+        }
+      },
+      "source_cells": {
+        "Display Grade Range": {
+          "cell": "AH62",
+          "raw_token": "Grades K\u20138"
+        },
+        "ID": {
+          "cell": "A62",
+          "raw_token": "rec1kXXvIucG7UkoA"
+        },
+        "Location Lat": {
+          "cell": "AC62",
+          "raw_token": "30.3351968"
+        },
+        "Location Lng": {
+          "cell": "AD62",
+          "raw_token": "-97.760044"
+        },
+        "Name": {
+          "cell": "B62",
+          "raw_token": "Ace Academy"
+        },
+        "School District Name": {
+          "cell": "P62",
+          "raw_token": "Austin ISD"
+        },
+        "School District Number": {
+          "cell": "R62",
+          "raw_token": "227901"
+        },
+        "Type": {
+          "cell": "AG62",
+          "raw_token": "Private School"
+        },
+        "Vendor Type": {
+          "cell": "AE62",
+          "raw_token": "Schools"
+        }
+      }
+    }
+  ],
+  "description": "Hand-selected publisher excerpts and handwritten expected truth. No library export generated these expectations.",
+  "release_validation": {
+    "attribute_metrics": {
+      "enrollment": "enrollment",
+      "rating": "overall_rating"
+    },
+    "case_ids": [
+      "austin-isd-2025",
+      "kiker-disclosure-and-five-model",
+      "basis-san-antonio-year-and-spatial",
+      "rocketship-reporting-only-notrated"
+    ],
+    "uncovered": [
+      "Complete TAPR field-unit dictionary",
+      "Private-school governing affiliation",
+      "Spatial ingestion and current TEFA roster acceptance",
+      "Remaining entities and datasets",
+      "Retained transfer map payloads and charter-transfer estimates",
+      "Private TAPR applicability in retained artifacts"
+    ],
+    "unit_metrics": [
+      "enrollment",
+      "overall_rating",
+      "tapr.student_membership_attrition_all_students_percent"
+    ]
+  },
+  "sources": {
+    "accountability_2025": {
+      "custody": "As-retained enhanced/reissued workbook selected by0.125; not claimed original2025 publication.",
+      "path": "teadata/data/accountability/2025-enhanced-statewide-summary-after-2023-appeal.xlsx",
+      "release_input": {
+        "dataset": "accountability",
+        "filename": "2025-enhanced-statewide-summary-after-2023-appeal.xlsx",
+        "sha256": "33bfe79c12298f205106bfb60c6782f2a5bbaf2e78757abe5345dad5b869955d",
+        "size_bytes": 16254056
+      },
+      "sha256": "33bfe79c12298f205106bfb60c6782f2a5bbaf2e78757abe5345dad5b869955d",
+      "size_bytes": 16254056,
+      "source_url": null,
+      "source_year": 2025,
+      "url_note": "Exact original acquisition URL is unknown; no generic portal is presented as an acquisition URL."
+    },
+    "charter_directory": {
+      "custody": "Filename-supported as-of date; exact acquisition URL/time unknown; not a universal full campus roster.",
+      "path": "teadata/data/charter_reference/AskTED Directory_09.30.2025.xlsx",
+      "period": {
+        "as_of": "2025-09-30",
+        "kind": "as_of"
+      },
+      "sha256": "b60cf6693c0cccd2c02e3dc32166ecdcf6fb4b86236a18d3f67e58bab4225f2d",
+      "size_bytes": 46845,
+      "source_url": null,
+      "source_year": 2025
+    },
+    "legacy_tefa": {
+      "custody": "2025 config label is not a school-year claim. Embedded acquisition/source claims are unverified; district/coordinate enrichment ancestry unknown.",
+      "embedded_claimed_url": "https://finder.educationfreedom.texas.gov/data/tx/vendors.json",
+      "path": "teadata/data/tefa/tx_efa_finder.xlsx",
+      "period": {
+        "kind": "unknown"
+      },
+      "sha256": "dee6d570f349aa9ee064ee55bd2ba27e6c267cb15cf6edd283dc357f002fd1d1",
+      "size_bytes": 1493427,
+      "source_url": null,
+      "source_year": 2025
+    },
+    "midpoint_methodology": {
+      "custody": "TEA Data model assumption, not a publisher-observed count or disclosure bound.",
+      "path": "teadata/methodologies/charter-transfer-midpoint.md",
+      "sha256": "9f3e2b243c9cf337d7ec252e460c215846bc6364f3474e034e2f7acf1133f81f",
+      "size_bytes": 2111,
+      "source_url": "https://github.com/adpena/teadata/blob/0019baae0cbdb6f6b9ef77e3b36aa8f233775bf4/teadata/methodologies/charter-transfer-midpoint.md"
+    },
+    "tapr_campus_csv": {
+      "custody": "As-retained publisher-formatted two-header CSV; original acquisition timestamp/exact download URL unknown.",
+      "path": "teadata/data/tapr/raw/2025 Campus Student Information.csv",
+      "release_input": {
+        "custody_note": "Selected normalized local workbook; original transformation event is unknown. Publisher values were independently checked in the retained CSV. Its identity is distinct from that CSV.",
+        "dataset": "campus_tapr_student_staff_profile",
+        "filename": "CAMPPROF_2024-2025_FINAL.xlsx",
+        "sha256": "bbe2c6432590faae7643a49415aaea66a9212021875cdf7be77e28250157bfc9",
+        "size_bytes": 13206224
+      },
+      "sha256": "7e0e762a8f2ba50687fd8c6a59e8052d5740ba57abbedecddfca064bbd77548e",
+      "size_bytes": 6979601,
+      "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html",
+      "source_year": 2025
+    },
+    "tapr_district_csv": {
+      "custody": "As-retained publisher-formatted two-header CSV; original acquisition unknown.",
+      "path": "teadata/data/tapr/raw/2025 District Student Information.csv",
+      "release_input": {
+        "custody_note": "Selected normalized local workbook; original transformation event is unknown. Publisher values were independently checked in the retained CSV. Its identity is distinct from that CSV.",
+        "dataset": "district_tapr_student_staff_profile",
+        "filename": "DISTPROF_2024-2025_FINAL.xlsx",
+        "sha256": "6068c6ac7a51c607c0f45744cf62948a339ee20f246db4ac08fee016f1b6f47d",
+        "size_bytes": 1950210
+      },
+      "sha256": "8ccd14fb2eaff8c73d94960950cc359d44bf4b81edb721975edf6795b8995811",
+      "size_bytes": 1057804,
+      "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html",
+      "source_year": 2025
+    },
+    "tapr_glossary": {
+      "path": "provenance/objects/846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416",
+      "sha256": "846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416",
+      "size_bytes": 834427,
+      "source_url": "https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf",
+      "source_year": 2025
+    },
+    "tapr_masking": {
+      "path": "provenance/objects/7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8",
+      "sha256": "7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8",
+      "size_bytes": 55298,
+      "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html",
+      "source_year": 2025
+    },
+    "transfer_masking": {
+      "custody": "Reviewed year-specific district-report footnotes establish sentinel semantics; campus rows supply the facts/grain, not this district summary.",
+      "path": "provenance/objects/26b502778c9143fb4ea8ded5531ae91c06960195ac8a8efd62e598666b8e6a9a",
+      "sha256": "26b502778c9143fb4ea8ded5531ae91c06960195ac8a8efd62e598666b8e6a9a",
+      "size_bytes": 16929,
+      "source_url": "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.download_transfer_report.sas&school_year=2025&report_format=csv&agg_level=district&scope=District&district=101902+ALDINE+ISD&_debug=0",
+      "source_year": 2025
+    },
+    "transfers_2025": {
+      "custody": "As-retained complete campus report; original acquisition unknown.",
+      "path": "teadata/data/transfer_reports/xfers_campus_2024_25.csv",
+      "sha256": "acd304693b0e93865d12add2909bd015e7c5f1e4c04370a75202ad4117a35cce",
+      "size_bytes": 45653363,
+      "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/campus_transfer_report.html",
+      "source_year": 2025
+    }
+  },
+  "worksheet_sha256": "5e30aceace27fa351f0314e0994646755c12f134997ef715007cca5735078d2e"
+}

@@ -13,7 +13,6 @@ __pycache__/
 
 # Byte-compiled / optimized / DLL files
 .Python
-.python-version
 
 # Virtual environments
 .venv/
@@ -180,6 +179,8 @@ target/
 !/teadata/.cache/boundaries_*.sqlite
 !/.cache/map_payloads_*.sqlite
 !/teadata/.cache/map_payloads_*.sqlite
+!/teadata/.cache/maps_*.sqlite
+!/teadata/.cache/entities_*.sqlite
 # Spatial data (comment out if you version control canonical shapes)
 *.geojson
 *.gpkg
@@ -199,6 +200,12 @@ data/
 # data_cache/
 # outputs/
 # reports/
+
+# Keep provenance JSON receipts in Git; archive raw content objects separately.
+/provenance/objects/
+
+# Machine-local check environments, logs, and receipts.
+/.local/
 
 # =========================
 # Project-specific: config samples vs. real configs

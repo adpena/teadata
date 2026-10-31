@@ -3,15 +3,13 @@
 from __future__ import annotations
 
 from .engine import (
-    DEFAULT_REPO_PKL_RELATIVE,
-    DEFAULT_REPO_PKL_URL,
     ENABLE_PROFILING,
     DataEngine as _DataEngine,
-    _compat_pickle_load,
     _discover_snapshot,
     timeit,
 )
 from collections import OrderedDict
+from collections.abc import Mapping
 from dataclasses import fields, is_dataclass
 from typing import Any
 
@@ -74,9 +72,6 @@ __all__ = [
     "unwrap_query",
     "ENABLE_PROFILING",
     "timeit",
-    "DEFAULT_REPO_PKL_RELATIVE",
-    "DEFAULT_REPO_PKL_URL",
-    "_compat_pickle_load",
     "_discover_snapshot",
     "GeoField",
     "SHAPELY",
@@ -155,7 +150,7 @@ def inspect_object(obj: Any) -> OrderedDict[str, Any]:
             _maybe_add(name, value)
 
     meta = getattr(obj, "meta", None)
-    if isinstance(meta, dict):
+    if isinstance(meta, Mapping):
         for key, value in meta.items():
             _maybe_add(f"meta.{key}", value)
 

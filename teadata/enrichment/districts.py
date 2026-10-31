@@ -4,17 +4,11 @@ from typing import Dict, Any, Optional
 import teadata.classes as classes_mod
 
 from . import enricher
-from .base import Enricher
+from .base import Enricher, clean_value_columns
 
 from teadata.teadata_config import load_config
 from teadata.teadata_config import canonical_district_number
 from teadata.teadata_config import normalize_district_number_column
-
-try:  # optional performance dependency
-    import polars as pl
-except Exception:  # pragma: no cover - optional dependency
-    pl = None  # type: ignore[assignment]
-
 
 def _profile_enabled() -> bool:
     return bool(getattr(classes_mod, "ENABLE_PROFILING", False))
@@ -43,59 +37,6 @@ def _canon_district_number(x: Any) -> Optional[str]:
         return canonical_district_number(x)
     except Exception:
         return None
-
-
-def _is_text_series(series: pd.Series, *, sample_size: int = 64) -> bool:
-    if pd.api.types.is_string_dtype(series):
-        return True
-    if series.dtype != object:
-        return False
-    non_null = series[series.notna()]
-    if non_null.empty:
-        return False
-    sample = non_null.head(sample_size)
-    return bool(len(sample)) and all(isinstance(v, str) for v in sample)
-
-
-def _clean_value_columns(df: pd.DataFrame, columns: list[str]) -> None:
-    text_cols = [col for col in columns if col in df.columns and _is_text_series(df[col])]
-    if text_cols:
-        if pl is not None:
-            try:
-                text_frame = pl.from_pandas(df[text_cols], include_index=False)
-                cleaned = text_frame.with_columns(
-                    [
-                        pl.when(pl.col(col).is_null())
-                        .then(None)
-                        .otherwise(pl.col(col).str.strip_chars())
-                        .alias(col)
-                        for col in text_cols
-                    ]
-                ).with_columns(
-                    [
-                        pl.when(pl.col(col) == "").then(None).otherwise(pl.col(col)).alias(
-                            col
-                        )
-                        for col in text_cols
-                    ]
-                )
-                cleaned_pdf = cleaned.to_pandas(use_pyarrow_extension_array=True)
-                for col in text_cols:
-                    df[col] = cleaned_pdf[col]
-            except Exception:
-                for col in text_cols:
-                    cleaned = df[col].astype("string").str.strip()
-                    cleaned = cleaned.replace("", pd.NA)
-                    df[col] = cleaned.where(cleaned.notna(), None)
-        else:
-            for col in text_cols:
-                cleaned = df[col].astype("string").str.strip()
-                cleaned = cleaned.replace("", pd.NA)
-                df[col] = cleaned.where(cleaned.notna(), None)
-
-    for col in columns:
-        if col in df.columns:
-            df[col] = df[col].where(pd.notna(df[col]), None)
 
 
 # -----------------------------
@@ -181,7 +122,7 @@ def _apply_district_enrichment_table(
             )
 
     # Basic whitespace/NA cleanup on the value columns
-    _clean_value_columns(df, use_cols)
+    clean_value_columns(df, use_cols)
 
     # Build mapping keyed by canonical district_number → {attr: value}
     sub = df[["district_number"] + use_cols].drop_duplicates("district_number")
@@ -279,10 +220,9 @@ class DistrictEnrichmentTable(Enricher):
             cfg_path,
             "accountability",
             year,
-            select=["overall_rating_2025"],
-            rename={"2025 Overall Rating": "overall_rating_2025"},
-            aliases={"overall_rating_2025": "rating"},
-            reader_kwargs={"sheet_name": "2011-2025 Summary"},
+            select=["overall_rating"],
+                        aliases={"overall_rating": "rating"},
+            reader_kwargs={"reader_profile": "ratings"},
         )
         return {"updated": updated, "year": year_resolved}
 

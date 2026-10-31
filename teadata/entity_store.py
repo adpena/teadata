@@ -1,153 +1,65 @@
 from __future__ import annotations
 
+from contextlib import closing
 import json
 import logging
-import os
+import math
 import sqlite3
 from dataclasses import dataclass, field
+from functools import cached_property
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
-from .assets import ensure_local_asset, is_lfs_pointer
-from .teadata_config import canonical_campus_number, canonical_district_number
-
-try:
-    from .engine import _discover_snapshot  # type: ignore
-except Exception:  # pragma: no cover - defensive import
-    _discover_snapshot = None
-
-
-_ENTITY_PREFIX = "entities_"
-_LAST_LOGGED_ENTITY_STORE: Optional[str] = None
+from .manifest import ContractError, read_sqlite_catalog, read_sqlite_catalog_connection
+from .release import current_release
+from .teadata_config import canonical_district_number
+from .identifiers import campus_lookup_key, normalize_campus_lookup_key
 
 logger = logging.getLogger(__name__)
 
 
-def entity_store_path_for_snapshot(snapshot_path: Path) -> Optional[Path]:
-    name = snapshot_path.name
-    if name.startswith("repo_"):
-        base = name[len("repo_") :]
-        if base.endswith(".pkl.gz"):
-            base = base[: -len(".pkl.gz")]
-        elif base.endswith(".pkl"):
-            base = base[: -len(".pkl")]
-        return snapshot_path.with_name(f"{_ENTITY_PREFIX}{base}.sqlite")
-    return None
+_CAMPUS_SELECT = """
+    SELECT c.campus_number, c.campus_number_canon, c.name, c.is_charter, c.is_private,
+           c.enrollment, c.rating, c.aea, c.aea_raw, c.grade_range, c.lon, c.lat, c.meta,
+           d.name, d.district_number, d.district_number_canon,
+           c.lookup_key,c.source_namespace,c.source_id,c.id,c.district_id
+    FROM campuses c LEFT JOIN districts d ON d.id = c.district_id
+"""
 
 
-def _newest_sqlite(folder: Path) -> Optional[Path]:
+def _campus_record(row, *, include_meta: bool, build_id: str) -> dict[str, Any]:
     try:
-        if not folder.exists() or not folder.is_dir():
-            return None
-        picks = sorted(
-            folder.glob(f"{_ENTITY_PREFIX}*.sqlite"),
-            key=lambda p: p.stat().st_mtime,
-            reverse=True,
-        )
-        return picks[0] if picks else None
-    except Exception:
-        return None
+        key = campus_lookup_key(campus_number=row[0], source_namespace=row[17], source_id=row[18], is_private=bool(row[4]))
+    except (ValueError, TypeError) as error:
+        raise ContractError("Stored campus has an invalid source identity") from error
+    if key is None or key != row[16]:
+        raise ContractError("Stored campus key differs from its source identity")
+    if bool(row[4]) and (row[20] is not None or row[14] is not None):
+        raise ContractError("Private school cannot have public governing affiliation")
+    return {
+        "id": row[19], "lookup_key": key, "source_namespace": row[17], "source_id": row[18],
+        "district_id": row[20], "source_build_id": build_id,
+        "campus_number": row[0], "campus_number_canon": row[1],
+        "name": row[2] or "", "is_charter": bool(row[3]), "is_private": bool(row[4]),
+        "enrollment": row[5], "rating": row[6], "aea": _nullable_bool(row[7]), "aea_raw": row[8],
+        "grade_range": row[9] or "", "lon": row[10], "lat": row[11],
+        "meta": _decode_json(row[12]) if include_meta else {}, "district_name": row[13],
+        "district_number": _strip_leading_apostrophe(row[14]) if row[14] is not None else None,
+        "district_number_canon": row[15],
+    }
 
 
-def _log_entity_store(path: Path, source: str) -> None:
-    global _LAST_LOGGED_ENTITY_STORE
-    try:
-        path_str = str(path)
-    except Exception:
-        return
-    if _LAST_LOGGED_ENTITY_STORE == path_str:
-        return
-    _LAST_LOGGED_ENTITY_STORE = path_str
-    logger.info("entity_store.discovered source=%s path=%s", source, path_str)
+def entity_store_path_for_snapshot(snapshot_path: Path) -> Path:
+    base = snapshot_path.name.removeprefix("repo_").removesuffix(".gz").removesuffix(".pkl")
+    return snapshot_path.with_name(f"entities_{base}.sqlite")
 
 
-def _resolve_entity_store(path: Path, source: str) -> Optional[Path]:
-    resolved = ensure_local_asset(
-        path, url_env="TEADATA_ENTITY_STORE_URL", label="entity store"
-    )
-    if not resolved.exists() or is_lfs_pointer(resolved):
-        logger.warning("entity_store.unavailable source=%s path=%s", source, path)
-        return None
-    _log_entity_store(resolved, source)
-    return resolved
-
-
-def _should_attempt_entity_resolution(path: Path) -> bool:
-    if path.exists() and path.is_file():
-        return True
-    return bool(os.environ.get("TEADATA_ENTITY_STORE_URL"))
-
-
-def discover_entity_store(explicit: str | Path | None = None) -> Optional[Path]:
-    if explicit:
-        p = Path(explicit)
-        if _should_attempt_entity_resolution(p):
-            resolved = _resolve_entity_store(p, "explicit")
-            if resolved:
-                return resolved
-
-    env = os.environ.get("TEADATA_ENTITY_STORE")
-    if env:
-        p = Path(env)
-        if _should_attempt_entity_resolution(p):
-            resolved = _resolve_entity_store(p, "env")
-            if resolved:
-                return resolved
-
-    if _discover_snapshot:
-        try:
-            snap = _discover_snapshot()
-            if snap:
-                candidate = entity_store_path_for_snapshot(Path(snap))
-                if candidate and _should_attempt_entity_resolution(candidate):
-                    resolved = _resolve_entity_store(candidate, "snapshot")
-                    if resolved:
-                        return resolved
-        except Exception:
-            pass
-
-    try:
-        package_dir = Path(__file__).resolve().parent
-        pkg_cache = package_dir / ".cache"
-        candidate = _newest_sqlite(pkg_cache)
-        if candidate:
-            resolved = _resolve_entity_store(candidate, "package-cache")
-            if resolved:
-                return resolved
-    except Exception:
-        pass
-
-    cwd = Path.cwd()
-    for idx, base in enumerate((cwd, *cwd.parents)):
-        candidate = _newest_sqlite(base / ".cache")
-        if candidate:
-            source = "cwd-cache" if idx == 0 else "parent-cache"
-            resolved = _resolve_entity_store(candidate, source)
-            if resolved:
-                return resolved
-
-    return None
-
-
-def _district_lookup_keys(district_number: Optional[str]) -> Iterable[str]:
-    if not district_number:
-        return ()
-    keys = []
-    canonical = canonical_district_number(district_number)
-    if canonical:
-        keys.append(canonical)
-    raw = str(district_number).strip()
-    if raw and raw not in keys:
-        keys.append(raw)
-    if raw.startswith("'") and len(raw) > 1:
-        digits = raw[1:]
-        if digits not in keys:
-            keys.append(digits)
-        if digits.isdigit():
-            normalized = str(int(digits))
-            if normalized not in keys:
-                keys.append(normalized)
-    return keys
+def discover_entity_store(explicit: str | Path | None = None) -> Path:
+    if explicit is not None:
+        path = Path(explicit)
+        read_sqlite_catalog(path)
+        return path
+    return current_release().artifact("entities")
 
 
 def _strip_leading_apostrophe(value: Optional[str]) -> str:
@@ -159,53 +71,44 @@ def _strip_leading_apostrophe(value: Optional[str]) -> str:
     return text
 
 
-def _campus_lookup_keys(campus_number: Optional[str]) -> Iterable[str]:
-    if not campus_number:
-        return ()
-    keys = []
-    canonical = canonical_campus_number(campus_number)
-    if canonical:
-        keys.append(canonical)
-    raw = str(campus_number).strip()
-    if raw and raw not in keys:
-        keys.append(raw)
-    if raw.startswith("'") and len(raw) > 1:
-        digits = raw[1:]
-        if digits not in keys:
-            keys.append(digits)
-        if digits.isdigit():
-            normalized = str(int(digits)).rjust(9, "0")
-            if normalized not in keys:
-                keys.append(normalized)
-    return keys
-
 
 def _decode_json(payload: Any) -> dict[str, Any]:
+    """Decode SQLite metadata without replacing malformed/unsupported data.
+
+    SQL NULL and JSON null represent empty nullable metadata. All other values
+    must be UTF-8 JSON objects; parser security limits remain in force.
+    """
     if payload is None:
         return {}
     if isinstance(payload, memoryview):
         payload = payload.tobytes()
     if isinstance(payload, (bytes, bytearray)):
         try:
-            text = payload.decode("utf-8")
-        except Exception:
-            return {}
-        if not text:
-            return {}
-        try:
-            return json.loads(text)
-        except Exception:
-            return {}
-    if isinstance(payload, str):
-        if not payload:
-            return {}
-        try:
-            return json.loads(payload)
-        except Exception:
-            return {}
-    if isinstance(payload, dict):
-        return payload
-    return {}
+            payload = payload.decode("utf-8")
+        except UnicodeError as error:
+            raise ContractError("Entity metadata must be UTF-8 JSON") from error
+    if not isinstance(payload, str):
+        raise ContractError("Entity metadata storage must be JSON text or SQL NULL")
+    try:
+        value = json.loads(payload, parse_constant=_reject_json_constant, parse_float=_finite_json_float)
+    except (ValueError, RecursionError) as error:
+        raise ContractError(f"Entity metadata contains malformed or unsupported JSON: {error}") from error
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ContractError("Entity metadata must be a JSON object or null")
+    return value
+
+
+def _reject_json_constant(value: str):
+    raise ValueError(f"non-finite JSON constant {value}")
+
+
+def _finite_json_float(value: str) -> float:
+    number = float(value)
+    if not math.isfinite(number):
+        raise ValueError("JSON number exceeds the finite Float64 range")
+    return number
 
 
 def _collect_meta_keys_from_json(
@@ -237,53 +140,13 @@ def _nullable_bool(value: Any) -> bool | None:
 
 
 def load_campus(
-    campus_number: str,
-    *,
-    store_path: str | Path | None = None,
+    campus_number: str, *, store_path: str | Path | None = None,
     include_meta: bool = True,
 ) -> Optional[dict[str, Any]]:
+    """Read one public or source-qualified campus through the canonical store."""
     path = discover_entity_store(store_path)
-    if not path:
-        return None
-
-    query = """
-        SELECT c.campus_number, c.campus_number_canon, c.name, c.is_charter, c.is_private,
-               c.enrollment, c.rating, c.aea, c.aea_raw, c.grade_range, c.lon, c.lat, c.meta,
-               d.name, d.district_number, d.district_number_canon
-        FROM campuses c
-        LEFT JOIN districts d ON d.id = c.district_id
-        WHERE c.campus_number_canon = ? OR c.campus_number = ?
-    """
-
-    try:
-        with sqlite3.connect(path) as conn:
-            for key in _campus_lookup_keys(campus_number):
-                row = conn.execute(query, (key, key)).fetchone()
-                if not row:
-                    continue
-                meta = _decode_json(row[12]) if include_meta else {}
-                return {
-                    "campus_number": row[0] or "",
-                    "campus_number_canon": row[1] or "",
-                    "name": row[2] or "",
-                    "is_charter": bool(row[3]),
-                    "is_private": bool(row[4]),
-                    "enrollment": row[5],
-                    "rating": row[6],
-                    "aea": _nullable_bool(row[7]),
-                    "aea_raw": row[8],
-                    "grade_range": row[9] or "",
-                    "lon": row[10],
-                    "lat": row[11],
-                    "meta": meta,
-                    "district_name": row[13] or "",
-                    "district_number": _strip_leading_apostrophe(row[14]),
-                    "district_number_canon": row[15] or "",
-                }
-    except Exception as exc:
-        raise RuntimeError(f"Failed querying campus from entity store '{path}': {exc}") from exc
-
-    return None
+    with EntityStore(path) as store:
+        return store.get_campus(campus_number, include_meta=include_meta)
 
 
 def load_district(
@@ -311,7 +174,7 @@ def load_district(
     """
 
     try:
-        with sqlite3.connect(path) as conn:
+        with closing(sqlite3.connect(path)) as conn:
             for key in _district_lookup_keys(district_number):
                 row = conn.execute(query, (key, key)).fetchone()
                 if not row:
@@ -331,6 +194,8 @@ def load_district(
                     "is_charter": has_charter,
                     "district_type": _district_type_from_flag(has_charter),
                 }
+    except ContractError:
+        raise
     except Exception as exc:
         raise RuntimeError(
             f"Failed querying district from entity store '{path}': {exc}"
@@ -350,7 +215,7 @@ def list_meta_keys(
     if limit:
         query = f"{query} LIMIT {int(limit)}"
     try:
-        with sqlite3.connect(path) as conn:
+        with closing(sqlite3.connect(path)) as conn:
             rows = conn.execute(query).fetchall()
             keys = [row[0] for row in rows if row and row[0]]
             if keys:
@@ -360,14 +225,24 @@ def list_meta_keys(
                 "districts" if entity_type == "district" else "campuses",
                 limit=limit,
             )
+    except ContractError:
+        raise
     except Exception:
         return []
 
 
 @dataclass
 class EntityStore:
+    """A reusable catalog-bound reader; scoped use closes all owned resources.
+
+    Lookups memoize by default. Streaming consumers can use ``cache=False``
+    inside ``with EntityStore(path) as store`` to retain only caller-owned rows.
+    A closed store cannot be reopened; create another reader for another scope.
+    """
+
     path: Path
     max_cache: int = 64
+    immutable: bool = False
     _conn: Optional[sqlite3.Connection] = field(default=None, init=False, repr=False)
     _campus_cache: dict[str, dict[str, Any]] = field(
         default_factory=dict, init=False, repr=False
@@ -382,99 +257,136 @@ class EntityStore:
     _meta_keys_cache: dict[str, list[str]] = field(
         default_factory=dict, init=False, repr=False
     )
+    _closed: bool = field(default=False, init=False, repr=False)
+
+    def __post_init__(self):
+        self.path = Path(self.path)
+        if type(self.immutable) is not bool:
+            raise ValueError("EntityStore immutable mode must be boolean")
+
+    def _ensure_open(self) -> None:
+        if self._closed:
+            raise RuntimeError("EntityStore is closed")
+
+    def close(self) -> None:
+        """Close the SQLite connection and release every store-owned cache."""
+        conn, self._conn = self._conn, None
+        self._closed = True
+        try:
+            if conn is not None:
+                conn.close()
+        finally:
+            self._campus_cache.clear()
+            self._district_cache.clear()
+            self._campus_meta_loaded.clear()
+            self._district_meta_loaded.clear()
+            self._meta_keys_cache.clear()
+            self.__dict__.pop("catalog", None)
+
+    def __enter__(self) -> EntityStore:
+        self._ensure_open()
+        try:
+            self.catalog
+            self._connect()
+        except BaseException:
+            self.close()
+            raise
+        return self
+
+    def __exit__(self, *exc: Any) -> None:
+        self.close()
+
+    @cached_property
+    def catalog(self):
+        self._ensure_open()
+        catalog = read_sqlite_catalog_connection(self.connection)
+        columns = {row[1] for row in self.connection.execute("PRAGMA table_info(campuses)")}
+        if not {"lookup_key", "source_namespace", "source_id"}.issubset(columns):
+            raise ContractError("Legacy entity store campus identity schema requires a source-bound rebuild")
+        return catalog
+
+    @property
+    def connection(self) -> sqlite3.Connection:
+        """The store-owned read-only SQLite connection; closed with this store.
+
+        Immutable mode reads only the exact checkpointed main-file artifact,
+        including its catalog. Callers may execute projections on this same
+        connection rather than opening a reader with different WAL semantics.
+        """
+        connection = self._connect()
+        if connection is None:
+            raise ContractError(f"Entity artifact does not exist: {self.path.name}")
+        return connection
 
     def _connect(self) -> Optional[sqlite3.Connection]:
+        self._ensure_open()
         if self._conn is not None:
             return self._conn
         if not self.path.exists():
             return None
-        uri = f"file:{self.path}?mode=ro"
+        uri = self.path.resolve().as_uri() + "?mode=ro" + ("&immutable=1" if self.immutable else "")
         self._conn = sqlite3.connect(uri, uri=True, check_same_thread=False)
         return self._conn
 
     @property
     def cache_key(self) -> str:
-        try:
-            stat = self.path.stat()
-            return f"{self.path}:{stat.st_mtime_ns}"
-        except Exception:
-            return str(self.path)
+        return self.catalog.build_id
 
-    def get_campus(self, campus_number: str, *, include_meta: bool = True) -> Optional[dict[str, Any]]:
+    def get_campus(self, campus_number: str, *, include_meta: bool = True, cache: bool = True) -> Optional[dict[str, Any]]:
+        self._ensure_open()
         if not campus_number:
             return None
-        key = canonical_campus_number(campus_number) or str(campus_number).strip()
+        key = normalize_campus_lookup_key(campus_number)
         if not key:
             return None
-        cached = self._campus_cache.get(key)
+        cached = self._campus_cache.get(key) if cache else None
         if cached is not None:
             if not include_meta or key in self._campus_meta_loaded:
                 return cached
         record = self._load_campus_from_conn(key, include_meta=include_meta)
         if record:
-            self._campus_cache[key] = record
-            if include_meta:
-                self._campus_meta_loaded.add(key)
-            else:
-                self._campus_meta_loaded.discard(key)
+            record["source_build_id"] = self.catalog.build_id
+            if cache:
+                self._campus_cache[key] = record
+                if include_meta:
+                    self._campus_meta_loaded.add(key)
+                else:
+                    self._campus_meta_loaded.discard(key)
         return record
 
     def get_district(
-        self, district_number: str, *, include_meta: bool = True
+        self, district_number: str, *, include_meta: bool = True, cache: bool = True
     ) -> Optional[dict[str, Any]]:
+        self._ensure_open()
         if not district_number:
             return None
         key = canonical_district_number(district_number) or str(district_number).strip()
         if not key:
             return None
-        cached = self._district_cache.get(key)
+        cached = self._district_cache.get(key) if cache else None
         if cached is not None:
             if not include_meta or key in self._district_meta_loaded:
                 return cached
         record = self._load_district_from_conn(key, include_meta=include_meta)
         if record:
-            self._district_cache[key] = record
-            if include_meta:
-                self._district_meta_loaded.add(key)
-            else:
-                self._district_meta_loaded.discard(key)
+            record["source_build_id"] = self.catalog.build_id
+            if cache:
+                self._district_cache[key] = record
+                if include_meta:
+                    self._district_meta_loaded.add(key)
+                else:
+                    self._district_meta_loaded.discard(key)
         return record
 
     def iter_campuses(self, *, include_meta: bool = True) -> Iterable[dict[str, Any]]:
         conn = self._connect()
         if conn is None:
-            return []
-        query = """
-            SELECT c.campus_number, c.campus_number_canon, c.name, c.is_charter, c.is_private,
-                   c.enrollment, c.rating, c.aea, c.aea_raw, c.grade_range, c.lon, c.lat, c.meta,
-                   d.name, d.district_number, d.district_number_canon
-            FROM campuses c
-            LEFT JOIN districts d ON d.id = c.district_id
-        """
+            return
         try:
-            rows = conn.execute(query)
-        except Exception:
-            return []
-        for row in rows:
-            meta = _decode_json(row[12]) if include_meta else {}
-            yield {
-                "campus_number": row[0] or "",
-                "campus_number_canon": row[1] or "",
-                "name": row[2] or "",
-                "is_charter": bool(row[3]),
-                "is_private": bool(row[4]),
-                "enrollment": row[5],
-                "rating": row[6],
-                "aea": _nullable_bool(row[7]),
-                "aea_raw": row[8],
-                "grade_range": row[9] or "",
-                "lon": row[10],
-                "lat": row[11],
-                "meta": meta,
-                "district_name": row[13] or "",
-                "district_number": _strip_leading_apostrophe(row[14]),
-                "district_number_canon": row[15] or "",
-            }
+            for row in conn.execute(_CAMPUS_SELECT):
+                yield _campus_record(row, include_meta=include_meta, build_id=self.catalog.build_id)
+        except sqlite3.OperationalError as error:
+            raise ContractError("Entity store requires the source-qualified campus identity schema; rebuild it") from error
 
     def iter_districts(self, *, include_meta: bool = True) -> Iterable[dict[str, Any]]:
         conn = self._connect()
@@ -500,6 +412,7 @@ class EntityStore:
             has_charter = bool(row[9])
             meta = _decode_json(row[7]) if include_meta else {}
             yield {
+                "source_build_id": self.catalog.build_id,
                 "name": row[0] or "",
                 "district_number": _strip_leading_apostrophe(row[1] or row[2]),
                 "district_number_canon": row[2] or "",
@@ -514,6 +427,7 @@ class EntityStore:
             }
 
     def list_meta_keys(self, entity_type: str, *, limit: int | None = None) -> list[str]:
+        self._ensure_open()
         cached = self._meta_keys_cache.get(entity_type)
         if cached is not None:
             return cached[:limit] if limit else list(cached)
@@ -536,45 +450,15 @@ class EntityStore:
         self._meta_keys_cache[entity_type] = keys
         return keys[:limit] if limit else keys
 
-    def _load_campus_from_conn(
-        self, key: str, *, include_meta: bool = True
-    ) -> Optional[dict[str, Any]]:
+    def _load_campus_from_conn(self, key: str, *, include_meta: bool = True) -> Optional[dict[str, Any]]:
         conn = self._connect()
         if conn is None:
             return None
-        query = """
-            SELECT c.campus_number, c.campus_number_canon, c.name, c.is_charter, c.is_private,
-                   c.enrollment, c.rating, c.aea, c.aea_raw, c.grade_range, c.lon, c.lat, c.meta,
-                   d.name, d.district_number, d.district_number_canon
-            FROM campuses c
-            LEFT JOIN districts d ON d.id = c.district_id
-            WHERE c.campus_number_canon = ? OR c.campus_number = ?
-        """
         try:
-            row = conn.execute(query, (key, key)).fetchone()
-        except Exception:
-            row = None
-        if not row:
-            return None
-        meta = _decode_json(row[12]) if include_meta else {}
-        return {
-            "campus_number": row[0] or "",
-            "campus_number_canon": row[1] or "",
-            "name": row[2] or "",
-            "is_charter": bool(row[3]),
-            "is_private": bool(row[4]),
-            "enrollment": row[5],
-            "rating": row[6],
-            "aea": _nullable_bool(row[7]),
-            "aea_raw": row[8],
-            "grade_range": row[9] or "",
-            "lon": row[10],
-            "lat": row[11],
-            "meta": meta,
-            "district_name": row[13] or "",
-            "district_number": _strip_leading_apostrophe(row[14]),
-            "district_number_canon": row[15] or "",
-        }
+            row = conn.execute(_CAMPUS_SELECT + " WHERE c.lookup_key = ?", (key,)).fetchone()
+        except sqlite3.OperationalError as error:
+            raise ContractError("Entity store requires the source-qualified campus identity schema; rebuild it") from error
+        return _campus_record(row, include_meta=include_meta, build_id=self.catalog.build_id) if row else None
 
     def _load_district_from_conn(
         self, key: str, *, include_meta: bool = True
@@ -616,3 +500,24 @@ class EntityStore:
             "is_charter": has_charter,
             "district_type": _district_type_from_flag(has_charter),
         }
+
+
+def _district_lookup_keys(district_number: Optional[str]) -> Iterable[str]:
+    if not district_number:
+        return ()
+    keys = []
+    canonical = canonical_district_number(district_number)
+    if canonical:
+        keys.append(canonical)
+    raw = str(district_number).strip()
+    if raw and raw not in keys:
+        keys.append(raw)
+    if raw.startswith("'") and len(raw) > 1:
+        digits = raw[1:]
+        if digits not in keys:
+            keys.append(digits)
+        if digits.isdigit():
+            normalized = str(int(digits))
+            if normalized not in keys:
+                keys.append(normalized)
+    return keys

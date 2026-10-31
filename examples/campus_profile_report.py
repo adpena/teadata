@@ -8,10 +8,12 @@ column during the district merge.
 from __future__ import annotations
 
 from typing import Iterable
+from pathlib import Path
 
 import pandas as pd
 
 from teadata import DataEngine
+from teadata.scripts.paths import data_path
 
 from restyle_existing_excel import style_existing_excel
 
@@ -161,7 +163,7 @@ def build_campus_summary(
 # Helper: add County via spatial join to Texas county boundaries
 def add_county_from_geometry(
     campus_df: pd.DataFrame,
-    counties_path: str = "teadata/data/shapes/Texas_County_Boundaries_Detailed_7317697762830183947.geojson",
+    counties_path: str | Path | None = None,
 ) -> pd.DataFrame:
     """
     Add a 'County' column by locating each campus point within Texas county polygons.
@@ -243,20 +245,17 @@ def add_county_from_geometry(
         campus_df.copy(), geometry=campus_df[geom_col], crs="EPSG:4326"
     )
 
-    # Read counties; fall back to data path if the project-relative path isn't found.
+    # Explicit paths are honored; otherwise use the portable source-data default.
+    if counties_path is None:
+        counties_path = data_path("shapes", "Texas_County_Boundaries_Detailed_7317697762830183947.geojson")
     try:
         counties = gpd.read_file(counties_path)
     except Exception:
-        try:
-            counties = gpd.read_file(
-                "/Users/adpena/PycharmProjects/teadata/teadata/data/shapes/Texas_County_Boundaries_Detailed_7317697762830183947.geojson"
-            )
-        except Exception:
-            campus_df = campus_df.copy()
-            campus_df["county"] = pd.NA
-            if temp_geom_built:
-                campus_df = campus_df.drop(columns=[geom_col], errors="ignore")
-            return campus_df
+        campus_df = campus_df.copy()
+        campus_df["county"] = pd.NA
+        if temp_geom_built:
+            campus_df = campus_df.drop(columns=[geom_col], errors="ignore")
+        return campus_df
 
     # Ensure CRS alignment
     if counties.crs is None:

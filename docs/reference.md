@@ -10,7 +10,7 @@
 ## Repo Layout
 
 - `teadata/classes.py` — models (`District`, `Campus`, `DataEngine`), query object, spatial index.
-- `teadata/load_data.py` / `teadata/load_data2.py` — examples/scripts to build and snapshot repos from raw sources.
+- `teadata/load_data.py` — build and publish a catalog-bound release from configured raw sources; see [dataset contracts and data releases](data-releases.md).
 - `teadata/teadata_config.py` — config reader/validator (YAML/TOML), year-resolution, schema validation.
 - `teadata/enrichment/` — modular enrichment functions (districts, campuses, charter networks, etc.).
 - `.cache/` — binary snapshots (`repo_*.pkl`) for instant loads.

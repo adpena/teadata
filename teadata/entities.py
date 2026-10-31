@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
 from datetime import date
 from functools import cached_property, singledispatchmethod
@@ -25,6 +26,7 @@ from .geometry import (
     polygon_area,
 )
 from .grades import coerce_grade_spans, spans_to_bounds
+from .identifiers import campus_lookup_key
 
 __all__ = [
     "District",
@@ -103,7 +105,7 @@ class District:
 
     polygon = GeoField("polygon")
 
-    meta: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
+    meta: MutableMapping[str, Any] = field(default_factory=dict, repr=False, compare=False)
     _repo: Any = field(default=None, repr=False, compare=False)
 
     def __post_init__(self):
@@ -159,7 +161,8 @@ class District:
 
     def __format__(self, spec: str) -> str:
         if spec == "brief":
-            return f"{self.name} (enr={self.enrollment:,}, rating={self.rating or '-'})"
+            enrollment = f"{self.enrollment:,}" if self.enrollment is not None else "unknown"
+            return f"{self.name} (enr={enrollment}, rating={self.rating or '-'})"
         return f"District<{self.name}>"
 
     __match_args__ = ("name", "enrollment")
@@ -203,14 +206,14 @@ class District:
 
     def __getattr__(self, name: str):
         meta = object.__getattribute__(self, "meta")
-        if isinstance(meta, dict) and name in meta:
+        if isinstance(meta, Mapping) and name in meta:
             return meta[name]
         raise AttributeError(f"{self.__class__.__name__} has no attribute {name!r}")
 
     def __dir__(self):
-        base = list(super().__dir__())
+        base = list(object.__dir__(self))
         m = object.__getattribute__(self, "meta")
-        if isinstance(m, dict):
+        if isinstance(m, Mapping):
             base.extend(k for k in m.keys() if isinstance(k, str))
         return sorted(set(base))
 
@@ -226,7 +229,7 @@ class District:
             sys.intern("aea_raw"): self.aea_raw,
             sys.intern("rating"): self.rating,
         }
-        if include_meta and isinstance(self.meta, dict):
+        if include_meta and isinstance(self.meta, Mapping):
             for k, v in self.meta.items():
                 ik = _intern_key(k)
                 if ik not in out:
@@ -249,7 +252,7 @@ class District:
 @dataclass(slots=True)
 class Campus:
     id: uuid.UUID
-    district_id: uuid.UUID
+    district_id: uuid.UUID | None
     name: str
     charter_type: str
     is_charter: bool
@@ -277,6 +280,8 @@ class Campus:
 
     district_number: Optional[str] = None
     campus_number: Optional[str] = None
+    source_namespace: str | None = None
+    source_id: str | None = None
 
     _district_number_canon: Optional[str] = field(init=False, repr=False, compare=False)
     _campus_number_canon: Optional[str] = field(init=False, repr=False, compare=False)
@@ -288,7 +293,7 @@ class Campus:
 
     point = GeoField("point")
 
-    meta: dict[str, Any] = field(default_factory=dict, repr=False, compare=False)
+    meta: MutableMapping[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
     def __setattr__(self, name: str, value: Any) -> None:
         if name == "grade_range":
@@ -305,6 +310,7 @@ class Campus:
         self.name = self.name.upper()
         self.is_charter = bool(self.is_charter)
         self.is_private = bool(self.is_private)
+        self.lookup_key  # Validate explicit identity fields before normalization.
         if self.location is not None:
             self.point = self.location
 
@@ -331,26 +337,34 @@ class Campus:
                 self.campus_number = canonical_campus_number(raw_cn) or raw_cn
         else:
             self._campus_number_canon = None
+            self.campus_number = None
 
     def __getattr__(self, name: str):
+        if name in {"lookup_key", "source_namespace", "source_id", "campus_number", "district_id", "district_number", "district_name"}:
+            raise AttributeError(f"Missing explicit campus identity field: {name}")
         meta = object.__getattribute__(self, "meta")
-        if isinstance(meta, dict) and name in meta:
+        if isinstance(meta, Mapping) and name in meta:
             return meta[name]
         raise AttributeError(f"{self.__class__.__name__} has no attribute {name!r}")
 
     def __dir__(self):
-        base = list(super().__dir__())
+        base = list(object.__dir__(self))
         m = object.__getattribute__(self, "meta")
-        if isinstance(m, dict):
+        if isinstance(m, Mapping):
             base.extend(k for k in m.keys() if isinstance(k, str))
         return sorted(set(base))
 
     def to_dict(
         self, *, include_meta: bool = True, include_geometry: bool = False
     ) -> dict:
+        lookup_key = self.lookup_key
         out = {
             sys.intern("id"): str(self.id),
-            sys.intern("district_id"): str(self.district_id),
+            sys.intern("district_id"): str(self.district_id) if self.district_id is not None else None,
+            sys.intern("district_name"): self.district_name,
+            sys.intern("lookup_key"): lookup_key,
+            sys.intern("source_namespace"): object.__getattribute__(self, "source_namespace"),
+            sys.intern("source_id"): object.__getattribute__(self, "source_id"),
             sys.intern("name"): self.name,
             sys.intern("charter_type"): self.charter_type,
             sys.intern("is_charter"): bool(self.is_charter),
@@ -367,7 +381,7 @@ class Campus:
             sys.intern("district_number"): self.district_number,
             sys.intern("campus_number"): self.campus_number,
         }
-        if include_meta and isinstance(self.meta, dict):
+        if include_meta and isinstance(self.meta, Mapping):
             for k, v in self.meta.items():
                 ik = _intern_key(k)
                 if ik not in out:
@@ -375,7 +389,7 @@ class Campus:
 
         percent_change: Optional[float]
         try:
-            percent_change = self.enrollment_percent_change_from_2015()
+            percent_change = self.enrollment_percent_change()
             if percent_change is not None:
                 percent_change = round(float(percent_change) * 100.0, 1)
         except ValueError:
@@ -430,10 +444,31 @@ class Campus:
             return None
 
     @property
+    def district_name(self) -> str | None:
+        from .attributes import campus_district_name
+
+        return campus_district_name(self)
+
+    @property
     def district(self) -> Optional[District]:
+        if self.is_private:
+            self.lookup_key  # Refuse a mutated invalid governing relation.
+            return None
         if self._repo is None:
             return None
         return self._repo._districts.get(self.district_id)
+
+    @property
+    def lookup_key(self) -> str | None:
+        if self.is_private and (self.district_id is not None or self.district_number is not None):
+            raise ValueError("Private schools have no governing public district; preserve directory claims separately")
+        try:
+            namespace = object.__getattribute__(self, "source_namespace")
+            identifier = object.__getattribute__(self, "source_id")
+        except AttributeError as error:
+            raise ValueError("Legacy campus identity requires a source-bound rebuild") from error
+        return campus_lookup_key(campus_number=self.campus_number,
+            source_namespace=namespace, source_id=identifier, is_private=self.is_private)
 
     def distance_to(self, other: Any) -> float:
         return self._distance_to(other)
@@ -447,6 +482,7 @@ class Campus:
             return float("inf")
         if (
             SHAPELY
+            and ShapelyPoint is not None
             and isinstance(self.point, ShapelyPoint)
             and isinstance(other.point, ShapelyPoint)
         ):
@@ -457,86 +493,42 @@ class Campus:
     def _(self, other: tuple) -> float:
         if self.point is None:
             return float("inf")
-        if SHAPELY and isinstance(self.point, ShapelyPoint):
+        if SHAPELY and ShapelyPoint is not None and isinstance(self.point, ShapelyPoint):
             return self.point.distance(ShapelyPoint(*other))
         return euclidean((self.point.x, self.point.y), other)
 
-    def enrollment_percent_change_from_2015(self) -> float:
-        enrollment = self.enrollment
-        baseline = None
-        if (
-            isinstance(self.meta, dict)
-            and "campus_2015_student_enrollment_all_students_count" in self.meta
-        ):
-            baseline = self.meta["campus_2015_student_enrollment_all_students_count"]
-        elif hasattr(self, "campus_2015_student_enrollment_all_students_count"):
-            baseline = getattr(
-                self, "campus_2015_student_enrollment_all_students_count"
-            )
-        if enrollment is None:
-            raise ValueError("Current enrollment is missing or None.")
-        if baseline is None:
-            raise ValueError("Baseline 2015 enrollment is missing or None.")
-        try:
-            enrollment_value = float(enrollment)
-            baseline_value = float(baseline)
-        except Exception as exc:  # pragma: no cover - defensive
-            raise ValueError(
-                "Enrollment or baseline could not be cast to float."
-            ) from exc
-        if baseline_value == 0:
-            raise ValueError(
-                "Baseline 2015 enrollment is zero, cannot compute percent change."
-            )
-        return (enrollment_value - baseline_value) / baseline_value
+    @property
+    def dataset_catalog(self):
+        from .manifest import ContractError
+        catalog = getattr(self._repo, "catalog", None)
+        if catalog is None:
+            raise ContractError("Entity is not bound to a data release")
+        return catalog
+
+    def metric(self, name: str):
+        return self.dataset_catalog.measurement(self, name, scope="campus")
+
+    def enrollment_percent_change(self) -> float:
+        current = self.metric("tapr.student_enrollment_all_students_count").numeric
+        baseline = self.metric("baseline.student_enrollment_all_students_count").numeric
+        if current is None or baseline is None or baseline <= 0:
+            raise ValueError("Enrollment change requires observed current and positive baseline enrollment")
+        return (current - baseline) / baseline
 
     @property
     def num_charter_transfer_destinations(self) -> int:
-        if not hasattr(self, "_repo") or self._repo is None:
-            return 0
-        try:
-            edges = self._repo.transfers_out(self)
-        except Exception:
-            return 0
-        ids = set()
-        for to_campus, _count, _masked in ((e[0], e[1], e[2]) for e in edges):
-            if to_campus is not None and is_charter(to_campus):
-                ids.add(getattr(to_campus, "id", None))
-        return len(ids)
+        from .transfer_summary import charter_transfer_observations
+        return charter_transfer_observations(self).destination_count
 
     @property
     def num_charter_transfer_destinations_masked(self) -> int:
-        if not hasattr(self, "_repo") or self._repo is None:
-            return 0
-        try:
-            edges = self._repo.transfers_out(self)
-        except Exception:
-            return 0
-        masked_ids = set()
-        for to_campus, _count, masked in ((e[0], e[1], e[2]) for e in edges):
-            if to_campus is not None and is_charter(to_campus) and bool(masked):
-                masked_ids.add(getattr(to_campus, "id", None))
-        return len(masked_ids)
+        from .transfer_summary import charter_transfer_observations
+        return charter_transfer_observations(self).aggregate.suppressed_count
 
     @property
     def total_unmasked_charter_transfers_out(self) -> int:
-        if not hasattr(self, "_repo") or self._repo is None:
-            return 0
-        try:
-            edges = self._repo.transfers_out(self)
-        except Exception:
-            return 0
-        total = 0
-        for to_campus, count, masked in ((e[0], e[1], e[2]) for e in edges):
-            if to_campus is None or not is_charter(to_campus):
-                continue
-            if count is None:
-                continue
-            try:
-                total += int(count)
-            except Exception:
-                continue
-        return total
+        from .transfer_summary import charter_transfer_observations
+        return int(charter_transfer_observations(self).aggregate.observed_sum)
 
 
 class EntityMap(dict):
@@ -587,7 +579,7 @@ class EntityMap(dict):
             def getter(obj, name=attr):
                 return getattr(obj, name, None)
 
-        vals = set()
+        vals: set[Any] = set()
         for obj in self.values():
             try:
                 v = getter(obj)
@@ -761,4 +753,4 @@ class ReadOnlyEntityView:
 
 
 # Register the Campus-specific overload after class creation to avoid forward references
-Campus._distance_to.register(Campus)(Campus._distance_to_campus)  # type: ignore[attr-defined]
+Campus.__dict__["_distance_to"].register(Campus)(Campus._distance_to_campus)
