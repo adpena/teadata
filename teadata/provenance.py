@@ -14,7 +14,7 @@ from pathlib import Path
 import tempfile
 from typing import Any, Mapping, Sequence
 
-from .dataset_metadata import ResolvedDataset, validate_http_url
+from .dataset_metadata import DatasetMetadata, ResolvedDataset, validate_http_url
 
 
 def _timestamp(value: datetime | None = None) -> str:
@@ -241,3 +241,60 @@ class ProvenanceStore:
         if _file_digest(path) != content_hash:
             raise ValueError(f"Archived artifact checksum mismatch: {content_hash}")
         return path
+
+    def verify_record_closure(self, record_ids: Sequence[str]) -> dict[str, dict[str, Any]]:
+        """Verify only the requested immutable graph, including reference links.
+
+        Archived hashes own content identity; portable reference paths need not
+        exist outside the original configuration directory. Ordinary source
+        builds still validate their selected local paths separately.
+        """
+        from .manifest import verify_reference_receipts
+
+        records: dict[str, dict[str, Any]] = {}
+        pending: set[str] = set()
+
+        def visit(identifier: str) -> None:
+            if identifier in records:
+                return
+            if identifier in pending:
+                raise ValueError("Provenance records contain a cycle")
+            pending.add(identifier)
+            record = self.read_record(identifier)
+            if record["kind"] == "acquisition":
+                artifacts = [record["artifact"]]
+                metadata = DatasetMetadata.from_dict(record["source_metadata"])
+                dependencies = [*metadata.provenance_ids,
+                                *(item for ref in metadata.references for item in ref.provenance_ids)]
+            else:
+                artifacts = list(record["outputs"].values())
+                metadata = None
+                dependencies = record["inputs"]
+            for dependency in dependencies:
+                visit(dependency)
+            for artifact in artifacts:
+                path = self.verify_artifact(artifact["sha256"])
+                if path.stat().st_size != artifact["size_bytes"]:
+                    raise ValueError("Provenance artifact size differs from its receipt")
+            if metadata is not None:
+                verify_reference_receipts(ResolvedDataset(record["dataset"], record["section"],
+                    record["requested_year"], record["resolved_year"], "", metadata),
+                    self, check_local_paths=False, verify_all_claimed=True)
+            pending.remove(identifier)
+            records[identifier] = record
+
+        for identifier in record_ids:
+            visit(identifier)
+        return records
+
+    def copy_record_from(self, source: ProvenanceStore, record_id: str) -> None:
+        """Retain an exact selected receipt/object closure, preserving history."""
+        records = source.verify_record_closure([record_id])
+        for identifier, record in records.items():
+            artifacts = [record["artifact"]] if record["kind"] == "acquisition" else record["outputs"].values()
+            for artifact in artifacts:
+                copied = self.retain_artifact(source.verify_artifact(artifact["sha256"]))
+                if copied["sha256"] != artifact["sha256"] or copied["size_bytes"] != artifact["size_bytes"]:
+                    raise ValueError("Copied provenance artifact differs from its receipt")
+            if self._record(record) != identifier:
+                raise ValueError("Copied provenance receipt changed its identity")

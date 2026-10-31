@@ -16,12 +16,11 @@ from teadata.scripts import paths
 
 SCRIPT_MODULES = [
     "build_campus_peims_financials_statewide_data",
-    "build_tapr_2025_profiles",
+    "build_tapr_profiles",
     "download_campus_peims_financials",
     "flatten_districts_geojson",
     "geocode_tepsac_data",
     "rename_tapr_campus_headers",
-    "rename_tapr_district_headers",
     "rename_tepsac_headers",
 ]
 
@@ -204,27 +203,81 @@ def test_geocoder_uses_explicit_paths_with_stubbed_providers(monkeypatch, tmp_pa
     assert result.loc[0, "Best Lat"] == 30.0
 
 
-def test_tapr_builder_accepts_external_input_and_output_dirs(tmp_path):
-    from teadata.scripts.build_tapr_2025_profiles import main
+@pytest.mark.parametrize("write_failure", [False, True, "missing_reference_store"])
+def test_tapr_builder_accepts_external_input_and_new_output_dirs(tmp_path, monkeypatch, write_failure):
+    from hashlib import sha256
+    import json
+    import pyarrow.parquet as pq
+    from teadata.column_schema import source_schema_fingerprint
+    from teadata.manifest import canonical_json
+    from teadata.scripts import build_tapr_profiles as script
+    from teadata.teadata_config import Config
 
     raw = tmp_path / "raw"
     raw.mkdir()
-    for kind, number, label in [
-        ("Campus", "000000123", "9 Digit Campus Number"),
-        ("District", "000456", "6 Digit County District Number"),
+    datasets, entries = [], {}
+    for scope, kind, number, code, label in [
+        ("campus", "Campus", "000000123", "CAMPUS", "9 Digit Campus Number"),
+        ("district", "District", "000456", "DISTRICT", "6 Digit County District Number"),
     ]:
-        for group in ("Student", "Staff"):
-            (raw / f"2025 {kind} {group} Information.csv").write_text(
-                f"{label},Example Value\nNUMBER,VALUE\n{number},42\n"
-            )
-    output_dir = tmp_path / "output"
-    main(["--input-dir", str(raw), "--output-dir", str(output_dir)])
-
-    campus = pd.read_excel(output_dir / "CAMPPROF_2024-2025_FINAL.xlsx")
-    district = pd.read_excel(output_dir / "DISTPROF_2024-2025_FINAL.xlsx")
-    assert campus.loc[0, "campus_number"] == 123
-    assert district.loc[0, "district_number"] == 456
-    assert len(list(output_dir.glob("*.xlsx"))) == 4
+        dataset = scope + "_tapr_student_staff_profile"
+        labels, codes, fields = [label, "Example Value"], [code, "VALUE"], [scope + "_number", "example_value"]
+        tables, paths = [], {}
+        for group in ["Student", "Staff"]:
+            path = raw / f"2025 {kind} {group} Information.csv"
+            path.write_text(f"{label},Example Value\n{code},VALUE\n{number},42\n")
+            paths[group.lower()] = str(path)
+            tables.append({"table": group.lower(), "input_sha256": sha256(path.read_bytes()).hexdigest(),
+                "source_schema_sha256": source_schema_fingerprint(labels, codes),
+                "fields": [{"position": i, "code": c, "label": text, "field": name}
+                           for i, (c, text, name) in enumerate(zip(codes, labels, fields, strict=True), 1)]})
+        datasets.append({"dataset": dataset, "edition": "2025", "prepared_input_sha256": "0" * 64, "tables": tables})
+        entries[dataset] = {2025: {"path": str(tmp_path / (scope + "-retained-reference.xlsx")),
+            "metadata": {"version": "2025"},
+            "reader": {"column_schema": "headers.json", "profiles": {"source": {"tapr_source": {"scope": scope, "tables": paths}}}}}}
+    schema = tmp_path / "headers.json"
+    schema.write_text(canonical_json({"schema_version": 2, "mapping_version": 1, "datasets": datasets}) + "\n")
+    for versions in entries.values():
+        versions[2025]["metadata"]["references"] = [{"reference_id": "columns", "role": "schema", "status": "available",
+            "path": "headers.json", "reviewed_sha256": sha256(schema.read_bytes()).hexdigest()}]
+        if write_failure == "missing_reference_store":
+            versions[2025]["metadata"]["references"][0]["provenance_ids"] = ["1" * 64]
+    cfg = Config.from_dict({"data_sources": entries})
+    cfg.base_dir = tmp_path
+    monkeypatch.setattr(script, "load_config", lambda _: cfg)
+    output_dir = tmp_path / "new-output"
+    if write_failure == "missing_reference_store":
+        with pytest.raises(ValueError, match="explicit reference_store"):
+            script.main(["--edition", "2025", "--input-dir", str(raw), "--output-dir", str(output_dir)])
+        assert not output_dir.exists()
+        assert not list(tmp_path.glob(".tapr-preparation-*"))
+        return
+    if write_failure:
+        def fail(*args, **kwargs):
+            raise OSError("simulated artifact write failure")
+        monkeypatch.setattr(pq, "write_table", fail)
+        with pytest.raises(OSError, match="simulated artifact write failure"):
+            script.main(["--edition", "2025", "--input-dir", str(raw), "--output-dir", str(output_dir)])
+        assert not output_dir.exists()
+        assert not list(tmp_path.glob(".tapr-preparation-*"))
+        return
+    script.main(["--edition", "2025", "--input-dir", str(raw), "--output-dir", str(output_dir)])
+    assert pq.read_table(output_dir / "campus.parquet").to_pylist() == [{"campus_number": "000000123", "example_value": "42"}]
+    assert pq.read_table(output_dir / "district.parquet").to_pylist() == [{"district_number": "000456", "example_value": "42"}]
+    receipt = json.loads((output_dir / "preparation.json").read_text())
+    assert receipt["release_activation"] is False
+    assert receipt["scopes"]["campus"]["source_columns_accounted"] == 4
+    assert receipt["scopes"]["campus"]["identity_fields"] == ["campus_number"]
+    from teadata.provenance import ProvenanceStore
+    store = ProvenanceStore(output_dir / "provenance")
+    for scope in ("campus", "district"):
+        assert receipt["scopes"][scope]["local_reference_closure_verified"] is True
+        closure = store.verify_record_closure([receipt["scopes"][scope]["processing_record_id"]])
+        for record in closure.values():
+            for reference in record.get("source_metadata", {}).get("references", []):
+                assert reference["provenance_ids"]
+                assert all(identifier in closure for identifier in reference["provenance_ids"])
+    assert not list(output_dir.glob("*.xlsx"))
 
 
 def test_snapshot_writer_only_writes_staging(monkeypatch, tmp_path, catalog):

@@ -14,6 +14,66 @@ from teadata.teadata_config import Config, load_config
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def test_complete_2024_source_crosswalk_is_offline_and_keeps_legacy_projection(monkeypatch):
+    cfg = load_config(ROOT / "teadata" / "teadata_sources.yaml")
+    def forbidden(*args, **kwargs):
+        pytest.fail("Header discovery read source facts")
+    monkeypatch.setattr(cfg, "_load_table", forbidden)
+    monkeypatch.setattr(cfg, "read_tapr_sources", forbidden)
+    for scope, count, retained in [("campus", 407, 404), ("district", 420, 75)]:
+        dataset = scope + "_tapr_student_staff_profile"
+        records = cfg.header_records(dataset, edition="2024", reader_profile="source")
+        assert len(records) == count
+        assert len(cfg.column_schema(dataset, 2024)) == retained
+        assert set(cfg.column_schema(dataset, 2024)) <= {record["field"] for record in records}
+        identities = {record["field"] for record in records if record["disposition"] == "identity"}
+        expected = {"district_number", "district_name"}
+        if scope == "campus":
+            expected |= {"campus_number", "campus_name"}
+        assert identities == expected
+        assert len(cfg.header_mapping(dataset, edition="2024", table="profile", reader_profile="source")) == count
+
+
+def test_default_build_keeps_unselected_source_locators_portable_across_data_roots(tmp_path, monkeypatch):
+    import yaml
+    from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
+    from teadata.manifest import BuildRecorder
+    from teadata.provenance import ProvenanceStore
+
+    _, raw, schema, _ = schema_config(tmp_path, reader={"profiles": {"source": {
+        "tapr_source": {"scope": "campus", "tables": {"profile": "data/tapr/raw/original.csv"}}}}})
+    raw["data_sources"]["sample"][2025]["path"] = "data/source.csv"
+    store = ProvenanceStore(tmp_path / "provenance")
+    schema_id = store.record_acquisition(schema, ResolvedDataset("reference:columns", "reference", None, None,
+        str(schema), DatasetMetadata(title="Test columns")))
+    raw["data_sources"]["sample"][2025]["metadata"]["references"][0]["provenance_ids"] = [schema_id]
+    config = tmp_path / "config.yaml"
+    config.write_text(yaml.safe_dump(raw))
+    roots = [tmp_path / "root-a", tmp_path / "root-b"]
+    for root in roots:
+        root.mkdir()
+        (root / "source.csv").write_text("alpha,beta\n1,2\n")
+    monkeypatch.setenv("TEADATA_DATA_DIR", str(roots[0]))
+    cfg = load_config(config)
+    observed = cfg.resolve_dataset("sample", 2025)
+    source_id = store.record_acquisition(observed.path, observed)
+    raw["data_sources"]["sample"][2025]["metadata"]["provenance_ids"] = [source_id]
+    config.write_text(yaml.safe_dump(raw))
+    build_ids = []
+    readers = []
+    for root in roots:
+        monkeypatch.setenv("TEADATA_DATA_DIR", str(root))
+        cfg = load_config(config)
+        with BuildRecorder(cfg, store) as recorder:
+            cfg.load_df("sample", 2025)
+        readers.append(recorder.datasets["sample"]["reader"])
+        build_ids.append(recorder.catalog().build_id)
+    assert build_ids[0] == build_ids[1]
+    assert readers[0] == readers[1]
+    assert readers[0]["profiles"]["source"]["tapr_source"]["tables"] == {"profile": "data/tapr/raw/original.csv"}
+    assert not any(str(root) in canonical_json(readers[0]) for root in roots)
+
+
 def schema_config(tmp_path, *, document=None, reader=None):
     directory = tmp_path / "schemas"
     directory.mkdir(exist_ok=True)
@@ -275,7 +335,10 @@ def test_every_packaged_version_and_declared_profile_has_an_offline_schema(monke
     for section in ("data_sources", "spatial"):
         for dataset, year_map in getattr(cfg, section).items():
             for year, entry in year_map.entries.items():
-                for profile in list(entry.reader.get("profiles", {})) or [None]:
+                profiles = list(entry.reader.get("profiles", {}))
+                if entry.reader.get("column_schema") or not profiles:
+                    profiles.insert(0, None)
+                for profile in profiles:
                     columns = cfg.column_schema(
                         dataset, year, section=section, reader_profile=profile
                     )
@@ -288,7 +351,7 @@ def test_every_packaged_version_and_declared_profile_has_an_offline_schema(monke
                     path = config_path.parent / options["column_schema"]
                     document = json.loads(path.read_bytes())
                     assert path.read_text() == canonical_json(document) + "\n"
-                    assert set(document) == {"schema_version", "columns"}
+                    assert document["schema_version"] in {1, 2}
                     paths.add(path)
                     count += 1
     assert count > 0

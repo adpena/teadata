@@ -1,6 +1,8 @@
 # teadata/__init__.py
 from importlib.metadata import PackageNotFoundError, version
+from importlib import import_module
 import sys
+from typing import TYPE_CHECKING, Any
 import warnings
 
 _MINIMUM_PYTHON = (3, 11)
@@ -65,12 +67,43 @@ try:
 except PackageNotFoundError:
     __version__ = "0.0.0"
 
-from .classes import DataEngine, District, Campus  # noqa: E402
-from .dataset_metadata import DataPeriod, DatasetMetadata, ResolvedDataset  # noqa: E402
-from .provenance import ProvenanceStore  # noqa: E402
-from .manifest import DatasetCatalog  # noqa: E402
-from .release import DataRelease, current_release  # noqa: E402
-from .values import Measurement, ValueStatus, ValuePolicy, EstimationPolicy, measure, aggregate  # noqa: E402
+if TYPE_CHECKING:
+    from .classes import DataEngine, District, Campus
+    from .dataset_metadata import DataPeriod, DatasetMetadata, ResolvedDataset
+    from .provenance import ProvenanceStore
+    from .manifest import DatasetCatalog
+    from .release import DataRelease, current_release
+    from .teadata_config import load_config
+    from .values import Measurement, ValueStatus, ValuePolicy, EstimationPolicy, measure, aggregate
+
+
+_EXPORT_MODULES = {
+    **dict.fromkeys(("DataEngine", "District", "Campus"), ".classes"),
+    **dict.fromkeys(("DataPeriod", "DatasetMetadata", "ResolvedDataset"), ".dataset_metadata"),
+    "ProvenanceStore": ".provenance",
+    "DatasetCatalog": ".manifest",
+    **dict.fromkeys(("DataRelease", "current_release"), ".release"),
+    "load_config": ".teadata_config",
+    **dict.fromkeys(("Measurement", "ValueStatus", "ValuePolicy", "EstimationPolicy", "measure", "aggregate"), ".values"),
+}
+
+
+def __getattr__(name: str) -> Any:
+    """Load public symbols on demand; metadata discovery does not load the engine.
+
+    Heavy entity exports still use the existing classes module so this step
+    preserves the released snapshot module paths until their planned retirement.
+    """
+    module = _EXPORT_MODULES.get(name)
+    if module is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(import_module(module, __name__), name)
+    globals()[name] = value
+    return value
+
+
+def __dir__() -> list[str]:
+    return sorted(set(globals()) | _EXPORT_MODULES.keys())
 
 __all__ = [
     "DataEngine",
@@ -84,6 +117,7 @@ __all__ = [
     "DatasetCatalog",
     "DataRelease",
     "current_release",
+    "load_config",
     "Measurement",
     "ValueStatus",
     "ValuePolicy",

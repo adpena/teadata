@@ -98,6 +98,18 @@ def _expand_path(value: str) -> str:
     return value
 
 
+def _resolve_source_path(value: str, base_dir: Path) -> str:
+    """Resolve one runtime locator without mutating portable reader metadata."""
+    if value.strip().isdigit() or "://" in value:
+        return value
+    path = Path(_expand_path(value))
+    if path.is_absolute():
+        return str(path)
+    if path.parts and path.parts[0] == "data" and os.environ.get("TEADATA_DATA_DIR"):
+        return str(Path(_expand_path(os.environ["TEADATA_DATA_DIR"])).resolve().joinpath(*path.parts[1:]))
+    return str(base_dir / path)
+
+
 def _rewrite_relative_paths(raw: dict, base_dir: Path) -> dict:
     """Rewrite relative file paths in data_sources/spatial to be relative to base_dir."""
 
@@ -109,24 +121,7 @@ def _rewrite_relative_paths(raw: dict, base_dir: Path) -> dict:
             return updated
         if not isinstance(val, str):
             return val
-        stripped = val.strip()
-        if stripped.isdigit() or "://" in stripped:
-            return val
-        expanded = _expand_path(val)
-        path = Path(expanded)
-        if path.is_absolute():
-            return str(path)
-        if (
-            path.parts
-            and path.parts[0] == "data"
-            and os.environ.get("TEADATA_DATA_DIR")
-        ):
-            return str(
-                Path(_expand_path(os.environ["TEADATA_DATA_DIR"]))
-                .resolve()
-                .joinpath(*path.parts[1:])
-            )
-        return str(base_dir / path)
+        return _resolve_source_path(val, base_dir)
 
     def rewrite_section(section: dict) -> dict:
         out: dict = {}
@@ -685,16 +680,16 @@ class Config:
             f"Unsupported file extension for loader: {ext} (from '{base}')"
         )
 
-    def column_schema(
+    def column_contract(
         self,
         dataset: str,
         year: int | None = None,
         *,
         section: str = "data_sources",
         reader_profile: str | None = None,
-    ) -> list[str] | None:
-        """Return the reviewed ordered reader columns without loading source rows."""
-        from .column_schema import load_column_schema, reader_options
+    ) -> dict[str, str] | None:
+        """Load the exact reviewed reader resource without source-row I/O."""
+        from .column_schema import load_column_contract, reader_options
         from .manifest import ContractError
 
         source = self.resolve_dataset(dataset, year, section=section)
@@ -705,7 +700,7 @@ class Config:
                 return None
             references = [
                 reference
-                for reference in source.metadata.references
+                for reference in self.reader_references(dataset, year, section=section, reader_profile=reader_profile)
                 if reference.role == "schema" and reference.path == resource
             ]
             if (
@@ -718,11 +713,151 @@ class Config:
                 )
             if self.base_dir is None:
                 raise ValueError("Column schema requires a source contract directory")
-            return load_column_schema(
+            return load_column_contract(
                 self.base_dir, resource, references[0].reviewed_sha256
             )
         except (OSError, ValueError) as error:
             raise ContractError(f"Invalid column schema for {dataset}: {error}") from error
+
+    def reader_references(self, dataset: str, year: int | None = None, *,
+                          section: str = "data_sources", reader_profile: str | None = None):
+        """Describe selected source-profile references without changing retained metadata."""
+        from .column_schema import reader_options
+        from .dataset_metadata import ReferenceDocument
+
+        source = self.resolve_dataset(dataset, year, section=section)
+        options = reader_options(source.reader, reader_profile)
+        extra = options.get("references", [])
+        if not isinstance(extra, list) or any(not isinstance(item, dict) for item in extra):
+            raise ValueError("Reader references must be reference-document records")
+        selected = [*source.metadata.references, *(ReferenceDocument.from_dict(item) for item in extra)]
+        if len({item.reference_id for item in selected}) != len(selected):
+            raise ValueError("Reader reference identifiers must be unique")
+        return selected
+
+    def column_schema(
+        self, dataset: str, year: int | None = None, *, section: str = "data_sources",
+        reader_profile: str | None = None,
+    ) -> list[str] | None:
+        """Derive ordered reader columns from the same reviewed resource."""
+        from .column_schema import parse_column_schema, schema_columns
+        from .manifest import ContractError
+
+        contract = self.column_contract(dataset, year, section=section, reader_profile=reader_profile)
+        if contract is None:
+            return None
+        source = self.resolve_dataset(dataset, year, section=section)
+        try:
+            return schema_columns(parse_column_schema(contract["text"].encode()),
+                                  dataset=source.dataset, edition=source.metadata.version)
+        except ValueError as error:
+            raise ContractError(f"Invalid column schema for {dataset}: {error}") from error
+
+    def header_records(self, dataset: str, *, edition: str,
+                       table: str | None = None, reader_profile: str | None = None) -> list[dict[str, Any]]:
+        """Return reviewed source-contract mappings without any dataset reads.
+
+        This explicitly selects this configuration's contract, independently of
+        a data release. Editions are exact metadata versions, never prior-year
+        fallbacks or guesses from filenames.
+        """
+        from .column_schema import parse_column_schema, header_records
+        from .manifest import ContractError
+
+        choices = [(section, year) for section in ("data_sources", "spatial")
+                   for name, versions in getattr(self, section).items() if name == dataset
+                   for year, definition in versions.entries.items() if definition.metadata.version == edition]
+        if len(choices) != 1:
+            raise ContractError(f"Source-contract header crosswalk edition unavailable or ambiguous: {dataset!r}, {edition!r}")
+        section, year = choices[0]
+        contract = self.column_contract(dataset, year, section=section, reader_profile=reader_profile)
+        if contract is None:
+            raise ContractError(f"Source-contract header crosswalk unavailable: {dataset!r}")
+        try:
+            return header_records(parse_column_schema(contract["text"].encode()),
+                                  dataset=dataset, edition=edition, table=table)
+        except ValueError as error:
+            raise ContractError(str(error)) from error
+
+    def is_source_only(self, dataset: str, year: int | None = None, *,
+                       section: str = "data_sources") -> bool:
+        """Describe preparation-only availability from the reviewed source contract.
+
+        A named retained reader (such as accountability ratings) still belongs
+        in release coverage. Only the explicit source-only crosswalk opts out.
+        """
+        from .column_schema import crosswalk_dataset, has_default_reader, parse_column_schema
+
+        source = self.resolve_dataset(dataset, year, section=section)
+        if has_default_reader(source.reader) or "source" not in source.reader.get("profiles", {}):
+            return False
+        contract = self.column_contract(dataset, year, section=section, reader_profile="source")
+        if contract is None:
+            return False
+        document = parse_column_schema(contract["text"].encode())
+        if document["schema_version"] != 2:
+            return False
+        if source.metadata.version is None:
+            raise ValueError("Source-only readers require an explicit source edition")
+        return crosswalk_dataset(document, dataset, source.metadata.version).get("source_only", False)
+
+    def header_mapping(self, dataset: str, *, edition: str, table: str,
+                       from_: str = "code", to: str = "field",
+                       columns: Iterable[str] | None = None, reader_profile: str | None = None) -> dict[str, str]:
+        """Return an ordinary rename map from this explicit source contract."""
+        from .column_schema import header_rename_map
+        from .manifest import ContractError
+
+        try:
+            return header_rename_map(self.header_records(dataset, edition=edition, table=table, reader_profile=reader_profile),
+                                     from_=from_, to=to, columns=columns)
+        except ValueError as error:
+            raise ContractError(str(error)) from error
+
+    def read_tapr_sources(self, dataset: str, year: int, *, input_dir: str | Path | None = None):
+        """Explicit full-edition raw preparation, independent of released facts.
+
+        The retained release recorder deliberately continues reading its exact
+        prepared inputs. Raw preparation has its own real processing receipt;
+        it cannot masquerade as a schema2 release build or replace those bytes.
+        """
+        from .column_schema import crosswalk_dataset, parse_column_schema, reader_options
+        from .manifest import ACTIVE_BUILD, ContractError
+        from .tapr import read_tapr_table
+
+        if ACTIVE_BUILD.get() is not None:
+            raise ContractError("Prepare full TAPR sources explicitly before a retained-format release build")
+        source = self.resolve_dataset(dataset, year)
+        if source.resolved_year != year or source.metadata.version != str(year):
+            raise ContractError("Full TAPR source preparation requires an exact declared edition")
+        options = reader_options(source.reader, "source")
+        selection = options.get("tapr_source")
+        if (not isinstance(selection, dict) or set(selection) != {"scope", "tables"}
+                or selection["scope"] not in {"campus", "district"}
+                or not isinstance(selection["tables"], dict)
+                or not selection["tables"]
+                or any(not isinstance(value, str) or not value or "://" in value
+                       for value in selection["tables"].values())):
+            raise ContractError("Full TAPR source profile requires an explicit scope and local table paths")
+        contract = self.column_contract(dataset, year, reader_profile="source")
+        if contract is None:
+            raise ContractError("Full TAPR source preparation requires a reviewed crosswalk")
+        selected = crosswalk_dataset(parse_column_schema(contract["text"].encode()), dataset, source.metadata.version)
+        if selected.get("source_only") and any(table["metric_period"] != source.metadata.period.to_dict()
+                                               for table in selected["tables"]):
+            raise ContractError("Source-only metric period differs from its declared source metadata")
+        if set(selection["tables"]) != {table["table"] for table in selected["tables"]}:
+            raise ContractError("Full TAPR source paths do not account for every reviewed table")
+        result = []
+        for table in selected["tables"]:
+            path = Path(selection["tables"][table["table"]])
+            if input_dir is not None:
+                path = Path(input_dir) / path.name
+            else:
+                path = Path(_resolve_source_path(str(path), self.base_dir or Path.cwd()))
+            result.append(read_tapr_table(path, mapping=table, key_field=selection["scope"] + "_number",
+                                          dataset=dataset, edition=source.metadata.version))
+        return result
 
     def load_df(
         self,
@@ -737,7 +872,7 @@ class Config:
         Resolve the dataset for the year and load as DataFrame (or GeoDataFrame if spatial).
         For CSV loads, you can pass dtype=... etc through reader_kwargs.
         """
-        from .column_schema import reader_options
+        from .column_schema import has_default_reader, reader_options
         from .manifest import ACTIVE_BUILD, ContractError
 
         source = self.resolve_dataset(dataset, year, section=section)
@@ -750,13 +885,27 @@ class Config:
         )
         if (
             reader_profile is None
-            and source.reader.get("profiles")
-            and expected_schema is None
+            and not has_default_reader(source.reader)
         ):
             raise ContractError(
                 f"Reader profile is required for {dataset}; no default column schema is declared"
             )
         options.pop("column_schema", None)
+        options.pop("references", None)
+        raw_tapr = options.pop("tapr_source", None)
+        if raw_tapr is not None:
+            from .tapr import merge_tapr_tables
+
+            if reader_profile != "source" or reader_kwargs:
+                raise ContractError("Full TAPR preparation uses its exact source profile without reader overrides")
+            selected_year = year if year is not None else source.resolved_year
+            if selected_year is None:
+                raise ContractError("Full TAPR source preparation requires an exact declared edition")
+            tables = self.read_tapr_sources(dataset, selected_year)
+            frame = merge_tapr_tables(tables, key_field=raw_tapr["scope"] + "_number").to_pandas()
+            if list(frame.columns) != expected_schema:
+                raise ContractError("Full TAPR source preparation differs from its complete crosswalk")
+            return source.resolved_year, frame
         columns = options.pop("columns", {})
         required = options.pop("required_columns", [])
         options.update(reader_kwargs)
@@ -1212,8 +1361,13 @@ def save_duckdb(df, db_path: str, *, table: str = "teadata_year"):
 # ------------------------------
 
 
-def load_config(path: str | Path) -> Config:
-    p = Path(path)
+def load_config(path: str | Path | None = None) -> Config:
+    """Load an explicit source contract, defaulting to the packaged metadata.
+
+    This never selects or fetches a data release. Source files need not exist
+    for schema/crosswalk discovery; rows are read only by load_df.
+    """
+    p = Path(path) if path is not None else Path(__file__).with_name("teadata_sources.yaml")
     if not p.exists():
         raise FileNotFoundError(p)
     raw = _detect_and_load(p)

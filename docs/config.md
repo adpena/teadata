@@ -197,6 +197,64 @@ not gain verified provenance merely because their configuration is extended.
 
 ## Maintenance Script Paths
 
+Catalogs that bind a reviewed header crosswalk expose the publisher's source
+codes, exact human labels and canonical Python field names without reading
+source datasets or current YAML:
+
+```python
+records = catalog.header_records(
+    "campus_tapr_student_staff_profile", edition="2025", table="student"
+)
+rename = catalog.header_mapping(
+    "campus_tapr_student_staff_profile", edition="2025", table="student",
+    from_="code", to="field", columns=df.columns,
+)
+renamed = df.rename(columns=rename)
+```
+
+For renaming your own data without a data release, use the explicit packaged
+source-contract entry point instead. No raw datasets or cache artifacts are
+required, and `TEADATA_RELEASE` is not consulted:
+
+```python
+from teadata import load_config
+
+contract = load_config()  # Packaged teadata_sources.yaml; an explicit path is also accepted.
+records = contract.header_records(
+    "district_tapr_student_staff_profile", edition="2025", table="student"
+)
+rename = contract.header_mapping(
+    "district_tapr_student_staff_profile", edition="2025", table="student",
+    from_="code", to="field", columns=df.columns,
+)
+```
+
+This selects the packaged source contract's reviewed mapping, which identifies
+the exact edition and retained raw input SHA. It does not claim that those
+facts belong to an installed data release. Release-bound catalog queries stay
+independent and never fall back to this configuration.
+
+Records are detached ordinary dictionaries suitable for a pandas/Polars table
+or `pyarrow.Table.from_pylist(records)`. They include dataset, selected edition,
+table, position, exact code/label, canonical field, input and header-schema
+hashes, and mapping version. Rename dictionaries also support `label` and
+reverse directions. Ambiguous mappings, duplicate external headers and
+collisions with unchanged destination columns raise errors. Source codes are
+recorded metadata, not alternate canonical query-field authorities.
+Passing `columns` also limits the dictionary to headers actually present, so
+partial tables work with libraries that reject unknown rename keys.
+
+The same reviewed resource in `DatasetDefinition.reader.column_schema` drives
+ETL and derives prepared column order. `BuildRecorder` binds its exact bytes
+once into the catalog, together with the selected input, edition and read
+schema. Lookup never falls back to package files or a newer configuration.
+Older catalogs, including published 0.0.126, explicitly report the crosswalk
+unavailable; the new contract requires a separately qualified future bundle.
+Unreviewed years/datasets are not inferred. A retained-input comparison and a
+new local observation do not establish an original download or historical
+transformation event. Source layout and naming remain separate from masking
+policies and measurement interpretation.
+
 Maintenance scripts use the package-adjacent `teadata/data/` directory by
 default. Moving a checkout or invoking a script from another working directory
 does not change that default. Raw source datasets are ignored by Git and must
@@ -208,7 +266,8 @@ Set `TEADATA_DATA_DIR` to point the scripts at an existing source-data tree:
 ```bash
 export TEADATA_DATA_DIR="$HOME/datasets/teadata"
 uv run python -m teadata.scripts.rename_tepsac_headers
-uv run python -m teadata.scripts.build_tapr_2025_profiles
+uv run python -m teadata.scripts.build_tapr_profiles \
+  --edition 2024 --reference-store provenance --output-dir prepared/tapr-2024
 ```
 
 The variable names the directory containing `tapr/`, `shapes/`, `tepsac/`, and
@@ -232,9 +291,86 @@ uv run python -m teadata.scripts.geocode_tepsac_data \
   --input raw/schools.xlsx --output output/geocoded.csv
 uv run python -m teadata.scripts.flatten_districts_geojson \
   --input districts.geojson --output districts_flat.geojson
-uv run python -m teadata.scripts.build_tapr_2025_profiles \
-  --input-dir raw/ --output-dir output/
+uv run python -m teadata.scripts.build_tapr_profiles \
+  --edition 2025 --input-dir raw/ --reference-store provenance --output-dir prepared/tapr-2025
 ```
+
+The TAPR command prepares every declared publisher column for both scopes into
+a **new** directory, validating all inputs before staging any output. Its
+Parquet files retain raw strings, source crosswalks, annotation records and
+immutable acquisition/processing receipts. Existing directories and retained
+reference workbooks are never replaced. These outputs are source preparations,
+not an activated release or typed scientific measurements. The old year-specific
+builder and the 75-column district renamer are retired; 2024 and 2025 use this
+same explicit preparation path.
+
+`--reference-store` supplies the canonical acquisition receipts and exact bytes
+for established reference links. The producer retains only their selected
+immutable closure, preserving record IDs and observation dates. A missing
+claimed receipt or artifact fails preparation. Newly observed crosswalks bind
+their own receipts; unreviewed link-only documents remain explicitly not
+acquired. Portable raw-source locators remain unchanged in public reader
+metadata and resolve against the configured data directory only when selected.
+
+Coverage refers to the declared inputs: 2024 `PROF` contains 407 campus and 420
+district columns, including 34 lagged annual-graduate fields in each scope.
+The 2025 `STUD`/`STAF` source preparation remains separate from `GRAD`
+Graduation Profile. Select the latter explicitly:
+
+```bash
+uv run python -m teadata.scripts.build_tapr_profiles \
+  --edition 2025 --family graduation_profile --input-dir raw/ \
+  --reference-store provenance --output-dir prepared/tapr-2025-grad
+```
+
+`campus_tapr_graduation_profile` and `district_tapr_graduation_profile` declare
+editions 2024 and 2025, measuring 2022–2023 and 2023–2024 annual graduates.
+The 2024 period comes from the annual glossary, pages 15–16. Its publisher
+dictionary heading instead says 2023–2024; the source notes retain that
+contradiction alongside the exact CSV labels, selection page and references.
+The current 2024 GRAD observations remain independent of retained 2024 PROF;
+their shared-cell literal `.` to blank changes remain visible in the audit.
+They retain 42 metrics
+and four/two canonical identity/history attributes in separate wide leaves;
+identity/name observation dates remain unknown. Their source-only crosswalk has
+no historical prepared-input hash and requires the explicit `source` profile.
+The source metadata and availability report describe this declared coverage,
+not inclusion in a released catalog. `cfg.is_source_only(dataset, 2025)` reads
+that flag from the reviewed crosswalk without opening source data. GRAD1–4 readiness/assessment families and
+other annual TAPR families are outside this preparation target.
+
+All 42 GRAD source codes and exact human labels are published in CSV records
+2 and 1. The acquired publisher dictionary documents only 39 metric codes per
+scope. `CA0GS24N`, `CA0GM24R`, `CA0GS24R` and their district `D` counterparts
+remain independent fields with `dictionary_status: not_documented`, null type
+and description, and the original CSV-header reference. Documented dictionary
+descriptions are retained without treating a similar label or equal value as
+semantic equivalence. Every metric uses the verified 2023–2024 reference period;
+units remain explicitly unknown until individually reviewed. Raw blanks and
+zeros are preserved without assigning a missingness or suppression cause.
+The producer requires and retains the original acquisition receipts and bytes
+for source-only datasets; a new local observation does not replace download
+history. GRAD is never automatically merged with STUD/STAF or entity metadata.
+
+The `source` reader profile exposes complete header contracts without reading
+source rows, for example
+`cfg.header_records("district_tapr_student_staff_profile", edition="2024", reader_profile="source")`.
+`cfg.load_df(..., reader_profile="source")` explicitly reads the full raw edition;
+the default reader continues to use its exact retained prepared workbook.
+Raw source preparation cannot run inside a retained-format release build.
+Source identities and historical names are lossless period-specific attributes,
+not additional metric keys or automatic `.meta` hydration. No current geometry
+roster limits source coverage. Unknown field units and reference periods remain
+unknown; the existing qualified metric bindings retain their lagged periods.
+
+One-header 2024 inputs use their complete Name/Type/Length/Label dictionaries;
+2025 inputs declare exact label and code header records. Any preamble, note,
+blank gap or footer must have reviewed CSV-record coordinates and an exact
+content hash in the source contract. Removed notes are retained as annotations.
+Undeclared records, duplicate identities, changed dictionaries, header collisions
+and conflicting shared fields fail. Shared-field merging is limited to the same
+qualified TAPR dataset and edition; it does not choose between observations
+from different datasets, editions or methodologies.
 
 Use `--help` to inspect options without loading source files or contacting
 download/geocoding services. Importing the download and geocoding modules does

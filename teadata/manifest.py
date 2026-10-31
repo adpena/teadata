@@ -13,13 +13,17 @@ from pathlib import Path
 import platform
 import os
 import sqlite3
-from typing import Any, Mapping
+from typing import Any, Iterable, Mapping
 
 from .dataset_metadata import DataPeriod, DatasetMetadata, MetricDefinition, ResolvedDataset
 from .metric_bindings import MetricBinding, parse_bindings
 from .provenance import ProvenanceStore
 from .values import Measurement, ValuePolicy, ValueStatus, measure
 from .transfer_summary import charter_transfer_observations
+from .column_schema import (
+    parse_column_schema, reader_options, validate_selected_crosswalk,
+    header_records as crosswalk_records, header_rename_map,
+)
 
 
 CATALOG_SCHEMA = 2
@@ -123,6 +127,17 @@ class DatasetCatalog:
             raise ContractError("A data release requires loaded dataset metadata")
         policies = document.get("value_policies", {})
         records = document.get("provenance", {})
+        column_schemas = document.get("column_schemas", {})
+        if not isinstance(column_schemas, dict):
+            raise ContractError("Invalid catalog column-schema resources")
+        self._column_schemas = {}
+        for digest, text in column_schemas.items():
+            if not isinstance(text, str) or sha256(text.encode()).hexdigest() != digest:
+                raise ContractError("Catalog column-schema resource checksum mismatch")
+            try:
+                self._column_schemas[digest] = parse_column_schema(text.encode())
+            except ValueError as error:
+                raise ContractError(f"Invalid catalog column-schema resource: {error}") from error
         for identifier, record in records.items():
             if (
                 sha256((canonical_json(record) + "\n").encode()).hexdigest()
@@ -164,6 +179,9 @@ class DatasetCatalog:
             for identifier in metadata.provenance_ids:
                 record = records.get(identifier, {})
                 _verify_input_receipt(record, dataset=key, section=section, artifact=artifact)
+                if (value.get("column_schema_sha256") is not None
+                        and record.get("resolved_year") != value.get("resolved_year")):
+                    raise ContractError("Header crosswalk source year differs from its acquisition receipt")
                 metadata_matched |= _metadata_content(metadata) == _metadata_content(DatasetMetadata.from_dict(record.get("source_metadata")))
             if not metadata_matched:
                 raise ContractError(f"Source metadata differs from its receipt: {key}")
@@ -190,6 +208,26 @@ class DatasetCatalog:
                         raise ContractError("Reference receipt belongs to a different document")
                     if reference.reviewed_sha256 is not None and record.get("artifact", {}).get("sha256") != reference.reviewed_sha256:
                         raise ContractError("Reference bytes differ from reviewed methodology")
+            crosswalk_sha = value.get("column_schema_sha256")
+            if crosswalk_sha is not None:
+                if crosswalk_sha not in self._column_schemas or metadata.version is None:
+                    raise ContractError("Header crosswalk is not bound to the selected source edition and schema reference")
+                reads = value.get("reads", [])
+                if not reads:
+                    raise ContractError("Header crosswalk requires a recorded prepared-schema read")
+                try:
+                    for read in reads:
+                        options = reader_options(value.get("reader", {}), read["profile"])
+                        schema_references = [item for item in metadata.references
+                                             if item.role == "schema" and item.path == options.get("column_schema")]
+                        if (len(schema_references) != 1 or schema_references[0].status != "available"
+                                or schema_references[0].reviewed_sha256 != crosswalk_sha):
+                            raise ValueError("Header crosswalk differs from the selected reader profile's reviewed schema reference")
+                        validate_selected_crosswalk(self._column_schemas[crosswalk_sha], dataset=key,
+                                                    edition=metadata.version, input_sha256=artifact["sha256"],
+                                                    columns=read["columns"])
+                except (KeyError, ValueError) as error:
+                    raise ContractError(f"Invalid selected header crosswalk: {error}") from error
         self._build_id = identity
         self._serialized = canonical_json(document)
         self._policies = {
@@ -230,6 +268,7 @@ class DatasetCatalog:
         records: Mapping[str, Any] | None = None,
         environment: Mapping[str, Any] | None = None,
         metric_bindings: Mapping[str, Any] | None = None,
+        column_schemas: Mapping[str, str] | None = None,
     ) -> DatasetCatalog:
         content = {
             "schema_version": CATALOG_SCHEMA,
@@ -240,6 +279,8 @@ class DatasetCatalog:
             "build_environment": dict(environment or {}),
             "metric_bindings": dict(metric_bindings or {}),
         }
+        if column_schemas:
+            content["column_schemas"] = dict(column_schemas)
         return cls(
             {
                 **content,
@@ -265,6 +306,35 @@ class DatasetCatalog:
             raise ContractError(
                 f"Dataset was not loaded in this release: {dataset}"
             ) from exc
+
+    def header_records(self, dataset: str, *, edition: str | None = None,
+                       table: str | None = None) -> list[dict[str, Any]]:
+        """Return detached code/label/field records from this release's bound resource.
+
+        Only the selected source edition is available. No package YAML, files,
+        source rows or network are consulted, including for older releases.
+        """
+        metadata = self.metadata(dataset)
+        selected = metadata.version
+        if edition is not None and edition != selected:
+            raise ContractError(f"Header crosswalk edition unavailable: {edition!r}; selected {selected!r}")
+        digest = self._sources[dataset].get("column_schema_sha256")
+        if digest is None or selected is None:
+            raise ContractError(f"Header crosswalk unavailable for selected dataset {dataset!r}")
+        try:
+            return crosswalk_records(self._column_schemas[digest], dataset=dataset, edition=selected, table=table)
+        except ValueError as error:
+            raise ContractError(str(error)) from error
+
+    def header_mapping(self, dataset: str, *, table: str, edition: str | None = None,
+                       from_: str = "code", to: str = "field",
+                       columns: Iterable[str] | None = None) -> dict[str, str]:
+        """Return a plain rename map; optional external headers detect collisions."""
+        try:
+            return header_rename_map(self.header_records(dataset, edition=edition, table=table),
+                                     from_=from_, to=to, columns=columns)
+        except ValueError as error:
+            raise ContractError(str(error)) from error
 
     def acquisitions(self, dataset: str) -> list[dict[str, Any]]:
         """Return immutable acquisition observations, including unknown download dates."""
@@ -593,6 +663,7 @@ class BuildRecorder:
         self.processor_sha256 = processor_identity()
         self.store = store
         self.datasets: dict[str, Any] = {}
+        self.column_schemas: dict[str, str] = {}
         self._token = None
 
     def __enter__(self) -> BuildRecorder:
@@ -659,6 +730,20 @@ class BuildRecorder:
             "status": "loaded",
             "reads": [],
         }
+        contract = self.cfg.column_contract(source.dataset, source.requested_year,
+                                            section=source.section, reader_profile=profile)
+        if contract is not None:
+            schema = parse_column_schema(contract["text"].encode())
+            if schema["schema_version"] == 2:
+                if source.metadata.version is None:
+                    raise ContractError("Header crosswalk requires an explicit source edition")
+                try:
+                    validate_selected_crosswalk(schema, dataset=source.dataset, edition=source.metadata.version,
+                                                input_sha256=identity["sha256"], columns=columns)
+                except ValueError as error:
+                    raise ContractError(f"Invalid build header crosswalk: {error}") from error
+                document["column_schema_sha256"] = contract["sha256"]
+                self.column_schemas[contract["sha256"]] = contract["text"]
         old = self.datasets.get(source.dataset)
         if old is not None:
             if {k: v for k, v in old.items() if k != "reads"} != {
@@ -719,6 +804,7 @@ class BuildRecorder:
                     )
                 },
             },
+            column_schemas=self.column_schemas,
         )
 
 
@@ -746,11 +832,12 @@ def verify_source_receipts(
 
 
 def verify_reference_receipts(
-    source: ResolvedDataset, store: ProvenanceStore, *, reference_base: Path | None = None
+    source: ResolvedDataset, store: ProvenanceStore, *, reference_base: Path | None = None,
+    check_local_paths: bool = True, verify_all_claimed: bool = False,
 ) -> None:
     """Verify archived documentation without confounding it with source observations."""
     for reference in source.metadata.references:
-        if reference.status != "available":
+        if reference.status != "available" and not (verify_all_claimed and reference.provenance_ids):
             continue
         if not reference.provenance_ids:
             raise ContractError(
@@ -769,7 +856,7 @@ def verify_reference_receipts(
             }:
                 raise ContractError("Reference receipt belongs to a different URL")
             store.verify_artifact(record["artifact"]["sha256"])
-            if reference.path is not None:
+            if reference.path is not None and check_local_paths:
                 if reference_base is None:
                     raise ContractError(
                         "Local reference needs a source contract directory"
