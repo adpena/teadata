@@ -9,9 +9,10 @@ from hashlib import sha256
 from pathlib import Path
 import tempfile
 import time
-from typing import Callable, Mapping
+from typing import Callable, Mapping, Sequence
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, build_opener
+from urllib.parse import urlencode
 
 from .dataset_metadata import ResolvedDataset, validate_http_url
 from .provenance import ProvenanceStore
@@ -153,3 +154,105 @@ class AcquisitionClient:
         if delay > self.max_retry_wait:
             raise AcquisitionError("Retry-After exceeds the local wait limit; acquisition deferred")
         return delay
+
+
+def _form_request(url: str, method: str, fields: Sequence[Sequence[str]],
+                  content_type: str | None) -> tuple[str, bytes | None, list[tuple[str, str]]]:
+    """Validate and encode the one supported UTF-8 public form contract."""
+    if method not in {"GET", "POST"}:
+        raise ValueError("Public form acquisition requires explicit GET or POST")
+    if (isinstance(fields, (str, bytes)) or any(isinstance(pair, (str, bytes))
+            or len(pair) != 2 or any(not isinstance(v, str) for v in pair) or not pair[0]
+            for pair in fields)):
+        raise ValueError("Form controls must be ordered nonempty-name/string-value pairs")
+    if content_type is not None and (not isinstance(content_type, str) or not content_type
+                                    or '\r' in content_type or '\n' in content_type):
+        raise ValueError("Invalid public form content type")
+    if method == "POST" and (content_type is None or content_type.split(';', 1)[0].strip().lower() != "application/x-www-form-urlencoded"):
+        raise ValueError("POST form replay requires explicit application/x-www-form-urlencoded")
+    if method == "POST" and content_type is not None:
+        parameters = content_type.split(';')[1:]
+        if parameters:
+            name, separator, value = parameters[0].partition('=')
+            if (len(parameters) != 1 or not separator or name.strip().lower() != 'charset'
+                    or value.strip().lower() not in {'utf-8', '"utf-8"'}):
+                raise ValueError("POST form controls support only UTF-8, with no other content-type parameters")
+    validate_http_url(url)
+    if '#' in url:
+        raise ValueError("Public acquisition URLs cannot contain a fragment")
+    controls = [(pair[0], pair[1]) for pair in fields]
+    encoded = urlencode(controls).encode("utf-8")
+    requested = url
+    if method == "GET" and controls:
+        requested += ('&' if '?' in url else '?') + encoded.decode("ascii")
+    return requested, encoded if method == "POST" else None, controls
+
+
+def acquire_form(client: AcquisitionClient, url: str, dataset: ResolvedDataset, *,
+                 filename: str, method: str, fields: Sequence[Sequence[str]] = (),
+                 content_type: str | None = None, replayed_from: str | None = None) -> AcquiredSource:
+    """Acquire explicit public controls, preserving order and repeated names.
+
+    POST controls use UTF-8; only an absent or explicit UTF-8 charset is supported.
+    Only a supplied content type becomes a request header. Authentication,
+    cookies, arbitrary headers and configuration activation are not replayed.
+    Transport bounds and immutable publication remain client/store concerns.
+    """
+    requested, body, controls = _form_request(url, method, fields, content_type)
+    return client.fetch(requested, dataset, filename=filename,
+        body=body,
+        headers={"Content-Type": content_type} if content_type is not None else {},
+        parameters={"form_url": url, "form_controls": controls, "form_content_type": content_type,
+                    "transport_limits": {"timeout": client.timeout, "attempts": client.attempts,
+                                         "max_bytes": client.max_bytes, "max_retry_wait": client.max_retry_wait},
+                    **({"replayed_from": replayed_from} if replayed_from is not None else {})})
+
+
+def replay_acquisition(client: AcquisitionClient, record_id: str, *, content_type: str | None = None) -> AcquiredSource:
+    """Repeat one retained public request as a new immutable observation.
+
+    Older GET receipts need no form reconstruction. Older POST receipts must
+    already retain explicit controls; labels never supply missing request data.
+    """
+    record = client.store.read_record(record_id)
+    if record["kind"] != "acquisition" or record.get("method") != "download":
+        raise ValueError("Replay requires an original HTTP acquisition receipt")
+    parameters = record.get("parameters", {})
+    method = parameters.get("http_method")
+    if method not in {"GET", "POST"} or not record.get("requested_url"):
+        raise ValueError("Original receipt lacks an explicit public request method/URL")
+    if method == "POST" and "form_controls" not in parameters:
+        raise ValueError("Original POST receipt lacks explicit public form controls")
+    retained_type = parameters.get("form_content_type")
+    if "form_content_type" in parameters and content_type is not None and retained_type != content_type:
+        raise ValueError("Replay cannot change the retained request content type")
+    content_type = retained_type if "form_content_type" in parameters else content_type
+    if method == "POST" and content_type is None:
+        raise ValueError("Legacy POST receipt needs an explicit request content type")
+    if method == "GET" and "form_controls" in parameters and "form_url" not in parameters:
+        raise ValueError("GET form controls need their original form URL for exact replay")
+    url = parameters.get("form_url", record["requested_url"])
+    fields = parameters.get("form_controls", ())
+    requested, _, _ = _form_request(url, method, fields, content_type)
+    if requested != record["requested_url"]:
+        raise ValueError("Reconstructed form request differs from the original observed request URL")
+    from .dataset_metadata import DatasetMetadata, ReferenceDocument
+
+    client.store.verify_record_closure([record_id])
+    metadata = DatasetMetadata.from_dict(record["source_metadata"])
+    retained_previous = next((r for r in metadata.references if r.reference_id == "previous_acquisition"), None)
+    if retained_previous is not None and (retained_previous.role != "source_notes"
+            or retained_previous.provenance_ids != (parameters.get("replayed_from"),)):
+        raise ValueError("Existing previous_acquisition reference is not this request's replay history")
+    previous = ReferenceDocument(reference_id="previous_acquisition", role="source_notes",
+        url=record["requested_url"], title="Previous exact public acquisition; no revision equivalence asserted",
+        provenance_ids=(record_id,), reviewed_sha256=record["artifact"]["sha256"])
+    metadata = replace(metadata, references=tuple(r for r in metadata.references
+                                                if r.reference_id != previous.reference_id) + (previous,))
+    source = ResolvedDataset(record["dataset"], record["section"], record["requested_year"],
+        record["resolved_year"], "", metadata)
+    return acquire_form(client, url, source,
+        filename=record["artifact"]["filename"], method=method,
+        fields=fields,
+        content_type=content_type,
+        replayed_from=record_id)

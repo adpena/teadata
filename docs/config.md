@@ -412,6 +412,71 @@ not start processing. Explicit relative paths are resolved from the invoking
 working directory. Download and geocoding commands make network requests when
 run normally.
 
+Historical refresh uses one explicit CLI and the same acquisition/provenance
+store. It never updates Config or replaces originals. A public GET, for example:
+
+```bash
+uv run python -m teadata.scripts.refresh_tapr acquire \
+  --url https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html \
+  --method GET --dataset tapr_2024_masking_reference --edition 2024 \
+  --filename masking.html --store provenance
+
+uv run python -m teadata.scripts.refresh_tapr replay \
+  --record ORIGINAL_RECORD_ID --store provenance
+```
+
+`acquire` and `replay` are the only network commands. Defaults are one attempt,
+20 seconds and 32 MiB per response. For POST, supply the observed content type
+and repeat `--field NAME VALUE` in original source order, including repeated
+names and empty values. The command records these controls and request limits.
+POST controls use UTF-8; other charset declarations are rejected before HTTP.
+It never invents form parameters, counts flags or private/authentication
+headers. Legacy POST receipts missing request content type require an explicit
+`--content-type application/x-www-form-urlencoded`. Replay retains predecessor
+history through the same provenance reference graph, even when bytes change.
+Reconstructed form URLs must exactly match the original requested URL. A legacy
+GET without form metadata reuses its exact retained URL.
+
+Compare two retained originals offline using their exact acquisition IDs and
+independently reviewed crosswalks. Substitute the actual IDs and reviewed SHAs:
+
+```bash
+uv run python -m teadata.scripts.refresh_tapr compare \
+  --scope district --store comparison-provenance --output comparison.json \
+  --old-store original-provenance --old-record OLD_RECORD_ID \
+  --old-schema contracts/old-student.json --old-schema-sha256 OLD_SCHEMA_SHA256 \
+  --old-dataset district_tapr_student_profile --old-edition 2024 \
+  --old-table student_profile \
+  --new-store refreshed-provenance --new-record NEW_RECORD_ID \
+  --new-schema contracts/new-student.json --new-schema-sha256 NEW_SCHEMA_SHA256 \
+  --new-dataset district_tapr_student_profile --new-edition 2024 \
+  --new-table student_profile
+```
+
+Original input drift against either reviewed contract blocks keyed comparison
+and retains a diagnostic report and original bytes. Reviewed header/layout,
+dictionary, period and historical-key changes are reported separately from
+cell differences. Old-only/new-only fields are source-schema absence, distinct
+from blank, masked, missing or not-applicable cells. A shared annual code or
+similar name/value does not establish a rename or methodological equivalence.
+Retained PROF and its unmatched 38/42 campus/district fields remain independent.
+
+Raw tokens are preserved, and scientific statuses default to unbound. Optional
+`--old-policy CODE POLICY_ID` / `--new-policy CODE POLICY_ID` select individual
+publisher fields from a SHA-pinned `--policy-config` and
+`--policy-config-sha256`. A caller selection does not establish applicability;
+the exact policy and its reference are recorded. Status projection uses the
+existing scalar authority once per distinct token, capped at 4096 per field,
+then native gathering. Decimal-spelling equality uses native exact decimals,
+without floats or rounding, inside a 38-integer/38-fraction-digit envelope.
+Other spellings remain unclassified. Selected non-observed statuses are never
+used in numeric comparison; unbound spelling equality is not measured-value
+equality or arithmetic. Reports publish atomically to new paths and retain
+their processing/closure identity. Key/token examples are bounded and disclose
+when the complete set is not emitted. Changed-observation examples include the
+canonical entity key, old/new raw tokens and statuses, in key order within each
+publisher code; exact totals and originals remain available.
+
 Relative `data/...` paths in the source contract also honor `TEADATA_DATA_DIR`. Other relative paths remain relative to the configuration file. `uv run python -m teadata.load_data` reads the selected contracts, stages a complete release, and activates `teadata/.cache/release.json` after validation. There is no second cache mirror or developer-checkout copy.
 
 The Excel styling example takes a workbook path rather than referring to an

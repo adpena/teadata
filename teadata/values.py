@@ -205,6 +205,28 @@ def presentation_value(value: Any) -> Any:
 PLAIN_NUMERIC = ValuePolicy("numeric")
 
 
+def source_token_statuses(values: Any, policy: ValuePolicy, *, max_distinct: int = 4096):
+    """Use the scalar authority once per distinct token, with a hard work bound.
+
+    Arrow performs dictionary selection and projection; no Python cell loop
+    or independent masking/numeric rules are introduced. Callers must select
+    the source's policy explicitly. This does not establish its applicability.
+    """
+    import pyarrow as pa
+    import pyarrow.compute as arrow_compute
+
+    pc: Any = arrow_compute
+    if (type(max_distinct) is not int or max_distinct < 1
+            or not isinstance(values, (pa.Array, pa.ChunkedArray))
+            or not (pa.types.is_string(values.type) or pa.types.is_large_string(values.type))):
+        raise ValueError("Token status projection requires Arrow strings and a positive distinct-token bound")
+    unique = pc.unique(values)
+    if len(unique) > max_distinct:
+        raise ValueError("Selected policy exceeds the bounded distinct-token interpretation limit")
+    statuses = pa.array([measure(raw, policy).status.value for raw in unique.to_pylist()], type=pa.string())
+    return pc.take(statuses, pc.index_in(values, value_set=unique))
+
+
 def _json_scalar(raw: Any) -> str | int | float | bool | None:
     if raw is None or isinstance(raw, (str, bool)):
         return raw

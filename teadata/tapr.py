@@ -12,13 +12,127 @@ from hashlib import sha256
 import io
 from pathlib import Path
 import re
-from typing import Any, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 
 from .column_schema import validate_header_table
 from .identifiers import canonical_source_identifiers
 
+if TYPE_CHECKING:
+    from .values import ValuePolicy
+
 
 TAPR_PROFILE_FAMILIES = ("student_staff_profile", "graduation_profile", "student_profile", "staff_profile")
+
+
+def compare_tapr_tables(old: TaprSourceTable, new: TaprSourceTable, *, key_field: str,
+                        old_policies: Mapping[str, ValuePolicy] | None = None,
+                        new_policies: Mapping[str, ValuePolicy] | None = None,
+                        max_examples: int = 20) -> dict[str, Any]:
+    """Compare pinned source observations by exact publisher code and strict key.
+
+    Code alignment is descriptive, never a rename, equivalence or default-source
+    binding. Native kernels own joins, lexical differences, decimal equality and
+    aggregation; only fields and bounded summaries are visited in Python.
+    """
+    import pyarrow as pa
+    import pyarrow.compute as arrow_compute
+    from .values import source_token_statuses
+
+    pc: Any = arrow_compute
+    if key_field not in {"campus_number", "district_number"} or type(max_examples) is not int or max_examples < 0:
+        raise ValueError("Comparison needs a strict source key and nonnegative example bound")
+    scope = key_field.removesuffix("_number")
+    policies = [dict(old_policies or {}), dict(new_policies or {})]
+    fields, identities = [], []
+    for source, selected_policy in zip([old, new], policies, strict=True):
+        validate_header_table(source.mapping)
+        if (not source.dataset.startswith(scope + "_tapr_")
+                or source.table.column_names != [f["field"] for f in source.mapping["fields"]]
+                or key_field not in source.table.column_names
+                or any(not pa.types.is_string(c.type) or c.null_count for c in source.table.columns)):
+            raise ValueError("Comparison requires complete exact-string source tables in one scope")
+        definitions = {f["code"]: f for f in source.mapping["fields"]}
+        if set(selected_policy) - {code for code, f in definitions.items() if f.get("disposition", "fact") != "identity"}:
+            raise ValueError("Policies must explicitly select actual non-identity publisher codes")
+        fields.append(definitions)
+        identity = canonical_source_identifiers(source.table[key_field], width=9 if scope == "campus" else 6)
+        if pc.any(pc.is_null(identity)).as_py() or pc.count_distinct(identity).as_py() != source.table.num_rows:
+            raise ValueError("Comparison cannot skip missing or duplicate source keys")
+        identities.append(identity)
+    common = [code for code in fields[0] if code in fields[1]]
+    left = old.table.select([fields[0][c]["field"] for c in common]).rename_columns(['a' + str(i) for i in range(len(common))]).append_column('__key', identities[0])
+    right = new.table.select([fields[1][c]["field"] for c in common]).rename_columns(['b' + str(i) for i in range(len(common))]).append_column('__key', identities[1])
+    joined = left.join(right, keys='__key', join_type='inner')
+    def count(mask):
+        return pc.sum(pc.cast(pc.fill_null(mask, False), pa.int64())).as_py() or 0
+    def key_difference(a, b):
+        difference = pa.table({'key': a}).join(pa.table({'key': b}), keys='key', join_type='left anti').sort_by([('key', 'ascending')])
+        return {'count': difference.num_rows, 'examples': difference.slice(0, max_examples)['key'].to_pylist(),
+                'all_keys_emitted': difference.num_rows <= max_examples}
+    def classes(values):
+        result = pc.if_else(pc.match_substring_regex(values, r'^[+-]?[0-9]+(\.[0-9]+)?$'), 'decimal_lexeme', 'other_text')
+        for token, label in [('', 'blank'), ('0', 'zero'), ('.', 'literal_dot'), ('-1', 'literal_-1'),
+                             ('-2', 'literal_-2'), ('-3', 'literal_-3'), ('•', 'literal_bullet'), ('n/a', 'literal_n/a')]:
+            result = pc.if_else(pc.equal(values, token), label, result)
+        return result
+    results = []
+    for i, code in enumerate(common):
+        a, b = joined['a' + str(i)], joined['b' + str(i)]
+        changed = pc.not_equal(a, b)
+        statuses = [source_token_statuses(values, selected[code]) if code in selected
+                    else pa.repeat('unbound', len(values)) for values, selected in zip([a, b], policies, strict=True)]
+        eligible = pc.and_(pc.match_substring_regex(a, r'^[+-]?[0-9]{1,38}(\.[0-9]{1,38})?$'),
+                           pc.match_substring_regex(b, r'^[+-]?[0-9]{1,38}(\.[0-9]{1,38})?$'))
+        # Unbound equality describes decimal spelling only, not measurements.
+        # Only the selected canonical policy can exclude scientific statuses.
+        for status, selected in zip(statuses, policies, strict=True):
+            if code in selected:
+                eligible = pc.and_(eligible, pc.equal(status, 'observed'))
+        decimal_a = pc.cast(pc.if_else(eligible, a, None), pa.decimal256(76, 38), safe=True)
+        decimal_b = pc.cast(pc.if_else(eligible, b, None), pa.decimal256(76, 38), safe=True)
+        equal = pc.fill_null(pc.equal(decimal_a, decimal_b), False)
+        decimal_state = pc.if_else(eligible, pc.if_else(equal, 'equal', 'unequal'), 'unclassified')
+        changes = pc.filter(pa.table({'entity_key': joined['__key'], 'old_raw': a, 'new_raw': b, 'old_class': classes(a), 'new_class': classes(b),
+            'old_status': statuses[0], 'new_status': statuses[1], 'decimal_lexeme_equivalence': decimal_state}), changed)
+        transition_keys = ['old_class', 'new_class', 'old_status', 'new_status', 'decimal_lexeme_equivalence']
+        transitions = changes.group_by(transition_keys).aggregate([('old_raw', 'count')]).sort_by([(k, 'ascending') for k in transition_keys])
+        pairs = changes.group_by(['old_raw', 'new_raw', 'old_status', 'new_status', 'decimal_lexeme_equivalence']).aggregate([('old_class', 'count')]).sort_by([('old_raw', 'ascending'), ('new_raw', 'ascending')])
+        results.append({'code': code, 'old_header': dict(fields[0][code]), 'new_header': dict(fields[1][code]),
+            'header_equal': all(fields[0][code].get(k) == fields[1][code].get(k) for k in ['position', 'code', 'label']),
+            'canonical_field_equal': fields[0][code]['field'] == fields[1][code]['field'],
+            'dictionary_definition_equal': all(fields[0][code].get(k) == fields[1][code].get(k)
+                for k in ['publisher_type', 'publisher_length', 'publisher_description', 'dictionary_status']),
+            'overlap_cells': joined.num_rows,
+            'lexical_changes': changes.num_rows, 'decimal_equal_changes': count(pc.and_(changed, pc.and_(eligible, equal))),
+            'decimal_unequal_changes': count(pc.and_(changed, pc.and_(eligible, pc.invert(equal)))),
+            'unclassified_changes': count(pc.and_(changed, pc.invert(eligible))),
+            'changed_observations': {'count': changes.num_rows,
+                'examples': changes.sort_by([('entity_key', 'ascending')]).slice(0, max_examples).to_pylist(),
+                'truncated': changes.num_rows > max_examples},
+            'raw_class_status_transitions': transitions.to_pylist(), 'distinct_raw_transition_pairs': pairs.num_rows,
+            'raw_transition_examples': pairs.slice(0, max_examples).to_pylist(), 'all_raw_pairs_emitted': pairs.num_rows <= max_examples})
+    return {'status': 'exact_reviewed_sources_compared', 'scope': scope, 'key_field': key_field,
+        'old': {'dataset': old.dataset, 'edition': old.edition, 'input_sha256': old.input_sha256,
+                'table': old.mapping['table'], 'rows': old.table.num_rows, 'columns': old.table.num_columns},
+        'new': {'dataset': new.dataset, 'edition': new.edition, 'input_sha256': new.input_sha256,
+                'table': new.mapping['table'], 'rows': new.table.num_rows, 'columns': new.table.num_columns},
+        'keysets': {'overlap': joined.num_rows, 'old_only': key_difference(identities[0], identities[1]),
+                    'new_only': key_difference(identities[1], identities[0]), 'raw_order_equal': identities[0].equals(identities[1])},
+        'source_structure': {side: {'layout': source.mapping.get('layout'), 'annotations': list(source.annotations),
+            'metric_period': source.mapping.get('metric_period', {'kind': 'unknown'}),
+            'dictionary': source.mapping.get('dictionary'), 'dictionary_records': source.mapping.get('dictionary_records')}
+            for side, source in [('old', old), ('new', new)]},
+        'columns': {'old_only': [dict(f) for c, f in fields[0].items() if c not in fields[1]],
+                    'new_only': [dict(f) for c, f in fields[1].items() if c not in fields[0]], 'common': results},
+        'selected_field_policies': {side: {code: policy.to_dict() for code, policy in selected.items()}
+                                   for side, selected in zip(['old', 'new'], policies, strict=True)},
+        'limits': ['Exact publisher-code alignment is not scientific equivalence, a rename or methodology/comparability review.',
+            'Absent source columns are schema absence, not null/missing/masked/NA observations or retirement. All historical members remain independent.',
+            'Default statuses are unbound; an explicit caller-selected field policy does not establish applicability. No units/causes are inferred.',
+            'Unbound decimal lexeme equality is a spelling relation, not measured-value equality or arithmetic. Selected non-observed statuses are excluded; no sign/token is a universal masking policy.',
+            'Decimal equality uses no floats or rounding, within 38 integer and 38 fractional digits. Other spellings are unclassified.',
+            'Changed-observation examples are ordered by canonical entity key within each publisher code; examples are bounded, with exact totals and truncation flags.',
+            'Transition/key examples are bounded; exact totals and original inputs are retained. No currentGIS filtering, coalescing or Config activation.']}
 
 
 @dataclass(frozen=True)

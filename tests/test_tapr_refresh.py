@@ -1,0 +1,451 @@
+from argparse import Namespace
+from dataclasses import replace
+from datetime import datetime, timezone
+from hashlib import sha256
+from io import BytesIO
+import csv
+import json
+from pathlib import Path
+from types import SimpleNamespace
+
+import pyarrow as pa
+import pytest
+
+from teadata.acquisition import AcquisitionClient, acquire_form, replay_acquisition
+from teadata.column_schema import source_schema_fingerprint
+from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
+from teadata.manifest import canonical_json
+from teadata.provenance import ProvenanceStore
+from teadata.scripts.refresh_tapr import compare_inputs, main
+from teadata.tapr import compare_tapr_tables, read_tapr_table
+from teadata.values import ValuePolicy, measure, source_token_statuses
+
+
+class Response(BytesIO):
+    status = 200
+    url = 'https://example.test/source.csv'
+    headers = {'ETag': 'publisher-tag', 'Last-Modified': 'Thu, 01 Jan 2026 00:00:00 GMT'}
+
+
+def test_explicit_post_replay_keeps_repeated_controls_closed_history_and_old_bytes(tmp_path):
+    requests = []
+    payloads = iter([b'old original', b'new original', b'third original'])
+    def opened(request, timeout):
+        requests.append((request, timeout))
+        return Response(next(payloads))
+    store = ProvenanceStore(tmp_path / 'store')
+    client = AcquisitionClient(store, opener=SimpleNamespace(open=opened), attempts=1, timeout=20, max_bytes=1024)
+    source = ResolvedDataset('campus_tapr_student_profile', 'data_sources', None, None, '', DatasetMetadata(version='2024'))
+    controls = [('key', 'A|B'), ('key', 'C'), ('empty', ''), ('datafmt', 'csv')]
+    first = acquire_form(client, 'https://example.test/form', source, filename='public.csv', method='POST',
+        fields=controls, content_type='application/x-www-form-urlencoded; charset=UTF-8')
+    original = store.read_record(first.record_id)
+    second = replay_acquisition(client, first.record_id)
+    third = replay_acquisition(client, second.record_id)
+    assert len(requests) == 3 and all(timeout == 20 for _, timeout in requests)
+    assert all(request.data == b'key=A%7CB&key=C&empty=&datafmt=csv' for request, _ in requests)
+    assert all(request.get_method() == 'POST' for request, _ in requests)
+    assert all(request.get_header('Content-type') == 'application/x-www-form-urlencoded; charset=UTF-8' for request, _ in requests)
+    assert all(not request.has_header('Authorization') and not request.has_header('Cookie') for request, _ in requests)
+    assert store.read_record(first.record_id) == original and first.path.read_bytes() == b'old original'
+    assert second.path.read_bytes() == b'new original' and third.path.read_bytes() == b'third original'
+    closure = store.verify_record_closure([third.record_id])
+    assert set(closure) == {first.record_id, second.record_id, third.record_id}
+    assert original['parameters']['form_controls'] == [list(p) for p in controls]
+    assert original['response_headers']['etag'] == 'publisher-tag'
+    assert original['parameters']['transport_limits'] == {'timeout': 20, 'attempts': 1, 'max_bytes': 1024, 'max_retry_wait': 30}
+
+
+def test_get_replay_preserves_exact_query_and_legacy_post_requires_explicit_controls_and_type(tmp_path):
+    requests = []
+    def opened(request, timeout):
+        requests.append(request)
+        return Response(b'original')
+    store = ProvenanceStore(tmp_path / 'store')
+    client = AcquisitionClient(store, opener=SimpleNamespace(open=opened), attempts=1)
+    source = ResolvedDataset('sample', 'data_sources', None, None, '')
+    first = acquire_form(client, 'https://example.test/form?edition=2024', source, filename='sample.csv',
+        method='GET', fields=[('key', 'a'), ('key', 'b')])
+    replay_acquisition(client, first.record_id)
+    assert [r.full_url for r in requests] == ['https://example.test/form?edition=2024&key=a&key=b'] * 2
+    with pytest.raises(ValueError, match='cannot change'):
+        replay_acquisition(client, first.record_id, content_type='text/csv')
+    path = tmp_path / 'legacy.csv'
+    path.write_bytes(b'legacy')
+    identifier = store.record_acquisition(path, source, requested_url='https://example.test/legacy',
+        downloaded_at=datetime(2026, 1, 1, tzinfo=timezone.utc), parameters={'http_method': 'POST', 'form_controls': [['key', 'A']]})
+    with pytest.raises(ValueError, match='explicit request content type'):
+        replay_acquisition(client, identifier)
+    repeated = replay_acquisition(client, identifier, content_type='application/x-www-form-urlencoded')
+    assert requests[-1].data == b'key=A'
+    local = store.record_acquisition(path, source)
+    with pytest.raises(ValueError, match='original HTTP'):
+        replay_acquisition(client, local)
+    no_controls = store.record_acquisition(path, source, requested_url='https://example.test/legacy',
+        downloaded_at=datetime(2026, 1, 1, tzinfo=timezone.utc), parameters={'http_method': 'POST'})
+    with pytest.raises(ValueError, match='explicit public form controls'):
+        replay_acquisition(client, no_controls, content_type='application/x-www-form-urlencoded')
+    with pytest.raises(ValueError, match='cannot change'):
+        replay_acquisition(client, repeated.record_id, content_type='text/csv')
+
+
+@pytest.mark.parametrize('method,fields,content_type', [('PUT', [], None), ('POST', [], None),
+    ('POST', [], 'text/csv'), ('GET', {'key': 'value'}, None), ('GET', [['', 'v']], None)])
+def test_invalid_or_implicit_form_requests_fail_before_network(tmp_path, method, fields, content_type):
+    client = AcquisitionClient(ProvenanceStore(tmp_path), opener=SimpleNamespace(open=lambda *a, **k: pytest.fail('network')))
+    with pytest.raises((ValueError, TypeError)):
+        acquire_form(client, 'https://example.test/form', ResolvedDataset('x', 'data_sources', None, None, ''),
+            filename='x.csv', method=method, fields=fields, content_type=content_type)
+
+
+@pytest.mark.parametrize('method,form_url,controls,observed', [
+    ('GET', 'https://example.test/different', [['key', 'B']], 'https://example.test/observed?key=A'),
+    ('POST', 'https://example.test/different', [['key', 'B']], 'https://example.test/observed?key=A'),
+    ('GET', 'https://example.test/form', [['key', 'B'], ['key', 'A']], 'https://example.test/form?key=A&key=B'),
+    ('GET', None, [['key', 'A']], 'https://example.test/form?key=A'),
+])
+def test_replay_rejects_auxiliary_request_drift_before_http(tmp_path, method, form_url, controls, observed):
+    store = ProvenanceStore(tmp_path / 'store')
+    path = tmp_path / 'original.csv'
+    path.write_bytes(b'retained original')
+    parameters = {'http_method': method, 'form_controls': controls,
+        'form_content_type': 'application/x-www-form-urlencoded' if method == 'POST' else None}
+    if form_url is not None:
+        parameters['form_url'] = form_url
+    identifier = store.record_acquisition(path, ResolvedDataset('sample', 'data_sources', None, None, ''),
+        requested_url=observed, downloaded_at=datetime(2026, 1, 1, tzinfo=timezone.utc), parameters=parameters)
+    original = (store.root / 'records' / (identifier + '.json')).read_bytes()
+    client = AcquisitionClient(store, opener=SimpleNamespace(open=lambda *a, **k: pytest.fail('HTTP')))
+    with pytest.raises(ValueError, match='original|observed'):
+        replay_acquisition(client, identifier)
+    assert (store.root / 'records' / (identifier + '.json')).read_bytes() == original
+
+
+def test_legacy_get_replays_observed_url_without_reconstructing_controls(tmp_path):
+    store = ProvenanceStore(tmp_path / 'store')
+    path = tmp_path / 'original.csv'
+    path.write_bytes(b'retained original')
+    url = 'https://example.test/form?key=A&key=B&empty=&spelling=%2f'
+    identifier = store.record_acquisition(path, ResolvedDataset('sample', 'data_sources', None, None, ''),
+        requested_url=url, downloaded_at=datetime(2026, 1, 1, tzinfo=timezone.utc), parameters={'http_method': 'GET'})
+    requests = []
+    def opened(request, timeout):
+        requests.append(request)
+        return Response(b'replayed bytes')
+    acquired = replay_acquisition(AcquisitionClient(store, opener=SimpleNamespace(open=opened)), identifier)
+    assert len(requests) == 1 and requests[0].full_url == url and requests[0].data is None
+    assert set(store.verify_record_closure([acquired.record_id])) == {identifier, acquired.record_id}
+
+
+@pytest.mark.parametrize('parameters', ['charset=ISO-8859-1', 'charset=utf8',
+    'charset=UTF-8; charset=ISO-8859-1', 'charset=UTF-8; charset=UTF-8', 'charset="UTF-8', 'boundary=anything'])
+def test_post_rejects_unsupported_or_ambiguous_encoding_before_http(tmp_path, parameters):
+    client = AcquisitionClient(ProvenanceStore(tmp_path), opener=SimpleNamespace(open=lambda *a, **k: pytest.fail('HTTP')))
+    with pytest.raises(ValueError, match='only UTF-8'):
+        acquire_form(client, 'https://example.test/form', ResolvedDataset('sample', 'data_sources', None, None, ''),
+            filename='sample.csv', method='POST', fields=[('name', 'é')],
+            content_type='application/x-www-form-urlencoded; ' + parameters)
+
+
+@pytest.mark.parametrize('content_type', ['application/x-www-form-urlencoded',
+    'application/x-www-form-urlencoded; charset=UTF-8', 'application/x-www-form-urlencoded; Charset = "utf-8"'])
+def test_unicode_post_and_replay_use_explicit_utf8_control_bytes(tmp_path, content_type):
+    requests = []
+    def opened(request, timeout):
+        requests.append(request)
+        return Response(b'original')
+    client = AcquisitionClient(ProvenanceStore(tmp_path), opener=SimpleNamespace(open=opened))
+    first = acquire_form(client, 'https://example.test/form', ResolvedDataset('sample', 'data_sources', None, None, ''),
+        filename='sample.csv', method='POST', fields=[('name', 'é'), ('name', '東京')], content_type=content_type)
+    replay_acquisition(client, first.record_id)
+    assert len(requests) == 2
+    assert all(r.data == b'name=%C3%A9&name=%E6%9D%B1%E4%BA%AC' for r in requests)
+    assert all(r.get_header('Content-type') == content_type for r in requests)
+
+
+def source(tmp_path, name, rows, *, code='VALUE', label='Value', field='value', period=None):
+    dataset = 'campus_tapr_student_profile'
+    path = tmp_path / (name + '.csv')
+    labels, codes = ['Campus Number', label], ['CAMPUS', code]
+    with path.open('w', newline='') as stream:
+        csv.writer(stream).writerows([labels, codes, *rows])
+    mapping = {'table': 'student_profile', 'metric_period': period or {'kind': 'unknown'},
+        'input_sha256': sha256(path.read_bytes()).hexdigest(), 'source_schema_sha256': source_schema_fingerprint(labels, codes),
+        'fields': [{'position': i, 'code': c, 'label': human, 'field': canonical,
+            'disposition': 'identity' if i == 1 else 'fact', 'dictionary_status': 'not_applicable' if i == 1 else 'not_documented',
+            'publisher_type': None, 'publisher_description': None}
+            for i, (c, human, canonical) in enumerate(zip(codes, labels, ['campus_number', field], strict=True), 1)]}
+    schema = tmp_path / (name + '.json')
+    schema.write_text(canonical_json({'schema_version': 2, 'mapping_version': 1,
+        'datasets': [{'dataset': dataset, 'edition': '2024', 'source_only': True, 'tables': [mapping]}]}) + '\n')
+    store = ProvenanceStore(tmp_path / (name + '-store'))
+    identifier = store.record_acquisition(path, ResolvedDataset(dataset, 'data_sources', None, None, str(path), DatasetMetadata(version='2024')))
+    native = read_tapr_table(path, mapping=mapping, key_field='campus_number', dataset=dataset, edition='2024')
+    return native, store, identifier, schema
+
+
+def test_keyed_native_diff_keeps_historical_members_schema_absence_and_independent_definitions(tmp_path):
+    old, *_ = source(tmp_path, 'old', [['001902041', '7'], ['001902001', '.']], label='Old definition')
+    new, *_ = source(tmp_path, 'new', [['001902099', '9'], ['001902001', '']], label='Changed definition', field='changed_value',
+        period={'kind': 'school_year', 'start_year': 2023, 'end_year': 2024})
+    result = compare_tapr_tables(old, new, key_field='campus_number')
+    assert result['keysets']['overlap'] == 1
+    assert result['keysets']['old_only']['examples'] == ["'001902041"]
+    assert result['keysets']['new_only']['examples'] == ["'001902099"]
+    value = result['columns']['common'][1]
+    assert not value['header_equal'] and value['lexical_changes'] == 1
+    assert value['raw_transition_examples'][0]['old_raw'] == '.'
+    assert value['raw_transition_examples'][0]['new_raw'] == ''
+    assert value['raw_transition_examples'][0]['new_status'] == 'unbound'
+    assert result['source_structure']['old']['metric_period'] != result['source_structure']['new']['metric_period']
+    other, *_ = source(tmp_path, 'other', [['001902001', '0']], code='NEW_CODE', label='Old definition')
+    result = compare_tapr_tables(old, other, key_field='campus_number')
+    assert [f['code'] for f in result['columns']['old_only']] == ['VALUE']
+    assert [f['code'] for f in result['columns']['new_only']] == ['NEW_CODE']
+    assert [f['code'] for f in result['columns']['common']] == ['CAMPUS']
+
+
+def test_decimal_spelling_equivalence_is_exact_beyond_float_precision_and_unsupported_is_unknown(tmp_path):
+    old_tokens = ['9007199254740993', '001', '1e3', '', '-1', '0']
+    new_tokens = ['9007199254740992', '1.0', '1000', '0', '-1.0', '0.0']
+    old, *_ = source(tmp_path, 'old', [[f'001902{i:03d}', v] for i, v in enumerate(old_tokens, 1)])
+    new, *_ = source(tmp_path, 'new', [[f'001902{i:03d}', v] for i, v in enumerate(new_tokens, 1)])
+    value = compare_tapr_tables(old, new, key_field='campus_number')['columns']['common'][1]
+    assert value['lexical_changes'] == 6 and value['decimal_equal_changes'] == 3
+    assert value['decimal_unequal_changes'] == 1 and value['unclassified_changes'] == 2
+    assert all(p['old_status'] == p['new_status'] == 'unbound' for p in value['raw_transition_examples'])
+
+
+def test_dictionary_only_changes_remain_dictionary_observations_not_fabricated_fields(tmp_path):
+    old, *_ = source(tmp_path, 'old', [['001902001', '1']])
+    new, *_ = source(tmp_path, 'new', [['001902001', '1']])
+    dictionary = [{'ordinal': 1, 'code': 'UNUSED', 'publisher_type': 'Number', 'publisher_description': 'Available dictionary field'}]
+    new = replace(new, mapping={**new.mapping, 'dictionary_records': dictionary})
+    result = compare_tapr_tables(old, new, key_field='campus_number')
+    assert result['source_structure']['new']['dictionary_records'] == dictionary
+    assert not result['columns']['new_only'] and not result['columns']['old_only']
+    assert [f['code'] for f in result['columns']['common']] == ['CAMPUS', 'VALUE']
+
+
+def test_negative_observed_and_suppressed_policies_have_one_canonical_authority(tmp_path):
+    old, *_ = source(tmp_path, 'old', [['001902001', '-1']])
+    new, *_ = source(tmp_path, 'new', [['001902001', '-1.0']])
+    observed = ValuePolicy.from_dict({'policy_id': 'numeric'})
+    suppressed = ValuePolicy.from_dict({'policy_id': 'reviewed', 'reference_id': 'masking',
+        'tokens': {'-1': {'status': 'suppressed', 'reason': 'explicit reviewed source rule'}}})
+    for policy, expected in [(observed, 1), (suppressed, 0)]:
+        result = compare_tapr_tables(old, new, key_field='campus_number', old_policies={'VALUE': policy}, new_policies={'VALUE': policy})
+        value = result['columns']['common'][1]
+        assert value['decimal_equal_changes'] == expected
+        assert value['raw_transition_examples'][0]['old_status'] == measure('-1', policy).status.value
+        assert result['selected_field_policies']['old']['VALUE'] == policy.to_dict()
+    with pytest.raises(ValueError, match='actual non-identity'):
+        compare_tapr_tables(old, new, key_field='campus_number', old_policies={'*': suppressed})
+
+
+@pytest.mark.parametrize('bound', [0, 2, 10])
+def test_changed_observation_examples_are_keyed_deterministic_bounded_and_policy_qualified(tmp_path, bound):
+    old, *_ = source(tmp_path, 'old', [['001902003', '1'], ['001902001', '1'], ['001902004', '7'], ['001902002', '-1']])
+    new, *_ = source(tmp_path, 'new', [['001902002', '0'], ['001902004', '7'], ['001902001', '2'], ['001902003', '1.0']])
+    policy = ValuePolicy.from_dict({'policy_id': 'explicit', 'tokens': {'-1': {'status': 'suppressed', 'reason': 'source-specific rule'}}})
+    result = compare_tapr_tables(old, new, key_field='campus_number', old_policies={'VALUE': policy},
+        new_policies={'VALUE': policy}, max_examples=bound)
+    field = result['columns']['common'][1]
+    observations = field['changed_observations']
+    assert result['key_field'] == 'campus_number'
+    assert observations['count'] == field['lexical_changes'] == 3
+    assert observations['truncated'] == (bound < 3)
+    examples = observations['examples']
+    assert [e['entity_key'] for e in examples] == ["'001902001", "'001902002", "'001902003"][:bound]
+    assert len(examples) == min(bound, 3)
+    if examples:
+        assert (examples[0]['old_raw'], examples[0]['new_raw']) == ('1', '2')
+        assert examples[0]['old_status'] == examples[0]['new_status'] == 'observed'
+        assert examples[0]['decimal_lexeme_equivalence'] == 'unequal'
+        assert examples[1]['old_status'] == 'suppressed' and examples[1]['new_status'] == 'observed'
+        assert examples[1]['decimal_lexeme_equivalence'] == 'unclassified'
+    if bound > 3:
+        assert examples[2]['decimal_lexeme_equivalence'] == 'equal'
+
+
+def test_changed_observation_examples_do_not_invent_cells_without_overlapping_keys(tmp_path):
+    old, *_ = source(tmp_path, 'old', [['001902001', '1']])
+    new, *_ = source(tmp_path, 'new', [['001902002', '2']])
+    result = compare_tapr_tables(old, new, key_field='campus_number', max_examples=1)
+    assert result['keysets']['overlap'] == 0
+    assert result['columns']['common'][1]['changed_observations'] == {'count': 0, 'examples': [], 'truncated': False}
+
+
+def test_status_bridge_matches_scalar_and_has_an_explicit_distinct_work_bound():
+    policy = ValuePolicy.from_dict({'policy_id': 'explicit', 'tokens': {'-1': {'status': 'suppressed', 'reason': 'documented'}}})
+    tokens = ['-1', '-1.00', ' -1 ', '0', '.', '', None, '9007199254740993', 'n/a']
+    assert source_token_statuses(pa.array(tokens), policy).to_pylist() == [measure(t, policy).status.value for t in tokens]
+    with pytest.raises(ValueError, match='distinct-token'):
+        source_token_statuses(pa.array(['1', '2', '3']), policy, max_distinct=2)
+
+
+@pytest.mark.parametrize('outside', ['1' * 39, '0.' + '1' * 39])
+def test_outside_exact_decimal_envelope_is_unclassified_without_rounding(tmp_path, outside):
+    old, *_ = source(tmp_path, 'old', [['001902001', outside]])
+    new, *_ = source(tmp_path, 'new', [['001902001', '1']])
+    field = compare_tapr_tables(old, new, key_field='campus_number', max_examples=0)['columns']['common'][1]
+    assert field['unclassified_changes'] == 1
+    assert field['decimal_equal_changes'] == field['decimal_unequal_changes'] == 0
+    assert field['raw_transition_examples'] == [] and not field['all_raw_pairs_emitted']
+
+
+def compare_args(tmp_path, old, new):
+    args = Namespace(store=tmp_path / 'result-store', output=tmp_path / 'result.json', scope='campus', max_examples=2,
+        old_policy=[], new_policy=[], policy_config=None, policy_config_sha256=None)
+    for side, (_, store, identifier, schema) in [('old', old), ('new', new)]:
+        for key, value in {'store': store.root, 'record': identifier, 'schema': schema,
+            'schema_sha256': sha256(schema.read_bytes()).hexdigest(), 'dictionary': None,
+            'dataset': 'campus_tapr_student_profile', 'edition': '2024', 'table': 'student_profile'}.items():
+            setattr(args, side + '_' + key, value)
+    return args
+
+
+def test_offline_cli_reports_and_closed_history_are_append_only_without_config_activation(tmp_path, monkeypatch):
+    old = source(tmp_path, 'old', [['001902001', '.']])
+    new = source(tmp_path, 'new', [['001902001', '0']])
+    args = compare_args(tmp_path, old, new)
+    monkeypatch.setattr('teadata.scripts.refresh_tapr.AcquisitionClient', lambda *a, **k: pytest.fail('HTTP client'))
+    result = compare_inputs(args)
+    assert result['status'] == 'compared'
+    store = ProvenanceStore(args.store)
+    closure = store.verify_record_closure([result['processing_record_id']])
+    assert old[2] in closure and new[2] in closure
+    assert closure[old[2]] == old[1].read_record(old[2])
+    before = args.output.read_bytes()
+    with pytest.raises(FileExistsError):
+        compare_inputs(args)
+    assert args.output.read_bytes() == before
+
+
+def test_explicit_policy_capacity_limit_is_reported_as_comparison_block_not_source_drift(tmp_path):
+    rows = [[str(100000000 + i), str(i)] for i in range(4097)]
+    old, new = source(tmp_path, 'old', rows), source(tmp_path, 'new', rows)
+    args = compare_args(tmp_path, old, new)
+    config = tmp_path / 'policy.yaml'
+    config.write_text('value_policies:\n  numeric:\n    tokens: {}\n')
+    args.policy_config, args.policy_config_sha256 = config, sha256(config.read_bytes()).hexdigest()
+    args.old_policy = [['VALUE', 'numeric']]
+    result = compare_inputs(args)
+    report = json.loads(args.output.read_bytes())
+    assert result['status'] == 'blocked_comparison'
+    assert report['keyed_comparison_attempted'] and not report['keyed_comparison_completed']
+    assert 'distinct-token' in report['diagnostic']
+
+
+@pytest.mark.parametrize('drift', ['source_sha', 'header', 'layout', 'schema_sha', 'edition', 'unexpected_dictionary', 'dictionary_definitions'])
+def test_structural_or_pin_drift_preserves_bytes_and_blocked_report_without_keyed_comparison(tmp_path, monkeypatch, drift):
+    old = source(tmp_path, 'old', [['001902001', '.']])
+    new = source(tmp_path, 'new', [['001902001', '0']])
+    args = compare_args(tmp_path, old, new)
+    schema = args.new_schema
+    document = json.loads(schema.read_bytes())
+    table = document['datasets'][0]['tables'][0]
+    if drift == 'source_sha':
+        table['input_sha256'] = '0' * 64
+    elif drift == 'header':
+        table['fields'][1]['label'] = 'Unreviewed actual header'
+        table['source_schema_sha256'] = source_schema_fingerprint([f['label'] for f in table['fields']], [f['code'] for f in table['fields']])
+    elif drift == 'layout':
+        table['layout'] = {'label_record': 1, 'code_record': 2, 'first_data_record': 3, 'last_data_record': 4, 'annotations': []}
+    elif drift == 'edition':
+        args.new_edition = '2025'
+    elif drift == 'unexpected_dictionary':
+        args.new_dictionary = tmp_path / 'unbound-dictionary.html'
+        args.new_dictionary.write_text('Not declared by this source contract')
+    elif drift == 'dictionary_definitions':
+        table['dictionary_records'] = [
+            {'ordinal': 1, 'code': 'UNUSED', 'publisher_type': 'Number', 'publisher_description': 'Definition A'},
+            {'ordinal': 2, 'code': 'UNUSED', 'publisher_type': 'Number', 'publisher_description': 'Definition B'}]
+    schema.write_text(canonical_json(document))
+    args.new_schema_sha256 = '0' * 64 if drift == 'schema_sha' else sha256(schema.read_bytes()).hexdigest()
+    monkeypatch.setattr('teadata.scripts.refresh_tapr.compare_tapr_tables', lambda *a, **k: pytest.fail('Unreviewed keyed comparison'))
+    result = compare_inputs(args)
+    report = json.loads(args.output.read_bytes())
+    assert result['status'] == 'blocked_contract_drift' and report['keyed_comparison_attempted'] is False
+    assert report['keyed_comparison_completed'] is False
+    assert not report.get('comparison') and '/Users/' not in report['diagnostic']
+    archive = ProvenanceStore(args.store)
+    closure = archive.verify_record_closure([result['processing_record_id']])
+    assert old[2] in closure and new[2] in closure
+    assert archive.verify_artifact(sha256(schema.read_bytes()).hexdigest()).read_bytes() == schema.read_bytes()
+
+
+@pytest.mark.parametrize('target', ['crosswalk', 'policy'])
+def test_comparison_parses_retained_pinned_bytes_after_operator_metadata_changes(tmp_path, monkeypatch, target):
+    old, new = source(tmp_path, 'old', [['001902001', '-1']]), source(tmp_path, 'new', [['001902001', '-1.0']])
+    args = compare_args(tmp_path, old, new)
+    if target == 'policy':
+        selected = tmp_path / 'policy.yaml'
+        selected.write_text('value_policies:\n  reviewed:\n    tokens:\n      "-1":\n        status: suppressed\n        reason: explicit source rule\n')
+        args.policy_config, args.policy_config_sha256 = selected, sha256(selected.read_bytes()).hexdigest()
+        args.old_policy, args.new_policy = [['VALUE', 'reviewed']], [['VALUE', 'reviewed']]
+    else:
+        selected = args.new_schema
+    original_bytes = selected.read_bytes()
+    original = ProvenanceStore.record_acquisition
+    def observe_then_change(self, path, *a, **k):
+        identifier = original(self, path, *a, **k)
+        if Path(path) == selected:
+            selected.write_text('operator file changed after its immutable snapshot')
+        return identifier
+    monkeypatch.setattr(ProvenanceStore, 'record_acquisition', observe_then_change)
+    result = compare_inputs(args)
+    assert result['status'] == 'compared' and selected.read_bytes() != original_bytes
+    archive = ProvenanceStore(args.store)
+    assert archive.verify_artifact(sha256(original_bytes).hexdigest()).read_bytes() == original_bytes
+    if target == 'policy':
+        report = json.loads(args.output.read_bytes())
+        field = report['comparison']['columns']['common'][1]
+        assert field['decimal_equal_changes'] == 0
+        assert field['raw_transition_examples'][0]['old_status'] == 'suppressed'
+
+
+def test_comparison_decodes_the_retained_dictionary_snapshot(tmp_path, monkeypatch):
+    from openpyxl import Workbook
+
+    old, new = source(tmp_path, 'old', [['001902001', '1']]), source(tmp_path, 'new', [['001902001', '2']])
+    args = compare_args(tmp_path, old, new)
+    dictionary = tmp_path / 'dictionary.xlsx'
+    book = Workbook()
+    sheet = book.active
+    assert sheet is not None
+    sheet.append(['Name', 'Type', 'Length', 'Label'])
+    sheet.append(['CAMPUS', 'Character', '9', 'Campus Number'])
+    sheet.append(['VALUE', 'Number', '8', 'Value'])
+    book.save(dictionary)
+    original_bytes = dictionary.read_bytes()
+    document = json.loads(args.old_schema.read_bytes())
+    dataset = document['datasets'][0]
+    dataset.pop('source_only')
+    dataset['prepared_input_sha256'] = old[0].input_sha256
+    table = dataset['tables'][0]
+    table['dictionary'] = {'filename': dictionary.name, 'sha256': sha256(original_bytes).hexdigest(), 'sheet_name': sheet.title}
+    for field, kind, length in zip(table['fields'], ['Character', 'Number'], ['9', '8'], strict=True):
+        field.pop('dictionary_status')
+        field.pop('publisher_description')
+        field.update(publisher_type=kind, publisher_length=length)
+    args.old_schema.write_text(canonical_json(document))
+    args.old_schema_sha256, args.old_dictionary = sha256(args.old_schema.read_bytes()).hexdigest(), dictionary
+    original = ProvenanceStore.record_acquisition
+    def observe_then_change(self, path, *a, **k):
+        identifier = original(self, path, *a, **k)
+        if Path(path) == dictionary:
+            dictionary.write_bytes(b'changed after immutable observation')
+        return identifier
+    monkeypatch.setattr(ProvenanceStore, 'record_acquisition', observe_then_change)
+    result = compare_inputs(args)
+    assert result['status'] == 'compared'
+    assert dictionary.read_bytes() != original_bytes
+    assert ProvenanceStore(args.store).verify_artifact(sha256(original_bytes).hexdigest()).read_bytes() == original_bytes
+
+
+def test_cli_help_is_offline_and_acquisition_requires_explicit_subcommand(capsys):
+    with pytest.raises(SystemExit) as caught:
+        main(['--help'])
+    assert caught.value.code == 0
+    assert 'acquire' in capsys.readouterr().out
