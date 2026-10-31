@@ -1,26 +1,35 @@
+from copy import deepcopy
+from datetime import datetime, timezone
 from hashlib import sha256
+import csv
 from pathlib import Path
 
 import pytest
 
-from teadata.column_schema import header_records, header_rename_map, parse_column_schema
-from teadata.manifest import ContractError
-from teadata.teadata_config import load_config
+from teadata.column_schema import header_records, header_rename_map, parse_column_schema, source_schema_fingerprint
+from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
+from teadata.manifest import ContractError, canonical_json
+from teadata.provenance import ProvenanceStore
+from teadata.scripts.build_tapr_profiles import main as prepare_main, prepare_profiles
+from teadata.teadata_config import Config, load_config
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RESOURCE = ROOT / 'docs/source-contracts/tapr--2025--staff-profile-crosswalk.json'
+RESOURCE = ROOT / 'teadata/schemas/tapr--2025--staff-profile-crosswalk.json'
 
 
-@pytest.mark.parametrize('scope,columns,rows,raw_sha,dictionary_sha,new_count', [
+@pytest.mark.parametrize('scope,columns,rows,raw_sha,dictionary_sha,new_count,raw_id', [
     ('campus', 106, 9084, 'ed29852dd7d7925963413b41c81a36508ccad83a4109a0aeebfa720bf90ff6ea',
-     'd5a1f29d97d34946eae7705d5f8a1ef7f376f7dd143cf0ce7b2fe0f1ba1f719e', 15),
+     'd5a1f29d97d34946eae7705d5f8a1ef7f376f7dd143cf0ce7b2fe0f1ba1f719e', 15,
+     '7ffcfafba5a510e01d1d613bc01598c6567ed11f1eee342136ca3aa129b49752'),
     ('district', 118, 1208, '29921c748875f91cc123c22dc5a295f1e61d1754842209bd86e56ad9f7c7abb1',
-     'fead1a0ad8f3a35949dfefc8161781be4161ff7fd028e926f99c3b9c41d5a8d6', 17),
+     'fead1a0ad8f3a35949dfefc8161781be4161ff7fd028e926f99c3b9c41d5a8d6', 17,
+     '4a72e91345b11dca068b1ae0744bef9b8ca4c269463e83dbaffe148d0e13ceff'),
 ])
-def test_new_crosswalk_retains_every_actual_column_without_activating_config(scope, columns, rows, raw_sha, dictionary_sha, new_count):
+def test_staff_crosswalk_retains_every_actual_column_without_default_activation(scope, columns, rows, raw_sha, dictionary_sha, new_count, raw_id):
     document = parse_column_schema(RESOURCE.read_bytes())
-    assert not (ROOT / 'teadata/schemas' / RESOURCE.name).exists()
+    assert not (ROOT / 'docs/source-contracts' / RESOURCE.name).exists()
+    assert sha256(RESOURCE.read_bytes()).hexdigest() == '579619e1d337a6c34078ad45f8138ac9277c4d3e6751995a56ad084c9599300e'
     dataset = next(d for d in document['datasets'] if d['dataset'] == scope + '_tapr_staff_profile')
     assert dataset['edition'] == '2025' and dataset['source_only'] is True
     table, = dataset['tables']
@@ -46,9 +55,18 @@ def test_new_crosswalk_retains_every_actual_column_without_activating_config(sco
     assert old_codes < {r['code'] for r in records}
     assert len({r['code'] for r in records} - old_codes) == new_count
     cfg = load_config()
-    assert cfg.availability_report()['data_sources'][dataset['dataset']]['years'] == [2024]
-    with pytest.raises(ContractError, match='edition unavailable'):
-        cfg.header_records(dataset['dataset'], edition='2025', reader_profile='source')
+    assert cfg.availability_report()['data_sources'][dataset['dataset']]['years'] == [2024, 2025]
+    assert cfg.header_records(dataset['dataset'], edition='2025', reader_profile='source') == records
+    assert cfg.is_source_only(dataset['dataset'], 2025)
+    assert cfg.column_schema(dataset['dataset'], 2025) is None
+    source = cfg.resolve_dataset(dataset['dataset'], 2025)
+    assert source.metadata.period.kind == 'unknown' and source.metadata.value_policy is None
+    assert not source.metadata.metrics and not source.metadata.provenance_ids and source.metadata.field_year is None
+    raw_reference = next(r for r in source.metadata.references if r.reference_id == 'csv_headers')
+    assert raw_reference.provenance_ids == (raw_id,) and raw_reference.reviewed_sha256 == raw_sha
+    assert source.reader['profiles']['source']['tapr_source']['tables']['staff_profile'] == f'data/tapr/raw/2025-{scope}-STAF-all-checked.csv'
+    with pytest.raises(ContractError, match='Reader profile is required'):
+        cfg.load_df(dataset['dataset'], 2025)
 
 
 def test_code_only_and_dictionary_only_codes_do_not_become_input_fields_or_aliases():
@@ -69,3 +87,208 @@ def test_code_only_and_dictionary_only_codes_do_not_become_input_fields_or_alias
         occurrences = [r for r in records if r['code'] == code]
         assert len(occurrences) == 2 and occurrences[0]['ordinal'] != occurrences[1]['ordinal']
         assert len({(r['publisher_type'], r['publisher_description']) for r in occurrences}) == 1
+
+
+@pytest.mark.parametrize('scope,width,rows,raw_sha,dictionary_sha,raw_id', [
+    ('campus', 243, 9084, '7e0e762a8f2ba50687fd8c6a59e8052d5740ba57abbedecddfca064bbd77548e',
+     '01b60e8eec23e5c158206d796c0ce82c713417e5f822f1ab81354199814ef209',
+     '3dec9c6e933d9f88c6efacc6f00f8669f8dda0e9d3c51ee9c176f910011e7b35'),
+    ('district', 242, 1208, '8ccd14fb2eaff8c73d94960950cc359d44bf4b81edb721975edf6795b8995811',
+     '693d84e0fa2285918c0f0d437a8fbfdefa72b66c1a7acd8ddac94165b536568d',
+     'cdef4db2551805ed9aa901243df73d91843d158d14426592607e842ce7036231'),
+])
+def test_student_source_contract_preserves_observed_headers_and_historical_names_without_period_inference(
+        scope, width, rows, raw_sha, dictionary_sha, raw_id):
+    resource = ROOT / 'teadata/schemas/tapr--2025--student-profile-crosswalk.json'
+    document = parse_column_schema(resource.read_bytes())
+    selected = next(d for d in document['datasets'] if d['dataset'] == scope + '_tapr_student_profile')
+    table, = selected['tables']
+    assert selected['source_only'] and 'prepared_input_sha256' not in selected
+    assert table['input_sha256'] == raw_sha and table['layout'] == {
+        'label_record': 1, 'code_record': 2, 'first_data_record': 3, 'last_data_record': rows + 2, 'annotations': []}
+    historical = parse_column_schema((ROOT / 'teadata/schemas/tapr--2025--header-crosswalk.json').read_bytes())
+    previous = next(d for d in historical['datasets'] if d['dataset'] == scope + '_tapr_student_staff_profile')
+    original = next(t for t in previous['tables'] if t['table'] == 'student')
+    assert [{key: f[key] for key in ['position', 'code', 'label', 'field']} for f in table['fields']] == original['fields']
+    assert table['source_schema_sha256'] == original['source_schema_sha256']
+    assert {r['source_sha256'] for r in table['dictionary_records']} == {dictionary_sha}
+    cfg = load_config()
+    source = cfg.resolve_dataset(selected['dataset'], 2025)
+    records = cfg.header_records(selected['dataset'], edition='2025', reader_profile='source')
+    assert len(records) == width and all(r['period'] == {'kind': 'unknown'} for r in records)
+    assert not source.metadata.metrics and source.metadata.value_policy is None and source.metadata.field_year is None
+    assert not source.metadata.provenance_ids
+    raw_reference = next(r for r in source.metadata.references if r.reference_id == 'csv_headers')
+    assert raw_reference.provenance_ids == (raw_id,) and raw_reference.reviewed_sha256 == raw_sha
+    assert source.metadata.notes and 'independent processing receipt' in source.metadata.notes
+    assert source.path.endswith(f'/data/tapr/raw/2025-{scope}-STUD-all-checked.csv')
+    for role in ['data_dictionary', 'glossary', 'masking_methodology']:
+        ref, = [r for r in source.metadata.references if r.role == role]
+        assert ref.status == 'available' and ref.provenance_ids and ref.reviewed_sha256
+    if scope == 'district':
+        duplicate = [r for r in table['dictionary_records'] if r['code'] == 'DAUND24C']
+        assert len(duplicate) == 2 and duplicate[0]['ordinal'] != duplicate[1]['ordinal']
+
+
+@pytest.mark.parametrize('scope,family,width', [
+    ('campus', 'student_profile', 243), ('district', 'student_profile', 242),
+    ('campus', 'staff_profile', 106), ('district', 'staff_profile', 118),
+])
+def test_2025_natural_source_consumer_keeps_all_synthetic_columns_and_original_typed_history(
+        tmp_path, scope, family, width):
+    import pyarrow.parquet as pq
+
+    cfg = load_config()
+    dataset = scope + '_tapr_' + family
+    contract = cfg.column_contract(dataset, 2025, reader_profile='source')
+    assert contract is not None
+    document = parse_column_schema(contract['text'].encode())
+    selected = deepcopy(next(d for d in document['datasets'] if d['dataset'] == dataset))
+    document['datasets'] = [selected]
+    table, = selected['tables']
+    path = tmp_path / 'original.csv'
+    identities = {'CAMPUS': '001902001', 'CAMPNAME': 'Historical campus',
+                  'DISTRICT': '001902', 'DISTNAME': 'Historical district'}
+    tokens = iter(['.', '', '0', '-1', 'n/a'])
+    values = [identities[field['code']] if field['code'] in identities else next(tokens, 'unchanged source text')
+              for field in table['fields']]
+    with path.open('w', newline='') as stream:
+        csv.writer(stream).writerows([[f['label'] for f in table['fields']], [f['code'] for f in table['fields']], values])
+    table['input_sha256'] = sha256(path.read_bytes()).hexdigest()
+    table['layout']['last_data_record'] = 3
+    schema = tmp_path / 'schema.json'
+    schema.write_text(canonical_json(document) + '\n')
+    original_store = ProvenanceStore(tmp_path / 'original-store')
+    original_label = scope + '_tapr_student_studf_profile' if family == 'student_profile' else scope + '_tapr_student_staff_profile'
+    raw_id = original_store.record_acquisition(path, ResolvedDataset(original_label, 'data_sources', 2025, 2025, '',
+        DatasetMetadata(version='2025')), requested_url='https://example.test/original.csv',
+        downloaded_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
+    original_record = original_store.read_record(raw_id)
+    annotation = tmp_path / 'annotation.json'
+    annotation.write_text('{"operation":"explicit label annotation; no alias"}')
+    correction = original_store.record_processing(dataset='explicit_annotation', inputs=[raw_id],
+        outputs={'annotation': annotation}, processor='synthetic fixture', code_version='fixture')
+    configured = Config.from_dict({'data_sources': {dataset: {2025: {'path': str(path),
+        'metadata': {'version': '2025', 'period': {'kind': 'unknown'}, 'references': [{
+            'reference_id': 'csv_headers', 'role': 'source_notes', 'url': 'https://example.test/original.csv',
+            'provenance_ids': [raw_id], 'reviewed_sha256': table['input_sha256']}]},
+        'reader': {'profiles': {'source': {'column_schema': schema.name,
+            'tapr_source': {'scope': scope, 'tables': {family: str(path)}}, 'references': [{
+                'reference_id': 'columns_source', 'role': 'schema', 'path': schema.name,
+                'reviewed_sha256': sha256(schema.read_bytes()).hexdigest()}]}}}}}}})
+    configured.base_dir = tmp_path
+    result = prepare_profiles(configured, edition='2025', family=family, scopes=[scope], input_dir=None,
+        output_dir=tmp_path / 'prepared', reference_store=original_store, processing_inputs={dataset: [correction]})
+    assert result['scopes'][scope]['fields'] == width and result['scopes'][scope]['rows'] == 1
+    prepared = pq.read_table(tmp_path / 'prepared' / (scope + '.parquet'))
+    assert [column[0].as_py() for column in prepared.columns] == values
+    archive = ProvenanceStore(tmp_path / 'prepared/provenance')
+    closure = archive.verify_record_closure([result['scopes'][scope]['processing_record_id']])
+    assert raw_id in closure and closure[raw_id] == original_record
+    assert original_store.read_record(raw_id) == original_record
+    assert closure[correction] == original_store.read_record(correction)
+    assert closure[correction]['kind'] == 'processing' and closure[correction]['inputs'] == [raw_id]
+    assert correction in closure[result['scopes'][scope]['processing_record_id']]['inputs']
+    assert result['scopes'][scope]['selected_processing_inputs'] == [correction]
+    assert configured.resolve_dataset(dataset, 2025).metadata.provenance_ids == ()
+
+
+@pytest.mark.parametrize('problem', ['foreign_dataset', 'acquisition_root', 'missing_closure', 'missing_store'])
+def test_processing_dependency_failures_precede_source_reads_and_publication(tmp_path, monkeypatch, problem):
+    store = ProvenanceStore(tmp_path / 'history')
+    source = tmp_path / 'original.csv'
+    source.write_bytes(b'original')
+    raw = store.record_acquisition(source, ResolvedDataset('original', 'data_sources', None, None, ''))
+    annotation = tmp_path / 'annotation.json'
+    annotation.write_bytes(b'{"annotation":true}')
+    processing = store.record_processing(dataset='annotation', inputs=[raw], outputs={'annotation': annotation},
+        processor='fixture', code_version='fixture')
+    dataset = 'campus_tapr_student_profile'
+    selected = {dataset: [processing]}
+    if problem == 'foreign_dataset':
+        selected = {'district_tapr_student_profile': [processing]}
+    elif problem == 'acquisition_root':
+        selected = {dataset: [raw]}
+    elif problem == 'missing_closure':
+        (store.root / 'objects' / sha256(b'original').hexdigest()).unlink()
+    cfg = Config()
+    monkeypatch.setattr(cfg, 'read_tapr_sources', lambda *a, **k: pytest.fail('Invalid dependency reached raw source read'))
+    with pytest.raises((ValueError, FileNotFoundError)):
+        prepare_profiles(cfg, edition='2025', scopes=['campus'], input_dir=None, family='student_profile',
+            output_dir=tmp_path / 'output', reference_store=None if problem == 'missing_store' else store,
+            processing_inputs=selected)
+    assert not (tmp_path / 'output').exists()
+    assert not list(tmp_path.glob('.tapr-preparation-*'))
+
+
+def tiny_annual_source(tmp_path, year):
+    """A two-column local observation; no real future-year data is asserted."""
+    path = tmp_path / 'source.csv'
+    labels, codes = ['Campus', 'Opaque source observation'], ['CAMPUS', 'VALUE']
+    path.write_text(','.join(labels) + '\n' + ','.join(codes) + '\n001902001,.\n')
+    fields = [{'position': 1, 'code': codes[0], 'label': labels[0], 'field': 'campus_number',
+               'disposition': 'identity', 'dictionary_status': 'not_applicable', 'publisher_type': None, 'publisher_description': None},
+              {'position': 2, 'code': codes[1], 'label': labels[1], 'field': 'source_observation',
+               'disposition': 'fact', 'dictionary_status': 'not_documented', 'publisher_type': None, 'publisher_description': None}]
+    table = {'table': 'student_profile', 'metric_period': {'kind': 'unknown'},
+        'input_sha256': sha256(path.read_bytes()).hexdigest(),
+        'source_schema_sha256': source_schema_fingerprint(labels, codes),
+        'fields': fields, 'layout': {'label_record': 1, 'code_record': 2, 'first_data_record': 3,
+                                    'last_data_record': 3, 'annotations': []}}
+    schema = tmp_path / 'schema.json'
+    schema.write_text(canonical_json({'schema_version': 2, 'mapping_version': 1, 'datasets': [{
+        'dataset': 'campus_tapr_student_profile', 'edition': str(year), 'source_only': True, 'tables': [table]}]}) + '\n')
+    store = ProvenanceStore(tmp_path / 'history')
+    raw = store.record_acquisition(path, ResolvedDataset('original local observation', 'data_sources', year, year, '',
+        DatasetMetadata(version=str(year))))
+    config = tmp_path / 'config.json'
+    config.write_text(canonical_json({'data_sources': {'campus_tapr_student_profile': {year: {
+        'path': path.name, 'metadata': {'version': str(year), 'period': {'kind': 'unknown'}, 'references': [{
+            'reference_id': 'csv_headers', 'role': 'source_notes', 'path': path.name,
+            'provenance_ids': [raw], 'reviewed_sha256': table['input_sha256']}]},
+        'reader': {'profiles': {'source': {'column_schema': schema.name,
+            'tapr_source': {'scope': 'campus', 'tables': {'student_profile': path.name}}, 'references': [{
+                'reference_id': 'columns_source', 'role': 'schema', 'path': schema.name,
+                'reviewed_sha256': sha256(schema.read_bytes()).hexdigest()}]}}}}}}}))
+    return config, store
+
+
+def test_registered_2026_annual_cli_uses_existing_exact_config_contract(tmp_path, capsys):
+    config, store = tiny_annual_source(tmp_path, 2026)
+    annotation = tmp_path / 'review.json'
+    annotation.write_text('{"review":"synthetic source context"}')
+    processing = store.record_processing(dataset='synthetic_review',
+        inputs=[store.history('original local observation')[0]['record_id']], outputs={'review': annotation},
+        processor='fixture', code_version='fixture')
+    prepare_main(['--edition', '2026', '--family', 'student_profile', '--scope', 'campus',
+        '--config', str(config), '--reference-store', str(store.root), '--input-dir', str(tmp_path),
+        '--processing-input', 'campus_tapr_student_profile', processing,
+        '--processing-input', 'campus_tapr_student_profile', processing,
+        '--output-dir', str(tmp_path / 'prepared')])
+    assert '"edition": "2026"' in capsys.readouterr().out
+    import pyarrow.parquet as pq
+    table = pq.read_table(tmp_path / 'prepared/campus.parquet')
+    assert table.to_pydict() == {'campus_number': ['001902001'], 'source_observation': ['.']}
+    import json
+    receipt = json.loads((tmp_path / 'prepared/preparation.json').read_text())
+    assert receipt['scopes']['campus']['selected_processing_inputs'] == [processing]
+    assert ProvenanceStore(tmp_path / 'prepared/provenance').read_record(processing) == store.read_record(processing)
+
+
+@pytest.mark.parametrize('configured_year', [2025, 2027])
+def test_absent_or_prior_fallback_2026_fails_before_source_open(tmp_path, monkeypatch, configured_year):
+    config, store = tiny_annual_source(tmp_path, configured_year)
+    monkeypatch.setattr('teadata.tapr.read_tapr_table', lambda *a, **k: pytest.fail('Unregistered annual source opened'))
+    with pytest.raises((ContractError, KeyError)):
+        prepare_profiles(load_config(config), edition='2026', family='student_profile', scopes=['campus'],
+            input_dir=tmp_path, output_dir=tmp_path / 'prepared', reference_store=store)
+    assert not (tmp_path / 'prepared').exists()
+
+
+@pytest.mark.parametrize('edition', ['02026', '2026 ', '2026.0', 'not-an-edition'])
+def test_noncanonical_annual_editions_fail_before_source_read(tmp_path, monkeypatch, edition):
+    cfg = Config()
+    monkeypatch.setattr(cfg, 'read_tapr_sources', lambda *a, **k: pytest.fail('Noncanonical edition reached source read'))
+    with pytest.raises(ValueError, match='canonical annual integer'):
+        prepare_profiles(cfg, edition=edition, family='student_profile', scopes=['campus'],
+            input_dir=None, output_dir=tmp_path / 'output')

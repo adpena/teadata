@@ -615,6 +615,75 @@ data_sources:
               status: available
               provenance_ids: []
               reviewed_sha256: abb6196de760d6156af23d31f32b91ce3599350d8b53259feb60cb96b37792cd
+    2025:
+      path: data/tapr/raw/2025-campus-STUD-all-checked.csv
+      metadata:
+        title: 2025 TAPR Campus Student Information; selected observed revision
+        publisher: Texas Education Agency
+        version: '2025'
+        period:
+          kind: unknown
+        source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        provenance_ids: []
+        notes: Independent source-only observation of publisher edition 2025. Table and field periods, units and scientific token policy remain unknown unless separately reviewed; no 2024 policy or historical composite metadata is inherited. Every source column, identity/history attribute and ordered dictionary occurrence is retained. Original HTTP dates and controls remain in their genuine receipts; old local-download dates remain unknown. The historical 2025 composite is a separate prior revision, not a fallback or current alias. No released default, semantic binding, entity enrichment or app data is activated. Original STUD acquisition logical-label typos are preserved; the explicit correction remains an independent processing receipt, not an acquisition ID or automatic alias. Config does not express a typed processing-input edge for that correction.
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          title: Genuine 2025 campus student_profile CSV; original observation and ordered controls preserved
+          status: available
+          provenance_ids:
+          - 3dec9c6e933d9f88c6efacc6f00f8669f8dda0e9d3c51ee9c176f910011e7b35
+          reviewed_sha256: 7e0e762a8f2ba50687fd8c6a59e8052d5740ba57abbedecddfca064bbd77548e
+        - provenance_ids:
+          - 5b4dae43db23a6a52ae258d48f85224709560d56ea77e17c1772d5d08f168175
+          reference_id: exact_selection_form
+          reviewed_sha256: cca0aa1cf5e13eabaf6ca19acebe68ced611d19256fa40f9a165cc92cf0b08e5
+          role: source_notes
+          status: available
+          title: Retained actual form, ordered repeated controls and literal action
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        - provenance_ids:
+          - 114edf213e7dd527c3167b5e6400feeeeae37ab272bcd9541e771d21c8171bd4
+          reference_id: actual2025_dictionary
+          reviewed_sha256: 01b60e8eec23e5c158206d796c0ce82c713417e5f822f1ab81354199814ef209
+          role: data_dictionary
+          status: available
+          title: Actual 2025 STUD dictionary metadata; code-only unknowns remain explicit in audit
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=C&dsname=STUD&dd=student&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - reference_id: glossary
+          role: glossary
+          url: https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf
+          title: 2024-25 Comprehensive TAPR Glossary
+          status: available
+          provenance_ids:
+          - e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db
+          reviewed_sha256: 846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416
+        - reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html
+          title: 2024-2025 TAPR Masking Rules
+          status: available
+          provenance_ids:
+          - 6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554
+          reviewed_sha256: 7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2025--student-profile-crosswalk.json
+            tapr_source:
+              scope: campus
+              tables:
+                student_profile: data/tapr/raw/2025-campus-STUD-all-checked.csv
+            references:
+            - reference_id: columns_source
+              role: schema
+              path: schemas/tapr--2025--student-profile-crosswalk.json
+              title: Reviewed complete 2025 student_profile source-only contract
+              status: available
+              provenance_ids: []
+              reviewed_sha256: 842ba240f4afffe88adc4f4a6070b8cf257c7ab3895eca23684484afd49b2975
   campus_tapr_staff_profile:
     2024:
       path: data/tapr/raw/2024 Campus Staff Information.csv
@@ -695,6 +764,75 @@ data_sources:
               status: available
               provenance_ids: []
               reviewed_sha256: 73b50ad614f998f5f19b725143f80f2b1faf045b2836a3f1bf9e8d261a8fd928
+    2025:
+      path: data/tapr/raw/2025-campus-STAF-all-checked.csv
+      metadata:
+        title: 2025 TAPR Campus Staff Information; selected observed revision
+        publisher: Texas Education Agency
+        version: '2025'
+        period:
+          kind: unknown
+        source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        provenance_ids: []
+        notes: Independent source-only observation of publisher edition 2025. Table and field periods, units and scientific token policy remain unknown unless separately reviewed; no 2024 policy or historical composite metadata is inherited. Every source column, identity/history attribute and ordered dictionary occurrence is retained. Original HTTP dates and controls remain in their genuine receipts; old local-download dates remain unknown. The historical 2025 composite is a separate prior revision, not a fallback or current alias. No released default, semantic binding, entity enrichment or app data is activated.
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          title: Genuine 2025 campus staff_profile CSV; original observation and ordered controls preserved
+          status: available
+          provenance_ids:
+          - 7ffcfafba5a510e01d1d613bc01598c6567ed11f1eee342136ca3aa129b49752
+          reviewed_sha256: ed29852dd7d7925963413b41c81a36508ccad83a4109a0aeebfa720bf90ff6ea
+        - provenance_ids:
+          - c47b8db7fa27c20dbefee429128fe682f2e07ee614b900ae1200d9df3217d032
+          reference_id: exact_selection_form
+          reviewed_sha256: b33d68be76e6dfcad50eb6660361fcab98c0f0474634026682efe04a3ed47bc9
+          role: source_notes
+          status: available
+          title: Retained actual form, ordered repeated controls and literal action
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        - provenance_ids:
+          - 818df760578532e76adb4c6ef32d29bf823adf293bab5bc295144cfaa95ba7f5
+          reference_id: actual2025_dictionary
+          reviewed_sha256: d5a1f29d97d34946eae7705d5f8a1ef7f376f7dd143cf0ce7b2fe0f1ba1f719e
+          role: data_dictionary
+          status: available
+          title: Actual 2025 STAF dictionary metadata; code-only unknowns remain explicit in audit
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=C&dsname=STAF&dd=staff&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - reference_id: glossary
+          role: glossary
+          url: https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf
+          title: 2024-25 Comprehensive TAPR Glossary
+          status: available
+          provenance_ids:
+          - e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db
+          reviewed_sha256: 846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416
+        - reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html
+          title: 2024-2025 TAPR Masking Rules
+          status: available
+          provenance_ids:
+          - 6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554
+          reviewed_sha256: 7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2025--staff-profile-crosswalk.json
+            tapr_source:
+              scope: campus
+              tables:
+                staff_profile: data/tapr/raw/2025-campus-STAF-all-checked.csv
+            references:
+            - reference_id: columns_source
+              role: schema
+              path: schemas/tapr--2025--staff-profile-crosswalk.json
+              title: Reviewed complete 2025 staff_profile source-only contract
+              status: available
+              provenance_ids: []
+              reviewed_sha256: 579619e1d337a6c34078ad45f8138ac9277c4d3e6751995a56ad084c9599300e
   district_tapr_student_profile:
     2024:
       path: data/tapr/raw/2024 District Student Information.csv
@@ -789,6 +927,75 @@ data_sources:
               status: available
               provenance_ids: []
               reviewed_sha256: abb6196de760d6156af23d31f32b91ce3599350d8b53259feb60cb96b37792cd
+    2025:
+      path: data/tapr/raw/2025-district-STUD-all-checked.csv
+      metadata:
+        title: 2025 TAPR District Student Information; selected observed revision
+        publisher: Texas Education Agency
+        version: '2025'
+        period:
+          kind: unknown
+        source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        provenance_ids: []
+        notes: Independent source-only observation of publisher edition 2025. Table and field periods, units and scientific token policy remain unknown unless separately reviewed; no 2024 policy or historical composite metadata is inherited. Every source column, identity/history attribute and ordered dictionary occurrence is retained. Original HTTP dates and controls remain in their genuine receipts; old local-download dates remain unknown. The historical 2025 composite is a separate prior revision, not a fallback or current alias. No released default, semantic binding, entity enrichment or app data is activated. Original STUD acquisition logical-label typos are preserved; the explicit correction remains an independent processing receipt, not an acquisition ID or automatic alias. Config does not express a typed processing-input edge for that correction.
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          title: Genuine 2025 district student_profile CSV; original observation and ordered controls preserved
+          status: available
+          provenance_ids:
+          - cdef4db2551805ed9aa901243df73d91843d158d14426592607e842ce7036231
+          reviewed_sha256: 8ccd14fb2eaff8c73d94960950cc359d44bf4b81edb721975edf6795b8995811
+        - provenance_ids:
+          - a3c2c2022cb5342750c9b0dd80364b2beb3f88c2f842e854d2dbcf3d7f11d708
+          reference_id: exact_selection_form
+          reviewed_sha256: ea6c5182add93aff2cc6905abf26fcc24afe9d8e34d7852a1abf0b4002e781dd
+          role: source_notes
+          status: available
+          title: Retained actual form, ordered repeated controls and literal action
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        - provenance_ids:
+          - 237fa1b42ce2d30f53bb56c7079a147c41b11e94aefb68927fca27e783cd9208
+          reference_id: actual2025_dictionary
+          reviewed_sha256: 693d84e0fa2285918c0f0d437a8fbfdefa72b66c1a7acd8ddac94165b536568d
+          role: data_dictionary
+          status: available
+          title: Actual 2025 STUD dictionary metadata; code-only unknowns remain explicit in audit
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=D&dsname=STUD&dd=student&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - reference_id: glossary
+          role: glossary
+          url: https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf
+          title: 2024-25 Comprehensive TAPR Glossary
+          status: available
+          provenance_ids:
+          - e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db
+          reviewed_sha256: 846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416
+        - reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html
+          title: 2024-2025 TAPR Masking Rules
+          status: available
+          provenance_ids:
+          - 6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554
+          reviewed_sha256: 7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2025--student-profile-crosswalk.json
+            tapr_source:
+              scope: district
+              tables:
+                student_profile: data/tapr/raw/2025-district-STUD-all-checked.csv
+            references:
+            - reference_id: columns_source
+              role: schema
+              path: schemas/tapr--2025--student-profile-crosswalk.json
+              title: Reviewed complete 2025 student_profile source-only contract
+              status: available
+              provenance_ids: []
+              reviewed_sha256: 842ba240f4afffe88adc4f4a6070b8cf257c7ab3895eca23684484afd49b2975
   district_tapr_staff_profile:
     2024:
       path: data/tapr/raw/2024 District Staff Information.csv
@@ -869,6 +1076,75 @@ data_sources:
               status: available
               provenance_ids: []
               reviewed_sha256: 73b50ad614f998f5f19b725143f80f2b1faf045b2836a3f1bf9e8d261a8fd928
+    2025:
+      path: data/tapr/raw/2025-district-STAF-all-checked.csv
+      metadata:
+        title: 2025 TAPR District Staff Information; selected observed revision
+        publisher: Texas Education Agency
+        version: '2025'
+        period:
+          kind: unknown
+        source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        provenance_ids: []
+        notes: Independent source-only observation of publisher edition 2025. Table and field periods, units and scientific token policy remain unknown unless separately reviewed; no 2024 policy or historical composite metadata is inherited. Every source column, identity/history attribute and ordered dictionary occurrence is retained. Original HTTP dates and controls remain in their genuine receipts; old local-download dates remain unknown. The historical 2025 composite is a separate prior revision, not a fallback or current alias. No released default, semantic binding, entity enrichment or app data is activated.
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          title: Genuine 2025 district staff_profile CSV; original observation and ordered controls preserved
+          status: available
+          provenance_ids:
+          - 4a72e91345b11dca068b1ae0744bef9b8ca4c269463e83dbaffe148d0e13ceff
+          reviewed_sha256: 29921c748875f91cc123c22dc5a295f1e61d1754842209bd86e56ad9f7c7abb1
+        - provenance_ids:
+          - 3e501706cba3379f94db5f71f6f6aaad84df253dfbb8f91313e70fbf33a124ed
+          reference_id: exact_selection_form
+          reviewed_sha256: 756c03abeab4089ef6b1047b2d26338d8b5453a7f222bd4a0086fa5bba7c64a5
+          role: source_notes
+          status: available
+          title: Retained actual form, ordered repeated controls and literal action
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        - provenance_ids:
+          - 3f655f2f3a8cd4dd8706dbc61abb1a324bd43434afde8ed68b2e334be20ea822
+          reference_id: actual2025_dictionary
+          reviewed_sha256: fead1a0ad8f3a35949dfefc8161781be4161ff7fd028e926f99c3b9c41d5a8d6
+          role: data_dictionary
+          status: available
+          title: Actual 2025 STAF dictionary metadata; code-only unknowns remain explicit in audit
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=D&dsname=STAF&dd=staff&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - reference_id: glossary
+          role: glossary
+          url: https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf
+          title: 2024-25 Comprehensive TAPR Glossary
+          status: available
+          provenance_ids:
+          - e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db
+          reviewed_sha256: 846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416
+        - reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html
+          title: 2024-2025 TAPR Masking Rules
+          status: available
+          provenance_ids:
+          - 6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554
+          reviewed_sha256: 7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2025--staff-profile-crosswalk.json
+            tapr_source:
+              scope: district
+              tables:
+                staff_profile: data/tapr/raw/2025-district-STAF-all-checked.csv
+            references:
+            - reference_id: columns_source
+              role: schema
+              path: schemas/tapr--2025--staff-profile-crosswalk.json
+              title: Reviewed complete 2025 staff_profile source-only contract
+              status: available
+              provenance_ids: []
+              reviewed_sha256: 579619e1d337a6c34078ad45f8138ac9277c4d3e6751995a56ad084c9599300e
   campus_tapr_graduation_profile:
     2024:
       path: data/tapr/raw/2024 Campus Graduation Profile.csv

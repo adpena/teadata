@@ -494,13 +494,48 @@ are never combined into a definition. Conflicting known components fail review.
 Dictionary-only codes do not become source columns or establish availability,
 aliases, units or reference periods. Existing `header_records()` and
 `header_rename_map()` remain the code/label/canonical-field mapping APIs.
-The proposal at `docs/source-contracts/tapr--2025--staff-profile-crosswalk.json`
-describes the retained 106/118-column observations. It is an unactivated source
-review input, outside shipped/runtime schemas; it replaces neither Config nor
-the historical 2025 composite contract. It makes no key/value-comparison or
-data-release claim. Later activation must move this same file into a referenced
-runtime schema, update its references/tests, and remove the proposal path in
-the same change.
+The 2025 `student_profile` and `staff_profile` branches are declared independently
+for both scopes through the same explicit `source` profile and preparation
+command. Student retains 243/242 campus/district columns and the exact pinned
+raw revision; Staff retains the fresh 106/118-column observations, including all
+15/17 additional columns. The reviewed Staff proposal moved unchanged to
+`schemas/tapr--2025--staff-profile-crosswalk.json`; its proposal path was removed.
+The Student contract derives its code/label/canonical-field mapping from the
+unchanged historical crosswalk and adds the actual ordered 2025 dictionary
+observations. Neither branch inherits 2024 periods, policies or metric bindings:
+table/field periods and scientific units remain unknown. Identity/history
+attributes stay lossless without creating extra entity metadata keys.
+
+Use `--edition 2025 --family student_profile` or `--family staff_profile` with
+the existing producer. Raw paths remain portable and `--input-dir` selects a
+local retained-input directory; provenance stores remain explicit local inputs.
+These Config declarations do not qualify a real preparation run, new data
+release, released defaults, app activation or schema3. The historical 2025
+composite and its older Staff revision remain independent reproducible evidence,
+without fallback, replacement or a current-source alias. An unavailable route
+for 2025 PROF does not establish that the source never existed.
+
+The selected raw, form, annual dictionary, glossary and masking references bind
+genuine immutable acquisition receipts. Fresh HTTP dates remain known; earlier
+local-download dates remain unknown. The original STUD logical-label typo is
+preserved alongside its explicit correction processing receipt; it is not an
+automatic alias or replacement acquisition. Config's acquisition-only fields do
+not express a processing-input edge. Pass a reviewed dependency explicitly with
+repeatable `--processing-input DATASET RECORD_ID` to the existing producer; each
+dataset must be selected by that invocation's family/scopes. The producer verifies
+that each root is a processing receipt with a complete closure before reading
+source rows, then copies that closure and includes the typed ID in that dataset's
+new processing inputs. It neither infers applicability nor converts processing
+records into acquisitions. The same STUD correction can be explicitly selected
+for each affected scope; its complete original graph remains intact. Real
+producer qualification still requires separately reviewed selected inputs and
+execution evidence; these declarations and synthetic tests do not supply it.
+
+Preparation accepts canonical annual integer editions exactly registered in
+Config, rather than a fixed year allowlist. The existing reader requires the
+resolved year and metadata version to match exactly before opening source rows;
+nearest-prior fallback remains prohibited. This does not declare or acquire real
+2026 inputs or introduce a general opaque-edition model.
 
 Compare two retained originals offline using their exact acquisition IDs and
 independently reviewed crosswalks. Substitute the actual IDs and reviewed SHAs:

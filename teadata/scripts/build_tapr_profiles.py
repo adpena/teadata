@@ -7,6 +7,7 @@ workbooks, changes release pointers, or assigns scientific units from labels.
 from __future__ import annotations
 
 import argparse
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from hashlib import sha256
 from importlib.metadata import version
@@ -28,23 +29,44 @@ from teadata.teadata_config import load_config
 
 def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | None,
                      output_dir: Path, reference_store: ProvenanceStore | None = None,
-                     family: str = "student_staff_profile") -> dict:
+                     family: str = "student_staff_profile",
+                     processing_inputs: Mapping[str, Sequence[str]] | None = None) -> dict:
     """Validate all selected inputs, then publish one complete new generation."""
     import pyarrow.parquet as pq
 
-    if (edition not in {"2024", "2025"} or not scopes or len(scopes) != len(set(scopes))
+    try:
+        year = int(edition)
+    except (TypeError, ValueError) as error:
+        raise ValueError("Select a canonical annual integer edition") from error
+    if not isinstance(edition, str) or edition != str(year) or year < 1:
+        raise ValueError("Select a canonical annual integer edition")
+    if (not scopes or len(scopes) != len(set(scopes))
             or set(scopes) - {"campus", "district"}
             or family not in TAPR_PROFILE_FAMILIES):
-        raise ValueError("Select a declared 2024/2025 edition and distinct campus/district scopes")
+        raise ValueError("Select a declared family and distinct campus/district scopes")
     output_dir = Path(output_dir)
     if output_dir.exists() or output_dir.is_symlink():
         raise FileExistsError(f"Preparation output already exists: {output_dir}")
+    selected_datasets = {scope + "_tapr_" + family for scope in scopes}
+    dependencies = dict(processing_inputs or {})
+    if set(dependencies) - selected_datasets:
+        raise ValueError("Processing inputs must name an exact selected dataset/scope")
+    for dataset, identifiers in dependencies.items():
+        if isinstance(identifiers, (str, bytes)) or not isinstance(identifiers, Sequence):
+            raise ValueError("Processing inputs require an ordered sequence of receipt IDs")
+        dependencies[dataset] = list(dict.fromkeys(identifiers))
+        for identifier in dependencies[dataset]:
+            if reference_store is None:
+                raise ValueError("Processing inputs require an explicit reference_store")
+            if reference_store.read_record(identifier)["kind"] != "processing":
+                raise ValueError("Selected processing input is not a processing receipt")
+            reference_store.verify_record_closure([identifier])
     prepared = []
     for scope in scopes:
         dataset = scope + "_tapr_" + family
-        sources = cfg.read_tapr_sources(dataset, int(edition), input_dir=input_dir)
+        sources = cfg.read_tapr_sources(dataset, year, input_dir=input_dir)
         table = merge_tapr_tables(sources, key_field=scope + "_number")
-        if table.column_names != cfg.column_schema(dataset, int(edition), reader_profile="source"):
+        if table.column_names != cfg.column_schema(dataset, year, reader_profile="source"):
             raise ValueError("Full TAPR preparation does not account for its complete field contract")
         prepared.append((scope, dataset, sources, table))
     # No writer or provenance archive runs until every selected input validates.
@@ -61,8 +83,8 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
                    "preparation_code_sha256": sha256(Path(__file__).read_bytes()).hexdigest(),
                    "scopes": {}}
         for scope, dataset, sources, table in prepared:
-            source = cfg.resolve_dataset(dataset, int(edition))
-            contract = cfg.column_contract(dataset, int(edition), reader_profile="source")
+            source = cfg.resolve_dataset(dataset, year)
+            contract = cfg.column_contract(dataset, year, reader_profile="source")
             assert contract is not None
             crosswalk_path = stage / (scope + "-crosswalk.json")
             crosswalk_path.write_text(contract["text"])
@@ -70,6 +92,11 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
                 replace(source, path=str(crosswalk_path), dataset=dataset + ":schema", section="reference",
                         metadata=DatasetMetadata(title="TEA Data full TAPR source/header contract")))
             inputs = [contract_observation]
+            selected_processing = dependencies.get(dataset, [])
+            for identifier in selected_processing:
+                assert reference_store is not None
+                store.copy_record_from(reference_store, identifier)
+                inputs.append(identifier)
             selected = crosswalk_dataset(parse_column_schema(contract["text"].encode()), dataset, edition)
             if selected.get("source_only"):
                 # Original HTTP observations may predate a source-family split.
@@ -95,7 +122,7 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
                 if acquired != expected:
                     raise ValueError("Original acquisition receipts do not account for every source-only raw input")
             references = []
-            for reference in cfg.reader_references(dataset, int(edition), reader_profile="source"):
+            for reference in cfg.reader_references(dataset, year, reader_profile="source"):
                 for identifier in reference.provenance_ids:
                     if reference_store is None:
                         raise ValueError("Claimed source references require an explicit reference_store / --reference-store")
@@ -144,10 +171,12 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
                 parameters={"edition": edition, "column_schema_sha256": contract["sha256"],
                             "preparation_code_sha256": receipt["preparation_code_sha256"],
                             "toolchain": receipt["toolchain"], "family": family,
+                            "selected_processing_inputs": selected_processing,
                             "whitespace": "preserve", "geospatial_filter": False},
                 validation=validation)
             store.verify_record_closure([processing])
             receipt["scopes"][scope] = {**validation, "dataset": dataset, "processing_record_id": processing,
+                "selected_processing_inputs": selected_processing,
                 "column_schema_sha256": contract["sha256"],
                 "local_reference_closure_verified": True,
                 "reference_states": [{"reference_id": ref.reference_id, "availability": ref.status,
@@ -175,20 +204,25 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--edition", required=True, choices=("2024", "2025"))
+    parser.add_argument("--edition", required=True, help="Canonical annual integer edition, exactly declared by Config")
     parser.add_argument("--family", choices=TAPR_PROFILE_FAMILIES,
                         default="student_staff_profile")
     parser.add_argument("--scope", action="append", choices=("campus", "district"))
     parser.add_argument("--config", type=Path)
     parser.add_argument("--reference-store", type=Path,
                         help="Canonical store containing the exact claimed reference receipts and bytes")
+    parser.add_argument("--processing-input", action="append", nargs=2, default=[], metavar=("DATASET", "RECORD_ID"),
+                        help="Explicit processing dependency for one exact selected dataset/scope; applicability is caller-reviewed")
     parser.add_argument("--input-dir", type=Path, default=data_path("tapr", "raw"))
     parser.add_argument("--output-dir", required=True, type=Path)
     args = parser.parse_args(argv)
+    processing_inputs: dict[str, list[str]] = {}
+    for dataset, identifier in args.processing_input:
+        processing_inputs.setdefault(dataset, []).append(identifier)
     result = prepare_profiles(load_config(args.config), edition=args.edition,
         scopes=args.scope or ["campus", "district"], input_dir=args.input_dir, output_dir=args.output_dir,
         reference_store=ProvenanceStore(args.reference_store) if args.reference_store is not None else None,
-        family=args.family)
+        family=args.family, processing_inputs=processing_inputs)
     print(json.dumps({"edition": args.edition, "output_dir": str(args.output_dir),
                       "scopes": {key: {"rows": value["rows"], "fields": value["fields"]}
                                  for key, value in result["scopes"].items()}}))

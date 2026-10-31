@@ -40,7 +40,7 @@ def test_four_natural_source_leaves_are_complete_independent_and_have_no_default
         source = cfg.resolve_dataset(dataset, 2024)
         records = cfg.header_records(dataset, edition='2024', reader_profile='source')
         assert len(records) == width and cfg.column_schema(dataset, 2024) is None
-        assert cfg.availability_report()['data_sources'][dataset]['years'] == [2024]
+        assert cfg.availability_report()['data_sources'][dataset]['years'] == [2024, 2025]
         assert cfg.is_source_only(dataset, 2024)
         assert source.metadata.version == '2024' and source.metadata.period.to_dict() == UNKNOWN
         assert source.metadata.value_policy is None and not source.metadata.provenance_ids
@@ -61,9 +61,9 @@ def test_four_natural_source_leaves_are_complete_independent_and_have_no_default
         with pytest.raises(ContractError, match='Reader profile is required'):
             cfg.load_df(dataset, 2024)
         with pytest.raises(ContractError, match='edition unavailable'):
-            cfg.header_records(dataset, edition='2025', reader_profile='source')
+            cfg.header_records(dataset, edition='2026', reader_profile='source')
         with pytest.raises(ContractError, match='exact declared edition'):
-            cfg.read_tapr_sources(dataset, 2025)
+            cfg.read_tapr_sources(dataset, 2026)
 
 
 def test_dictionary_gaps_unused_codes_and_identical_occurrences_are_preserved():
@@ -392,7 +392,8 @@ def test_all_prior_dataset_contracts_bindings_options_and_defaults_stay_pinned()
     assert sha256(canonical_json(previous).encode()).hexdigest() == 'b81466d6c461979f483b406b3685d04d6e3146704e10896f0645c6ae12baff65'
 
 
-def test_current_family_discovery_is_metadata_only_in_a_fresh_process():
+@pytest.mark.parametrize('edition', [2024, 2025])
+def test_current_family_discovery_is_metadata_only_in_a_fresh_process(edition):
     code = '''
 import importlib.abc,pathlib,socket,sys,urllib.request
 heavy=('teadata.engine','teadata.entities','teadata.geometry','pyarrow','duckdb','pandas','numpy','sqlalchemy','geopandas','shapely')
@@ -402,8 +403,9 @@ class Trap(importlib.abc.MetaPathFinder):
 sys.meta_path.insert(0,Trap())
 from teadata.teadata_config import load_config
 import teadata.teadata_config as module
+edition=int(sys.argv[1])
 root=pathlib.Path(module.__file__).parent
-allowed={(root/'teadata_sources.yaml').resolve(),(root/'schemas/tapr--2024--student-profile-crosswalk.json').resolve(),(root/'schemas/tapr--2024--staff-profile-crosswalk.json').resolve()}
+allowed={(root/'teadata_sources.yaml').resolve()}|{(root/f'schemas/tapr--{edition}--{family}-profile-crosswalk.json').resolve() for family in ['student','staff']}
 original=pathlib.Path.open
 def guarded(self,*a,**k):
  if self.resolve() not in allowed: raise AssertionError('Non-metadata open: '+str(self))
@@ -416,9 +418,9 @@ cfg=load_config()
 for scope in ['campus','district']:
  for family in ['student_profile','staff_profile']:
   dataset=scope+'_tapr_'+family
-  assert cfg.header_records(dataset,edition='2024',reader_profile='source')
-  assert cfg.is_source_only(dataset,2024)
+  assert cfg.header_records(dataset,edition=str(edition),reader_profile='source')
+  assert cfg.is_source_only(dataset,edition)
 assert not any(n==p or n.startswith(p+'.') for n in sys.modules for p in heavy)
 '''
-    result = subprocess.run([sys.executable, '-B', '-c', code], cwd=ROOT, capture_output=True, text=True)
+    result = subprocess.run([sys.executable, '-B', '-c', code, str(edition)], cwd=ROOT, capture_output=True, text=True)
     assert result.returncode == 0, result.stdout + result.stderr
