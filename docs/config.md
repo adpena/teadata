@@ -324,7 +324,13 @@ uv run python -m teadata.scripts.build_tapr_profiles \
 ```
 
 `campus_tapr_graduation_profile` and `district_tapr_graduation_profile` declare
-only edition 2025, measuring 2023–2024 annual graduates. They retain 42 metrics
+editions 2024 and 2025, measuring 2022–2023 and 2023–2024 annual graduates.
+The 2024 period comes from the annual glossary, pages 15–16. Its publisher
+dictionary heading instead says 2023–2024; the source notes retain that
+contradiction alongside the exact CSV labels, selection page and references.
+The current 2024 GRAD observations remain independent of retained 2024 PROF;
+their shared-cell literal `.` to blank changes remain visible in the audit.
+They retain 42 metrics
 and four/two canonical identity/history attributes in separate wide leaves;
 identity/name observation dates remain unknown. Their source-only crosswalk has
 no historical prepared-input hash and requires the explicit `source` profile.

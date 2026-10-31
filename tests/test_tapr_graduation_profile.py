@@ -32,37 +32,39 @@ PERIOD = {'kind': 'school_year', 'start_year': 2023, 'end_year': 2024}
 
 
 @pytest.mark.parametrize('scope,identities', [('campus', 4), ('district', 2)])
-def test_full_publisher_coverage_is_discoverable_with_explicit_dictionary_gaps(scope, identities):
+@pytest.mark.parametrize('edition,ending,period', [(2024, '23', {'kind': 'school_year', 'start_year': 2022, 'end_year': 2023}),
+    (2025, '24', PERIOD)])
+def test_full_publisher_coverage_is_discoverable_with_explicit_dictionary_gaps(scope, identities, edition, ending, period):
     cfg = load_config()
     dataset = scope + '_tapr_graduation_profile'
-    records = cfg.header_records(dataset, edition='2025', reader_profile='source')
+    records = cfg.header_records(dataset, edition=str(edition), reader_profile='source')
     assert len(records) == 42 + identities
     facts = [f for f in records if f['disposition'] == 'fact']
     missing = [f for f in facts if f['dictionary_status'] == 'not_documented']
     prefix = scope[0].upper()
-    assert {f['code'] for f in missing} == {prefix + c for c in ['A0GS24N', 'A0GM24R', 'A0GS24R']}
+    assert {f['code'] for f in missing} == {prefix + c + ending + kind for c, kind in [('A0GS', 'N'), ('A0GM', 'R'), ('A0GS', 'R')]}
     assert all(f['publisher_type'] is None and f['publisher_description'] is None for f in missing)
     assert sum(f['dictionary_status'] == 'documented' for f in facts) == 39
-    assert all(f['period'] == PERIOD for f in facts)
+    assert all(f['period'] == period for f in facts)
     assert all(f['period'] == {'kind': 'unknown'} for f in records if f['disposition'] == 'identity')
-    source = cfg.resolve_dataset(dataset, 2025)
-    assert source.metadata.version == '2025' and source.metadata.period.to_dict() == PERIOD
+    source = cfg.resolve_dataset(dataset, edition)
+    assert source.metadata.version == str(edition) and source.metadata.period.to_dict() == period
     assert len(source.metadata.metrics) == 42
-    assert all(m.unit is None and m.period is not None and m.period.to_dict() == PERIOD
+    assert all(m.unit is None and m.period is not None and m.period.to_dict() == period
                for m in source.metadata.metrics.values())
-    assert cfg.availability_report()['data_sources'][dataset]['years'] == [2025]
-    assert cfg.is_source_only(dataset, 2025) is True
-    assert cfg.column_schema(dataset, 2025) is None
+    assert cfg.availability_report()['data_sources'][dataset]['years'] == [2024, 2025]
+    assert cfg.is_source_only(dataset, edition) is True
+    assert cfg.column_schema(dataset, edition) is None
     with pytest.raises(ContractError, match='Reader profile is required'):
-        cfg.load_df(dataset, 2025)
+        cfg.load_df(dataset, edition)
     with pytest.raises(ContractError, match='edition unavailable'):
-        cfg.header_records(dataset, edition='2024', reader_profile='source')
+        cfg.header_records(dataset, edition='2023', reader_profile='source')
     with pytest.raises(ContractError, match='exact declared edition'):
         cfg.read_tapr_sources(dataset, 2026)
     # A source-only contract cannot certify an unrelated prepared workbook.
     with pytest.raises(ValueError, match='different prepared input'):
-        validate_selected_crosswalk(parse_column_schema(RESOURCE.read_bytes()), dataset=dataset,
-            edition='2025', input_sha256='0' * 64, columns=[f['field'] for f in records])
+        validate_selected_crosswalk(parse_column_schema(RESOURCE.with_name(f'tapr--{edition}--graduation-profile-crosswalk.json').read_bytes()),
+            dataset=dataset, edition=str(edition), input_sha256='0' * 64, columns=[f['field'] for f in records])
 
 
 @pytest.mark.parametrize('change', ['missing_status', 'invented_type', 'invented_definition', 'false_documented'])
@@ -324,6 +326,9 @@ def test_existing_default_contracts_and_public_metric_bindings_remain_pinned(cat
     for (scope, year), digest in expected.items():
         entry = cfg['data_sources'][scope + '_tapr_student_staff_profile'][year]
         assert sha256(canonical_json(entry).encode()).hexdigest() == digest
+    for scope, digest in [('campus', 'da06b3e24f7acc2b553c25f09e35d4f21fbfb8ef1c270b6a7cba80317ceda2fa'),
+                         ('district', '172240f0850fa64d294307874fcef3e69c5d94ee14e39da83d2682c75ae97c61')]:
+        assert sha256(canonical_json(cfg['data_sources'][scope + '_tapr_graduation_profile'][2025]).encode()).hexdigest() == digest
     assert all('graduation' not in canonical_json(binding) for binding in cfg['metric_bindings'].values())
     assert not any('graduation' in dataset for dataset in catalog.datasets)
     loaded = load_config()
@@ -332,7 +337,44 @@ def test_existing_default_contracts_and_public_metric_bindings_remain_pinned(cat
                for scope in ('campus', 'district') for year in (2024, 2025))
 
 
-def test_grad_discovery_opens_only_metadata_in_a_fresh_process():
+@pytest.mark.parametrize('scope', ['campus', 'district'])
+def test_2024_grad_period_and_dictionary_contradiction_are_discoverable_without_coalescing(scope):
+    source = load_config().resolve_dataset(scope + '_tapr_graduation_profile', 2024)
+    assert source.metadata.version == '2024'
+    assert source.metadata.period.to_dict() == {'kind': 'school_year', 'start_year': 2022, 'end_year': 2023}
+    notes = source.metadata.notes
+    assert notes and '2023-24 Annual Graduates' in notes and 'pages 15-16' in notes
+    assert 'not inferred from source-code suffixes' in notes and 'independent of retained 2024 PROF' in notes
+    refs = {ref.reference_id: ref for ref in source.metadata.references}
+    assert {refs[name].role for name in ('dictionary', 'glossary', 'masking', 'selection')} == {
+        'data_dictionary', 'glossary', 'masking_methodology', 'source_notes'}
+    assert refs['glossary'].reviewed_sha256 == 'e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8'
+    assert all(ref.provenance_ids for ref in source.metadata.references)
+    assert source.metadata.value_policy is None
+
+
+def test_2024_current_source_preserves_dot_blank_and_historical_members_independently(tmp_path):
+    resource = RESOURCE.with_name('tapr--2024--graduation-profile-crosswalk.json')
+    mapping = deepcopy(parse_column_schema(resource.read_bytes())['datasets'][0]['tables'][0])
+    fields = mapping['fields']
+    rows = [['001902001', 'Historical campus', '001902', 'Historical district', '.'] + [''] * 41,
+            ['001902041', 'Another historical campus', '001902', 'Historical district', ''] + ['0'] * 41]
+    path = tmp_path / 'source.csv'
+    with path.open('w', newline='') as stream:
+        csv.writer(stream).writerows([[f['label'] for f in fields], [f['code'] for f in fields], *rows])
+    mapping['input_sha256'] = sha256(path.read_bytes()).hexdigest()
+    mapping['layout']['last_data_record'] = 4
+    result = read_tapr_table(path, mapping=mapping, key_field='campus_number',
+        dataset='campus_tapr_graduation_profile', edition='2024')
+    assert result.table.num_rows == 2
+    assert result.table[fields[4]['field']].to_pylist() == ['.', '']
+    assert result.table['campus_name'].to_pylist() == ['Historical campus', 'Another historical campus']
+    assert result.table['campus_number'].to_pylist() == ['001902001', '001902041']
+    assert result.edition == '2024' and result.dataset == 'campus_tapr_graduation_profile'
+
+
+@pytest.mark.parametrize('edition', [2024, 2025])
+def test_grad_discovery_opens_only_metadata_in_a_fresh_process(edition):
     code = '''
 import importlib.abc, pathlib, socket, sqlite3, sys, urllib.request
 heavy = ('teadata.classes','teadata.engine','teadata.entities','teadata.geometry','pyarrow','duckdb','sqlalchemy','pandas','numpy','geopandas','shapely')
@@ -343,7 +385,8 @@ sys.meta_path.insert(0, Trap())
 from teadata import load_config
 import teadata.teadata_config as config_module
 root = pathlib.Path(config_module.__file__).parent
-allowed = {(root/'teadata_sources.yaml').resolve(),(root/'schemas/tapr--2025--graduation-profile-crosswalk.json').resolve()}
+edition = __EDITION__
+allowed = {(root/'teadata_sources.yaml').resolve(),(root/f'schemas/tapr--{edition}--graduation-profile-crosswalk.json').resolve()}
 original = pathlib.Path.open
 def guarded(self,*args,**kwargs):
  if self.resolve() not in allowed: raise AssertionError('Non-metadata open: ' + str(self))
@@ -356,12 +399,12 @@ urllib.request.urlopen = forbidden
 cfg = load_config()
 for scope, width in [('campus',46),('district',44)]:
  ds = scope + '_tapr_graduation_profile'
- records = cfg.header_records(ds,edition='2025',reader_profile='source')
+ records = cfg.header_records(ds,edition=str(edition),reader_profile='source')
  assert len(records) == width
- assert cfg.availability_report()['data_sources'][ds]['years'] == [2025]
- assert cfg.is_source_only(ds,2025)
- assert len(cfg.resolve_dataset(ds,2025).metadata.metrics) == 42
+ assert cfg.availability_report()['data_sources'][ds]['years'] == [2024,2025]
+ assert cfg.is_source_only(ds,edition)
+ assert len(cfg.resolve_dataset(ds,edition).metadata.metrics) == 42
 assert not any(n == p or n.startswith(p + '.') for n in sys.modules for p in heavy)
 '''
-    result = subprocess.run([sys.executable, '-B', '-c', code], cwd=ROOT, capture_output=True, text=True)
+    result = subprocess.run([sys.executable, '-B', '-c', code.replace('__EDITION__', str(edition))], cwd=ROOT, capture_output=True, text=True)
     assert result.returncode == 0, result.stdout + result.stderr
