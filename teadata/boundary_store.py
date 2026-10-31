@@ -62,7 +62,7 @@ def load_boundary(
     if not path:
         return None
     try:
-        with closing(sqlite3.connect(path)) as conn:
+        with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as conn:
             for key in _district_lookup_keys(district_number):
                 row = conn.execute(
                     "SELECT wkb FROM boundaries WHERE district_number = ?",
@@ -94,7 +94,7 @@ class BoundaryStore:
             return self._conn
         if not self.path.exists():
             return None
-        uri = f"file:{self.path}?mode=ro"
+        uri = self.path.resolve().as_uri() + "?mode=ro"
         self._conn = sqlite3.connect(uri, uri=True, check_same_thread=False)
         return self._conn
 

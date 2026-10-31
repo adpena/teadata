@@ -68,6 +68,46 @@ def test_entity_store_round_trip(tmp_path, catalog):
     assert "campus_2025_demo" in keys
 
 
+@pytest.mark.parametrize("method, argument", [("load_district", "123456"), ("list_meta_keys", "campus")])
+def test_one_shot_snapshot_readers_reject_writes(tmp_path, catalog, monkeypatch, method, argument):
+    original = _build_entity_store(tmp_path, catalog)
+    path = original.with_name("entities #? café.sqlite")
+    original.rename(path)
+    connect = sqlite3.connect
+
+    def readonly_connect(*args, **kwargs):
+        connection = connect(*args, **kwargs)
+        try:
+            with pytest.raises(sqlite3.OperationalError, match="readonly"):
+                connection.execute("CREATE TABLE unexpected_write(value)")
+        except BaseException:
+            connection.close()
+            raise
+        return connection
+
+    monkeypatch.setattr(sqlite3, "connect", readonly_connect)
+    assert getattr(entity_store, method)(argument, store_path=path)
+
+
+@pytest.mark.parametrize("method, argument", [("load_district", "123456"), ("list_meta_keys", "campus")])
+def test_one_shot_readers_do_not_recreate_removed_snapshot(tmp_path, catalog, monkeypatch, method, argument):
+    path = _build_entity_store(tmp_path, catalog)
+    discover = entity_store.discover_entity_store
+
+    def removed_after_discovery(explicit):
+        resolved = discover(explicit)
+        resolved.unlink()
+        return resolved
+
+    monkeypatch.setattr(entity_store, "discover_entity_store", removed_after_discovery)
+    if method == "load_district":
+        with pytest.raises(RuntimeError, match="Failed querying district"):
+            entity_store.load_district(argument, store_path=path)
+    else:
+        assert entity_store.list_meta_keys(argument, store_path=path) == []
+    assert not path.exists()
+
+
 def test_entity_store_get_meta_after_no_meta_lookup(tmp_path, catalog):
     path = _build_entity_store(tmp_path, catalog)
     store = entity_store.EntityStore(path)
