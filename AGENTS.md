@@ -7,6 +7,7 @@
 - Tests reside in `tests/` (e.g., `tests/test_snapshot_loading.py`), and example notebooks/scripts are in `examples/`. Packaging artifacts land in `build/` and `teadata.egg-info/`.
 
 ## Build, Test, and Development Commands
+- Code-only clones and worktrees must set `GIT_LFS_SKIP_SMUDGE=1` during checkout. Hydrate only explicitly selected retained-release artifacts when an artifact check requires them.
 - Install for iterative work: `uv sync --all-extras` (this handles dev, database, and notebook extras automatically).
 - Always run Python commands through `uv run` and manage packages with `uv`; avoid bare `python` or `pip` to keep environments consistent.
 - `.python-version` is the default development and `scripts/check` interpreter authority; `TEADATA_CHECK_PYTHON` selects a compatibility-check override.
