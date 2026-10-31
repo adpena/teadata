@@ -13,12 +13,186 @@ import pytest
 
 from teadata.acquisition import AcquisitionClient, acquire_form, replay_acquisition
 from teadata.column_schema import source_schema_fingerprint
-from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
+from teadata.dataset_metadata import DatasetMetadata, ReferenceDocument, ResolvedDataset
 from teadata.manifest import canonical_json
 from teadata.provenance import ProvenanceStore
-from teadata.scripts.refresh_tapr import compare_inputs, main
+from teadata.scripts.refresh_tapr import compare_inputs, inspect_dictionary, main
 from teadata.tapr import compare_tapr_tables, read_tapr_table
 from teadata.values import ValuePolicy, measure, source_token_statuses
+
+
+def test_dictionary_cli_keeps_partial_occurrences_and_exact_retained_history_offline(tmp_path, monkeypatch, capsys):
+    def forbidden(*args, **kwargs):
+        pytest.fail('Dictionary inspection attempted HTTP')
+    monkeypatch.setattr('teadata.scripts.refresh_tapr.AcquisitionClient', forbidden)
+    source_store = ProvenanceStore(tmp_path / 'original')
+    selection = tmp_path / 'selection.html'
+    selection.write_text('<form>Original source controls</form>')
+    parent = source_store.record_acquisition(selection, ResolvedDataset('reference:selection', 'reference',
+        None, None, '', DatasetMetadata(title='Original selection', source_url='https://example.test/selection')))
+    original = tmp_path / 'dictionary.html'
+    raw = (b'<span class="tooltip">X<span class="tooltiptext"><div class="dd_hdr">Name:</div>'
+        b'<div class="dd_desc">X</div><div class="dd_hdr">Type:</div><div class="dd_desc">Number</div>'
+        b'<div class="dd_hdr">Description:</div><div class="dd_desc">Original</br> description</div></span></span>\n'
+        b'<span class="tooltip">Y<span class="tooltiptext">Y</span></span>')
+    original.write_bytes(raw)
+    metadata = DatasetMetadata(version='2025', references=(ReferenceDocument(reference_id='selection', url='https://example.test/selection',
+        role='source_notes', provenance_ids=(parent,), reviewed_sha256=sha256(selection.read_bytes()).hexdigest()),))
+    identifier = source_store.record_acquisition(original,
+        ResolvedDataset('reference:dictionary', 'reference', 2025, 2025, '', metadata),
+        downloaded_at=datetime(2025, 12, 1, tzinfo=timezone.utc),
+        requested_url='https://example.test/dictionary', parameters={'http_method': 'GET'})
+    before = source_store.read_record(identifier)
+    archive, output = tmp_path / 'observations', tmp_path / 'dictionary-report.json'
+    args = ['dictionary', '--source-store', str(source_store.root), '--record', identifier,
+            '--encoding', 'utf-8', '--store', str(archive), '--output', str(output)]
+    assert main(args) == 0
+    result = json.loads(capsys.readouterr().out)
+    report = json.loads(output.read_text())
+    assert result['status'] == 'inspected_dictionary'
+    assert report['max_bytes'] == 2 * 1024 * 1024
+    assert [row['code'] for row in report['dictionary_records']] == ['X', 'Y']
+    assert report['dictionary_records'][0]['publisher_description'] == 'Original description'
+    assert report['dictionary_records'][1]['publisher_type'] is None
+    assert report['dictionary_records'][1]['publisher_description'] is None
+    assert report['dictionary_records'][1]['source_line'] == 2
+    assert report['dictionary_records'][1]['source_column'] == 0
+    assert {r['source_sha256'] for r in report['dictionary_records']} == {sha256(raw).hexdigest()}
+    closure = ProvenanceStore(archive).verify_record_closure([result['processing_record_id']])
+    assert set(closure) == {parent, identifier, result['processing_record_id']}
+    assert source_store.read_record(identifier) == before == closure[identifier]
+    assert original.read_bytes() == raw and not report['source_activation']
+    published = output.read_bytes()
+    with pytest.raises(FileExistsError, match='already exists'):
+        main(args)
+    assert output.read_bytes() == published
+
+
+@pytest.mark.parametrize('raw,encoding,error', [
+    (b'<span class="tooltip">X<span class="tooltiptext">X', 'utf-8', ValueError),
+    ('é'.encode('iso-8859-1'), 'utf-8', UnicodeDecodeError),
+])
+def test_dictionary_cli_failure_does_not_publish_a_successful_report(tmp_path, raw, encoding, error):
+    source_store = ProvenanceStore(tmp_path / 'original')
+    original = tmp_path / 'dictionary.html'
+    original.write_bytes(raw)
+    identifier = source_store.record_acquisition(original,
+        ResolvedDataset('reference:dictionary', 'reference', None, None, '', DatasetMetadata()))
+    output = tmp_path / 'report.json'
+    archive = tmp_path / 'archive'
+    with pytest.raises(error):
+        main(['dictionary', '--source-store', str(source_store.root), '--record', identifier,
+              '--encoding', encoding, '--store', str(archive), '--output', str(output)])
+    assert not output.exists() and original.read_bytes() == raw
+    assert len(list((archive / 'records').glob('*.json'))) == 1
+
+
+def dictionary_input(tmp_path):
+    raw = b'<span class="tooltip">X<span class="tooltiptext">X</span></span>'
+    original = tmp_path / 'dictionary.html'
+    original.write_bytes(raw)
+    store = ProvenanceStore(tmp_path / 'source')
+    identifier = store.record_acquisition(original,
+        ResolvedDataset('reference:dictionary', 'reference', None, None, '', DatasetMetadata()))
+    return raw, store, identifier, Namespace(source_store=store.root, record=identifier,
+        encoding='utf-8', store=tmp_path / 'archive', output=tmp_path / 'report.json', max_bytes=len(raw))
+
+
+@pytest.mark.parametrize('actual_growth', [False, True])
+def test_dictionary_size_guard_precedes_bulk_read_and_closure_copy(tmp_path, monkeypatch, actual_growth):
+    raw, store, identifier, args = dictionary_input(tmp_path)
+    path = store.verify_artifact(sha256(raw).hexdigest())
+    if actual_growth:
+        path.write_bytes(raw + b' ')
+    else:
+        args.max_bytes = len(raw) - 1
+    original_open = Path.open
+    class NoBodyRead:
+        def __init__(self, stream):
+            self.stream = stream
+        def __enter__(self):
+            return self
+        def __exit__(self, *unused):
+            self.stream.close()
+        def fileno(self):
+            return self.stream.fileno()
+        def read(self, *unused):
+            pytest.fail('Oversized dictionary body was read')
+    def guarded_open(selected, *positional, **keywords):
+        if selected == path and positional == ('rb',):
+            assert actual_growth, 'Advertised oversize should fail before opening its body'
+            return NoBodyRead(original_open(selected, *positional, **keywords))
+        return original_open(selected, *positional, **keywords)
+    monkeypatch.setattr(Path, 'open', guarded_open)
+    def forbidden_copy(*unused):
+        pytest.fail('Oversized dictionary reached bulk closure copy')
+    monkeypatch.setattr(ProvenanceStore, 'copy_record_from', forbidden_copy)
+    with pytest.raises(ValueError, match='exceeds max-bytes'):
+        inspect_dictionary(args)
+    assert not args.output.exists() and not (args.store / 'records').exists()
+
+
+def test_dictionary_capped_read_binds_actual_bytes_before_any_processing_receipt(tmp_path, monkeypatch):
+    raw, store, identifier, args = dictionary_input(tmp_path)
+    selected = store.verify_artifact(sha256(raw).hexdigest())
+    original_open = Path.open
+    class ChangedRead:
+        def __init__(self, stream):
+            self.stream = stream
+        def __enter__(self):
+            return self
+        def __exit__(self, *unused):
+            self.stream.close()
+        def fileno(self):
+            return self.stream.fileno()
+        def read(self, maximum):
+            # Equivalent to same-length source mutation after stat/verification.
+            assert maximum == args.max_bytes + 1
+            return self.stream.read(maximum).replace(b'>X<', b'>Y<')
+    def changed_open(path, *positional, **keywords):
+        stream = original_open(path, *positional, **keywords)
+        return ChangedRead(stream) if path == selected and positional == ('rb',) else stream
+    monkeypatch.setattr(Path, 'open', changed_open)
+    with pytest.raises(ValueError, match='bytes differ from the selected acquisition'):
+        inspect_dictionary(args)
+    assert not args.output.exists() and not (args.store / 'records').exists()
+
+
+def test_dictionary_does_not_parse_a_later_unbound_read_after_verification(tmp_path, monkeypatch):
+    raw, store, identifier, args = dictionary_input(tmp_path)
+    original_read = Path.read_bytes
+    def changed_read(path):
+        if path == args.store / 'objects' / sha256(raw).hexdigest():
+            return raw.replace(b'>X<', b'>Y<')
+        return original_read(path)
+    monkeypatch.setattr(Path, 'read_bytes', changed_read)
+    result = inspect_dictionary(args)
+    report = json.loads(args.output.read_text())
+    assert [row['code'] for row in report['dictionary_records']] == ['X']
+    assert {row['source_sha256'] for row in report['dictionary_records']} == {sha256(raw).hexdigest()}
+    assert ProvenanceStore(args.store).verify_record_closure([result['processing_record_id']])
+
+
+@pytest.mark.parametrize('maximum', [0, -1])
+def test_dictionary_limit_must_be_positive_before_loading_any_input(tmp_path, maximum):
+    args = ['dictionary', '--source-store', str(tmp_path / 'missing'), '--record', 'a' * 64,
+            '--encoding', 'utf-8', '--store', str(tmp_path / 'archive'),
+            '--output', str(tmp_path / 'report.json'), '--max-bytes', str(maximum)]
+    with pytest.raises(ValueError, match='positive integer'):
+        main(args)
+    assert not (tmp_path / 'archive').exists()
+
+
+def test_dictionary_cli_accepts_an_explicit_reviewed_larger_limit(tmp_path, capsys):
+    raw, store, identifier, args = dictionary_input(tmp_path)
+    assert main(['dictionary', '--source-store', str(store.root), '--record', identifier,
+                 '--encoding', 'utf-8', '--store', str(args.store), '--output', str(args.output),
+                 '--max-bytes', '4194304']) == 0
+    result = json.loads(capsys.readouterr().out)
+    report = json.loads(args.output.read_text())
+    assert report['max_bytes'] == 4194304
+    assert report['source_artifact']['sha256'] == sha256(raw).hexdigest()
+    assert ProvenanceStore(args.store).read_record(result['processing_record_id'])['parameters']['max_bytes'] == 4194304
 
 
 class Response(BytesIO):

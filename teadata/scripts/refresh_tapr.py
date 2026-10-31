@@ -17,7 +17,7 @@ import tempfile
 from teadata.acquisition import AcquisitionClient, acquire_form, replay_acquisition
 from teadata.column_schema import crosswalk_dataset, parse_column_schema
 from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
-from teadata.provenance import ProvenanceStore
+from teadata.provenance import ProvenanceStore, _identifier
 from teadata.tapr import compare_tapr_tables, read_tapr_table
 
 
@@ -147,6 +147,60 @@ def compare_inputs(args) -> dict:
             'report_sha256': sha256(output.read_bytes()).hexdigest()}
 
 
+def inspect_dictionary(args) -> dict:
+    """Inspect one retained HTML artifact offline, preserving its exact history."""
+    from teadata.tapr_dictionary import extract_tapr_dictionary
+
+    if args.output.exists() or args.output.is_symlink():
+        raise FileExistsError("Dictionary output already exists; select a new observation path")
+    if type(args.max_bytes) is not int or args.max_bytes < 1:
+        raise ValueError('Dictionary max-bytes must be a positive integer')
+    source, archive = ProvenanceStore(args.source_store), ProvenanceStore(args.store)
+    record = source.read_record(args.record)
+    if record['kind'] != 'acquisition':
+        raise ValueError('Dictionary input must be a retained acquisition observation')
+    artifact = record['artifact']
+    expected_size = artifact['size_bytes']
+    if type(expected_size) is not int or expected_size < 0:
+        raise ValueError('Invalid retained dictionary size')
+    if expected_size > args.max_bytes:
+        raise ValueError('Retained dictionary exceeds max-bytes')
+    selected = source.root / 'objects' / _identifier(artifact['sha256'])
+    with selected.open('rb') as stream:
+        if os.fstat(stream.fileno()).st_size > args.max_bytes:
+            raise ValueError('Retained dictionary exceeds max-bytes')
+        raw = stream.read(args.max_bytes + 1)
+    if len(raw) > args.max_bytes:
+        raise ValueError('Retained dictionary exceeds max-bytes')
+    if len(raw) != expected_size or sha256(raw).hexdigest() != artifact['sha256']:
+        raise ValueError('Parsed dictionary bytes differ from the selected acquisition')
+    archive.copy_record_from(source, args.record)
+    occurrences = extract_tapr_dictionary(raw, encoding=args.encoding)
+    root = Path(__file__).resolve().parents[1]
+    implementation = {name: sha256((root / name).read_bytes()).hexdigest()
+                      for name in ['tapr_dictionary.py', 'scripts/refresh_tapr.py']}
+    report = {'schema_version': 1, 'source_record_id': args.record,
+              'source_artifact': artifact, 'encoding': args.encoding, 'max_bytes': args.max_bytes,
+              'coordinate_semantics': 'Outer tooltip start tag; one-based line, zero-based decoded-character column',
+              'text_projection': 'Decoded rendered text; presentation whitespace only is normalized. Raw artifact owns original bytes.',
+              'dictionary_records': [row.column_record() for row in occurrences],
+              'implementation_sha256': implementation, 'source_activation': False}
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix='.tapr-dictionary-', dir=args.output.parent) as directory:
+        staged = Path(directory) / args.output.name
+        staged.write_text(json.dumps(report, indent=2, ensure_ascii=True, allow_nan=False) + '\n')
+        staged.chmod(0o600)
+        processing = archive.record_processing(dataset='tapr_explicit_dictionary_inspection', inputs=[args.record],
+            outputs={'dictionary_occurrences': staged}, processor='teadata.scripts.refresh_tapr',
+            code_version=sha256(json.dumps(implementation, sort_keys=True).encode()).hexdigest(),
+            parameters={'encoding': args.encoding, 'max_bytes': args.max_bytes, 'no_config_activation': True},
+            validation={'occurrences': len(occurrences), 'scientific_equivalence_claimed': False})
+        archive.verify_record_closure([processing])
+        os.link(staged, args.output)
+    return {'status': 'inspected_dictionary', 'processing_record_id': processing,
+            'report_sha256': sha256(args.output.read_bytes()).hexdigest()}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
@@ -165,6 +219,14 @@ def main(argv: list[str] | None = None) -> int:
         command.add_argument('--store', type=Path, required=True)
         command.add_argument('--timeout', type=float, default=20)
         command.add_argument('--max-bytes', type=int, default=32 * 1024 * 1024)
+    dictionary = commands.add_parser('dictionary', help='Inspect one retained HTML dictionary offline; keep partial ordered occurrences')
+    dictionary.add_argument('--source-store', type=Path, required=True)
+    dictionary.add_argument('--record', required=True)
+    dictionary.add_argument('--encoding', required=True, help='Explicit decoding of the retained publisher bytes')
+    dictionary.add_argument('--max-bytes', type=int, default=2 * 1024 * 1024,
+                            help='Positive retained HTML byte limit; default 2 MiB')
+    dictionary.add_argument('--store', type=Path, required=True, help='Append-only output provenance archive')
+    dictionary.add_argument('--output', type=Path, required=True, help='New occurrence report; never overwritten')
     compare = commands.add_parser('compare', help='Compare two pinned reviewed original inputs offline')
     compare.add_argument('--store', type=Path, required=True, help='Append-only report/provenance archive')
     compare.add_argument('--output', type=Path, required=True, help='New report path; never overwritten')
@@ -181,6 +243,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == 'compare':
         result = compare_inputs(args)
+    elif args.command == 'dictionary':
+        result = inspect_dictionary(args)
     else:
         archive = ProvenanceStore(args.store)
         client = AcquisitionClient(archive, timeout=args.timeout, attempts=1, max_bytes=args.max_bytes, max_retry_wait=0)
@@ -194,7 +258,7 @@ def main(argv: list[str] | None = None) -> int:
         record = archive.read_record(acquired.record_id)
         result = {'status': 'acquired', 'record_id': acquired.record_id, 'artifact': record['artifact']}
     print(json.dumps(result, sort_keys=True))
-    return 0 if result['status'] in {'compared', 'acquired'} else 2
+    return 0 if result['status'] in {'compared', 'acquired', 'inspected_dictionary'} else 2
 
 
 if __name__ == '__main__':

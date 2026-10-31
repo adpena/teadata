@@ -104,20 +104,34 @@ def validate_header_table(table: Mapping[str, Any]) -> None:
             raise ValueError("Invalid source dictionary reference")
         _adjacent_filename(dictionary["filename"])
     definitions: dict[str, tuple[str, str]] = {}
+    observed_components: dict[tuple[str, str], str] = {}
     if "dictionary_records" in table:
         records = table["dictionary_records"]
         if not isinstance(records, list) or not records:
             raise ValueError("Publisher dictionary records must retain their ordered occurrences")
         for ordinal, record in enumerate(records, 1):
             if (not isinstance(record, dict)
-                    or set(record) != {"ordinal", "code", "publisher_type", "publisher_description"}
+                    or not {"ordinal", "code", "publisher_type", "publisher_description"} <= set(record)
+                    or set(record) - {"ordinal", "code", "publisher_type", "publisher_description",
+                                     "source_sha256", "source_line", "source_column"}
                     or type(record["ordinal"]) is not int or record["ordinal"] != ordinal
-                    or any(not isinstance(record[key], str) or not record[key].strip()
-                           for key in ("code", "publisher_type", "publisher_description"))):
+                    or not isinstance(record["code"], str) or not record["code"].strip()
+                    or any(record[key] is not None and (not isinstance(record[key], str) or not record[key].strip())
+                           for key in ("publisher_type", "publisher_description"))):
                 raise ValueError("Invalid publisher dictionary occurrence")
-            definition = record["publisher_type"], record["publisher_description"]
-            if definitions.setdefault(record["code"], definition) != definition:
-                raise ValueError(f"Conflicting publisher dictionary definitions for {record['code']!r}")
+            anchors = {"source_sha256", "source_line", "source_column"} & set(record)
+            if anchors and (anchors != {"source_sha256", "source_line", "source_column"}
+                    or not _checksum(record["source_sha256"])
+                    or type(record["source_line"]) is not int or record["source_line"] < 1
+                    or type(record["source_column"]) is not int or record["source_column"] < 0):
+                raise ValueError("Invalid publisher dictionary source anchor")
+            for key in ("publisher_type", "publisher_description"):
+                value = record[key]
+                if value is not None and observed_components.setdefault((record["code"], key), value) != value:
+                    raise ValueError(f"Conflicting publisher dictionary definitions for {record['code']!r}")
+            if record["publisher_type"] is not None and record["publisher_description"] is not None:
+                # Partial observations never combine to manufacture a definition.
+                definitions[record["code"]] = record["publisher_type"], record["publisher_description"]
     seen_codes, seen_fields = set(), set()
     for position, field in enumerate(table["fields"], 1):
         if (not isinstance(field, dict)

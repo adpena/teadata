@@ -437,6 +437,42 @@ history through the same provenance reference graph, even when bytes change.
 Reconstructed form URLs must exactly match the original requested URL. A legacy
 GET without form metadata reuses its exact retained URL.
 
+Inspect a retained TAPR HTML dictionary offline through the same command owner:
+
+```bash
+uv run python -m teadata.scripts.refresh_tapr dictionary \
+  --source-store provenance --record DICTIONARY_ACQUISITION_ID \
+  --encoding iso-8859-1 --store provenance --output dictionary-observations.json
+```
+
+This appends a processing receipt without changing Config or acquiring data.
+`--max-bytes` is a positive retained-input limit (default 2 MiB); a separately
+reviewed larger dictionary can use an explicit larger value. Advertised and
+actual sizes are bounded before copying, and the capped parsed bytes must
+match the selected acquisition's SHA and length.
+The typed `teadata.tapr_dictionary.extract_tapr_dictionary()` API retains every
+ordered occurrence, including duplicate codes and independently unknown type
+or description components. It preserves an exact decoded HTML slice; archived
+raw bytes remain the identity authority. Rendered text normalizes presentation
+whitespace only. Anchors bind the raw SHA to the outer tooltip start tag using
+one-based lines and zero-based decoded-character columns.
+Supported `p`, `div` and `br` boundaries separate rendered text. Ambiguous
+dictionary-relevant duplicate class attributes fail instead of hiding a code.
+
+The existing `dictionary_records` column contract retains these observations.
+Only a complete occurrence can document a field; separate partial occurrences
+are never combined into a definition. Conflicting known components fail review.
+Dictionary-only codes do not become source columns or establish availability,
+aliases, units or reference periods. Existing `header_records()` and
+`header_rename_map()` remain the code/label/canonical-field mapping APIs.
+The proposal at `docs/source-contracts/tapr--2025--staff-profile-crosswalk.json`
+describes the retained 106/118-column observations. It is an unactivated source
+review input, outside shipped/runtime schemas; it replaces neither Config nor
+the historical 2025 composite contract. It makes no key/value-comparison or
+data-release claim. Later activation must move this same file into a referenced
+runtime schema, update its references/tests, and remove the proposal path in
+the same change.
+
 Compare two retained originals offline using their exact acquisition IDs and
 independently reviewed crosswalks. Substitute the actual IDs and reviewed SHAs:
 
