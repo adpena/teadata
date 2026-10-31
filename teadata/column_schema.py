@@ -7,7 +7,10 @@ import json
 import keyword
 from pathlib import Path, PurePosixPath
 import re
-from typing import Any, Iterable, Mapping
+from typing import TYPE_CHECKING, Any, Iterable, Mapping
+
+if TYPE_CHECKING:
+    from .dataset_metadata import DatasetMetadata
 
 
 def has_default_reader(reader: Mapping[str, Any]) -> bool:
@@ -79,7 +82,7 @@ def validate_header_table(table: Mapping[str, Any]) -> None:
     """Validate one explicit mapping; never synthesize or deduplicate names."""
     if (not isinstance(table, dict)
             or not {"table", "input_sha256", "source_schema_sha256", "fields"} <= set(table)
-            or set(table) - {"table", "input_sha256", "source_schema_sha256", "fields", "layout", "dictionary", "metric_period"}
+            or set(table) - {"table", "input_sha256", "source_schema_sha256", "fields", "layout", "dictionary", "metric_period", "dictionary_records"}
             or not isinstance(table["table"], str) or not table["table"].strip()
             or not _checksum(table["input_sha256"]) or not _checksum(table["source_schema_sha256"])
             or not isinstance(table["fields"], list) or not table["fields"]):
@@ -100,6 +103,21 @@ def validate_header_table(table: Mapping[str, Any]) -> None:
                 or not isinstance(dictionary["sheet_name"], str) or not dictionary["sheet_name"]):
             raise ValueError("Invalid source dictionary reference")
         _adjacent_filename(dictionary["filename"])
+    definitions: dict[str, tuple[str, str]] = {}
+    if "dictionary_records" in table:
+        records = table["dictionary_records"]
+        if not isinstance(records, list) or not records:
+            raise ValueError("Publisher dictionary records must retain their ordered occurrences")
+        for ordinal, record in enumerate(records, 1):
+            if (not isinstance(record, dict)
+                    or set(record) != {"ordinal", "code", "publisher_type", "publisher_description"}
+                    or type(record["ordinal"]) is not int or record["ordinal"] != ordinal
+                    or any(not isinstance(record[key], str) or not record[key].strip()
+                           for key in ("code", "publisher_type", "publisher_description"))):
+                raise ValueError("Invalid publisher dictionary occurrence")
+            definition = record["publisher_type"], record["publisher_description"]
+            if definitions.setdefault(record["code"], definition) != definition:
+                raise ValueError(f"Conflicting publisher dictionary definitions for {record['code']!r}")
     seen_codes, seen_fields = set(), set()
     for position, field in enumerate(table["fields"], 1):
         if (not isinstance(field, dict)
@@ -128,6 +146,13 @@ def validate_header_table(table: Mapping[str, Any]) -> None:
             raise ValueError(f"Invalid publisher metadata in column {position}")
         if field.get("disposition", "fact") not in {"identity", "fact"}:
             raise ValueError(f"Unaccounted source column {position}; retain an identity or fact")
+        if "dictionary_records" in table:
+            definition = definitions.get(field["code"])
+            status = field.get("dictionary_status")
+            if ((status == "documented" and definition != (field.get("publisher_type"), field.get("publisher_description")))
+                    or (status in {"not_applicable", "not_documented"} and definition is not None)
+                    or status is None):
+                raise ValueError(f"Source column {position} differs from its publisher dictionary occurrences")
         if "dictionary" in table and not {"publisher_type", "publisher_length", "disposition"} <= set(field):
             raise ValueError(f"Missing publisher dictionary metadata in column {position}")
         name = field["field"]
@@ -270,17 +295,49 @@ def validate_selected_crosswalk(document: Mapping[str, Any], *, dataset: str, ed
 
 
 def header_records(document: Mapping[str, Any], *, dataset: str, edition: str,
-                   table: str | None = None) -> list[dict[str, Any]]:
+                   table: str | None = None,
+                   metadata: DatasetMetadata | None = None) -> list[dict[str, Any]]:
+    """Project reviewed field periods from this selected metadata, never report years.
+
+    Exact MetricDefinition fields use their explicit period, or the selected
+    dataset period when omitted, as catalog metric resolution does. Undeclared
+    names never acquire a period from a field prefix or report year.
+    """
+    from .dataset_metadata import DataPeriod
+
     selected = crosswalk_dataset(document, dataset, edition)
     tables = [item for item in selected["tables"] if table is None or item["table"] == table]
     if not tables:
         raise ValueError(f"Header crosswalk table unavailable: {table!r}")
-    return [{**field, "dataset": dataset, "edition": edition, "table": item["table"],
-             "mapping_version": document["mapping_version"], "input_sha256": item["input_sha256"],
-             "source_schema_sha256": item["source_schema_sha256"],
-             **({"period": dict(item["metric_period"]) if field.get("disposition", "fact") == "fact"
-                 else {"kind": "unknown"}} if "metric_period" in item else {})}
-            for item in tables for field in item["fields"]]
+    periods: dict[str, DataPeriod] = {}
+    if metadata is not None:
+        for definition in metadata.metrics.values():
+            period = definition.period if definition.period is not None else metadata.period
+            if periods.setdefault(definition.field, period) != period:
+                raise ValueError(f"Conflicting reviewed field periods for {definition.field!r}")
+    result = []
+    for item in tables:
+        default = DataPeriod.from_dict(item.get("metric_period"))
+        if (metadata is not None and metadata.period.kind != "unknown" and default.kind != "unknown"
+                and metadata.period != default):
+            raise ValueError("Source metric period differs from its declared source metadata")
+        occurrences: dict[str, list[dict[str, Any]]] = {}
+        for row in item.get("dictionary_records", ()):
+            occurrences.setdefault(row["code"], []).append(row)
+        for field in item["fields"]:
+            identity = field.get("disposition", "fact") == "identity"
+            reviewed = periods.get(field["field"])
+            if (not identity and reviewed is not None and reviewed.kind != "unknown"
+                    and default.kind != "unknown" and reviewed != default):
+                raise ValueError(f"Conflicting known table/field periods for {field['field']!r}")
+            period = DataPeriod() if identity else reviewed if reviewed is not None else default
+            record = {**field, "dataset": dataset, "edition": edition, "table": item["table"],
+                      "mapping_version": document["mapping_version"], "input_sha256": item["input_sha256"],
+                      "source_schema_sha256": item["source_schema_sha256"], "period": period.to_dict()}
+            if "dictionary_records" in item:
+                record["dictionary_occurrences"] = [dict(row) for row in occurrences.get(field["code"], ())]
+            result.append(record)
+    return result
 
 
 def header_rename_map(records: list[dict[str, Any]], *, from_: str = "code", to: str = "field",

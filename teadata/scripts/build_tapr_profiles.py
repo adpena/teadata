@@ -72,14 +72,22 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
             inputs = [contract_observation]
             selected = crosswalk_dataset(parse_column_schema(contract["text"].encode()), dataset, edition)
             if selected.get("source_only"):
-                if reference_store is None or not source.metadata.provenance_ids:
+                # Original HTTP observations may predate a source-family split.
+                # An explicit reviewed source-notes reference binds those exact
+                # bytes without relabeling the immutable acquisition's dataset.
+                raw_references = {identifier for ref in source.metadata.references
+                                  if ref.reference_id == "csv_headers" and ref.role == "source_notes" and ref.reviewed_sha256 in
+                                  {item.input_sha256 for item in sources}
+                                  for identifier in ref.provenance_ids}
+                if reference_store is None or not (source.metadata.provenance_ids or raw_references):
                     raise ValueError("Source-only preparation requires original acquisition receipts in an explicit reference_store")
                 acquired = set()
                 expected = {item.input_sha256 for item in sources}
-                for identifier in source.metadata.provenance_ids:
+                for identifier in dict.fromkeys([*source.metadata.provenance_ids, *sorted(raw_references)]):
                     store.copy_record_from(reference_store, identifier)
                     record = store.read_record(identifier)
-                    if (record["kind"] != "acquisition" or record["dataset"] != dataset
+                    if (record["kind"] != "acquisition"
+                            or (identifier in source.metadata.provenance_ids and record["dataset"] != dataset)
                             or record["artifact"]["sha256"] not in expected):
                         raise ValueError("Source acquisition receipt does not identify the selected raw input")
                     acquired.add(record["artifact"]["sha256"])

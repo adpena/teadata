@@ -352,6 +352,40 @@ The producer requires and retains the original acquisition receipts and bytes
 for source-only datasets; a new local observation does not replace download
 history. GRAD is never automatically merged with STUD/STAF or entity metadata.
 
+The current 2024 STUD and STAF observations have separate source-only datasets:
+`campus_tapr_student_profile`, `district_tapr_student_profile`,
+`campus_tapr_staff_profile` and `district_tapr_staff_profile`. Select
+`--edition 2024 --family student_profile` or `--family staff_profile` with the
+same producer, input directory and canonical reference store. Each produces
+one independent table per scope: STUD has 243/242 campus/district columns and
+STAF has 106/118. These observations do not replace retained PROF or fill fields
+absent from the selected family. PROF retains its 407/420 columns, including
+38/42 codes absent from the current three-family union.
+
+The mixed STUD/STAF tables have an explicit unknown reference period, separate
+from publisher edition 2024. Source-reviewed mobility and attrition percent
+fields declare 2022–2023, supported by their current dictionary descriptions
+and annual glossary page 32. Total enrollment count and total staff FTE declare
+the 2023–2024 context documented on pages 28 and 34. Enrollment is an October
+snapshot, not an annual cumulative count; no exact observation date is invented.
+Staff FTE is not headcount and its unit remains unknown in the current vocabulary.
+Other periods and units remain unknown. The one header projection uses exact registered
+`MetricDefinition.field` matches: explicit field periods refine unknown table
+periods; an omitted registered period uses selected dataset metadata; an
+explicit unknown stays unknown. Identities and undeclared fields never inherit
+a report year. Conflicting known table/field periods or conflicting definitions
+fail before source rows are opened. Config and a frozen catalog use this same
+projection, with the catalog consulting only its own bound metadata.
+
+The new crosswalks preserve all ordered dictionary occurrences, including
+identical repeated district definitions, and retain dictionary-only codes
+without creating CSV columns. Campus staff `CPSCTOFC` remains undocumented;
+dictionary-only `CPSCTOST` is not an alias. Original HTTP receipts retain their
+original composite dataset names. The reviewed `csv_headers` source-notes
+reference binds exact raw bytes to each independent derivation without
+rewriting those receipts. Raw dots, blanks, zeros and the six observed new
+positive numeric lexemes remain distinct; no revision cause is inferred.
+
 The `source` reader profile exposes complete header contracts without reading
 source rows, for example
 `cfg.header_records("district_tapr_student_staff_profile", edition="2024", reader_profile="source")`.

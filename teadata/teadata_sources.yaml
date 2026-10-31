@@ -521,6 +521,354 @@ data_sources:
                 link
               status: unreviewed
               provenance_ids: []
+  campus_tapr_student_profile:
+    2024:
+      path: data/tapr/raw/2024 Campus Student Information.csv
+      metadata:
+        title: 2023-2024 TAPR Campus Student Information
+        publisher: Texas Education Agency
+        version: '2024'
+        period:
+          kind: unknown
+        source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/index.html
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        provenance_ids: []
+        notes: 'Source-only independent STUD observation within publisher edition 2024. Mixed measurement periods: table period and undeclared field periods are explicitly unknown; edition and code suffixes do not establish a reference period. For STUD only, reviewed dictionary descriptions identify 2022-23 attrition and 2023 mobility; annual 2023-24 TAPR Glossary page 32 defines mobility in 2022-23 and attrition from fall 2022 to fall 2023, supporting the two qualified 2022-23 percent bindings. No other field period/unit is assigned except the bounded basic-total review below. CSV labels/code/order and complete original dictionary occurrences are retained, including identical duplicate rows. Dictionary-only codes are not fabricated CSV fields; conflicting definitions fail. Campus STAF CPSCTOFC has no dictionary definition; dictionary-only CPSCTOST/DPSCTOST are not aliases. Raw dots, blanks, zeros and positive numeric observations remain distinct; causes and status are not guessed. Original
+          HTTP receipts retain their original composite dataset names and are linked through csv_headers as source derivation history, not relabeled. Do not coalesce with retained PROF, other families or revisions, and do not fill absent fields from PROF. Historical keys/names/parents are source attributes independent of current GIS. No default released reader, semantic binding or entity hydration is activated.Bounded current-source review: annual glossary page 28 labels Student Information (2023-24), defines enrollment as the last-Friday-in-October snapshot and defines Total Students. The exact current CPNTALLC/DPNTALLC dictionary descriptions identify total enrollment count. Its 2023-24 school-year binding records that source context, not an annual cumulative measurement; exact as_of date is unrecorded and not invented. Annual glossary page 34 labels Staff Information (2023-24); exact current CPSATOFC/DPSATOFC descriptions identify All Staff Total Full Time Equiv Count. Only those staff
+          fields receive 2023-24; FTE is not headcount, the precise observation date is unspecified and unit stays unknown under the existing unit vocabulary. No blanket period assignment is made to other fields. '
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          title: Original 2024 Campus STUD CSV; exact POST controls and original acquisition dataset retained in receipt
+          status: available
+          provenance_ids:
+          - 9b115abb5b7c0f5ce4ebdd82f36fc14e06ab55658b496f31064776277b16658c
+          reviewed_sha256: 8dc181ee75c5da8451a45c8f405f8cbc8fe9987efb198d9ded90d7d512f161a0
+        - reference_id: selection
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&tapr=all_c&ccyy=2024&step=3&bylev=All+Campuses&level=Campus&sumlev=C&id=&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_step_6.sas&dsname=STUD
+          title: 2023-24 TAPR Campus STUD original selection controls
+          status: available
+          provenance_ids:
+          - 873673ddd77f0272a9b27d6b35f105b3841b517dc70cf01441f8644d231baa3c
+          reviewed_sha256: 1b97e003c153c6102b740180959050d162afbf52e85d28170a3879376248352b
+        - reference_id: dictionary
+          role: data_dictionary
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=C&dsname=STUD&dd=student&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          title: 2023-24 TAPR Campus STUD publisher code/type/description dictionary; ordered duplicate occurrences retained
+          status: available
+          provenance_ids:
+          - af099020dae0691ae9cb783daaf00ec3610d3a14935ad794ae58f5e6e1434a1e
+          reviewed_sha256: 71b163012db6b6b8c59e247be815428627dec22e7d0c6c7ca8d48cad02145ad7
+        - reference_id: glossary
+          role: glossary
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+          title: 2023-24 TAPR Glossary; Student Information p28, lagged mobility/attrition p32, Staff Information p34
+          status: available
+          provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+        - reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+          title: Explanation of 2023-24 TAPR Masking Rules; reference only, no new token rule inferred
+          status: available
+          provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+        metrics:
+          student_membership_attrition_all_students_percent:
+            field: campus_2024_student_membership_2022_23_attrition_all_students_percent
+            period:
+              kind: school_year
+              start_year: 2022
+              end_year: 2023
+            unit: percent
+          student_membership_mobility_all_students_percent:
+            field: campus_2024_student_membership_2023_mobility_all_students_percent
+            period:
+              kind: school_year
+              start_year: 2022
+              end_year: 2023
+            unit: percent
+          student_enrollment_all_students_count:
+            field: campus_2024_student_enrollment_all_students_count
+            period:
+              kind: school_year
+              start_year: 2023
+              end_year: 2024
+            unit: count
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--student-profile-crosswalk.json
+            tapr_source:
+              scope: campus
+              tables:
+                student_profile: data/tapr/raw/2024 Campus Student Information.csv
+            references:
+            - reference_id: columns_source
+              role: schema
+              path: schemas/tapr--2024--student-profile-crosswalk.json
+              title: Reviewed complete 2024 student_profile source-only header/layout and ordered dictionary-occurrence contract
+              status: available
+              provenance_ids: []
+              reviewed_sha256: abb6196de760d6156af23d31f32b91ce3599350d8b53259feb60cb96b37792cd
+  campus_tapr_staff_profile:
+    2024:
+      path: data/tapr/raw/2024 Campus Staff Information.csv
+      metadata:
+        title: 2023-2024 TAPR Campus Staff Information
+        publisher: Texas Education Agency
+        version: '2024'
+        period:
+          kind: unknown
+        source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/index.html
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        provenance_ids: []
+        notes: 'Source-only independent STAF observation within publisher edition 2024. Mixed measurement periods: table period and undeclared field periods are explicitly unknown; edition and code suffixes do not establish a reference period. For STUD only, reviewed dictionary descriptions identify 2022-23 attrition and 2023 mobility; annual 2023-24 TAPR Glossary page 32 defines mobility in 2022-23 and attrition from fall 2022 to fall 2023, supporting the two qualified 2022-23 percent bindings. No other field period/unit is assigned except the bounded basic-total review below. CSV labels/code/order and complete original dictionary occurrences are retained, including identical duplicate rows. Dictionary-only codes are not fabricated CSV fields; conflicting definitions fail. Campus STAF CPSCTOFC has no dictionary definition; dictionary-only CPSCTOST/DPSCTOST are not aliases. Raw dots, blanks, zeros and positive numeric observations remain distinct; causes and status are not guessed. Original
+          HTTP receipts retain their original composite dataset names and are linked through csv_headers as source derivation history, not relabeled. Do not coalesce with retained PROF, other families or revisions, and do not fill absent fields from PROF. Historical keys/names/parents are source attributes independent of current GIS. No default released reader, semantic binding or entity hydration is activated.Bounded current-source review: annual glossary page 28 labels Student Information (2023-24), defines enrollment as the last-Friday-in-October snapshot and defines Total Students. The exact current CPNTALLC/DPNTALLC dictionary descriptions identify total enrollment count. Its 2023-24 school-year binding records that source context, not an annual cumulative measurement; exact as_of date is unrecorded and not invented. Annual glossary page 34 labels Staff Information (2023-24); exact current CPSATOFC/DPSATOFC descriptions identify All Staff Total Full Time Equiv Count. Only those staff
+          fields receive 2023-24; FTE is not headcount, the precise observation date is unspecified and unit stays unknown under the existing unit vocabulary. No blanket period assignment is made to other fields. '
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          title: Original 2024 Campus STAF CSV; exact POST controls and original acquisition dataset retained in receipt
+          status: available
+          provenance_ids:
+          - 02df3081b6b7178e8d536ee5ceb8313cc68af7ef8e8204a246bc2a2fd8de0509
+          reviewed_sha256: bead14bbdc54396c8e41e5b744c2aeccf8728df3b819981a9f4270b225c2ea16
+        - reference_id: selection
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&tapr=all_c&ccyy=2024&step=3&bylev=All+Campuses&level=Campus&sumlev=C&id=&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_step_6.sas&dsname=STAF
+          title: 2023-24 TAPR Campus STAF original selection controls
+          status: available
+          provenance_ids:
+          - 3bb286b5cd21ee5776ca8269c47c06e91b2c6c63f18245519677f8b7164684ab
+          reviewed_sha256: 5026de1af092315800f80e81fb05ee1dba82bca6a15490d35f5150c20d5f73c8
+        - reference_id: dictionary
+          role: data_dictionary
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=C&dsname=STAF&dd=staff&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          title: 2023-24 TAPR Campus STAF publisher code/type/description dictionary; ordered duplicate occurrences retained
+          status: available
+          provenance_ids:
+          - 747c65c197c2f8a298d2c0d13c2c7e5abad777c87cdca80e5d1a39a2d7150d1e
+          reviewed_sha256: e25bc3ae475bbd756b324ccefa839ded1f7e7106aee9e5bbf2990193fea4a4be
+        - reference_id: glossary
+          role: glossary
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+          title: 2023-24 TAPR Glossary; Student Information p28, lagged mobility/attrition p32, Staff Information p34
+          status: available
+          provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+        - reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+          title: Explanation of 2023-24 TAPR Masking Rules; reference only, no new token rule inferred
+          status: available
+          provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+        metrics:
+          staff_all_staff_total_full_time_equiv_count:
+            field: campus_2024_staff_all_staff_total_full_time_equiv_count
+            period:
+              kind: school_year
+              start_year: 2023
+              end_year: 2024
+            unit: null
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--staff-profile-crosswalk.json
+            tapr_source:
+              scope: campus
+              tables:
+                staff_profile: data/tapr/raw/2024 Campus Staff Information.csv
+            references:
+            - reference_id: columns_source
+              role: schema
+              path: schemas/tapr--2024--staff-profile-crosswalk.json
+              title: Reviewed complete 2024 staff_profile source-only header/layout and ordered dictionary-occurrence contract
+              status: available
+              provenance_ids: []
+              reviewed_sha256: 73b50ad614f998f5f19b725143f80f2b1faf045b2836a3f1bf9e8d261a8fd928
+  district_tapr_student_profile:
+    2024:
+      path: data/tapr/raw/2024 District Student Information.csv
+      metadata:
+        title: 2023-2024 TAPR District Student Information
+        publisher: Texas Education Agency
+        version: '2024'
+        period:
+          kind: unknown
+        source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/index.html
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        provenance_ids: []
+        notes: 'Source-only independent STUD observation within publisher edition 2024. Mixed measurement periods: table period and undeclared field periods are explicitly unknown; edition and code suffixes do not establish a reference period. For STUD only, reviewed dictionary descriptions identify 2022-23 attrition and 2023 mobility; annual 2023-24 TAPR Glossary page 32 defines mobility in 2022-23 and attrition from fall 2022 to fall 2023, supporting the two qualified 2022-23 percent bindings. No other field period/unit is assigned except the bounded basic-total review below. CSV labels/code/order and complete original dictionary occurrences are retained, including identical duplicate rows. Dictionary-only codes are not fabricated CSV fields; conflicting definitions fail. Campus STAF CPSCTOFC has no dictionary definition; dictionary-only CPSCTOST/DPSCTOST are not aliases. Raw dots, blanks, zeros and positive numeric observations remain distinct; causes and status are not guessed. Original
+          HTTP receipts retain their original composite dataset names and are linked through csv_headers as source derivation history, not relabeled. Do not coalesce with retained PROF, other families or revisions, and do not fill absent fields from PROF. Historical keys/names/parents are source attributes independent of current GIS. No default released reader, semantic binding or entity hydration is activated.Bounded current-source review: annual glossary page 28 labels Student Information (2023-24), defines enrollment as the last-Friday-in-October snapshot and defines Total Students. The exact current CPNTALLC/DPNTALLC dictionary descriptions identify total enrollment count. Its 2023-24 school-year binding records that source context, not an annual cumulative measurement; exact as_of date is unrecorded and not invented. Annual glossary page 34 labels Staff Information (2023-24); exact current CPSATOFC/DPSATOFC descriptions identify All Staff Total Full Time Equiv Count. Only those staff
+          fields receive 2023-24; FTE is not headcount, the precise observation date is unspecified and unit stays unknown under the existing unit vocabulary. No blanket period assignment is made to other fields. '
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          title: Original 2024 District STUD CSV; exact POST controls and original acquisition dataset retained in receipt
+          status: available
+          provenance_ids:
+          - 7751ad5be1a4b99a80902d2d8370dbbfc4c4d7c620a1498b1ed965c0bf66aaa7
+          reviewed_sha256: f595728ad54e4e49986fc060ee8f492964127ebb8f6b262b725e1daf30c96984
+        - reference_id: selection
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&tapr=all_d&ccyy=2024&step=3&bylev=All+Districts&level=District&sumlev=D&id=&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_step_6.sas&dsname=STUD
+          title: 2023-24 TAPR District STUD original selection controls
+          status: available
+          provenance_ids:
+          - bbcdf5e655c1a2a1e37534a3d42eac233940c006607dc3192dd7e58503029864
+          reviewed_sha256: df9388b25d3fa9db851028a12284b7b83179248b1bd79da9fa39df91d6680b82
+        - reference_id: dictionary
+          role: data_dictionary
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=D&dsname=STUD&dd=student&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          title: 2023-24 TAPR District STUD publisher code/type/description dictionary; ordered duplicate occurrences retained
+          status: available
+          provenance_ids:
+          - 457b51f5da28051f04166675ffca42fedfd480044110da323f310bd20bcd45b7
+          reviewed_sha256: b38d8255e5717bc82a8b7083d2fbc34cd8be9f19c88fc2d65807552ecf97934b
+        - reference_id: glossary
+          role: glossary
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+          title: 2023-24 TAPR Glossary; Student Information p28, lagged mobility/attrition p32, Staff Information p34
+          status: available
+          provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+        - reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+          title: Explanation of 2023-24 TAPR Masking Rules; reference only, no new token rule inferred
+          status: available
+          provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+        metrics:
+          student_membership_attrition_all_students_percent:
+            field: district_2024_student_membership_2022_23_attrition_all_students_percent
+            period:
+              kind: school_year
+              start_year: 2022
+              end_year: 2023
+            unit: percent
+          student_membership_mobility_all_students_percent:
+            field: district_2024_student_membership_2023_mobility_all_students_percent
+            period:
+              kind: school_year
+              start_year: 2022
+              end_year: 2023
+            unit: percent
+          student_enrollment_all_students_count:
+            field: district_2024_student_enrollment_all_students_count
+            period:
+              kind: school_year
+              start_year: 2023
+              end_year: 2024
+            unit: count
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--student-profile-crosswalk.json
+            tapr_source:
+              scope: district
+              tables:
+                student_profile: data/tapr/raw/2024 District Student Information.csv
+            references:
+            - reference_id: columns_source
+              role: schema
+              path: schemas/tapr--2024--student-profile-crosswalk.json
+              title: Reviewed complete 2024 student_profile source-only header/layout and ordered dictionary-occurrence contract
+              status: available
+              provenance_ids: []
+              reviewed_sha256: abb6196de760d6156af23d31f32b91ce3599350d8b53259feb60cb96b37792cd
+  district_tapr_staff_profile:
+    2024:
+      path: data/tapr/raw/2024 District Staff Information.csv
+      metadata:
+        title: 2023-2024 TAPR District Staff Information
+        publisher: Texas Education Agency
+        version: '2024'
+        period:
+          kind: unknown
+        source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/index.html
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        provenance_ids: []
+        notes: 'Source-only independent STAF observation within publisher edition 2024. Mixed measurement periods: table period and undeclared field periods are explicitly unknown; edition and code suffixes do not establish a reference period. For STUD only, reviewed dictionary descriptions identify 2022-23 attrition and 2023 mobility; annual 2023-24 TAPR Glossary page 32 defines mobility in 2022-23 and attrition from fall 2022 to fall 2023, supporting the two qualified 2022-23 percent bindings. No other field period/unit is assigned except the bounded basic-total review below. CSV labels/code/order and complete original dictionary occurrences are retained, including identical duplicate rows. Dictionary-only codes are not fabricated CSV fields; conflicting definitions fail. Campus STAF CPSCTOFC has no dictionary definition; dictionary-only CPSCTOST/DPSCTOST are not aliases. Raw dots, blanks, zeros and positive numeric observations remain distinct; causes and status are not guessed. Original
+          HTTP receipts retain their original composite dataset names and are linked through csv_headers as source derivation history, not relabeled. Do not coalesce with retained PROF, other families or revisions, and do not fill absent fields from PROF. Historical keys/names/parents are source attributes independent of current GIS. No default released reader, semantic binding or entity hydration is activated.Bounded current-source review: annual glossary page 28 labels Student Information (2023-24), defines enrollment as the last-Friday-in-October snapshot and defines Total Students. The exact current CPNTALLC/DPNTALLC dictionary descriptions identify total enrollment count. Its 2023-24 school-year binding records that source context, not an annual cumulative measurement; exact as_of date is unrecorded and not invented. Annual glossary page 34 labels Staff Information (2023-24); exact current CPSATOFC/DPSATOFC descriptions identify All Staff Total Full Time Equiv Count. Only those staff
+          fields receive 2023-24; FTE is not headcount, the precise observation date is unspecified and unit stays unknown under the existing unit vocabulary. No blanket period assignment is made to other fields. '
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          title: Original 2024 District STAF CSV; exact POST controls and original acquisition dataset retained in receipt
+          status: available
+          provenance_ids:
+          - b79b0b56bab1386c7e12c64e6373303efacd4b5322b431243db42f50b26f07a5
+          reviewed_sha256: f1107353cdaacc78085fbc0621f1696cd14faf276052d8c9d879f29e53f281c3
+        - reference_id: selection
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&tapr=all_d&ccyy=2024&step=3&bylev=All+Districts&level=District&sumlev=D&id=&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_step_6.sas&dsname=STAF
+          title: 2023-24 TAPR District STAF original selection controls
+          status: available
+          provenance_ids:
+          - 15de5c0052e59b903fa812bd5c62849dec2b5a0d969dacde56f7e5e383aba18c
+          reviewed_sha256: a5d682dde8c30afc955f3693e6a7911fa165b3acd8055a0cfb640a017932c840
+        - reference_id: dictionary
+          role: data_dictionary
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=D&dsname=STAF&dd=staff&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          title: 2023-24 TAPR District STAF publisher code/type/description dictionary; ordered duplicate occurrences retained
+          status: available
+          provenance_ids:
+          - fdaea8543aff26c718af0d4f7ced6d77e1ed9656b29d83644ac4d021a51074b6
+          reviewed_sha256: 64c41ab6871956220100fbe6006b569a1187965420429d1144d9d31756a1dc6a
+        - reference_id: glossary
+          role: glossary
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+          title: 2023-24 TAPR Glossary; Student Information p28, lagged mobility/attrition p32, Staff Information p34
+          status: available
+          provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+        - reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+          title: Explanation of 2023-24 TAPR Masking Rules; reference only, no new token rule inferred
+          status: available
+          provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+        metrics:
+          staff_all_staff_total_full_time_equiv_count:
+            field: district_2024_staff_all_staff_total_full_time_equiv_count
+            period:
+              kind: school_year
+              start_year: 2023
+              end_year: 2024
+            unit: null
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--staff-profile-crosswalk.json
+            tapr_source:
+              scope: district
+              tables:
+                staff_profile: data/tapr/raw/2024 District Staff Information.csv
+            references:
+            - reference_id: columns_source
+              role: schema
+              path: schemas/tapr--2024--staff-profile-crosswalk.json
+              title: Reviewed complete 2024 staff_profile source-only header/layout and ordered dictionary-occurrence contract
+              status: available
+              provenance_ids: []
+              reviewed_sha256: 73b50ad614f998f5f19b725143f80f2b1faf045b2836a3f1bf9e8d261a8fd928
   campus_tapr_graduation_profile:
     2024:
       path: data/tapr/raw/2024 Campus Graduation Profile.csv
@@ -2041,6 +2389,14 @@ schema:
     - csv
     campus_tapr_student_staff_profile:
     - xlsx
+    campus_tapr_student_profile:
+    - csv
+    campus_tapr_staff_profile:
+    - csv
+    district_tapr_student_profile:
+    - csv
+    district_tapr_staff_profile:
+    - csv
     campus_tapr_graduation_profile:
     - csv
     district_tapr_graduation_profile:

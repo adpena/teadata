@@ -226,6 +226,8 @@ class DatasetCatalog:
                         validate_selected_crosswalk(self._column_schemas[crosswalk_sha], dataset=key,
                                                     edition=metadata.version, input_sha256=artifact["sha256"],
                                                     columns=read["columns"])
+                    crosswalk_records(self._column_schemas[crosswalk_sha], dataset=key,
+                                      edition=metadata.version, metadata=metadata)
                 except (KeyError, ValueError) as error:
                     raise ContractError(f"Invalid selected header crosswalk: {error}") from error
         self._build_id = identity
@@ -322,7 +324,8 @@ class DatasetCatalog:
         if digest is None or selected is None:
             raise ContractError(f"Header crosswalk unavailable for selected dataset {dataset!r}")
         try:
-            return crosswalk_records(self._column_schemas[digest], dataset=dataset, edition=selected, table=table)
+            return crosswalk_records(self._column_schemas[digest], dataset=dataset, edition=selected,
+                                     table=table, metadata=metadata)
         except ValueError as error:
             raise ContractError(str(error)) from error
 

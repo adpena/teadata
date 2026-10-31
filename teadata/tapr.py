@@ -18,7 +18,7 @@ from .column_schema import validate_header_table
 from .identifiers import canonical_source_identifiers
 
 
-TAPR_PROFILE_FAMILIES = ("student_staff_profile", "graduation_profile")
+TAPR_PROFILE_FAMILIES = ("student_staff_profile", "graduation_profile", "student_profile", "staff_profile")
 
 
 @dataclass(frozen=True)
