@@ -73,19 +73,38 @@ def _checksum(value: Any) -> bool:
 def validate_header_table(table: Mapping[str, Any]) -> None:
     """Validate one explicit mapping; never synthesize or deduplicate names."""
     if (not isinstance(table, dict)
-            or set(table) != {"table", "input_sha256", "source_schema_sha256", "fields"}
+            or not {"table", "input_sha256", "source_schema_sha256", "fields"} <= set(table)
+            or set(table) - {"table", "input_sha256", "source_schema_sha256", "fields", "layout", "dictionary"}
             or not isinstance(table["table"], str) or not table["table"].strip()
             or not _checksum(table["input_sha256"]) or not _checksum(table["source_schema_sha256"])
             or not isinstance(table["fields"], list) or not table["fields"]):
         raise ValueError("Invalid header crosswalk table")
+    if "layout" in table:
+        validate_source_layout(table["layout"])
+    if "dictionary" in table:
+        dictionary = table["dictionary"]
+        if (not isinstance(dictionary, dict)
+                or set(dictionary) != {"filename", "sha256", "sheet_name"}
+                or not _checksum(dictionary["sha256"])
+                or not isinstance(dictionary["sheet_name"], str) or not dictionary["sheet_name"]):
+            raise ValueError("Invalid source dictionary reference")
+        _adjacent_filename(dictionary["filename"])
     seen_codes, seen_fields = set(), set()
     for position, field in enumerate(table["fields"], 1):
-        if (not isinstance(field, dict) or set(field) != {"position", "code", "label", "field"}
+        if (not isinstance(field, dict)
+                or not {"position", "code", "label", "field"} <= set(field)
+                or set(field) - {"position", "code", "label", "field", "publisher_type", "publisher_length", "disposition"}
                 or type(field["position"]) is not int or field["position"] != position
                 or not isinstance(field["code"], str) or not field["code"].strip()
                 or not isinstance(field["label"], str) or not field["label"].strip()
                 or not isinstance(field["field"], str)):
             raise ValueError(f"Invalid header crosswalk column {position}")
+        if any(not isinstance(field[key], str) for key in ("publisher_type", "publisher_length") if key in field):
+            raise ValueError(f"Invalid publisher metadata in column {position}")
+        if field.get("disposition", "fact") not in {"identity", "fact"}:
+            raise ValueError(f"Unaccounted source column {position}; retain an identity or fact")
+        if "dictionary" in table and not {"publisher_type", "publisher_length", "disposition"} <= set(field):
+            raise ValueError(f"Missing publisher dictionary metadata in column {position}")
         name = field["field"]
         if re.fullmatch(r"[a-z_][a-z0-9_]*", name) is None or keyword.iskeyword(name):
             raise ValueError(f"Invalid canonical header in column {position}: {name!r}; ASCII snake_case is required")
@@ -98,6 +117,46 @@ def validate_header_table(table: Mapping[str, Any]) -> None:
     if source_schema_fingerprint([f["label"] for f in table["fields"]],
                                  [f["code"] for f in table["fields"]]) != table["source_schema_sha256"]:
         raise ValueError("Header crosswalk source-schema checksum mismatch")
+
+
+def _adjacent_filename(value: Any) -> None:
+    if (not isinstance(value, str) or not value or value in {".", ".."}
+            or "/" in value or "\\" in value or ":" in value):
+        raise ValueError("Source filename must be one adjacent portable filename")
+
+
+def validate_source_layout(layout: Any) -> None:
+    """Require reviewed record coordinates; never guess where notes end."""
+    if (not isinstance(layout, dict)
+            or set(layout) != {"code_record", "label_record", "first_data_record", "last_data_record", "annotations"}
+            or any(type(layout[key]) is not int or layout[key] < 1
+                   for key in ("code_record", "first_data_record", "last_data_record"))
+            or (layout["label_record"] is not None
+                and (type(layout["label_record"]) is not int or layout["label_record"] < 1))
+            or layout["last_data_record"] < layout["first_data_record"]
+            or not isinstance(layout["annotations"], list)):
+        raise ValueError("Invalid source record layout")
+    headers = {layout["code_record"]}
+    if layout["label_record"] is not None:
+        if layout["label_record"] in headers:
+            raise ValueError("Source header records overlap")
+        headers.add(layout["label_record"])
+    if any(layout["first_data_record"] <= number <= layout["last_data_record"] for number in headers):
+        raise ValueError("Source header and data records overlap")
+    covered: list[tuple[int, int]] = []
+    for annotation in layout["annotations"]:
+        if (not isinstance(annotation, dict)
+                or set(annotation) != {"first_record", "last_record", "kind", "sha256"}
+                or annotation["kind"] not in {"preamble", "note", "footer", "blank"}
+                or any(type(annotation[key]) is not int or annotation[key] < 1 for key in ("first_record", "last_record"))
+                or annotation["last_record"] < annotation["first_record"]
+                or not _checksum(annotation["sha256"])):
+            raise ValueError("Invalid source annotation range")
+        first, last = annotation["first_record"], annotation["last_record"]
+        if (any(first <= number <= last for number in headers)
+                or any(first <= old_last and old_first <= last for old_first, old_last in covered)):
+            raise ValueError("Source annotation ranges overlap")
+        covered.append((first, last))
 
 
 def parse_column_schema(data: bytes) -> dict[str, Any]:

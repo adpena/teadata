@@ -266,7 +266,8 @@ Set `TEADATA_DATA_DIR` to point the scripts at an existing source-data tree:
 ```bash
 export TEADATA_DATA_DIR="$HOME/datasets/teadata"
 uv run python -m teadata.scripts.rename_tepsac_headers
-uv run python -m teadata.scripts.build_tapr_2025_profiles
+uv run python -m teadata.scripts.build_tapr_profiles \
+  --edition 2024 --reference-store provenance --output-dir prepared/tapr-2024
 ```
 
 The variable names the directory containing `tapr/`, `shapes/`, `tepsac/`, and
@@ -290,9 +291,52 @@ uv run python -m teadata.scripts.geocode_tepsac_data \
   --input raw/schools.xlsx --output output/geocoded.csv
 uv run python -m teadata.scripts.flatten_districts_geojson \
   --input districts.geojson --output districts_flat.geojson
-uv run python -m teadata.scripts.build_tapr_2025_profiles \
-  --input-dir raw/ --output-dir output/
+uv run python -m teadata.scripts.build_tapr_profiles \
+  --edition 2025 --input-dir raw/ --reference-store provenance --output-dir prepared/tapr-2025
 ```
+
+The TAPR command prepares every declared publisher column for both scopes into
+a **new** directory, validating all inputs before staging any output. Its
+Parquet files retain raw strings, source crosswalks, annotation records and
+immutable acquisition/processing receipts. Existing directories and retained
+reference workbooks are never replaced. These outputs are source preparations,
+not an activated release or typed scientific measurements. The old year-specific
+builder and the 75-column district renamer are retired; 2024 and 2025 use this
+same explicit preparation path.
+
+`--reference-store` supplies the canonical acquisition receipts and exact bytes
+for established reference links. The producer retains only their selected
+immutable closure, preserving record IDs and observation dates. A missing
+claimed receipt or artifact fails preparation. Newly observed crosswalks bind
+their own receipts; unreviewed link-only documents remain explicitly not
+acquired. Portable raw-source locators remain unchanged in public reader
+metadata and resolve against the configured data directory only when selected.
+
+Coverage refers to the declared inputs: 2024 `PROF` contains 407 campus and 420
+district columns, including 34 lagged annual-graduate fields in each scope.
+The current 2025 inputs are `STUD` and `STAF` only. They contain no graduate
+fields; the separate publisher `GRAD` Graduation Profile needs its own audited
+input/header contract before claiming equivalent annual-profile coverage.
+
+The `source` reader profile exposes complete header contracts without reading
+source rows, for example
+`cfg.header_records("district_tapr_student_staff_profile", edition="2024", reader_profile="source")`.
+`cfg.load_df(..., reader_profile="source")` explicitly reads the full raw edition;
+the default reader continues to use its exact retained prepared workbook.
+Raw source preparation cannot run inside a retained-format release build.
+Source identities and historical names are lossless period-specific attributes,
+not additional metric keys or automatic `.meta` hydration. No current geometry
+roster limits source coverage. Unknown field units and reference periods remain
+unknown; the existing qualified metric bindings retain their lagged periods.
+
+One-header 2024 inputs use their complete Name/Type/Length/Label dictionaries;
+2025 inputs declare exact label and code header records. Any preamble, note,
+blank gap or footer must have reviewed CSV-record coordinates and an exact
+content hash in the source contract. Removed notes are retained as annotations.
+Undeclared records, duplicate identities, changed dictionaries, header collisions
+and conflicting shared fields fail. Shared-field merging is limited to the same
+qualified TAPR dataset and edition; it does not choose between observations
+from different datasets, editions or methodologies.
 
 Use `--help` to inspect options without loading source files or contacting
 download/geocoding services. Importing the download and geocoding modules does

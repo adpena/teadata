@@ -12,6 +12,71 @@ from teadata.provenance import ProvenanceStore
 NOW = datetime(2026, 1, 1, 12, tzinfo=timezone.utc)
 
 
+def test_copy_selected_record_closure_retains_nested_reference_history_only(tmp_path):
+    from dataclasses import replace
+    from teadata.manifest import verify_reference_receipts
+
+    source = ProvenanceStore(tmp_path / "original-store")
+    document = tmp_path / "definitions.md"
+    document.write_text("Publisher definitions")
+    doc_id = source.record_acquisition(document, source_definition(document), recorded_at=NOW)
+    reference = {"reference_id": "definitions", "role": "data_dictionary", "status": "available",
+                 "path": "portable/original-definitions.md", "reviewed_sha256": sha256(document.read_bytes()).hexdigest(),
+                 "provenance_ids": [doc_id]}
+    raw = tmp_path / "raw.csv"
+    raw.write_text("value\n42\n")
+    observed = replace(source_definition(raw), metadata=DatasetMetadata.from_dict({"references": [reference]}))
+    raw_id = source.record_acquisition(raw, observed, recorded_at=NOW + timedelta(seconds=1))
+    output = tmp_path / "prepared.csv"
+    output.write_text("value\n42\n")
+    processing = source.record_processing(dataset="example", inputs=[raw_id], outputs={"prepared": output},
+        processor="test", code_version="test", recorded_at=NOW + timedelta(seconds=2))
+    unrelated = tmp_path / "unrelated.txt"
+    unrelated.write_text("Not part of the selected provenance graph")
+    unrelated_id = source.record_acquisition(unrelated, source_definition(unrelated), recorded_at=NOW)
+    target = ProvenanceStore(tmp_path / "standalone")
+    target.copy_record_from(source, processing)
+    closure = target.verify_record_closure([processing])
+    assert set(closure) == {processing, raw_id, doc_id}
+    assert unrelated_id not in closure
+    assert target.read_record(doc_id) == source.read_record(doc_id)
+    assert target.read_record(raw_id)["recorded_at"] == (NOW + timedelta(seconds=1)).isoformat()
+    assert not (target.root / "objects" / sha256(unrelated.read_bytes()).hexdigest()).exists()
+    with pytest.raises(FileNotFoundError):
+        verify_reference_receipts(observed, target, reference_base=tmp_path)
+
+
+def test_claimed_unreviewed_reference_sha_mismatch_is_not_hidden_by_status(tmp_path):
+    from dataclasses import replace
+    from teadata.manifest import ContractError
+
+    store = ProvenanceStore(tmp_path / "store")
+    document = tmp_path / "reference.md"
+    document.write_text("Exact reference bytes")
+    document_id = store.record_acquisition(document, source_definition(document))
+    source = tmp_path / "source.csv"
+    source.write_text("value\n42\n")
+    definition = replace(source_definition(source), metadata=DatasetMetadata.from_dict({"references": [{
+        "reference_id": "draft", "role": "methodology", "status": "unreviewed",
+        "provenance_ids": [document_id], "reviewed_sha256": "0" * 64}]}))
+    source_id = store.record_acquisition(source, definition)
+    with pytest.raises(ContractError, match="Reference bytes differ"):
+        store.verify_record_closure([source_id])
+
+
+def test_link_only_unreviewed_reference_does_not_claim_an_acquired_record(tmp_path):
+    from dataclasses import replace
+
+    store = ProvenanceStore(tmp_path / "store")
+    raw = tmp_path / "source.csv"
+    raw.write_text("value\n42\n")
+    definition = replace(source_definition(raw), metadata=DatasetMetadata.from_dict({"references": [{
+        "reference_id": "link", "role": "data_dictionary", "status": "unreviewed",
+        "url": "https://example.org/dictionary", "provenance_ids": []}]}))
+    record_id = store.record_acquisition(raw, definition)
+    assert set(store.verify_record_closure([record_id])) == {record_id}
+
+
 def source_definition(path: Path) -> ResolvedDataset:
     return ResolvedDataset(
         dataset="example",

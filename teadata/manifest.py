@@ -832,11 +832,12 @@ def verify_source_receipts(
 
 
 def verify_reference_receipts(
-    source: ResolvedDataset, store: ProvenanceStore, *, reference_base: Path | None = None
+    source: ResolvedDataset, store: ProvenanceStore, *, reference_base: Path | None = None,
+    check_local_paths: bool = True, verify_all_claimed: bool = False,
 ) -> None:
     """Verify archived documentation without confounding it with source observations."""
     for reference in source.metadata.references:
-        if reference.status != "available":
+        if reference.status != "available" and not (verify_all_claimed and reference.provenance_ids):
             continue
         if not reference.provenance_ids:
             raise ContractError(
@@ -855,7 +856,7 @@ def verify_reference_receipts(
             }:
                 raise ContractError("Reference receipt belongs to a different URL")
             store.verify_artifact(record["artifact"]["sha256"])
-            if reference.path is not None:
+            if reference.path is not None and check_local_paths:
                 if reference_base is None:
                     raise ContractError(
                         "Local reference needs a source contract directory"

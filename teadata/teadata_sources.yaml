@@ -405,6 +405,29 @@ data_sources:
         dtype: str
         keep_default_na: false
         column_schema: schemas/data_sources--campus_tapr_student_staff_profile--2024--default.json
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--header-crosswalk.json
+            tapr_source:
+              scope: campus
+              tables:
+                profile: data/tapr/raw/CAMPPROF_2023-2024.csv
+            references:
+            - reference_id: source_dictionary
+              role: data_dictionary
+              url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&prgopt=2024%2Ftapr%2FAdvanced+Download%2Fgetdata_2024.sas&sumlev=C&setpick=PROF&ddic=Y
+              title: 2024 Campus Profile publisher Data Elements; current reference
+                link, not original acquisition URL
+              status: unreviewed
+              provenance_ids: []
+            - reference_id: columns_source
+              role: schema
+              path: schemas/tapr--2024--header-crosswalk.json
+              title: Complete retained 2024 publisher code-label-field and source
+                layout contract; not released facts
+              status: available
+              provenance_ids: []
+              reviewed_sha256: 54cc99ffc8ce29f7ea9b80f88d03c0a4c7c2b345846707e81bb897c5a02c4de0
     2025:
       path: data/tapr/CAMPPROF_2024-2025_FINAL.xlsx
       metadata:
@@ -476,6 +499,28 @@ data_sources:
         dtype: str
         keep_default_na: false
         column_schema: schemas/tapr--2025--header-crosswalk.json
+        profiles:
+          source:
+            tapr_source:
+              scope: campus
+              tables:
+                student: data/tapr/raw/2025 Campus Student Information.csv
+                staff: data/tapr/raw/2025 Campus Staff Information.csv
+            references:
+            - reference_id: dictionary_student
+              role: data_dictionary
+              url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=C&dsname=STUD&dd=student&asvab=&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_dictionary.sas
+              title: 2025 Campus Student Information publisher dictionary; current
+                reference link
+              status: unreviewed
+              provenance_ids: []
+            - reference_id: dictionary_staff
+              role: data_dictionary
+              url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=C&dsname=STAF&dd=staff&asvab=&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_dictionary.sas
+              title: 2025 Campus Staff Information publisher dictionary; current reference
+                link
+              status: unreviewed
+              provenance_ids: []
   campus_tapr_historical_enrollment:
     2015:
       path: data/tapr/CAMPPROF_2014-2015_FINAL.xlsx
@@ -597,6 +642,29 @@ data_sources:
         dtype: str
         keep_default_na: false
         column_schema: schemas/data_sources--district_tapr_student_staff_profile--2024--default.json
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--header-crosswalk.json
+            tapr_source:
+              scope: district
+              tables:
+                profile: data/tapr/raw/DISTPROF_2023-2024.csv
+            references:
+            - reference_id: source_dictionary
+              role: data_dictionary
+              url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&prgopt=2024%2Ftapr%2FAdvanced+Download%2Fgetdata_2024.sas&sumlev=D&setpick=PROF&ddic=Y
+              title: 2024 District Profile publisher Data Elements; current reference
+                link, not original acquisition URL
+              status: unreviewed
+              provenance_ids: []
+            - reference_id: columns_source
+              role: schema
+              path: schemas/tapr--2024--header-crosswalk.json
+              title: Complete retained 2024 publisher code-label-field and source
+                layout contract; not released facts
+              status: available
+              provenance_ids: []
+              reviewed_sha256: 54cc99ffc8ce29f7ea9b80f88d03c0a4c7c2b345846707e81bb897c5a02c4de0
     2025:
       path: data/tapr/DISTPROF_2024-2025_FINAL.xlsx
       metadata:
@@ -668,6 +736,28 @@ data_sources:
         dtype: str
         keep_default_na: false
         column_schema: schemas/tapr--2025--header-crosswalk.json
+        profiles:
+          source:
+            tapr_source:
+              scope: district
+              tables:
+                student: data/tapr/raw/2025 District Student Information.csv
+                staff: data/tapr/raw/2025 District Staff Information.csv
+            references:
+            - reference_id: dictionary_student
+              role: data_dictionary
+              url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=D&dsname=STUD&dd=student&asvab=&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_dictionary.sas
+              title: 2025 District Student Information publisher dictionary; current
+                reference link
+              status: unreviewed
+              provenance_ids: []
+            - reference_id: dictionary_staff
+              role: data_dictionary
+              url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=D&dsname=STAF&dd=staff&asvab=&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_dictionary.sas
+              title: 2025 District Staff Information publisher dictionary; current
+                reference link
+              status: unreviewed
+              provenance_ids: []
   campus_planned_closures:
     2025:
       path: data/closures/Planned School Closures_10.03.2025.xlsx

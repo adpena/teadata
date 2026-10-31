@@ -117,3 +117,41 @@ def canonical_source_identifier(value: Any, *, width: int) -> str | None:
     if len(text) > width or not text.isascii() or not text.isdigit() or int(text) == 0:
         raise ValueError("Source identifier has invalid width or value")
     return "'" + text.zfill(width)
+
+
+def canonical_source_identifiers(values: Any, *, width: int):
+    """Vectorize the scalar source-string contract without changing raw tokens.
+
+    This explicit native boundary accepts Arrow string arrays only. Missing
+    strings remain null; malformed nonblank identifiers fail rather than being
+    extracted from notes, rounded, or silently discarded.
+    """
+    import pyarrow as pa
+    import pyarrow.compute as arrow_compute
+
+    # Arrow registers most compute kernels dynamically at import time.
+    pc: Any = arrow_compute
+
+    if type(width) is not int or width < 1:
+        raise ValueError("Identifier width must be a positive integer")
+    if not isinstance(values, (pa.Array, pa.ChunkedArray)) or not (
+        pa.types.is_string(values.type) or pa.types.is_large_string(values.type)
+    ):
+        raise ValueError("Source identifier batches require Arrow strings")
+    # Exact characters accepted by Python's str.strip, shared with the scalar
+    # contract (including the four ASCII information separators).
+    whitespace = " \t\n\r\v\f\x1c\x1d\x1e\x1f\x85\xa0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000"
+    text = pc.utf8_trim(values, characters=whitespace)
+    missing = pc.or_(pc.is_null(text), pc.fill_null(pc.equal(text, ""), False))
+    text = pc.replace_substring_regex(text, pattern="^'", replacement="")
+    text = pc.utf8_trim(text, characters=whitespace)
+    valid = pc.match_substring_regex(text, pattern=rf"^[0-9]{{1,{width}}}(?:\.0+)?$")
+    digits = pc.replace_substring_regex(text, pattern=r"\.0+$", replacement="")
+    valid = pc.and_(valid, pc.invert(pc.match_substring_regex(digits, pattern="^0+$")))
+    bad = pc.and_(pc.invert(missing), pc.invert(pc.fill_null(valid, False)))
+    if pc.any(bad).as_py():
+        position = pc.index(bad, True).as_py()
+        raise ValueError(f"Invalid source identifier at batch row {position + 1}: {values[position].as_py()!r}")
+    normalized = pc.binary_join_element_wise(pa.scalar("'", type=values.type),
+        pc.utf8_lpad(digits, width=width, padding="0"), pa.scalar("", type=values.type))
+    return pc.if_else(missing, pa.scalar(None, type=values.type), normalized)

@@ -1,14 +1,23 @@
 import csv
+from dataclasses import replace
 from hashlib import sha256
+from io import StringIO
+from pathlib import Path
+from types import SimpleNamespace
 
+import pyarrow as pa
 import pytest
 
-from teadata.scripts import build_tapr_2025_profiles as script
-from teadata.column_schema import source_schema_fingerprint
+from teadata.column_schema import source_schema_fingerprint, validate_header_table
+from teadata.identifiers import canonical_source_identifier, canonical_source_identifiers
+from teadata.scripts.build_tapr_profiles import prepare_profiles
+from teadata.tapr import TaprSourceTable, merge_tapr_tables, read_tapr_table
 
 
 LABELS = ["9 Digit Campus Number", "Example Value"]
 CODES = ["CAMPUS", "VALUE"]
+FIELDS = ["campus_number", "example_value"]
+DATASET = "campus_tapr_student_staff_profile"
 
 
 def write_source(tmp_path, records):
@@ -18,146 +27,96 @@ def write_source(tmp_path, records):
     return path
 
 
-def mapping_for(path, *, labels=LABELS, codes=CODES, fields=("campus_number", "example_value")):
-    return {"table": "student", "input_sha256": sha256(path.read_bytes()).hexdigest(),
-            "source_schema_sha256": source_schema_fingerprint(labels, codes),
-            "fields": [{"position": i, "code": code, "label": label, "field": field}
-                       for i, (code, label, field) in enumerate(zip(codes, labels, fields, strict=True), 1)]}
+def mapping_for(path, *, labels=LABELS, codes=CODES, fields=FIELDS, layout=None):
+    mapping = {"table": "student", "input_sha256": sha256(path.read_bytes()).hexdigest(),
+        "source_schema_sha256": source_schema_fingerprint(labels, codes),
+        "fields": [{"position": i, "code": code, "label": label, "field": field}
+                   for i, (code, label, field) in enumerate(zip(codes, labels, fields, strict=True), 1)]}
+    if layout is not None:
+        mapping["layout"] = layout
+    return mapping
 
 
-def read_source(path, *, mapping=None):
-    return script._read_tapr_csv(path, mapping=mapping_for(path) if mapping is None else mapping, key_field="campus_number")
+def read_source(path, *, mapping=None, key_field="campus_number", dataset=DATASET, edition="2025"):
+    return read_tapr_table(path, mapping=mapping_for(path) if mapping is None else mapping,
+                           key_field=key_field, dataset=dataset, edition=edition)
 
 
-@pytest.mark.parametrize("token", ["-1", "-3", "-2", ".", "•", "n/a", "0", "0.0", "9007199254740993", ""])
-def test_reader_preserves_source_tokens_without_interpreting_masking(tmp_path, token):
+@pytest.mark.parametrize("token", ["-1", "-3", "-2", ".", "•", "n/a", "0", "0.0", "9007199254740993", "", " -3 ", "first\nsecond"])
+def test_native_reader_preserves_exact_source_tokens_without_masking_or_whitespace_casts(tmp_path, token):
     path = write_source(tmp_path, [LABELS, CODES, ["001902001", token]])
     before = path.read_bytes()
-    headers, rows, elements = read_source(path)
-    assert headers == ["campus_number", "example_value"]
-    assert rows == {"001902001": {"campus_number": "001902001", "example_value": token}}
-    assert elements == [
-        {"code": "CAMPUS", "label": LABELS[0], "sanitized_label": "campus_number"},
-        {"code": "VALUE", "label": LABELS[1], "sanitized_label": "example_value"},
-    ]
+    result = read_source(path)
+    assert result.table.to_pylist() == [{"campus_number": "001902001", "example_value": token}]
+    assert all(pa.types.is_string(field.type) for field in result.table.schema)
     assert path.read_bytes() == before
 
 
-def test_metadata_retains_exact_human_labels_and_codes(tmp_path):
-    labels = [LABELS[0], "  Campus 2025: Example (Value)  "]
-    codes = ["CAMPUS", " VALUE "]
-    path = write_source(tmp_path, [labels, codes, ["001902001", " -3 "]])
-    headers, rows, elements = read_source(path, mapping=mapping_for(path, labels=labels, codes=codes,
-                                                                  fields=("campus_number", "campus_2025_example_value")))
-    assert headers == ["campus_number", "campus_2025_example_value"]
-    assert elements[1] == {"code": " VALUE ", "label": labels[1], "sanitized_label": headers[1]}
-    assert rows["001902001"][headers[1]] == "-3"  # Existing body whitespace behavior.
-
-
 @pytest.mark.parametrize("override", ["CamelCase", "naïve", "2025_name", "class", ""])
-def test_explicit_header_overrides_must_be_python_safe_ascii_snake_case(tmp_path, override):
+def test_unsafe_canonical_names_fail_without_sanitizing_at_runtime(tmp_path, override):
     path = write_source(tmp_path, [LABELS, CODES, ["001902001", "42"]])
-    with pytest.raises(ValueError, match="(?i)invalid canonical header.*ASCII snake_case"):
-        read_source(path, mapping=mapping_for(path, fields=("campus_number", override)))
+    with pytest.raises(ValueError, match="Invalid canonical header"):
+        read_source(path, mapping=mapping_for(path, fields=["campus_number", override]))
 
 
-def test_explicit_header_override_collision_names_the_column(tmp_path):
+@pytest.mark.parametrize("codes", [["CAMPUS", ""], ["CAMPUS", " CAMPUS "]])
+def test_duplicate_or_blank_publisher_codes_fail(tmp_path, codes):
+    path = write_source(tmp_path, [LABELS, codes, ["001902001", "42"]])
+    with pytest.raises(ValueError, match="(Invalid header crosswalk|Duplicate source code)"):
+        read_source(path, mapping=mapping_for(path, codes=codes))
+
+
+def test_canonical_header_collision_is_not_suffixed(tmp_path):
     path = write_source(tmp_path, [LABELS, CODES, ["001902001", "42"]])
-    with pytest.raises(ValueError, match="(?i)canonical header collision in column 2: 'campus_number'"):
-        read_source(path, mapping=mapping_for(path, fields=("campus_number", "campus_number")))
+    with pytest.raises(ValueError, match="Canonical header collision"):
+        read_source(path, mapping=mapping_for(path, fields=["campus_number", "campus_number"]))
 
 
-@pytest.mark.parametrize("records, message", [
-    ([], "header records"),
-    ([LABELS], "header records"),
-    ([LABELS, ["CAMPUS"]], "header width mismatch"),
-    ([LABELS, CODES + ["EXTRA"]], "header width mismatch"),
-    ([LABELS, ["001902001", "42"], ["001902041", "99"]], "expected source-code header 'CAMPUS'"),
-    ([LABELS, ["CAMPUS", ""]], "headers differ"),
-    ([LABELS, ["CAMPUS", "CAMPUS"]], "headers differ"),
-    ([[LABELS[0], "Class"], CODES], "headers differ"),
-    ([[LABELS[0], "2025 Value"], CODES], "headers differ"),
-    ([[LABELS[0], "???"], CODES], "headers differ"),
-    ([[LABELS[0], "Example-Value", "Example Value"], ["CAMPUS", "A", "B"]], "headers differ"),
-    ([["Not The Campus Key", "Example"], CODES], "headers differ"),
-    ([LABELS, CODES], "no TAPR data records"),
-])
-def test_ambiguous_or_incomplete_headers_fail_closed(tmp_path, records, message):
+@pytest.mark.parametrize("records", [[], [LABELS], [LABELS, ["CAMPUS"]], [LABELS, CODES + ["EXTRA"]],
+    [LABELS, ["001902001", "42"], ["001902041", "99"]], [[LABELS[0], "Changed label"], CODES],
+    [["Metadata title"], LABELS, CODES, ["001902001", "42"]]])
+def test_unreviewed_header_preamble_or_code_record_changes_fail(tmp_path, records):
     path = write_source(tmp_path, records)
-    with pytest.raises(ValueError, match=message) as error:
+    with pytest.raises(ValueError) as error:
         read_source(path)
     assert str(path) in str(error.value)
 
 
-@pytest.mark.parametrize("codes", [["CAMPUS", ""], ["CAMPUS", " CAMPUS "]])
-def test_crosswalk_rejects_empty_or_duplicate_source_codes(tmp_path, codes):
-    path = write_source(tmp_path, [LABELS, codes, ["001902001", "42"]])
-    with pytest.raises(ValueError, match="(?i)(invalid header crosswalk column|duplicate source code)"):
-        read_source(path, mapping=mapping_for(path, codes=codes))
-
-
-def test_reader_rejects_input_bytes_outside_the_reviewed_edition(tmp_path):
-    path = write_source(tmp_path, [LABELS, CODES, ["001902001", "42"]])
-    mapping = mapping_for(path)
-    path.write_text(path.read_text().replace("42", "99"))
-    with pytest.raises(ValueError, match="input differs"):
-        read_source(path, mapping=mapping)
-
-
 @pytest.mark.parametrize("row", [["001902001"], ["001902001", "42", "EXTRA"], []])
-def test_reader_rejects_bad_width_instead_of_padding_truncating_or_skipping(tmp_path, row):
+def test_bad_record_width_is_never_padded_truncated_or_skipped(tmp_path, row):
     path = write_source(tmp_path, [LABELS, CODES, row])
     with pytest.raises(ValueError, match=r"record 3 has .* fields; expected 2"):
         read_source(path)
 
 
 @pytest.mark.parametrize("key", ["", "000000000", "-1", "True", "001902001.5", "1001902001", "1e3", "９９９９９９９９９", "Notes: suppression applies"])
-def test_invalid_identifiers_and_footer_text_are_not_data(tmp_path, key):
+def test_invalid_identity_or_footer_text_is_not_silently_removed(tmp_path, key):
     path = write_source(tmp_path, [LABELS, CODES, [key, "42"]])
-    with pytest.raises(ValueError, match="record 3 has invalid campus_number"):
+    with pytest.raises(ValueError, match="invalid campus_number"):
         read_source(path)
 
 
 @pytest.mark.parametrize("later", ["001902001", "1902001", "'001902001"])
-def test_duplicate_entity_identity_is_never_overwritten(tmp_path, later):
+def test_duplicate_entity_identity_is_not_overwritten(tmp_path, later):
     path = write_source(tmp_path, [LABELS, CODES, ["001902001", "42"], [later, "99"]])
-    with pytest.raises(ValueError, match="duplicate campus_number at records 3 and 4"):
+    with pytest.raises(ValueError, match=r"duplicate campus_number at records \[3, 4\]"):
         read_source(path)
 
 
-def test_campus_district_claim_is_checked_when_present(tmp_path):
-    labels, codes = [LABELS[0], "6 Digit County District Number"], ["CAMPUS", "DISTRICT"]
-    path = write_source(tmp_path, [
-        labels, codes,
-        ["001902001", "227901"],
-    ])
+@pytest.mark.parametrize("district", ["", "227901"])
+def test_campus_parent_claim_is_required_and_consistent_when_present(tmp_path, district):
+    labels, codes = [LABELS[0], "District Number"], ["CAMPUS", "DISTRICT"]
+    path = write_source(tmp_path, [labels, codes, ["001902001", district]])
     with pytest.raises(ValueError, match="campus and district identifiers disagree"):
-        read_source(path, mapping=mapping_for(path, labels=labels, codes=codes,
-                                              fields=("campus_number", "district_number")))
+        read_source(path, mapping=mapping_for(path, labels=labels, codes=codes, fields=["campus_number", "district_number"]))
 
 
-def test_district_reader_uses_six_digit_identity_and_preserves_metadata(tmp_path):
-    labels, codes = ["6 Digit County District Number", "District Name"], ["DISTRICT", "DISTNAME"]
-    path = write_source(tmp_path, [
-        labels, codes,
-        ["001902", "CAYUGA ISD"],
-    ])
-    headers, rows, elements = script._read_tapr_csv(path, mapping=mapping_for(path, labels=labels, codes=codes,
-                                                 fields=("district_number", "district_name")), key_field="district_number")
-    assert headers == ["district_number", "district_name"]
-    assert rows["001902"]["district_name"] == "CAYUGA ISD"
-    assert elements[0]["code"] == "DISTRICT"
-
-
-def test_district_reader_refuses_a_data_record_as_the_code_header(tmp_path):
-    path = write_source(tmp_path, [
-        ["6 Digit County District Number", "District Name"],
-        ["001902", "CAYUGA ISD"], ["001903", "FRANKSTON ISD"],
-    ])
-    with pytest.raises(ValueError, match="expected source-code header 'DISTRICT'"):
-        script._read_tapr_csv(path, mapping=mapping_for(path,
-            labels=["6 Digit County District Number", "District Name"], codes=["DISTRICT", "DISTNAME"],
-            fields=("district_number", "district_name")), key_field="district_number")
+def test_original_content_revision_is_not_replaced_under_one_contract(tmp_path):
+    path = write_source(tmp_path, [LABELS, CODES, ["001902001", "42"]])
+    mapping = mapping_for(path)
+    path.write_text(path.read_text().replace("42", "99"))
+    with pytest.raises(ValueError, match="input differs"):
+        read_source(path, mapping=mapping)
 
 
 def test_csv_quoting_error_is_not_silently_accepted(tmp_path):
@@ -167,58 +126,157 @@ def test_csv_quoting_error_is_not_silently_accepted(tmp_path):
         read_source(path)
 
 
-def merge(primary, secondary):
-    return script._merge_tables(
-        list(next(iter(primary.values()))), primary,
-        list(next(iter(secondary.values()))), secondary,
-        key_field="campus_number", preferred_cols=("campus_number", "campus_name"),
-    )
+def test_reviewed_preamble_gap_and_footer_notes_have_exact_provenance(tmp_path):
+    records = [["Publisher report"], CODES, ["001902001", " -3 "], [], ["001902041", "."], ["Notes:", "Unavailable is not zero"]]
+    path = write_source(tmp_path, records)
+    def note(number, kind):
+        text = StringIO(newline="")
+        csv.writer(text).writerow(records[number - 1])
+        return {"first_record": number, "last_record": number, "kind": kind, "sha256": sha256(text.getvalue().encode()).hexdigest()}
+    layout = {"code_record": 2, "label_record": None, "first_data_record": 3, "last_data_record": 5,
+              "annotations": [note(1, "preamble"), note(4, "blank"), note(6, "footer")]}
+    result = read_source(path, mapping=mapping_for(path, layout=layout))
+    assert result.table.to_pylist() == [{"campus_number": "001902001", "example_value": " -3 "}, {"campus_number": "001902041", "example_value": "."}]
+    assert result.annotations[-1]["records"] == [["Notes:", "Unavailable is not zero"]]
+    assert [note["first_record"] for note in result.annotations] == [1, 4, 6]
+    changed = mapping_for(path, layout=layout)
+    changed["layout"]["annotations"][-1]["sha256"] = "0" * 64
+    with pytest.raises(ValueError, match="annotation range"):
+        read_source(path, mapping=changed)
 
 
-def test_merge_rejects_conflicting_shared_values_without_masking_assumptions():
-    primary = {"001902001": {"campus_number": "001902001", "example": "."}}
-    secondary = {"001902001": {"campus_number": "001902001", "example": "42"}}
+@pytest.mark.parametrize("kind", ["unreviewed", "overlap", "header_overlap"])
+def test_ambiguous_or_unaccounted_note_ranges_fail(tmp_path, kind):
+    path = write_source(tmp_path, [LABELS, CODES, ["001902001", "42"], ["Footer", "note"]])
+    layout = {"code_record": 2, "label_record": 1, "first_data_record": 3, "last_data_record": 3, "annotations": []}
+    if kind != "unreviewed":
+        item = {"first_record": 1 if kind == "header_overlap" else 4, "last_record": 4, "kind": "footer", "sha256": "0" * 64}
+        layout["annotations"] = [item] if kind == "header_overlap" else [item, item]
+    with pytest.raises(ValueError, match="(unaccounted record 4|overlap)"):
+        read_source(path, mapping=mapping_for(path, layout=layout))
+
+
+def native_source(records, *, edition="2025", labels=None, table_name="student"):
+    table = pa.Table.from_pylist(records)
+    fields = table.column_names
+    codes = ["CAMPUS" if name == "campus_number" else name.upper() for name in fields]
+    labels = labels or fields
+    mapping = {"table": table_name, "input_sha256": "0" * 64, "source_schema_sha256": source_schema_fingerprint(labels, codes),
+               "fields": [{"position": i, "code": code, "label": label, "field": field} for i, (code, label, field) in enumerate(zip(codes, labels, fields, strict=True), 1)]}
+    return TaprSourceTable(table, Path(__file__), "0" * 64, DATASET, edition, (), mapping)
+
+
+def test_same_edition_shared_identity_conflicts_fail_without_masking_assumptions():
+    a = native_source([{"campus_number": "001902001", "example": "."}])
+    b = native_source([{"campus_number": "001902001", "example": "42"}], table_name="staff")
     with pytest.raises(ValueError, match="Conflicting TAPR values.*example"):
-        merge(primary, secondary)
-    assert primary["001902001"]["example"] == "."
+        merge_tapr_tables([a, b], key_field="campus_number")
 
 
-def test_merge_preserves_blank_fill_behavior_order_and_nonconflicting_tokens():
-    primary = {"001902001": {"campus_number": "001902001", "empty": "", "student": "-1"}}
-    secondary = {"001902001": {"campus_number": "001902001", "empty": "filled", "staff": "-3"}}
-    headers, records = merge(primary, secondary)
-    assert headers == ["campus_number", "empty", "student", "staff"]
-    assert records == [{"campus_number": "001902001", "empty": "filled", "student": "-1", "staff": "-3"}]
+def test_one_sided_historical_entities_remain_and_absent_table_is_not_raw_blank():
+    a = native_source([{"campus_number": "001902001", "student": "-1"}])
+    b = native_source([{"campus_number": "001902041", "staff": "-3"}], table_name="staff")
+    assert merge_tapr_tables([a, b], key_field="campus_number").to_pylist() == [
+        {"campus_number": "001902001", "student": "-1", "staff": None},
+        {"campus_number": "001902041", "student": None, "staff": "-3"}]
 
 
-def test_merge_retains_one_sided_entities_without_claiming_complete_coverage():
-    primary = {"001902001": {"campus_number": "001902001", "student": "-1"}}
-    secondary = {"001902041": {"campus_number": "001902041", "staff": "-3"}}
-    headers, records = merge(primary, secondary)
-    assert headers == ["campus_number", "student", "staff"]
-    assert records == [primary["001902001"], secondary["001902041"]]
-    assert script._rows_for_headers(headers, records) == [["001902001", "-1", ""], ["001902041", "", "-3"]]
+def test_blank_fill_and_nonblank_shared_values_have_explicit_rules():
+    a = native_source([{"campus_number": "001902001", "campus_name": "Historical school", "empty": "", "student": "-1"}])
+    b = native_source([{"campus_number": "001902001", "campus_name": "Historical school", "empty": "filled", "staff": "-3"}], table_name="staff")
+    assert merge_tapr_tables([a, b], key_field="campus_number").to_pylist() == [
+        {"campus_number": "001902001", "campus_name": "Historical school", "empty": "filled", "student": "-1", "staff": "-3"}]
+    conflict = native_source([{"campus_number": "001902001", "campus_name": "A different school"}], table_name="staff")
+    with pytest.raises(ValueError, match="campus_name"):
+        merge_tapr_tables([a, conflict], key_field="campus_number")
 
 
-def test_merge_refuses_two_spellings_of_the_same_source_identity():
-    primary = {"001902001": {"campus_number": "001902001"}}
-    secondary = {"1902001": {"campus_number": "1902001"}}
+def test_equivalent_identity_spellings_must_not_duplicate_or_overwrite_an_entity():
+    a = native_source([{"campus_number": "001902001"}])
+    b = native_source([{"campus_number": "1902001"}], table_name="staff")
     with pytest.raises(ValueError, match="Inconsistent TAPR campus_number representations"):
-        merge(primary, secondary)
+        merge_tapr_tables([a, b], key_field="campus_number")
 
 
-def test_bad_input_prevents_cli_from_invoking_a_writer(tmp_path, monkeypatch):
-    raw = tmp_path / "raw"
-    raw.mkdir()
-    (raw / "2025 Campus Student Information.csv").write_text(
-        "9 Digit Campus Number,Example Value\nCAMPUS,VALUE\n001902001,42,EXTRA\n"
-    )
-    def forbidden(*args, **kwargs):
-        raise AssertionError("Writer must not run for invalid input")
-    monkeypatch.setattr(script, "_write_workbook", forbidden)
-    monkeypatch.setattr(script, "load_config", lambda *_: object())
-    mapping = mapping_for(raw / "2025 Campus Student Information.csv")
-    monkeypatch.setattr(script, "_header_tables", lambda *_: {"student": mapping, "staff": mapping})
+def test_observations_from_different_editions_or_datasets_are_not_coalesced():
+    original = native_source([{"campus_number": "001902001", "campus_name": "Earlier name"}], edition="2024")
+    later = native_source([{"campus_number": "001902001", "campus_name": "Later name"}], edition="2025")
+    with pytest.raises(ValueError, match="different qualified datasets or editions"):
+        merge_tapr_tables([original, later], key_field="campus_number")
+    foreign = replace(original, dataset="accountability")
+    with pytest.raises(ValueError, match="different qualified datasets or editions"):
+        merge_tapr_tables([original, foreign], key_field="campus_number")
+    assert original.table["campus_name"][0].as_py() == "Earlier name"
+
+
+def test_reissued_table_revision_is_not_silently_coalesced_with_retained_observation():
+    original = native_source([{"campus_number": "001902001", "example": "42"}])
+    reissued = replace(original, input_sha256="1" * 64)
+    with pytest.raises(ValueError, match="Different revisions or repeated observations"):
+        merge_tapr_tables([original, reissued], key_field="campus_number")
+
+
+@pytest.mark.parametrize("token", [None, "", "  ", "'", "0", "000000000", "001902001", "1902001", "'001902001", "  ' 001902001.00 ", "\x1c001902001\x1f", "True", "-1", "1e3", "001902001.1", "９９９９９９９９９"])
+def test_native_string_identifier_contract_matches_scalar_oracle(token):
+    try:
+        expected = canonical_source_identifier(token, width=9)
+    except ValueError:
+        with pytest.raises(ValueError):
+            canonical_source_identifiers(pa.array([token], type=pa.string()), width=9)
+    else:
+        assert canonical_source_identifiers(pa.array([token], type=pa.string()), width=9).to_pylist() == [expected]
+
+
+def test_bad_input_prevents_all_writers_and_output_activation(tmp_path, monkeypatch):
+    import pyarrow.parquet as pq
+
+    path = write_source(tmp_path, [LABELS, CODES, ["001902001", "42", "EXTRA"]])
+    def load(*args, **kwargs):
+        return [read_source(path)]
+    cfg = SimpleNamespace(read_tapr_sources=load)
+    monkeypatch.setattr(pq, "write_table", lambda *a, **k: pytest.fail("Writer ran for invalid input"))
+    out = tmp_path / "new" / "output"
     with pytest.raises(ValueError, match="record 3 has 3 fields"):
-        script.main(["--input-dir", str(raw), "--output-dir", str(tmp_path / "output")])
-    assert not (tmp_path / "output").exists()
+        prepare_profiles(cfg, edition="2025", scopes=["campus"], input_dir=tmp_path, output_dir=out)
+    assert not out.parent.exists()
+
+
+def test_preparation_never_overwrites_an_existing_directory(tmp_path):
+    out = tmp_path / "preserved"
+    out.mkdir()
+    marker = out / "original.txt"
+    marker.write_text("original")
+    with pytest.raises(FileExistsError):
+        prepare_profiles(object(), edition="2024", scopes=["district"], input_dir=tmp_path, output_dir=out)
+    assert marker.read_text() == "original"
+
+
+def test_source_column_disposition_cannot_silently_exclude_a_publisher_field(tmp_path):
+    path = write_source(tmp_path, [LABELS, CODES, ["001902001", "42"]])
+    mapping = mapping_for(path)
+    mapping["fields"][1]["disposition"] = "ignore"
+    with pytest.raises(ValueError, match="Unaccounted source column 2"):
+        validate_header_table(mapping)
+
+
+@pytest.mark.parametrize("large", [False, True])
+def test_native_identifier_contract_supports_chunked_string_representations(large):
+    kind = pa.large_string() if large else pa.string()
+    values = pa.chunked_array([["1902001", None], ["'001902041"]], type=kind)
+    assert canonical_source_identifiers(values, width=9).to_pylist() == ["'001902001", None, "'001902041"]
+
+
+def test_publisher_dictionary_revision_is_checked_before_excel_decode(tmp_path, monkeypatch):
+    import pandas as pd
+
+    path = write_source(tmp_path, [CODES, ["001902001", "42"]])
+    dictionary = tmp_path / "dictionary.xlsx"
+    dictionary.write_bytes(b"changed publisher workbook")
+    mapping = mapping_for(path, layout={"code_record": 1, "label_record": None,
+        "first_data_record": 2, "last_data_record": 2, "annotations": []})
+    mapping["dictionary"] = {"filename": dictionary.name, "sha256": "0" * 64, "sheet_name": "Sheet1"}
+    for field in mapping["fields"]:
+        field.update(publisher_type="Character", publisher_length="", disposition="fact")
+    monkeypatch.setattr(pd, "read_excel", lambda *a, **k: pytest.fail("Unreviewed dictionary decoded"))
+    with pytest.raises(ValueError, match="publisher dictionary bytes differ"):
+        read_source(path, mapping=mapping)
