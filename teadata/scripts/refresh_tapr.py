@@ -6,6 +6,7 @@ No command changes source configuration or activates acquired/prepared data.
 from __future__ import annotations
 
 import argparse
+from dataclasses import replace
 from hashlib import sha256
 from importlib.metadata import version
 import json
@@ -13,12 +14,83 @@ import os
 from pathlib import Path
 import sys
 import tempfile
+from urllib.error import HTTPError
+from urllib.request import HTTPRedirectHandler, build_opener
 
 from teadata.acquisition import AcquisitionClient, acquire_form, replay_acquisition
 from teadata.column_schema import crosswalk_dataset, parse_column_schema
 from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
 from teadata.provenance import ProvenanceStore, _identifier
 from teadata.tapr import compare_tapr_tables, read_tapr_table
+
+
+def _read_pinned_input(path: Path, expected_sha256: str) -> bytes:
+    """Capture one small explicit input; the same bytes are parsed and retained."""
+    _identifier(expected_sha256)
+    limit = 2 * 1024 * 1024
+    with path.open('rb') as stream:
+        size = os.fstat(stream.fileno()).st_size
+        if size > limit:
+            raise ValueError('Acquisition metadata/config input exceeds 2 MiB')
+        raw = stream.read(limit + 1)
+    if len(raw) > limit or len(raw) != size or sha256(raw).hexdigest() != expected_sha256:
+        raise ValueError('Captured acquisition input differs from its pinned SHA/size')
+    return raw
+
+
+def acquisition_source(args, archive: ProvenanceStore) -> ResolvedDataset:
+    """Validate explicit observation metadata and selected documentation before HTTP."""
+    from teadata.manifest import verify_reference_receipts
+    from teadata.teadata_config import load_config_bytes
+
+    metadata_raw = _read_pinned_input(args.metadata, args.metadata_sha256)
+    metadata = DatasetMetadata.from_dict(json.loads(metadata_raw))
+    if not args.edition.strip() or metadata.version != args.edition:
+        raise ValueError('Explicit acquisition metadata version must equal edition')
+    inputs = [('metadata', args.metadata.name, metadata_raw)]
+    if args.section == 'data_sources':
+        if args.config is None or args.config_sha256 is None or args.year is None:
+            raise ValueError('Data-source acquisition requires pinned config and explicit year')
+        config_raw = _read_pinned_input(args.config, args.config_sha256)
+        cfg = load_config_bytes(config_raw, path=args.config)
+        selected = cfg.resolve_dataset(args.dataset, args.year, strict=True)
+        if selected.resolved_year != args.year or selected.metadata.version != args.edition:
+            raise ValueError('Acquisition requires an exact configured year and edition; no fallback')
+        inputs.append(('config', args.config.name, config_raw))
+        source = replace(selected, metadata=metadata)
+    else:
+        if args.config is not None or args.config_sha256 is not None or args.year is not None:
+            raise ValueError('Reference acquisition does not select a Config/year')
+        if not args.dataset.strip():
+            raise ValueError('Reference acquisition requires an explicit dataset label')
+        source = ResolvedDataset(args.dataset, 'reference', None, None, '', metadata)
+    reference_store = ProvenanceStore(args.reference_store) if args.reference_store is not None else archive
+    identifiers = list(dict.fromkeys([*metadata.provenance_ids,
+        *(identifier for ref in metadata.references for identifier in ref.provenance_ids)]))
+    reference_store.verify_record_closure(identifiers)
+    verify_reference_receipts(source, reference_store, check_local_paths=False, verify_all_claimed=True)
+    for identifier in identifiers:
+        archive.copy_record_from(reference_store, identifier)
+    # Retain the actual captured contract inputs, not later rereads of mutable paths.
+    with tempfile.TemporaryDirectory(prefix='teadata-acquire-inputs-') as directory:
+        input_ids = []
+        for role, filename, raw in inputs:
+            staged = Path(directory) / role / filename
+            staged.parent.mkdir()
+            staged.write_bytes(raw)
+            input_ids.append(archive.record_acquisition(staged, ResolvedDataset(
+                'reference:acquire_' + role, 'reference', None, None, '',
+                DatasetMetadata(title='Explicit SHA-pinned acquisition ' + role + ' input'))))
+    source = replace(source, metadata=replace(metadata,
+        provenance_ids=tuple([*metadata.provenance_ids, *input_ids])))
+    archive.verify_record_closure(source.metadata.provenance_ids)
+    verify_reference_receipts(source, archive, check_local_paths=False, verify_all_claimed=True)
+    return source
+
+
+class _NoRedirect(HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise HTTPError(req.full_url, code, 'Acquisition redirect blocked', headers, fp)
 
 
 def compare_inputs(args) -> dict:
@@ -208,6 +280,14 @@ def main(argv: list[str] | None = None) -> int:
     acquire.add_argument('--url', required=True)
     acquire.add_argument('--dataset', required=True)
     acquire.add_argument('--edition', required=True)
+    acquire.add_argument('--section', choices=['data_sources', 'reference'], default='data_sources')
+    acquire.add_argument('--metadata', type=Path, required=True, help='Explicit DatasetMetadata JSON; never inherited from Config')
+    acquire.add_argument('--metadata-sha256', required=True)
+    acquire.add_argument('--config', type=Path, help='Data-source identity/year/version authority; required for data_sources')
+    acquire.add_argument('--config-sha256')
+    acquire.add_argument('--year', type=int)
+    acquire.add_argument('--reference-store', type=Path, help='Existing selected reference closures; defaults to --store')
+    acquire.add_argument('--no-redirects', action='store_true', help='Reject redirects without another HTTP request')
     acquire.add_argument('--filename', required=True)
     acquire.add_argument('--method', required=True, choices=['GET', 'POST'])
     acquire.add_argument('--field', action='append', nargs=2, default=[], metavar=('NAME', 'VALUE'))
@@ -247,14 +327,17 @@ def main(argv: list[str] | None = None) -> int:
         result = inspect_dictionary(args)
     else:
         archive = ProvenanceStore(args.store)
-        client = AcquisitionClient(archive, timeout=args.timeout, attempts=1, max_bytes=args.max_bytes, max_retry_wait=0)
         if args.command == 'replay':
+            client = AcquisitionClient(archive, timeout=args.timeout, attempts=1, max_bytes=args.max_bytes, max_retry_wait=0)
             acquired = replay_acquisition(client, args.record, content_type=args.content_type)
         else:
-            source = ResolvedDataset(args.dataset, 'data_sources', None, None, '',
-                                     DatasetMetadata(version=args.edition))
+            source = acquisition_source(args, archive)
+            client = AcquisitionClient(archive, timeout=args.timeout, attempts=1,
+                max_bytes=args.max_bytes, max_retry_wait=0,
+                opener=build_opener(_NoRedirect()) if args.no_redirects else None)
             acquired = acquire_form(client, args.url, source, filename=args.filename, method=args.method,
                                     fields=args.field, content_type=args.content_type)
+            archive.verify_record_closure([acquired.record_id])
         record = archive.read_record(acquired.record_id)
         result = {'status': 'acquired', 'record_id': acquired.record_id, 'artifact': record['artifact']}
     print(json.dumps(result, sort_keys=True))

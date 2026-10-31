@@ -21,6 +21,195 @@ from teadata.tapr import compare_tapr_tables, read_tapr_table
 from teadata.values import ValuePolicy, measure, source_token_statuses
 
 
+def acquisition_inputs(tmp_path, *, edition='2025'):
+    """A configured identity and real-shaped selected documentation closure."""
+    references = ProvenanceStore(tmp_path / 'references')
+    index = tmp_path / 'index.html'
+    index.write_bytes(b'<a href="selection">Retained publisher index</a>')
+    index_id = references.record_acquisition(index, ResolvedDataset('reference:index', 'reference', None, None, '',
+        DatasetMetadata(source_url='https://example.test/index')))
+    selected = []
+    for role in ['selection', 'dictionary']:
+        path = tmp_path / (role + '.html')
+        path.write_text('<html>Retained ' + role + '</html>')
+        url = 'https://example.test/' + role
+        source = ResolvedDataset('reference:' + role, 'reference', None, None, '', DatasetMetadata(
+            source_url=url, provenance_ids=(index_id,), version=edition))
+        identifier = references.record_acquisition(path, source, requested_url=url,
+            downloaded_at=datetime(2025, 1, 1, tzinfo=timezone.utc))
+        selected.append({'reference_id': role, 'role': 'data_dictionary' if role == 'dictionary' else 'source_notes',
+            'url': url, 'provenance_ids': [identifier], 'reviewed_sha256': sha256(path.read_bytes()).hexdigest()})
+    metadata = tmp_path / 'observation-metadata.json'
+    metadata.write_text(json.dumps({'title': '2025 Campus STUD all-checked observation', 'version': edition,
+        'period': {'kind': 'unknown'}, 'references': selected}))
+    config = tmp_path / 'catalog.yaml'
+    config.write_text('''value_policies: {config_policy: {tokens: {}}}
+data_sources:
+  campus_tapr_student_staff_profile:
+    2025:
+      path: nonexistent-source.xlsx
+      metadata:
+        version: '2025'
+        period: {kind: school_year, start_year: 2024, end_year: 2025}
+        field_year: 2025
+        value_policy: config_policy
+        metrics: {enrollment: {field: enrollment, unit: count}}
+        references: [{reference_id: config_only, role: source_notes, status: unreviewed}]
+''')
+    args = ['acquire', '--url', 'https://rptsvr1.tea.texas.gov/cgi/sas/broker/',
+        '--dataset', 'campus_tapr_student_staff_profile', '--edition', edition,
+        '--method', 'POST', '--filename', '2025-campus-STUD.csv',
+        '--content-type', 'application/x-www-form-urlencoded', '--no-redirects',
+        '--metadata', str(metadata), '--metadata-sha256', sha256(metadata.read_bytes()).hexdigest(),
+        '--config', str(config), '--config-sha256', sha256(config.read_bytes()).hexdigest(), '--year', '2025',
+        '--reference-store', str(references.root), '--store', str(tmp_path / 'observations')]
+    return args, metadata, config, references
+
+
+@pytest.mark.parametrize('failure', ['dataset_typo', 'prior_year', 'edition', 'metadata_version',
+    'metadata_sha', 'config_sha', 'missing_config', 'missing_year', 'missing_closure',
+    'wrong_reference_sha', 'wrong_reference_url', 'configured_edition', 'oversized_metadata', 'oversized_config'])
+def test_acquire_invalid_bound_inputs_fail_before_http(tmp_path, monkeypatch, failure):
+    args, metadata, config, references = acquisition_inputs(tmp_path)
+    monkeypatch.setattr('teadata.scripts.refresh_tapr.AcquisitionClient',
+        lambda *a, **k: pytest.fail('Invalid preflight constructed HTTP client'))
+    def option(name, value):
+        args[args.index(name) + 1] = value
+    if failure == 'dataset_typo':
+        option('--dataset', 'campus_tapr_student_studf_profile')
+    elif failure == 'prior_year':
+        option('--year', '2026')
+    elif failure == 'edition':
+        option('--edition', '2024')
+    elif failure == 'metadata_version':
+        raw = json.loads(metadata.read_text())
+        raw['version'] = '2024'
+        metadata.write_text(json.dumps(raw))
+        option('--metadata-sha256', sha256(metadata.read_bytes()).hexdigest())
+    elif failure in {'metadata_sha', 'config_sha'}:
+        option('--' + failure.replace('_', '-') + '256', '0' * 64)
+    elif failure in {'missing_config', 'missing_year'}:
+        name = '--config' if failure == 'missing_config' else '--year'
+        index = args.index(name)
+        del args[index:index + 2]
+    elif failure == 'missing_closure':
+        next((references.root / 'records').glob('*.json')).unlink()
+    elif failure in {'wrong_reference_sha', 'wrong_reference_url'}:
+        raw = json.loads(metadata.read_text())
+        if failure == 'wrong_reference_sha':
+            raw['references'][0]['reviewed_sha256'] = '0' * 64
+        else:
+            raw['references'][0]['url'] = 'https://example.test/not-the-selected-source'
+        metadata.write_text(json.dumps(raw))
+        option('--metadata-sha256', sha256(metadata.read_bytes()).hexdigest())
+    elif failure == 'configured_edition':
+        config.write_text(config.read_text().replace("version: '2025'", "version: '2024'"))
+        option('--config-sha256', sha256(config.read_bytes()).hexdigest())
+    else:
+        selected = metadata if failure == 'oversized_metadata' else config
+        selected.write_bytes(b' ' * (2 * 1024 * 1024 + 1))
+        option('--metadata-sha256' if selected == metadata else '--config-sha256', sha256(selected.read_bytes()).hexdigest())
+    with pytest.raises((ValueError, KeyError, FileNotFoundError, RuntimeError)):
+        main(args)
+    assert not (tmp_path / 'observations' / 'records').exists()
+
+
+def test_acquire_cli_captures_actual_shape_metadata_config_controls_and_closed_history(tmp_path, monkeypatch, capsys):
+    from urllib.parse import urlencode
+    import teadata.scripts.refresh_tapr as refresh
+
+    args, metadata_path, config_path, references = acquisition_inputs(tmp_path)
+    original_metadata, original_config = metadata_path.read_bytes(), config_path.read_bytes()
+    original_records = {path.name: path.read_bytes() for path in (references.root / 'records').glob('*.json')}
+    controls = [('_service', 'marykay'), ('_program', 'perfrept.perfmast.sas'), ('_debug', '0'),
+        ('tapr', 'all_c'), ('ccyy', '2025'), ('dsname', 'STUD'), ('sumlev', 'C'), ('level', 'Campus'),
+        ('id', ''), ('prgopt', 'reports/tapr/dd/dd_tapr_step_7.sas'), ('key', 'ETALL|NTALL'),
+        ('key', 'ETSIM|ETSIN|ETSIN|ETSPH|ETSPH|ETSAU|ETSAU|ETSBH|ETSBH|ETSNO|ETSNO'), ('datafmt', 'csv')]
+    for name, value in controls:
+        args.extend(['--field', name, value])
+    read = refresh._read_pinned_input
+    def captured(path, expected):
+        raw = read(path, expected)
+        path.write_bytes(b'changed after capture')
+        return raw
+    monkeypatch.setattr(refresh, '_read_pinned_input', captured)
+    observed = []
+    def opened(request, timeout):
+        observed.append(request)
+        assert timeout == 20
+        assert request.full_url == 'https://rptsvr1.tea.texas.gov/cgi/sas/broker/'
+        assert request.get_method() == 'POST' and request.data == urlencode(controls).encode()
+        response = Response(b'complete original public CSV bytes')
+        response.url = request.full_url
+        return response
+    def client(store, **kwargs):
+        assert kwargs['attempts'] == 1 and kwargs['max_retry_wait'] == 0
+        assert any(isinstance(handler, refresh._NoRedirect) for handler in kwargs['opener'].handlers)
+        kwargs['opener'] = SimpleNamespace(open=opened)
+        return AcquisitionClient(store, **kwargs)
+    monkeypatch.setattr(refresh, 'AcquisitionClient', client)
+    monkeypatch.setattr('socket.socket', lambda *a, **k: pytest.fail('Real socket attempted'))
+    assert main(args) == 0
+    result = json.loads(capsys.readouterr().out)
+    archive = ProvenanceStore(tmp_path / 'observations')
+    record = archive.read_record(result['record_id'])
+    assert len(observed) == 1 and record['dataset'] == 'campus_tapr_student_staff_profile'
+    assert record['section'] == 'data_sources' and record['requested_year'] == record['resolved_year'] == 2025
+    actual = DatasetMetadata.from_dict(record['source_metadata'])
+    expected = DatasetMetadata.from_dict(json.loads(original_metadata))
+    assert replace(actual, provenance_ids=()).to_dict() == expected.to_dict()
+    assert actual.period.kind == 'unknown' and actual.value_policy is None and not actual.metrics
+    retained_inputs = {archive.read_record(identifier)['dataset']: archive.read_record(identifier)
+                      for identifier in actual.provenance_ids}
+    for role, raw in [('metadata', original_metadata), ('config', original_config)]:
+        source = retained_inputs['reference:acquire_' + role]
+        assert source['method'] == 'local_observation' and source['downloaded_at'] is None
+        assert archive.verify_artifact(source['artifact']['sha256']).read_bytes() == raw
+    assert record['parameters']['form_controls'] == [list(pair) for pair in controls]
+    assert len(archive.verify_record_closure([result['record_id']])) == 6
+    assert {path.name: path.read_bytes() for path in (references.root / 'records').glob('*.json')} == original_records
+
+
+def test_acquire_reference_section_is_explicit_and_does_not_require_config(tmp_path, monkeypatch, capsys):
+    args, metadata, _config, _references = acquisition_inputs(tmp_path, edition='2024')
+    for name in ['--config', '--config-sha256', '--year']:
+        index = args.index(name)
+        del args[index:index + 2]
+    args.extend(['--section', 'reference'])
+    args[args.index('--dataset') + 1] = 'tapr_2024_masking_reference'
+    args[args.index('--method') + 1] = 'GET'
+    def client(store, **kwargs):
+        kwargs['opener'] = SimpleNamespace(open=lambda *a, **k: Response(b'masking document'))
+        return AcquisitionClient(store, **kwargs)
+    monkeypatch.setattr('teadata.scripts.refresh_tapr.AcquisitionClient', client)
+    assert main(args) == 0
+    archive = ProvenanceStore(tmp_path / 'observations')
+    record = archive.read_record(json.loads(capsys.readouterr().out)['record_id'])
+    assert record['section'] == 'reference' and record['dataset'] == 'tapr_2024_masking_reference'
+    assert record['requested_year'] is record['resolved_year'] is None
+    assert replace(DatasetMetadata.from_dict(record['source_metadata']), provenance_ids=()).to_dict() == DatasetMetadata.from_dict(json.loads(metadata.read_bytes())).to_dict()
+
+
+def test_acquire_reference_section_rejects_config_flags_and_old_unbound_cli(tmp_path, monkeypatch):
+    args, _metadata, _config, _references = acquisition_inputs(tmp_path)
+    monkeypatch.setattr('teadata.scripts.refresh_tapr.AcquisitionClient', lambda *a, **k: pytest.fail('HTTP client'))
+    with pytest.raises(ValueError, match='does not select'):
+        main([*args, '--section', 'reference'])
+    with pytest.raises(SystemExit):
+        main(['acquire', '--url', 'https://example.test/reference', '--dataset', 'unregistered',
+            '--edition', '2025', '--filename', 'reference.html', '--method', 'GET', '--store', str(tmp_path / 'archive')])
+
+
+def test_acquire_no_redirect_handler_rejects_followup():
+    from urllib.error import HTTPError
+    from urllib.request import Request
+    from teadata.scripts.refresh_tapr import _NoRedirect
+
+    with pytest.raises(HTTPError, match='redirect blocked'):
+        _NoRedirect().redirect_request(Request('https://example.test/original'), None,
+            302, 'Found', {}, 'https://example.test/not-authorized')
+
+
 def test_dictionary_cli_keeps_partial_occurrences_and_exact_retained_history_offline(tmp_path, monkeypatch, capsys):
     def forbidden(*args, **kwargs):
         pytest.fail('Dictionary inspection attempted HTTP')

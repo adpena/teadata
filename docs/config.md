@@ -418,7 +418,8 @@ store. It never updates Config or replaces originals. A public GET, for example:
 ```bash
 uv run python -m teadata.scripts.refresh_tapr acquire \
   --url https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html \
-  --method GET --dataset tapr_2024_masking_reference --edition 2024 \
+  --method GET --section reference --dataset tapr_2024_masking_reference --edition 2024 \
+  --metadata masking-metadata.json --metadata-sha256 METADATA_SHA256 --no-redirects \
   --filename masking.html --store provenance
 
 uv run python -m teadata.scripts.refresh_tapr replay \
@@ -436,6 +437,34 @@ headers. Legacy POST receipts missing request content type require an explicit
 history through the same provenance reference graph, even when bytes change.
 Reconstructed form URLs must exactly match the original requested URL. A legacy
 GET without form metadata reuses its exact retained URL.
+
+Every new `acquire` requires explicit SHA-pinned `DatasetMetadata` JSON. For
+example, `masking-metadata.json` can contain
+`{"title":"2024 TAPR masking reference","version":"2024","period":{"kind":"unknown"}}`.
+Its version must exactly equal `--edition`. `--section reference` explicitly
+labels a documentation observation; it does not select a configured dataset.
+Data acquisitions use the default `--section data_sources` and additionally
+require `--config CONFIG --config-sha256 CONFIG_SHA256 --year YEAR`. The dataset
+must exist in that Config, resolve to exactly that year, and have the exact
+edition. Prior-year fallback is rejected by this acquisition consumer; ordinary
+Config selection semantics are unchanged. Config validates identity/year/version
+only: its period, metrics, policies, references and source rows are never
+inherited or loaded. The supplied observation metadata remains independent.
+
+Metadata and Config inputs are each capped at 2 MiB; their captured bytes are
+SHA-checked, parsed and retained without rereading the original file. Config
+format and relative-base handling use the same canonical loader as `load_config`.
+The input files become local-observation receipts linked through the acquired
+record's metadata `provenance_ids`; this adds input lineage, not a replacement
+download date. Supply `--reference-store STORE` when selected reference receipts
+live elsewhere, or retain them in `--store`. Only explicitly claimed metadata
+and reference closures are verified and copied before HTTP. Missing, changed,
+wrong-URL or wrong-SHA documentation fails before the request. No reference is
+fetched implicitly. Use `--no-redirects` when authorization covers only the
+literal request URL. These are socket/response bounds, not a whole-batch deadline;
+an operator's separately selected outer deadline still applies. `replay` retains
+the original observation metadata and is unchanged; it does not apply aliases or
+silently correct historical labels.
 
 Inspect a retained TAPR HTML dictionary offline through the same command owner:
 

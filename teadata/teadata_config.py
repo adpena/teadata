@@ -72,9 +72,9 @@ def _load_toml(text: str) -> dict:
     return data
 
 
-def _detect_and_load(path: Path) -> dict:
-    suffix = path.suffix.lower()
-    text = path.read_text(encoding="utf-8")
+def _decode_config(raw: bytes, suffix: str) -> dict:
+    # Match read_text's universal-newline behavior for both captured and file input.
+    text = raw.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
     if suffix in (".yaml", ".yml"):
         return _load_yaml(text)
     if suffix == ".toml":
@@ -1380,9 +1380,18 @@ def load_config(path: str | Path | None = None) -> Config:
     p = Path(path) if path is not None else Path(__file__).with_name("teadata_sources.yaml")
     if not p.exists():
         raise FileNotFoundError(p)
-    raw = _detect_and_load(p)
-    raw = _rewrite_relative_paths(raw, p.resolve().parent)
-    cfg = Config.from_dict(raw)
+    return load_config_bytes(p.read_bytes(), path=p)
+
+
+def load_config_bytes(raw: bytes, *, path: str | Path) -> Config:
+    """Parse captured contract bytes using the original format and relative base.
+
+    ``path`` supplies the format suffix and original contract directory only;
+    the file is never reopened. Selection and metadata semantics match load_config.
+    """
+    p = Path(path)
+    document = _rewrite_relative_paths(_decode_config(raw, p.suffix.lower()), p.resolve().parent)
+    cfg = Config.from_dict(document)
     cfg.base_dir = p.resolve().parent
     return cfg
 
