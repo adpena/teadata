@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import closing
 import logging
 import sqlite3
 from collections import OrderedDict
@@ -61,7 +62,7 @@ def load_boundary(
     if not path:
         return None
     try:
-        with sqlite3.connect(path) as conn:
+        with closing(sqlite3.connect(path)) as conn:
             for key in _district_lookup_keys(district_number):
                 row = conn.execute(
                     "SELECT wkb FROM boundaries WHERE district_number = ?",
