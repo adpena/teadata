@@ -174,7 +174,7 @@ def load_district(
     """
 
     try:
-        with closing(sqlite3.connect(path)) as conn:
+        with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as conn:
             for key in _district_lookup_keys(district_number):
                 row = conn.execute(query, (key, key)).fetchone()
                 if not row:
@@ -215,7 +215,7 @@ def list_meta_keys(
     if limit:
         query = f"{query} LIMIT {int(limit)}"
     try:
-        with closing(sqlite3.connect(path)) as conn:
+        with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as conn:
             rows = conn.execute(query).fetchall()
             keys = [row[0] for row in rows if row and row[0]]
             if keys:

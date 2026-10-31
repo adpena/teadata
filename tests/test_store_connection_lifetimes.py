@@ -12,8 +12,8 @@ from teadata.manifest import ContractError, write_sqlite_catalog
 
 @pytest.fixture
 def stores(tmp_path, catalog):
-    maps = tmp_path / "maps.sqlite"
-    boundaries = tmp_path / "boundaries.sqlite"
+    maps = tmp_path / "maps #? café.sqlite"
+    boundaries = tmp_path / "boundaries #? café.sqlite"
     for path in (maps, boundaries):
         with closing(sqlite3.connect(path)) as connection:
             write_sqlite_catalog(connection, catalog)
@@ -24,7 +24,7 @@ def stores(tmp_path, catalog):
                 connection.execute("INSERT INTO closures_map VALUES (?,?,?)", ("123456", '{"district":true}', '{"transfers":true}'))
             else:
                 connection.execute("CREATE TABLE boundaries(district_number TEXT,wkb BLOB)")
-                connection.execute("INSERT INTO boundaries VALUES (?,?)", ("123456", Point(0, 0).wkb))
+                connection.execute("INSERT INTO boundaries VALUES (?,?)", ("'123456", Point(0, 0).wkb))
             connection.commit()
     return maps, boundaries
 
@@ -53,6 +53,62 @@ def assert_closed(connections):
     for connection in connections:
         with pytest.raises(sqlite3.ProgrammingError, match="closed"):
             connection.execute("SELECT 1")
+
+
+@pytest.mark.parametrize("reader", ["campus", "district", "boundary", "boundary_store"])
+def test_snapshot_payload_connections_reject_writes(stores, monkeypatch, reader):
+    maps, boundaries = stores
+    connect = sqlite3.connect
+
+    def readonly_connect(*args, **kwargs):
+        connection = connect(*args, **kwargs)
+        try:
+            with pytest.raises(sqlite3.OperationalError, match="readonly"):
+                connection.execute("CREATE TABLE unexpected_write(value)")
+        except BaseException:
+            connection.close()
+            raise
+        return connection
+
+    monkeypatch.setattr(sqlite3, "connect", readonly_connect)
+    if reader == "campus":
+        assert map_store.load_campus_profile_payload("123456789", store_path=maps) == {"campus": True}
+    elif reader == "district":
+        assert map_store.load_map_payload_parts("123456", store_path=maps) == ({"district": True}, {"transfers": True})
+    elif reader == "boundary":
+        assert boundary_store.load_boundary("123456", store_path=boundaries).equals(Point(0, 0))
+    else:
+        store = boundary_store.BoundaryStore(boundaries)
+        try:
+            assert store.get("123456").equals(Point(0, 0))
+        finally:
+            store.close()
+
+
+@pytest.mark.parametrize("reader", ["campus", "district", "boundary"])
+def test_removed_snapshot_is_not_recreated_after_discovery(stores, monkeypatch, reader):
+    maps, boundaries = stores
+    module, name, path = (
+        (boundary_store, "discover_boundary_store", boundaries)
+        if reader == "boundary"
+        else (map_store, "discover_map_store", maps)
+    )
+    discover = getattr(module, name)
+
+    def removed_after_discovery(explicit):
+        resolved = discover(explicit)
+        resolved.unlink()
+        return resolved
+
+    monkeypatch.setattr(module, name, removed_after_discovery)
+    if reader == "campus":
+        with pytest.raises(ContractError):
+            map_store.load_campus_profile_payload("123456789", store_path=path)
+    elif reader == "district":
+        assert map_store.load_map_payload_parts("123456", store_path=path) == (None, None)
+    else:
+        assert boundary_store.load_boundary("123456", store_path=path) is None
+    assert not path.exists()
 
 
 @pytest.mark.parametrize("reader", ["campus", "district", "boundary"])
