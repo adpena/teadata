@@ -94,10 +94,14 @@ def test_catalog_persists_exact_resource_and_returns_detached_records(bound_cata
     records = catalog.header_records("sample", edition="2025", table="student")
     assert records[0] == {"dataset": "sample", "edition": "2025", "table": "student", "mapping_version": 1,
                           "position": 1, "code": "CAMPUS", "label": "9 Digit Campus Number", "field": "campus_number",
+                          "period": {"kind": "unknown"},
                           "input_sha256": "1" * 64, "source_schema_sha256": source_schema_fingerprint(
                               ["9 Digit Campus Number", "Example Value"], ["CAMPUS", "VALUE"])}
     records[0]["field"] = "changed"
+    records[0]["period"]["kind"] = "changed"
     assert catalog.header_mapping("sample", table="student") == {"CAMPUS": "campus_number", "VALUE": "example_value"}
+    assert catalog.header_records("sample", table="student")[0]["period"] == {"kind": "unknown"}
+    assert cfg.header_records("sample", edition="2025", table="student")[0]["period"] == {"kind": "unknown"}
 
 
 def test_query_uses_only_catalog_bound_bytes_after_files_are_gone(bound_catalog, monkeypatch):
