@@ -18,6 +18,9 @@ from .column_schema import validate_header_table
 from .identifiers import canonical_source_identifiers
 
 
+TAPR_PROFILE_FAMILIES = ("student_staff_profile", "graduation_profile")
+
+
 @dataclass(frozen=True)
 class TaprSourceTable:
     table: Any
@@ -133,7 +136,8 @@ def read_tapr_table(path: str | Path, *, mapping: Mapping[str, Any], key_field: 
     pc: Any = arrow_compute  # Arrow registers compute kernels dynamically.
     path = Path(path)
     if (key_field not in {"campus_number", "district_number"}
-            or dataset != key_field.removesuffix("_number") + "_tapr_student_staff_profile"
+            or dataset not in {key_field.removesuffix("_number") + "_tapr_" + family
+                               for family in TAPR_PROFILE_FAMILIES}
             or not isinstance(edition, str) or not edition.strip()):
         raise ValueError("TAPR preparation requires an explicit qualified dataset and source edition")
     validate_header_table(mapping)
@@ -200,6 +204,8 @@ def merge_tapr_tables(sources: list[TaprSourceTable], *, key_field: str):
     width = 9 if key_field == "campus_number" else 6
     if len({(source.dataset, source.edition) for source in sources}) != 1:
         raise ValueError("TAPR tables from different qualified datasets or editions must remain independent")
+    if len({tuple(sorted(source.mapping.get("metric_period", {}).items())) for source in sources}) != 1:
+        raise ValueError("TAPR tables with different metric reference periods must remain independent")
     if len({source.mapping["table"] for source in sources}) != len(sources):
         raise ValueError("Different revisions or repeated observations of one TAPR table must remain independent")
     for source in sources:

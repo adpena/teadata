@@ -314,9 +314,37 @@ metadata and resolve against the configured data directory only when selected.
 
 Coverage refers to the declared inputs: 2024 `PROF` contains 407 campus and 420
 district columns, including 34 lagged annual-graduate fields in each scope.
-The current 2025 inputs are `STUD` and `STAF` only. They contain no graduate
-fields; the separate publisher `GRAD` Graduation Profile needs its own audited
-input/header contract before claiming equivalent annual-profile coverage.
+The 2025 `STUD`/`STAF` source preparation remains separate from `GRAD`
+Graduation Profile. Select the latter explicitly:
+
+```bash
+uv run python -m teadata.scripts.build_tapr_profiles \
+  --edition 2025 --family graduation_profile --input-dir raw/ \
+  --reference-store provenance --output-dir prepared/tapr-2025-grad
+```
+
+`campus_tapr_graduation_profile` and `district_tapr_graduation_profile` declare
+only edition 2025, measuring 2023–2024 annual graduates. They retain 42 metrics
+and four/two canonical identity/history attributes in separate wide leaves;
+identity/name observation dates remain unknown. Their source-only crosswalk has
+no historical prepared-input hash and requires the explicit `source` profile.
+The source metadata and availability report describe this declared coverage,
+not inclusion in a released catalog. `cfg.is_source_only(dataset, 2025)` reads
+that flag from the reviewed crosswalk without opening source data. GRAD1–4 readiness/assessment families and
+other annual TAPR families are outside this preparation target.
+
+All 42 GRAD source codes and exact human labels are published in CSV records
+2 and 1. The acquired publisher dictionary documents only 39 metric codes per
+scope. `CA0GS24N`, `CA0GM24R`, `CA0GS24R` and their district `D` counterparts
+remain independent fields with `dictionary_status: not_documented`, null type
+and description, and the original CSV-header reference. Documented dictionary
+descriptions are retained without treating a similar label or equal value as
+semantic equivalence. Every metric uses the verified 2023–2024 reference period;
+units remain explicitly unknown until individually reviewed. Raw blanks and
+zeros are preserved without assigning a missingness or suppression cause.
+The producer requires and retains the original acquisition receipts and bytes
+for source-only datasets; a new local observation does not replace download
+history. GRAD is never automatically merged with STUD/STAF or entity metadata.
 
 The `source` reader profile exposes complete header contracts without reading
 source rows, for example

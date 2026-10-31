@@ -779,6 +779,28 @@ class Config:
         except ValueError as error:
             raise ContractError(str(error)) from error
 
+    def is_source_only(self, dataset: str, year: int | None = None, *,
+                       section: str = "data_sources") -> bool:
+        """Describe preparation-only availability from the reviewed source contract.
+
+        A named retained reader (such as accountability ratings) still belongs
+        in release coverage. Only the explicit source-only crosswalk opts out.
+        """
+        from .column_schema import crosswalk_dataset, has_default_reader, parse_column_schema
+
+        source = self.resolve_dataset(dataset, year, section=section)
+        if has_default_reader(source.reader) or "source" not in source.reader.get("profiles", {}):
+            return False
+        contract = self.column_contract(dataset, year, section=section, reader_profile="source")
+        if contract is None:
+            return False
+        document = parse_column_schema(contract["text"].encode())
+        if document["schema_version"] != 2:
+            return False
+        if source.metadata.version is None:
+            raise ValueError("Source-only readers require an explicit source edition")
+        return crosswalk_dataset(document, dataset, source.metadata.version).get("source_only", False)
+
     def header_mapping(self, dataset: str, *, edition: str, table: str,
                        from_: str = "code", to: str = "field",
                        columns: Iterable[str] | None = None, reader_profile: str | None = None) -> dict[str, str]:
@@ -821,6 +843,9 @@ class Config:
         if contract is None:
             raise ContractError("Full TAPR source preparation requires a reviewed crosswalk")
         selected = crosswalk_dataset(parse_column_schema(contract["text"].encode()), dataset, source.metadata.version)
+        if selected.get("source_only") and any(table["metric_period"] != source.metadata.period.to_dict()
+                                               for table in selected["tables"]):
+            raise ContractError("Source-only metric period differs from its declared source metadata")
         if set(selection["tables"]) != {table["table"] for table in selected["tables"]}:
             raise ContractError("Full TAPR source paths do not account for every reviewed table")
         result = []
@@ -847,7 +872,7 @@ class Config:
         Resolve the dataset for the year and load as DataFrame (or GeoDataFrame if spatial).
         For CSV loads, you can pass dtype=... etc through reader_kwargs.
         """
-        from .column_schema import reader_options
+        from .column_schema import has_default_reader, reader_options
         from .manifest import ACTIVE_BUILD, ContractError
 
         source = self.resolve_dataset(dataset, year, section=section)
@@ -860,8 +885,7 @@ class Config:
         )
         if (
             reader_profile is None
-            and source.reader.get("profiles")
-            and expected_schema is None
+            and not has_default_reader(source.reader)
         ):
             raise ContractError(
                 f"Reader profile is required for {dataset}; no default column schema is declared"

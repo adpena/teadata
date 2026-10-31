@@ -22,6 +22,10 @@ def catalog():
     for section in ("data_sources", "spatial"):
         for name in getattr(cfg, section):
             source = cfg.resolve_dataset(name, section=section)
+            # Source-only preparation contracts are discoverable configuration,
+            # not datasets loaded into this retained-format catalog fixture.
+            if cfg.is_source_only(name, section=section):
+                continue
             for identifier in source.metadata.provenance_ids:
                 records[identifier] = store.read_record(identifier)
             for reference in source.metadata.references:

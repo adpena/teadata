@@ -10,6 +10,11 @@ import re
 from typing import Any, Iterable, Mapping
 
 
+def has_default_reader(reader: Mapping[str, Any]) -> bool:
+    """Named profiles without a default schema require explicit selection."""
+    return not reader.get("profiles") or reader.get("column_schema") is not None
+
+
 def reader_options(reader: Mapping[str, Any], profile: str | None) -> dict[str, Any]:
     """Select the same reader contract for schema lookup and table loading."""
     options = dict(reader)
@@ -74,13 +79,19 @@ def validate_header_table(table: Mapping[str, Any]) -> None:
     """Validate one explicit mapping; never synthesize or deduplicate names."""
     if (not isinstance(table, dict)
             or not {"table", "input_sha256", "source_schema_sha256", "fields"} <= set(table)
-            or set(table) - {"table", "input_sha256", "source_schema_sha256", "fields", "layout", "dictionary"}
+            or set(table) - {"table", "input_sha256", "source_schema_sha256", "fields", "layout", "dictionary", "metric_period"}
             or not isinstance(table["table"], str) or not table["table"].strip()
             or not _checksum(table["input_sha256"]) or not _checksum(table["source_schema_sha256"])
             or not isinstance(table["fields"], list) or not table["fields"]):
         raise ValueError("Invalid header crosswalk table")
     if "layout" in table:
         validate_source_layout(table["layout"])
+    if "metric_period" in table:
+        from .dataset_metadata import DataPeriod
+
+        period = table["metric_period"]
+        if not isinstance(period, Mapping) or DataPeriod.from_dict(period).to_dict() != period:
+            raise ValueError("Source metric period requires an explicit canonical period mapping")
     if "dictionary" in table:
         dictionary = table["dictionary"]
         if (not isinstance(dictionary, dict)
@@ -93,13 +104,27 @@ def validate_header_table(table: Mapping[str, Any]) -> None:
     for position, field in enumerate(table["fields"], 1):
         if (not isinstance(field, dict)
                 or not {"position", "code", "label", "field"} <= set(field)
-                or set(field) - {"position", "code", "label", "field", "publisher_type", "publisher_length", "disposition"}
+                or set(field) - {"position", "code", "label", "field", "publisher_type", "publisher_length", "disposition",
+                                 "dictionary_status", "publisher_description"}
                 or type(field["position"]) is not int or field["position"] != position
                 or not isinstance(field["code"], str) or not field["code"].strip()
                 or not isinstance(field["label"], str) or not field["label"].strip()
                 or not isinstance(field["field"], str)):
             raise ValueError(f"Invalid header crosswalk column {position}")
-        if any(not isinstance(field[key], str) for key in ("publisher_type", "publisher_length") if key in field):
+        if "dictionary_status" in field:
+            status = field["dictionary_status"]
+            if (status not in {"documented", "not_documented", "not_applicable"}
+                    or not {"publisher_type", "publisher_description", "disposition"} <= set(field)
+                    or (status == "not_applicable" and field["disposition"] != "identity")
+                    or (status == "documented" and any(not isinstance(field[key], str) or not field[key].strip()
+                        for key in ("publisher_type", "publisher_description")))
+                    or (status != "documented" and any(field[key] is not None
+                        for key in ("publisher_type", "publisher_description")))):
+                raise ValueError(f"Inconsistent publisher dictionary status in column {position}")
+        elif "publisher_description" in field or field.get("publisher_type", "") is None:
+            raise ValueError(f"Missing publisher dictionary status in column {position}")
+        if any(not isinstance(field[key], str) for key in ("publisher_type", "publisher_length")
+               if key in field and not (key == "publisher_type" and "dictionary_status" in field)):
             raise ValueError(f"Invalid publisher metadata in column {position}")
         if field.get("disposition", "fact") not in {"identity", "fact"}:
             raise ValueError(f"Unaccounted source column {position}; retain an identity or fact")
@@ -179,9 +204,11 @@ def parse_column_schema(data: bytes) -> dict[str, Any]:
         seen = set()
         for dataset in document["datasets"]:
             if (not isinstance(dataset, dict)
-                    or set(dataset) != {"dataset", "edition", "prepared_input_sha256", "tables"}
+                    or set(dataset) not in ({"dataset", "edition", "prepared_input_sha256", "tables"},
+                                           {"dataset", "edition", "source_only", "tables"})
                     or any(not isinstance(dataset[k], str) or not dataset[k].strip() for k in ("dataset", "edition"))
-                    or not _checksum(dataset["prepared_input_sha256"])
+                    or ("source_only" in dataset and dataset["source_only"] is not True)
+                    or ("prepared_input_sha256" in dataset and not _checksum(dataset["prepared_input_sha256"]))
                     or not isinstance(dataset["tables"], list) or not dataset["tables"]):
                 raise ValueError("Invalid header crosswalk dataset")
             identity = dataset["dataset"], dataset["edition"]
@@ -191,6 +218,9 @@ def parse_column_schema(data: bytes) -> dict[str, Any]:
             tables, shared = set(), {}
             for table in dataset["tables"]:
                 validate_header_table(table)
+                if dataset.get("source_only") and ("metric_period" not in table
+                        or any("dictionary_status" not in field for field in table["fields"])):
+                    raise ValueError("Source-only fields require an explicit metric period and publisher dictionary status")
                 if table["table"] in tables:
                     raise ValueError("Duplicate header crosswalk table")
                 tables.add(table["table"])
@@ -233,7 +263,7 @@ def schema_columns(document: Mapping[str, Any], *, dataset: str | None = None,
 def validate_selected_crosswalk(document: Mapping[str, Any], *, dataset: str, edition: str,
                                 input_sha256: str, columns: list[str]) -> None:
     selected = crosswalk_dataset(document, dataset, edition)
-    if selected["prepared_input_sha256"] != input_sha256:
+    if selected.get("prepared_input_sha256") != input_sha256:
         raise ValueError("Header crosswalk belongs to a different prepared input")
     if schema_columns(document, dataset=dataset, edition=edition) != columns:
         raise ValueError("Header crosswalk differs from the selected prepared schema")
@@ -247,7 +277,9 @@ def header_records(document: Mapping[str, Any], *, dataset: str, edition: str,
         raise ValueError(f"Header crosswalk table unavailable: {table!r}")
     return [{**field, "dataset": dataset, "edition": edition, "table": item["table"],
              "mapping_version": document["mapping_version"], "input_sha256": item["input_sha256"],
-             "source_schema_sha256": item["source_schema_sha256"]}
+             "source_schema_sha256": item["source_schema_sha256"],
+             **({"period": dict(item["metric_period"]) if field.get("disposition", "fact") == "fact"
+                 else {"kind": "unknown"}} if "metric_period" in item else {})}
             for item in tables for field in item["fields"]]
 
 

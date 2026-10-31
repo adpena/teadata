@@ -521,6 +521,491 @@ data_sources:
                 link
               status: unreviewed
               provenance_ids: []
+  campus_tapr_graduation_profile:
+    2025:
+      path: data/tapr/raw/2025 Campus Graduation Profile.csv
+      metadata:
+        title: 2024-2025 TAPR Campus Graduation Profile (2023-2024 annual graduates)
+        publisher: Texas Education Agency
+        version: '2025'
+        period: &id001
+          kind: school_year
+          start_year: 2023
+          end_year: 2024
+        source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=C&level=Campus&tapr=all_c&id=&dsname=GRAD&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_step_7.sas&key=0G1%7C0GA%7C0GE%7C0GH%7C0GM%7C0GN%7C0GR%7C0GS&var_type=N&var_type=D&var_type=P&var_type=R&datafmt=csv
+        provenance_ids:
+        - 2fdf8e78ac6879c765eda31ff907e69c54b8c1ddb4149f2f871c8346941a0c99
+        notes: Source-only GRAD family; not released facts or all annual TAPR/readiness
+          families. Metrics measure 2023-2024 annual graduates inside publisher edition
+          2025. Identity/name observation dates are unknown. Exact CSV code and label
+          headers supply all 42 metric bindings; three metrics lack publisher dictionary
+          type/definition. Units remain unknown until individually reviewed; no suppression
+          or blank-cause interpretation is applied. No cross-year equivalence or merge
+          with STUD/STAF is asserted.
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=C&level=Campus&tapr=all_c&id=&dsname=GRAD&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_step_7.sas&key=0G1%7C0GA%7C0GE%7C0GH%7C0GM%7C0GN%7C0GR%7C0GS&var_type=N&var_type=D&var_type=P&var_type=R&datafmt=csv
+          title: 'Original publisher GRAD CSV: human labels in record 1 and source codes
+            in record 2'
+          status: available
+          provenance_ids:
+          - 2fdf8e78ac6879c765eda31ff907e69c54b8c1ddb4149f2f871c8346941a0c99
+          reviewed_sha256: 8734133d9b8805e51f68185e954175ac63a50a2650c048ff25f6afe7f059174f
+        - reference_id: dictionary
+          role: data_dictionary
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=C&dsname=GRAD&dd=gradprofile&asvab=&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_dictionary.sas
+          title: 2024-2025 Campus Graduation Profile dictionary; 39 of 42 metric codes
+            documented
+          status: available
+          provenance_ids:
+          - 7fe8d8252f1c6a45a8700840d758ac1f115cbd962b284aca3ad988900117dc82
+          reviewed_sha256: 3fc2ca2a971fbc3f6de3e020712eab5bc594614c405836dfa44968a9bf111121
+        - reference_id: glossary
+          role: glossary
+          url: https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf
+          title: 2024-25 TAPR Glossary
+          status: available
+          provenance_ids:
+          - e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db
+          reviewed_sha256: 846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416
+        - reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html
+          title: Explanation of 2024-25 TAPR Masking Rules
+          status: available
+          provenance_ids:
+          - 6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554
+          reviewed_sha256: 7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8
+        field_year: 2024
+        metrics:
+          campus_2024_graduates_all_students_count_including_fhsp:
+            field: campus_2024_graduates_all_students_count_including_fhsp
+            period: *id001
+            unit: null
+          campus_2024_graduates_minimum_hs_pgm_all_students_count:
+            field: campus_2024_graduates_minimum_hs_pgm_all_students_count
+            period: *id001
+            unit: null
+          campus_2024_graduates_rhsp_dap_all_students_count:
+            field: campus_2024_graduates_rhsp_dap_all_students_count
+            period: *id001
+            unit: null
+          campus_2024_graduates_fhsp_no_endorsement_all_students_count:
+            field: campus_2024_graduates_fhsp_no_endorsement_all_students_count
+            period: *id001
+            unit: null
+          campus_2024_graduates_fhsp_e_all_students_count:
+            field: campus_2024_graduates_fhsp_e_all_students_count
+            period: *id001
+            unit: null
+          campus_2024_graduates_fhsp_dla_all_students_count:
+            field: campus_2024_graduates_fhsp_dla_all_students_count
+            period: *id001
+            unit: null
+          campus_2024_graduates_texas_first_dla_all_students_count:
+            field: campus_2024_graduates_texas_first_dla_all_students_count
+            period: *id001
+            unit: null
+          campus_2024_graduates_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla_all_students_count:
+            field: campus_2024_graduates_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla_all_students_count
+            period: *id001
+            unit: null
+          campus_2024_graduates_all_students_count_all_students_denominator:
+            field: campus_2024_graduates_all_students_count_all_students_denominator
+            period: *id001
+            unit: null
+          campus_2024_graduates_african_american_count:
+            field: campus_2024_graduates_african_american_count
+            period: *id001
+            unit: null
+          campus_2024_graduates_hispanic_count:
+            field: campus_2024_graduates_hispanic_count
+            period: *id001
+            unit: null
+          campus_2024_graduates_white_count:
+            field: campus_2024_graduates_white_count
+            period: *id001
+            unit: null
+          campus_2024_graduates_american_indian_count:
+            field: campus_2024_graduates_american_indian_count
+            period: *id001
+            unit: null
+          campus_2024_graduates_asian_count:
+            field: campus_2024_graduates_asian_count
+            period: *id001
+            unit: null
+          campus_2024_graduates_pacific_islander_count:
+            field: campus_2024_graduates_pacific_islander_count
+            period: *id001
+            unit: null
+          campus_2024_graduates_two_or_more_races_count:
+            field: campus_2024_graduates_two_or_more_races_count
+            period: *id001
+            unit: null
+          campus_2024_graduates_econ_disadv_count:
+            field: campus_2024_graduates_econ_disadv_count
+            period: *id001
+            unit: null
+          campus_2024_graduates_special_ed_count:
+            field: campus_2024_graduates_special_ed_count
+            period: *id001
+            unit: null
+          campus_2024_graduates_eb_el_count:
+            field: campus_2024_graduates_eb_el_count
+            period: *id001
+            unit: null
+          campus_2024_graduates_at_risk_count:
+            field: campus_2024_graduates_at_risk_count
+            period: *id001
+            unit: null
+          campus_2024_graduates_cte_program_completer_count:
+            field: campus_2024_graduates_cte_program_completer_count
+            period: *id001
+            unit: null
+          campus_2024_graduates_cte_program_completer_student_group_percent:
+            field: campus_2024_graduates_cte_program_completer_student_group_percent
+            period: *id001
+            unit: null
+          campus_2024_graduates_rhsp_dap_all_students_percent_profile_only:
+            field: campus_2024_graduates_rhsp_dap_all_students_percent_profile_only
+            period: *id001
+            unit: null
+          campus_2024_graduates_fhsp_no_endorsement_all_students_percent_profile_only:
+            field: campus_2024_graduates_fhsp_no_endorsement_all_students_percent_profile_only
+            period: *id001
+            unit: null
+          campus_2024_graduates_fhsp_e_all_students_percent_profile_only:
+            field: campus_2024_graduates_fhsp_e_all_students_percent_profile_only
+            period: *id001
+            unit: null
+          campus_2024_graduates_fhsp_dla_all_students_percent_profile_only:
+            field: campus_2024_graduates_fhsp_dla_all_students_percent_profile_only
+            period: *id001
+            unit: null
+          campus_2024_graduates_texas_first_dla_all_students_percent_profile_only:
+            field: campus_2024_graduates_texas_first_dla_all_students_percent_profile_only
+            period: *id001
+            unit: null
+          campus_2024_graduates_all_students_group_percent:
+            field: campus_2024_graduates_all_students_group_percent
+            period: *id001
+            unit: null
+          campus_2024_graduates_minimum_hs_pgm_all_students_percent:
+            field: campus_2024_graduates_minimum_hs_pgm_all_students_percent
+            period: *id001
+            unit: null
+          campus_2024_graduates_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla_all_students_percent:
+            field: campus_2024_graduates_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla_all_students_percent
+            period: *id001
+            unit: null
+          campus_2024_graduates_african_american_student_group_percent:
+            field: campus_2024_graduates_african_american_student_group_percent
+            period: *id001
+            unit: null
+          campus_2024_graduates_hispanic_student_group_percent:
+            field: campus_2024_graduates_hispanic_student_group_percent
+            period: *id001
+            unit: null
+          campus_2024_graduates_white_student_group_percent:
+            field: campus_2024_graduates_white_student_group_percent
+            period: *id001
+            unit: null
+          campus_2024_graduates_american_indian_student_group_percent:
+            field: campus_2024_graduates_american_indian_student_group_percent
+            period: *id001
+            unit: null
+          campus_2024_graduates_asian_student_group_percent:
+            field: campus_2024_graduates_asian_student_group_percent
+            period: *id001
+            unit: null
+          campus_2024_graduates_pacific_islander_student_group_percent:
+            field: campus_2024_graduates_pacific_islander_student_group_percent
+            period: *id001
+            unit: null
+          campus_2024_graduates_two_or_more_races_student_group_percent:
+            field: campus_2024_graduates_two_or_more_races_student_group_percent
+            period: *id001
+            unit: null
+          campus_2024_graduates_econ_disadv_student_group_percent:
+            field: campus_2024_graduates_econ_disadv_student_group_percent
+            period: *id001
+            unit: null
+          campus_2024_graduates_special_ed_student_group_percent:
+            field: campus_2024_graduates_special_ed_student_group_percent
+            period: *id001
+            unit: null
+          campus_2024_graduates_eb_el_student_group_percent:
+            field: campus_2024_graduates_eb_el_student_group_percent
+            period: *id001
+            unit: null
+          campus_2024_graduates_at_risk_student_group_percent:
+            field: campus_2024_graduates_at_risk_student_group_percent
+            period: *id001
+            unit: null
+          campus_2024_graduates_minimum_hs_pgm_all_students_percent_profile_only:
+            field: campus_2024_graduates_minimum_hs_pgm_all_students_percent_profile_only
+            period: *id001
+            unit: null
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2025--graduation-profile-crosswalk.json
+            tapr_source:
+              scope: campus
+              tables:
+                graduation_profile: data/tapr/raw/2025 Campus Graduation Profile.csv
+            references:
+            - reference_id: columns_source
+              role: schema
+              path: schemas/tapr--2025--graduation-profile-crosswalk.json
+              title: Reviewed GRAD CSV headers, source layout and dictionary availability;
+                source-only, not a historical prepared-input claim
+              status: available
+              provenance_ids: []
+              reviewed_sha256: bf848a6c47d7f5ed783b57d862d4fcaefced1e2988b65b75c13abddcd998ec98
+  district_tapr_graduation_profile:
+    2025:
+      path: data/tapr/raw/2025 District Graduation Profile.csv
+      metadata:
+        title: 2024-2025 TAPR District Graduation Profile (2023-2024 annual graduates)
+        publisher: Texas Education Agency
+        version: '2025'
+        period: *id001
+        source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=D&level=District&tapr=all_d&id=&dsname=GRAD&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_step_7.sas&key=0G1%7C0GA%7C0GE%7C0GH%7C0GM%7C0GN%7C0GR%7C0GS&var_type=N&var_type=D&var_type=P&var_type=R&datafmt=csv
+        provenance_ids:
+        - aa9450c995c2e41da8ca190e390efc76a83381e3f1357010db2ce850013ec664
+        notes: Source-only GRAD family; not released facts or all annual TAPR/readiness
+          families. Metrics measure 2023-2024 annual graduates inside publisher edition
+          2025. Identity/name observation dates are unknown. Exact CSV code and label
+          headers supply all 42 metric bindings; three metrics lack publisher dictionary
+          type/definition. Units remain unknown until individually reviewed; no suppression
+          or blank-cause interpretation is applied. No cross-year equivalence or merge
+          with STUD/STAF is asserted.
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=D&level=District&tapr=all_d&id=&dsname=GRAD&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_step_7.sas&key=0G1%7C0GA%7C0GE%7C0GH%7C0GM%7C0GN%7C0GR%7C0GS&var_type=N&var_type=D&var_type=P&var_type=R&datafmt=csv
+          title: 'Original publisher GRAD CSV: human labels in record 1 and source codes
+            in record 2'
+          status: available
+          provenance_ids:
+          - aa9450c995c2e41da8ca190e390efc76a83381e3f1357010db2ce850013ec664
+          reviewed_sha256: 486326546705eb72f068f5d587b68222a15e9d32a262914d04cc4c91ef24cf72
+        - reference_id: dictionary
+          role: data_dictionary
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=D&dsname=GRAD&dd=gradprofile&asvab=&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_dictionary.sas
+          title: 2024-2025 District Graduation Profile dictionary; 39 of 42 metric codes
+            documented
+          status: available
+          provenance_ids:
+          - 436dc9d78129baeceafc63c59a5f280af5b9560b370967f661b3a83a906c4fca
+          reviewed_sha256: 14e909067dc352a5cbf57b467d311954661743c47bf37bedb62f335127d27626
+        - reference_id: glossary
+          role: glossary
+          url: https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf
+          title: 2024-25 TAPR Glossary
+          status: available
+          provenance_ids:
+          - e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db
+          reviewed_sha256: 846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416
+        - reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html
+          title: Explanation of 2024-25 TAPR Masking Rules
+          status: available
+          provenance_ids:
+          - 6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554
+          reviewed_sha256: 7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8
+        field_year: 2024
+        metrics:
+          district_2024_graduates_all_students_count_including_fhsp:
+            field: district_2024_graduates_all_students_count_including_fhsp
+            period: *id001
+            unit: null
+          district_2024_graduates_minimum_hs_pgm_all_students_count:
+            field: district_2024_graduates_minimum_hs_pgm_all_students_count
+            period: *id001
+            unit: null
+          district_2024_graduates_rhsp_dap_all_students_count:
+            field: district_2024_graduates_rhsp_dap_all_students_count
+            period: *id001
+            unit: null
+          district_2024_graduates_fhsp_no_endorsement_all_students_count:
+            field: district_2024_graduates_fhsp_no_endorsement_all_students_count
+            period: *id001
+            unit: null
+          district_2024_graduates_fhsp_e_all_students_count:
+            field: district_2024_graduates_fhsp_e_all_students_count
+            period: *id001
+            unit: null
+          district_2024_graduates_fhsp_dla_all_students_count:
+            field: district_2024_graduates_fhsp_dla_all_students_count
+            period: *id001
+            unit: null
+          district_2024_graduates_texas_first_dla_all_students_count:
+            field: district_2024_graduates_texas_first_dla_all_students_count
+            period: *id001
+            unit: null
+          district_2024_graduates_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla_all_students_count:
+            field: district_2024_graduates_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla_all_students_count
+            period: *id001
+            unit: null
+          district_2024_graduates_all_students_count_all_students_denominator:
+            field: district_2024_graduates_all_students_count_all_students_denominator
+            period: *id001
+            unit: null
+          district_2024_graduates_african_american_count:
+            field: district_2024_graduates_african_american_count
+            period: *id001
+            unit: null
+          district_2024_graduates_hispanic_count:
+            field: district_2024_graduates_hispanic_count
+            period: *id001
+            unit: null
+          district_2024_graduates_white_count:
+            field: district_2024_graduates_white_count
+            period: *id001
+            unit: null
+          district_2024_graduates_american_indian_count:
+            field: district_2024_graduates_american_indian_count
+            period: *id001
+            unit: null
+          district_2024_graduates_asian_count:
+            field: district_2024_graduates_asian_count
+            period: *id001
+            unit: null
+          district_2024_graduates_pacific_islander_count:
+            field: district_2024_graduates_pacific_islander_count
+            period: *id001
+            unit: null
+          district_2024_graduates_two_or_more_races_count:
+            field: district_2024_graduates_two_or_more_races_count
+            period: *id001
+            unit: null
+          district_2024_graduates_econ_disadv_count:
+            field: district_2024_graduates_econ_disadv_count
+            period: *id001
+            unit: null
+          district_2024_graduates_special_ed_count:
+            field: district_2024_graduates_special_ed_count
+            period: *id001
+            unit: null
+          district_2024_graduates_eb_el_count:
+            field: district_2024_graduates_eb_el_count
+            period: *id001
+            unit: null
+          district_2024_graduates_at_risk_count:
+            field: district_2024_graduates_at_risk_count
+            period: *id001
+            unit: null
+          district_2024_graduates_cte_program_completer_count:
+            field: district_2024_graduates_cte_program_completer_count
+            period: *id001
+            unit: null
+          district_2024_graduates_cte_program_completer_student_group_percent:
+            field: district_2024_graduates_cte_program_completer_student_group_percent
+            period: *id001
+            unit: null
+          district_2024_graduates_rhsp_dap_all_students_percent_profile_only:
+            field: district_2024_graduates_rhsp_dap_all_students_percent_profile_only
+            period: *id001
+            unit: null
+          district_2024_graduates_fhsp_no_endorsement_all_students_percent_profile_only:
+            field: district_2024_graduates_fhsp_no_endorsement_all_students_percent_profile_only
+            period: *id001
+            unit: null
+          district_2024_graduates_fhsp_e_all_students_percent_profile_only:
+            field: district_2024_graduates_fhsp_e_all_students_percent_profile_only
+            period: *id001
+            unit: null
+          district_2024_graduates_fhsp_dla_all_students_percent_profile_only:
+            field: district_2024_graduates_fhsp_dla_all_students_percent_profile_only
+            period: *id001
+            unit: null
+          district_2024_graduates_texas_first_dla_all_students_percent_profile_only:
+            field: district_2024_graduates_texas_first_dla_all_students_percent_profile_only
+            period: *id001
+            unit: null
+          district_2024_graduates_all_students_group_percent:
+            field: district_2024_graduates_all_students_group_percent
+            period: *id001
+            unit: null
+          district_2024_graduates_minimum_hs_pgm_all_students_percent:
+            field: district_2024_graduates_minimum_hs_pgm_all_students_percent
+            period: *id001
+            unit: null
+          district_2024_graduates_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla_all_students_percent:
+            field: district_2024_graduates_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla_all_students_percent
+            period: *id001
+            unit: null
+          district_2024_graduates_african_american_student_group_percent:
+            field: district_2024_graduates_african_american_student_group_percent
+            period: *id001
+            unit: null
+          district_2024_graduates_hispanic_student_group_percent:
+            field: district_2024_graduates_hispanic_student_group_percent
+            period: *id001
+            unit: null
+          district_2024_graduates_white_student_group_percent:
+            field: district_2024_graduates_white_student_group_percent
+            period: *id001
+            unit: null
+          district_2024_graduates_american_indian_student_group_percent:
+            field: district_2024_graduates_american_indian_student_group_percent
+            period: *id001
+            unit: null
+          district_2024_graduates_asian_student_group_percent:
+            field: district_2024_graduates_asian_student_group_percent
+            period: *id001
+            unit: null
+          district_2024_graduates_pacific_islander_student_group_percent:
+            field: district_2024_graduates_pacific_islander_student_group_percent
+            period: *id001
+            unit: null
+          district_2024_graduates_two_or_more_races_student_group_percent:
+            field: district_2024_graduates_two_or_more_races_student_group_percent
+            period: *id001
+            unit: null
+          district_2024_graduates_econ_disadv_student_group_percent:
+            field: district_2024_graduates_econ_disadv_student_group_percent
+            period: *id001
+            unit: null
+          district_2024_graduates_special_ed_student_group_percent:
+            field: district_2024_graduates_special_ed_student_group_percent
+            period: *id001
+            unit: null
+          district_2024_graduates_eb_el_student_group_percent:
+            field: district_2024_graduates_eb_el_student_group_percent
+            period: *id001
+            unit: null
+          district_2024_graduates_at_risk_student_group_percent:
+            field: district_2024_graduates_at_risk_student_group_percent
+            period: *id001
+            unit: null
+          district_2024_graduates_minimum_hs_pgm_all_students_percent_profile_only:
+            field: district_2024_graduates_minimum_hs_pgm_all_students_percent_profile_only
+            period: *id001
+            unit: null
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2025--graduation-profile-crosswalk.json
+            tapr_source:
+              scope: district
+              tables:
+                graduation_profile: data/tapr/raw/2025 District Graduation Profile.csv
+            references:
+            - reference_id: columns_source
+              role: schema
+              path: schemas/tapr--2025--graduation-profile-crosswalk.json
+              title: Reviewed GRAD CSV headers, source layout and dictionary availability;
+                source-only, not a historical prepared-input claim
+              status: available
+              provenance_ids: []
+              reviewed_sha256: bf848a6c47d7f5ed783b57d862d4fcaefced1e2988b65b75c13abddcd998ec98
   campus_tapr_historical_enrollment:
     2015:
       path: data/tapr/CAMPPROF_2014-2015_FINAL.xlsx
@@ -1045,6 +1530,10 @@ schema:
     - csv
     campus_tapr_student_staff_profile:
     - xlsx
+    campus_tapr_graduation_profile:
+    - csv
+    district_tapr_graduation_profile:
+    - csv
     campus_tapr_historical_enrollment:
     - xlsx
     district_tapr_student_staff_profile:

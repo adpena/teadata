@@ -17,27 +17,31 @@ import shutil
 import sys
 import tempfile
 
+from teadata.column_schema import crosswalk_dataset, parse_column_schema
 from teadata.dataset_metadata import DatasetMetadata
 from teadata.manifest import processor_identity, verify_reference_receipts
 from teadata.provenance import ProvenanceStore
 from teadata.scripts.paths import data_path
-from teadata.tapr import merge_tapr_tables
+from teadata.tapr import TAPR_PROFILE_FAMILIES, merge_tapr_tables
 from teadata.teadata_config import load_config
 
 
 def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | None,
-                     output_dir: Path, reference_store: ProvenanceStore | None = None) -> dict:
+                     output_dir: Path, reference_store: ProvenanceStore | None = None,
+                     family: str = "student_staff_profile") -> dict:
     """Validate all selected inputs, then publish one complete new generation."""
     import pyarrow.parquet as pq
 
-    if edition not in {"2024", "2025"} or not scopes or len(scopes) != len(set(scopes)) or set(scopes) - {"campus", "district"}:
+    if (edition not in {"2024", "2025"} or not scopes or len(scopes) != len(set(scopes))
+            or set(scopes) - {"campus", "district"}
+            or family not in TAPR_PROFILE_FAMILIES):
         raise ValueError("Select a declared 2024/2025 edition and distinct campus/district scopes")
     output_dir = Path(output_dir)
     if output_dir.exists() or output_dir.is_symlink():
         raise FileExistsError(f"Preparation output already exists: {output_dir}")
     prepared = []
     for scope in scopes:
-        dataset = scope + "_tapr_student_staff_profile"
+        dataset = scope + "_tapr_" + family
         sources = cfg.read_tapr_sources(dataset, int(edition), input_dir=input_dir)
         table = merge_tapr_tables(sources, key_field=scope + "_number")
         if table.column_names != cfg.column_schema(dataset, int(edition), reader_profile="source"):
@@ -49,7 +53,8 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
     stage.chmod(0o700)
     try:
         store = ProvenanceStore(stage / "provenance")
-        receipt = {"schema_version": 1, "edition": edition, "status": "validated_source_preparation",
+        receipt = {"schema_version": 1, "edition": edition, "family": family,
+                   "status": "validated_source_preparation",
                    "release_activation": False,
                    "toolchain": {"python": sys.version, "packages": {name: version(name) for name in ("pyarrow", "duckdb", "pandas", "openpyxl")}},
                    "processor_sha256": processor_identity(),
@@ -65,6 +70,22 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
                 replace(source, path=str(crosswalk_path), dataset=dataset + ":schema", section="reference",
                         metadata=DatasetMetadata(title="TEA Data full TAPR source/header contract")))
             inputs = [contract_observation]
+            selected = crosswalk_dataset(parse_column_schema(contract["text"].encode()), dataset, edition)
+            if selected.get("source_only"):
+                if reference_store is None or not source.metadata.provenance_ids:
+                    raise ValueError("Source-only preparation requires original acquisition receipts in an explicit reference_store")
+                acquired = set()
+                expected = {item.input_sha256 for item in sources}
+                for identifier in source.metadata.provenance_ids:
+                    store.copy_record_from(reference_store, identifier)
+                    record = store.read_record(identifier)
+                    if (record["kind"] != "acquisition" or record["dataset"] != dataset
+                            or record["artifact"]["sha256"] not in expected):
+                        raise ValueError("Source acquisition receipt does not identify the selected raw input")
+                    acquired.add(record["artifact"]["sha256"])
+                    inputs.append(identifier)
+                if acquired != expected:
+                    raise ValueError("Original acquisition receipts do not account for every source-only raw input")
             references = []
             for reference in cfg.reader_references(dataset, int(edition), reader_profile="source"):
                 for identifier in reference.provenance_ids:
@@ -83,7 +104,7 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
             for item in sources:
                 acquisition = store.record_acquisition(item.path, replace(source, path=str(item.path),
                     metadata=bound_metadata),
-                    parameters={"observation": "retained local raw source; original acquisition time remains unknown",
+                    parameters={"observation": "local raw-source read; acquisition history is retained separately when available",
                                 "table": item.mapping["table"]})
                 if store.read_record(acquisition)["artifact"]["sha256"] != item.input_sha256:
                     raise ValueError("TAPR input changed before provenance binding")
@@ -114,7 +135,8 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
                 processor="teadata.scripts.build_tapr_profiles", code_version=receipt["processor_sha256"],
                 parameters={"edition": edition, "column_schema_sha256": contract["sha256"],
                             "preparation_code_sha256": receipt["preparation_code_sha256"],
-                            "toolchain": receipt["toolchain"], "whitespace": "preserve", "geospatial_filter": False},
+                            "toolchain": receipt["toolchain"], "family": family,
+                            "whitespace": "preserve", "geospatial_filter": False},
                 validation=validation)
             store.verify_record_closure([processing])
             receipt["scopes"][scope] = {**validation, "dataset": dataset, "processing_record_id": processing,
@@ -124,7 +146,9 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
                     "acquisition_state": "retained" if ref.provenance_ids else "not_acquired",
                     "provenance_ids": list(ref.provenance_ids)} for ref in references],
                 "source_tables": [{"table": item.mapping["table"], "source_revision_sha256": item.input_sha256,
-                                   "publisher_columns": len(item.mapping["fields"]), "rows": item.table.num_rows}
+                                   "publisher_columns": len(item.mapping["fields"]), "rows": item.table.num_rows,
+                                   **({"metric_period": item.mapping["metric_period"]}
+                                      if "metric_period" in item.mapping else {})}
                                   for item in sources],
                 "coverage_scope": "Complete columns of the explicitly declared source tables; not all annual TAPR download families.",
                 "qualified_metrics": {key: value.to_dict() for key, value in source.metadata.metrics.items()},
@@ -144,6 +168,8 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--edition", required=True, choices=("2024", "2025"))
+    parser.add_argument("--family", choices=TAPR_PROFILE_FAMILIES,
+                        default="student_staff_profile")
     parser.add_argument("--scope", action="append", choices=("campus", "district"))
     parser.add_argument("--config", type=Path)
     parser.add_argument("--reference-store", type=Path,
@@ -153,7 +179,8 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     result = prepare_profiles(load_config(args.config), edition=args.edition,
         scopes=args.scope or ["campus", "district"], input_dir=args.input_dir, output_dir=args.output_dir,
-        reference_store=ProvenanceStore(args.reference_store) if args.reference_store is not None else None)
+        reference_store=ProvenanceStore(args.reference_store) if args.reference_store is not None else None,
+        family=args.family)
     print(json.dumps({"edition": args.edition, "output_dir": str(args.output_dir),
                       "scopes": {key: {"rows": value["rows"], "fields": value["fields"]}
                                  for key, value in result["scopes"].items()}}))
