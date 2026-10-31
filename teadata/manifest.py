@@ -196,6 +196,7 @@ class DatasetCatalog:
             key: ValuePolicy.from_dict(value) for key, value in policies.items()
         }
         self._sources = sources
+        self._records = records
         self._read_columns = {
             dataset: frozenset(column for read in source.get("reads", [])
                                for column in read.get("columns", []))
@@ -253,7 +254,15 @@ class DatasetCatalog:
 
     @property
     def datasets(self) -> dict[str, Any]:
-        return self.to_dict()["datasets"]
+        return deepcopy(self._sources)
+
+    def __getstate__(self) -> dict[str, Any]:
+        # Derived record lookup must not change the established snapshot state.
+        return {key: value for key, value in self.__dict__.items() if key != "_records"}
+
+    def __setstate__(self, state: dict[str, Any]) -> None:
+        self.__dict__.update(state)
+        self._records = json.loads(self._serialized)["provenance"]
 
     def to_dict(self) -> dict[str, Any]:
         return json.loads(self._serialized)
@@ -268,9 +277,8 @@ class DatasetCatalog:
 
     def acquisitions(self, dataset: str) -> list[dict[str, Any]]:
         """Return immutable acquisition observations, including unknown download dates."""
-        records = self.to_dict()["provenance"]
         return [
-            {"record_id": identifier, **records[identifier]}
+            deepcopy({"record_id": identifier, **self._records[identifier]})
             for identifier in self.metadata(dataset).provenance_ids
         ]
 
