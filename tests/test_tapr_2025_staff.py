@@ -627,12 +627,18 @@ def test_prepared_selection_rejects_inconsistent_declarations_before_native_io(p
         tables = crosswalk['datasets'][0]['tables']
         tables.append({**deepcopy(tables[0]), 'table': 'second_table'})
         path.write_text(canonical_json(crosswalk))
-        profile['references'][0]['reviewed_sha256'] = sha256(path.read_bytes()).hexdigest()
+        schema_reference, = [ref for ref in declaration['metadata']['references'] if ref['role'] == 'schema']
+        revised_schema = store.record_acquisition(path, ResolvedDataset(dataset + ':schema', 'reference', 2024, 2024, '',
+            DatasetMetadata(title='Synthetic revised schema with two declared tables')))
+        schema_reference.update(reviewed_sha256=sha256(path.read_bytes()).hexdigest(), provenance_ids=[revised_schema])
         profile['tapr_source']['tables']['second_table'] = 'second.csv'
     cfg = Config.from_dict(document)
     cfg.base_dir = tmp_path
     monkeypatch.setattr(pq, 'ParquetFile', lambda *a, **k: pytest.fail('Ambiguous native source opened'))
-    with pytest.raises((ValueError, ContractError, KeyError)):
+    if damage == 'ambiguous':
+        monkeypatch.setattr(store, 'verify_record_closure', lambda *a: pytest.fail('Ambiguity reached provenance checks'))
+    with pytest.raises((ValueError, ContractError, KeyError),
+                       match='one complete, unambiguous declared source table' if damage == 'ambiguous' else None):
         prepare_profiles(cfg, edition='2024', scopes=['campus', 'district'], input_dir=None,
             output_dir=tmp_path / 'blocked-selection', reference_store=None if damage == 'no_store' else store,
             prepared_inputs=selected, processing_inputs={'district_tapr_graduation_profile':
