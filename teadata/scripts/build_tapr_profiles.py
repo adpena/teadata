@@ -29,17 +29,51 @@ from teadata.provenance import ProvenanceStore, validate_reference_records
 from teadata.release import publish_release
 from teadata.scripts.paths import data_path
 from teadata.tapr import (
-    TAPR_PROFILE_FAMILIES, merge_tapr_tables, qualified_tapr_family,
+    TAPR_PROFILE_FAMILIES, TaprReadBudget, TaprSourceRequest, TaprSourceSummary, qualified_tapr_family,
     reviewed_tapr_data_record_count, tapr_source_selection, validate_tapr_key,
 )
 from teadata.teadata_config import load_config
+
+
+def _write_raw_source(request: TaprSourceRequest, expected: TaprSourceSummary,
+                      path: Path, budget: TaprReadBudget) -> None:
+    """One admitted batch per row group, then exact bounded source readback."""
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    with request.open(budget=budget) as reader:
+        writer = None
+        try:
+            for batch in reader:
+                if writer is None:
+                    writer = pq.ParquetWriter(path, batch.schema, compression="zstd")
+                writer.write_batch(batch, row_group_size=batch.num_rows)
+        finally:
+            if writer is not None:
+                writer.close()
+        if reader.summary != expected:
+            raise ValueError("TAPR source changed between validation and writing")
+        del batch, writer
+    with pq.ParquetFile(path) as reopened, request.open(budget=budget) as reader:
+        groups = 0
+        for groups, batch in enumerate(reader, 1):
+            if groups > reopened.metadata.num_row_groups:
+                raise ValueError("TAPR prepared source has missing row groups")
+            # The producer wrote exactly one admitted batch per row group.
+            # A fixed4096-row reader would not bound a wide source's bytes.
+            actual = reopened.read_row_group(groups - 1, use_threads=False)
+            if actual.nbytes > budget.batch_bytes or not actual.equals(pa.Table.from_batches([batch]), check_metadata=True):
+                raise ValueError("TAPR prepared source artifact differs from validated raw strings")
+        if groups != reopened.metadata.num_row_groups or reader.summary != expected:
+            raise ValueError("TAPR source/readback changed or has additional row groups")
 
 
 def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | None,
                      output_dir: Path, reference_store: ProvenanceStore | None = None,
                      family: str = "student_staff_profile",
                      processing_inputs: Mapping[str, Sequence[str]] | None = None,
-                     prepared_inputs: Mapping[str, tuple[str, tuple[str, ...]]] | None = None) -> dict:
+                     prepared_inputs: Mapping[str, tuple[str, tuple[str, ...]]] | None = None,
+                     budget: TaprReadBudget | None = None) -> dict:
     """Validate all selected inputs, then publish one complete new generation.
 
     ``scopes``, ``family`` and ``input_dir`` select CSV intake only. An explicit
@@ -58,9 +92,13 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
     if output_dir.exists() or output_dir.is_symlink():
         raise FileExistsError(f"Preparation output already exists: {output_dir}")
     if prepared_inputs is not None:
+        if budget is not None:
+            raise ValueError("Source read budgets do not apply to prepared-leaf intake")
         return _prepare_edition_leaves(cfg, edition=edition, year=year, output_dir=output_dir,
             reference_store=reference_store, prepared_inputs=prepared_inputs, processing_inputs=processing_inputs)
-    import pyarrow.parquet as pq
+    if budget is not None and not isinstance(budget, TaprReadBudget):
+        raise ValueError("TAPR source preparation requires a typed read budget")
+    budget = budget if budget is not None else TaprReadBudget()
     selected_datasets = {scope + "_tapr_" + family for scope in scopes}
     dependencies = dict(processing_inputs or {})
     if set(dependencies) - selected_datasets:
@@ -78,11 +116,18 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
     prepared = []
     for scope in scopes:
         dataset = scope + "_tapr_" + family
-        sources = cfg.read_tapr_sources(dataset, year, input_dir=input_dir)
-        table = merge_tapr_tables(sources, key_field=scope + "_number")
-        if table.column_names != cfg.column_schema(dataset, year, reader_profile="source"):
+        requests = cfg.tapr_source_requests(dataset, year, input_dir=input_dir)
+        if len(requests) != 1:
+            raise ValueError("Bounded TAPR preparation requires one physical table per source; no eager merge fallback")
+        request = requests[0]
+        if [field["field"] for field in request.mapping["fields"]] != cfg.column_schema(dataset, year, reader_profile="source"):
             raise ValueError("Full TAPR preparation does not account for its complete field contract")
-        prepared.append((scope, dataset, sources, table))
+        with request.open(budget=budget) as reader:
+            for _ in reader:
+                pass
+            summary = reader.summary
+            del _
+        prepared.append((scope, dataset, request, summary))
     # No writer or provenance archive runs until every selected input validates.
     output_dir.parent.mkdir(parents=True, exist_ok=True)
     stage = Path(tempfile.mkdtemp(prefix=".tapr-preparation-", dir=output_dir.parent))
@@ -96,7 +141,8 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
                    "processor_sha256": processor_identity(),
                    "preparation_code_sha256": sha256(Path(__file__).read_bytes()).hexdigest(),
                    "scopes": {}}
-        for scope, dataset, sources, table in prepared:
+        for scope, dataset, request, summary in prepared:
+            sources = [summary]
             source = cfg.resolve_dataset(dataset, year, reader_profile="source")
             contract = cfg.column_contract(dataset, year, reader_profile="source")
             assert contract is not None
@@ -172,11 +218,8 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
             note_path = stage / (scope + "-annotations.json")
             note_path.write_text(json.dumps(annotations, ensure_ascii=True, sort_keys=True) + "\n")
             parquet_path = stage / (scope + ".parquet")
-            pq.write_table(table, parquet_path, compression="zstd", row_group_size=4096)
-            reopened = pq.read_table(parquet_path)
-            if not reopened.equals(table, check_metadata=True):
-                raise ValueError("TAPR prepared source artifact differs from validated raw strings")
-            validation = {"rows": table.num_rows, "fields": table.num_columns,
+            _write_raw_source(request, summary, parquet_path, budget)
+            validation = {"rows": summary.rows, "fields": len(summary.mapping["fields"]),
                           "source_columns_accounted": sum(len(item.mapping["fields"]) for item in sources),
                           "raw_string_readback_equal": True, "all_historical_source_rows_retained": True}
             processing = store.record_processing(dataset=dataset, inputs=list(dict.fromkeys(inputs)),
@@ -185,6 +228,7 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
                 parameters={"edition": edition, "column_schema_sha256": contract["sha256"],
                             "preparation_code_sha256": receipt["preparation_code_sha256"],
                             "toolchain": receipt["toolchain"], "family": family,
+                            "source_read_budget": vars(budget),
                             "selected_processing_inputs": selected_processing,
                             "whitespace": "preserve", "geospatial_filter": False},
                 validation=validation)
@@ -197,14 +241,15 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
                     "acquisition_state": "retained" if ref.provenance_ids else "not_acquired",
                     "provenance_ids": list(ref.provenance_ids)} for ref in references],
                 "source_tables": [{"table": item.mapping["table"], "source_revision_sha256": item.input_sha256,
-                                   "publisher_columns": len(item.mapping["fields"]), "rows": item.table.num_rows,
+                                   "publisher_columns": len(item.mapping["fields"]), "rows": item.rows,
                                    **({"metric_period": item.mapping["metric_period"]}
                                       if "metric_period" in item.mapping else {})}
                                   for item in sources],
                 "coverage_scope": "Complete columns of the explicitly declared source tables; not all annual TAPR download families.",
                 "qualified_metrics": {key: value.to_dict() for key, value in source.metadata.metrics.items()},
                 "other_field_semantics": "Unit/reference period unknown unless explicitly bound by qualified_metrics; edition is not a field reference period.",
-                "identity_fields": [name for name in table.column_names if name in {"campus_number", "campus_name", "district_number", "district_name"}],
+                "identity_fields": [field["field"] for field in summary.mapping["fields"]
+                                    if field["field"] in {"campus_number", "campus_name", "district_number", "district_name"}],
                 "identity_storage": "Lossless source/history attributes; not additional metric keys or entity.meta hydration."}
         (stage / "preparation.json").write_text(json.dumps(receipt, ensure_ascii=True, sort_keys=True, indent=2) + "\n")
         if output_dir.exists() or output_dir.is_symlink():

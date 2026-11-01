@@ -20,7 +20,7 @@ Features:
 
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import Dict, Any, Optional, Tuple, List, Sequence, Mapping, Iterable, Literal
+from typing import TYPE_CHECKING, Dict, Any, Optional, Tuple, List, Sequence, Mapping, Iterable, Literal
 from pathlib import Path
 from urllib.parse import urlparse
 import os
@@ -31,6 +31,9 @@ import re
 from teadata.dataset_metadata import DatasetDefinition, DatasetMetadata, ResolvedDataset
 from teadata.values import ValuePolicy
 from teadata.metric_bindings import MetricBinding, parse_bindings, bindings_document
+
+if TYPE_CHECKING:
+    from .tapr import TaprSourceRequest, TaprSourceTable
 
 YEAR_MIN_DEFAULT = 2009
 
@@ -848,8 +851,9 @@ class Config:
         except ValueError as error:
             raise ContractError(str(error)) from error
 
-    def read_tapr_sources(self, dataset: str, year: int, *, input_dir: str | Path | None = None):
-        """Explicit full-edition raw preparation, independent of released facts.
+    def tapr_source_requests(self, dataset: str, year: int, *,
+                             input_dir: str | Path | None = None) -> list[TaprSourceRequest]:
+        """Validate the one metadata authority before any raw source is opened.
 
         The retained release recorder deliberately continues reading its exact
         prepared inputs. Raw preparation has its own real processing receipt;
@@ -857,7 +861,7 @@ class Config:
         """
         from .column_schema import crosswalk_dataset, parse_column_schema, reader_options
         from .manifest import ACTIVE_BUILD, ContractError
-        from .tapr import read_tapr_table, tapr_source_selection
+        from .tapr import TaprSourceRequest, tapr_source_selection
 
         if ACTIVE_BUILD.get() is not None:
             raise ContractError("Prepare full TAPR sources explicitly before a retained-format release build")
@@ -888,9 +892,18 @@ class Config:
                 path = Path(input_dir) / path.name
             else:
                 path = Path(_resolve_source_path(str(path), self.base_dir or Path.cwd()))
-            result.append(read_tapr_table(path, mapping=table, key_field=selection["scope"] + "_number",
-                                          dataset=dataset, edition=source.metadata.version))
+            result.append(TaprSourceRequest(path, table, selection["scope"] + "_number",
+                                             dataset, source.metadata.version))
         return result
+
+    def read_tapr_sources(self, dataset: str, year: int, *,
+                          input_dir: str | Path | None = None) -> list[TaprSourceTable]:
+        """Explicit eager source API; bounded preparation consumes the same plans."""
+        from .tapr import read_tapr_table
+
+        return [read_tapr_table(request.path, mapping=request.mapping, key_field=request.key_field,
+            dataset=request.dataset, edition=request.edition)
+            for request in self.tapr_source_requests(dataset, year, input_dir=input_dir)]
 
     def load_df(
         self,

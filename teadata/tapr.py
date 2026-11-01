@@ -7,12 +7,14 @@ merges whole native tables; scientific token interpretation stays in values.py.
 from __future__ import annotations
 
 import csv
+from collections.abc import Generator, Iterator
+from copy import deepcopy
 from dataclasses import dataclass
 from hashlib import sha256
 import io
 from pathlib import Path
 import re
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import TYPE_CHECKING, Any, BinaryIO, Mapping
 
 from .column_schema import validate_header_table, validate_source_layout
 from .identifiers import canonical_source_identifiers
@@ -168,88 +170,305 @@ class TaprSourceTable:
     mapping: Mapping[str, Any]
 
 
-def _extract_records(raw: bytes, mapping: Mapping[str, Any], path: Path):
-    """Extract only explicitly reviewed data/annotation record ranges.
+@dataclass(frozen=True)
+class TaprReadBudget:
+    """Admission limits for source buffers, not a native allocator/RSS promise.
 
-    The standard CSV decoder handles quoted multiline records. This scan never
-    converts fact cells, pads widths, strips tokens or infers notes from IDs.
+    Batch admission includes raw UTF8 bytes and all string offsets. Metadata
+    charges retained text plus64 bytes per structural cell. The narrow global
+    identity/record index is separately bounded before native conversion.
     """
-    fields = mapping["fields"]
-    width = len(fields)
-    layout = mapping.get("layout")
-    code_record = layout["code_record"] if layout else 2
-    label_record = layout["label_record"] if layout else 1
-    first = layout["first_data_record"] if layout else 3
-    last = layout["last_data_record"] if layout else None
-    annotations = layout["annotations"] if layout else []
-    text = raw.decode("utf-8-sig")
-    stream = io.StringIO(text, newline="")
-    reader = csv.reader(stream, strict=True)
-    headers: dict[int, list[str]] = {}
-    spans: list[tuple[int, int]] = []
-    observed: list[dict[str, Any]] = []
-    annotation_records: dict[int, list[list[str]]] = {}
-    annotation_text: dict[int, list[str]] = {}
-    data_records: list[int] = []
-    count = 0
-    try:
+
+    batch_bytes: int = 8 * 1024 * 1024
+    record_bytes: int = 1024 * 1024
+    metadata_bytes: int = 8 * 1024 * 1024
+    key_bytes: int = 16 * 1024 * 1024
+    batch_rows: int = 4096
+
+    def __post_init__(self):
+        if any(type(value) is not int or value < 1 or value > 1024**3
+               for value in vars(self).values()):
+            raise ValueError("TAPR byte/row budgets require positive bounded integers")
+
+
+@dataclass(frozen=True)
+class TaprSourceRequest:
+    """One explicit source selection, with no I/O at construction."""
+
+    path: Path
+    mapping: Mapping[str, Any]
+    key_field: str
+    dataset: str
+    edition: str
+    dictionary_path: Path | None = None
+
+    def open(self, *, budget: TaprReadBudget | None = None) -> TaprSourceReader:
+        if budget is not None and not isinstance(budget, TaprReadBudget):
+            raise ValueError("TAPR source requires a typed read budget")
+        return TaprSourceReader(self, budget=budget if budget is not None else TaprReadBudget())
+
+
+@dataclass(frozen=True)
+class TaprSourceSummary:
+    path: Path
+    input_sha256: str
+    dataset: str
+    edition: str
+    annotations: tuple[dict[str, Any], ...]
+    mapping: Mapping[str, Any]
+    rows: int
+    source_stat: tuple[int, ...]
+
+
+def _source_stat(path: Path) -> tuple[int, ...]:
+    value = path.stat()
+    return (value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns, value.st_ctime_ns)
+
+
+class _SourceLines:
+    """Bounded original physical lines for the C CSV logical-record decoder."""
+
+    def __init__(self, stream: BinaryIO, limit: int, error: str):
+        self.stream, self.limit = stream, limit
+        self.error = error
+        self.pending = bytearray()
+        self.record = bytearray()
+        self.digest = sha256()
+        self.eof = False
+        self.first = True
+
+    def __iter__(self):
+        return self
+
+    def __next__(self) -> str:
         while True:
-            start = stream.tell()
-            try:
-                row = next(reader)
-            except StopIteration:
+            match = re.search(rb"\r\n|\r|\n", self.pending)
+            # A CR at the end of a block may be half of a CRLF.
+            if match and (match.end() < len(self.pending) or self.eof or self.pending[-1] != 13):
+                end = match.end()
                 break
-            end = stream.tell()
-            count += 1
-            note = next((i for i, item in enumerate(annotations)
-                         if item["first_record"] <= count <= item["last_record"]), None)
-            if note is not None:
-                annotation_records.setdefault(note, []).append(row)
-                segment = text[start:end]
-                if count == 1 and raw.startswith(b"\xef\xbb\xbf"):
-                    segment = "\ufeff" + segment
-                annotation_text.setdefault(note, []).append(segment)
-            elif count in {code_record, label_record}:
-                headers[count] = row
-            elif count >= first and (last is None or count <= last):
-                if len(row) != width:
-                    raise ValueError(f"{path}: record {count} has {len(row)} fields; expected {width}")
-                data_records.append(count)
-                if spans and spans[-1][1] == start:
-                    spans[-1] = (spans[-1][0], end)
-                else:
-                    spans.append((start, end))
-            else:
-                raise ValueError(f"{path}: unaccounted record {count}; review its layout/annotation provenance")
-    except csv.Error as error:
-        raise ValueError(f"{path}: invalid CSV near physical line {reader.line_num}: {error}") from error
-    if last is not None and count < last:
-        raise ValueError(f"{path}: missing reviewed data records through {last}")
-    if headers.get(code_record) != [field["code"] for field in fields]:
-        raise ValueError(f"{path}: source-code header differs from reviewed record {code_record}")
-    if label_record is not None and headers.get(label_record) != [field["label"] for field in fields]:
-        raise ValueError(f"{path}: human-label header differs from reviewed record {label_record}")
-    for index, note in enumerate(annotations):
-        records = annotation_records.get(index, [])
-        content = "".join(annotation_text.get(index, [])).encode("utf-8")
-        if (len(records) != note["last_record"] - note["first_record"] + 1
-                or sha256(content).hexdigest() != note["sha256"]):
-            raise ValueError(f"{path}: annotation range {note['first_record']}–{note['last_record']} differs from reviewed notes")
-        if note["kind"] == "blank" and any(any(cell for cell in row) for row in records):
-            raise ValueError(f"{path}: declared blank annotation contains nonblank source text")
-        observed.append({**note, "records": records})
-    if not spans:
-        raise ValueError(f"{path}: no TAPR data records")
-    if layout is not None and len(data_records) != reviewed_tapr_data_record_count(mapping):
-        raise ValueError(f"{path}: extracted data count differs from reviewed record layout")
-    return "".join(text[start:end] for start, end in spans).encode("utf-8"), observed, data_records
+            if self.eof:
+                if not self.pending:
+                    raise StopIteration
+                end = len(self.pending)
+                break
+            if len(self.record) + len(self.pending) > self.limit:
+                raise ValueError(self.error)
+            block = self.stream.read(min(65536, self.limit + 1))
+            self.digest.update(block)
+            self.pending.extend(block)
+            self.eof = not block
+        if len(self.record) + end > self.limit:
+            raise ValueError(self.error)
+        segment = bytes(self.pending[:end])
+        del self.pending[:end]
+        self.record.extend(segment)
+        text = segment.decode("utf-8-sig" if self.first else "utf-8")
+        self.first = False
+        return text
 
 
-def _verify_dictionary(path: Path, mapping: Mapping[str, Any]) -> None:
+class TaprSourceReader(Iterator[Any]):
+    """One canonical source scanner; only a fully exhausted scan has a summary.
+
+    Batches are provisional until EOF validates source identity, global keys,
+    headers and annotations. Close early/exceptionally and no summary exists.
+    """
+
+    def __init__(self, request: TaprSourceRequest, *, budget: TaprReadBudget):
+        qualified_tapr_family(request.dataset, request.key_field)
+        if not isinstance(request.edition, str) or not request.edition.strip():
+            raise ValueError("TAPR preparation requires an explicit qualified dataset and source edition")
+        self.request = request
+        self.mapping = deepcopy(request.mapping)
+        validate_header_table(self.mapping)
+        try:
+            validate_tapr_key(self.mapping, request.key_field)
+        except ValueError as error:
+            raise ValueError(f"{request.path}: {error}") from error
+        self.budget = budget
+        self._summary: TaprSourceSummary | None = None
+        self._iterator = self._read()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self._iterator.close()
+
+    def __next__(self):
+        return next(self._iterator)
+
+    @property
+    def summary(self) -> TaprSourceSummary:
+        if self._summary is None:
+            raise ValueError("TAPR source has not completed validated EOF")
+        return self._summary
+
+    def _read(self) -> Generator[Any, None, None]:
+        import pyarrow as pa
+        import pyarrow.compute as arrow_compute
+        import pyarrow.csv as pacsv
+
+        pc: Any = arrow_compute
+        request, mapping, budget = self.request, self.mapping, self.budget
+        path = request.path
+        before = _source_stat(path)
+        if "dictionary" in mapping:
+            _verify_dictionary(request.dictionary_path or path.with_name(mapping["dictionary"]["filename"]),
+                               mapping, max_bytes=budget.metadata_bytes)
+        fields = mapping["fields"]
+        width = len(fields)
+        codes, names = [f["code"] for f in fields], [f["field"] for f in fields]
+        if 8 * width > budget.batch_bytes:
+            raise ValueError(f"{path}: string offsets exceed native batch byte budget")
+        layout = mapping.get("layout")
+        code_record = layout["code_record"] if layout else 2
+        label_record = layout["label_record"] if layout else 1
+        first, last = (layout["first_data_record"], layout["last_data_record"]) if layout else (3, None)
+        notes = layout["annotations"] if layout else []
+        headers: dict[int, list[str]] = {}
+        note_records: dict[int, list[list[str]]] = {}
+        note_digests = [sha256() for _ in notes]
+        keys, positions = [], []
+        key_width = 9 if request.key_field == "campus_number" else 6
+        count = rows = metadata_bytes = 0
+        body = bytearray()
+        numbers: list[int] = []
+
+        def decode():
+            # A controlled single LF prevents Arrow from treating a literal
+            # BOM at a later chunk's first data cell as a file signature.
+            table = pacsv.read_csv(pa.BufferReader(b"\n" + body),
+                read_options=pacsv.ReadOptions(column_names=codes, use_threads=False,
+                                               skip_rows=1, block_size=len(body) + 1),
+                parse_options=pacsv.ParseOptions(newlines_in_values=True, ignore_empty_lines=False),
+                convert_options=pacsv.ConvertOptions(column_types=dict.fromkeys(codes, pa.string()),
+                    null_values=[], strings_can_be_null=False, quoted_strings_can_be_null=False)).rename_columns(names)
+            if table.nbytes > budget.batch_bytes or table.num_rows != len(numbers):
+                raise ValueError(f"{path}: native CSV batch exceeds admitted byte/row budget")
+            try:
+                identity = canonical_source_identifiers(table[request.key_field], width=key_width)
+                if pc.any(pc.is_null(identity)).as_py():
+                    i = pc.index(pc.is_null(identity), True).as_py()
+                    raise ValueError(f"record {numbers[i]} has a missing source identifier")
+                if request.key_field == "campus_number" and "district_number" in names:
+                    district = canonical_source_identifiers(table["district_number"], width=6)
+                    parent = pc.utf8_slice_codeunits(identity, start=1, stop=7)
+                    if pc.any(pc.or_(pc.is_null(district), pc.fill_null(pc.not_equal(
+                            parent, pc.utf8_slice_codeunits(district, start=1)), True))).as_py():
+                        raise ValueError("campus and district identifiers disagree")
+            except ValueError as error:
+                message = str(error)
+                if match := re.search(r"batch row ([0-9]+)", message):
+                    message += f" (source record {numbers[int(match[1]) - 1]})"
+                raise ValueError(f"{path}: invalid {request.key_field}: {message}") from error
+            keys.extend(identity.chunks)
+            positions.append(pa.array(numbers, type=pa.int64()))
+            # A batch has at most the byte-admitted record count. Arrow may
+            # internally produce chunks; expose one bounded batch consistently.
+            return table.combine_chunks().to_batches()[0]
+
+        with path.open("rb") as stream:
+            record_error = f"{path}: logical CSV record exceeds record byte budget"
+            lines = _SourceLines(stream, budget.record_bytes, record_error)
+            reader = csv.reader(lines, strict=True)
+            try:
+                while True:
+                    lines.record.clear()
+                    metadata_record = count + 1 in {code_record, label_record} or any(
+                        note["first_record"] <= count + 1 <= note["last_record"] for note in notes)
+                    remaining = max(0, budget.metadata_bytes - metadata_bytes)
+                    lines.limit = min(budget.record_bytes, remaining) if metadata_record else budget.record_bytes
+                    lines.error = (f"{path}: header/annotation metadata byte budget exceeded"
+                                   if metadata_record and remaining < budget.record_bytes else record_error)
+                    try:
+                        row = next(reader)
+                    except StopIteration:
+                        break
+                    count += 1
+                    segment = lines.record
+                    note = next((i for i, n in enumerate(notes)
+                                 if n["first_record"] <= count <= n["last_record"]), None)
+                    if note is not None or count in {code_record, label_record}:
+                        metadata_bytes += len(segment) + 64 * len(row)
+                        if metadata_bytes > budget.metadata_bytes:
+                            raise ValueError(f"{path}: header/annotation metadata byte budget exceeded")
+                        if note is not None:
+                            note_records.setdefault(note, []).append(row)
+                            note_digests[note].update(segment)
+                            if notes[note]["kind"] == "blank" and any(row):
+                                raise ValueError(f"{path}: declared blank annotation contains nonblank source text")
+                        else:
+                            headers[count] = row
+                    elif count >= first and (last is None or count <= last):
+                        if len(row) != width:
+                            raise ValueError(f"{path}: record {count} has {len(row)} fields; expected {width}")
+                        # Fixed-width normalized keys, offsets and record numbers;
+                        # reserve before conversion/retention, never per fact cell.
+                        if (rows + 1) * (key_width + 18) > budget.key_bytes:
+                            raise ValueError(f"{path}: global identity index byte budget exceeded")
+                        data = bytes(segment)
+                        if count == 1:
+                            data = data.removeprefix(b"\xef\xbb\xbf")
+                        if len(data) + 1 + 8 * width > budget.batch_bytes:
+                            raise ValueError(f"{path}: record cannot fit native batch byte budget")
+                        if numbers and (len(numbers) == budget.batch_rows
+                                or len(body) + len(data) + 1 + 4 * width * (len(numbers) + 2) > budget.batch_bytes):
+                            yield decode()
+                            body.clear()
+                            numbers.clear()
+                        body.extend(data)
+                        numbers.append(count)
+                        rows += 1
+                    else:
+                        raise ValueError(f"{path}: unaccounted record {count}; review its layout/annotation provenance")
+            except csv.Error as error:
+                raise ValueError(f"{path}: invalid CSV near physical line {reader.line_num}: {error}") from error
+            if numbers:
+                yield decode()
+            if lines.digest.hexdigest() != mapping["input_sha256"]:
+                raise ValueError(f"{path}: input differs from the reviewed header crosswalk")
+        if _source_stat(path) != before:
+            raise ValueError(f"{path}: input changed during source preparation")
+        if last is not None and count < last:
+            raise ValueError(f"{path}: missing reviewed data records through {last}")
+        if headers.get(code_record) != codes:
+            raise ValueError(f"{path}: source-code header differs from reviewed record {code_record}")
+        if label_record is not None and headers.get(label_record) != [f["label"] for f in fields]:
+            raise ValueError(f"{path}: human-label header differs from reviewed record {label_record}")
+        observed = []
+        for i, note in enumerate(notes):
+            records = note_records.get(i, [])
+            if len(records) != note["last_record"] - note["first_record"] + 1 or note_digests[i].hexdigest() != note["sha256"]:
+                raise ValueError(f"{path}: annotation range {note['first_record']}–{note['last_record']} differs from reviewed notes")
+            observed.append({**note, "records": records})
+        if not rows:
+            raise ValueError(f"{path}: no TAPR data records")
+        if layout is not None and rows != reviewed_tapr_data_record_count(mapping):
+            raise ValueError(f"{path}: extracted data count differs from reviewed record layout")
+        identity = pa.chunked_array(keys)
+        if pc.count_distinct(identity).as_py() != rows:
+            counts = pc.value_counts(identity)
+            duplicate = pc.filter(counts.field("values"), pc.greater(counts.field("counts"), 1))[0]
+            records = pc.filter(pa.chunked_array(positions), pc.equal(identity, duplicate))
+            example = records.slice(0, 20).to_pylist()
+            suffix = " (first20)" if len(records) > 20 else ""
+            raise ValueError(f"{path}: invalid {request.key_field}: duplicate {request.key_field} at records {example}{suffix}")
+        self._summary = TaprSourceSummary(path, mapping["input_sha256"], request.dataset,
+            request.edition, tuple(observed), mapping, rows, before)
+
+
+def _verify_dictionary(path: Path, mapping: Mapping[str, Any], *, max_bytes: int) -> None:
     import pandas as pd
 
     descriptor = mapping["dictionary"]
-    raw = path.read_bytes()
+    if path.stat().st_size > max_bytes:
+        raise ValueError(f"{path}: publisher dictionary exceeds metadata byte budget")
+    with path.open("rb") as stream:
+        raw = stream.read(max_bytes + 1)
+    if len(raw) > max_bytes:
+        raise ValueError(f"{path}: publisher dictionary exceeds metadata byte budget")
     if sha256(raw).hexdigest() != descriptor["sha256"]:
         raise ValueError(f"{path}: publisher dictionary bytes differ from reviewed edition")
     dictionary = pd.read_excel(io.BytesIO(raw), sheet_name=descriptor["sheet_name"],
@@ -290,60 +509,18 @@ def reviewed_tapr_data_record_count(mapping: Mapping[str, Any]) -> int:
 
 def read_tapr_table(path: str | Path, *, mapping: Mapping[str, Any], key_field: str,
                     dataset: str, edition: str,
-                    dictionary_path: str | Path | None = None) -> TaprSourceTable:
-    """Read all publisher fields as exact strings, validating strict identities."""
+                    dictionary_path: str | Path | None = None,
+                    budget: TaprReadBudget | None = None) -> TaprSourceTable:
+    """Explicit eager API, composed from the canonical bounded source scanner."""
     import pyarrow as pa
-    import pyarrow.compute as arrow_compute
-    import pyarrow.csv as pacsv
 
-    pc: Any = arrow_compute  # Arrow registers compute kernels dynamically.
-    path = Path(path)
-    qualified_tapr_family(dataset, key_field)
-    if not isinstance(edition, str) or not edition.strip():
-        raise ValueError("TAPR preparation requires an explicit qualified dataset and source edition")
-    validate_header_table(mapping)
-    raw = path.read_bytes()
-    if sha256(raw).hexdigest() != mapping["input_sha256"]:
-        raise ValueError(f"{path}: input differs from the reviewed header crosswalk")
-    if "dictionary" in mapping:
-        _verify_dictionary(Path(dictionary_path) if dictionary_path is not None
-                           else path.with_name(mapping["dictionary"]["filename"]), mapping)
-    fields = mapping["fields"]
-    headers = [field["field"] for field in fields]
-    try:
-        validate_tapr_key(mapping, key_field)
-    except ValueError as error:
-        raise ValueError(f"{path}: {error}") from error
-    body, annotations, data_records = _extract_records(raw, mapping, path)
-    codes = [field["code"] for field in fields]
-    table = pacsv.read_csv(pa.BufferReader(body),
-        read_options=pacsv.ReadOptions(column_names=codes, use_threads=False),
-        parse_options=pacsv.ParseOptions(newlines_in_values=True, ignore_empty_lines=False),
-        convert_options=pacsv.ConvertOptions(column_types=dict.fromkeys(codes, pa.string()),
-            null_values=[], strings_can_be_null=False, quoted_strings_can_be_null=False)).rename_columns(headers)
-    try:
-        identity = canonical_source_identifiers(table[key_field], width=9 if key_field == "campus_number" else 6)
-        if pc.any(pc.is_null(identity)).as_py():
-            position = pc.index(pc.is_null(identity), True).as_py()
-            raise ValueError(f"record {data_records[position]} has a missing source identifier")
-        if pc.count_distinct(identity).as_py() != table.num_rows:
-            counts = pc.value_counts(identity)
-            duplicate = pc.filter(counts.field("values"), pc.greater(counts.field("counts"), 1))[0]
-            positions = pc.indices_nonzero(pc.equal(identity, duplicate)).to_pylist()
-            raise ValueError(f"duplicate {key_field} at records {[data_records[index] for index in positions]}")
-        if key_field == "campus_number" and "district_number" in headers:
-            district = canonical_source_identifiers(table["district_number"], width=6)
-            parent = pc.utf8_slice_codeunits(identity, start=1, stop=7)
-            if pc.any(pc.or_(pc.is_null(district), pc.fill_null(pc.not_equal(parent, pc.utf8_slice_codeunits(district, start=1)), True))).as_py():
-                raise ValueError("campus and district identifiers disagree")
-    except ValueError as error:
-        message = str(error)
-        if match := re.search(r"batch row ([0-9]+)", message):
-            message += f" (source record {data_records[int(match[1]) - 1]})"
-        raise ValueError(f"{path}: invalid {key_field}: {message}") from error
-    if sha256(path.read_bytes()).hexdigest() != mapping["input_sha256"]:
-        raise ValueError(f"{path}: input changed during source preparation")
-    return TaprSourceTable(table, path, mapping["input_sha256"], dataset, edition, tuple(annotations), mapping)
+    request = TaprSourceRequest(Path(path), mapping, key_field, dataset, edition,
+        Path(dictionary_path) if dictionary_path is not None else None)
+    with request.open(budget=budget) as reader:
+        table = pa.Table.from_batches(reader)
+        summary = reader.summary
+    return TaprSourceTable(table, summary.path, summary.input_sha256, dataset, edition,
+                           summary.annotations, summary.mapping)
 
 
 def merge_tapr_tables(sources: list[TaprSourceTable], *, key_field: str):

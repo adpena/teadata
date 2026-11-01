@@ -461,6 +461,34 @@ acquisition dates stay intact, and the generated schema has its own genuine
 local observation.
 Registration does not prepare, publish or activate these sources.
 
+Raw TAPR intake uses one logical-record scanner for both the eager
+`read_tapr_table()` API and bounded source preparation. Quoted multiline
+headers and values, original whitespace, UTF8 BOMs, CR/LF separators and
+reviewed annotation ranges remain lossless. Batch results are provisional
+until the reader reaches validated EOF; early close or any validation failure
+does not expose a successful source summary.
+
+`Config.tapr_source_requests()` validates the same source metadata without
+opening raw files. A request's `open(budget=TaprReadBudget(...))` context
+manager yields Arrow batches. Import the budget from `teadata.tapr` and set
+`batch_bytes`, `record_bytes`, `metadata_bytes`, `key_bytes` and `batch_rows`
+when an explicit intake envelope is needed. Admission counts original record
+bytes, native string payload/offsets, retained header/annotation text and the
+narrow global identity index. These limits bound the admitted working data;
+they are not a promise about Python, Arrow or codec peak RSS. Fact values
+remain exact strings with no masking or numeric interpretation.
+
+The raw `prepare_profiles(..., budget=...)` path validates every selected
+source before opening a writer or archive, then processes scopes sequentially
+into private Parquet row groups bounded by admitted batches. It verifies exact
+strings, schema and row groups against a further bounded source scan before
+publishing the complete generation. It currently requires one physical table
+per source and rejects a multi-table source before reading its raw rows;
+there is no eager merge
+fallback. Public eager `read_tapr_sources()` and `merge_tapr_tables()` keep
+their existing multi-table merge semantics. Prepared-leaf intake is separate
+and rejects a raw-source budget rather than implying it applies there.
+
 One-header 2024 inputs use their complete Name/Type/Length/Label dictionaries;
 2025 inputs declare exact label and code header records. Any preamble, note,
 blank gap or footer must have reviewed CSV-record coordinates and an exact

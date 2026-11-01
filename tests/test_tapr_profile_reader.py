@@ -4,6 +4,7 @@ from hashlib import sha256
 from io import StringIO
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pyarrow as pa
 import pytest
@@ -11,7 +12,9 @@ import pytest
 from teadata.column_schema import source_schema_fingerprint, validate_header_table
 from teadata.identifiers import canonical_source_identifier, canonical_source_identifiers
 from teadata.scripts.build_tapr_profiles import prepare_profiles
-from teadata.tapr import TaprSourceTable, merge_tapr_tables, read_tapr_table
+from teadata.tapr import (
+    TaprReadBudget, TaprSourceRequest, TaprSourceTable, merge_tapr_tables, read_tapr_table,
+)
 
 
 LABELS = ["9 Digit Campus Number", "Example Value"]
@@ -231,9 +234,9 @@ def test_bad_input_prevents_all_writers_and_output_activation(tmp_path, monkeypa
     import pyarrow.parquet as pq
 
     path = write_source(tmp_path, [LABELS, CODES, ["001902001", "42", "EXTRA"]])
-    def load(*args, **kwargs):
-        return [read_source(path)]
-    cfg = SimpleNamespace(read_tapr_sources=load)
+    request = TaprSourceRequest(path, mapping_for(path), "campus_number", DATASET, "2025")
+    cfg = SimpleNamespace(tapr_source_requests=lambda *a, **k: [request],
+                          column_schema=lambda *a, **k: FIELDS)
     monkeypatch.setattr(pq, "write_table", lambda *a, **k: pytest.fail("Writer ran for invalid input"))
     out = tmp_path / "new" / "output"
     with pytest.raises(ValueError, match="record 3 has 3 fields"):
@@ -280,3 +283,315 @@ def test_publisher_dictionary_revision_is_checked_before_excel_decode(tmp_path, 
     monkeypatch.setattr(pd, "read_excel", lambda *a, **k: pytest.fail("Unreviewed dictionary decoded"))
     with pytest.raises(ValueError, match="publisher dictionary bytes differ"):
         read_source(path, mapping=mapping)
+
+
+def test_dictionary_growth_after_stat_is_bounded_before_excel_decode(tmp_path, monkeypatch):
+    import pandas as pd
+
+    path = write_source(tmp_path, [CODES, ["001902001", "42"]])
+    dictionary = tmp_path / "dictionary.xlsx"
+    raw = b"x" * 129
+    dictionary.write_bytes(raw)
+    mapping = mapping_for(path, layout={"code_record": 1, "label_record": None,
+        "first_data_record": 2, "last_data_record": 2, "annotations": []})
+    mapping["dictionary"] = {"filename": dictionary.name, "sha256": sha256(raw).hexdigest(), "sheet_name": "Sheet1"}
+    for field in mapping["fields"]:
+        field.update(publisher_type="Character", publisher_length="", disposition="fact")
+    original_stat = Path.stat
+    def stat_before_growth(file, *args, **kwargs):
+        return SimpleNamespace(st_size=0) if file == dictionary else original_stat(file, *args, **kwargs)
+    monkeypatch.setattr(Path, "stat", stat_before_growth)
+    monkeypatch.setattr(pd, "read_excel", lambda *a, **k: pytest.fail("Over-budget workbook decoded"))
+    with pytest.raises(ValueError, match="dictionary exceeds metadata byte budget"):
+        read_tapr_table(path, mapping=mapping, key_field="campus_number", dataset=DATASET,
+                        edition="2025", budget=TaprReadBudget(metadata_bytes=128))
+
+
+@pytest.mark.parametrize("ending", ["\n", "\r\n", "\r"])
+def test_bounded_batches_preserve_multiline_headers_bom_notes_and_strings(tmp_path, ending):
+    labels = [LABELS[0], "First\nsecond\nthird label"]
+    records = [["Publisher\nreport"], labels, CODES,
+               ["001902001", " -3 "], [], ["001902041", "a\nb"], ["Notes", "Do not infer"]]
+    text = StringIO(newline="")
+    # Quote embedded LF even when the file's physical separator is CR.
+    writer = csv.writer(text, lineterminator=ending, quoting=csv.QUOTE_ALL)
+    writer.writerows(records)
+    raw = b"\xef\xbb\xbf" + text.getvalue().encode()
+    path = tmp_path / "multiline.csv"
+    path.write_bytes(raw)
+    def note(number, kind):
+        stream = StringIO(newline="")
+        csv.writer(stream, lineterminator=ending, quoting=csv.QUOTE_ALL).writerow(records[number - 1])
+        content = stream.getvalue().encode()
+        if number == 1:
+            content = b"\xef\xbb\xbf" + content
+        return {"first_record": number, "last_record": number, "kind": kind,
+                "sha256": sha256(content).hexdigest()}
+    layout = {"label_record": 2, "code_record": 3, "first_data_record": 4, "last_data_record": 6,
+              "annotations": [note(1, "preamble"), note(5, "blank"), note(7, "footer")]}
+    mapping = mapping_for(path, labels=labels, layout=layout)
+    budget = TaprReadBudget(batch_bytes=128, batch_rows=1)
+    with TaprSourceRequest(path, mapping, "campus_number", DATASET, "2025").open(budget=budget) as reader:
+        with pytest.raises(ValueError, match="validated EOF"):
+            _ = reader.summary
+        batches = list(reader)
+        assert len(batches) == 2 and all(batch.num_rows == 1 and batch.nbytes <= 128 for batch in batches)
+        assert reader.summary.rows == 2 and reader.summary.annotations[0]["records"] == [["Publisher\nreport"]]
+    eager = read_tapr_table(path, mapping=mapping, key_field="campus_number", dataset=DATASET,
+                            edition="2025", budget=budget)
+    assert pa.Table.from_batches(batches).equals(eager.table)
+    assert eager.table["example_value"].to_pylist() == [" -3 ", "a\nb"]
+    assert path.read_bytes() == raw
+
+
+def test_early_close_and_bad_tail_never_produce_a_validated_summary(tmp_path):
+    path = write_source(tmp_path, [LABELS, CODES, ["001902001", "42"], ["001902041", "99"]])
+    request = TaprSourceRequest(path, mapping_for(path), "campus_number", DATASET, "2025")
+    with request.open(budget=TaprReadBudget(batch_rows=1)) as reader:
+        assert next(reader).num_rows == 1
+    with pytest.raises(ValueError, match="validated EOF"):
+        _ = reader.summary
+    mapping = mapping_for(path)
+    mapping["input_sha256"] = "0" * 64
+    with TaprSourceRequest(path, mapping, "campus_number", DATASET, "2025").open() as reader:
+        with pytest.raises(ValueError, match="input differs"):
+            list(reader)
+        with pytest.raises(ValueError, match="validated EOF"):
+            _ = reader.summary
+
+
+@pytest.mark.parametrize("budget,match", [
+    (TaprReadBudget(record_bytes=20), "record byte budget"),
+    (TaprReadBudget(metadata_bytes=20), "metadata byte budget"),
+    (TaprReadBudget(batch_bytes=16), "native batch byte budget"),
+    (TaprReadBudget(key_bytes=30, batch_rows=1), "identity index byte budget"),
+])
+def test_structural_and_native_admission_budgets_reject_before_unbounded_storage(tmp_path, budget, match):
+    path = write_source(tmp_path, [LABELS, CODES, ["001902001", "42"], ["001902041", "99"]])
+    with pytest.raises(ValueError, match=match):
+        read_tapr_table(path, mapping=mapping_for(path), key_field="campus_number",
+                        dataset=DATASET, edition="2025", budget=budget)
+
+
+@pytest.mark.parametrize("value", [True, False, 0, -1, 1.5, 1024**3 + 1])
+def test_budget_fields_fail_closed(value):
+    with pytest.raises(ValueError, match="positive bounded integers"):
+        TaprReadBudget(batch_bytes=value)
+
+
+def test_wide_sparse_batch_admission_accounts_for_native_column_offsets(tmp_path, monkeypatch):
+    import pyarrow.csv as pacsv
+
+    width, rows = 2212, 12
+    labels, codes = [LABELS[0]] + ["Value " + str(i) for i in range(width - 1)], ["CAMPUS"] + ["V" + str(i) for i in range(width - 1)]
+    names = ["campus_number"] + ["value_" + str(i) for i in range(width - 1)]
+    path = write_source(tmp_path, [labels, codes, *[[f"001902{i:03d}"] + [""] * (width - 1) for i in range(1, rows + 1)]])
+    mapping = mapping_for(path, labels=labels, codes=codes, fields=names)
+    budget = TaprReadBudget(batch_bytes=32768)
+    original = pacsv.read_csv
+    admitted = []
+    def decode(*args, **kwargs):
+        table = original(*args, **kwargs)
+        admitted.append((table.num_rows, table.nbytes))
+        return table
+    monkeypatch.setattr(pacsv, "read_csv", decode)
+    result = read_tapr_table(path, mapping=mapping, key_field="campus_number", dataset=DATASET,
+                             edition="2025", budget=budget)
+    assert result.table.num_rows == rows and len(admitted) > 1
+    assert max(count for count, _ in admitted) <= 2
+    assert all(size <= budget.batch_bytes for _, size in admitted)
+
+
+def test_multiline_record_budget_is_cumulative_before_native_decode(tmp_path, monkeypatch):
+    import pyarrow.csv as pacsv
+
+    path = write_source(tmp_path, [CODES, ["001902001", "first\nsecond\nthird"]])
+    layout = {"code_record": 1, "label_record": None, "first_data_record": 2,
+              "last_data_record": 2, "annotations": []}
+    mapping = mapping_for(path, layout=layout)
+    monkeypatch.setattr(pacsv, "read_csv", lambda *a, **k: pytest.fail("Oversized record reached native decode"))
+    with pytest.raises(ValueError, match="record byte budget"):
+        read_tapr_table(path, mapping=mapping, key_field="campus_number", dataset=DATASET,
+                        edition="2025", budget=TaprReadBudget(record_bytes=22))
+
+
+def test_literal_bom_in_a_fact_cell_is_never_treated_as_a_new_chunk_signature(tmp_path):
+    labels, codes, fields = ["Raw value", LABELS[0]], ["VALUE", "CAMPUS"], ["example_value", "campus_number"]
+    path = write_source(tmp_path, [labels, codes, ["\ufefffirst", "001902001"], ["\ufeffsecond", "001902041"]])
+    result = read_tapr_table(path, mapping=mapping_for(path, labels=labels, codes=codes, fields=fields),
+        key_field="campus_number", dataset=DATASET, edition="2025", budget=TaprReadBudget(batch_rows=1))
+    assert result.table["example_value"].to_pylist() == ["\ufefffirst", "\ufeffsecond"]
+
+
+def test_metadata_budget_bounds_a_reviewed_footer_without_discarding_it(tmp_path):
+    records = [LABELS, CODES, ["001902001", "42"], ["Notes", "x" * 256]]
+    path = write_source(tmp_path, records)
+    text = StringIO(newline="")
+    csv.writer(text).writerow(records[-1])
+    layout = {"label_record": 1, "code_record": 2, "first_data_record": 3, "last_data_record": 3,
+        "annotations": [{"first_record": 4, "last_record": 4, "kind": "footer",
+                         "sha256": sha256(text.getvalue().encode()).hexdigest()}]}
+    with pytest.raises(ValueError, match="metadata byte budget"):
+        read_tapr_table(path, mapping=mapping_for(path, layout=layout), key_field="campus_number",
+            dataset=DATASET, edition="2025", budget=TaprReadBudget(metadata_bytes=512))
+
+
+def test_utf8_errors_and_untyped_budgets_never_produce_a_summary(tmp_path):
+    path = tmp_path / "invalid.csv"
+    path.write_bytes(b"Campus,Value\nCAMPUS,VALUE\n001902001,\xff\n")
+    mapping = mapping_for(path, labels=["Campus", "Value"])
+    request = TaprSourceRequest(path, mapping, "campus_number", DATASET, "2025")
+    bad_budget: Any = False  # Deliberately cross the typed boundary.
+    with pytest.raises(ValueError, match="typed read budget"):
+        request.open(budget=bad_budget)
+    with request.open() as reader:
+        with pytest.raises(UnicodeDecodeError):
+            list(reader)
+        with pytest.raises(ValueError, match="validated EOF"):
+            _ = reader.summary
+
+
+def test_global_duplicate_and_source_change_are_detected_across_batches(tmp_path):
+    path = write_source(tmp_path, [LABELS, CODES, ["001902001", "42"], ["1902001", "99"]])
+    request = TaprSourceRequest(path, mapping_for(path), "campus_number", DATASET, "2025")
+    with request.open(budget=TaprReadBudget(batch_rows=1)) as reader:
+        with pytest.raises(ValueError, match=r"duplicate campus_number at records \[3, 4\]"):
+            list(reader)
+    path = write_source(tmp_path, [LABELS, CODES, ["001902001", "42"], ["001902041", "99"]])
+    with TaprSourceRequest(path, mapping_for(path), "campus_number", DATASET, "2025").open(
+            budget=TaprReadBudget(batch_rows=1)) as reader:
+        next(reader)
+        path.write_bytes(path.read_bytes())  # Same content, changed input during the open scan.
+        with pytest.raises(ValueError, match="input changed"):
+            list(reader)
+
+
+def configured_sources(tmp_path, *, second_bad=False):
+    """A complete tiny canonical Config/store; never load retained artifacts."""
+    from teadata.manifest import canonical_json
+    from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
+    from teadata.provenance import ProvenanceStore
+    from teadata.teadata_config import Config
+
+    sources = {}
+    paths = {}
+    store = ProvenanceStore(tmp_path / "original")
+    for scope, code, digits in [("campus", "CAMPUS", 9), ("district", "DISTRICT", 6)]:
+        folder = tmp_path / scope
+        folder.mkdir()
+        labels, codes, names = [scope + " ID", "Raw token"], [code, "VALUE"], [scope + "_number", "value"]
+        records = [labels, codes, *[[str(1902000 + i).zfill(digits), token]
+            for i, token in enumerate([" -3 ", "first\nsecond", "", "•", "0"], 1)]]
+        if scope == "district":
+            for i, row in enumerate(records[2:], 1):
+                row[0] = str(1900 + i).zfill(6)
+        if second_bad and scope == "district":
+            records[-1].append("unreviewed extra")
+        path = write_source(folder, records)
+        dataset = scope + "_tapr_student_staff_profile"
+        mapping = mapping_for(path, labels=labels, codes=codes, fields=names)
+        mapping["metric_period"] = {"kind": "unknown"}
+        for field in mapping["fields"]:
+            identity = field["position"] == 1
+            field.update(disposition="identity" if identity else "fact", publisher_type=None,
+                publisher_description=None,
+                dictionary_status="not_applicable" if identity else "not_documented")
+        identifier = store.record_acquisition(path, ResolvedDataset(dataset, "data_sources", 2025, 2025,
+            str(path), DatasetMetadata(version="2025")))
+        schema = folder / "schema.json"
+        schema_relative = str(schema.relative_to(tmp_path))
+        schema.write_text(canonical_json({"schema_version": 2, "mapping_version": 1,
+            "datasets": [{"dataset": dataset, "edition": "2025", "source_only": True, "tables": [mapping]}]}) + "\n")
+        sources[dataset] = {2025: {"path": str(path), "metadata": {"version": "2025",
+            "provenance_ids": [identifier],
+            "references": [{"reference_id": "columns", "role": "schema", "path": schema_relative,
+                "status": "available", "reviewed_sha256": sha256(schema.read_bytes()).hexdigest()}]},
+            "reader": {"profiles": {"source": {"column_schema": schema_relative,
+                "tapr_source": {"scope": scope, "tables": {"student": str(path)}}}}}}}
+        paths[scope] = path
+    cfg = Config.from_dict({"data_sources": sources})
+    cfg.base_dir = tmp_path
+    return cfg, paths, store
+
+
+def test_all_scopes_validate_before_any_writer_or_archive(tmp_path, monkeypatch):
+    import pyarrow.parquet as pq
+    from teadata.provenance import ProvenanceStore
+
+    cfg, _, store = configured_sources(tmp_path, second_bad=True)
+    monkeypatch.setattr(pq, "ParquetWriter", lambda *a, **k: pytest.fail("Invalid cohort opened writer"))
+    monkeypatch.setattr(ProvenanceStore, "record_acquisition", lambda *a, **k: pytest.fail("Invalid cohort archived"))
+    output = tmp_path / "new" / "cohort"
+    with pytest.raises(ValueError, match="record 7 has 3 fields"):
+        prepare_profiles(cfg, edition="2025", scopes=["campus", "district"], input_dir=None,
+                          output_dir=output, reference_store=store, budget=TaprReadBudget(batch_rows=1))
+    assert not output.parent.exists()
+
+
+def test_source_requests_are_metadata_only_and_do_not_open_raw_paths(tmp_path, monkeypatch):
+    cfg, paths, _ = configured_sources(tmp_path)
+    original_open = Path.open
+    def open_path(path, *args, **kwargs):
+        if path in paths.values():
+            pytest.fail("Metadata-only source selection opened raw rows")
+        return original_open(path, *args, **kwargs)
+    monkeypatch.setattr(Path, "open", open_path)
+    requests = cfg.tapr_source_requests(DATASET, 2025)
+    assert len(requests) == 1 and requests[0].path == paths["campus"]
+
+
+def test_bounded_producer_uses_exact_row_groups_and_original_processing_closure(tmp_path, monkeypatch):
+    import pyarrow.parquet as pq
+    from teadata.provenance import ProvenanceStore
+
+    cfg, paths, store = configured_sources(tmp_path)
+    output = tmp_path / "cohort"
+    monkeypatch.setattr(pq, "read_table", lambda *a, **k: pytest.fail("Whole Parquet readback"))
+    monkeypatch.setattr(cfg, "read_tapr_sources", lambda *a, **k: pytest.fail("Eager source path"))
+    result = prepare_profiles(cfg, edition="2025", scopes=["campus", "district"], input_dir=None,
+        output_dir=output, reference_store=store, budget=TaprReadBudget(batch_rows=2, batch_bytes=256))
+    for scope in paths:
+        with pq.ParquetFile(output / (scope + ".parquet")) as native:
+            assert native.metadata.num_row_groups == 3
+            assert [native.metadata.row_group(i).num_rows for i in range(3)] == [2, 2, 1]
+            table = pa.Table.from_batches(native.iter_batches(batch_size=2))
+        assert table["value"].to_pylist() == [" -3 ", "first\nsecond", "", "•", "0"]
+        receipt = result["scopes"][scope]
+        assert receipt["raw_string_readback_equal"] and receipt["rows"] == 5
+        graph = ProvenanceStore(output / "provenance").verify_record_closure([receipt["processing_record_id"]])
+        processing = graph[receipt["processing_record_id"]]
+        assert processing["parameters"]["source_read_budget"]["batch_bytes"] == 256
+        assert receipt["qualified_metrics"] == {}
+        assert all(record["downloaded_at"] is None for record in graph.values() if record["kind"] == "acquisition")
+
+
+@pytest.mark.parametrize("problem", ["second_pass_source", "readback", "extra_table"])
+def test_late_source_readback_failures_cleanup_and_multitable_has_no_eager_fallback(tmp_path, monkeypatch, problem):
+    import teadata.scripts.build_tapr_profiles as producer
+    from teadata.tapr import TaprSourceReader
+
+    cfg, paths, store = configured_sources(tmp_path)
+    output = tmp_path / "new" / "cohort"
+    if problem == "extra_table":
+        original_requests = cfg.tapr_source_requests
+        monkeypatch.setattr(cfg, "tapr_source_requests", lambda *a, **k: original_requests(*a, **k) * 2)
+        monkeypatch.setattr(TaprSourceReader, "_read", lambda *a: pytest.fail("Unsupported merge opened source"))
+    elif problem == "second_pass_source":
+        original_write = producer._write_raw_source
+        def write(request, expected, path, budget):
+            paths["campus"].write_text(paths["campus"].read_text().replace(" -3 ", " -2 "))
+            return original_write(request, expected, path, budget)
+        monkeypatch.setattr(producer, "_write_raw_source", write)
+    else:
+        import pyarrow.parquet as pq
+        original_read_group = pq.ParquetFile.read_row_group
+        def corrupt(self, *args, **kwargs):
+            value = original_read_group(self, *args, **kwargs)
+            return value.set_column(1, "value", pa.array(["changed"] * value.num_rows))
+        monkeypatch.setattr(pq.ParquetFile, "read_row_group", corrupt)
+    with pytest.raises(ValueError, match="physical table|input differs|changed|artifact differs"):
+        prepare_profiles(cfg, edition="2025", scopes=["campus", "district"], input_dir=None,
+            output_dir=output, reference_store=store, budget=TaprReadBudget(batch_rows=1))
+    assert not output.exists() and not list(tmp_path.rglob(".tapr-preparation-*"))
+    if problem == "extra_table":
+        assert not output.parent.exists()
