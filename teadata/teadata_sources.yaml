@@ -2191,6 +2191,170 @@ data_sources:
               status: available
               provenance_ids: []
               reviewed_sha256: bf848a6c47d7f5ed783b57d862d4fcaefced1e2988b65b75c13abddcd998ec98
+  campus_tapr_four_year_longitudinal_rate:
+    2024:
+      path: data/tapr/raw/2024-c-COMP4.csv
+      metadata:
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        identifiers: []
+        metrics: {}
+        notes: Source-only complete COMP4 observation from the literal 4-Year Longitudinal Rate menu in publisher edition 2024. All 224 facts and source identity columns remain lossless strings; historical names and parent IDs remain identity attributes, not entity.meta metrics. Literal 2023 labels and dictionary descriptions are preserved independently of edition. The 42 federal fields use only their exact publisher heading as a reviewed naming qualifier; the 182 ordinary fact names remain unchanged. Publisher context and Type are descriptive metadata, not a scientific period, unit, eligibility/exclusion rule, numeric status, masking policy or comparability claim. The retained annual 2023-24 TAPR glossary and masking page are linked as available references; field-specific COMP4 masking applicability remains unreviewed. No token rule, suppression threshold, cohort window, unit or scientific equivalence is assigned. Original HTTP receipts and dates remain immutable. No default reader, release
+          or app enrichment is activated.
+        period:
+          kind: unknown
+        provenance_ids:
+        - 1ecb3c44285694d03d6b054674ea235e1462a699a2fa8db64fc25e5286caab90
+        publisher: Texas Education Agency
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          title: Original 2024 campus_tapr_four_year_longitudinal_rate raw CSV; genuine HTTP observation and ordered controls
+          status: available
+          provenance_ids:
+          - 1ecb3c44285694d03d6b054674ea235e1462a699a2fa8db64fc25e5286caab90
+          reviewed_sha256: 8678ac96672bafe15e6be395488167de7bf081ee4bd0a203f463155b95361045
+        - provenance_ids:
+          - 2049ed24f8163464e4e287ee1bf0a9b445910f2fb57afd299e8ee4912497e318
+          reference_id: menu
+          reviewed_sha256: db8c40fef108b66a59697ce87ea02d60d32ea8f4e33fe486ec4aac6fa76caa79
+          role: source_notes
+          status: available
+          title: Official current 2024 campus TAPR family menu
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&tapr=all_c&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr.sas
+        - provenance_ids:
+          - 25f865544a99b653b9502dabeb89395e8c0c6594eac8a02fc3e8904ecd3cb20c
+          reference_id: selection
+          reviewed_sha256: a9b22430821e488fd240955e0e1a587ce6e1fb645987c7b746076bea9b09c77f
+          role: source_notes
+          status: available
+          title: Actual current 2024 campus COMP4 selection form and checked defaults
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        - provenance_ids:
+          - a9fbdbff7dbcf720b96c5fcb6777ac0310f8c15616d2e716c3dcbbc8219783b6
+          reference_id: dictionary
+          reviewed_sha256: c1236c3f347413aba29b883af02c2b42b8ea5c833e569c94d1f9b61a7af87f8e
+          role: data_dictionary
+          status: available
+          title: Actual current 2024 campus COMP4 publisher dictionary
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=C&dsname=COMP4&dd=attendgrad&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reference_id: glossary
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+          role: glossary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+        - provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reference_id: masking
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+          role: masking_methodology
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2024--four-year-longitudinal-rate-crosswalk.json
+          title: TEA Data-generated complete 2024 COMP4 source-only header/layout and literal publisher-context contract
+          status: available
+          provenance_ids:
+          - e2200d2550eba788ecfd8ce3fbe91540fe8756d9a4299bfdf43107d2341f1aeb
+          reviewed_sha256: cb417b4e95ba1a46ce85e36b4f791002eab8f8adc1e46eaa3cd663566de35921
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        title: 2024 TAPR Campus 4-Year Longitudinal Rate; current raw observation
+        version: '2024'
+        value_policy: null
+        estimation: null
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--four-year-longitudinal-rate-crosswalk.json
+            tapr_source:
+              scope: campus
+              tables:
+                four_year_longitudinal_rate: data/tapr/raw/2024-c-COMP4.csv
+  district_tapr_four_year_longitudinal_rate:
+    2024:
+      path: data/tapr/raw/2024-d-COMP4.csv
+      metadata:
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        identifiers: []
+        metrics: {}
+        notes: Source-only complete COMP4 observation from the literal 4-Year Longitudinal Rate menu in publisher edition 2024. All 224 facts and source identity columns remain lossless strings; historical names and parent IDs remain identity attributes, not entity.meta metrics. Literal 2023 labels and dictionary descriptions are preserved independently of edition. The 42 federal fields use only their exact publisher heading as a reviewed naming qualifier; the 182 ordinary fact names remain unchanged. Publisher context and Type are descriptive metadata, not a scientific period, unit, eligibility/exclusion rule, numeric status, masking policy or comparability claim. The retained annual 2023-24 TAPR glossary and masking page are linked as available references; field-specific COMP4 masking applicability remains unreviewed. No token rule, suppression threshold, cohort window, unit or scientific equivalence is assigned. Original HTTP receipts and dates remain immutable. No default reader, release
+          or app enrichment is activated.
+        period:
+          kind: unknown
+        provenance_ids:
+        - 632d7f6c24087c3f557882724229ebc68318e510ac1f206181e39b5833aef16a
+        publisher: Texas Education Agency
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          title: Original 2024 district_tapr_four_year_longitudinal_rate raw CSV; genuine HTTP observation and ordered controls
+          status: available
+          provenance_ids:
+          - 632d7f6c24087c3f557882724229ebc68318e510ac1f206181e39b5833aef16a
+          reviewed_sha256: fd3780604193a0a4587c94ddc9333b787021a7724158a36debeff81c07a57d05
+        - provenance_ids:
+          - 444eec93f8bdea6bfaf5768188ec6efb6463ce30ef95c8da8dc3d682c2ea0df6
+          reference_id: menu
+          reviewed_sha256: 85342018b36c3601c43fe565d18f2e6ef01cc90edb49aa07e45df875bb0df109
+          role: source_notes
+          status: available
+          title: Official current 2024 district TAPR family menu
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&tapr=all_d&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr.sas
+        - provenance_ids:
+          - 368b7c08ffca35680f549052264da6e0009be721c36803ad672e8472ab9f7ea1
+          reference_id: selection
+          reviewed_sha256: 7b3b84a2300e983fe90702ebe634600f3fbe62ac9e12b06075bf259412daeb1b
+          role: source_notes
+          status: available
+          title: Actual current 2024 district COMP4 selection form and checked defaults
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        - provenance_ids:
+          - 8e58d3e36ee7939934c45a1c288ad83d52cca5f577d3dec1cb2ab1653130349c
+          reference_id: dictionary
+          reviewed_sha256: 6dc90bf9706b791b22e2c349deac621e85dde3a1197af690ea0245e7b1b7490c
+          role: data_dictionary
+          status: available
+          title: Actual current 2024 district COMP4 publisher dictionary
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=D&dsname=COMP4&dd=attendgrad&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reference_id: glossary
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+          role: glossary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+        - provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reference_id: masking
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+          role: masking_methodology
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2024--four-year-longitudinal-rate-crosswalk.json
+          title: TEA Data-generated complete 2024 COMP4 source-only header/layout and literal publisher-context contract
+          status: available
+          provenance_ids:
+          - e2200d2550eba788ecfd8ce3fbe91540fe8756d9a4299bfdf43107d2341f1aeb
+          reviewed_sha256: cb417b4e95ba1a46ce85e36b4f791002eab8f8adc1e46eaa3cd663566de35921
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        title: 2024 TAPR District 4-Year Longitudinal Rate; current raw observation
+        version: '2024'
+        value_policy: null
+        estimation: null
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--four-year-longitudinal-rate-crosswalk.json
+            tapr_source:
+              scope: district
+              tables:
+                four_year_longitudinal_rate: data/tapr/raw/2024-d-COMP4.csv
   campus_tapr_reference:
     2024:
       path: data/tapr/raw/2024-c-REF.csv
@@ -3085,6 +3249,10 @@ schema:
     campus_tapr_graduation_profile:
     - csv
     district_tapr_graduation_profile:
+    - csv
+    campus_tapr_four_year_longitudinal_rate:
+    - csv
+    district_tapr_four_year_longitudinal_rate:
     - csv
     campus_tapr_reference:
     - csv

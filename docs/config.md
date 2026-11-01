@@ -434,6 +434,33 @@ GRAD. Their original HTTP dates and annual context receipts remain immutable;
 the schema has its own genuine local observation. This registration supplies
 contracts, not prepared outputs, released/default facts or app activation.
 
+The 2024 `campus_tapr_four_year_longitudinal_rate` and
+`district_tapr_four_year_longitudinal_rate` source profiles retain the complete
+228/226-column COMP4 observations: 224 facts per scope and their original
+campus/district identity columns. Use the explicit `source` profile and the
+existing `four_year_longitudinal_rate` preparation family. The single curated
+crosswalk preserves both exact CSV header records, finite data ranges and raw
+checksums. Code-based `header_mapping()` distinguishes repeated labels; a
+label-only rename remains ambiguous and is rejected.
+
+Each dictionary occurrence exposes its literal anchored `publisher_context`.
+The 182 ordinary fact names stay unchanged; the 42 federal names per scope
+include the exact section title, `4-Year Federal Graduation Rate Without
+Exclusions (Gr 9-12)`, as a naming qualifier. Original codes, labels,
+descriptions and source anchors remain discoverable. Literal 2023 text does
+not establish the reference window of publisher edition 2024. The retained
+annual [glossary](https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf)
+and [masking page](https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html)
+are linked as available references with their original acquisition receipts.
+Field-specific COMP4 masking applicability remains unreviewed. Shared annual
+documentation does not by itself assign token rules, suppression thresholds,
+cohort windows, scientific units or comparability. Periods and scientific
+metric bindings stay unknown/unassigned, with no applied policy or estimation.
+Identity attributes do not become repeated entity metadata metrics. Original
+acquisition dates stay intact, and the generated schema has its own genuine
+local observation.
+Registration does not prepare, publish or activate these sources.
+
 One-header 2024 inputs use their complete Name/Type/Length/Label dictionaries;
 2025 inputs declare exact label and code header records. Any preamble, note,
 blank gap or footer must have reviewed CSV-record coordinates and an exact

@@ -1,4 +1,4 @@
-"""Current REF/DROP_ATT contracts retain labels, history and unbound strings."""
+"""Current source families retain labels, history and unbound strings."""
 
 from copy import deepcopy
 from dataclasses import replace
@@ -28,6 +28,8 @@ SOURCES = [
     ('district', 'reference', 12, 1207, 'f0841681cbf8e28a91dfe31c9653b04cf4a6d933ad6bf30d334a603362b9d0b7'),
     ('campus', 'dropout_attendance', 166, 9082, '35a1fd68ec12257cf38a835a3cd63a8676affd81d1d4381c2c513b13ae2b0a0c'),
     ('district', 'dropout_attendance', 164, 1207, 'e05111f5db6e9b6e6477a4ac38b7a2e38c694f94312e5fa20c7082125fe863af'),
+    ('campus', 'four_year_longitudinal_rate', 228, 9082, '1ecb3c44285694d03d6b054674ea235e1462a699a2fa8db64fc25e5286caab90'),
+    ('district', 'four_year_longitudinal_rate', 226, 1207, '632d7f6c24087c3f557882724229ebc68318e510ac1f206181e39b5833aef16a'),
 ]
 NEW_DATASETS = {scope + '_tapr_' + family for scope, family, *_ in SOURCES}
 
@@ -61,14 +63,16 @@ def test_complete_source_only_discovery_and_typed_receipts_need_no_artifact_io(s
     validate_reference_records(source, graph.__getitem__, verify_all_claimed=True)
     acquired = graph[raw_id]
     assert acquired['dataset'] == dataset and acquired['method'] == 'download'
-    assert acquired['downloaded_at'].startswith('2026-11-01T06:11:')
+    assert acquired['downloaded_at'].startswith(
+        '2026-11-01T09:06:' if family == 'four_year_longitudinal_rate' else '2026-11-01T06:11:')
     assert acquired['response_headers']['content-type'] == 'text/&content_type.-separated-values'
     assert acquired['source_metadata']['period'] == UNKNOWN and acquired['source_metadata']['metrics'] == {}
     schema_ref = next(ref for ref in metadata.references if ref.role == 'schema')
     local = graph[schema_ref.provenance_ids[0]]
     assert local['method'] == 'local_observation' and local['downloaded_at'] is None
     assert local['requested_url'] is None and local['resolved_url'] is None
-    assert local['artifact']['sha256'] == schema_ref.reviewed_sha256 == sha256(RESOURCE.read_bytes()).hexdigest()
+    assert schema_ref.path is not None
+    assert local['artifact']['sha256'] == schema_ref.reviewed_sha256 == sha256((ROOT / 'teadata' / schema_ref.path).read_bytes()).hexdigest()
     records = cfg.header_records(dataset, edition='2024', reader_profile='source')
     assert len(records) == width == len({record['code'] for record in records}) == len({record['field'] for record in records})
     assert all(record['period'] == UNKNOWN and record['table'] == family for record in records)
@@ -148,19 +152,83 @@ def test_unknowns_and_reviewed_names_cannot_be_repaired_by_alias_or_inference(da
         validate_header_table(table)
 
 
-def test_new_opt_ins_leave_the_entire_existing_Config_semantics_unchanged():
+def test_current_source_contracts_keep_explicit_one_year_csv_opt_ins():
     current = yaml.safe_load((ROOT / 'teadata/teadata_sources.yaml').read_text())
     for dataset in NEW_DATASETS:
         assert list(current['data_sources'].pop(dataset)) == [2024]
         assert current['schema']['data_sources'].pop(dataset) == ['csv']
-    # Computed from exact pre-change 82cbe54 YAML; not the candidate's defaults.
-    assert sha256(canonical_json(current).encode()).hexdigest() == '2f29eb8cd6c364f5c5f86b29c681497ee47ff680be9c55c17be6682a7421df5e'
+    # Full pre-change Config preservation has one current baseline owner below.
+
+
+def test_comp4_opt_ins_preserve_the_entire_preexisting_Config():
+    current = yaml.safe_load((ROOT / 'teadata/teadata_sources.yaml').read_text())
+    for scope in ['campus', 'district']:
+        dataset = scope + '_tapr_four_year_longitudinal_rate'
+        current['data_sources'].pop(dataset)
+        current['schema']['data_sources'].pop(dataset)
+    # Exact pre-change 27cb372 Config, including existing REF/DROP opt-ins.
+    assert sha256(canonical_json(current).encode()).hexdigest() == '954db99c8a419a2378fec77c45b835d2b600d893816f5d796f63719470f3b354'
+
+
+@pytest.mark.parametrize('scope,prefix', [('campus', 'C'), ('district', 'D')])
+def test_comp4_context_names_and_annual_references_do_not_assign_methodology(scope, prefix):
+    cfg = load_config()
+    dataset = scope + '_tapr_four_year_longitudinal_rate'
+    records = cfg.header_records(dataset, edition='2024', reader_profile='source')
+    facts = [record for record in records if record['disposition'] == 'fact']
+    identities = [record for record in records if record['disposition'] == 'identity']
+    assert len(facts) == 224 and all(record['dictionary_status'] == 'documented' for record in facts)
+    assert all(record['dictionary_status'] == 'not_applicable' and record['dictionary_occurrences'] == [] for record in identities)
+    ordinary = '4-Year Longitudinal Rate (Gr 9-12)'
+    federal = '4-Year Federal Graduation Rate Without Exclusions (Gr 9-12)'
+    headings = [record['dictionary_occurrences'][0]['publisher_context']['heading'] for record in facts]
+    assert headings.count(ordinary) == 182 and headings.count(federal) == 42
+    grouped = {}
+    for record in facts:
+        occurrence, = record['dictionary_occurrences']
+        context = occurrence['publisher_context']
+        assert context['source_column'] == 0
+        assert context['source_line'] == (2492 if context['heading'] == federal else 2272)
+        assert (context['source_line'], context['source_column']) < (occurrence['source_line'], occurrence['source_column'])
+        assert ('federal_graduation_rate_without_exclusions_gr_9_12' in record['field']) == (context['heading'] == federal)
+        grouped.setdefault(record['label'], []).append(record)
+    pairs = [group for group in grouped.values() if len(group) == 2]
+    assert len(pairs) == 42
+    assert all({record['dictionary_occurrences'][0]['publisher_context']['heading'] for record in pair} == {ordinary, federal} for pair in pairs)
+    by_code = {record['code']: record for record in facts}
+    assert by_code[prefix + 'AGC4X23N']['field'] == scope + '_2023_4_year_longitudinal_graduates_for_all_students_numerator'
+    assert by_code[prefix + 'AGC423N']['field'] == scope + '_2023_4_year_federal_graduation_rate_without_exclusions_gr_9_12_graduates_for_all_students_numerator'
+    with pytest.raises(ContractError, match='Ambiguous header mapping'):
+        cfg.header_mapping(dataset, edition='2024', table='four_year_longitudinal_rate', from_='label', reader_profile='source')
+    by_code[prefix + 'AGC423N']['dictionary_occurrences'][0]['publisher_context']['heading'] = 'Caller change'
+    fresh = cfg.header_records(dataset, edition='2024', reader_profile='source')
+    assert next(record for record in fresh if record['code'] == prefix + 'AGC423N')['dictionary_occurrences'][0]['publisher_context']['heading'] == federal
+    source = cfg.resolve_dataset(dataset, 2024, reader_profile='source')
+    for role in ['glossary', 'masking_methodology']:
+        reference, = [reference for reference in source.metadata.references if reference.role == role]
+        original, = [reference for reference in cfg.resolve_dataset('campus_tapr_reference', 2024, reader_profile='source').metadata.references if reference.role == role]
+        assert reference.to_dict() == original.to_dict() and reference.status == 'available'
+        identifier, = reference.provenance_ids
+        acquired = ProvenanceStore(ROOT / 'provenance').read_record(identifier)
+        assert acquired['method'] == 'download' and acquired['artifact']['sha256'] == reference.reviewed_sha256
+        assert acquired['requested_url'] == reference.url
+        assert acquired['downloaded_at'].startswith('2026-10-31T17:11:09.')
+    store = ProvenanceStore(ROOT / 'provenance')
+    roots = [*source.metadata.provenance_ids, *(identifier for ref in source.metadata.references for identifier in ref.provenance_ids)]
+    graph = validate_record_graph(store.read_record, roots)
+    validate_reference_records(source, graph.__getitem__, verify_all_claimed=True)
+    assert source.metadata.metrics == {} and source.metadata.period.to_dict() == UNKNOWN
+    assert source.metadata.value_policy is None and source.metadata.estimation is None and source.metadata.field_year is None
+    assert 'field-specific COMP4 masking applicability remains unreviewed' in source.metadata.notes
+    _validate_methodology(source.metadata, None)
 
 
 @pytest.mark.parametrize('scope,family,width,rows,raw_id', SOURCES)
 def test_tiny_ordinary_source_preparation_preserves_raw_tokens_and_physical_table_independence(tmp_path, scope, family, width, rows, raw_id):
     dataset = scope + '_tapr_' + family
-    original = next(item for item in parse_column_schema(RESOURCE.read_bytes())['datasets'] if item['dataset'] == dataset)
+    contract = load_config().column_contract(dataset, 2024, reader_profile='source')
+    assert contract is not None
+    original = next(item for item in parse_column_schema(contract['text'].encode())['datasets'] if item['dataset'] == dataset)
     mapping = deepcopy(original['tables'][0])
     mapping['table'] = 'publisher_rows'  # A physical table is not a logical-family alias.
     row = ['-3'] * width
@@ -205,7 +273,7 @@ def test_tiny_ordinary_source_preparation_preserves_raw_tokens_and_physical_tabl
     assert closure[local_id] == store.read_record(local_id)
 
 
-@pytest.mark.parametrize('dataset', ['campus_tapr_ref', 'campus_tapr_DROP_ATT', 'district_tapr_reference_alias'])
+@pytest.mark.parametrize('dataset', ['campus_tapr_ref', 'campus_tapr_DROP_ATT', 'district_tapr_reference_alias', 'campus_tapr_comp4'])
 def test_foreign_family_names_fail_before_source_io(tmp_path, dataset, monkeypatch):
     monkeypatch.setattr(Path, 'read_bytes', lambda *a, **k: pytest.fail('Foreign family opened source bytes'))
     with pytest.raises(ValueError, match='explicit qualified dataset'):
