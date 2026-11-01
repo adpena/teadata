@@ -256,7 +256,10 @@ def test_v3_well_hashed_contradictions_fail_before_io(edition_fixture, damage, m
     elif damage == "policy":
         document["value_policies"]["numeric"]["tokens"] = {"-1": {"status": "missing"}}
     elif damage == "derivation":
-        ref["processing_id"] = next(iter(document["provenance"]))
+        acquisition = next(identifier for identifier, record in document["provenance"].items()
+                           if record["kind"] == "acquisition")
+        assert acquisition != ref["processing_id"]
+        ref["processing_id"] = acquisition
     elif damage == "revision":
         document["editions"][fields[0]["edition_id"]]["key"]["revision_sha256"] = "f" * 64
     else:
