@@ -14,7 +14,7 @@ from pathlib import Path
 import re
 from typing import TYPE_CHECKING, Any, Mapping
 
-from .column_schema import validate_header_table
+from .column_schema import validate_header_table, validate_source_layout
 from .identifiers import canonical_source_identifiers
 
 if TYPE_CHECKING:
@@ -218,6 +218,8 @@ def _extract_records(raw: bytes, mapping: Mapping[str, Any], path: Path):
         observed.append({**note, "records": records})
     if not spans:
         raise ValueError(f"{path}: no TAPR data records")
+    if layout is not None and len(data_records) != reviewed_tapr_data_record_count(mapping):
+        raise ValueError(f"{path}: extracted data count differs from reviewed record layout")
     return "".join(text[start:end] for start, end in spans).encode("utf-8"), observed, data_records
 
 
@@ -237,6 +239,31 @@ def _verify_dictionary(path: Path, mapping: Mapping[str, Any]) -> None:
                              for field in mapping["fields"]])
     if not dictionary.equals(expected):
         raise ValueError(f"{path}: publisher dictionary does not match the complete reviewed crosswalk")
+
+
+def validate_tapr_key(mapping: Mapping[str, Any], key_field: str) -> None:
+    """Share the existing reviewed publisher-code/physical-key binding."""
+    headers = [field["field"] for field in mapping["fields"]]
+    if key_field not in {"campus_number", "district_number"} or key_field not in headers:
+        raise ValueError(f"missing or unsupported source key {key_field!r}")
+    expected_code = "CAMPUS" if key_field == "campus_number" else "DISTRICT"
+    if mapping["fields"][headers.index(key_field)]["code"] != expected_code:
+        raise ValueError(f"source key must bind publisher code {expected_code!r}")
+
+
+def reviewed_tapr_data_record_count(mapping: Mapping[str, Any]) -> int:
+    """Count a finite reviewed interval with the reader's annotation precedence."""
+    layout = mapping.get("layout")
+    if layout is None:
+        raise ValueError("Prepared source requires a finite reviewed record layout")
+    validate_source_layout(layout)
+    first, last = layout["first_data_record"], layout["last_data_record"]
+    excluded = sum(len(range(max(first, note["first_record"]), min(last, note["last_record"]) + 1))
+                   for note in layout["annotations"])
+    rows = last - first + 1 - excluded
+    if rows < 1:
+        raise ValueError("Reviewed source layout has no TAPR data records")
+    return rows
 
 
 def read_tapr_table(path: str | Path, *, mapping: Mapping[str, Any], key_field: str,
@@ -263,11 +290,10 @@ def read_tapr_table(path: str | Path, *, mapping: Mapping[str, Any], key_field: 
                            else path.with_name(mapping["dictionary"]["filename"]), mapping)
     fields = mapping["fields"]
     headers = [field["field"] for field in fields]
-    if key_field not in {"campus_number", "district_number"} or key_field not in headers:
-        raise ValueError(f"{path}: missing or unsupported source key {key_field!r}")
-    expected_code = "CAMPUS" if key_field == "campus_number" else "DISTRICT"
-    if fields[headers.index(key_field)]["code"] != expected_code:
-        raise ValueError(f"{path}: source key must bind publisher code {expected_code!r}")
+    try:
+        validate_tapr_key(mapping, key_field)
+    except ValueError as error:
+        raise ValueError(f"{path}: {error}") from error
     body, annotations, data_records = _extract_records(raw, mapping, path)
     codes = [field["code"] for field in fields]
     table = pacsv.read_csv(pa.BufferReader(body),

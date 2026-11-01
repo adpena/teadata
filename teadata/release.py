@@ -290,50 +290,68 @@ def snapshot_build_id(path: str | Path) -> str:
 def publish_release(
     directory: Path,
     catalog: DatasetCatalog,
-    artifacts: dict[str, Path],
+    artifacts: dict[str, Path] | None = None,
     *,
-    processing: dict,
+    processing: dict | None = None,
+    schema_version: int | None = None,
 ) -> Path:
     """Activate only a complete validated bundle; keep the previous pointer on failure."""
-    if catalog.to_dict().get("schema_version") != 2:
+    if type(schema_version) is int and schema_version == 3:
+        if artifacts is not None or processing is not None or catalog.to_dict().get("schema_version") != 3:
+            raise ContractError("Schema3 publication uses only its catalog artifact registry")
+        document = {"schema_version": 3, "catalog": catalog.to_dict()}
+        if len(canonical_json(document).encode()) + 1 > 4 * 1024 * 1024:
+            raise ContractError("Release manifest is too large")
+        if (directory / "release.json").exists() or (directory / "release.json").is_symlink():
+            raise FileExistsError("Schema3 candidate root already exists")
+        directory.mkdir(parents=True, exist_ok=True)
+    elif schema_version is not None:
+        raise ContractError("Select explicit schema3 or the unchanged legacy publisher")
+    elif catalog.to_dict().get("schema_version") != 2:
         raise ContractError("Legacy release publication requires a schema2 catalog")
-    if set(artifacts) not in (ROLES, ANALYTICAL_RELEASE_ROLES):
+    elif artifacts is None or processing is None or set(artifacts) not in (ROLES, ANALYTICAL_RELEASE_ROLES):
         raise ContractError("Cannot publish an incomplete release")
-    directory.mkdir(parents=True, exist_ok=True)
-    names = {}
-    for role, source in artifacts.items():
-        suffix = ".parquet" if role in ANALYTICAL_ROLES else ".pkl.gz" if role == "snapshot" else ".sqlite"
-        name = f"{role}_{catalog.build_id}{suffix}"
-        destination = directory / name
-        if (
-            role in ROLES - {"snapshot"}
-            and read_sqlite_catalog(source).build_id != catalog.build_id
-        ):
-            raise ContractError(f"Cannot publish mixed data builds: {role}")
-        if role in ANALYTICAL_ROLES:
-            validate_artifact(source, catalog, role, entities_sha256=file_identity(artifacts["entities"])["sha256"])
-        identity = file_identity(source)
-        if destination.exists():
-            if file_identity(destination)["sha256"] != identity["sha256"]:
-                raise ContractError(
-                    "A build identity already has different artifact bytes"
-                )
-        else:
-            # Same-filesystem staging makes activation atomic and avoids partial downloads.
-            os.link(source, destination)
-        names[role] = {**identity, "filename": name}
-    document = {
-        "schema_version": 2 if set(artifacts) == ANALYTICAL_RELEASE_ROLES else 1,
-        "catalog": catalog.to_dict(),
-        "artifacts": names,
-        "processing": processing,
-    }
+    else:
+        directory.mkdir(parents=True, exist_ok=True)
+        names = {}
+        for role, source in artifacts.items():
+            suffix = ".parquet" if role in ANALYTICAL_ROLES else ".pkl.gz" if role == "snapshot" else ".sqlite"
+            name = f"{role}_{catalog.build_id}{suffix}"
+            destination = directory / name
+            if (
+                role in ROLES - {"snapshot"}
+                and read_sqlite_catalog(source).build_id != catalog.build_id
+            ):
+                raise ContractError(f"Cannot publish mixed data builds: {role}")
+            if role in ANALYTICAL_ROLES:
+                validate_artifact(source, catalog, role, entities_sha256=file_identity(artifacts["entities"])["sha256"])
+            identity = file_identity(source)
+            if destination.exists():
+                if file_identity(destination)["sha256"] != identity["sha256"]:
+                    raise ContractError(
+                        "A build identity already has different artifact bytes"
+                    )
+            else:
+                # Same-filesystem staging makes activation atomic and avoids partial downloads.
+                os.link(source, destination)
+            names[role] = {**identity, "filename": name}
+        document = {
+            "schema_version": 2 if set(artifacts) == ANALYTICAL_RELEASE_ROLES else 1,
+            "catalog": catalog.to_dict(),
+            "artifacts": names,
+            "processing": processing,
+        }
     with tempfile.NamedTemporaryFile(dir=directory, mode="w", delete=False) as stream:
         temporary = Path(stream.name)
         stream.write(canonical_json(document) + "\n")
+        stream.flush()
+        os.fsync(stream.fileno())
     try:
-        DataRelease(temporary).verify()
-        os.replace(temporary, directory / "release.json")
+        DataRelease(temporary, offline=schema_version == 3).verify()
+        if schema_version == 3:
+            os.link(temporary, directory / "release.json")
+        else:
+            os.replace(temporary, directory / "release.json")
     finally:
         temporary.unlink(missing_ok=True)
     return directory / "release.json"

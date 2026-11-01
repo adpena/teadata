@@ -9,10 +9,12 @@ from __future__ import annotations
 from collections.abc import Mapping
 import json
 import math
+import os
 from pathlib import Path
+import tempfile
 from typing import Any, TYPE_CHECKING
 
-from .manifest import ContractError, DatasetCatalog, canonical_json
+from .manifest import ContractError, DatasetCatalog, canonical_json, file_identity
 from .values import Measurement, ValueStatus, presentation_value
 from .dataset_metadata import ArtifactRef
 
@@ -383,10 +385,52 @@ def validate_artifact(path: str | Path, catalog: DatasetCatalog, role: str,
     return document
 
 
-def validate_leaf_artifact(path: str | Path, descriptor: ArtifactRef) -> None:
-    """Open only a selected v3 leaf; legacy footer validation stays separate."""
+def _leaf_schema(contract):
+    """Decode native IPC only at a selected native read/write boundary."""
     import base64
     import pyarrow as pa
+
+    schema = pa.ipc.read_schema(pa.BufferReader(base64.b64decode(contract["schema"], validate=True)))
+    if (schema.metadata is not None or schema.names != contract["columns"]
+            or not contract["key_columns"] or len(set(contract["key_columns"])) != len(contract["key_columns"])
+            or not set(contract["key_columns"]) <= set(schema.names)):
+        raise ContractError("Leaf contract requires metadata-free native schema and explicit keys")
+    return schema
+
+
+def write_leaf_artifact(path: str | Path, batches, *, contract: Mapping[str, Any]) -> dict[str, Any]:
+    """Write one new immutable wide leaf; caller owns cohort staging/activation."""
+    from hashlib import sha256
+    import pyarrow.parquet as pq
+
+    path = Path(path)
+    if path.exists() or path.is_symlink():
+        raise FileExistsError("Leaf output already exists")
+    schema = _leaf_schema(contract)
+    identity = sha256(canonical_json(contract).encode()).hexdigest()
+    footer = {LEAF_METADATA: canonical_json({"schema_version": 3, "leaf_contract_sha256": identity}).encode()}
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as stream:
+            temporary = Path(stream.name)
+        rows = 0
+        with pq.ParquetWriter(temporary, schema.with_metadata(footer), compression="zstd") as writer:
+            for batch in batches:
+                if not batch.schema.remove_metadata().equals(schema, check_metadata=True):
+                    raise ContractError("Leaf batch differs from its complete native schema")
+                rows += batch.num_rows
+                writer.write_batch(batch.replace_schema_metadata(footer), row_group_size=4096)
+        if type(contract["rows"]) is not int or rows != contract["rows"]:
+            raise ContractError("Leaf rows differ from its declared count")
+        os.link(temporary, path)  # exclusive publication; never replace an existing leaf
+        return file_identity(path)
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
+def validate_leaf_artifact(path: str | Path, descriptor: ArtifactRef) -> None:
+    """Open only a selected v3 leaf; legacy footer validation stays separate."""
     import pyarrow.parquet as pq
 
     contract = descriptor.contract
@@ -394,9 +438,9 @@ def validate_leaf_artifact(path: str | Path, descriptor: ArtifactRef) -> None:
         parquet = pq.ParquetFile(path)
         schema = parquet.schema_arrow
         document = json.loads((schema.metadata or {})[LEAF_METADATA])
-        expected = pa.ipc.read_schema(pa.BufferReader(base64.b64decode(contract["schema"], validate=True)))
+        expected = _leaf_schema(contract)
         if (document != {"schema_version": 3, "leaf_contract_sha256": descriptor.identity}
-                or expected.metadata is not None or set(schema.metadata or {}) != {LEAF_METADATA}
+                or set(schema.metadata or {}) != {LEAF_METADATA}
                 or not schema.remove_metadata().equals(expected, check_metadata=True)
                 or schema.names != contract["columns"] or parquet.metadata.num_rows != contract["rows"]
                 or not set(contract["key_columns"]) <= set(schema.names)):

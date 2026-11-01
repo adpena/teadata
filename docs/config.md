@@ -579,9 +579,10 @@ publisher code; exact totals and originals remain available.
 
 ### Unreleased opt-in edition catalog reader
 
-Schema 3 is an explicit contract/reader API. Existing bundle writers still emit
-schemas 1/2, and published 0.0.126 and app defaults are unchanged. This API does
-not publish a schema 3 release or establish all-family/year coverage.
+Schema 3 is an explicit contract/reader API. Default bundle writers still emit
+schemas 1/2, and published 0.0.126 and app defaults are unchanged. The opt-in
+source producer below writes a new local candidate; it does not activate a
+released default or establish all-family/year coverage.
 
 `BuildRecorder.leaf_contract(...)` derives interpretation and selected mapping
 identities from the same Config/crosswalk authorities. A native writer supplies
@@ -614,6 +615,48 @@ and global-footer checks remain strict for schemas 1/2. The root limit remains
 4 MiB; the index covers its registered editions, with no claim that arbitrary
 future history fits this in-memory envelope. `verify()` explicitly opens every
 registered artifact and is not a discovery operation.
+
+### Unreleased raw-wide source cohort
+
+The same `build_tapr_profiles` owner can consume four accepted natural source
+preparations for one registered annual edition: Student and Staff, each at
+campus and district scope. Supply the exact processing receipts and explicit
+physical keys. For example, after the ordinary source-preparation commands:
+
+```bash
+uv run python -m teadata.scripts.build_tapr_profiles \
+  --edition 2024 --config reviewed-sources.yaml --reference-store selected-provenance \
+  --prepared-input campus_tapr_student_profile CAMPUS_STUDENT_PROCESSING_ID campus_number \
+  --prepared-input district_tapr_student_profile DISTRICT_STUDENT_PROCESSING_ID district_number \
+  --prepared-input campus_tapr_staff_profile CAMPUS_STAFF_PROCESSING_ID campus_number \
+  --prepared-input district_tapr_staff_profile DISTRICT_STAFF_PROCESSING_ID district_number \
+  --output-dir new-2024-raw-wide-candidate
+```
+
+All selected typed closures, exact Config editions, reviewed source/header
+contracts, upstream raw identities and declared processing dependencies validate
+before native input opening. Explicit keys must match the existing TAPR
+publisher-code contract; native types, complete columns, row count and key
+uniqueness are checked before activation. The producer writes batches of at
+most 4096 rows. Preparation row claims must first match the finite reviewed
+data-record interval after its explicit annotation exclusions; missing or empty
+layouts cannot establish retained rows. The producer verifies exact raw-string
+readback, registers every source field, validates its four-leaf root through `publish_release(...,
+schema_version=3)`, and renames only a complete fresh staging directory. Existing
+outputs are never replaced. `--processing-input DATASET RECORD_ID` remains
+available for additional explicitly reviewed typed dependencies; inherited
+preparation dependencies remain in the closure without relabeling acquisitions.
+
+Use one bounded edition/cohort root at a time, with 2024 before 2025 and later
+reviewed annual editions. This is a raw-wide selection path: edition text is
+not a measurement period, and unknown units, policies and meanings remain
+unknown. It does not implement qualified batch measurement normalization or
+longitudinal comparability. Select an exact edition/field using the catalog,
+then use the returned `ArtifactRef` with `DataRelease.analytical_dataset` and
+ordinary Arrow `scanner(columns=..., filter=..., batch_size=...)`. Root metadata
+discovery opens no leaf; selected reads use the existing per-SHA verified cache
+and pinned-root offline behavior. No entity engine, analytical EAV conversion,
+source reacquisition or all-history manifest is introduced.
 
 Relative `data/...` paths in the source contract also honor `TEADATA_DATA_DIR`. Other relative paths remain relative to the configuration file. `uv run python -m teadata.load_data` reads the selected contracts, stages a complete release, and activates `teadata/.cache/release.json` after validation. There is no second cache mirror or developer-checkout copy.
 

@@ -139,8 +139,7 @@ def test_projection_optimization_does_not_weaken_receipt_validation(selected_cat
 def edition_fixture(tmp_path):
     """Two tiny native leaves built from the ordinary recorder and crosswalk."""
     import pyarrow as pa
-    import pyarrow.parquet as pq
-    from teadata.analytical import LEAF_METADATA
+    from teadata.analytical import write_leaf_artifact
     from teadata.column_schema import source_schema_fingerprint
 
     store = ProvenanceStore(tmp_path / "provenance")
@@ -184,14 +183,14 @@ def edition_fixture(tmp_path):
         key = EditionKey(dataset, "2025", EditionKey.source_revision((raw_sha,)), "campus", family, "one row per campus")
         native = pa.schema([pa.field("campus_number", pa.string(), nullable=False),
                             pa.field("campus_name", pa.string()), pa.field("amount", pa.string())])
-        recipe = {"operation": "tiny native fixture", "compression": "snappy"}
+        recipe = {"operation": "tiny native fixture", "compression": "zstd"}
         toolchain = {"python": sys.version, "pyarrow": version("pyarrow")}
         contract = recorder.leaf_contract(key, source, native_schema=native.serialize().to_pybytes(),
             columns=native.names, key_columns=["campus_number"], rows=1, inputs=[raw_sha], recipe=recipe, toolchain=toolchain)
         leaf_id = sha256(canonical_json(contract).encode()).hexdigest()
         leaf = tmp_path / (family + ".parquet")
-        pq.write_table(pa.Table.from_arrays([pa.array(["001"]), pa.array(["One"]), pa.array(["5"])],
-            schema=native.with_metadata({LEAF_METADATA: canonical_json({"schema_version": 3, "leaf_contract_sha256": leaf_id}).encode()})), leaf)
+        write_leaf_artifact(leaf, pa.Table.from_arrays([pa.array(["001"]), pa.array(["One"]), pa.array(["5"])],
+            schema=native).to_batches(), contract=contract)
         processing = store.record_processing(dataset=dataset, inputs=[acquisition], outputs={"leaf": leaf},
             processor="native-fixture", code_version=recorder.processor_sha256,
             parameters={"leaf_contract_sha256": leaf_id, "recipe": recipe, "toolchain": toolchain})
@@ -464,10 +463,61 @@ def test_native_footer_preserves_order_type_nullability_and_no_global_metadata(e
             validate_leaf_artifact(destination, ref)
 
 
+@pytest.mark.parametrize('damage', ['schema', 'rows', 'iteration'])
+def test_native_leaf_writer_drops_partial_output_and_never_replaces(edition_fixture, tmp_path, damage):
+    import pyarrow.parquet as pq
+    from teadata.analytical import write_leaf_artifact
+
+    _, ref, original = edition_fixture['leaves']['student']
+    table = pq.read_table(original).replace_schema_metadata(None)
+    output = tmp_path / 'new-leaf.parquet'
+    before = set(tmp_path.iterdir())
+    if damage == 'schema':
+        batches = table.select(['amount']).to_batches()
+    elif damage == 'rows':
+        batches = table.slice(0, 0).to_batches()
+    else:
+        def interrupted():
+            yield from table.to_batches()
+            raise RuntimeError('injected batch interruption')
+        batches = interrupted()
+    with pytest.raises((ContractError, RuntimeError)):
+        write_leaf_artifact(output, batches, contract=ref.contract)
+    assert not output.exists() and set(tmp_path.iterdir()) == before
+    identity = file_identity(original)
+    with pytest.raises(FileExistsError):
+        write_leaf_artifact(original, table.to_batches(), contract=ref.contract)
+    assert file_identity(original) == identity
+
+
+def test_explicit_local_schema3_publisher_uses_one_registry_and_keeps_prior_root(edition_fixture, monkeypatch):
+    from teadata.release import DataRelease, publish_release
+    root = edition_fixture['root']
+    root.unlink()  # hand-authored test root is replaced by the canonical publisher.
+    published = publish_release(root.parent, edition_fixture['catalog'], schema_version=3)
+    assert DataRelease(published, offline=True).verify()
+    before = file_identity(published)
+    with pytest.raises(FileExistsError):
+        publish_release(root.parent, edition_fixture['catalog'], schema_version=3)
+    assert file_identity(published) == before
+    with pytest.raises(ContractError, match='only its catalog'):
+        publish_release(root.parent, edition_fixture['catalog'], artifacts={}, schema_version=3)
+    with pytest.raises(ContractError, match='schema2'):
+        publish_release(root.parent, edition_fixture['catalog'])
+    with pytest.raises(ContractError, match='explicit schema3'):
+        publish_release(root.parent, edition_fixture['catalog'], schema_version=3.0)  # ty: ignore[invalid-argument-type]
+    oversized = deepcopy(edition_fixture['catalog'].to_dict())
+    oversized['description'] = 'x' * (4 * 1024 * 1024)
+    monkeypatch.setattr(edition_fixture['catalog'], 'to_dict', lambda: oversized)
+    with pytest.raises(ContractError, match='too large'):
+        publish_release(root.parent / 'oversized', edition_fixture['catalog'], schema_version=3)
+    assert not (root.parent / 'oversized').exists()
+
+
 def test_exact_same_dataset_revisions_never_choose_latest_or_share_field_cache(edition_fixture, tmp_path):
     import pyarrow as pa
     import pyarrow.parquet as pq
-    from teadata.analytical import LEAF_METADATA
+    from teadata.analytical import write_leaf_artifact
     from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
 
     catalog, store = edition_fixture["catalog"], edition_fixture["store"]
@@ -493,9 +543,9 @@ def test_exact_same_dataset_revisions_never_choose_latest_or_share_field_cache(e
     contract["semantics_sha256"] = _leaf_semantics(metadata, header_records(resource,
         dataset=key.dataset, edition=key.edition, table=key.table, metadata=metadata))
     identity = sha256(canonical_json(contract).encode()).hexdigest()
-    native = pq.read_table(leaf).replace_schema_metadata({LEAF_METADATA: canonical_json({"schema_version": 3, "leaf_contract_sha256": identity}).encode()})
+    native = pq.read_table(leaf).replace_schema_metadata(None)
     output = tmp_path / "reissued.parquet"
-    pq.write_table(native.set_column(2, "amount", pa.array(["7"])), output)
+    write_leaf_artifact(output, native.set_column(2, "amount", pa.array(["7"])).to_batches(), contract=contract)
     old_processing = store.read_record(ref.processing_id)
     processing = store.record_processing(dataset=key.dataset, inputs=[acquisition], outputs={"leaf": output},
         processor=old_processing["processor"], code_version=old_processing["code_version"],
@@ -619,7 +669,7 @@ print(json.dumps({'root_bytes':len(raw), 'editions':len(list(catalog.editions())
 def catalog_with_methodology(edition_fixture, tmp_path, *, suppression=False):
     """Genuine tiny native model leaf and retained method; no scientific data claim."""
     import pyarrow.parquet as pq
-    from teadata.analytical import LEAF_METADATA
+    from teadata.analytical import write_leaf_artifact
     from teadata.column_schema import header_records
     from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
     from teadata.manifest import _leaf_semantics
@@ -646,9 +696,9 @@ def catalog_with_methodology(edition_fixture, tmp_path, *, suppression=False):
         header_records(schema, dataset=key.dataset, edition=key.edition, table=key.table, metadata=metadata))
     contract["policy_sha256"] = sha256(canonical_json(policy.to_dict()).encode()).hexdigest()
     identity = sha256(canonical_json(contract).encode()).hexdigest()
-    native = pq.read_table(leaf).replace_schema_metadata({LEAF_METADATA: canonical_json({"schema_version": 3, "leaf_contract_sha256": identity}).encode()})
+    native = pq.read_table(leaf).replace_schema_metadata(None)
     output = tmp_path / "method-reviewed.parquet"
-    pq.write_table(native, output)
+    write_leaf_artifact(output, native.to_batches(), contract=contract)
     previous = store.read_record(ref.processing_id)
     processing = store.record_processing(dataset=key.dataset, inputs=[*previous["inputs"], method_id], outputs={"leaf": output},
         processor=previous["processor"], code_version=previous["code_version"],
