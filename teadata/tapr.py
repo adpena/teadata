@@ -21,7 +21,8 @@ if TYPE_CHECKING:
     from .values import ValuePolicy
 
 
-TAPR_PROFILE_FAMILIES = ("student_staff_profile", "graduation_profile", "student_profile", "staff_profile")
+TAPR_PROFILE_FAMILIES = ("student_staff_profile", "graduation_profile", "student_profile", "staff_profile",
+                         "reference", "dropout_attendance")
 
 
 def qualified_tapr_family(dataset: str, key_field: str) -> str:

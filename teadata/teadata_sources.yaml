@@ -2191,6 +2191,315 @@ data_sources:
               status: available
               provenance_ids: []
               reviewed_sha256: bf848a6c47d7f5ed783b57d862d4fcaefced1e2988b65b75c13abddcd998ec98
+  campus_tapr_reference:
+    2024:
+      path: data/tapr/raw/2024-c-REF.csv
+      metadata:
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        identifiers: []
+        metrics: {}
+        notes: Source-only independent current-interface REF observation in publisher edition 2024. Every ordered CSV code/label and raw string is retained; names, source identities and historical parent attributes are not entity.meta hydration. Leading literal label years are preserved in reviewed human-readable field names after the already-present Campus/District word. County Number and ESC Region omit only the literal digit-width naming prefix. Field naming does not establish measurement period, unit or equivalence. Table/field period is unknown; no applied value policy, metrics or estimation is selected. Dictionary Type and Length are literal descriptive metadata, not a scientific type, unit, CSV-value width or status rule. DROP_ATT retains 54 undocumented fact fields per scope as unknown definitions; N/D/R and label years do not supply scientific meaning. All original HTTP dates, exact controls, source metadata and annual menu/selection/dictionary/glossary/masking context remain in their
+          immutable receipts. These current report families are not aliases for legacy GRAD or other reports. No default reader, release/app data or enrichment is activated.
+        period:
+          kind: unknown
+        provenance_ids:
+        - 46bd6f225bfb3bc1aaf2a3fd733bb212d2e6ebd19e9e8c81486be15323e37f1b
+        publisher: Texas Education Agency
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          title: Original 2024 campus_tapr_reference CSV; genuine HTTP observation and exact ordered report controls
+          status: available
+          provenance_ids:
+          - 46bd6f225bfb3bc1aaf2a3fd733bb212d2e6ebd19e9e8c81486be15323e37f1b
+          reviewed_sha256: 776f08ecb49cc773b172c7b25525865980cd7290dbf74d792f5fdbd2c4fe2036
+        - provenance_ids:
+          - 2049ed24f8163464e4e287ee1bf0a9b445910f2fb57afd299e8ee4912497e318
+          reference_id: menu
+          reviewed_sha256: db8c40fef108b66a59697ce87ea02d60d32ea8f4e33fe486ec4aac6fa76caa79
+          role: source_notes
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&tapr=all_c&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr.sas
+        - provenance_ids:
+          - b02816ddc39710e8dfc5069e305eca2c83941b88ccd87540438f345f2e116505
+          reference_id: selection
+          reviewed_sha256: 23a597686345412767b6175d2d683f555d534f7e57c85b7a25092860b5600e2f
+          role: source_notes
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&tapr=all_c&ccyy=2024&step=3&bylev=All+Campuses&level=Campus&sumlev=C&id=&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_step_6.sas&dsname=REF
+        - provenance_ids:
+          - 04695f47cfd3cb9d7200f7a844fdca05240e5bd95baffd69cf8194d6841d7e41
+          reference_id: dictionary
+          reviewed_sha256: c0dbed06fe034b68deec7c3b9279f16a3ff4efb0fab0f89a80cf0a3c3f8cf5a2
+          role: data_dictionary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=C&dsname=REF&dd=ref&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reference_id: glossary
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+          role: glossary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+        - provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reference_id: masking
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+          role: masking_methodology
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2024--reference-dropout-attendance-crosswalk.json
+          title: Reviewed complete 2024 REF and DROP_ATT source-only header/layout and dictionary-occurrence contract
+          status: available
+          provenance_ids:
+          - 5637e5e05c575e0f1e83fb84ed4e8dbb3b0df84cba5d7ece5a4c6f1c7420f2a1
+          reviewed_sha256: 14f36f38b4f8fedecbb80577ee5c72a29d0183c7adbe82b12372404360218bb8
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&tapr=all_c&ccyy=2024&step=3&bylev=All+Campuses&level=Campus&sumlev=C&id=&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_step_6.sas&dsname=REF
+        title: 2024 TAPR Campus Reference; current download UI raw observation
+        version: '2024'
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--reference-dropout-attendance-crosswalk.json
+            tapr_source:
+              scope: campus
+              tables:
+                reference: data/tapr/raw/2024-c-REF.csv
+  district_tapr_reference:
+    2024:
+      path: data/tapr/raw/2024-d-REF.csv
+      metadata:
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        identifiers: []
+        metrics: {}
+        notes: Source-only independent current-interface REF observation in publisher edition 2024. Every ordered CSV code/label and raw string is retained; names, source identities and historical parent attributes are not entity.meta hydration. Leading literal label years are preserved in reviewed human-readable field names after the already-present Campus/District word. County Number and ESC Region omit only the literal digit-width naming prefix. Field naming does not establish measurement period, unit or equivalence. Table/field period is unknown; no applied value policy, metrics or estimation is selected. Dictionary Type and Length are literal descriptive metadata, not a scientific type, unit, CSV-value width or status rule. DROP_ATT retains 54 undocumented fact fields per scope as unknown definitions; N/D/R and label years do not supply scientific meaning. All original HTTP dates, exact controls, source metadata and annual menu/selection/dictionary/glossary/masking context remain in their
+          immutable receipts. These current report families are not aliases for legacy GRAD or other reports. No default reader, release/app data or enrichment is activated.
+        period:
+          kind: unknown
+        provenance_ids:
+        - f0841681cbf8e28a91dfe31c9653b04cf4a6d933ad6bf30d334a603362b9d0b7
+        publisher: Texas Education Agency
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          title: Original 2024 district_tapr_reference CSV; genuine HTTP observation and exact ordered report controls
+          status: available
+          provenance_ids:
+          - f0841681cbf8e28a91dfe31c9653b04cf4a6d933ad6bf30d334a603362b9d0b7
+          reviewed_sha256: bf65701800746ccf58dccf1f88853195e08bcd1ae1b9f4eb9fb77a47655d819e
+        - provenance_ids:
+          - 444eec93f8bdea6bfaf5768188ec6efb6463ce30ef95c8da8dc3d682c2ea0df6
+          reference_id: menu
+          reviewed_sha256: 85342018b36c3601c43fe565d18f2e6ef01cc90edb49aa07e45df875bb0df109
+          role: source_notes
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&tapr=all_d&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr.sas
+        - provenance_ids:
+          - e847baa867188d8cca4c71515d4db37cc30bd33d20ac1a5054442f413addb7e1
+          reference_id: selection
+          reviewed_sha256: 1277a0950adf05cccf4d60e1e856430fd9a589c87cf99653e5df3f834857326c
+          role: source_notes
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&tapr=all_d&ccyy=2024&step=3&bylev=All+Districts&level=District&sumlev=D&id=&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_step_6.sas&dsname=REF
+        - provenance_ids:
+          - 7c57a726f029752babaa90e4920977ea4e85d9daa09b57d1372385598794b79e
+          reference_id: dictionary
+          reviewed_sha256: 9430d6132b6a10e2cb33ba60929ee4a68c09e4604cec0f45e4df275091ebc246
+          role: data_dictionary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=D&dsname=REF&dd=ref&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reference_id: glossary
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+          role: glossary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+        - provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reference_id: masking
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+          role: masking_methodology
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2024--reference-dropout-attendance-crosswalk.json
+          title: Reviewed complete 2024 REF and DROP_ATT source-only header/layout and dictionary-occurrence contract
+          status: available
+          provenance_ids:
+          - 5637e5e05c575e0f1e83fb84ed4e8dbb3b0df84cba5d7ece5a4c6f1c7420f2a1
+          reviewed_sha256: 14f36f38b4f8fedecbb80577ee5c72a29d0183c7adbe82b12372404360218bb8
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&tapr=all_d&ccyy=2024&step=3&bylev=All+Districts&level=District&sumlev=D&id=&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_step_6.sas&dsname=REF
+        title: 2024 TAPR District Reference; current download UI raw observation
+        version: '2024'
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--reference-dropout-attendance-crosswalk.json
+            tapr_source:
+              scope: district
+              tables:
+                reference: data/tapr/raw/2024-d-REF.csv
+  campus_tapr_dropout_attendance:
+    2024:
+      path: data/tapr/raw/2024-c-DROP_ATT.csv
+      metadata:
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        identifiers: []
+        metrics: {}
+        notes: Source-only independent current-interface DROP_ATT observation in publisher edition 2024. Every ordered CSV code/label and raw string is retained; names, source identities and historical parent attributes are not entity.meta hydration. Leading literal label years are preserved in reviewed human-readable field names after the already-present Campus/District word. County Number and ESC Region omit only the literal digit-width naming prefix. Field naming does not establish measurement period, unit or equivalence. Table/field period is unknown; no applied value policy, metrics or estimation is selected. Dictionary Type and Length are literal descriptive metadata, not a scientific type, unit, CSV-value width or status rule. DROP_ATT retains 54 undocumented fact fields per scope as unknown definitions; N/D/R and label years do not supply scientific meaning. All original HTTP dates, exact controls, source metadata and annual menu/selection/dictionary/glossary/masking context remain
+          in their immutable receipts. These current report families are not aliases for legacy GRAD or other reports. No default reader, release/app data or enrichment is activated.
+        period:
+          kind: unknown
+        provenance_ids:
+        - 35a1fd68ec12257cf38a835a3cd63a8676affd81d1d4381c2c513b13ae2b0a0c
+        publisher: Texas Education Agency
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          title: Original 2024 campus_tapr_dropout_attendance CSV; genuine HTTP observation and exact ordered report controls
+          status: available
+          provenance_ids:
+          - 35a1fd68ec12257cf38a835a3cd63a8676affd81d1d4381c2c513b13ae2b0a0c
+          reviewed_sha256: d2a5e304b25d908274693e77310db8046d48426950e087edbde856d009d17b82
+        - provenance_ids:
+          - 2049ed24f8163464e4e287ee1bf0a9b445910f2fb57afd299e8ee4912497e318
+          reference_id: menu
+          reviewed_sha256: db8c40fef108b66a59697ce87ea02d60d32ea8f4e33fe486ec4aac6fa76caa79
+          role: source_notes
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&tapr=all_c&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr.sas
+        - provenance_ids:
+          - b1da5ea79591ccf06971fe2c884b87b3a1532f51da59d725dbca1fd6c4af7d38
+          reference_id: selection
+          reviewed_sha256: 46b22cb476660278180174c816c42314b11a8b4d05d6945ab4fbce1d293101e1
+          role: source_notes
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&tapr=all_c&ccyy=2024&step=3&bylev=All+Campuses&level=Campus&sumlev=C&id=&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_step_6.sas&dsname=DROP_ATT
+        - provenance_ids:
+          - 11b0ff28b690f7feea3f7b0eb8aa2f878752dc3d880730ad63609aa6d057f1b6
+          reference_id: dictionary
+          reviewed_sha256: 545e320ba8a525ed833e9f3b6923ccb2b3f21ff08b4bb736bfca70f298104714
+          role: data_dictionary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=C&dsname=DROP_ATT&dd=attendgrad&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reference_id: glossary
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+          role: glossary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+        - provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reference_id: masking
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+          role: masking_methodology
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2024--reference-dropout-attendance-crosswalk.json
+          title: Reviewed complete 2024 REF and DROP_ATT source-only header/layout and dictionary-occurrence contract
+          status: available
+          provenance_ids:
+          - 5637e5e05c575e0f1e83fb84ed4e8dbb3b0df84cba5d7ece5a4c6f1c7420f2a1
+          reviewed_sha256: 14f36f38b4f8fedecbb80577ee5c72a29d0183c7adbe82b12372404360218bb8
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&tapr=all_c&ccyy=2024&step=3&bylev=All+Campuses&level=Campus&sumlev=C&id=&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_step_6.sas&dsname=DROP_ATT
+        title: 2024 TAPR Attendance, Chronic Absenteeism, and Annual Dropout; current download UI raw observation
+        version: '2024'
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--reference-dropout-attendance-crosswalk.json
+            tapr_source:
+              scope: campus
+              tables:
+                dropout_attendance: data/tapr/raw/2024-c-DROP_ATT.csv
+  district_tapr_dropout_attendance:
+    2024:
+      path: data/tapr/raw/2024-d-DROP_ATT.csv
+      metadata:
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        identifiers: []
+        metrics: {}
+        notes: Source-only independent current-interface DROP_ATT observation in publisher edition 2024. Every ordered CSV code/label and raw string is retained; names, source identities and historical parent attributes are not entity.meta hydration. Leading literal label years are preserved in reviewed human-readable field names after the already-present Campus/District word. County Number and ESC Region omit only the literal digit-width naming prefix. Field naming does not establish measurement period, unit or equivalence. Table/field period is unknown; no applied value policy, metrics or estimation is selected. Dictionary Type and Length are literal descriptive metadata, not a scientific type, unit, CSV-value width or status rule. DROP_ATT retains 54 undocumented fact fields per scope as unknown definitions; N/D/R and label years do not supply scientific meaning. All original HTTP dates, exact controls, source metadata and annual menu/selection/dictionary/glossary/masking context remain
+          in their immutable receipts. These current report families are not aliases for legacy GRAD or other reports. No default reader, release/app data or enrichment is activated.
+        period:
+          kind: unknown
+        provenance_ids:
+        - e05111f5db6e9b6e6477a4ac38b7a2e38c694f94312e5fa20c7082125fe863af
+        publisher: Texas Education Agency
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          title: Original 2024 district_tapr_dropout_attendance CSV; genuine HTTP observation and exact ordered report controls
+          status: available
+          provenance_ids:
+          - e05111f5db6e9b6e6477a4ac38b7a2e38c694f94312e5fa20c7082125fe863af
+          reviewed_sha256: 6421df3cd1fedc88f4c243808b2f22749126d0355f86d973cba1d598b531adec
+        - provenance_ids:
+          - 444eec93f8bdea6bfaf5768188ec6efb6463ce30ef95c8da8dc3d682c2ea0df6
+          reference_id: menu
+          reviewed_sha256: 85342018b36c3601c43fe565d18f2e6ef01cc90edb49aa07e45df875bb0df109
+          role: source_notes
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&tapr=all_d&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr.sas
+        - provenance_ids:
+          - eadb93fd787ebfcfb1cb7cce62b398a4a8108527fa80e9d6c413a1392dae14a8
+          reference_id: selection
+          reviewed_sha256: 00489756462867f76586af0be87d9d627c23da1fcc23d49a7c87021af2f411ac
+          role: source_notes
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&tapr=all_d&ccyy=2024&step=3&bylev=All+Districts&level=District&sumlev=D&id=&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_step_6.sas&dsname=DROP_ATT
+        - provenance_ids:
+          - 7c8b5a5cceb358dcad723ce67bb186d45b285322747f2ceaab3d1a5390b68195
+          reference_id: dictionary
+          reviewed_sha256: 3612dc3be5f6de377d3fd3ae19bd8237bf74821bf2364738c903c9f1bda3d5c1
+          role: data_dictionary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=D&dsname=DROP_ATT&dd=attendgrad&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reference_id: glossary
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+          role: glossary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+        - provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reference_id: masking
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+          role: masking_methodology
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2024--reference-dropout-attendance-crosswalk.json
+          title: Reviewed complete 2024 REF and DROP_ATT source-only header/layout and dictionary-occurrence contract
+          status: available
+          provenance_ids:
+          - 5637e5e05c575e0f1e83fb84ed4e8dbb3b0df84cba5d7ece5a4c6f1c7420f2a1
+          reviewed_sha256: 14f36f38b4f8fedecbb80577ee5c72a29d0183c7adbe82b12372404360218bb8
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&tapr=all_d&ccyy=2024&step=3&bylev=All+Districts&level=District&sumlev=D&id=&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_step_6.sas&dsname=DROP_ATT
+        title: 2024 TAPR Attendance, Chronic Absenteeism, and Annual Dropout; current download UI raw observation
+        version: '2024'
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--reference-dropout-attendance-crosswalk.json
+            tapr_source:
+              scope: district
+              tables:
+                dropout_attendance: data/tapr/raw/2024-d-DROP_ATT.csv
+
   campus_tapr_historical_enrollment:
     2015:
       path: data/tapr/CAMPPROF_2014-2015_FINAL.xlsx
@@ -2776,6 +3085,14 @@ schema:
     campus_tapr_graduation_profile:
     - csv
     district_tapr_graduation_profile:
+    - csv
+    campus_tapr_reference:
+    - csv
+    district_tapr_reference:
+    - csv
+    campus_tapr_dropout_attendance:
+    - csv
+    district_tapr_dropout_attendance:
     - csv
     campus_tapr_historical_enrollment:
     - xlsx

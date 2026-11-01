@@ -424,7 +424,7 @@ def test_explicit_raw_derivation_reference_preserves_original_receipt_and_reject
 def test_all_prior_dataset_contracts_bindings_options_and_defaults_stay_pinned():
     after = yaml.safe_load((ROOT / 'teadata/teadata_sources.yaml').read_bytes())
     new = {scope + '_tapr_' + family for scope in ['campus', 'district']
-           for family in ['student_profile', 'staff_profile']}
+           for family in ['student_profile', 'staff_profile', 'reference', 'dropout_attendance']}
     previous = {key: after[key] for key in ['spatial', 'metric_bindings', 'options']}
     previous['data_sources'] = {key: value for key, value in after['data_sources'].items() if key not in new}
     # Only the two explicitly selected PROF source profiles change metadata.

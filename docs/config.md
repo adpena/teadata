@@ -414,6 +414,26 @@ not additional metric keys or automatic `.meta` hydration. No current geometry
 roster limits source coverage. Unknown field units and reference periods remain
 unknown; the existing qualified metric bindings retain their lagged periods.
 
+The 2024 `campus_tapr_reference` / `district_tapr_reference` and
+`campus_tapr_dropout_attendance` / `district_tapr_dropout_attendance` branches
+are also source-only. Select `reader_profile="source"` explicitly to discover
+their complete 22/12 and 166/164 ordered fields. One reviewed crosswalk binds
+the exact two CSV header records, finite data ranges, original raw checksums
+and dictionary occurrences. Human-readable field names retain a leading label
+year after its literal Campus/District word; `county_number` and `esc_region`
+omit only the label's digit-width naming prefix. The original codes, labels
+and years remain available through `header_records` / `header_mapping`.
+
+All 54 undocumented DROP_ATT fact columns per scope remain present with unknown
+type and definition. Every field period is unknown, with no metric, estimation
+or applied value policy; interpretation therefore fails rather than assigning
+a status from `N`/`D`/`R`, a label year, or a masking-looking string. REF dictionary
+Type/Length values are literal publisher metadata, not scientific types, units
+or CSV-value limits. These current-interface families are independent of legacy
+GRAD. Their original HTTP dates and annual context receipts remain immutable;
+the schema has its own genuine local observation. This registration supplies
+contracts, not prepared outputs, released/default facts or app activation.
+
 One-header 2024 inputs use their complete Name/Type/Length/Label dictionaries;
 2025 inputs declare exact label and code header records. Any preamble, note,
 blank gap or footer must have reviewed CSV-record coordinates and an exact
