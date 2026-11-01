@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+import base64
 from datetime import date, datetime
+from hashlib import sha256
+import json
 from typing import Any, Mapping
 from urllib.parse import urlparse
 
@@ -47,6 +50,170 @@ def validate_http_url(value: str | None) -> None:
         or parsed.password
     ):
         raise ValueError("Source URLs must use HTTP(S) without credentials")
+
+
+def _digest_text(value: Any) -> str:
+    if not isinstance(value, str) or len(value) != 64 or any(c not in "0123456789abcdef" for c in value):
+        raise ValueError("Expected a SHA-256 identity")
+    return value
+
+
+def _record_json(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
+
+
+@dataclass(frozen=True)
+class EditionKey:
+    """Exact source revision, separate from publisher edition and leaf identity."""
+
+    dataset: str
+    edition: str
+    revision_sha256: str
+    scope: str
+    table: str
+    grain: str
+
+    def __post_init__(self) -> None:
+        _digest_text(self.revision_sha256)
+        if any(not isinstance(value, str) or not value.strip()
+               for value in (self.dataset, self.edition, self.scope, self.table, self.grain)):
+            raise ValueError("Edition keys require explicit dataset/edition/scope/table/grain")
+
+    @staticmethod
+    def source_revision(input_sha256: tuple[str, ...]) -> str:
+        """Ordered upstream bytes, independent of receipts, time and this key."""
+        if not input_sha256:
+            raise ValueError("A source revision requires input bytes")
+        return sha256(_record_json(list(dict.fromkeys(_digest_text(v) for v in input_sha256))).encode()).hexdigest()
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, Any]) -> EditionKey:
+        _known_fields(raw, set(cls.__dataclass_fields__), "edition key")
+        return cls(**raw)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+    @property
+    def identity(self) -> str:
+        return sha256(_record_json(self.to_dict()).encode()).hexdigest()
+
+
+@dataclass(frozen=True)
+class ArtifactRef:
+    """Transport bytes plus an independent, immutable native leaf contract.
+
+    Contract JSON contains no file hash, final receipt or root identity. The
+    native Arrow schema is opaque serialized IPC until selected opening.
+    """
+
+    edition: EditionKey
+    sha256: str
+    size_bytes: int
+    location: str
+    contract_json: str
+    processing_id: str
+    output: str
+
+    def __post_init__(self) -> None:
+        _digest_text(self.sha256)
+        _digest_text(self.processing_id)
+        if type(self.size_bytes) is not int or self.size_bytes <= 0 or not isinstance(self.output, str) or not self.output:
+            raise ValueError("Artifact references require bytes and a processing output")
+        if not isinstance(self.location, str) or not self.location:
+            raise ValueError("Artifact location is required")
+        if "://" in self.location:
+            validate_http_url(self.location)
+        elif (self.location in {".", ".."} or "/" in self.location or "\\" in self.location
+              or ":" in self.location):
+            raise ValueError("Artifact location must be an adjacent filename or explicit HTTP(S) URL")
+        contract = json.loads(self.contract_json)
+        required = {"edition", "schema", "schema_sha256", "columns", "key_columns", "rows", "inputs", "mapping_sha256",
+                    "recipe_sha256", "policy_sha256", "semantics_sha256", "producer"}
+        if not isinstance(contract, dict) or set(contract) != required or contract["edition"] != self.edition.to_dict():
+            raise ValueError("Leaf contract does not bind its exact edition")
+        schema = base64.b64decode(contract["schema"], validate=True)
+        if not schema or sha256(schema).hexdigest() != _digest_text(contract["schema_sha256"]):
+            raise ValueError("Leaf native schema identity mismatch")
+        columns = contract["columns"]
+        if (not isinstance(columns, list) or not columns
+                or any(not isinstance(v, str) or not v for v in columns) or len(set(columns)) != len(columns)):
+            raise ValueError("Leaf contract requires ordered native columns")
+        keys = contract["key_columns"]
+        if (not isinstance(keys, list) or not keys or any(not isinstance(k, str) for k in keys)
+                or len(set(keys)) != len(keys) or not set(keys) <= set(columns)):
+            raise ValueError("Leaf grain requires explicit ordered native key columns")
+        if type(contract["rows"]) is not int or contract["rows"] < 0:
+            raise ValueError("Leaf row count must be a nonnegative integer")
+        inputs = contract["inputs"]
+        if not isinstance(inputs, list) or not inputs:
+            raise ValueError("Leaf contract requires upstream input hashes")
+        for digest in [*inputs, contract["mapping_sha256"], contract["recipe_sha256"], contract["semantics_sha256"]]:
+            _digest_text(digest)
+        if contract["policy_sha256"] is not None:
+            _digest_text(contract["policy_sha256"])
+        producer = contract["producer"]
+        if (not isinstance(producer, dict) or set(producer) != {"code_sha256", "toolchain"}
+                or not isinstance(producer["toolchain"], dict) or not producer["toolchain"]
+                or any(not isinstance(k, str) or not isinstance(v, str) or not v
+                       for k, v in producer["toolchain"].items())):
+            raise ValueError("Leaf producer requires code and actual toolchain identities")
+        _digest_text(producer["code_sha256"])
+        object.__setattr__(self, "contract_json", _record_json(contract))
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, Any]) -> ArtifactRef:
+        if set(raw) != {"edition", "sha256", "size_bytes", "location", "contract", "processing_id", "output", "format"} or raw["format"] != "parquet":
+            raise ValueError("Unsupported artifact descriptor")
+        return cls(EditionKey.from_dict(raw["edition"]), raw["sha256"], raw["size_bytes"], raw["location"],
+                   _record_json(raw["contract"]), raw["processing_id"], raw["output"])
+
+    @property
+    def contract(self) -> dict[str, Any]:
+        return json.loads(self.contract_json)
+
+    @property
+    def identity(self) -> str:
+        return sha256(self.contract_json.encode()).hexdigest()
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"edition": self.edition.to_dict(), "sha256": self.sha256, "size_bytes": self.size_bytes,
+                "location": self.location, "contract": self.contract, "format": "parquet",
+                "processing_id": self.processing_id, "output": self.output}
+
+
+@dataclass(frozen=True)
+class FieldBinding:
+    """Physical projection for one exact qualified field; semantics stay canonical."""
+
+    edition_id: str
+    field: str
+    artifact_id: str
+    column: str
+    dependencies: tuple[tuple[str, str], ...] = ()
+
+    def __post_init__(self) -> None:
+        _digest_text(self.edition_id)
+        _digest_text(self.artifact_id)
+        if any(not isinstance(v, str) or not v for v in (self.field, self.column)):
+            raise ValueError("Field bindings require explicit public and physical columns")
+        if (not isinstance(self.dependencies, tuple) or len(set(self.dependencies)) != len(self.dependencies)
+                or any(not isinstance(pair, tuple) or len(pair) != 2 or not isinstance(pair[1], str)
+                       or not pair[1] for pair in self.dependencies)):
+            raise ValueError("Field dependencies require distinct qualified field pairs")
+        for edition, _ in self.dependencies:
+            _digest_text(edition)
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, Any]) -> FieldBinding:
+        if set(raw) != {"edition_id", "field", "artifact_id", "column", "dependencies"}:
+            raise ValueError("Invalid field binding")
+        return cls(raw["edition_id"], raw["field"], raw["artifact_id"], raw["column"],
+                   tuple(tuple(pair) for pair in raw["dependencies"]))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"edition_id": self.edition_id, "field": self.field, "artifact_id": self.artifact_id,
+                "column": self.column, "dependencies": [list(pair) for pair in self.dependencies]}
 
 
 @dataclass(frozen=True)

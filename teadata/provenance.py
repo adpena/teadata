@@ -12,7 +12,7 @@ import json
 import os
 from pathlib import Path
 import tempfile
-from typing import Any, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence
 
 from .dataset_metadata import DatasetMetadata, ResolvedDataset, validate_http_url
 
@@ -57,6 +57,77 @@ def _publish_once(temporary: Path, destination: Path) -> None:
             raise ValueError(
                 f"Conflicting immutable provenance file: {destination.name}"
             )
+
+
+def validate_reference_records(source: ResolvedDataset, read_record: Callable[[str], Mapping[str, Any]],
+                               *, verify_all_claimed: bool = False) -> None:
+    """Validate acquisition-only metadata edges without opening artifacts."""
+    from .manifest import ContractError
+    for identifier in source.metadata.provenance_ids:
+        if read_record(identifier).get("kind") != "acquisition":
+            raise ContractError("Source metadata provenance_ids require acquisition receipts")
+    for reference in source.metadata.references:
+        for identifier in reference.provenance_ids:
+            if read_record(identifier).get("kind") != "acquisition":
+                raise ContractError("Reference receipt is not an acquisition")
+        if reference.status != "available" and not (verify_all_claimed and reference.provenance_ids):
+            continue
+        if not reference.provenance_ids:
+            raise ContractError(f"Reference document {reference.reference_id} needs an acquisition receipt")
+        for identifier in reference.provenance_ids:
+            record = read_record(identifier)
+            if reference.reviewed_sha256 is not None and record.get("artifact", {}).get("sha256") != reference.reviewed_sha256:
+                raise ContractError("Reference bytes differ from reviewed methodology")
+            if reference.url not in {record.get("requested_url"), record.get("resolved_url"),
+                                     record.get("source_metadata", {}).get("source_url")}:
+                raise ContractError("Reference receipt belongs to a different URL")
+
+
+def validate_record_graph(read_record: Callable[[str], Mapping[str, Any]],
+                          record_ids: Sequence[str]) -> dict[str, dict[str, Any]]:
+    """Canonical pure receipt/typed-reference closure, shared by store and catalog."""
+    records: dict[str, dict[str, Any]] = {}
+    pending: set[str] = set()
+
+    def visit(identifier: str) -> None:
+        _identifier(identifier)
+        if identifier in records:
+            return
+        if identifier in pending:
+            raise ValueError("Provenance records contain a cycle")
+        pending.add(identifier)
+        record = dict(read_record(identifier))
+        if sha256(_canonical(record)).hexdigest() != identifier:
+            raise ValueError("Provenance receipt identity mismatch")
+        if record.get("schema_version") != 1 or record.get("kind") not in {"acquisition", "processing"}:
+            raise ValueError("Unsupported provenance record schema")
+        if record["kind"] == "acquisition":
+            artifacts = [record["artifact"]]
+            metadata = DatasetMetadata.from_dict(record["source_metadata"])
+            dependencies = [*metadata.provenance_ids,
+                            *(value for ref in metadata.references for value in ref.provenance_ids)]
+        else:
+            artifacts = list(record["outputs"].values())
+            metadata = None
+            dependencies = record["inputs"]
+            if not artifacts or not dependencies or not record.get("processor") or not record.get("code_version"):
+                raise ValueError("Incomplete processing receipt")
+        for dependency in dependencies:
+            visit(dependency)
+        for artifact in artifacts:
+            _identifier(artifact["sha256"])
+            if type(artifact.get("size_bytes")) is not int or artifact["size_bytes"] < 0:
+                raise ValueError("Invalid provenance artifact size")
+        if metadata is not None:
+            validate_reference_records(ResolvedDataset(record["dataset"], record["section"],
+                record["requested_year"], record["resolved_year"], "", metadata), read_record,
+                verify_all_claimed=True)
+        pending.remove(identifier)
+        records[identifier] = record
+
+    for identifier in record_ids:
+        visit(identifier)
+    return records
 
 
 class ProvenanceStore:
@@ -249,42 +320,16 @@ class ProvenanceStore:
         exist outside the original configuration directory. Ordinary source
         builds still validate their selected local paths separately.
         """
-        from .manifest import verify_reference_receipts
-
-        records: dict[str, dict[str, Any]] = {}
-        pending: set[str] = set()
-
-        def visit(identifier: str) -> None:
-            if identifier in records:
-                return
-            if identifier in pending:
-                raise ValueError("Provenance records contain a cycle")
-            pending.add(identifier)
-            record = self.read_record(identifier)
+        records = validate_record_graph(self.read_record, record_ids)
+        for record in records.values():
             if record["kind"] == "acquisition":
                 artifacts = [record["artifact"]]
-                metadata = DatasetMetadata.from_dict(record["source_metadata"])
-                dependencies = [*metadata.provenance_ids,
-                                *(item for ref in metadata.references for item in ref.provenance_ids)]
             else:
                 artifacts = list(record["outputs"].values())
-                metadata = None
-                dependencies = record["inputs"]
-            for dependency in dependencies:
-                visit(dependency)
             for artifact in artifacts:
                 path = self.verify_artifact(artifact["sha256"])
                 if path.stat().st_size != artifact["size_bytes"]:
                     raise ValueError("Provenance artifact size differs from its receipt")
-            if metadata is not None:
-                verify_reference_receipts(ResolvedDataset(record["dataset"], record["section"],
-                    record["requested_year"], record["resolved_year"], "", metadata),
-                    self, check_local_paths=False, verify_all_claimed=True)
-            pending.remove(identifier)
-            records[identifier] = record
-
-        for identifier in record_ids:
-            visit(identifier)
         return records
 
     def copy_record_from(self, source: ProvenanceStore, record_id: str) -> None:

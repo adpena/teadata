@@ -14,6 +14,7 @@ from typing import Any, TYPE_CHECKING
 
 from .manifest import ContractError, DatasetCatalog, canonical_json
 from .values import Measurement, ValueStatus, presentation_value
+from .dataset_metadata import ArtifactRef
 
 if TYPE_CHECKING:
     import pyarrow as pa
@@ -22,6 +23,7 @@ if TYPE_CHECKING:
 
 ANALYTICAL_SCHEMA_VERSION = 2
 ANALYTICAL_METADATA = b"teadata.analytical"
+LEAF_METADATA = b"teadata.leaf"
 ANALYTICAL_TABLES = {
     "campus_analytics": ("cells", "campus"),
     "district_analytics": ("cells", "district"),
@@ -379,6 +381,28 @@ def validate_artifact(path: str | Path, catalog: DatasetCatalog, role: str,
                    for key in ("python", "pyarrow"))):
         raise ContractError("Analytical artifact producer inputs are missing or inconsistent")
     return document
+
+
+def validate_leaf_artifact(path: str | Path, descriptor: ArtifactRef) -> None:
+    """Open only a selected v3 leaf; legacy footer validation stays separate."""
+    import base64
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    contract = descriptor.contract
+    try:
+        parquet = pq.ParquetFile(path)
+        schema = parquet.schema_arrow
+        document = json.loads((schema.metadata or {})[LEAF_METADATA])
+        expected = pa.ipc.read_schema(pa.BufferReader(base64.b64decode(contract["schema"], validate=True)))
+        if (document != {"schema_version": 3, "leaf_contract_sha256": descriptor.identity}
+                or expected.metadata is not None or set(schema.metadata or {}) != {LEAF_METADATA}
+                or not schema.remove_metadata().equals(expected, check_metadata=True)
+                or schema.names != contract["columns"] or parquet.metadata.num_rows != contract["rows"]
+                or not set(contract["key_columns"]) <= set(schema.names)):
+            raise ValueError("Foreign leaf contract, native schema, row count or grain")
+    except (KeyError, TypeError, ValueError, OSError) as error:
+        raise ContractError(f"Invalid selected leaf: {error}") from error
 
 
 def analytical_dataset(path: str | Path, catalog: DatasetCatalog, role: str,

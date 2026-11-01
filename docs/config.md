@@ -577,6 +577,44 @@ when the complete set is not emitted. Changed-observation examples include the
 canonical entity key, old/new raw tokens and statuses, in key order within each
 publisher code; exact totals and originals remain available.
 
+### Unreleased opt-in edition catalog reader
+
+Schema 3 is an explicit contract/reader API. Existing bundle writers still emit
+schemas 1/2, and published 0.0.126 and app defaults are unchanged. This API does
+not publish a schema 3 release or establish all-family/year coverage.
+
+`BuildRecorder.leaf_contract(...)` derives interpretation and selected mapping
+identities from the same Config/crosswalk authorities. A native writer supplies
+metadata-free Arrow IPC schema bytes, ordered physical columns and **explicit
+ordered key columns**, row count, input hashes, recipe and actual toolchain.
+The contract excludes final file SHA, processing receipt and root/footer
+metadata. After writing the `teadata.leaf` footer and recording the file through
+`ProvenanceStore.record_processing`, whose parameters bind `leaf_contract_sha256`,
+`recipe` and `toolchain`, register the exact `ArtifactRef` with
+`record_edition(...)`; `catalog(schema_version=3)` is opt-in. The source revision
+is derived from ordered upstream bytes, independently of edition text and leaf
+transform identity. These are separate from observation dates and transport URLs.
+
+On a loaded schema 3 `DatasetCatalog`, `editions(...)` and `variables(...)` yield
+detached registered metadata; `resolve_artifacts([(edition_key, field), ...])`
+returns descriptors and physical projections including declared keys and
+dependencies. These calls perform no artifact I/O. An explicit `period=DataPeriod(...)`
+requires exact known coverage; unknown fields remain discoverable without
+invented units/policies. Scalar interpretation is not added by this native
+reader. `metadata`, `policy`, `field_metadata` and crosswalk projections require
+an exact `EditionKey` when a unique match cannot be established. Schema 2 does
+not invent a complete index by consulting current configuration.
+
+`DataRelease(uri, expected_sha256=pin, offline=True)` verifies the selected root
+in the existing URI cache slot and forbids root and leaf downloads. A missing or
+corrupt pinned root fails even with leaves cached. `artifact(artifact_id)` and
+`analytical_dataset(artifact_id)` open only selected schema 3 leaves, validating
+their own contract, native types/nullability, row count and grain. Legacy role
+and global-footer checks remain strict for schemas 1/2. The root limit remains
+4 MiB; the index covers its registered editions, with no claim that arbitrary
+future history fits this in-memory envelope. `verify()` explicitly opens every
+registered artifact and is not a discovery operation.
+
 Relative `data/...` paths in the source contract also honor `TEADATA_DATA_DIR`. Other relative paths remain relative to the configuration file. `uv run python -m teadata.load_data` reads the selected contracts, stages a complete release, and activates `teadata/.cache/release.json` after validation. There is no second cache mirror or developer-checkout copy.
 
 The Excel styling example takes a workbook path rather than referring to an

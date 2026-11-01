@@ -16,7 +16,7 @@ from urllib.request import urlopen
 
 from platformdirs import user_cache_path
 
-from .analytical import ANALYTICAL_DATASETS, ANALYTICAL_ROLES, analytical_dataset, validate_artifact
+from .analytical import ANALYTICAL_DATASETS, ANALYTICAL_ROLES, analytical_dataset, validate_artifact, validate_leaf_artifact
 from .dataset_metadata import validate_http_url
 from .manifest import (
     ContractError,
@@ -58,16 +58,16 @@ def _download(url: str, path: Path, *, expected: dict | None = None) -> None:
         ):
             temporary = Path(stream.name)
             size = 0
-            limit = expected["size_bytes"] if expected else 4 * 1024 * 1024
+            digest = sha256()
+            limit = expected.get("size_bytes", 4 * 1024 * 1024) if expected else 4 * 1024 * 1024
             while block := response.read(1024 * 1024):
                 size += len(block)
                 if size > limit:
                     raise ContractError("Download exceeds the declared artifact size")
                 stream.write(block)
-        if expected and any(
-            file_identity(temporary)[key] != expected[key]
-            for key in ("sha256", "size_bytes")
-        ):
+                digest.update(block)
+        observed = {"sha256": digest.hexdigest(), "size_bytes": size}
+        if expected and any(observed[key] != expected[key] for key in ("sha256", "size_bytes") if key in expected):
             raise ContractError("Downloaded artifact checksum or size mismatch")
         os.replace(temporary, path)
     finally:
@@ -78,28 +78,51 @@ def _download(url: str, path: Path, *, expected: dict | None = None) -> None:
 class DataRelease:
     """A complete bundle with one catalog and content hashes for every artifact."""
 
-    def __init__(self, manifest: str | Path):
+    def __init__(self, manifest: str | Path, *, expected_sha256: str | None = None, offline: bool = False):
         self.source = str(manifest)
         self.remote = "://" in self.source
         self.cache = Path(user_cache_path("teadata")) / "releases"
+        if expected_sha256 is not None and (not isinstance(expected_sha256, str) or len(expected_sha256) != 64
+                or any(c not in "0123456789abcdef" for c in expected_sha256)):
+            raise ContractError("Manifest pin must be a SHA-256 identity")
+        if type(offline) is not bool:
+            raise ContractError("Offline selection must be explicit boolean")
+        self.offline = offline
         if self.remote:
             validate_http_url(self.source)
             identity = sha256(self.source.encode()).hexdigest()
             path = self.cache / "manifests" / f"{identity}.json"
-            # The configured URL selects the release for this process lifetime.
-            _download(self.source, path)
+            if offline and expected_sha256 is None:
+                raise ContractError("Offline remote roots require an expected manifest SHA-256")
+            # Existing URI slot and content check; never infer a pin from cached leaves.
+            if not offline and (expected_sha256 is None or not path.exists()):
+                _download(self.source, path, expected={"sha256": expected_sha256} if expected_sha256 else None)
         else:
             path = Path(manifest).expanduser().resolve()
         self.path = path
-        raw = path.read_bytes()
+        with path.open("rb") as stream:
+            raw = stream.read(4 * 1024 * 1024 + 1)
         if len(raw) > 4 * 1024 * 1024:
             raise ContractError("Release manifest is too large")
+        if expected_sha256 is not None and sha256(raw).hexdigest() != expected_sha256:
+            raise ContractError("Release manifest checksum differs from its trusted pin")
         document = json.loads(raw)
         version = document.get("schema_version")
+        self._v3 = type(version) is int and version == 3
+        if self._v3:
+            if set(document) != {"schema_version", "catalog"} or document["catalog"].get("schema_version") != 3:
+                raise ContractError("Schema3 roots require one authoritative edition catalog")
+            self.catalog = DatasetCatalog(document["catalog"])
+            self._verified = {}
+            self._verified_bytes: dict[str, tuple[Path, tuple[int, int, int, int]]] = {}
+            return
         expected_roles = {1: ROLES, 2: ANALYTICAL_RELEASE_ROLES}.get(version) if type(version) is int else None
         if expected_roles is None or set(document.get("artifacts", {})) != expected_roles:
             raise ContractError("A release requires the complete artifact set for its schema version")
-        self.catalog = DatasetCatalog(document["catalog"])
+        catalog_document = document["catalog"]
+        if catalog_document.get("schema_version") != 2:
+            raise ContractError("Legacy release roots require a schema2 catalog")
+        self.catalog = DatasetCatalog(catalog_document)
         processing = document.get("processing", {})
         record = processing.get("record", {})
         if (
@@ -138,6 +161,8 @@ class DataRelease:
 
     @property
     def processing(self) -> dict:
+        if self._v3:
+            raise ContractError("Schema3 processing receipts are bound per selected leaf")
         return json.loads(self._processing)
 
     @property
@@ -145,6 +170,32 @@ class DataRelease:
         return self.catalog.build_id
 
     def artifact(self, role: str) -> Path:
+        if self._v3:
+            descriptor = self.catalog.artifact_ref(role)
+            location = descriptor.location
+            remote = "://" in location or self.remote
+            if remote:
+                path = self.cache / "objects" / descriptor.sha256
+                if not path.exists():
+                    if self.offline:
+                        raise ContractError("Selected leaf is not cached for offline use")
+                    _download(location if "://" in location else urljoin(self.source, location), path,
+                              expected={"sha256": descriptor.sha256, "size_bytes": descriptor.size_bytes})
+            else:
+                path = self.path.parent / location
+            state = path.stat()
+            signature = (state.st_ino, state.st_size, state.st_mtime_ns, state.st_ctime_ns)
+            if self._verified_bytes.get(descriptor.sha256) != (path, signature):
+                observed = file_identity(path)
+                if observed["sha256"] != descriptor.sha256 or observed["size_bytes"] != descriptor.size_bytes:
+                    raise ContractError("Selected leaf checksum or size mismatch")
+                self._verified_bytes[descriptor.sha256] = path, signature
+            # Acceptance includes the full immutable descriptor, not merely SHA or a role.
+            semantic = sha256(canonical_json(descriptor.to_dict()).encode()).hexdigest()
+            if self._verified.get(semantic) != (path, signature):
+                validate_leaf_artifact(path, descriptor)
+                self._verified[semantic] = path, signature
+            return path
         if role not in ANALYTICAL_RELEASE_ROLES:
             raise ContractError(f"Unknown artifact role: {role}")
         if role not in self._artifacts:
@@ -153,6 +204,8 @@ class DataRelease:
         if self.remote:
             path = self.cache / "objects" / expected["sha256"]
             if not path.exists():
+                if self.offline:
+                    raise ContractError("Release artifact is not cached for offline use")
                 _download(
                     urljoin(self.source, expected["filename"]), path, expected=expected
                 )
@@ -175,6 +228,8 @@ class DataRelease:
         return path
 
     def verify(self) -> dict[str, Path]:
+        if self._v3:
+            return {identifier: self.artifact(identifier) for identifier in self.catalog.to_dict()["artifacts"]}
         return {role: self.artifact(role) for role in sorted(self._artifacts)}
 
     def analytical_dataset(self, name: str):
@@ -184,6 +239,9 @@ class DataRelease:
         another Arrow consumer. An older release refuses this explicit request;
         it never silently computes a different read model at request time.
         """
+        if self._v3:
+            import pyarrow.dataset as ds
+            return ds.dataset(self.artifact(name), format="parquet")
         try:
             role = ANALYTICAL_DATASETS[name]
         except KeyError as error:
@@ -193,8 +251,8 @@ class DataRelease:
 
 
 @lru_cache(maxsize=4)
-def _load_release(source: str, stamp: int) -> DataRelease:
-    return DataRelease(source)
+def _load_release(source: str, stamp: int, expected_sha256: str | None = None, offline: bool = False) -> DataRelease:
+    return DataRelease(source, expected_sha256=expected_sha256, offline=offline)
 
 
 def current_release() -> DataRelease:
@@ -237,6 +295,8 @@ def publish_release(
     processing: dict,
 ) -> Path:
     """Activate only a complete validated bundle; keep the previous pointer on failure."""
+    if catalog.to_dict().get("schema_version") != 2:
+        raise ContractError("Legacy release publication requires a schema2 catalog")
     if set(artifacts) not in (ROLES, ANALYTICAL_RELEASE_ROLES):
         raise ContractError("Cannot publish an incomplete release")
     directory.mkdir(parents=True, exist_ok=True)
