@@ -252,15 +252,18 @@ def tiny_annual_source(tmp_path, year, *, scope='campus', family='student_profil
     store = ProvenanceStore(tmp_path / 'history')
     raw = store.record_acquisition(path, ResolvedDataset('original local observation', 'data_sources', year, year, '',
         DatasetMetadata(version=str(year))))
+    schema_sha = sha256(schema.read_bytes()).hexdigest()
+    schema_id = store.record_acquisition(schema, ResolvedDataset(dataset + ':schema', 'reference', year, year, '',
+        DatasetMetadata(title='Selected complete synthetic source contract')))
     config = tmp_path / (stem + 'config.json')
     config.write_text(canonical_json({'data_sources': {dataset: {year: {
         'path': path.name, 'metadata': {'version': str(year), 'period': {'kind': 'unknown'}, 'references': [{
             'reference_id': 'csv_headers', 'role': 'source_notes', 'path': path.name,
-            'provenance_ids': [raw], 'reviewed_sha256': table['input_sha256']}]},
+            'provenance_ids': [raw], 'reviewed_sha256': table['input_sha256']}, {
+            'reference_id': 'columns_source', 'role': 'schema', 'path': schema.name,
+            'provenance_ids': [schema_id], 'reviewed_sha256': schema_sha}]},
         'reader': {'profiles': {'source': {'column_schema': schema.name,
-            'tapr_source': {'scope': scope, 'tables': {table_name: path.name}}, 'references': [{
-                'reference_id': 'columns_source', 'role': 'schema', 'path': schema.name,
-                'reviewed_sha256': sha256(schema.read_bytes()).hexdigest()}]}}}}}}}))
+            'tapr_source': {'scope': scope, 'tables': {table_name: path.name}}}}}}}}}))
     return config, store
 
 
@@ -331,12 +334,6 @@ def prepared_cohort(tmp_path, request):
                 entry = document['data_sources'][dataset][str(year)]
                 profile = entry['reader']['profiles']['source']
                 raw_metadata = deepcopy(entry['metadata'])
-                raw_metadata['references'].extend(profile.pop('references'))
-                schema_reference = raw_metadata['references'][-1]
-                schema_path = tmp_path / schema_reference['path']
-                schema_reference['provenance_ids'] = [history.record_acquisition(schema_path,
-                    ResolvedDataset(dataset + ':schema', 'reference', year, year, '',
-                                    DatasetMetadata(title='Selected complete source contract')))]
                 profile['metadata'] = raw_metadata
                 entry['metadata'] = {'version': str(year), 'value_policy': 'legacy',
                     'period': {'kind': 'calendar_year', 'year': year - 1},
@@ -391,6 +388,11 @@ def test_raw_cohort_cli_keeps_all_fields_typed_closure_and_native_selection(prep
     assert result['status'] == 'unpublished_raw_wide_cohort' and result['release_activation'] is False
     assert len(release.verify()) == 4 and len(list(release.catalog.variables())) == 8
     assert set(result['datasets']) == set(inputs)
+    resources = {contract['sha256']: contract['text'].encode() for dataset in inputs
+                 for contract in [cfg.column_contract(dataset, reader_profile='source')]}
+    descriptors = release.catalog.column_schema_refs()
+    assert {ref.sha256: ref.size_bytes for ref in descriptors} == {digest: len(raw) for digest, raw in resources.items()}
+    assert all((output / ref.location).read_bytes() == resources[ref.sha256] for ref in descriptors)
     roots = ProvenanceStore(output / 'provenance')
     for row in result['datasets'].values():
         key = EditionKey.from_dict(row['key'])
@@ -408,6 +410,13 @@ def test_raw_cohort_cli_keeps_all_fields_typed_closure_and_native_selection(prep
         assert release.catalog.metadata(key.dataset, edition=key).period.kind == 'unknown'
         graph = roots.verify_record_closure([row['processing_record_id']])
         assert inputs[key.dataset][0] in graph
+        schema_reference, = [ref for ref in cfg.resolve_dataset(key.dataset, reader_profile='source').metadata.references
+                             if ref.role == 'schema']
+        assert len(schema_reference.provenance_ids) == 1
+        schema_id, = schema_reference.provenance_ids
+        assert graph[schema_id]['kind'] == 'acquisition' and graph[schema_id]['downloaded_at'] is None
+        assert graph[schema_id]['artifact']['sha256'] == schema_reference.reviewed_sha256
+        assert graph[schema_id]['artifact']['size_bytes'] == len(resources[schema_reference.reviewed_sha256])
         if key.dataset in annotations:
             assert graph[annotations[key.dataset]]['kind'] == 'processing'
             assert annotations[key.dataset] in row['inherited_processing_inputs']
