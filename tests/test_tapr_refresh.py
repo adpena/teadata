@@ -5,6 +5,7 @@ from hashlib import sha256
 from io import BytesIO
 import csv
 import json
+import os
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -313,7 +314,9 @@ def test_dictionary_size_guard_precedes_bulk_read_and_closure_copy(tmp_path, mon
         path.write_bytes(raw + b' ')
     else:
         args.max_bytes = len(raw) - 1
-    original_open = Path.open
+    original_fdopen = os.fdopen
+    identity = path.stat()
+    opened = []
     class NoBodyRead:
         def __init__(self, stream):
             self.stream = stream
@@ -325,24 +328,30 @@ def test_dictionary_size_guard_precedes_bulk_read_and_closure_copy(tmp_path, mon
             return self.stream.fileno()
         def read(self, *unused):
             pytest.fail('Oversized dictionary body was read')
-    def guarded_open(selected, *positional, **keywords):
-        if selected == path and positional == ('rb',):
+    def guarded_open(fd, *positional, **keywords):
+        stream = original_fdopen(fd, *positional, **keywords)
+        current = os.fstat(fd)
+        if (current.st_dev, current.st_ino) == (identity.st_dev, identity.st_ino) and positional == ('rb',):
             assert actual_growth, 'Advertised oversize should fail before opening its body'
-            return NoBodyRead(original_open(selected, *positional, **keywords))
-        return original_open(selected, *positional, **keywords)
-    monkeypatch.setattr(Path, 'open', guarded_open)
+            opened.append(True)
+            return NoBodyRead(stream)
+        return stream
+    monkeypatch.setattr(os, 'fdopen', guarded_open)
     def forbidden_copy(*unused):
         pytest.fail('Oversized dictionary reached bulk closure copy')
     monkeypatch.setattr(ProvenanceStore, 'copy_record_from', forbidden_copy)
     with pytest.raises(ValueError, match='exceeds max-bytes'):
         inspect_dictionary(args)
+    assert opened == ([True] if actual_growth else [])
     assert not args.output.exists() and not (args.store / 'records').exists()
 
 
 def test_dictionary_capped_read_binds_actual_bytes_before_any_processing_receipt(tmp_path, monkeypatch):
     raw, store, identifier, args = dictionary_input(tmp_path)
     selected = store.verify_artifact(sha256(raw).hexdigest())
-    original_open = Path.open
+    original_fdopen = os.fdopen
+    identity = selected.stat()
+    reads = []
     class ChangedRead:
         def __init__(self, stream):
             self.stream = stream
@@ -355,13 +364,18 @@ def test_dictionary_capped_read_binds_actual_bytes_before_any_processing_receipt
         def read(self, maximum):
             # Equivalent to same-length source mutation after stat/verification.
             assert maximum == args.max_bytes + 1
+            reads.append(maximum)
             return self.stream.read(maximum).replace(b'>X<', b'>Y<')
-    def changed_open(path, *positional, **keywords):
-        stream = original_open(path, *positional, **keywords)
-        return ChangedRead(stream) if path == selected and positional == ('rb',) else stream
-    monkeypatch.setattr(Path, 'open', changed_open)
+    def changed_open(fd, *positional, **keywords):
+        stream = original_fdopen(fd, *positional, **keywords)
+        current = os.fstat(fd)
+        return (ChangedRead(stream)
+                if (current.st_dev, current.st_ino) == (identity.st_dev, identity.st_ino) and positional == ('rb',)
+                else stream)
+    monkeypatch.setattr(os, 'fdopen', changed_open)
     with pytest.raises(ValueError, match='bytes differ from the selected acquisition'):
         inspect_dictionary(args)
+    assert reads == [args.max_bytes + 1]
     assert not args.output.exists() and not (args.store / 'records').exists()
 
 
