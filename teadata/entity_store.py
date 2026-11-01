@@ -18,13 +18,34 @@ from .identifiers import campus_lookup_key, normalize_campus_lookup_key
 logger = logging.getLogger(__name__)
 
 
-_CAMPUS_SELECT = """
+def _campus_select(*, include_meta: bool) -> str:
+    meta = "c.meta" if include_meta else "NULL AS meta"
+    return f"""
     SELECT c.campus_number, c.campus_number_canon, c.name, c.is_charter, c.is_private,
-           c.enrollment, c.rating, c.aea, c.aea_raw, c.grade_range, c.lon, c.lat, c.meta,
+           c.enrollment, c.rating, c.aea, c.aea_raw, c.grade_range, c.lon, c.lat, {meta},
            d.name, d.district_number, d.district_number_canon,
            c.lookup_key,c.source_namespace,c.source_id,c.id,c.district_id
     FROM campuses c LEFT JOIN districts d ON d.id = c.district_id
 """
+
+
+def _district_select(*, include_meta: bool, lookup: bool = False) -> str:
+    meta = "d.meta" if include_meta else "NULL AS meta"
+    query = f"""
+        SELECT d.name, d.district_number, d.district_number_canon, d.enrollment, d.rating, d.aea, d.aea_raw, {meta},
+               COALESCE(counts.campus_count, 0), COALESCE(counts.has_charter, 0)
+        FROM districts d
+        LEFT JOIN (
+            SELECT district_id,
+                   COUNT(*) AS campus_count,
+                   MAX(CASE WHEN is_charter THEN 1 ELSE 0 END) AS has_charter
+            FROM campuses
+            GROUP BY district_id
+        ) counts ON counts.district_id = d.id
+    """
+    if lookup:
+        query += " WHERE d.district_number_canon = ? OR d.district_number = ?"
+    return query
 
 
 def _campus_record(row, *, include_meta: bool, build_id: str) -> dict[str, Any]:
@@ -159,19 +180,7 @@ def load_district(
     if not path:
         return None
 
-    query = """
-        SELECT d.name, d.district_number, d.district_number_canon, d.enrollment, d.rating, d.aea, d.aea_raw, d.meta,
-               COALESCE(counts.campus_count, 0), COALESCE(counts.has_charter, 0)
-        FROM districts d
-        LEFT JOIN (
-            SELECT district_id,
-                   COUNT(*) AS campus_count,
-                   MAX(CASE WHEN is_charter THEN 1 ELSE 0 END) AS has_charter
-            FROM campuses
-            GROUP BY district_id
-        ) counts ON counts.district_id = d.id
-        WHERE d.district_number_canon = ? OR d.district_number = ?
-    """
+    query = _district_select(include_meta=include_meta, lookup=True)
 
     try:
         with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as conn:
@@ -383,7 +392,7 @@ class EntityStore:
         if conn is None:
             return
         try:
-            for row in conn.execute(_CAMPUS_SELECT):
+            for row in conn.execute(_campus_select(include_meta=include_meta)):
                 yield _campus_record(row, include_meta=include_meta, build_id=self.catalog.build_id)
         except sqlite3.OperationalError as error:
             raise ContractError("Entity store requires the source-qualified campus identity schema; rebuild it") from error
@@ -392,18 +401,7 @@ class EntityStore:
         conn = self._connect()
         if conn is None:
             return []
-        query = """
-            SELECT d.name, d.district_number, d.district_number_canon, d.enrollment, d.rating, d.aea, d.aea_raw, d.meta,
-                   COALESCE(counts.campus_count, 0), COALESCE(counts.has_charter, 0)
-            FROM districts d
-            LEFT JOIN (
-                SELECT district_id,
-                       COUNT(*) AS campus_count,
-                       MAX(CASE WHEN is_charter THEN 1 ELSE 0 END) AS has_charter
-                FROM campuses
-                GROUP BY district_id
-            ) counts ON counts.district_id = d.id
-        """
+        query = _district_select(include_meta=include_meta)
         try:
             rows = conn.execute(query)
         except Exception:
@@ -455,7 +453,7 @@ class EntityStore:
         if conn is None:
             return None
         try:
-            row = conn.execute(_CAMPUS_SELECT + " WHERE c.lookup_key = ?", (key,)).fetchone()
+            row = conn.execute(_campus_select(include_meta=include_meta) + " WHERE c.lookup_key = ?", (key,)).fetchone()
         except sqlite3.OperationalError as error:
             raise ContractError("Entity store requires the source-qualified campus identity schema; rebuild it") from error
         return _campus_record(row, include_meta=include_meta, build_id=self.catalog.build_id) if row else None
@@ -466,19 +464,7 @@ class EntityStore:
         conn = self._connect()
         if conn is None:
             return None
-        query = """
-            SELECT d.name, d.district_number, d.district_number_canon, d.enrollment, d.rating, d.aea, d.aea_raw, d.meta,
-                   COALESCE(counts.campus_count, 0), COALESCE(counts.has_charter, 0)
-            FROM districts d
-            LEFT JOIN (
-                SELECT district_id,
-                       COUNT(*) AS campus_count,
-                       MAX(CASE WHEN is_charter THEN 1 ELSE 0 END) AS has_charter
-                FROM campuses
-                GROUP BY district_id
-            ) counts ON counts.district_id = d.id
-            WHERE d.district_number_canon = ? OR d.district_number = ?
-        """
+        query = _district_select(include_meta=include_meta, lookup=True)
         try:
             row = conn.execute(query, (key, key)).fetchone()
         except Exception:

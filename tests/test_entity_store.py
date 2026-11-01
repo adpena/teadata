@@ -1,3 +1,4 @@
+from contextlib import closing
 import sqlite3
 import uuid
 
@@ -125,6 +126,72 @@ def test_entity_store_get_meta_after_no_meta_lookup(tmp_path, catalog):
     district_with_meta = store.get_district("123456", include_meta=True)
     assert district_with_meta
     assert district_with_meta["meta"]["district_2025_demo"] == "ok"
+
+
+def _read_entity_rows(path, kind, number, accessor, *, include_meta):
+    if accessor == "standalone":
+        row = getattr(entity_store, f"load_{kind}")(
+            number, store_path=path, include_meta=include_meta
+        )
+        assert row is not None
+        return [row]
+    with entity_store.EntityStore(path) as store:
+        if accessor == "point":
+            row = getattr(store, f"get_{kind}")(number, include_meta=include_meta)
+            assert row is not None
+            return [row]
+        plural = "campuses" if kind == "campus" else "districts"
+        return list(getattr(store, f"iter_{plural}")(include_meta=include_meta))
+
+
+@pytest.mark.parametrize("accessor", ["standalone", "point", "iter"])
+@pytest.mark.parametrize("kind,number", [("campus", "123456789"), ("district", "123456")])
+def test_no_meta_readers_do_not_access_either_metadata_column(
+    tmp_path, catalog, monkeypatch, kind, number, accessor
+):
+    path = _build_entity_store(tmp_path, catalog)
+    table = "campuses" if kind == "campus" else "districts"
+    expected = _read_entity_rows(path, kind, number, accessor, include_meta=True)
+    connect = sqlite3.connect
+    denied = []
+
+    def deny_meta(action, table, column, *_):
+        if action == sqlite3.SQLITE_READ and table in {"campuses", "districts"} and column == "meta":
+            denied.append((table, column))
+            return sqlite3.SQLITE_DENY
+        return sqlite3.SQLITE_OK
+
+    def guarded_connect(*args, **kwargs):
+        conn = connect(*args, **kwargs)
+        conn.set_authorizer(deny_meta)
+        return conn
+
+    monkeypatch.setattr(sqlite3, "connect", guarded_connect)
+    rows = _read_entity_rows(path, kind, number, accessor, include_meta=False)
+    assert rows == [{**row, "meta": {}} for row in expected]
+    assert denied == []
+
+    # Prove the guard rejects real column access rather than merely recording SQL.
+    with closing(guarded_connect(path)) as conn:
+        with pytest.raises(sqlite3.DatabaseError, match="prohibited"):
+            conn.execute(f"SELECT meta FROM {table}")
+    assert denied == [(table, "meta")]
+
+
+@pytest.mark.parametrize("accessor", ["standalone", "point", "iter"])
+@pytest.mark.parametrize("kind,number", [("campus", "123456789"), ("district", "123456")])
+def test_entity_readers_still_reject_requested_malformed_metadata(
+    tmp_path, catalog, kind, number, accessor
+):
+    path = _build_entity_store(tmp_path, catalog)
+    table = "campuses" if kind == "campus" else "districts"
+    with closing(sqlite3.connect(path)) as conn:
+        conn.execute(f"UPDATE {table} SET meta = ?", ("{",))
+        conn.commit()
+    rows = _read_entity_rows(path, kind, number, accessor, include_meta=False)
+    assert len(rows) == 1 and rows[0]["meta"] == {}
+    with pytest.raises(entity_store.ContractError, match="malformed or unsupported JSON"):
+        _read_entity_rows(path, kind, number, accessor, include_meta=True)
 
 
 def test_entity_store_meta_keys_limit_does_not_truncate_cache(tmp_path, catalog):
