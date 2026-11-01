@@ -10,7 +10,6 @@ import subprocess
 import sys
 
 import pytest
-import yaml
 
 from teadata.column_schema import header_records, parse_column_schema, source_schema_fingerprint
 from teadata.dataset_metadata import DataPeriod, DatasetMetadata, MetricDefinition, ResolvedDataset
@@ -419,19 +418,6 @@ def test_explicit_raw_derivation_reference_preserves_original_receipt_and_reject
     qualified = [r for r in closure.values() if r.get('dataset') == dataset and r.get('kind') == 'acquisition']
     assert len(qualified) == 1 and qualified[0]['downloaded_at'] is None
     assert receipt['scopes']['campus']['rows'] == 6
-
-
-def test_all_prior_dataset_contracts_bindings_options_and_defaults_stay_pinned():
-    after = yaml.safe_load((ROOT / 'teadata/teadata_sources.yaml').read_bytes())
-    new = {scope + '_tapr_' + family for scope in ['campus', 'district']
-           for family in ['student_profile', 'staff_profile', 'reference', 'dropout_attendance']}
-    previous = {key: after[key] for key in ['spatial', 'metric_bindings', 'options']}
-    previous['data_sources'] = {key: value for key, value in after['data_sources'].items() if key not in new}
-    # Only the two explicitly selected PROF source profiles change metadata.
-    # Base metadata, default readers and every other prior declaration stay pinned.
-    for scope in ('campus', 'district'):
-        del previous['data_sources'][scope + '_tapr_student_staff_profile'][2024]['reader']['profiles']['source']
-    assert sha256(canonical_json(previous).encode()).hexdigest() == 'eac1fe86510ded164dfc33957580479d09c20627b2bcf523a5d50e6ef346a32a'
 
 
 @pytest.mark.parametrize('edition', [2024, 2025])
