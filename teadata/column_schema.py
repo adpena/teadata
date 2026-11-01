@@ -113,7 +113,7 @@ def validate_header_table(table: Mapping[str, Any]) -> None:
             if (not isinstance(record, dict)
                     or not {"ordinal", "code", "publisher_type", "publisher_description"} <= set(record)
                     or set(record) - {"ordinal", "code", "publisher_type", "publisher_description",
-                                     "publisher_length", "source_sha256", "source_line", "source_column"}
+                                     "publisher_length", "publisher_context", "source_sha256", "source_line", "source_column"}
                     or type(record["ordinal"]) is not int or record["ordinal"] != ordinal
                     or not isinstance(record["code"], str) or not record["code"].strip()
                     or any(record.get(key) is not None and (not isinstance(record[key], str) or not record[key].strip())
@@ -125,6 +125,17 @@ def validate_header_table(table: Mapping[str, Any]) -> None:
                     or type(record["source_line"]) is not int or record["source_line"] < 1
                     or type(record["source_column"]) is not int or record["source_column"] < 0):
                 raise ValueError("Invalid publisher dictionary source anchor")
+            if "publisher_context" in record:
+                context = record["publisher_context"]
+                if (not isinstance(context, dict)
+                        or set(context) != {"heading", "source_line", "source_column"}
+                        or not isinstance(context["heading"], str) or not context["heading"].strip()
+                        or type(context["source_line"]) is not int or context["source_line"] < 1
+                        or type(context["source_column"]) is not int or context["source_column"] < 0
+                        or not anchors
+                        or (context["source_line"], context["source_column"])
+                        >= (record["source_line"], record["source_column"])):
+                    raise ValueError("Invalid publisher dictionary context")
             for key in ("publisher_type", "publisher_description", "publisher_length"):
                 value = record.get(key)
                 if value is not None and observed_components.setdefault((record["code"], key), value) != value:
@@ -352,7 +363,13 @@ def header_records(document: Mapping[str, Any], *, dataset: str, edition: str,
                       "mapping_version": document["mapping_version"], "input_sha256": item["input_sha256"],
                       "source_schema_sha256": item["source_schema_sha256"], "period": period.to_dict()}
             if "dictionary_records" in item:
-                record["dictionary_occurrences"] = [dict(row) for row in occurrences.get(field["code"], ())]
+                detached = []
+                for row in occurrences.get(field["code"], ()):
+                    copied = dict(row)
+                    if "publisher_context" in row:
+                        copied["publisher_context"] = dict(row["publisher_context"])
+                    detached.append(copied)
+                record["dictionary_occurrences"] = detached
             result.append(record)
     return result
 

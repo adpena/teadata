@@ -2,10 +2,19 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from hashlib import sha256
 from html.parser import HTMLParser
 from typing import Any
+
+
+@dataclass(frozen=True)
+class TaprPublisherContext:
+    """Literal publisher section heading in the occurrence's source artifact."""
+
+    heading: str
+    source_line: int
+    source_column: int
 
 
 @dataclass(frozen=True)
@@ -19,6 +28,7 @@ class TaprDictionaryOccurrence:
     source_column: int
     source_html: str
     publisher_length: str | None = None
+    publisher_context: TaprPublisherContext | None = None
 
     def column_record(self) -> dict[str, Any]:
         """Project into the existing column-schema occurrence contract.
@@ -32,12 +42,44 @@ class TaprDictionaryOccurrence:
             'source_sha256', 'source_line', 'source_column')}
         if self.publisher_length is not None:
             record['publisher_length'] = self.publisher_length
+        if self.publisher_context is not None:
+            record['publisher_context'] = {
+                'heading': self.publisher_context.heading,
+                'source_line': self.publisher_context.source_line,
+                'source_column': self.publisher_context.source_column,
+            }
         return record
 
 
 def _rendered(parts: list[str]) -> str:
     # HTML presentation whitespace only; punctuation/case/identifiers stay exact.
     return ' '.join(''.join(parts).split())
+
+
+@dataclass
+class _ContextRow:
+    cells: int = 0
+    cell: str | None = None
+    section_like: bool = False
+    heading: bool = False
+    invalid: bool = False
+    tooltip: bool = False
+    start: tuple[int, int] = (0, 0)
+    parts: list[str] = field(default_factory=list)
+
+
+@dataclass
+class _ContextTable:
+    context: TaprPublisherContext | None = None
+    pending: TaprPublisherContext | None = None
+    row: _ContextRow | None = None
+
+    def invalidate(self) -> None:
+        if self.row is not None and self.row.tooltip and self.context is not None:
+            raise ValueError('Ambiguous publisher context row')
+        self.context = self.pending = None
+        if self.row is not None:
+            self.row.invalid = True
 
 
 class _DictionaryParser(HTMLParser):
@@ -56,6 +98,92 @@ class _DictionaryParser(HTMLParser):
         self.display: list[str] = []
         self.loose: list[str] = []
         self.start = (0, 0)
+        self.tables: list[_ContextTable] = []
+        self.publisher_context: TaprPublisherContext | None = None
+
+    def context_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == 'table':
+            if self.tables:
+                self.tables[-1].invalidate()
+            self.tables.append(_ContextTable())
+            return
+        if not self.tables:
+            return
+        table = self.tables[-1]
+        if tag == 'tr':
+            if table.row is not None:
+                table.invalidate()
+            table.row = _ContextRow()
+        elif tag in {'td', 'th'}:
+            row = table.row
+            if row is None:
+                table.invalidate()
+                return
+            if row.cell is not None:
+                table.invalidate()
+            row.cells += 1
+            row.cell = tag
+            classes = [value or '' for name, value in attrs if name == 'class']
+            section_like = any('linecontent' in value.split() for value in classes)
+            if section_like:
+                # A section-like cell mixed with data cannot inherit an old title.
+                if row.tooltip:
+                    table.invalidate()
+                table.context = None
+                row.section_like = True
+                spans = [value or '' for name, value in attrs if name == 'colspan']
+                row.heading = (tag == 'td' and row.cells == 1 and len(classes) == 1
+                               and len(spans) == 1 and spans[0].isascii()
+                               and spans[0].isdigit() and int(spans[0]) > 0)
+                row.start = self.getpos()
+            if row.cells != 1:
+                row.heading = False
+        elif tag in {'br', 'p', 'div'} and table.row is not None and table.row.heading:
+            table.row.parts.append(' ')
+        elif table.row is None and tag not in {'tbody', 'thead'}:
+            table.invalidate()
+
+    def context_endtag(self, tag: str) -> None:
+        if not self.tables:
+            return
+        table = self.tables[-1]
+        row = table.row
+        if tag == 'table':
+            if row is not None:
+                table.invalidate()
+            self.tables.pop()
+        elif tag in {'td', 'th'} and row is not None:
+            if row.cell != tag:
+                table.invalidate()
+            row.cell = None
+        elif tag == 'tr' and row is not None:
+            if row.cell is not None:
+                row.invalid = True
+            heading = _rendered(row.parts)
+            if row.heading and row.cells == 1 and not row.invalid and not row.tooltip and heading:
+                # First title in a contiguous pre-data block is primary. A later
+                # auxiliary row (for example a class label) must not replace it.
+                if table.pending is None:
+                    table.pending = TaprPublisherContext(heading, *row.start)
+                table.context = None
+            elif row.invalid or row.section_like or not row.tooltip:
+                table.invalidate()
+            table.row = None
+        elif tag in {'br', 'p', 'div'} and row is not None and row.heading:
+            row.parts.append(' ')
+
+    def occurrence_context(self) -> TaprPublisherContext | None:
+        if not self.tables:
+            return None
+        table = self.tables[-1]
+        row = table.row
+        if row is None or row.cell is None or row.invalid or row.section_like:
+            table.invalidate()
+            return None
+        row.tooltip = True
+        if table.pending is not None:
+            table.context, table.pending = table.pending, None
+        return table.context
 
     def source_offset(self, position: tuple[int, int]) -> int:
         return self.lines[position[0] - 1] + position[1]
@@ -66,6 +194,8 @@ class _DictionaryParser(HTMLParser):
         if len(class_values) > 1 and any(relevant & set(value.split()) for value in class_values):
             raise ValueError('Ambiguous dictionary class attributes')
         classes = (dict(attrs).get('class') or '').split()
+        if not self.span_depth:
+            self.context_starttag(tag, attrs)
         if tag == 'span' and 'tooltip' in classes:
             if self.span_depth:
                 raise ValueError('Nested dictionary tooltip')
@@ -74,6 +204,7 @@ class _DictionaryParser(HTMLParser):
             self.capture, self.pending = None, None
             self.values, self.display, self.loose = {}, [], []
             self.start = self.getpos()
+            self.publisher_context = self.occurrence_context()
             return
         if not self.span_depth:
             return
@@ -100,6 +231,7 @@ class _DictionaryParser(HTMLParser):
 
     def handle_endtag(self, tag: str) -> None:
         if not self.span_depth:
+            self.context_endtag(tag)
             return
         if tag in {'br', 'p'}:  # Publisher also emits the literal </br> spelling.
             self.handle_data(' ')
@@ -131,6 +263,13 @@ class _DictionaryParser(HTMLParser):
 
     def handle_data(self, data: str) -> None:
         if not self.span_depth:
+            if self.tables:
+                table = self.tables[-1]
+                if table.row is not None and table.row.cell is not None:
+                    if table.row.heading:
+                        table.row.parts.append(data)
+                elif data.strip():
+                    table.invalidate()
             return
         if self.capture is not None:
             self.capture[2].append(data)
@@ -165,6 +304,7 @@ class _DictionaryParser(HTMLParser):
             source_line=self.start[0], source_column=self.start[1],
             source_html=self.text[self.source_offset(self.start):end + 1],
             publisher_length=self.values.get('Length'),
+            publisher_context=self.publisher_context,
         ))
 
 
@@ -175,6 +315,8 @@ def extract_tapr_dictionary(raw: bytes, *, encoding: str) -> tuple[TaprDictionar
     bound or scientific unit. Encoding is explicit; decoding errors and
     ambiguous/truncated tooltip structure fail. Rendered text normalizes
     presentation whitespace only.
+    An unambiguous table-scoped section title is optional literal context,
+    never an inferred reference period, unit, policy or methodological claim.
     Original decoded HTML slices and raw SHA remain available. Duplicate codes
     and conflicting definitions remain separate observations; column_schema
     owns whether those observations can document reviewed source fields.

@@ -211,7 +211,8 @@ def test_acquire_no_redirect_handler_rejects_followup():
 
 
 @pytest.mark.parametrize('length', [None, '002'])
-def test_dictionary_cli_keeps_partial_occurrences_and_exact_retained_history_offline(tmp_path, monkeypatch, capsys, length):
+@pytest.mark.parametrize('with_context', [False, True])
+def test_dictionary_cli_keeps_partial_occurrences_and_exact_retained_history_offline(tmp_path, monkeypatch, capsys, length, with_context):
     def forbidden(*args, **kwargs):
         pytest.fail('Dictionary inspection attempted HTTP')
     monkeypatch.setattr('teadata.scripts.refresh_tapr.AcquisitionClient', forbidden)
@@ -228,6 +229,9 @@ def test_dictionary_cli_keeps_partial_occurrences_and_exact_retained_history_off
     if length is not None:
         raw = raw.replace(b'<div class="dd_hdr">Description:',
             f'<div class="dd_hdr">Length:</div><div class="dd_desc">{length}</div><div class="dd_hdr">Description:'.encode())
+    if with_context:
+        raw = (b'<table><tr><td class="linecontent" colspan="2">Literal section</td></tr><tr><td>'
+               + raw.replace(b'\n', b'</td></tr>\n<tr><td>') + b'</td></tr></table>')
     original.write_bytes(raw)
     metadata = DatasetMetadata(version='2025', references=(ReferenceDocument(reference_id='selection', url='https://example.test/selection',
         role='source_notes', provenance_ids=(parent,), reviewed_sha256=sha256(selection.read_bytes()).hexdigest()),))
@@ -254,7 +258,12 @@ def test_dictionary_cli_keeps_partial_occurrences_and_exact_retained_history_off
     assert report['dictionary_records'][1]['publisher_type'] is None
     assert report['dictionary_records'][1]['publisher_description'] is None
     assert report['dictionary_records'][1]['source_line'] == 2
-    assert report['dictionary_records'][1]['source_column'] == 0
+    assert report['dictionary_records'][1]['source_column'] == (8 if with_context else 0)
+    if with_context:
+        assert all(row['publisher_context'] == {'heading': 'Literal section', 'source_line': 1, 'source_column': 11}
+                   for row in report['dictionary_records'])
+    else:
+        assert all('publisher_context' not in row for row in report['dictionary_records'])
     assert {r['source_sha256'] for r in report['dictionary_records']} == {sha256(raw).hexdigest()}
     closure = ProvenanceStore(archive).verify_record_closure([result['processing_record_id']])
     assert set(closure) == {parent, identifier, result['processing_record_id']}
@@ -591,12 +600,15 @@ def test_decimal_spelling_equivalence_is_exact_beyond_float_precision_and_unsupp
 def test_dictionary_only_changes_remain_dictionary_observations_not_fabricated_fields(tmp_path):
     old, *_ = source(tmp_path, 'old', [['001902001', '1']])
     new, *_ = source(tmp_path, 'new', [['001902001', '1']])
-    dictionary = [{'ordinal': 1, 'code': 'UNUSED', 'publisher_type': 'Number', 'publisher_description': 'Available dictionary field'}]
+    dictionary = [{'ordinal': 1, 'code': 'UNUSED', 'publisher_type': 'Number', 'publisher_description': 'Available dictionary field',
+        'source_sha256': 'a' * 64, 'source_line': 2, 'source_column': 0,
+        'publisher_context': {'heading': 'Literal section', 'source_line': 1, 'source_column': 0}}]
     new = replace(new, mapping={**new.mapping, 'dictionary_records': dictionary})
     result = compare_tapr_tables(old, new, key_field='campus_number')
     assert result['source_structure']['new']['dictionary_records'] == dictionary
     assert not result['columns']['new_only'] and not result['columns']['old_only']
     assert [f['code'] for f in result['columns']['common']] == ['CAMPUS', 'VALUE']
+    assert all(f['dictionary_definition_equal'] for f in result['columns']['common'])
 
 
 def test_negative_observed_and_suppressed_policies_have_one_canonical_authority(tmp_path):

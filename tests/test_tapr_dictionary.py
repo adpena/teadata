@@ -1,11 +1,12 @@
 from copy import deepcopy
+from dataclasses import FrozenInstanceError
 from hashlib import sha256
 from pathlib import Path
 
 import pytest
 
 from teadata.column_schema import header_records, source_schema_fingerprint, validate_header_table
-from teadata.tapr_dictionary import extract_tapr_dictionary
+from teadata.tapr_dictionary import TaprPublisherContext, extract_tapr_dictionary
 
 
 # Tiny public markup from the retained2025 STAF source; source rendering includes
@@ -246,3 +247,153 @@ def test_anchored_unknowns_and_legacy_complete_records_share_one_validation_owne
     invalid['dictionary_records'][0]['publisher_type'] = ''
     with pytest.raises(ValueError, match='Invalid publisher dictionary occurrence'):
         validate_header_table(invalid)
+
+
+def heading(text, *, attributes='class="l m linecontent" colspan="15"'):
+    return f'<tr><td {attributes}>{text}</td></tr>'
+
+
+def data_row(markup=CODE_ONLY):
+    return f'<tr><td>{markup}</td></tr>'
+
+
+def test_primary_context_survives_auxiliary_rows_and_changes_only_after_data():
+    # Synthetic, publisher-shaped COMP4 boundary: ordinary Class is another
+    # linecontent row; federal Class is a th/rowspan cell in the data row.
+    ordinary = '4-Year Longitudinal Rate (Gr 9-12)'
+    federal = '4-Year Federal Graduation Rate Without Exclusions (Gr 9-12)'
+    text = '\n'.join(['<table><tbody>', heading(ordinary), heading('Class of 2023'),
+        data_row(), data_row(COMPLETE), heading(federal),
+        '<tr><th rowspan="3">Class of 2023</th><td>' + CODE_ONLY + '</td></tr>',
+        '</tbody></table>'])
+    rows = extract_tapr_dictionary(text.encode(), encoding='utf-8')
+    assert [row.publisher_context for row in rows] == [
+        TaprPublisherContext(ordinary, 2, 4), TaprPublisherContext(ordinary, 2, 4),
+        TaprPublisherContext(federal, 6, 4)]
+    assert rows[0].column_record()['publisher_context'] == {
+        'heading': ordinary, 'source_line': 2, 'source_column': 4}
+    assert rows[0].source_html == CODE_ONLY and rows[1].source_html == COMPLETE
+    assert rows[0].publisher_description is None  # Context never fills a partial.
+    assert rows[0].source_sha256 == sha256(text.encode()).hexdigest()
+    with pytest.raises(FrozenInstanceError):
+        rows[0].publisher_context.heading = 'Caller mutation'
+
+
+def test_context_uses_structural_heading_and_literal_rendering_without_family_dispatch():
+    text = ('<table>\r\n  ' + heading('Different &amp; <b>literal</b><br>section',
+        attributes='colspan="2" class="linecontent"') + '\r\n' + data_row() + '</table>')
+    row, = extract_tapr_dictionary(text.encode(), encoding='utf-8')
+    assert row.publisher_context == TaprPublisherContext('Different & literal section', 2, 6)
+
+
+@pytest.mark.parametrize('interruption', [
+    '<tr><td class="linecontent">Missing colspan</td></tr>',
+    heading('Zero span', attributes='class="linecontent" colspan="0"'),
+    heading('Repeated span', attributes='class="linecontent" colspan="2" colspan="3"'),
+    heading('Repeated class', attributes='class="linecontent" class="other" colspan="2"'),
+    '<tr><td class="linecontent" colspan="2">Mixed</td><td>Other cell</td></tr>',
+    '<tr><th class="linecontent" colspan="2">Unsupported heading cell</th></tr>',
+    '<tr><td>Unrelated navigation</td></tr>',
+    '<nav>Unrelated navigation</nav>',
+    '<footer></footer>',
+    'Unrelated text',
+])
+def test_ambiguous_or_unrelated_transition_cannot_carry_previous_context(interruption):
+    raw = ('<table>' + heading('Known') + data_row() + interruption + data_row() + '</table>').encode()
+    first, second = extract_tapr_dictionary(raw, encoding='utf-8')
+    assert first.publisher_context is not None
+    assert second.publisher_context is None and 'publisher_context' not in second.column_record()
+
+
+def test_noncontiguous_pending_heading_is_not_promoted_to_known_context():
+    raw = ('<table>' + heading('Pending') + '<tr><td>Interruption</td></tr>' + data_row() + '</table>').encode()
+    row, = extract_tapr_dictionary(raw, encoding='utf-8')
+    assert row.publisher_context is None
+
+
+def test_context_is_table_scoped_without_nested_inheritance_or_leakage():
+    text = ('<table>' + heading('Outer') + data_row() + '<tr><td><table>' + data_row()
+            + heading('Inner') + data_row() + '</table></td></tr>' + data_row()
+            + '</table><table>' + data_row() + heading('Unused footer') + '</table>' + CODE_ONLY)
+    rows = extract_tapr_dictionary(text.encode(), encoding='utf-8')
+    assert [row.publisher_context.heading if row.publisher_context else None for row in rows] == [
+        'Outer', None, 'Inner', None, None, None]
+
+
+def test_ambiguous_structure_after_claimed_context_fails_instead_of_publishing_it():
+    text = ('<table>' + heading('Known') + '<tr><td>' + CODE_ONLY
+            + '</td><td class="linecontent" colspan="2">Uncertain</td></tr></table>')
+    with pytest.raises(ValueError, match='Ambiguous publisher context row'):
+        extract_tapr_dictionary(text.encode(), encoding='utf-8')
+
+
+def anchored_occurrence():
+    return {**occurrence(1, None, None), 'source_sha256': 'a' * 64,
+            'source_line': 10, 'source_column': 20}
+
+
+@pytest.mark.parametrize('context', [
+    None, {}, {'heading': 'Title'},
+    {'heading': 'Title', 'source_line': 1, 'source_column': 0, 'extra': 'No'},
+    {'heading': '', 'source_line': 1, 'source_column': 0},
+    {'heading': ' ', 'source_line': 1, 'source_column': 0},
+    {'heading': 2023, 'source_line': 1, 'source_column': 0},
+    {'heading': 'Title', 'source_line': True, 'source_column': 0},
+    {'heading': 'Title', 'source_line': '1', 'source_column': 0},
+    {'heading': 'Title', 'source_line': 0, 'source_column': 0},
+    {'heading': 'Title', 'source_line': 1, 'source_column': False},
+    {'heading': 'Title', 'source_line': 1, 'source_column': '0'},
+    {'heading': 'Title', 'source_line': 1, 'source_column': -1},
+    {'heading': 'Title', 'source_line': 10, 'source_column': 20},
+    {'heading': 'Title', 'source_line': 10, 'source_column': 21},
+    {'heading': 'Title', 'source_line': 11, 'source_column': 0},
+])
+def test_context_wire_is_exact_known_object_anchored_before_occurrence(context):
+    with pytest.raises(ValueError, match='dictionary context'):
+        validate_header_table(table_with([{**anchored_occurrence(), 'publisher_context': context}]))
+
+
+def test_context_requires_existing_source_anchor_and_never_becomes_field_authority():
+    context = {'heading': 'Literal Title', 'source_line': 1, 'source_column': 0}
+    with pytest.raises(ValueError, match='dictionary context'):
+        validate_header_table(table_with([{**occurrence(1, None, None), 'publisher_context': context}]))
+    table = table_with([{**anchored_occurrence(), 'publisher_context': context}])
+    table['fields'][0]['publisher_context'] = context
+    with pytest.raises(ValueError, match='header crosswalk column'):
+        validate_header_table(table)
+
+
+def test_context_projection_is_detached_and_does_not_infer_period_or_change_header_fingerprint():
+    from teadata.dataset_metadata import DatasetMetadata
+
+    context = {'heading': 'Class of 2023 Without Exclusions', 'source_line': 10, 'source_column': 19}
+    record = {**anchored_occurrence(), 'publisher_context': context}
+    table = table_with([record])
+    fingerprint = table['source_schema_sha256']
+    validate_header_table(table)
+    document = {'schema_version': 2, 'mapping_version': 1, 'datasets': [{
+        'dataset': 'campus_tapr_staff_profile', 'edition': '2024', 'source_only': True, 'tables': [table]}]}
+    metadata = DatasetMetadata()
+    result, = header_records(document, dataset='campus_tapr_staff_profile', edition='2024', metadata=metadata)
+    assert result['period'] == {'kind': 'unknown'}
+    assert metadata.value_policy is None and metadata.estimation is None and not metadata.metrics
+    assert result['dictionary_occurrences'] == [record]
+    result['dictionary_occurrences'][0]['publisher_context']['heading'] = 'Caller mutation'
+    again, = header_records(document, dataset='campus_tapr_staff_profile', edition='2024')
+    assert again['dictionary_occurrences'][0]['publisher_context'] == context
+    assert record['publisher_context']['heading'] == 'Class of 2023 Without Exclusions'
+    assert table['source_schema_sha256'] == fingerprint == source_schema_fingerprint(
+        [table['fields'][0]['label']], [table['fields'][0]['code']])
+
+
+def test_context_does_not_merge_partial_or_license_conflicting_definitions():
+    context = {'heading': 'First section', 'source_line': 1, 'source_column': 0}
+    first = {**anchored_occurrence(), 'publisher_context': context, 'publisher_type': 'Number'}
+    second = {**first, 'ordinal': 2, 'publisher_context': {**context, 'heading': 'Other section'},
+              'publisher_type': None, 'publisher_description': 'Description'}
+    validate_header_table(table_with([first, second]))
+    with pytest.raises(ValueError, match='differs from its publisher dictionary'):
+        validate_header_table(table_with([first, second], documented=True))
+    second['publisher_type'] = 'Text'
+    with pytest.raises(ValueError, match='Conflicting publisher dictionary definitions'):
+        validate_header_table(table_with([first, second]))

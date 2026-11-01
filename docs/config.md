@@ -539,6 +539,24 @@ Known length conflicts fail through the same occurrence validation, and an
 explicit source-field length must agree with a known observed length. Every
 occurrence remains available in the detached header projection without filling
 missing field metadata from another occurrence.
+An optional `publisher_context` occurrence object preserves a literal section
+`heading` and its `source_line`/`source_column` in the same raw dictionary SHA.
+The typed parser exposes this as frozen `TaprPublisherContext`; `column_record()`
+omits the key when the context is unknown. The heading anchor locates the section
+cell start, precedes the tooltip, and uses the same line/column conventions.
+Only a closed, single-cell `linecontent` row with positive `colspan` establishes
+a section. Contiguous heading rows before data form one block whose first title
+is primary; an auxiliary class label does not replace that title. Context is
+table-scoped, and ambiguous transitions omit context or reject a previously
+claimed known-context row. It never supplies periods, units, masking policies
+or methodological equivalence. `header_records()` exposes a detached copy in
+`dictionary_occurrences`; field mappings do not acquire another context authority.
+Existing records without this key remain unchanged and accepted. New context
+documents require the updated reader; older strict readers may reject them.
+Context does not change the original raw-header fingerprint.
+Source comparisons retain these observations in `source_structure`; their
+`dictionary_definition_equal` flag compares literal field definition components,
+not section context or methodological equivalence.
 Dictionary-only codes do not become source columns or establish availability,
 aliases, units or reference periods. Existing `header_records()` and
 `header_rename_map()` remain the code/label/canonical-field mapping APIs.
