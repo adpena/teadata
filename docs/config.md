@@ -292,17 +292,22 @@ uv run python -m teadata.scripts.geocode_tepsac_data \
 uv run python -m teadata.scripts.flatten_districts_geojson \
   --input districts.geojson --output districts_flat.geojson
 uv run python -m teadata.scripts.build_tapr_profiles \
-  --edition 2025 --input-dir raw/ --reference-store provenance --output-dir prepared/tapr-2025
+  --edition 2025 --family student_profile --input-dir raw/ \
+  --reference-store provenance --output-dir prepared/tapr-2025-students
+uv run python -m teadata.scripts.build_tapr_profiles \
+  --edition 2025 --family staff_profile --input-dir raw/ \
+  --reference-store provenance --output-dir prepared/tapr-2025-staff
 ```
 
-The TAPR command prepares every declared publisher column for both scopes into
-a **new** directory, validating all inputs before staging any output. Its
+The TAPR command prepares every declared publisher column in the selected
+single-table family for both scopes into a **new** directory, validating all
+inputs before staging any output. Its
 Parquet files retain raw strings, source crosswalks, annotation records and
 immutable acquisition/processing receipts. Existing directories and retained
 reference workbooks are never replaced. These outputs are source preparations,
 not an activated release or typed scientific measurements. The old year-specific
-builder and the 75-column district renamer are retired; 2024 and 2025 use this
-same explicit preparation path.
+builder and the 75-column district renamer are retired; supported 2024 and 2025
+single-table families use this explicit preparation path.
 
 `--reference-store` supplies the canonical acquisition receipts and exact bytes
 for established reference links. The producer retains only their selected
@@ -484,9 +489,18 @@ into private Parquet row groups bounded by admitted batches. It verifies exact
 strings, schema and row groups against a further bounded source scan before
 publishing the complete generation. It currently requires one physical table
 per source and rejects a multi-table source before reading its raw rows;
-there is no eager merge
-fallback. Public eager `read_tapr_sources()` and `merge_tapr_tables()` keep
-their existing multi-table merge semantics. Prepared-leaf intake is separate
+there is no eager merge fallback. The declared 2024 source entries each have
+one physical table. The legacy 2025 `campus_tapr_student_staff_profile` and
+`district_tapr_student_staff_profile` source profiles each declare two physical
+tables and are unsupported by this bounded producer. Select the separate
+2025 `student_profile` and `staff_profile` families, as in the explicit commands
+above, with a new output directory for each. Their existing source profiles
+are independent contracts; this does not rewrite the historical combined
+configuration or choose an eager join automatically.
+
+Public eager `read_tapr_sources()` and `merge_tapr_tables()` remain available
+for explicit multi-table reading and merging. That API is separate from the
+bounded producer and is never its fallback. Prepared-leaf intake is separate
 and rejects a raw-source budget rather than implying it applies there.
 
 One-header 2024 inputs use their complete Name/Type/Length/Label dictionaries;

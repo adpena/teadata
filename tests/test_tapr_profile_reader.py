@@ -237,7 +237,7 @@ def test_bad_input_prevents_all_writers_and_output_activation(tmp_path, monkeypa
     request = TaprSourceRequest(path, mapping_for(path), "campus_number", DATASET, "2025")
     cfg = SimpleNamespace(tapr_source_requests=lambda *a, **k: [request],
                           column_schema=lambda *a, **k: FIELDS)
-    monkeypatch.setattr(pq, "write_table", lambda *a, **k: pytest.fail("Writer ran for invalid input"))
+    monkeypatch.setattr(pq, "ParquetWriter", lambda *a, **k: pytest.fail("Writer ran for invalid input"))
     out = tmp_path / "new" / "output"
     with pytest.raises(ValueError, match="record 3 has 3 fields"):
         prepare_profiles(cfg, edition="2025", scopes=["campus"], input_dir=tmp_path, output_dir=out)

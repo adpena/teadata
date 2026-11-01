@@ -222,15 +222,13 @@ def test_tapr_builder_accepts_external_input_and_new_output_dirs(tmp_path, monke
     ]:
         dataset = scope + "_tapr_student_staff_profile"
         labels, codes, fields = [label, "Example Value"], [code, "VALUE"], [scope + "_number", "example_value"]
-        tables, paths = [], {}
-        for group in ["Student", "Staff"]:
-            path = raw / f"2025 {kind} {group} Information.csv"
-            path.write_text(f"{label},Example Value\n{code},VALUE\n{number},42\n")
-            paths[group.lower()] = str(path)
-            tables.append({"table": group.lower(), "input_sha256": sha256(path.read_bytes()).hexdigest(),
-                "source_schema_sha256": source_schema_fingerprint(labels, codes),
-                "fields": [{"position": i, "code": c, "label": text, "field": name}
-                           for i, (c, text, name) in enumerate(zip(codes, labels, fields, strict=True), 1)]})
+        path = raw / f"2025 {kind} Student Information.csv"
+        path.write_text(f"{label},Example Value\n{code},VALUE\n{number},42\n")
+        paths = {"student": str(path)}
+        tables = [{"table": "student", "input_sha256": sha256(path.read_bytes()).hexdigest(),
+            "source_schema_sha256": source_schema_fingerprint(labels, codes),
+            "fields": [{"position": i, "code": c, "label": text, "field": name}
+                       for i, (c, text, name) in enumerate(zip(codes, labels, fields, strict=True), 1)]}]
         datasets.append({"dataset": dataset, "edition": "2025", "prepared_input_sha256": "0" * 64, "tables": tables})
         entries[dataset] = {2025: {"path": str(tmp_path / (scope + "-retained-reference.xlsx")),
             "metadata": {"version": "2025"},
@@ -255,7 +253,7 @@ def test_tapr_builder_accepts_external_input_and_new_output_dirs(tmp_path, monke
     if write_failure:
         def fail(*args, **kwargs):
             raise OSError("simulated artifact write failure")
-        monkeypatch.setattr(pq, "write_table", fail)
+        monkeypatch.setattr(pq, "ParquetWriter", fail)
         with pytest.raises(OSError, match="simulated artifact write failure"):
             script.main(["--edition", "2025", "--input-dir", str(raw), "--output-dir", str(output_dir)])
         assert not output_dir.exists()
@@ -266,11 +264,11 @@ def test_tapr_builder_accepts_external_input_and_new_output_dirs(tmp_path, monke
     assert pq.read_table(output_dir / "district.parquet").to_pylist() == [{"district_number": "000456", "example_value": "42"}]
     receipt = json.loads((output_dir / "preparation.json").read_text())
     assert receipt["release_activation"] is False
-    assert receipt["scopes"]["campus"]["source_columns_accounted"] == 4
     assert receipt["scopes"]["campus"]["identity_fields"] == ["campus_number"]
     from teadata.provenance import ProvenanceStore
     store = ProvenanceStore(output_dir / "provenance")
     for scope in ("campus", "district"):
+        assert receipt["scopes"][scope]["source_columns_accounted"] == 2
         assert receipt["scopes"][scope]["local_reference_closure_verified"] is True
         closure = store.verify_record_closure([receipt["scopes"][scope]["processing_record_id"]])
         for record in closure.values():
@@ -278,6 +276,37 @@ def test_tapr_builder_accepts_external_input_and_new_output_dirs(tmp_path, monke
                 assert reference["provenance_ids"]
                 assert all(identifier in closure for identifier in reference["provenance_ids"])
     assert not list(output_dir.glob("*.xlsx"))
+
+
+@pytest.mark.parametrize("scope", ["campus", "district"])
+def test_packaged_2025_combined_tapr_profile_rejects_before_raw_io(tmp_path, monkeypatch, scope):
+    import pyarrow.parquet as pq
+    from teadata.provenance import ProvenanceStore
+    from teadata.scripts.build_tapr_profiles import prepare_profiles
+    from teadata.tapr import TaprSourceRequest
+    from teadata.teadata_config import load_config
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("Unsupported combined preparation must reject before raw I/O or eager fallback")
+
+    cfg = load_config()
+    monkeypatch.setattr(TaprSourceRequest, "open", forbidden)
+    monkeypatch.setattr(cfg, "read_tapr_sources", forbidden)
+    monkeypatch.setattr(pq, "ParquetWriter", forbidden)
+    monkeypatch.setattr(ProvenanceStore, "record_acquisition", forbidden)
+    unread = tmp_path / "unread-source"
+    combined = scope + "_tapr_student_staff_profile"
+    assert len(cfg.tapr_source_requests(combined, 2025, input_dir=unread)) == 2
+    for family in ("student_profile", "staff_profile"):
+        request, = cfg.tapr_source_requests(scope + "_tapr_" + family, 2025, input_dir=unread)
+        assert request.dataset == scope + "_tapr_" + family
+        assert request.edition == "2025" and request.key_field == scope + "_number"
+
+    output = tmp_path / "new" / "cohort"
+    with pytest.raises(ValueError, match="one physical table per source; no eager merge fallback"):
+        prepare_profiles(cfg, edition="2025", scopes=[scope], input_dir=unread, output_dir=output)
+    assert not unread.exists() and not output.parent.exists()
+    assert not list(tmp_path.rglob(".tapr-preparation-*"))
 
 
 def test_snapshot_writer_only_writes_staging(monkeypatch, tmp_path, catalog):
