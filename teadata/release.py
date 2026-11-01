@@ -381,7 +381,7 @@ def publish_release(
     """Activate only a complete validated bundle; keep the previous pointer on failure."""
     if type(schema_version) is int and schema_version in (3, 4):
         if artifacts is not None or processing is not None or catalog.to_dict().get("schema_version") != schema_version:
-            raise ContractError("Edition publication uses only its matching catalog artifact registry")
+            raise ContractError("Edition publication uses only its catalog artifact registry with a matching schema version")
         document = {"schema_version": schema_version, "catalog": catalog.to_dict()}
         if len(canonical_json(document).encode()) + 1 > 4 * 1024 * 1024:
             raise ContractError("Release manifest is too large")
