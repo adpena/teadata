@@ -15,7 +15,7 @@ import pytest
 import yaml
 
 from teadata.column_schema import (
-    header_records, parse_column_schema, source_schema_fingerprint, validate_header_table,
+    header_records, parse_column_schema, reader_options, source_schema_fingerprint, validate_header_table,
     validate_selected_crosswalk,
 )
 from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
@@ -319,13 +319,16 @@ def test_source_only_metadata_period_mismatch_fails_before_reading_rows(tmp_path
 
 def test_existing_default_contracts_and_public_metric_bindings_remain_pinned(catalog):
     cfg = yaml.safe_load((ROOT / 'teadata/teadata_sources.yaml').read_bytes())
-    expected = {('campus', 2024): 'bedc5ea74bcba865ebf65942878a233fc695bd5cf3b83a2dbfdbc3023415e04d',
-        ('campus', 2025): '36fc570425e654fbc50bb257042d7078986626741f68745446316e8ea9860df4',
-        ('district', 2024): '63bc2ae7dacef0db0a0491d2f02e9d5c2c80bc3f7474419c4ed5b75af1e4979d',
-        ('district', 2025): 'fbdd676a4a2b3be9a2df36dfcd84337772e0247e64fe9f7c1c927c519f23dcbc'}
+    # Fixed from fee47071's canonical default projection, including its path
+    # and complete base metadata; named opt-in profiles are separate contracts.
+    expected = {('campus', 2024): '6a0893a78bd67167d596a8bb135f712d8ce07e358d4408c82e0b7736c5c7edbe',
+        ('campus', 2025): 'a2cc8992744dbd615a96f01bcb76d7999ddaa8ce45c227d8ede3e3f9ea7ba436',
+        ('district', 2024): '0c43e0e72f3cb7483b26977ab4e90cb5c1dbdabd3d988f4cb61d640db4f1d438',
+        ('district', 2025): 'be72f63ca5612fa122004b7c060be01b0559cbc852f6ce4daf84fe682b43c8bf'}
     for (scope, year), digest in expected.items():
         entry = cfg['data_sources'][scope + '_tapr_student_staff_profile'][year]
-        assert sha256(canonical_json(entry).encode()).hexdigest() == digest
+        default_entry = {**entry, 'reader': reader_options(entry.get('reader', {}), None)}
+        assert sha256(canonical_json(default_entry).encode()).hexdigest() == digest
     for scope, digest in [('campus', 'da06b3e24f7acc2b553c25f09e35d4f21fbfb8ef1c270b6a7cba80317ceda2fa'),
                          ('district', '172240f0850fa64d294307874fcef3e69c5d94ee14e39da83d2682c75ae97c61')]:
         assert sha256(canonical_json(cfg['data_sources'][scope + '_tapr_graduation_profile'][2025]).encode()).hexdigest() == digest
