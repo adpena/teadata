@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 
 TAPR_PROFILE_FAMILIES = ("student_staff_profile", "graduation_profile", "student_profile", "staff_profile",
-                         "reference", "dropout_attendance", "four_year_longitudinal_rate")
+                         "reference", "dropout_attendance", "four_year_longitudinal_rate", "staar_school_progress")
 
 
 def qualified_tapr_family(dataset: str, key_field: str) -> str:

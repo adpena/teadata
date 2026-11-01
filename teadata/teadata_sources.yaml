@@ -2191,6 +2191,196 @@ data_sources:
               status: available
               provenance_ids: []
               reviewed_sha256: bf848a6c47d7f5ed783b57d862d4fcaefced1e2988b65b75c13abddcd998ec98
+  campus_tapr_staar_school_progress:
+    2024:
+      path: data/tapr/raw/2024-campus-staar-school-progress.csv
+      metadata:
+        title: 2024 TAPR Campus STAAR School Progress; current raw observation
+        version: '2024'
+        publisher: Texas Education Agency
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        period:
+          kind: unknown
+        identifiers: []
+        provenance_ids:
+        - 751c3626c097b51f2d4467950aa7f77da976083fc63169d1c19268198bd5b96c
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          title: Original 2024 campus_tapr_staar_school_progress raw CSV; genuine HTTP observation and ordered
+            controls
+          status: available
+          provenance_ids:
+          - 751c3626c097b51f2d4467950aa7f77da976083fc63169d1c19268198bd5b96c
+          reviewed_sha256: fe9199fa97e76654ebc7e1efba22a834402529411e5f01b2b776ef72143e1472
+        - provenance_ids:
+          - 2049ed24f8163464e4e287ee1bf0a9b445910f2fb57afd299e8ee4912497e318
+          reference_id: menu
+          reviewed_sha256: db8c40fef108b66a59697ce87ea02d60d32ea8f4e33fe486ec4aac6fa76caa79
+          role: source_notes
+          status: available
+          title: Official current 2024 campus TAPR family menu
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&tapr=all_c&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr.sas
+        - provenance_ids:
+          - 053f93e248e44ad6928384fe45b48f5fee39006eb9e63369d87ddb95fcb1a0c1
+          reference_id: selection
+          reviewed_sha256: 508d90901be28470f70c90be4848f1e54f2e46a2b47b0b289de10934b2afc0e3
+          role: source_notes
+          status: available
+          title: 'Official retained TEA TAPR 2024 Campus: STAAR School Progress selection metadata'
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        - provenance_ids:
+          - c019fd14106ea634d1c734f6490be0b91134f2b73d5a41858931856270b905b8
+          reference_id: dictionary
+          reviewed_sha256: 251f3e19060d8dc90449be501c1a5466ee1f271631f7e169992daf9794e102f7
+          role: data_dictionary
+          status: available
+          title: 'Official retained TEA TAPR 2024 Campus: STAAR School Progress dictionary'
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=C&dsname=STAAR_SP&dd=progress&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reference_id: glossary
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+          role: glossary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+        - provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reference_id: masking
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+          role: masking_methodology
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2024--staar-school-progress-crosswalk.json
+          title: TEA Data-generated 2024 STAAR School Progress source-only header/layout and all publisher
+            dictionary occurrences; not a publisher download
+          status: available
+          provenance_ids:
+          - 0996a94aaf8ca75d90dea32f6addeb5e2ce36c949dbeb1f97555248c0863f390
+          reviewed_sha256: 3501e9d058a5368265941a79b3f51365ee089750ac968b8b1da71522cd5a826f
+        metrics: {}
+        value_policy: null
+        estimation: null
+        notes: 'Source-only observation from the literal STAAR School Progress menu in publisher edition
+          2024. All 2208 returned facts and original identity columns remain lossless strings. Exact multiline
+          CSV labels, codes and finite record ranges are retained. All 2400 publisher dictionary occurrences
+          per scope are preserved: 2208 document returned facts; 192 have no physical column in this exact
+          response (96 complete definitions and 96 code-only observations). Dictionary-only members are
+          metadata, not fabricated value bindings, missing/null/scientific statuses or a cause/completeness
+          claim. Literal 2024 names and descriptive Number types do not establish a scientific period, unit,
+          masking rule, applicability or comparability. Section context remains unknown in the original
+          dictionary extraction and is not synthesized. Annual 2023-24 glossary and masking references are
+          available; field-specific STAAR School Progress masking applicability remains unreviewed. No token
+          policy, estimation, numeric parsing, cohort or scientific metric is assigned, including no charter-transfer
+          midpoint. Original HTTP metadata, dates and IDs remain immutable. This opt-in source profile activates
+          no default reader, released catalog, entity enrichment or app behavior.'
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--staar-school-progress-crosswalk.json
+            tapr_source:
+              scope: campus
+              tables:
+                staar_school_progress: data/tapr/raw/2024-campus-staar-school-progress.csv
+  district_tapr_staar_school_progress:
+    2024:
+      path: data/tapr/raw/2024-district-staar-school-progress.csv
+      metadata:
+        title: 2024 TAPR District STAAR School Progress; current raw observation
+        version: '2024'
+        publisher: Texas Education Agency
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        period:
+          kind: unknown
+        identifiers: []
+        provenance_ids:
+        - 72df19ef8f42a1b404e80ef528a1f9cc9cc93cc27aa466891140ed2fc374fdfb
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          title: Original 2024 district_tapr_staar_school_progress raw CSV; genuine HTTP observation and
+            ordered controls
+          status: available
+          provenance_ids:
+          - 72df19ef8f42a1b404e80ef528a1f9cc9cc93cc27aa466891140ed2fc374fdfb
+          reviewed_sha256: 7eb6f84bc0a46d37ad4eed73985ffde93ecbc3a29aea63575810ea08ae97bcf9
+        - provenance_ids:
+          - 444eec93f8bdea6bfaf5768188ec6efb6463ce30ef95c8da8dc3d682c2ea0df6
+          reference_id: menu
+          reviewed_sha256: 85342018b36c3601c43fe565d18f2e6ef01cc90edb49aa07e45df875bb0df109
+          role: source_notes
+          status: available
+          title: Official current 2024 district TAPR family menu
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&tapr=all_d&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr.sas
+        - provenance_ids:
+          - 12e955f8140fbe4e21b37755fcf17203f1db323e4e423536b6178b2cac2cf43b
+          reference_id: selection
+          reviewed_sha256: c685e1bfd3333251c3c692dfa765d3e2453528c82ca26a79884ad9b593553664
+          role: source_notes
+          status: available
+          title: 'Official retained TEA TAPR 2024 District: STAAR School Progress selection metadata'
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        - provenance_ids:
+          - faf01675032424ca5d736b5c4fd90f83058d65e84d3bc797be70a586bcf57256
+          reference_id: dictionary
+          reviewed_sha256: b8181891238a493e59df548a6460f149bce7b618255064c28fcf82f7858f9507
+          role: data_dictionary
+          status: available
+          title: 'Official retained TEA TAPR 2024 District: STAAR School Progress dictionary'
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=D&dsname=STAAR_SP&dd=progress&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reference_id: glossary
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+          role: glossary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+        - provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reference_id: masking
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+          role: masking_methodology
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2024--staar-school-progress-crosswalk.json
+          title: TEA Data-generated 2024 STAAR School Progress source-only header/layout and all publisher
+            dictionary occurrences; not a publisher download
+          status: available
+          provenance_ids:
+          - 0996a94aaf8ca75d90dea32f6addeb5e2ce36c949dbeb1f97555248c0863f390
+          reviewed_sha256: 3501e9d058a5368265941a79b3f51365ee089750ac968b8b1da71522cd5a826f
+        metrics: {}
+        value_policy: null
+        estimation: null
+        notes: 'Source-only observation from the literal STAAR School Progress menu in publisher edition
+          2024. All 2208 returned facts and original identity columns remain lossless strings. Exact multiline
+          CSV labels, codes and finite record ranges are retained. All 2400 publisher dictionary occurrences
+          per scope are preserved: 2208 document returned facts; 192 have no physical column in this exact
+          response (96 complete definitions and 96 code-only observations). Dictionary-only members are
+          metadata, not fabricated value bindings, missing/null/scientific statuses or a cause/completeness
+          claim. Literal 2024 names and descriptive Number types do not establish a scientific period, unit,
+          masking rule, applicability or comparability. Section context remains unknown in the original
+          dictionary extraction and is not synthesized. Annual 2023-24 glossary and masking references are
+          available; field-specific STAAR School Progress masking applicability remains unreviewed. No token
+          policy, estimation, numeric parsing, cohort or scientific metric is assigned, including no charter-transfer
+          midpoint. Original HTTP metadata, dates and IDs remain immutable. This opt-in source profile activates
+          no default reader, released catalog, entity enrichment or app behavior.'
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--staar-school-progress-crosswalk.json
+            tapr_source:
+              scope: district
+              tables:
+                staar_school_progress: data/tapr/raw/2024-district-staar-school-progress.csv
   campus_tapr_four_year_longitudinal_rate:
     2024:
       path: data/tapr/raw/2024-c-COMP4.csv
@@ -3249,6 +3439,10 @@ schema:
     campus_tapr_graduation_profile:
     - csv
     district_tapr_graduation_profile:
+    - csv
+    campus_tapr_staar_school_progress:
+    - csv
+    district_tapr_staar_school_progress:
     - csv
     campus_tapr_four_year_longitudinal_rate:
     - csv

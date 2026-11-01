@@ -464,6 +464,32 @@ metric bindings stay unknown/unassigned, with no applied policy or estimation.
 Identity attributes do not become repeated entity metadata metrics. Original
 acquisition dates stay intact, and the generated schema has its own genuine
 local observation.
+
+The 2024 `campus_tapr_staar_school_progress` and
+`district_tapr_staar_school_progress` declarations require the explicit `source`
+profile. Their single curated crosswalk retains all 2,212/2,210 physical columns:
+2,208 returned facts per scope and four/two canonical identity attributes. Both
+logical CSV headers retain their exact labels and codes; the first header spans
+four physical lines. Names use the existing sanitizer on literal labels, with
+no aliases or code suffixes. The original raw observations and dates stay intact.
+
+Each table's existing `dictionary_records` retains all 2,400 ordered publisher
+occurrences and source anchors. The 192 dictionary members absent from each
+raw response remain dictionary metadata: 96 complete definitions and 96
+code-only observations. `header_records()` and `header_mapping()` expose the
+actual columns only. Compute dictionary-only membership from these two existing
+collections; it does not create empty value columns or missing/masked statuses.
+No cause or publisher-family completeness is inferred from the difference.
+
+Literal edition/year text, descriptive `Number` types and linked annual
+glossary/masking documents do not assign field-specific scientific periods,
+units, token rules, applicability or comparability. Those remain unreviewed,
+with no value policy, metric definitions or estimation. Original dictionary
+section context is unknown and is not synthesized. The charter-transfer
+midpoint never applies to these fields. These declarations are source metadata
+only; actual School Progress preparation is held for the separately reviewed
+bounded producer migration. No released/default catalog or app behavior is
+activated by this source contract.
 Registration does not prepare, publish or activate these sources.
 
 Raw TAPR intake uses one logical-record scanner for both the eager
