@@ -797,6 +797,55 @@ including every field binding, native contract and provenance record. `verify()`
 explicitly validates all metadata and opens every registered leaf; publication
 performs that complete local offline check before exposing its root.
 
+### Unreleased edition metadata resources (schema 4)
+
+For cheap discovery, use the same iterator with metadata explicitly excluded:
+
+```python
+for edition in release.catalog.editions(include_metadata=False):
+    print(edition["dataset"], edition["edition"], edition["edition_id"])
+```
+
+Schema 4 is an explicit, unpublished representation. Its small root contains
+exact `EditionKey`/`EditionMetadataRef` entries and artifact-ID-to-edition routes.
+Each child contains that edition's complete metadata, native contracts, qualified
+field bindings, policies and original receipt closure. An `EditionMetadataRef`
+uses the existing SHA/size/location contract and a 4 MiB per-child limit;
+crosswalks retain their independent 8 MiB limit. All resources use the same
+verified release transport/cache. The complete canonical root remains capped at
+4 MiB. These limits do not establish a memory or arbitrary-history capacity claim.
+
+The default `editions()` result shape is unchanged and includes metadata. It is
+a generator: creating it performs no child I/O; iteration loads the selected
+children. `metadata()`, `datasets`, unfiltered `variables()` and complete
+`column_schema_refs()` discovery may read all relevant child metadata, never
+native leaves. Broad `variables()` discovery uses edition-index order, then the
+original field order within each edition; selected field/header/projection order
+is preserved. Internal index discovery uses `include_metadata=False`.
+
+Selected field/header and direct artifact resolution close foreign edition
+dependencies before running the same catalog validator and selected crosswalk
+checks. Missing qualified dependencies, cycles, foreign metadata and unsupported
+period requests fail before leaf opening. Policies remain scoped to their exact
+edition, even when historical policy names repeat. There are no policy aliases,
+implicit current-Config lookups or new scalar interpretation APIs.
+
+Explicit migration is `schema3_catalog.externalize_editions()`; alternatively,
+`DatasetCatalog.create_editions(..., schema_version=4)` and
+`BuildRecorder.catalog(schema_version=4)` opt in after ordinary v3 validation.
+Migration preserves native artifact IDs/contracts/locations, fields, source
+revision, original schema bytes and every receipt. It rejects unbound provenance
+or missing genuine schema observations; callers must review any historical
+reference additions explicitly before migration. It creates only in-memory
+metadata resources. `publish_release(..., schema_version=4)` preflights all local
+destinations and existing sidecars, then performs complete metadata and native
+leaf verification before exposing a new root. Cached parsed children and leaf
+acceptance are transient; unpickling a release reopens its pinned root and
+reverifies selected resources. A standalone catalog pickle needs explicit
+resolvers again. Published schemas 1/2, their default writers and snapshot state
+remain unchanged. Explicit schema 3 remains available until its actual consumers
+have qualified an explicit migration; no representation is inferred or retried.
+
 ### Unreleased raw-wide source selection
 
 The same `build_tapr_profiles` owner can consume one or more explicitly selected

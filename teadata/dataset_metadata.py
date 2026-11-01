@@ -63,6 +63,7 @@ def _record_json(value: Any) -> str:
 
 
 COLUMN_SCHEMA_MAX_BYTES = 8 * 1024 * 1024
+EDITION_METADATA_MAX_BYTES = 4 * 1024 * 1024
 
 
 @dataclass(frozen=True)
@@ -88,6 +89,30 @@ class ColumnSchemaRef:
     def from_dict(cls, raw: Mapping[str, Any]) -> ColumnSchemaRef:
         if not isinstance(raw, Mapping) or set(raw) != {"sha256", "size_bytes", "location"}:
             raise ValueError("Unsupported column-schema resource descriptor")
+        return cls(**raw)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+@dataclass(frozen=True)
+class EditionMetadataRef:
+    """One bounded edition's catalog metadata, never a native data artifact."""
+
+    sha256: str
+    size_bytes: int
+    location: str
+
+    def __post_init__(self) -> None:
+        # Use the same identity/location contract as the existing metadata resource.
+        ColumnSchemaRef(self.sha256, self.size_bytes, self.location)
+        if self.size_bytes > EDITION_METADATA_MAX_BYTES:
+            raise ValueError("Edition metadata exceeds its finite metadata byte budget")
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, Any]) -> EditionMetadataRef:
+        if not isinstance(raw, Mapping) or set(raw) != {"sha256", "size_bytes", "location"}:
+            raise ValueError("Unsupported edition-metadata resource descriptor")
         return cls(**raw)
 
     def to_dict(self) -> dict[str, Any]:

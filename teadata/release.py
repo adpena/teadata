@@ -19,7 +19,7 @@ from urllib.request import urlopen
 from platformdirs import user_cache_path
 
 from .analytical import ANALYTICAL_DATASETS, ANALYTICAL_ROLES, analytical_dataset, validate_artifact, validate_leaf_artifact
-from .dataset_metadata import COLUMN_SCHEMA_MAX_BYTES, ColumnSchemaRef, validate_http_url
+from .dataset_metadata import COLUMN_SCHEMA_MAX_BYTES, ColumnSchemaRef, EditionMetadataRef, validate_http_url
 from .manifest import (
     ContractError,
     DatasetCatalog,
@@ -77,7 +77,7 @@ def _download(url: str, path: Path, *, expected: dict | None = None) -> None:
             temporary.unlink(missing_ok=True)
 
 
-def _capture_column_schema(path: Path, descriptor: ColumnSchemaRef, *,
+def _capture_column_schema(path: Path, descriptor: ColumnSchemaRef | EditionMetadataRef, *,
                            cached: tuple[Path, tuple[int, ...], bytes] | None = None) -> tuple[bytes, tuple[int, ...]]:
     """Admit one regular metadata file before reading its exact verified buffer."""
     def signature(state):
@@ -108,7 +108,7 @@ def _capture_column_schema(path: Path, descriptor: ColumnSchemaRef, *,
         raise ContractError("Invalid column-schema resource filesystem entry") from error
 
 
-def _schema_publication_destinations(catalog: DatasetCatalog) -> tuple[ColumnSchemaRef, ...]:
+def _schema_publication_destinations(catalog: DatasetCatalog) -> tuple[ColumnSchemaRef | EditionMetadataRef, ...]:
     """Reject every colliding local destination before metadata resolution/writes."""
     names = {"release.json"}
     def reserve(location):
@@ -117,10 +117,17 @@ def _schema_publication_destinations(catalog: DatasetCatalog) -> tuple[ColumnSch
         if not key or "\0" in name or key in names:
             raise ContractError("Schema3 publication destinations collide with a reserved root or another resource")
         names.add(key)
-    for artifact in catalog.to_dict()["artifacts"].values():
+    if catalog.to_dict()["schema_version"] == 4:
+        # Child metadata must be read to discover destinations; no schema/leaf
+        # is opened until every destination has passed this same preflight.
+        resources, descriptors = catalog._publication_metadata()
+        artifacts = [descriptor.to_dict() for descriptor in descriptors]
+    else:
+        resources = catalog.column_schema_refs()
+        artifacts = catalog.to_dict()["artifacts"].values()
+    for artifact in artifacts:
         if "://" not in artifact["location"]:
             reserve(artifact["location"])
-    resources = catalog.column_schema_refs()
     for resource in resources:
         reserve(resource.location)
     return resources
@@ -159,15 +166,18 @@ class DataRelease:
             raise ContractError("Release manifest checksum differs from its trusted pin")
         document = json.loads(raw)
         version = document.get("schema_version")
-        self._v3 = type(version) is int and version == 3
+        self._v3 = type(version) is int and version in (3, 4)
         if self._v3:
-            if set(document) != {"schema_version", "catalog"} or document["catalog"].get("schema_version") != 3:
-                raise ContractError("Schema3 roots require one authoritative edition catalog")
+            if (set(document) != {"schema_version", "catalog"}
+                    or type(document["catalog"].get("schema_version")) is not int
+                    or document["catalog"]["schema_version"] != version):
+                raise ContractError(f"Schema{version} roots require one authoritative edition catalog")
             self._verified = {}
             self._verified_bytes: dict[str, tuple[Path, tuple[int, int, int, int]]] = {}
             self._column_schema_data: dict[str, tuple[Path, tuple[int, ...], bytes]] = {}
             self._manifest_sha256 = sha256(raw).hexdigest()
-            self.catalog = DatasetCatalog(document["catalog"], column_schema_loader=self._column_schema_bytes)
+            self.catalog = DatasetCatalog(document["catalog"], column_schema_loader=self._column_schema_bytes,
+                                          edition_metadata_loader=self._column_schema_bytes)
             return
         expected_roles = {1: ROLES, 2: ANALYTICAL_RELEASE_ROLES}.get(version) if type(version) is int else None
         if expected_roles is None or set(document.get("artifacts", {})) != expected_roles:
@@ -234,7 +244,7 @@ class DataRelease:
             return path
         return self.path.parent / location
 
-    def _column_schema_bytes(self, descriptor: ColumnSchemaRef) -> bytes:
+    def _column_schema_bytes(self, descriptor: ColumnSchemaRef | EditionMetadataRef) -> bytes:
         path = self._resource_path(descriptor.location, descriptor.sha256, descriptor.size_bytes)
         raw, before = _capture_column_schema(path, descriptor, cached=self._column_schema_data.get(descriptor.sha256))
         self._column_schema_data[descriptor.sha256] = path, before, raw
@@ -369,10 +379,10 @@ def publish_release(
     schema_version: int | None = None,
 ) -> Path:
     """Activate only a complete validated bundle; keep the previous pointer on failure."""
-    if type(schema_version) is int and schema_version == 3:
-        if artifacts is not None or processing is not None or catalog.to_dict().get("schema_version") != 3:
-            raise ContractError("Schema3 publication uses only its catalog artifact registry")
-        document = {"schema_version": 3, "catalog": catalog.to_dict()}
+    if type(schema_version) is int and schema_version in (3, 4):
+        if artifacts is not None or processing is not None or catalog.to_dict().get("schema_version") != schema_version:
+            raise ContractError("Edition publication uses only its matching catalog artifact registry")
+        document = {"schema_version": schema_version, "catalog": catalog.to_dict()}
         if len(canonical_json(document).encode()) + 1 > 4 * 1024 * 1024:
             raise ContractError("Release manifest is too large")
         if (directory / "release.json").exists() or (directory / "release.json").is_symlink():
@@ -382,7 +392,12 @@ def publish_release(
         admitted = []
         for descriptor in resources:
             destination = directory / descriptor.location
-            raw = catalog.column_schema_bytes(descriptor.sha256)
+            if isinstance(descriptor, EditionMetadataRef):
+                identifier = next(row["edition_id"] for row in catalog.editions(include_metadata=False)
+                                  if catalog.to_dict()["editions"][row["edition_id"]]["metadata"] == descriptor.to_dict())
+                raw = catalog.edition_metadata_bytes(identifier)
+            else:
+                raw = catalog.column_schema_bytes(descriptor.sha256)
             try:
                 destination.stat(follow_symlinks=False)
             except FileNotFoundError:
@@ -406,7 +421,7 @@ def publish_release(
                     if resource_temporary is not None:
                         resource_temporary.unlink(missing_ok=True)
     elif schema_version is not None:
-        raise ContractError("Select explicit schema3 or the unchanged legacy publisher")
+        raise ContractError("Select explicit schema3/schema4 or the unchanged legacy publisher")
     elif catalog.to_dict().get("schema_version") != 2:
         raise ContractError("Legacy release publication requires a schema2 catalog")
     elif artifacts is None or processing is None or set(artifacts) not in (ROLES, ANALYTICAL_RELEASE_ROLES):
@@ -447,8 +462,8 @@ def publish_release(
         stream.flush()
         os.fsync(stream.fileno())
     try:
-        DataRelease(temporary, offline=schema_version == 3).verify()
-        if schema_version == 3:
+        DataRelease(temporary, offline=schema_version in (3, 4)).verify()
+        if schema_version in (3, 4):
             os.link(temporary, directory / "release.json")
         else:
             os.replace(temporary, directory / "release.json")

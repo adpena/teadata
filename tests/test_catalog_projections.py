@@ -18,7 +18,7 @@ import pytest
 from teadata.engine import DataEngine
 from teadata.manifest import ContractError, DatasetCatalog, canonical_json
 from teadata.release import SNAPSHOT_MAGIC
-from teadata.dataset_metadata import ArtifactRef, ColumnSchemaRef, DataPeriod, DatasetMetadata, EditionKey, ReferenceDocument, ResolvedDataset
+from teadata.dataset_metadata import ArtifactRef, ColumnSchemaRef, DataPeriod, DatasetMetadata, EditionKey, EditionMetadataRef, ReferenceDocument, ResolvedDataset
 from teadata.manifest import BuildRecorder, file_identity
 from teadata.provenance import ProvenanceStore
 from teadata.teadata_config import Config
@@ -1211,3 +1211,432 @@ def test_metadata_regular_capture_reuses_only_same_file_signature(edition_fixtur
     monkeypatch.setattr(transport.os, "open", count_open)
     assert len(list(release.catalog.variables(edition=key))) == 3
     assert calls == [path]
+
+
+@pytest.fixture
+def edition_index_fixture(edition_fixture):
+    """Explicit v3 migration using only the existing two tiny synthetic leaves."""
+    catalog = edition_fixture["catalog"].externalize_editions()
+    resources = {}
+    for row in catalog.editions(include_metadata=False):
+        identifier = row["edition_id"]
+        raw = catalog.edition_metadata_bytes(identifier)
+        descriptor = catalog.to_dict()["editions"][identifier]["metadata"]
+        resources[descriptor["sha256"]] = raw
+        edition_fixture["root"].with_name(descriptor["location"]).write_bytes(raw)
+    root = edition_fixture["root"].with_name("index.json")
+    root.write_text(canonical_json({"schema_version": 4, "catalog": catalog.to_dict()}) + "\n")
+    return {**edition_fixture, "legacy": edition_fixture["catalog"], "catalog": catalog, "root": root,
+            "children": resources}
+
+
+def index_with_child(edition_index_fixture, key, change):
+    """Rehash a deliberately contradictory child; never mutate its leaf or receipt."""
+    fixture = edition_index_fixture
+    document, resources = fixture["catalog"].to_dict(), dict(fixture["children"])
+    ref = document["editions"][key.identity]["metadata"]
+    child = json.loads(resources[ref["sha256"]])
+    change(child)
+    raw = (canonical_json(child) + "\n").encode()
+    digest = sha256(raw).hexdigest()
+    resources[digest] = raw
+    document["editions"][key.identity]["metadata"] = EditionMetadataRef(digest, len(raw), digest + ".json").to_dict()
+    document["build_id"] = sha256(canonical_json({k: v for k, v in document.items() if k != "build_id"}).encode()).hexdigest()
+    return DatasetCatalog(document, column_schema_loader=lambda ref: fixture["resources"][ref.sha256],
+                          edition_metadata_loader=lambda ref: resources[ref.sha256])
+
+
+@pytest.mark.parametrize("damage", ["size_bool", "oversize", "unknown", "traversal", "credentials", "sha"])
+def test_v4_metadata_resource_descriptor_is_strict(damage):
+    from teadata.dataset_metadata import EDITION_METADATA_MAX_BYTES
+    raw = {"sha256": "a" * 64, "size_bytes": 10, "location": "metadata.json"}
+    if damage == "size_bool":
+        raw["size_bytes"] = True
+    elif damage == "oversize":
+        raw["size_bytes"] = EDITION_METADATA_MAX_BYTES + 1
+    elif damage == "unknown":
+        raw["format"] = "parquet"
+    elif damage == "traversal":
+        raw["location"] = "../metadata.json"
+    elif damage == "credentials":
+        raw["location"] = "https://user:password@example.invalid/metadata.json"
+    else:
+        raw["sha256"] = "z" * 64
+    with pytest.raises(ValueError):
+        EditionMetadataRef.from_dict(raw)
+
+
+def test_v4_index_discovery_and_construction_never_prefetch_children(edition_index_fixture, monkeypatch):
+    fixture = edition_index_fixture
+    calls = []
+    def child(ref):
+        calls.append(ref.sha256)
+        return fixture["children"][ref.sha256]
+    catalog = DatasetCatalog(fixture["catalog"].to_dict(), edition_metadata_loader=child,
+                             column_schema_loader=lambda ref: fixture["resources"][ref.sha256])
+    monkeypatch.setattr(Path, "open", lambda *a, **k: pytest.fail("Metadata discovery opened data"))
+    full = catalog.editions()
+    assert calls == []
+    cheap = list(catalog.editions(include_metadata=False))
+    assert len(cheap) == 2 and all("metadata" not in row for row in cheap) and calls == []
+    first = next(full)
+    assert len(calls) == 1 and "metadata" in first
+    assert list(catalog.editions(dataset=first["dataset"])) == [first]
+    assert len(set(calls)) == 1
+    assert not catalog._edition_views[first["edition_id"]]._validated_editions  # no crosswalk needed for source metadata
+
+
+def test_v4_migration_preserves_detached_public_projections_and_every_identity(edition_index_fixture):
+    fixture = edition_index_fixture
+    old, current = fixture["legacy"], fixture["catalog"]
+    original = old.to_dict()
+    assert current.datasets == old.datasets
+    assert list(current.editions()) == list(old.editions())
+    records, fields, artifacts = {}, [], {}
+    for row in current.editions(include_metadata=False):
+        identifier = row["edition_id"]
+        child = json.loads(current.edition_metadata_bytes(identifier))
+        records.update(child["provenance"])
+        fields.extend(child["field_bindings"])
+        artifacts.update(child["artifacts"])
+        key = EditionKey.from_dict(child["edition"]["key"])
+        assert current.metadata(key.dataset, edition=key) == old.metadata(key.dataset, edition=key)
+        assert current.acquisitions(key.dataset, edition=key) == old.acquisitions(key.dataset, edition=key)
+        assert current.policy(key.dataset, edition=key) == old.policy(key.dataset, edition=key)
+        assert current.header_records(key.dataset, edition_key=key) == old.header_records(key.dataset, edition_key=key)
+        assert list(current.variables(edition=key)) == list(old.variables(edition=key))
+        assert current.field_metadata("amount", edition=key) == old.field_metadata("amount", edition=key)
+        assert current.resolve_artifacts([(key, "amount"), (key, "campus_name")]) == old.resolve_artifacts([(key, "amount"), (key, "campus_name")])
+    assert records == original["provenance"] and artifacts == original["artifacts"]
+    assert sorted(fields, key=canonical_json) == sorted(original["field_bindings"], key=canonical_json)
+    for artifact in original["artifacts"]:
+        assert current.artifact_ref(artifact) == old.artifact_ref(artifact)
+    detached = current.datasets
+    detached[next(iter(detached))]["metadata"]["title"] = "foreign mutation"
+    assert current.datasets == old.datasets and original == old.to_dict()
+
+
+@pytest.mark.parametrize("damage", ["edition", "route", "missing_observation", "methodology", "foreign_field", "cycle"])
+def test_v4_child_and_closed_dependency_contradictions_precede_leaf_io(edition_index_fixture, monkeypatch, damage):
+    fixture = edition_index_fixture
+    key, descriptor, _ = fixture["leaves"]["student"]
+    def change(child):
+        if damage == "edition":
+            child["edition"]["key"]["edition"] = "2026"
+        elif damage == "route":
+            child["artifacts"] = {}
+        elif damage == "missing_observation":
+            child["edition"]["metadata"]["references"][0]["provenance_ids"] = []
+        elif damage == "methodology":
+            child["edition"]["metadata"]["estimation"] = {"method": "unknown"}
+        else:
+            amount = next(row for row in child["field_bindings"] if row["field"] == "amount")
+            amount["dependencies"] = [[key.identity, "missing" if damage == "foreign_field" else "amount"]]
+    catalog = index_with_child(fixture, key, change)
+    monkeypatch.setattr(Path, "open", lambda *a, **k: pytest.fail("Contradictory metadata opened a leaf"))
+    with pytest.raises(ContractError):
+        catalog.artifact_ref(descriptor.identity)
+
+
+def test_v4_selected_foreign_dependency_closure_uses_existing_resolver(edition_index_fixture, monkeypatch):
+    fixture = edition_index_fixture
+    student, ref, _ = fixture["leaves"]["student"]
+    staff, _, _ = fixture["leaves"]["staff"]
+    def change(child):
+        next(row for row in child["field_bindings"] if row["field"] == "amount")["dependencies"] = [[staff.identity, "amount"]]
+    catalog = index_with_child(fixture, student, change)
+    calls = []
+    original = catalog._edition_metadata_loader
+    def capture(descriptor):
+        calls.append(descriptor.sha256)
+        return original(descriptor)
+    catalog._edition_metadata_loader = capture
+    monkeypatch.setattr(Path, "open", lambda *a, **k: pytest.fail("Resolver opened native data"))
+    assert catalog.artifact_ref(ref.identity) == ref
+    result = catalog.resolve_artifacts([(student, "amount"), (staff, "amount")])
+    assert [row["artifact"].edition for row in result] == [student, staff]
+    assert [row["columns"] for row in result] == [("campus_number", "amount"), ("campus_number", "amount")]
+    assert len(set(calls)) == 2
+    with pytest.raises(ContractError, match="period"):
+        catalog.resolve_artifacts([(student, "campus_number")], period=DataPeriod(kind="calendar_year", year=2025))
+    def foreign(child):
+        next(row for row in child["field_bindings"] if row["field"] == "amount")["dependencies"] = [["f" * 64, "amount"]]
+    with pytest.raises(ContractError, match="metadata"):
+        index_with_child(fixture, student, foreign).artifact_ref(ref.identity)
+
+
+def test_v4_pickle_drops_child_acceptance_and_rechecks_current_files(edition_index_fixture):
+    from teadata.release import DataRelease
+    fixture = edition_index_fixture
+    release = DataRelease(fixture["root"], offline=True)
+    key, ref, _ = fixture["leaves"]["student"]
+    assert len(list(release.catalog.variables(edition=key))) == 3
+    restored_catalog = pickle.loads(pickle.dumps(release.catalog))
+    assert not restored_catalog._edition_views and not restored_catalog._edition_buffers
+    assert len(list(restored_catalog.editions(include_metadata=False))) == 2
+    with pytest.raises(ContractError, match="explicit.*resolver"):
+        next(restored_catalog.editions())
+    restored = pickle.loads(pickle.dumps(release))
+    assert not restored._column_schema_data and not restored._verified
+    child = release.catalog.to_dict()["editions"][key.identity]["metadata"]
+    path = fixture["root"].with_name(child["location"])
+    raw = path.read_bytes()
+    path.write_bytes(raw[:-1] + b"!")
+    for selected in (release, restored):
+        with pytest.raises(ContractError, match="checksum"):
+            selected.catalog.artifact_ref(ref.identity)
+
+
+def test_v4_offline_remote_root_and_selected_children_share_existing_cache(edition_index_fixture, monkeypatch, tmp_path):
+    from teadata.release import DataRelease
+    import teadata.release as transport
+    fixture = edition_index_fixture
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
+    root = fixture["root"].read_bytes()
+    available = {"index.json": root, **{ref.location: fixture["children"][ref.sha256] for ref in fixture["catalog"].edition_metadata_refs()},
+                 **{ref.location: fixture["resources"][ref.sha256] for ref in fixture["legacy"].column_schema_refs()}}
+    requests = []
+    def download(url, path, *, expected=None):
+        requests.append(url)
+        raw = available[url.rsplit("/", 1)[1]]
+        assert expected is None or all(expected.get(k, v) == v for k, v in (("sha256", sha256(raw).hexdigest()), ("size_bytes", len(raw))))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(raw)
+    monkeypatch.setattr(transport, "_download", download)
+    pin = sha256(root).hexdigest()
+    release = DataRelease("https://example.invalid/index.json", expected_sha256=pin)
+    assert len(list(release.catalog.editions(include_metadata=False))) == 2 and len(requests) == 1
+    key, _, _ = fixture["leaves"]["student"]
+    assert len(list(release.catalog.variables(edition=key))) == 3 and len(requests) == 3
+    offline = DataRelease(release.source, expected_sha256=pin, offline=True)
+    assert len(list(offline.catalog.variables(edition=key))) == 3 and len(requests) == 3
+    staff, _, _ = fixture["leaves"]["staff"]
+    with pytest.raises(ContractError, match="not cached"):
+        list(offline.catalog.variables(edition=staff))
+    release.path.unlink()
+    with pytest.raises(FileNotFoundError):
+        DataRelease(release.source, expected_sha256=pin, offline=True)
+
+
+def test_v4_publication_is_explicit_complete_and_preserves_native_contracts(edition_index_fixture, tmp_path):
+    from teadata.release import DataRelease, publish_release
+    fixture = edition_index_fixture
+    output = tmp_path / "published-v4"
+    output.mkdir()
+    for _, ref, leaf in fixture["leaves"].values():
+        (output / ref.location).write_bytes(leaf.read_bytes())
+    root = publish_release(output, fixture["catalog"], schema_version=4)
+    release = DataRelease(root, offline=True)
+    assert len(list(release.catalog.editions(include_metadata=False))) == 2
+    assert set(release.verify()) == set(fixture["legacy"].to_dict()["artifacts"])
+    for artifact, expected in fixture["legacy"].to_dict()["artifacts"].items():
+        assert release.catalog.artifact_ref(artifact).to_dict() == expected
+    with pytest.raises(FileExistsError):
+        publish_release(output, fixture["catalog"], schema_version=4)
+    with pytest.raises(ContractError, match="schema2"):
+        publish_release(tmp_path / "default", fixture["catalog"])
+    assert fixture["recorder"].catalog(schema_version=4).to_dict() == fixture["catalog"].to_dict()
+
+
+@pytest.mark.parametrize("damage", ["child_root", "child_artifact", "sidecar_symlink", "sidecar_corrupt", "sidecar_directory"])
+def test_v4_publication_admits_every_resource_before_writes(edition_index_fixture, tmp_path, damage):
+    from teadata.release import publish_release
+    fixture = edition_index_fixture
+    document = fixture["catalog"].to_dict()
+    first = next(iter(document["editions"]))
+    if damage.startswith("child_"):
+        document["editions"][first]["metadata"]["location"] = (
+            "ReLeAsE.JsOn." if damage == "child_root" else next(iter(fixture["legacy"].to_dict()["artifacts"].values()))["location"])
+        document["build_id"] = sha256(canonical_json({k: v for k, v in document.items() if k != "build_id"}).encode()).hexdigest()
+    catalog = DatasetCatalog(document, edition_metadata_loader=lambda ref: fixture["children"][ref.sha256],
+                             column_schema_loader=lambda ref: fixture["resources"][ref.sha256])
+    output = tmp_path / "refused-v4"
+    before = set()
+    if damage.startswith("sidecar_"):
+        output.mkdir()
+        target = output / list(catalog.edition_metadata_refs())[-1].location
+        if damage == "sidecar_directory":
+            target.mkdir()
+        elif damage == "sidecar_symlink":
+            target.symlink_to(fixture["root"])
+        else:
+            target.write_bytes(b"corrupt")
+        before = set(output.iterdir())
+    with pytest.raises(ContractError):
+        publish_release(output, catalog, schema_version=4)
+    assert set(output.iterdir()) == before if output.exists() else not before
+    assert not (output / "release.json").exists()
+
+
+def test_v4_migration_rejects_unbound_original_provenance(edition_fixture):
+    document = edition_fixture["catalog"].to_dict()
+    raw = edition_fixture["root"].with_name("unrelated.txt")
+    raw.write_text("unrelated")
+    identifier = edition_fixture["store"].record_acquisition(raw, ResolvedDataset("unrelated", "reference", None, None,
+        str(raw), DatasetMetadata(title="Unbound synthetic observation")))
+    document["provenance"][identifier] = edition_fixture["store"].read_record(identifier)
+    with pytest.raises(ContractError, match="account for every"):
+        rehash_catalog(document, edition_fixture["resources"]).externalize_editions()
+
+
+def test_v4_interleaved_input_preserves_selected_order_without_a_global_field_ledger(edition_fixture):
+    document = edition_fixture["catalog"].to_dict()
+    editions = list(document["editions"])
+    groups = [[row for row in document["field_bindings"] if row["edition_id"] == edition] for edition in editions]
+    document["field_bindings"] = [row for pair in zip(*groups) for row in pair]
+    old = rehash_catalog(document, edition_fixture["resources"])
+    current = old.externalize_editions()
+    expected = []
+    for row in current.editions(include_metadata=False):
+        key = old._edition_keys[row["edition_id"]]
+        assert list(current.variables(edition=key)) == list(old.variables(edition=key))
+        expected.extend(old.variables(edition=key))
+        fields = ["amount", "campus_name", "amount"]
+        assert current.resolve_artifacts((key, field) for field in fields) == old.resolve_artifacts((key, field) for field in fields)
+    assert list(current.variables()) == expected
+    assert list(current.variables()) != list(old.variables())
+
+
+def test_v4_same_policy_name_remains_edition_scoped_even_through_foreign_dependencies(edition_fixture, tmp_path):
+    from teadata.provenance import validate_record_graph
+    modeled = catalog_with_methodology(edition_fixture, tmp_path, suppression=True).to_dict()
+    student = next(iter(modeled["editions"]))
+    roots = [ref["processing_id"] for ref in modeled["artifacts"].values()]
+    roots.extend(value for reference in modeled["editions"][student]["metadata"]["references"] for value in reference["provenance_ids"])
+    modeled["provenance"] = validate_record_graph(modeled["provenance"].__getitem__, roots)
+    student_index = rehash_catalog(modeled, edition_fixture["resources"]).externalize_editions()
+    plain = edition_fixture["catalog"].to_dict()
+    staff = next(key for key in plain["editions"] if key != student)
+    plain["editions"] = {staff: plain["editions"][staff]}
+    plain["artifacts"] = {key: ref for key, ref in plain["artifacts"].items() if ref["edition"]["dataset"] == "campus_staff"}
+    plain["field_bindings"] = [row for row in plain["field_bindings"] if row["edition_id"] == staff]
+    digest = plain["editions"][staff]["column_schema_sha256"]
+    plain["column_schemas"] = {digest: plain["column_schemas"][digest]}
+    roots = [ref["processing_id"] for ref in plain["artifacts"].values()]
+    roots.extend(value for reference in plain["editions"][staff]["metadata"]["references"] for value in reference["provenance_ids"])
+    plain["provenance"] = validate_record_graph(plain["provenance"].__getitem__, roots)
+    staff_index = rehash_catalog(plain, edition_fixture["resources"]).externalize_editions()
+    document, children = student_index.to_dict(), {}
+    for index in (student_index, staff_index):
+        for identifier in index.to_dict()["editions"]:
+            raw = index.edition_metadata_bytes(identifier)
+            if identifier == student:
+                child = json.loads(raw)
+                next(row for row in child["field_bindings"] if row["field"] == "amount")["dependencies"] = [[staff, "amount"]]
+                raw = (canonical_json(child) + "\n").encode()
+            digest = sha256(raw).hexdigest()
+            children[digest] = raw
+            document["editions"][identifier] = {"key": index.to_dict()["editions"][identifier]["key"],
+                "metadata": EditionMetadataRef(digest, len(raw), digest + ".json").to_dict()}
+        document["artifacts"].update(index.to_dict()["artifacts"])
+    document["build_id"] = sha256(canonical_json({k: v for k, v in document.items() if k != "build_id"}).encode()).hexdigest()
+    current = DatasetCatalog(document, edition_metadata_loader=lambda ref: children[ref.sha256],
+                             column_schema_loader=lambda ref: edition_fixture["resources"][ref.sha256])
+    student_key = EditionKey.from_dict(document["editions"][student]["key"])
+    staff_key = EditionKey.from_dict(document["editions"][staff]["key"])
+    assert current.policy(student_key.dataset, edition=student_key).tokens["-1"].status.value == "suppressed"
+    assert not current.policy(staff_key.dataset, edition=staff_key).tokens
+    assert len(current.resolve_artifacts([(student_key, "amount")])) == 2
+
+
+def test_v4_direct_leaf_transport_waits_for_foreign_crosswalk_semantics(edition_index_fixture, tmp_path, monkeypatch):
+    from teadata.release import DataRelease
+    fixture = edition_index_fixture
+    student, ref, _ = fixture["leaves"]["student"]
+    staff, _, _ = fixture["leaves"]["staff"]
+    def change(child):
+        next(row for row in child["field_bindings"] if row["field"] == "amount")["dependencies"] = [[staff.identity, "amount"]]
+    catalog = index_with_child(fixture, student, change)
+    document = catalog.to_dict()
+    for identifier, entry in document["editions"].items():
+        fixture["root"].with_name(entry["metadata"]["location"]).write_bytes(catalog.edition_metadata_bytes(identifier))
+    fixture["root"].write_text(canonical_json({"schema_version": 4, "catalog": document}))
+    digest = fixture["legacy"].to_dict()["editions"][staff.identity]["column_schema_sha256"]
+    schema = json.loads(fixture["resources"][digest])
+    schema["datasets"][0]["tables"][0]["fields"][2]["label"] = "Different scientific meaning"
+    # Corruption is sufficient to require rejection before ANY leaf transport;
+    # existing v3 well-hashed mapping contradiction coverage uses this same validator.
+    fixture["root"].with_name(digest + ".json").write_text(canonical_json(schema))
+    release = DataRelease(fixture["root"])
+    original = release._resource_path
+    def selected(location, sha, size):
+        assert not location.endswith(".parquet"), "Foreign dependency was not validated before leaf transport"
+        return original(location, sha, size)
+    monkeypatch.setattr(release, "_resource_path", selected)
+    with pytest.raises(ContractError, match="checksum|size"):
+        release.artifact(ref.identity)
+
+
+@pytest.mark.parametrize("entry", ["symlink", "directory", "fifo", "oversize"])
+def test_v4_selected_child_uses_shared_regular_bounded_capture(edition_index_fixture, monkeypatch, entry):
+    import os
+    from teadata.release import DataRelease
+    fixture = edition_index_fixture
+    key, _, _ = fixture["leaves"]["student"]
+    descriptor = fixture["catalog"].to_dict()["editions"][key.identity]["metadata"]
+    path = fixture["root"].with_name(descriptor["location"])
+    if entry == "oversize":
+        with path.open("ab") as stream:
+            stream.write(b"extra")
+    else:
+        path.unlink()
+        if entry == "symlink":
+            path.symlink_to(fixture["root"])
+        elif entry == "directory":
+            path.mkdir()
+        else:
+            os.mkfifo(path, 0o600)
+    release = DataRelease(fixture["root"])
+    monkeypatch.setattr(os, "open", lambda *a, **k: pytest.fail("Invalid child entry reached open"))
+    with pytest.raises(ContractError, match="regular|bounded"):
+        release.catalog.metadata(key.dataset, edition=key)
+
+
+def test_v4_fresh_process_index_discovery_loads_no_heavy_modules(edition_index_fixture):
+    script = r'''
+import sys
+from pathlib import Path
+from teadata.release import DataRelease
+release = DataRelease(sys.argv[1])
+Path.open = lambda *a, **k: (_ for _ in ()).throw(AssertionError('index-only discovery opened a child'))
+assert len(list(release.catalog.editions(include_metadata=False))) == 2
+iterator = release.catalog.editions()
+assert not release.catalog._edition_children
+for name in ('pyarrow', 'duckdb', 'pandas', 'sqlalchemy', 'teadata.engine'):
+    assert name not in sys.modules, name
+'''
+    result = subprocess.run([sys.executable, "-c", script, str(edition_index_fixture["root"])],
+                            capture_output=True, text=True, timeout=30)
+    assert result.returncode == 0, result.stderr
+
+
+def test_v4_complete_root_cap_still_precedes_child_resolution(edition_index_fixture, tmp_path, monkeypatch):
+    from teadata.release import DataRelease, publish_release
+    cap = 4 * 1024 * 1024
+    document = edition_index_fixture["catalog"].to_dict()
+    size = len((canonical_json({"schema_version": 4, "catalog": document}) + "\n").encode())
+    document["description"] = "x" * (cap - size)
+    document["build_id"] = sha256(canonical_json({k: v for k, v in document.items() if k != "build_id"}).encode()).hexdigest()
+    raw = (canonical_json({"schema_version": 4, "catalog": document}) + "\n").encode()
+    assert len(raw) == cap
+    path = tmp_path / "v4-exact-cap.json"
+    path.write_bytes(raw)
+    release = DataRelease(path)
+    assert len(list(release.catalog.editions(include_metadata=False))) == 2
+    path.write_bytes(raw + b" ")
+    with pytest.raises(ContractError, match="too large"):
+        DataRelease(path)
+    document["description"] += "x"
+    document["build_id"] = sha256(canonical_json({k: v for k, v in document.items() if k != "build_id"}).encode()).hexdigest()
+    catalog = DatasetCatalog(document)
+    monkeypatch.setattr(catalog, "_edition_child", lambda *a: pytest.fail("Over-cap root resolved a child"))
+    with pytest.raises(ContractError, match="too large"):
+        publish_release(tmp_path / "over-cap", catalog, schema_version=4)
+    assert not (tmp_path / "over-cap").exists()
+
+
+def test_v4_scalar_refusal_precedes_even_selected_child_io(edition_index_fixture, monkeypatch):
+    catalog = edition_index_fixture["catalog"]
+    monkeypatch.setattr(catalog, "_edition_metadata_loader", lambda *a: pytest.fail("Scalar API loaded child metadata"))
+    with pytest.raises(ContractError, match="Schema4 scalar interpretation"):
+        catalog.measure_field("amount", "5")

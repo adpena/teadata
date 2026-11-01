@@ -13,9 +13,10 @@ from pathlib import Path
 import platform
 import os
 import sqlite3
+import unicodedata
 from typing import Any, Callable, Iterable, Mapping
 
-from .dataset_metadata import ArtifactRef, ColumnSchemaRef, DataPeriod, DatasetMetadata, EditionKey, FieldBinding, MetricDefinition, ResolvedDataset
+from .dataset_metadata import ArtifactRef, ColumnSchemaRef, DataPeriod, DatasetMetadata, EditionKey, EditionMetadataRef, FieldBinding, MetricDefinition, ResolvedDataset
 from .metric_bindings import MetricBinding, parse_bindings
 from .provenance import ProvenanceStore, validate_record_graph, validate_reference_records
 from .values import Measurement, ValuePolicy, ValueStatus, measure
@@ -138,8 +139,14 @@ class DatasetCatalog:
     """Validated, read-only metadata describing sources actually used in a build."""
 
     def __init__(self, document: Mapping[str, Any], *, expected_build_id: str | None = None,
-                 column_schema_loader: Callable[[ColumnSchemaRef], bytes] | None = None):
+                 column_schema_loader: Callable[[ColumnSchemaRef], bytes] | None = None,
+                 edition_metadata_loader: Callable[[EditionMetadataRef], bytes] | None = None):
         document = json.loads(canonical_json(document))
+        if type(document.get("schema_version")) is int and document["schema_version"] == 4:
+            self._column_schema_loader = column_schema_loader
+            self._edition_metadata_loader = edition_metadata_loader
+            self._init_edition_index(document, expected_build_id)
+            return
         if type(document.get("schema_version")) is int and document["schema_version"] == 3:
             self._column_schema_loader = column_schema_loader
             self._init_editions(document, expected_build_id)
@@ -281,7 +288,8 @@ class DatasetCatalog:
                 if self._metadata[binding.dataset.replace("{scope}", scope)].value_policy not in self._policies:
                     raise ContractError("Metric binding requires a loaded value policy")
 
-    def _init_editions(self, document: dict[str, Any], expected_build_id: str | None) -> None:
+    def _init_editions(self, document: dict[str, Any], expected_build_id: str | None, *,
+                       edition_policies: Mapping[str, Mapping[str, Any]] | None = None) -> None:
         """Load the opt-in complete index using small, already captured metadata."""
         try:
             identity = document["build_id"]
@@ -290,6 +298,9 @@ class DatasetCatalog:
                 raise ValueError("Dataset catalog identity mismatch")
             self._records = validate_record_graph(document["provenance"].__getitem__, list(document["provenance"]))
             self._policies = {name: ValuePolicy.from_dict(value) for name, value in document["value_policies"].items()}
+            self._edition_policies = ({identifier: {name: ValuePolicy.from_dict(value) for name, value in policies.items()}
+                                      for identifier, policies in edition_policies.items()}
+                                     if edition_policies is not None else None)
             self._column_schema_refs = {digest: ColumnSchemaRef.from_dict(value)
                                         for digest, value in document["column_schemas"].items()}
             if any(digest != ref.sha256 for digest, ref in self._column_schema_refs.items()):
@@ -339,8 +350,8 @@ class DatasetCatalog:
                         units.setdefault(metric.field, set()).add(metric.unit)
                 if any(len(values) > 1 for values in units.values()):
                     raise ValueError("Conflicting canonical metric units")
-                _validate_methodology(metadata, self._policies[metadata.value_policy] if metadata.value_policy else None)
                 self._edition_keys[identifier], self._edition_metadata[identifier] = key, metadata
+                _validate_methodology(metadata, self._policy_for_edition(identifier) if metadata.value_policy else None)
                 inputs[identifier] = hashes
             if set(self._column_schema_refs) != {entry["column_schema_sha256"] for entry in self._edition_entries.values()}:
                 raise ValueError("Column-schema registry must account for exactly the registered editions")
@@ -355,7 +366,7 @@ class DatasetCatalog:
                 if identifier != ref.identity or self._edition_keys[edition] != ref.edition:
                     raise ValueError("Artifact contract identity mismatch")
                 metadata = self._edition_metadata[edition]
-                policy_sha = (sha256(canonical_json(self._policies[metadata.value_policy].to_dict()).encode()).hexdigest()
+                policy_sha = (sha256(canonical_json(self._policy_for_edition(edition).to_dict()).encode()).hexdigest()
                               if metadata.value_policy else None)
                 if (contract["policy_sha256"] != policy_sha or not set(inputs[edition]) <= set(contract["inputs"])):
                     raise ValueError("Leaf policy or inputs differ from selected edition")
@@ -412,21 +423,219 @@ class DatasetCatalog:
         except (KeyError, TypeError, ValueError) as error:
             raise ContractError(f"Invalid edition catalog: {error}") from error
 
+    def _policy_for_edition(self, identifier: str) -> ValuePolicy:
+        name = self._edition_metadata[identifier].value_policy
+        if name is None:
+            raise ValueError("Edition has no value policy")
+        policies = self._edition_policies[identifier] if self._edition_policies is not None else self._policies
+        return policies[name]
+
+    def _init_edition_index(self, document: dict[str, Any], expected_build_id: str | None) -> None:
+        """Validate the small v4 index without opening any child or data file."""
+        try:
+            if set(document) != {"schema_version", "build_id", "editions", "artifacts", "description"}:
+                raise ValueError("Unsupported edition index fields")
+            content = {key: value for key, value in document.items() if key != "build_id"}
+            identity = sha256(canonical_json(content).encode()).hexdigest()
+            if document["build_id"] != identity or (expected_build_id is not None and expected_build_id != identity):
+                raise ValueError("Dataset catalog identity mismatch")
+            if not isinstance(document["editions"], dict) or not document["editions"]:
+                raise ValueError("An edition index requires registered editions")
+            self._edition_keys, self._edition_metadata_refs = {}, {}
+            for identifier, entry in document["editions"].items():
+                if set(entry) != {"key", "metadata"}:
+                    raise ValueError("Unsupported edition index entry")
+                key = EditionKey.from_dict(entry["key"])
+                if key.identity != identifier:
+                    raise ValueError("Edition key identity mismatch")
+                self._edition_keys[identifier] = key
+                self._edition_metadata_refs[identifier] = EditionMetadataRef.from_dict(entry["metadata"])
+            self._artifact_routes = document["artifacts"]
+            if not isinstance(self._artifact_routes, dict) or not self._artifact_routes:
+                raise ValueError("An edition index requires artifact routes")
+            for identifier, edition in self._artifact_routes.items():
+                if (not isinstance(identifier, str) or len(identifier) != 64
+                        or any(c not in "0123456789abcdef" for c in identifier)
+                        or edition not in self._edition_keys):
+                    raise ValueError("Invalid artifact route")
+            if set(self._artifact_routes.values()) != set(self._edition_keys):
+                raise ValueError("Every edition requires an artifact route")
+            self._edition_buffers: dict[str, bytes] = {}
+            self._edition_children: dict[str, dict[str, Any]] = {}
+            self._edition_views: dict[str, DatasetCatalog] = {}
+            self._build_id, self._serialized = identity, canonical_json(document)
+            self._v3, self._v4 = True, True
+        except (KeyError, TypeError, ValueError) as error:
+            raise ContractError(f"Invalid edition index: {error}") from error
+
+    def edition_metadata_refs(self) -> tuple[EditionMetadataRef, ...]:
+        """Index-only child descriptors; no child or native leaf I/O."""
+        if not getattr(self, "_v4", False):
+            raise ContractError("Edition metadata resources require a schema4 catalog")
+        return tuple(self._edition_metadata_refs.values())
+
+    def edition_metadata_bytes(self, identifier: str) -> bytes:
+        """Reverify the selected child's exact bounded bytes, including on warm use."""
+        try:
+            ref = self._edition_metadata_refs[identifier]
+            if self._edition_metadata_loader is None:
+                raise ValueError("Selected edition requires an explicit metadata resolver")
+            raw = self._edition_metadata_loader(ref)
+            if type(raw) is not bytes or len(raw) != ref.size_bytes:
+                raise ValueError("Edition metadata resource byte size mismatch")
+            if self._edition_buffers.get(identifier) is not raw:
+                if sha256(raw).hexdigest() != ref.sha256:
+                    raise ValueError("Edition metadata resource checksum mismatch")
+                self._edition_buffers[identifier] = raw
+            return raw
+        except (KeyError, TypeError, ValueError, OSError) as error:
+            raise ContractError(f"Invalid selected edition metadata: {error}") from error
+
+    def _edition_child(self, identifier: str) -> dict[str, Any]:
+        raw = self.edition_metadata_bytes(identifier)
+        if identifier not in self._edition_children:
+            try:
+                child = json.loads(raw)
+                if (set(child) != {"schema_version", "edition", "artifacts", "field_bindings", "column_schemas",
+                                   "provenance", "value_policies"} or type(child["schema_version"]) is not int
+                        or child["schema_version"] != 4 or child["edition"]["key"] != self._edition_keys[identifier].to_dict()
+                        or set(child["edition"]) != {"key", "metadata", "acquisition_ids", "column_schema_sha256"}
+                        or set(child["artifacts"]) != {key for key, edition in self._artifact_routes.items() if edition == identifier}
+                        or any(value["edition_id"] != identifier for value in child["field_bindings"])
+                        or any(value["edition"] != child["edition"]["key"] for value in child["artifacts"].values())):
+                    raise ValueError("Edition child differs from its exact index entry or artifact routes")
+                self._edition_children[identifier] = child
+            except (KeyError, TypeError, ValueError) as error:
+                raise ContractError(f"Invalid edition metadata child: {error}") from error
+        return self._edition_children[identifier]
+
+    def _edition_view(self, identifier: str) -> DatasetCatalog:
+        """Close selected foreign dependencies, then run the same catalog validator."""
+        children: dict[str, dict[str, Any]] = {}
+        def visit(selected):
+            if selected not in children:
+                child = children[selected] = self._edition_child(selected)
+                for value in child["field_bindings"]:
+                    for edition, _field in FieldBinding.from_dict(value).dependencies:
+                        visit(edition)
+        try:
+            visit(identifier)
+            if identifier not in self._edition_views:
+                combined: dict[str, Any] = {"schema_version": 3, "editions": {}, "artifacts": {}, "field_bindings": [],
+                                            "column_schemas": {}, "provenance": {}, "value_policies": {}, "description": ""}
+                policies = {}
+                for selected, child in children.items():
+                    combined["editions"][selected] = child["edition"]
+                    policies[selected] = child["value_policies"]
+                    combined["field_bindings"].extend(child["field_bindings"])
+                    for section in ("artifacts", "column_schemas", "provenance"):
+                        for key, value in child[section].items():
+                            if key in combined[section] and combined[section][key] != value:
+                                raise ValueError("Conflicting metadata identity across edition children")
+                            combined[section][key] = value
+                combined["build_id"] = sha256(canonical_json(combined).encode()).hexdigest()
+                view = object.__new__(DatasetCatalog)
+                view._column_schema_loader = self._column_schema_loader
+                view._init_editions(combined, None, edition_policies=policies)
+                self._edition_views[identifier] = view
+            view = self._edition_views[identifier]
+            self._check_metadata_locations((*self.edition_metadata_refs(), *view.column_schema_refs(), *view._artifact_refs.values()))
+            return view
+        except (KeyError, TypeError, ValueError) as error:
+            raise ContractError(f"Invalid selected edition dependency closure: {error}") from error
+
+    @staticmethod
+    def _check_metadata_locations(refs) -> None:
+        """Selected metadata may not route different bytes to one portable name."""
+        locations = {("local", "release.json"): None}
+        for ref in refs:
+            location = ref.location
+            key = (("url", location) if "://" in location else
+                   ("local", unicodedata.normalize("NFC", location).casefold().rstrip(" .")))
+            identity = ref.sha256, ref.size_bytes
+            if not key[1] or "\0" in location or (key in locations and locations[key] != identity):
+                raise ContractError("Edition metadata and artifact destinations collide")
+            locations[key] = identity
+
+    def externalize_editions(self) -> DatasetCatalog:
+        """Explicitly migrate validated v3 metadata to v4; preserve every native identity.
+
+        This constructs metadata in memory. It never publishes resources or opens
+        native leaves, and never invents missing schema observations/references.
+        """
+        self._require_index()
+        if getattr(self, "_v4", False):
+            raise ContractError("Externalization requires an explicit schema3 catalog")
+        self.verify_metadata()
+        children, entries, accounted = {}, {}, set()
+        for identifier, entry in self._edition_entries.items():
+            artifacts = {key: ref.to_dict() for key, ref in self._artifact_refs.items() if ref.edition.identity == identifier}
+            roots = list(entry["acquisition_ids"]) + list(self._edition_metadata[identifier].provenance_ids)
+            roots.extend(value for reference in self._edition_metadata[identifier].references for value in reference.provenance_ids)
+            roots.extend(ref["processing_id"] for ref in artifacts.values())
+            records = validate_record_graph(self._records.__getitem__, list(dict.fromkeys(roots)))
+            accounted.update(records)
+            name = self._edition_metadata[identifier].value_policy
+            child = {"schema_version": 4, "edition": deepcopy(entry), "artifacts": artifacts,
+                     "field_bindings": [binding.to_dict() for (edition, _), binding in self._field_bindings.items() if edition == identifier],
+                     "provenance": records, "value_policies": {name: self._policies[name].to_dict()} if name else {},
+                     "column_schemas": {entry["column_schema_sha256"]: self._column_schema_refs[entry["column_schema_sha256"]].to_dict()}}
+            raw = (canonical_json(child) + "\n").encode()
+            digest = sha256(raw).hexdigest()
+            descriptor = EditionMetadataRef(digest, len(raw), digest + ".json")
+            children[digest] = raw
+            entries[identifier] = {"key": entry["key"], "metadata": descriptor.to_dict()}
+        if accounted != set(self._records):
+            raise ContractError("Explicit metadata migration must account for every original provenance record")
+        content = {"schema_version": 4, "editions": entries,
+                   "artifacts": {key: ref.edition.identity for key, ref in self._artifact_refs.items()},
+                   "description": self.to_dict()["description"]}
+        return DatasetCatalog({**content, "build_id": sha256(canonical_json(content).encode()).hexdigest()},
+            column_schema_loader=self._column_schema_loader, edition_metadata_loader=lambda ref: children[ref.sha256])
+
+    def _publication_metadata(self) -> tuple[tuple[EditionMetadataRef | ColumnSchemaRef, ...], tuple[ArtifactRef, ...]]:
+        """Complete descriptor preflight, before crosswalk or native data resolution."""
+        refs: dict[str, EditionMetadataRef | ColumnSchemaRef] = {ref.sha256: ref for ref in self.edition_metadata_refs()}
+        artifacts = {}
+        for identifier in self._edition_keys:
+            view = self._edition_view(identifier)
+            for ref in view.column_schema_refs():
+                if ref.sha256 in refs and refs[ref.sha256].to_dict() != ref.to_dict():
+                    raise ContractError("Conflicting metadata resource identity")
+                refs[ref.sha256] = ref
+            for key, ref in view._artifact_refs.items():
+                artifacts[key] = ref
+        self._check_metadata_locations((*refs.values(), *artifacts.values()))
+        return tuple(refs.values()), tuple(artifacts.values())
+
     @classmethod
     def create_editions(cls, *, editions: Mapping[str, Any], artifacts: Mapping[str, Any],
                         field_bindings: Iterable[Mapping[str, Any]], column_schemas: Mapping[str, Any],
                         records: Mapping[str, Any], value_policies: Mapping[str, Any], description: str = "",
-                        column_schema_loader: Callable[[ColumnSchemaRef], bytes] | None = None) -> DatasetCatalog:
+                        column_schema_loader: Callable[[ColumnSchemaRef], bytes] | None = None,
+                        schema_version: int = 3) -> DatasetCatalog:
         """Explicit unpublished v3 construction; the default writer stays v2."""
         content = {"schema_version": 3, "editions": dict(editions), "artifacts": dict(artifacts),
                    "field_bindings": list(field_bindings), "column_schemas": dict(column_schemas),
                    "provenance": dict(records), "value_policies": dict(value_policies), "description": description}
-        return cls({**content, "build_id": sha256(canonical_json(content).encode()).hexdigest()},
-                   column_schema_loader=column_schema_loader)
+        catalog = cls({**content, "build_id": sha256(canonical_json(content).encode()).hexdigest()},
+                      column_schema_loader=column_schema_loader)
+        if type(schema_version) is not int or schema_version not in (3, 4):
+            raise ContractError("Select explicit schema3 or schema4 edition construction")
+        return catalog.externalize_editions() if schema_version == 4 else catalog
 
     def column_schema_refs(self) -> tuple[ColumnSchemaRef, ...]:
-        """External schema descriptors, without resolving their bytes."""
+        """All schema descriptors; v4 explicitly reads all child metadata, never leaves."""
         self._require_index()
+        if getattr(self, "_v4", False):
+            refs = {}
+            for identifier in self._edition_keys:
+                for digest, value in self._edition_child(identifier)["column_schemas"].items():
+                    ref = ColumnSchemaRef.from_dict(value)
+                    if digest != ref.sha256 or (digest in refs and refs[digest] != ref):
+                        raise ContractError("Conflicting column-schema resource identity")
+                    refs[digest] = ref
+            return tuple(refs.values())
         return tuple(self._column_schema_refs.values())
 
     def column_schema_bytes(self, digest: str) -> bytes:
@@ -434,6 +643,15 @@ class DatasetCatalog:
         self._require_index()
         if self._column_schema_loader is None:
             raise ContractError("Selected metadata requires an explicit column-schema resolver")
+        if getattr(self, "_v4", False):
+            try:
+                ref = next(ref for ref in self.column_schema_refs() if ref.sha256 == digest)
+                raw = self._column_schema_loader(ref)
+                if type(raw) is not bytes or len(raw) != ref.size_bytes or sha256(raw).hexdigest() != digest:
+                    raise ContractError("Column-schema resource checksum or size mismatch")
+                return raw
+            except StopIteration as error:
+                raise ContractError("Unknown column-schema resource") from error
         try:
             descriptor = self._column_schema_refs[digest]
             raw = self._column_schema_loader(descriptor)
@@ -499,19 +717,32 @@ class DatasetCatalog:
     def verify_metadata(self) -> None:
         """Explicitly validate every registered edition's external metadata."""
         self._require_index()
+        if getattr(self, "_v4", False):
+            self._publication_metadata()
         for identifier in self._edition_keys:
-            self._ensure_edition(identifier)
+            if getattr(self, "_v4", False):
+                self._edition_view(identifier).verify_metadata()
+            else:
+                self._ensure_edition(identifier)
 
     def _require_index(self) -> None:
         if not getattr(self, "_v3", False):
             raise ContractError("Complete edition index unavailable in this schema2 catalog")
 
-    def editions(self, *, dataset: str | None = None, scope: str | None = None):
-        """Yield detached registered edition metadata without any artifact I/O."""
+    def editions(self, *, dataset: str | None = None, scope: str | None = None, include_metadata: bool = True):
+        """Yield detached editions. False is index-only; True may read child metadata.
+
+        No child is prefetched before iteration, and neither mode opens native leaves.
+        """
         self._require_index()
+        if type(include_metadata) is not bool:
+            raise ContractError("include_metadata must be an explicit boolean")
         for identifier, key in self._edition_keys.items():
             if (dataset is None or key.dataset == dataset) and (scope is None or key.scope == scope):
-                yield {"edition_id": identifier, **key.to_dict(), "metadata": self._edition_metadata[identifier].to_dict()}
+                row = {"edition_id": identifier, **key.to_dict()}
+                if include_metadata:
+                    row["metadata"] = self.metadata(key.dataset, edition=key).to_dict()
+                yield row
 
     def _selected_edition(self, dataset: str, edition: EditionKey | None) -> str:
         self._require_index()
@@ -524,6 +755,12 @@ class DatasetCatalog:
     def variables(self, *, edition: EditionKey | None = None, dataset: str | None = None, scope: str | None = None):
         """Yield the complete registered field projection, not a new dictionary."""
         self._require_index()
+        if getattr(self, "_v4", False):
+            for row in self.editions(dataset=dataset, scope=scope, include_metadata=False):
+                key = self._edition_keys[row["edition_id"]]
+                if edition is None or edition == key:
+                    yield from self._edition_view(key.identity).variables(edition=key)
+            return
         validated: set[str] = set()
         for qualified, binding in self._field_bindings.items():
             key = self._edition_keys[qualified[0]]
@@ -542,6 +779,11 @@ class DatasetCatalog:
 
     def artifact_ref(self, identifier: str) -> ArtifactRef:
         self._require_index()
+        if getattr(self, "_v4", False):
+            try:
+                return self._edition_view(self._artifact_routes[identifier]).artifact_ref(identifier)
+            except KeyError as error:
+                raise ContractError("Unknown selected artifact ID") from error
         try:
             descriptor = self._artifact_refs[identifier]
             self._ensure_edition(descriptor.edition.identity)
@@ -554,6 +796,18 @@ class DatasetCatalog:
     def resolve_artifacts(self, fields: Iterable[tuple[EditionKey, str]], *, period: DataPeriod | None = None) -> tuple[dict[str, Any], ...]:
         """Resolve exact fields/dependencies; only selected metadata may need I/O."""
         self._require_index()
+        if getattr(self, "_v4", False):
+            selected = {}
+            for key, field in fields:
+                if self._edition_keys.get(key.identity) != key:
+                    raise ContractError("Exact qualified field unavailable")
+                for row in self._edition_view(key.identity).resolve_artifacts([(key, field)], period=period):
+                    ref = row["artifact"]
+                    projection = selected.setdefault(ref.identity, {"artifact": ref, "columns": []})
+                    for column in row["columns"]:
+                        if column not in projection["columns"]:
+                            projection["columns"].append(column)
+            return tuple({"artifact": row["artifact"], "columns": tuple(row["columns"])} for row in selected.values())
         columns: dict[str, list[str]] = {}
         visited: set[tuple[str, str]] = set()
 
@@ -618,6 +872,9 @@ class DatasetCatalog:
 
     @property
     def datasets(self) -> dict[str, Any]:
+        if getattr(self, "_v4", False):
+            return {identifier: deepcopy(self._edition_view(identifier)._edition_entries[identifier])
+                    for identifier in self._edition_keys}
         if getattr(self, "_v3", False):
             return deepcopy(self._edition_entries)
         return deepcopy(self._sources)
@@ -639,6 +896,9 @@ class DatasetCatalog:
         return json.loads(self._serialized)
 
     def metadata(self, dataset: str, *, edition: EditionKey | None = None) -> DatasetMetadata:
+        if getattr(self, "_v4", False):
+            identifier = self._selected_edition(dataset, edition)
+            return self._edition_view(identifier).metadata(dataset, edition=self._edition_keys[identifier])
         if getattr(self, "_v3", False):
             return DatasetMetadata.from_dict(self._edition_entries[self._selected_edition(dataset, edition)]["metadata"])
         if edition is not None:
@@ -665,6 +925,8 @@ class DatasetCatalog:
                 raise ContractError("Header crosswalk edition is missing or ambiguous")
             identifier = candidates[0]
             key = self._edition_keys[identifier]
+            if getattr(self, "_v4", False):
+                return self._edition_view(identifier).header_records(dataset, edition_key=key)
             self._ensure_edition(identifier)
             return crosswalk_records(self._column_schemas[self._edition_entries[identifier]["column_schema_sha256"]],
                 dataset=key.dataset, edition=key.edition, table=key.table, metadata=self._edition_metadata[identifier])
@@ -695,6 +957,9 @@ class DatasetCatalog:
 
     def acquisitions(self, dataset: str, *, edition: EditionKey | None = None) -> list[dict[str, Any]]:
         """Return immutable acquisition observations, including unknown download dates."""
+        if getattr(self, "_v4", False):
+            identifier = self._selected_edition(dataset, edition)
+            return self._edition_view(identifier).acquisitions(dataset, edition=self._edition_keys[identifier])
         if getattr(self, "_v3", False):
             return [deepcopy({"record_id": identifier, **self._records[identifier]})
                     for identifier in self._edition_entries[self._selected_edition(dataset, edition)]["acquisition_ids"]]
@@ -720,10 +985,14 @@ class DatasetCatalog:
         return year
 
     def policy(self, dataset: str, *, edition: EditionKey | None = None) -> ValuePolicy:
+        if getattr(self, "_v4", False):
+            identifier = self._selected_edition(dataset, edition)
+            return self._edition_view(identifier).policy(dataset, edition=self._edition_keys[identifier])
         policy_id = self.metadata(dataset, edition=edition).value_policy
         if policy_id is None:
             raise ContractError(f"Dataset {dataset} has no value policy")
-        return ValuePolicy.from_dict(self._policies[policy_id].to_dict())
+        policy = self._policy_for_edition(self._selected_edition(dataset, edition)) if getattr(self, "_v3", False) else self._policies[policy_id]
+        return ValuePolicy.from_dict(policy.to_dict())
 
     def _resolve_metric(self, metric: str, scope: str) -> tuple[MetricBinding, str, str, MetricDefinition | None]:
         self._require_scalar_interpretation()
@@ -775,6 +1044,17 @@ class DatasetCatalog:
         catalog cannot establish the field's source; names are never guessed.
         Returned metadata is detached from the catalog's immutable authority.
         """
+        if getattr(self, "_v4", False):
+            found = []
+            for row in self.editions(scope=scope, include_metadata=False):
+                key = self._edition_keys[row["edition_id"]]
+                if edition is None or edition == key:
+                    value = self._edition_view(key.identity).field_metadata(field, scope=scope, edition=key)
+                    if value is not None:
+                        found.append(value)
+            if len(found) > 1:
+                raise ContractError("Qualified field is ambiguous; select an exact EditionKey")
+            return found[0] if found else None
         if getattr(self, "_v3", False):
             candidates = [(identifier, field) for identifier, key in self._edition_keys.items()
                           if key.scope == scope and (edition is None or key == edition)
@@ -999,7 +1279,8 @@ class DatasetCatalog:
 
     def _require_scalar_interpretation(self) -> None:
         if getattr(self, "_v3", False):
-            raise ContractError("Schema3 scalar interpretation is unavailable; this reader only opens qualified native leaves")
+            schema = 4 if getattr(self, "_v4", False) else 3
+            raise ContractError(f"Schema{schema} scalar interpretation is unavailable; this reader only opens qualified native leaves")
 
 
 def write_sqlite_catalog(
@@ -1219,7 +1500,7 @@ class BuildRecorder:
     def catalog(self, *, schema_version: int = CATALOG_SCHEMA) -> DatasetCatalog:
         if processor_identity() != self.processor_sha256:
             raise ContractError("Processing source changed during the build")
-        if schema_version == 3:
+        if type(schema_version) is int and schema_version in (3, 4):
             records = self.store.verify_record_closure(sorted(self.edition_roots))
             resources = {digest: text.encode() for digest, text in self.column_schemas.items()}
             descriptors = {digest: ColumnSchemaRef(digest, len(raw), digest + ".json").to_dict()
@@ -1227,7 +1508,7 @@ class BuildRecorder:
             return DatasetCatalog.create_editions(editions=self.edition_entries, artifacts=self.edition_artifacts,
                 field_bindings=self.edition_fields, column_schemas=descriptors, records=records,
                 value_policies={key: value.to_dict() for key, value in self.cfg.value_policies.items()},
-                column_schema_loader=lambda ref: resources[ref.sha256])
+                column_schema_loader=lambda ref: resources[ref.sha256], schema_version=schema_version)
         if schema_version != CATALOG_SCHEMA:
             raise ContractError("Unsupported catalog writer schema")
         identifiers = set()
