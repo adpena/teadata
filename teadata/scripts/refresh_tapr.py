@@ -12,6 +12,7 @@ from importlib.metadata import version
 import json
 import os
 from pathlib import Path
+import stat
 import sys
 import tempfile
 from urllib.error import HTTPError
@@ -22,6 +23,8 @@ from teadata.column_schema import crosswalk_dataset, parse_column_schema
 from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
 from teadata.provenance import ProvenanceStore, _identifier
 from teadata.tapr import compare_tapr_tables, read_tapr_table
+
+INSPECTION_OUTPUT_MAX_BYTES = 8 * 1024 * 1024
 
 
 def _read_pinned_input(path: Path, expected_sha256: str) -> bytes:
@@ -219,61 +222,122 @@ def compare_inputs(args) -> dict:
             'report_sha256': sha256(output.read_bytes()).hexdigest()}
 
 
-def inspect_dictionary(args) -> dict:
-    """Inspect one retained HTML artifact offline, preserving its exact history."""
-    from teadata.tapr_dictionary import extract_tapr_dictionary
-
+def _inspection_input(args, label: str) -> tuple[ProvenanceStore, dict, bytes]:
+    """Capture the exact bounded HTML bytes whose acquisition is retained."""
     if args.output.exists() or args.output.is_symlink():
-        raise FileExistsError("Dictionary output already exists; select a new observation path")
+        raise FileExistsError(f"{label} output already exists; select a new observation path")
     if type(args.max_bytes) is not int or args.max_bytes < 1:
-        raise ValueError('Dictionary max-bytes must be a positive integer')
+        raise ValueError(f'{label} max-bytes must be a positive integer')
+    output_limit = getattr(args, 'max_output_bytes', INSPECTION_OUTPUT_MAX_BYTES)
+    if type(output_limit) is not int or output_limit < 1:
+        raise ValueError('Inspection max-output-bytes must be a positive integer')
     source, archive = ProvenanceStore(args.source_store), ProvenanceStore(args.store)
     record = source.read_record(args.record)
     if record['kind'] != 'acquisition':
-        raise ValueError('Dictionary input must be a retained acquisition observation')
+        raise ValueError(f'{label} input must be a retained acquisition observation')
     artifact = record['artifact']
     expected_size = artifact['size_bytes']
     if type(expected_size) is not int or expected_size < 0:
-        raise ValueError('Invalid retained dictionary size')
+        raise ValueError(f'Invalid retained {label.lower()} size')
     if expected_size > args.max_bytes:
-        raise ValueError('Retained dictionary exceeds max-bytes')
+        raise ValueError(f'Retained {label.lower()} exceeds max-bytes')
     selected = source.root / 'objects' / _identifier(artifact['sha256'])
-    with selected.open('rb') as stream:
-        if os.fstat(stream.fileno()).st_size > args.max_bytes:
-            raise ValueError('Retained dictionary exceeds max-bytes')
+    fd = os.open(selected, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    with os.fdopen(fd, 'rb') as stream:
+        before = os.fstat(stream.fileno())
+        if not stat.S_ISREG(before.st_mode):
+            raise ValueError('Retained inspection input must be a regular file')
+        if before.st_size > args.max_bytes:
+            raise ValueError(f'Retained {label.lower()} exceeds max-bytes')
         raw = stream.read(args.max_bytes + 1)
+        after = os.fstat(stream.fileno())
+    fields = ('st_dev', 'st_ino', 'st_mode', 'st_size', 'st_mtime_ns', 'st_ctime_ns')
+    current = selected.stat(follow_symlinks=False)
+    if any(getattr(before, key) != getattr(after, key) or getattr(after, key) != getattr(current, key)
+           for key in fields):
+        raise ValueError('Retained inspection input changed during capture')
     if len(raw) > args.max_bytes:
-        raise ValueError('Retained dictionary exceeds max-bytes')
+        raise ValueError(f'Retained {label.lower()} exceeds max-bytes')
     if len(raw) != expected_size or sha256(raw).hexdigest() != artifact['sha256']:
-        raise ValueError('Parsed dictionary bytes differ from the selected acquisition')
+        raise ValueError(f'Parsed {label.lower()} bytes differ from the selected acquisition')
     archive.copy_record_from(source, args.record)
+    return archive, record, raw
+
+
+def _save_inspection(args, archive: ProvenanceStore, report: dict, *, kind: str,
+                     implementation: dict, validation: dict) -> dict:
+    """Retain one new inspection and its processing closure without overwriting."""
+    report['implementation_sha256'] = implementation
+    args.output.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=f'.tapr-{kind}-', dir=args.output.parent) as directory:
+        staged = Path(directory) / args.output.name
+        output_limit = getattr(args, 'max_output_bytes', INSPECTION_OUTPUT_MAX_BYTES)
+        written = 0
+        with staged.open('xb') as stream:
+            os.fchmod(stream.fileno(), 0o600)
+            for text in json.JSONEncoder(indent=2, ensure_ascii=True, allow_nan=False).iterencode(report):
+                chunk = text.encode('utf-8')
+                written += len(chunk)
+                if written + 1 > output_limit:
+                    raise ValueError('Inspection output exceeds max-output-bytes')
+                stream.write(chunk)
+            stream.write(b'\n')
+        processing = archive.record_processing(dataset=f'tapr_explicit_{kind}_inspection', inputs=[args.record],
+            outputs={f'{kind}_occurrences': staged}, processor='teadata.scripts.refresh_tapr',
+            code_version=sha256(json.dumps(implementation, sort_keys=True).encode()).hexdigest(),
+            parameters={'encoding': args.encoding, 'max_bytes': args.max_bytes,
+                        'max_output_bytes': output_limit, 'no_config_activation': True,
+                        **({'max_nodes': report['max_nodes']} if kind == 'form' else {})},
+            validation=validation)
+        archive.verify_record_closure([processing])
+        os.link(staged, args.output)
+    return {'status': f'inspected_{kind}', 'processing_record_id': processing,
+            'report_sha256': sha256(args.output.read_bytes()).hexdigest()}
+
+
+def inspect_dictionary(args) -> dict:
+    """Inspect one retained HTML dictionary offline, preserving its history."""
+    from teadata.tapr_dictionary import extract_tapr_dictionary
+
+    archive, record, raw = _inspection_input(args, 'Dictionary')
     occurrences = extract_tapr_dictionary(raw, encoding=args.encoding)
     root = Path(__file__).resolve().parents[1]
     implementation = {name: sha256((root / name).read_bytes()).hexdigest()
                       for name in ['tapr_dictionary.py', 'scripts/refresh_tapr.py']}
     report = {'schema_version': 1, 'source_record_id': args.record,
-              'source_artifact': artifact, 'encoding': args.encoding, 'max_bytes': args.max_bytes,
+              'source_artifact': record['artifact'], 'encoding': args.encoding, 'max_bytes': args.max_bytes,
               'coordinate_semantics': 'Outer tooltip start tag; one-based line, zero-based decoded-character column',
               'text_projection': 'Decoded rendered text; presentation whitespace only is normalized. Raw artifact owns original bytes.',
-              'dictionary_records': [row.column_record() for row in occurrences],
-              'implementation_sha256': implementation, 'source_activation': False}
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.TemporaryDirectory(prefix='.tapr-dictionary-', dir=args.output.parent) as directory:
-        staged = Path(directory) / args.output.name
-        staged.write_text(json.dumps(report, indent=2, ensure_ascii=True, allow_nan=False) + '\n')
-        staged.chmod(0o600)
-        processing = archive.record_processing(dataset='tapr_explicit_dictionary_inspection', inputs=[args.record],
-            outputs={'dictionary_occurrences': staged}, processor='teadata.scripts.refresh_tapr',
-            code_version=sha256(json.dumps(implementation, sort_keys=True).encode()).hexdigest(),
-            parameters={'encoding': args.encoding, 'max_bytes': args.max_bytes, 'no_config_activation': True},
-            validation={'occurrences': len(occurrences), 'scientific_equivalence_claimed': False})
-        archive.verify_record_closure([processing])
-        os.link(staged, args.output)
-    return {'status': 'inspected_dictionary', 'processing_record_id': processing,
-            'report_sha256': sha256(args.output.read_bytes()).hexdigest()}
+              'dictionary_records': [row.column_record() for row in occurrences], 'source_activation': False}
+    return _save_inspection(args, archive, report, kind='dictionary', implementation=implementation,
+        validation={'occurrences': len(occurrences), 'scientific_equivalence_claimed': False})
+
+
+def inspect_form(args) -> dict:
+    """Observe retained controls and literal links; never submit or evaluate JS."""
+    from teadata.tapr_forms import DEFAULT_FORM_NODES, extract_tapr_forms
+
+    archive, record, raw = _inspection_input(args, 'Form')
+    base_url = record.get('resolved_url') or record.get('requested_url')
+    max_nodes = getattr(args, 'max_nodes', DEFAULT_FORM_NODES)
+    forms = extract_tapr_forms(raw, encoding=args.encoding, base_url=base_url, max_nodes=max_nodes)
+    root = Path(__file__).resolve().parents[1]
+    implementation = {name: sha256((root / name).read_bytes()).hexdigest()
+                      for name in ['tapr_forms.py', 'scripts/refresh_tapr.py']}
+    report = {'schema_version': 1, 'source_record_id': args.record, 'source_artifact': record['artifact'],
+              'encoding': args.encoding, 'max_bytes': args.max_bytes, 'max_nodes': max_nodes, 'base_url': base_url,
+              'coordinate_semantics': 'Start tag; one-based line, zero-based decoded-character column',
+              'text_projection': 'Display-label whitespace normalized; textarea text exact. Raw artifact owns original bytes.',
+              'forms': [form.to_dict() for form in forms], 'source_activation': False,
+              'submission_controls_inferred': False, 'javascript_executed': False}
+    return _save_inspection(args, archive, report, kind='form', implementation=implementation,
+        validation={'forms': len(forms), 'closed_forms': sum(form.closed for form in forms),
+                    'scientific_equivalence_claimed': False, 'data_downloaded': False})
 
 
 def main(argv: list[str] | None = None) -> int:
+    from teadata.tapr_forms import DEFAULT_FORM_NODES
+
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
     acquire = commands.add_parser('acquire', help='Explicit bounded public GET/POST acquisition; never change Config')
@@ -307,6 +371,16 @@ def main(argv: list[str] | None = None) -> int:
                             help='Positive retained HTML byte limit; default 2 MiB')
     dictionary.add_argument('--store', type=Path, required=True, help='Append-only output provenance archive')
     dictionary.add_argument('--output', type=Path, required=True, help='New occurrence report; never overwritten')
+    dictionary.add_argument('--max-output-bytes', type=int, default=INSPECTION_OUTPUT_MAX_BYTES)
+    form = commands.add_parser('form', help='Inspect retained HTML controls and literal links offline')
+    form.add_argument('--source-store', type=Path, required=True)
+    form.add_argument('--record', required=True)
+    form.add_argument('--encoding', required=True)
+    form.add_argument('--max-bytes', type=int, default=2 * 1024 * 1024)
+    form.add_argument('--max-output-bytes', type=int, default=INSPECTION_OUTPUT_MAX_BYTES)
+    form.add_argument('--max-nodes', type=int, default=DEFAULT_FORM_NODES)
+    form.add_argument('--store', type=Path, required=True, help='Append-only inspection provenance archive')
+    form.add_argument('--output', type=Path, required=True, help='New form report; never overwritten')
     compare = commands.add_parser('compare', help='Compare two pinned reviewed original inputs offline')
     compare.add_argument('--store', type=Path, required=True, help='Append-only report/provenance archive')
     compare.add_argument('--output', type=Path, required=True, help='New report path; never overwritten')
@@ -325,6 +399,8 @@ def main(argv: list[str] | None = None) -> int:
         result = compare_inputs(args)
     elif args.command == 'dictionary':
         result = inspect_dictionary(args)
+    elif args.command == 'form':
+        result = inspect_form(args)
     else:
         archive = ProvenanceStore(args.store)
         if args.command == 'replay':
@@ -341,7 +417,7 @@ def main(argv: list[str] | None = None) -> int:
         record = archive.read_record(acquired.record_id)
         result = {'status': 'acquired', 'record_id': acquired.record_id, 'artifact': record['artifact']}
     print(json.dumps(result, sort_keys=True))
-    return 0 if result['status'] in {'compared', 'acquired', 'inspected_dictionary'} else 2
+    return 0 if result['status'] in {'compared', 'acquired', 'inspected_dictionary', 'inspected_form'} else 2
 
 
 if __name__ == '__main__':

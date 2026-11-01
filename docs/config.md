@@ -598,6 +598,42 @@ an operator's separately selected outer deadline still applies. `replay` retains
 the original observation metadata and is unchanged; it does not apply aliases or
 silently correct historical labels.
 
+Inspect retained family menus and variable-selection forms before composing the
+next explicit request:
+
+```bash
+uv run python -m teadata.scripts.refresh_tapr form \
+  --source-store provenance --record FORM_ACQUISITION_ID \
+  --encoding iso-8859-1 --store provenance --output form-observations.json
+```
+
+This offline inspection records source-order control and option attributes,
+labels, literal method/action values, tag coordinates, and fieldset/optgroup
+context. A shared context table uses parent indices; controls reference that
+table instead of copying their ancestors. It preserves repeated control names
+and empty values. Missing methods
+stay unknown. A missing form end tag is reported as `closed: false`; ambiguous
+nested forms, controls or duplicate attributes fail for source review. Display
+labels normalize presentation whitespace; textarea content stays exact.
+The typed `teadata.tapr_forms.extract_tapr_forms()` API provides the same snapshots.
+
+The report resolves anchor URLs and literal `window.open` first arguments
+against the retained acquisition's observed URL. It never executes JavaScript,
+evaluates disabled/checked/select submission rules, infers selected variables,
+submits a form, or downloads data. Computed event handlers remain literal
+attributes for review. A local observation without a recorded HTTP URL keeps
+relative targets unresolved. The original bytes and acquisition dates remain
+authoritative; a new private processing receipt records this inspection.
+Inputs use the same explicit positive `--max-bytes` bound and SHA/length checks
+as dictionary inspection, and existing output paths are never overwritten.
+`--max-nodes` bounds the complete form projection (default 20,000 observed forms,
+controls, options, labels, links and context nodes). `--max-output-bytes` bounds
+streamed JSON staging for both form and dictionary inspection (default 8 MiB).
+Oversized output is discarded before publishing a processing receipt or report;
+larger reviewed inspections require explicit limits. Retained inputs must be
+regular files, are opened without following a final symlink or blocking on a
+FIFO, and must retain the same file identity throughout capture.
+
 Inspect a retained TAPR HTML dictionary offline through the same command owner:
 
 ```bash
