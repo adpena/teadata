@@ -504,10 +504,21 @@ whitespace only. Anchors bind the raw SHA to the outer tooltip start tag using
 one-based lines and zero-based decoded-character columns.
 Supported `p`, `div` and `br` boundaries separate rendered text. Ambiguous
 dictionary-relevant duplicate class attributes fail instead of hiding a code.
+The optional `Length:` heading is retained separately as literal
+`publisher_length`, including leading zeros; it is not folded into publisher
+type, cast to a number, treated as a scientific unit, or enforced as a maximum
+CSV-value length. Missing length stays unknown and leaves the legacy column
+record shape unchanged. The retained 2024 REF tooltips use this fourth heading;
+the existing three-heading and code-only forms remain supported.
 
 The existing `dictionary_records` column contract retains these observations.
 Only a complete occurrence can document a field; separate partial occurrences
 are never combined into a definition. Conflicting known components fail review.
+Length is supplemental metadata, not a requirement for a complete definition.
+Known length conflicts fail through the same occurrence validation, and an
+explicit source-field length must agree with a known observed length. Every
+occurrence remains available in the detached header projection without filling
+missing field metadata from another occurrence.
 Dictionary-only codes do not become source columns or establish availability,
 aliases, units or reference periods. Existing `header_records()` and
 `header_rename_map()` remain the code/label/canonical-field mapping APIs.

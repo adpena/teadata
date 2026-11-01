@@ -1,5 +1,6 @@
 from copy import deepcopy
 from hashlib import sha256
+from pathlib import Path
 
 import pytest
 
@@ -13,6 +14,46 @@ COMPLETE = '''<span class="tooltip">CPSATOFC<span class="tooltiptext" style="dis
 CODE_ONLY = '''<span class="tooltip">CPSXTOFC<span class="tooltiptext" style="dispaly</br>none">CPSXTOFC   </span></span>'''
 
 
+@pytest.mark.parametrize('scope,size,digest,code,length,description', [
+    ('campus', 669, '18fc077546cd208c8777b737fa19d8f517048e0ed894bf87b5cd80b37b6b9bda',
+     'CAMPUS', '9', '9 Digit Campus Number'),
+    ('district', 671, 'd6440307ca082e06ee48f0f33642558538ed5a4ddaae4296c279415bda8336b6',
+     'DISTRICT', '6', '6 Digit County District Number'),
+])
+def test_exact_public_ref_spans_keep_type_and_literal_length_separate(scope, size, digest, code, length, description):
+    # Exact 2024 REF slices: campus body c0dbed06... bytes51069:51738;
+    # district body9430d613... bytes51082:51753. Both start at2244/46 in
+    # their original bodies. The isolated fixtures have their own SHA/1,0 anchor.
+    path = Path(__file__).parent / 'fixtures/tapr_dictionary' / f'2024-{scope}-ref-first-tooltip.html'
+    raw = path.read_bytes()
+    assert len(raw) == size and sha256(raw).hexdigest() == digest
+    row, = extract_tapr_dictionary(raw, encoding='iso-8859-1')
+    assert (row.code, row.publisher_type, row.publisher_length, row.publisher_description) == (
+        code, 'Character', length, description)
+    assert row.source_html == raw.decode('iso-8859-1')
+    assert row.source_sha256 == digest and (row.source_line, row.source_column) == (1, 0)
+    record = row.column_record()
+    assert record['publisher_type'] == 'Character' and record['publisher_length'] == length
+
+
+@pytest.mark.parametrize('length', ['2', '002', 'not stated'])
+def test_publisher_length_is_literal_supplemental_metadata_without_numeric_cast(length):
+    markup = COMPLETE.replace('Number   ', 'Character').replace('<div class="dd_hdr">Description:',
+        f'<div class="dd_hdr">Length:</div><div class="dd_desc">{length}</div><div class="dd_hdr">Description:')
+    row, = extract_tapr_dictionary(markup.encode(), encoding='utf-8')
+    assert row.publisher_type == 'Character' and row.publisher_length == length
+    assert row.column_record()['publisher_length'] == length
+    assert row.source_html == markup
+
+
+def test_duplicate_length_heading_fails_instead_of_overwriting_the_first_value():
+    markup = COMPLETE.replace('<div class="dd_hdr">Description:',
+        '<div class="dd_hdr">Length:</div><div class="dd_desc">2</div>'
+        '<div class="dd_hdr">Length:</div><div class="dd_desc">3</div><div class="dd_hdr">Description:')
+    with pytest.raises(ValueError, match='Repeated dictionary field'):
+        extract_tapr_dictionary(markup.encode(), encoding='utf-8')
+
+
 def test_public_markup_keeps_order_duplicates_unknowns_and_original_source_spans():
     text = '<table>\n  ' + COMPLETE + '\n' + CODE_ONLY + '\n' + COMPLETE + '</table>'
     raw = text.encode('iso-8859-1')
@@ -21,6 +62,7 @@ def test_public_markup_keeps_order_duplicates_unknowns_and_original_source_spans
     assert rows[0].publisher_type == 'Number'
     assert rows[0].publisher_description == 'Campus 2025 Staff All Staff Total Full Time Equiv Count'
     assert rows[1].publisher_type is None and rows[1].publisher_description is None
+    assert all(row.publisher_length is None and 'publisher_length' not in row.column_record() for row in rows)
     assert (rows[0].source_line, rows[0].source_column) == (2, 2)
     assert (rows[1].source_line, rows[1].source_column) == (3, 0)
     assert [r.source_html for r in rows] == [COMPLETE, CODE_ONLY, COMPLETE]
@@ -49,6 +91,7 @@ def test_encoding_entity_text_and_crlf_anchors_do_not_replace_raw_byte_identity(
     source = ('é\r\n ' + COMPLETE.replace('All Staff', 'Staff &amp; pédagogie')).encode('iso-8859-1')
     row, = extract_tapr_dictionary(source, encoding='iso-8859-1')
     assert (row.source_line, row.source_column) == (2, 1)
+    assert row.publisher_description is not None
     assert 'Staff & pédagogie' in row.publisher_description
     assert '&amp;' in row.source_html and 'pédagogie' in row.source_html
     assert row.source_sha256 == sha256(source).hexdigest()
@@ -79,7 +122,7 @@ def test_duplicate_dictionary_class_attributes_cannot_hide_an_occurrence(old, ne
 @pytest.mark.parametrize('markup,reason', [
     (COMPLETE.replace('>CPSATOFC</div>', '>OTHER</div>', 1), 'code and Name differ'),
     (COMPLETE.replace('<div class="dd_hdr">Type:</div>', '<div class="dd_hdr">Name:</div>'), 'Repeated dictionary field'),
-    (COMPLETE.replace('Type:</div>', 'Length:</div>'), 'Unsupported dictionary heading'),
+    (COMPLETE.replace('Type:</div>', 'Units:</div>'), 'Unsupported dictionary heading'),
     (COMPLETE.replace('<div class="dd_desc">Number   </div>', ''), 'heading lacks its value'),
     (COMPLETE.replace('<div class="dd_hdr">Type:</div>', ''), 'value lacks its heading'),
     (COMPLETE[:-7], 'Truncated dictionary tooltip'),
@@ -135,6 +178,47 @@ def test_same_occurrence_list_keeps_partials_without_manufacturing_a_definition(
 def test_complete_and_partial_known_component_conflicts_still_fail(records):
     with pytest.raises(ValueError, match='Conflicting publisher dictionary definitions'):
         validate_header_table(table_with(records, documented=True))
+
+
+def test_optional_length_survives_occurrence_projection_without_filling_field_metadata():
+    records = [{**occurrence(1, 'Number', 'Description'), 'publisher_length': '002'},
+               {**occurrence(2, 'Number', 'Description'), 'publisher_length': '002'}]
+    table = table_with(records, documented=True)
+    validate_header_table(table)
+    document = {'schema_version': 2, 'mapping_version': 1, 'datasets': [{
+        'dataset': 'campus_tapr_staff_profile', 'edition': '2025', 'tables': [table]}]}
+    result, = header_records(document, dataset='campus_tapr_staff_profile', edition='2025')
+    assert 'publisher_length' not in result  # No metadata synthesis from another occurrence.
+    assert [row['publisher_length'] for row in result['dictionary_occurrences']] == ['002', '002']
+    result['dictionary_occurrences'][0]['publisher_length'] = 'Caller change'
+    assert records[0]['publisher_length'] == '002'
+    table['fields'][0]['publisher_length'] = '002'
+    validate_header_table(table)
+    table['fields'][0]['publisher_length'] = '2'
+    with pytest.raises(ValueError, match='differs from its publisher dictionary length'):
+        validate_header_table(table)
+
+
+def test_partial_length_never_manufactures_a_definition_and_conflicts_remain_strict():
+    records = [{**occurrence(1, 'Number', None), 'publisher_length': '2'}, occurrence(2, None, 'Description')]
+    validate_header_table(table_with(records))
+    with pytest.raises(ValueError, match='differs from its publisher dictionary'):
+        validate_header_table(table_with(records, documented=True))
+    records.append({**occurrence(3, None, None), 'publisher_length': '3'})
+    with pytest.raises(ValueError, match='Conflicting publisher dictionary definitions'):
+        validate_header_table(table_with(records))
+
+
+@pytest.mark.parametrize('length', ['', ' ', 2, True, [], {}])
+def test_length_occurrence_rejects_nonliteral_or_empty_components(length):
+    record = {**occurrence(1, None, None), 'publisher_length': length}
+    with pytest.raises(ValueError, match='Invalid publisher dictionary occurrence'):
+        validate_header_table(table_with([record]))
+
+
+def test_unknown_length_is_optional_and_does_not_change_legacy_definition_requirements():
+    table = table_with([{**occurrence(1, 'Number', 'Description'), 'publisher_length': None}], documented=True)
+    validate_header_table(table)
 
 
 @pytest.mark.parametrize('change', [

@@ -113,11 +113,11 @@ def validate_header_table(table: Mapping[str, Any]) -> None:
             if (not isinstance(record, dict)
                     or not {"ordinal", "code", "publisher_type", "publisher_description"} <= set(record)
                     or set(record) - {"ordinal", "code", "publisher_type", "publisher_description",
-                                     "source_sha256", "source_line", "source_column"}
+                                     "publisher_length", "source_sha256", "source_line", "source_column"}
                     or type(record["ordinal"]) is not int or record["ordinal"] != ordinal
                     or not isinstance(record["code"], str) or not record["code"].strip()
-                    or any(record[key] is not None and (not isinstance(record[key], str) or not record[key].strip())
-                           for key in ("publisher_type", "publisher_description"))):
+                    or any(record.get(key) is not None and (not isinstance(record[key], str) or not record[key].strip())
+                           for key in ("publisher_type", "publisher_description", "publisher_length"))):
                 raise ValueError("Invalid publisher dictionary occurrence")
             anchors = {"source_sha256", "source_line", "source_column"} & set(record)
             if anchors and (anchors != {"source_sha256", "source_line", "source_column"}
@@ -125,8 +125,8 @@ def validate_header_table(table: Mapping[str, Any]) -> None:
                     or type(record["source_line"]) is not int or record["source_line"] < 1
                     or type(record["source_column"]) is not int or record["source_column"] < 0):
                 raise ValueError("Invalid publisher dictionary source anchor")
-            for key in ("publisher_type", "publisher_description"):
-                value = record[key]
+            for key in ("publisher_type", "publisher_description", "publisher_length"):
+                value = record.get(key)
                 if value is not None and observed_components.setdefault((record["code"], key), value) != value:
                     raise ValueError(f"Conflicting publisher dictionary definitions for {record['code']!r}")
             if record["publisher_type"] is not None and record["publisher_description"] is not None:
@@ -167,6 +167,9 @@ def validate_header_table(table: Mapping[str, Any]) -> None:
                     or (status in {"not_applicable", "not_documented"} and definition is not None)
                     or status is None):
                 raise ValueError(f"Source column {position} differs from its publisher dictionary occurrences")
+            length = observed_components.get((field["code"], "publisher_length"))
+            if length is not None and "publisher_length" in field and field["publisher_length"] != length:
+                raise ValueError(f"Source column {position} differs from its publisher dictionary length")
         if "dictionary" in table and not {"publisher_type", "publisher_length", "disposition"} <= set(field):
             raise ValueError(f"Missing publisher dictionary metadata in column {position}")
         name = field["field"]

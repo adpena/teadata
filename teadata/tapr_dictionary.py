@@ -18,6 +18,7 @@ class TaprDictionaryOccurrence:
     source_line: int
     source_column: int
     source_html: str
+    publisher_length: str | None = None
 
     def column_record(self) -> dict[str, Any]:
         """Project into the existing column-schema occurrence contract.
@@ -26,9 +27,12 @@ class TaprDictionaryOccurrence:
         zero-based character column in the explicitly decoded source. The raw
         artifact checksum, rather than this decoded slice, owns byte identity.
         """
-        return {name: getattr(self, name) for name in (
+        record = {name: getattr(self, name) for name in (
             'ordinal', 'code', 'publisher_type', 'publisher_description',
             'source_sha256', 'source_line', 'source_column')}
+        if self.publisher_length is not None:
+            record['publisher_length'] = self.publisher_length
+        return record
 
 
 def _rendered(parts: list[str]) -> str:
@@ -108,7 +112,7 @@ class _DictionaryParser(HTMLParser):
                 value = _rendered(parts)
                 self.capture = None
                 if kind == 'dd_hdr':
-                    if value not in {'Name:', 'Type:', 'Description:'}:
+                    if value not in {'Name:', 'Type:', 'Length:', 'Description:'}:
                         raise ValueError('Unsupported dictionary heading')
                     self.pending = value[:-1]
                 else:
@@ -160,14 +164,17 @@ class _DictionaryParser(HTMLParser):
             source_sha256=self.source_sha256,
             source_line=self.start[0], source_column=self.start[1],
             source_html=self.text[self.source_offset(self.start):end + 1],
+            publisher_length=self.values.get('Length'),
         ))
 
 
 def extract_tapr_dictionary(raw: bytes, *, encoding: str) -> tuple[TaprDictionaryOccurrence, ...]:
     """Extract exact ordered complete/partial observations from retained bytes.
 
-    Encoding is explicit; decoding errors and ambiguous/truncated tooltip
-    structure fail. Rendered text normalizes presentation whitespace only.
+    Optional publisher length stays literal metadata, never a numeric value
+    bound or scientific unit. Encoding is explicit; decoding errors and
+    ambiguous/truncated tooltip structure fail. Rendered text normalizes
+    presentation whitespace only.
     Original decoded HTML slices and raw SHA remain available. Duplicate codes
     and conflicting definitions remain separate observations; column_schema
     owns whether those observations can document reviewed source fields.

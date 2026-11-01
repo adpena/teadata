@@ -210,7 +210,8 @@ def test_acquire_no_redirect_handler_rejects_followup():
             302, 'Found', {}, 'https://example.test/not-authorized')
 
 
-def test_dictionary_cli_keeps_partial_occurrences_and_exact_retained_history_offline(tmp_path, monkeypatch, capsys):
+@pytest.mark.parametrize('length', [None, '002'])
+def test_dictionary_cli_keeps_partial_occurrences_and_exact_retained_history_offline(tmp_path, monkeypatch, capsys, length):
     def forbidden(*args, **kwargs):
         pytest.fail('Dictionary inspection attempted HTTP')
     monkeypatch.setattr('teadata.scripts.refresh_tapr.AcquisitionClient', forbidden)
@@ -224,6 +225,9 @@ def test_dictionary_cli_keeps_partial_occurrences_and_exact_retained_history_off
         b'<div class="dd_desc">X</div><div class="dd_hdr">Type:</div><div class="dd_desc">Number</div>'
         b'<div class="dd_hdr">Description:</div><div class="dd_desc">Original</br> description</div></span></span>\n'
         b'<span class="tooltip">Y<span class="tooltiptext">Y</span></span>')
+    if length is not None:
+        raw = raw.replace(b'<div class="dd_hdr">Description:',
+            f'<div class="dd_hdr">Length:</div><div class="dd_desc">{length}</div><div class="dd_hdr">Description:'.encode())
     original.write_bytes(raw)
     metadata = DatasetMetadata(version='2025', references=(ReferenceDocument(reference_id='selection', url='https://example.test/selection',
         role='source_notes', provenance_ids=(parent,), reviewed_sha256=sha256(selection.read_bytes()).hexdigest()),))
@@ -242,6 +246,11 @@ def test_dictionary_cli_keeps_partial_occurrences_and_exact_retained_history_off
     assert report['max_bytes'] == 2 * 1024 * 1024
     assert [row['code'] for row in report['dictionary_records']] == ['X', 'Y']
     assert report['dictionary_records'][0]['publisher_description'] == 'Original description'
+    if length is not None:
+        assert report['dictionary_records'][0]['publisher_length'] == length
+    else:
+        assert 'publisher_length' not in report['dictionary_records'][0]
+    assert 'publisher_length' not in report['dictionary_records'][1]
     assert report['dictionary_records'][1]['publisher_type'] is None
     assert report['dictionary_records'][1]['publisher_description'] is None
     assert report['dictionary_records'][1]['source_line'] == 2
