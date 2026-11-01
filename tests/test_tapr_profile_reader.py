@@ -491,6 +491,7 @@ def configured_sources(tmp_path, *, second_bad=False):
         dataset = scope + "_tapr_student_staff_profile"
         mapping = mapping_for(path, labels=labels, codes=codes, fields=names)
         mapping["metric_period"] = {"kind": "unknown"}
+        mapping["layout"] = {"label_record": 1, "code_record": 2, "first_data_record": 3, "last_data_record": 7, "annotations": []}
         for field in mapping["fields"]:
             identity = field["position"] == 1
             field.update(disposition="identity" if identity else "fact", publisher_type=None,
@@ -595,3 +596,117 @@ def test_late_source_readback_failures_cleanup_and_multitable_has_no_eager_fallb
     assert not output.exists() and not list(tmp_path.rglob(".tapr-preparation-*"))
     if problem == "extra_table":
         assert not output.parent.exists()
+
+
+@pytest.fixture
+def accepted_prepared_sources(tmp_path):
+    from teadata.provenance import ProvenanceStore
+
+    cfg, _, store = configured_sources(tmp_path)
+    sources = tmp_path / "sources"
+    result = prepare_profiles(cfg, edition="2025", scopes=["campus", "district"], input_dir=None,
+        output_dir=sources, reference_store=store, budget=TaprReadBudget(batch_rows=2, batch_bytes=80))
+    source_store = ProvenanceStore(sources / "provenance")
+    # Bind the genuine synthetic schema observations already recorded by source preparation.
+    from teadata.dataset_metadata import DatasetDefinition, DatasetMetadata
+    from teadata.manifest import processor_identity
+    for scope, prepared in result["scopes"].items():
+        dataset = prepared["dataset"]
+        definition = cfg.data_sources[dataset].entries[2025]
+        metadata = definition.metadata.to_dict()
+        schema_sha = prepared["column_schema_sha256"]
+        metadata["references"][0]["provenance_ids"] = [identifier for identifier, record in
+            source_store.verify_record_closure([prepared["processing_record_id"]]).items()
+            if record["kind"] == "acquisition" and record["artifact"]["sha256"] == schema_sha]
+        cfg.data_sources[dataset].entries[2025] = DatasetDefinition(definition.path, DatasetMetadata.from_dict(metadata), definition.reader)
+    assert processor_identity() == source_store.read_record(result["scopes"]["campus"]["processing_record_id"])["code_version"]
+    selected = {item["dataset"]: (item["processing_record_id"], (scope + "_number",)) for scope, item in result["scopes"].items()}
+    return cfg, source_store, selected, result, sources
+
+
+def test_prepared_leaf_preserves_admitted_groups_and_external_schema_bytes(tmp_path, monkeypatch, accepted_prepared_sources):
+    import pyarrow.parquet as pq
+    from teadata.release import DataRelease
+    cfg, source_store, selected, result, sources = accepted_prepared_sources
+    with pq.ParquetFile(sources / "campus.parquet") as source:
+        assert next(source.iter_batches(batch_size=4096)).nbytes > 80
+    output = tmp_path / "leaves"
+    monkeypatch.setattr(pq, "read_table", lambda *a, **k: pytest.fail("Whole table read"))
+    leaves = prepare_profiles(cfg, edition="2025", scopes=[], input_dir=None, output_dir=output,
+        reference_store=source_store, prepared_inputs=selected)
+    release = DataRelease(output / "release.json", offline=True)
+    assert release.verify()
+    for scope, item in result["scopes"].items():
+        entry = leaves["datasets"][item["dataset"]]
+        with pq.ParquetFile(release.artifact(entry["artifact_id"])) as native:
+            assert [native.metadata.row_group(i).num_rows for i in range(native.metadata.num_row_groups)] == [2, 2, 1]
+            assert all(native.read_row_group(i).nbytes <= 80 for i in range(native.metadata.num_row_groups))
+        descriptor = next(ref for ref in release.catalog.column_schema_refs() if ref.sha256 == item["column_schema_sha256"])
+        assert (output / descriptor.location).read_bytes() == cfg.column_contract(item["dataset"], 2025, reader_profile="source")["text"].encode()
+    assert len(release.catalog.column_schema_refs()) == 2
+
+
+@pytest.mark.parametrize("damage", ["missing_budget", "boolean_budget", "code", "script", "key_budget"])
+def test_prepared_budget_and_code_admission_precede_every_writer(tmp_path, monkeypatch, accepted_prepared_sources, damage):
+    import teadata.scripts.build_tapr_profiles as producer
+    cfg, store, selected, result, _ = accepted_prepared_sources
+    dataset = result["scopes"]["district"]["dataset"]
+    record = store.read_record(selected[dataset][0])
+    params = record["parameters"]
+    code = record["code_version"]
+    if damage == "missing_budget":
+        params.pop("source_read_budget")
+    elif damage == "boolean_budget":
+        params["source_read_budget"]["batch_bytes"] = True
+    elif damage == "code":
+        code = "f" * 64
+    elif damage == "script":
+        params["preparation_code_sha256"] = "f" * 64
+    else:
+        params["source_read_budget"]["key_bytes"] = 1
+    changed = store.record_processing(dataset=dataset, inputs=record["inputs"],
+        outputs={name: store.verify_artifact(value["sha256"]) for name, value in record["outputs"].items()},
+        processor=record["processor"], code_version=code, parameters=params, validation=record["validation"])
+    selected[dataset] = changed, selected[dataset][1]
+    monkeypatch.setattr(producer, "write_leaf_artifact", lambda *a, **k: pytest.fail("Writer before all source admissions"))
+    output = tmp_path / "new" / "leaves"
+    with pytest.raises(ValueError, match="bounded|budget"):
+        prepare_profiles(cfg, edition="2025", scopes=[], input_dir=None, output_dir=output,
+            reference_store=store, prepared_inputs=selected)
+    assert not output.parent.exists()
+
+
+@pytest.mark.parametrize("damage", ["readback", "source_changed"])
+def test_prepared_leaf_late_failure_never_publishes_partial_cohort(tmp_path, monkeypatch, accepted_prepared_sources, damage):
+    import teadata.scripts.build_tapr_profiles as producer
+    cfg, store, selected, result, _ = accepted_prepared_sources
+    dataset = result["scopes"]["campus"]["dataset"]
+    record = store.read_record(selected[dataset][0])
+    prepared_sha = record["outputs"]["prepared_source"]["sha256"]
+    if damage == "readback":
+        original = producer._prepared_batches
+        calls = 0
+        def changed_batches(native, budget):
+            nonlocal calls
+            calls += 1
+            for index, batch in enumerate(original(native, budget)):
+                if calls == 1 and index == 0:
+                    yield batch.set_column(1, batch.schema.field(1), pa.array(["changed"] * batch.num_rows))
+                else:
+                    yield batch
+        monkeypatch.setattr(producer, "_prepared_batches", changed_batches)
+    else:
+        original = producer.write_leaf_artifact
+        def changed_source(*a, **k):
+            output = original(*a, **k)
+            # Perturb the active private-stage preparation, not the upstream fixture store.
+            prepared = Path(a[0]).parent / "provenance" / "objects" / prepared_sha
+            with prepared.open("ab") as stream:
+                stream.write(b"injected late source change")
+            return output
+        monkeypatch.setattr(producer, "write_leaf_artifact", changed_source)
+    output = tmp_path / "new" / "leaves"
+    with pytest.raises(ValueError, match="readback differs|changed during materialization"):
+        prepare_profiles(cfg, edition="2025", scopes=[], input_dir=None, output_dir=output,
+            reference_store=store, prepared_inputs=selected)
+    assert not output.exists() and list(output.parent.iterdir()) == []

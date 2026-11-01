@@ -10,14 +10,16 @@ import json
 import gzip
 import os
 from pathlib import Path
+import stat
 import tempfile
+import unicodedata
 from urllib.parse import urljoin
 from urllib.request import urlopen
 
 from platformdirs import user_cache_path
 
 from .analytical import ANALYTICAL_DATASETS, ANALYTICAL_ROLES, analytical_dataset, validate_artifact, validate_leaf_artifact
-from .dataset_metadata import validate_http_url
+from .dataset_metadata import COLUMN_SCHEMA_MAX_BYTES, ColumnSchemaRef, validate_http_url
 from .manifest import (
     ContractError,
     DatasetCatalog,
@@ -75,6 +77,55 @@ def _download(url: str, path: Path, *, expected: dict | None = None) -> None:
             temporary.unlink(missing_ok=True)
 
 
+def _capture_column_schema(path: Path, descriptor: ColumnSchemaRef, *,
+                           cached: tuple[Path, tuple[int, ...], bytes] | None = None) -> tuple[bytes, tuple[int, ...]]:
+    """Admit one regular metadata file before reading its exact verified buffer."""
+    def signature(state):
+        return tuple(getattr(state, key) for key in
+                     ("st_dev", "st_ino", "st_mode", "st_uid", "st_size", "st_mtime_ns", "st_ctime_ns"))
+    try:
+        state = path.stat(follow_symlinks=False)
+        if (not stat.S_ISREG(state.st_mode) or not 0 < descriptor.size_bytes <= COLUMN_SCHEMA_MAX_BYTES
+                or state.st_size != descriptor.size_bytes):
+            raise ContractError("Column-schema resource must be regular and match its declared bounded size")
+        before = signature(state)
+        if cached is not None and cached[:2] == (path, before):
+            return cached[2], before
+        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        with os.fdopen(fd, "rb") as stream:
+            opened = os.fstat(stream.fileno())
+            if (not stat.S_ISREG(opened.st_mode) or opened.st_size != descriptor.size_bytes
+                    or signature(opened) != before):
+                raise ContractError("Column-schema resource changed before reading")
+            raw = stream.read(descriptor.size_bytes + 1)
+            if signature(os.fstat(stream.fileno())) != before:
+                raise ContractError("Column-schema resource changed during reading")
+        if (signature(path.stat(follow_symlinks=False)) != before or len(raw) != descriptor.size_bytes
+                or sha256(raw).hexdigest() != descriptor.sha256):
+            raise ContractError("Column-schema resource checksum, size or identity mismatch")
+        return raw, before
+    except OSError as error:
+        raise ContractError("Invalid column-schema resource filesystem entry") from error
+
+
+def _schema_publication_destinations(catalog: DatasetCatalog) -> tuple[ColumnSchemaRef, ...]:
+    """Reject every colliding local destination before metadata resolution/writes."""
+    names = {"release.json"}
+    def reserve(location):
+        name = _safe_filename(location)
+        key = unicodedata.normalize("NFC", name).casefold().rstrip(" .")
+        if not key or "\0" in name or key in names:
+            raise ContractError("Schema3 publication destinations collide with a reserved root or another resource")
+        names.add(key)
+    for artifact in catalog.to_dict()["artifacts"].values():
+        if "://" not in artifact["location"]:
+            reserve(artifact["location"])
+    resources = catalog.column_schema_refs()
+    for resource in resources:
+        reserve(resource.location)
+    return resources
+
+
 class DataRelease:
     """A complete bundle with one catalog and content hashes for every artifact."""
 
@@ -112,9 +163,11 @@ class DataRelease:
         if self._v3:
             if set(document) != {"schema_version", "catalog"} or document["catalog"].get("schema_version") != 3:
                 raise ContractError("Schema3 roots require one authoritative edition catalog")
-            self.catalog = DatasetCatalog(document["catalog"])
             self._verified = {}
             self._verified_bytes: dict[str, tuple[Path, tuple[int, int, int, int]]] = {}
+            self._column_schema_data: dict[str, tuple[Path, tuple[int, ...], bytes]] = {}
+            self._manifest_sha256 = sha256(raw).hexdigest()
+            self.catalog = DatasetCatalog(document["catalog"], column_schema_loader=self._column_schema_bytes)
             return
         expected_roles = {1: ROLES, 2: ANALYTICAL_RELEASE_ROLES}.get(version) if type(version) is int else None
         if expected_roles is None or set(document.get("artifacts", {})) != expected_roles:
@@ -169,20 +222,39 @@ class DataRelease:
     def build_id(self) -> str:
         return self.catalog.build_id
 
+    def _resource_path(self, location: str, digest: str, size: int) -> Path:
+        """One location/cache/download path for selected v3 bytes."""
+        if "://" in location or self.remote:
+            path = self.cache / "objects" / digest
+            if not path.exists():
+                if self.offline:
+                    raise ContractError("Selected resource is not cached for offline use")
+                _download(location if "://" in location else urljoin(self.source, location), path,
+                          expected={"sha256": digest, "size_bytes": size})
+            return path
+        return self.path.parent / location
+
+    def _column_schema_bytes(self, descriptor: ColumnSchemaRef) -> bytes:
+        path = self._resource_path(descriptor.location, descriptor.sha256, descriptor.size_bytes)
+        raw, before = _capture_column_schema(path, descriptor, cached=self._column_schema_data.get(descriptor.sha256))
+        self._column_schema_data[descriptor.sha256] = path, before, raw
+        return raw
+
+    def __getstate__(self) -> dict:
+        if self._v3:
+            return {"_v3": True, "source": self.source, "pin": self._manifest_sha256, "offline": self.offline}
+        return self.__dict__.copy()
+
+    def __setstate__(self, state: dict) -> None:
+        if state.get("_v3") is True:
+            self.__init__(state["source"], expected_sha256=state["pin"], offline=state["offline"])
+        else:
+            self.__dict__.update(state)
+
     def artifact(self, role: str) -> Path:
         if self._v3:
             descriptor = self.catalog.artifact_ref(role)
-            location = descriptor.location
-            remote = "://" in location or self.remote
-            if remote:
-                path = self.cache / "objects" / descriptor.sha256
-                if not path.exists():
-                    if self.offline:
-                        raise ContractError("Selected leaf is not cached for offline use")
-                    _download(location if "://" in location else urljoin(self.source, location), path,
-                              expected={"sha256": descriptor.sha256, "size_bytes": descriptor.size_bytes})
-            else:
-                path = self.path.parent / location
+            path = self._resource_path(descriptor.location, descriptor.sha256, descriptor.size_bytes)
             state = path.stat()
             signature = (state.st_ino, state.st_size, state.st_mtime_ns, state.st_ctime_ns)
             if self._verified_bytes.get(descriptor.sha256) != (path, signature):
@@ -229,6 +301,7 @@ class DataRelease:
 
     def verify(self) -> dict[str, Path]:
         if self._v3:
+            self.catalog.verify_metadata()
             return {identifier: self.artifact(identifier) for identifier in self.catalog.to_dict()["artifacts"]}
         return {role: self.artifact(role) for role in sorted(self._artifacts)}
 
@@ -304,7 +377,34 @@ def publish_release(
             raise ContractError("Release manifest is too large")
         if (directory / "release.json").exists() or (directory / "release.json").is_symlink():
             raise FileExistsError("Schema3 candidate root already exists")
+        resources = _schema_publication_destinations(catalog)
+        catalog.verify_metadata()
+        admitted = []
+        for descriptor in resources:
+            destination = directory / descriptor.location
+            raw = catalog.column_schema_bytes(descriptor.sha256)
+            try:
+                destination.stat(follow_symlinks=False)
+            except FileNotFoundError:
+                present = False
+            else:
+                _capture_column_schema(destination, descriptor)
+                present = True
+            admitted.append((destination, raw, present))
         directory.mkdir(parents=True, exist_ok=True)
+        for destination, raw, present in admitted:
+            if not present:
+                resource_temporary = None
+                try:
+                    with tempfile.NamedTemporaryFile(dir=directory, delete=False) as stream:
+                        resource_temporary = Path(stream.name)
+                        stream.write(raw)
+                        stream.flush()
+                        os.fsync(stream.fileno())
+                    os.link(resource_temporary, destination)
+                finally:
+                    if resource_temporary is not None:
+                        resource_temporary.unlink(missing_ok=True)
     elif schema_version is not None:
         raise ContractError("Select explicit schema3 or the unchanged legacy publisher")
     elif catalog.to_dict().get("schema_version") != 2:

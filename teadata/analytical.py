@@ -398,12 +398,15 @@ def _leaf_schema(contract):
     return schema
 
 
-def write_leaf_artifact(path: str | Path, batches, *, contract: Mapping[str, Any]) -> dict[str, Any]:
+def write_leaf_artifact(path: str | Path, batches, *, contract: Mapping[str, Any],
+                        batch_bytes: int | None = None) -> dict[str, Any]:
     """Write one new immutable wide leaf; caller owns cohort staging/activation."""
     from hashlib import sha256
     import pyarrow.parquet as pq
 
     path = Path(path)
+    if batch_bytes is not None and (type(batch_bytes) is not int or batch_bytes < 1):
+        raise ContractError("Leaf batch byte budget must be a positive integer")
     if path.exists() or path.is_symlink():
         raise FileExistsError("Leaf output already exists")
     schema = _leaf_schema(contract)
@@ -418,8 +421,10 @@ def write_leaf_artifact(path: str | Path, batches, *, contract: Mapping[str, Any
             for batch in batches:
                 if not batch.schema.remove_metadata().equals(schema, check_metadata=True):
                     raise ContractError("Leaf batch differs from its complete native schema")
+                if batch.num_rows < 1 or (batch_bytes is not None and batch.nbytes > batch_bytes):
+                    raise ContractError("Leaf batch exceeds its admitted native byte budget")
                 rows += batch.num_rows
-                writer.write_batch(batch.replace_schema_metadata(footer), row_group_size=4096)
+                writer.write_batch(batch.replace_schema_metadata(footer), row_group_size=batch.num_rows)
         if type(contract["rows"]) is not int or rows != contract["rows"]:
             raise ContractError("Leaf rows differ from its declared count")
         os.link(temporary, path)  # exclusive publication; never replace an existing leaf

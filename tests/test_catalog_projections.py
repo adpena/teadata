@@ -9,16 +9,16 @@ from dataclasses import replace
 import json
 import subprocess
 import sys
-import threading
 from importlib.metadata import version
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from io import BytesIO
+from urllib.parse import urlparse
 
 import pytest
 
 from teadata.engine import DataEngine
 from teadata.manifest import ContractError, DatasetCatalog, canonical_json
 from teadata.release import SNAPSHOT_MAGIC
-from teadata.dataset_metadata import ArtifactRef, DataPeriod, EditionKey
+from teadata.dataset_metadata import ArtifactRef, ColumnSchemaRef, DataPeriod, DatasetMetadata, EditionKey, ReferenceDocument, ResolvedDataset
 from teadata.manifest import BuildRecorder, file_identity
 from teadata.provenance import ProvenanceStore
 from teadata.teadata_config import Config
@@ -165,13 +165,18 @@ def edition_fixture(tmp_path):
         resource = tmp_path / (family + "-schema.json")
         resource.write_text(canonical_json(schema_doc))
         schema_sha = file_identity(resource)["sha256"]
-        schemas[schema_sha] = resource.read_text()
+        schemas[schema_sha] = resource.read_bytes()
+        schema_observation = store.record_acquisition(resource, ResolvedDataset(dataset + ":schema", "reference", None, None,
+            str(resource), DatasetMetadata(title="Synthetic retained crosswalk")))
+        (tmp_path / (schema_sha + ".json")).write_bytes(schemas[schema_sha])
         datasets[dataset] = {2025: {"path": str(raw), "metadata": {
             "version": "2025", "value_policy": "numeric", "metrics": {
                 "amount": {"field": "amount", "unit": "count", "period": {"kind": "calendar_year", "year": 2024}}}},
             "reader": {"profiles": {"source": {"column_schema": resource.name,
                 "references": [{"reference_id": "columns", "role": "schema", "path": resource.name,
-                    "reviewed_sha256": schema_sha}]}}}}}
+                    "reviewed_sha256": schema_sha, "status": "available", "provenance_ids": [schema_observation]}]}}}}}
+        profile = datasets[dataset][2025]["reader"]["profiles"]["source"]
+        datasets[dataset][2025]["metadata"]["references"] = profile.pop("references")
         specs.append((family, dataset, raw, raw_sha, table))
     cfg = Config.from_dict({"data_sources": datasets, "value_policies": {"numeric": {}}})
     cfg.base_dir = tmp_path
@@ -200,14 +205,15 @@ def edition_fixture(tmp_path):
         recorder.record_edition(key, source, artifacts=[ref], acquisition_ids=[acquisition])
         leaves[family] = (key, ref, leaf)
     catalog = recorder.catalog(schema_version=3)
+    catalog.verify_metadata()
     root = tmp_path / "root.json"
     root.write_text(canonical_json({"schema_version": 3, "catalog": catalog.to_dict()}))
-    return {"catalog": catalog, "root": root, "leaves": leaves, "recorder": recorder, "store": store}
+    return {"catalog": catalog, "root": root, "leaves": leaves, "recorder": recorder, "store": store, "resources": schemas}
 
 
-def rehash_catalog(document):
+def rehash_catalog(document, resources=None):
     document["build_id"] = sha256(canonical_json({k: v for k, v in document.items() if k != "build_id"}).encode()).hexdigest()
-    return DatasetCatalog(document)
+    return DatasetCatalog(document, column_schema_loader=(lambda ref: resources[ref.sha256]) if resources is not None else None)
 
 
 def test_edition_index_resolves_explicit_keys_periods_dependencies_and_detaches(edition_fixture, monkeypatch):
@@ -274,7 +280,7 @@ def test_new_root_metadata_reuses_leaf_but_transform_inputs_change_contract(edit
     catalog = edition_fixture["catalog"]
     changed = catalog.to_dict()
     changed["description"] = "new root-only editorial metadata"
-    newer = rehash_catalog(changed)
+    newer = rehash_catalog(changed, edition_fixture["resources"])
     key, ref, _ = edition_fixture["leaves"]["student"]
     assert newer.build_id != catalog.build_id and newer.artifact_ref(ref.identity) == ref
     assert key.revision_sha256 == EditionKey.source_revision(tuple(ref.contract["inputs"]))
@@ -287,36 +293,23 @@ def test_new_root_metadata_reuses_leaf_but_transform_inputs_change_contract(edit
 
 
 @pytest.fixture
-def catalog_http(tmp_path):
+def catalog_transport(tmp_path, monkeypatch):
+    """Exercise the real streamed downloader without opening any socket."""
     requests = []
-
-    class Handler(BaseHTTPRequestHandler):
-        def do_GET(self):
-            requests.append(self.path)
-            target = tmp_path / self.path.lstrip("/")
-            if not target.is_file():
-                self.send_error(404)
-                return
-            self.send_response(200)
-            self.end_headers()
-            self.wfile.write(target.read_bytes())
-
-        def log_message(self, format, *args):
-            pass
-    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-    thread = threading.Thread(target=server.serve_forever)
-    thread.start()
-    try:
-        yield "http://127.0.0.1:" + str(server.server_port), requests
-    finally:
-        server.shutdown()
-        server.server_close()
-        thread.join(2)
+    monkeypatch.setattr("teadata.release.user_cache_path", lambda name: tmp_path / "resource-cache")
+    base = "https://synthetic.invalid"
+    def open_response(url, timeout):
+        assert url.startswith(base + "/") and timeout == 60
+        path = urlparse(url).path
+        requests.append(path)
+        return BytesIO((tmp_path / path.lstrip("/")).read_bytes())
+    monkeypatch.setattr("teadata.release.urlopen", open_response)
+    return base, requests
 
 
-def test_pinned_root_selected_transport_second_root_and_offline(edition_fixture, catalog_http, monkeypatch, tmp_path):
+def test_pinned_root_selected_transport_second_root_and_offline(edition_fixture, catalog_transport, monkeypatch, tmp_path):
     from teadata.release import DataRelease
-    base, requests = catalog_http
+    base, requests = catalog_transport
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     root = edition_fixture["root"]
     key, student, _ = edition_fixture["leaves"]["student"]
@@ -325,15 +318,18 @@ def test_pinned_root_selected_transport_second_root_and_offline(edition_fixture,
     pin = file_identity(root)["sha256"]
     selected = DataRelease(url, expected_sha256=pin)
     assert requests == ["/root.json"]
-    assert len(list(selected.catalog.variables())) == 6 and requests == ["/root.json"]
+    assert len(list(selected.catalog.editions())) == 2 and requests == ["/root.json"]
+    assert len(list(selected.catalog.variables(edition=key))) == 3
+    student_schema = selected.catalog.to_dict()["editions"][key.identity]["column_schema_sha256"]
+    assert requests == ["/root.json", "/" + student_schema + ".json"]
     assert selected.analytical_dataset(student.identity).to_table(columns=["amount"]).to_pydict() == {"amount": ["5"]}
-    assert requests == ["/root.json", "/student.parquet"]
+    assert requests == ["/root.json", "/" + student_schema + ".json", "/student.parquet"]
     offline = DataRelease(url, expected_sha256=pin, offline=True)
     assert offline.artifact(student.identity).is_file()
     with pytest.raises(ContractError, match="not cached"):
         offline.artifact(staff.identity)
     selected.artifact(staff.identity)
-    assert requests[-1] == "/staff.parquet" and len(requests) == 3
+    assert requests[-1] == "/staff.parquet" and len(requests) == 5
     document = selected.catalog.to_dict()
     for ref in document["artifacts"].values():
         ref["location"] = base + "/" + ref["location"]
@@ -343,7 +339,7 @@ def test_pinned_root_selected_transport_second_root_and_offline(edition_fixture,
     second.write_text(canonical_json({"schema_version": 3, "catalog": newer.to_dict()}))
     next_release = DataRelease(base + "/second.json", expected_sha256=file_identity(second)["sha256"])
     next_release.artifact(student.identity)
-    assert requests[-1] == "/second.json" and len(requests) == 4
+    assert requests[-1] == "/second.json" and len(requests) == 6
     with pytest.raises(ContractError, match="period"):
         next_release.catalog.resolve_artifacts([(key, "amount")], period=DataPeriod(kind="calendar_year", year=2026))
     cached_root = offline.path
@@ -353,7 +349,7 @@ def test_pinned_root_selected_transport_second_root_and_offline(edition_fixture,
     cached_root.unlink()
     with pytest.raises(FileNotFoundError):
         DataRelease(url, expected_sha256=pin, offline=True)
-    assert len(requests) == 4
+    assert len(requests) == 6
 
 
 def test_cached_sha_never_grants_foreign_descriptor_footer_acceptance(edition_fixture):
@@ -374,6 +370,7 @@ def test_v3_fresh_process_metadata_loading_imports_no_native_or_engine(edition_f
 import json, pathlib, sys
 from teadata.release import DataRelease
 release = DataRelease(sys.argv[1])
+assert len(list(release.catalog.variables())) == 6
 pathlib.Path.open = lambda *a, **k: (_ for _ in ()).throw(AssertionError('I/O after bootstrap'))
 assert len(list(release.catalog.variables())) == 6
 assert len(list(release.catalog.editions())) == 2
@@ -392,7 +389,7 @@ def test_valid_pure_graph_and_dependency_resolution_need_no_artifact_io(edition_
     amount["dependencies"] = [[staff.identity, "amount"]]
     with monkeypatch.context() as forbidden:
         forbidden.setattr(Path, "open", lambda *a, **k: pytest.fail("pure graph opened artifact"))
-        catalog = rehash_catalog(document)
+        catalog = rehash_catalog(document, edition_fixture["resources"])
         selected = catalog.resolve_artifacts([(student, "amount")])
         assert [row["artifact"].edition for row in selected] == [student, staff]
         assert all(row["columns"] == ("campus_number", "amount") for row in selected)
@@ -402,9 +399,9 @@ def test_valid_pure_graph_and_dependency_resolution_need_no_artifact_io(edition_
             catalog.resolve_artifacts([(student, "campus_number")], period=DataPeriod(kind="calendar_year", year=2025))
 
 
-def test_partial_download_and_changed_cached_leaf_fail_without_fallback(edition_fixture, catalog_http, monkeypatch, tmp_path):
+def test_partial_download_and_changed_cached_leaf_fail_without_fallback(edition_fixture, catalog_transport, monkeypatch, tmp_path):
     from teadata.release import DataRelease
-    base, requests = catalog_http
+    base, requests = catalog_transport
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     selected = DataRelease(base + "/root.json", expected_sha256=file_identity(edition_fixture["root"])["sha256"])
     _, student, _ = edition_fixture["leaves"]["student"]
@@ -413,17 +410,17 @@ def test_partial_download_and_changed_cached_leaf_fail_without_fallback(edition_
     with pytest.raises(ContractError, match="checksum or size"):
         selected.artifact(staff.identity)
     assert not (selected.cache / "objects" / staff.sha256).exists()
-    assert list((selected.cache / "objects").iterdir()) == []
+    assert list((selected.cache / "objects").iterdir())  # selected metadata is independently cached
     path = selected.artifact(student.identity)
     path.write_bytes(b"corrupt")
     with pytest.raises(ContractError, match="checksum or size"):
         selected.artifact(student.identity)
-    assert requests == ["/root.json", "/staff.parquet", "/student.parquet"]
+    assert requests[0] == "/root.json" and [p for p in requests if p.endswith(".parquet")] == ["/staff.parquet", "/student.parquet"]
 
 
-def test_stream_download_accepts_legacy_full_identity_and_root_cache_keys_include_trust_options(edition_fixture, catalog_http, monkeypatch, tmp_path):
+def test_stream_download_accepts_legacy_full_identity_and_root_cache_keys_include_trust_options(edition_fixture, catalog_transport, monkeypatch, tmp_path):
     from teadata.release import _download, _load_release
-    base, requests = catalog_http
+    base, requests = catalog_transport
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
     _, _, leaf = edition_fixture["leaves"]["student"]
     target = tmp_path / "downloaded.parquet"
@@ -527,7 +524,7 @@ def test_exact_same_dataset_revisions_never_choose_latest_or_share_field_cache(e
     original, ref, leaf = edition_fixture["leaves"]["student"]
     document = catalog.to_dict()
     old_entry = document["editions"][original.identity]
-    resource = json.loads(document["column_schemas"][old_entry["column_schema_sha256"]])
+    resource = json.loads(catalog.column_schema_bytes(old_entry["column_schema_sha256"]))
     raw = tmp_path / "reissued.csv"
     raw.write_text("ID,NAME,VALUE\n001,One,7\n")
     raw_sha = file_identity(raw)["sha256"]
@@ -539,6 +536,12 @@ def test_exact_same_dataset_revisions_never_choose_latest_or_share_field_cache(e
     table["input_sha256"] = raw_sha
     text = canonical_json(resource)
     schema_sha = sha256(text.encode()).hexdigest()
+    schema_path = tmp_path / (schema_sha + ".json")
+    schema_path.write_text(text)
+    schema_id = store.record_acquisition(schema_path, ResolvedDataset(key.dataset + ":schema", "reference", None, None,
+        str(schema_path), DatasetMetadata()))
+    metadata = replace(metadata, references=(ReferenceDocument(reference_id="columns", role="schema", status="available",
+        path=schema_path.name, reviewed_sha256=schema_sha, provenance_ids=(schema_id,)),))
     contract = ref.contract
     contract.update(edition=key.to_dict(), inputs=[raw_sha], mapping_sha256=sha256(canonical_json(table).encode()).hexdigest())
     from teadata.column_schema import header_records
@@ -555,14 +558,14 @@ def test_exact_same_dataset_revisions_never_choose_latest_or_share_field_cache(e
         parameters={**old_processing["parameters"], "leaf_contract_sha256": identity})
     actual = file_identity(output)
     newer = ArtifactRef(key, actual["sha256"], actual["size_bytes"], output.name, canonical_json(contract), processing, "leaf")
-    document["column_schemas"][schema_sha] = text
+    document["column_schemas"][schema_sha] = ColumnSchemaRef(schema_sha, len(text.encode()), schema_path.name).to_dict()
     document["editions"][key.identity] = {"key": key.to_dict(), "metadata": metadata.to_dict(),
         "acquisition_ids": [acquisition], "column_schema_sha256": schema_sha}
     document["artifacts"][identity] = newer.to_dict()
     document["field_bindings"].extend({**row, "edition_id": key.identity, "artifact_id": identity}
         for row in list(document["field_bindings"]) if row["edition_id"] == original.identity)
-    document["provenance"].update(store.verify_record_closure([processing]))
-    selected = rehash_catalog(document)
+    document["provenance"].update(store.verify_record_closure([processing, schema_id]))
+    selected = rehash_catalog(document, {**edition_fixture["resources"], schema_sha: text.encode()})
     with pytest.raises(ContractError, match="ambiguous"):
         selected.metadata(key.dataset)
     with pytest.raises(ContractError, match="ambiguous"):
@@ -609,7 +612,13 @@ def test_many_year_metadata_envelope_is_measured_without_native_imports(tmp_path
                     "edition": str(year), "source_only": True, "tables": [table]}]}
                 text = canonical_json(resource)
                 schema_sha = sha256(text.encode()).hexdigest()
-                schemas[schema_sha] = text
+                schemas[schema_sha] = ColumnSchemaRef(schema_sha, len(text.encode()), schema_sha + ".json").to_dict()
+                (tmp_path / (schema_sha + ".json")).write_text(text)
+                schema_id = receipt({"schema_version": 1, "kind": "acquisition", "dataset": dataset + ":schema", "section": "reference",
+                    "requested_year": None, "resolved_year": None, "source_metadata": {},
+                    "artifact": {"sha256": schema_sha, "size_bytes": len(text.encode()), "filename": schema_sha + ".json"}})
+                metadata = replace(metadata, references=(ReferenceDocument(reference_id="columns", role="schema", status="available",
+                    path=schema_sha + ".json", reviewed_sha256=schema_sha, provenance_ids=(schema_id,)),))
                 acquisition = receipt({"schema_version": 1, "kind": "acquisition", "dataset": dataset,
                     "section": "data_sources", "requested_year": year, "resolved_year": year, "source_metadata": metadata.to_dict(),
                     "artifact": {"sha256": raw_sha, "size_bytes": 1, "filename": "synthetic-unopened.csv"}})
@@ -646,7 +655,7 @@ from teadata.manifest import ContractError
 raw = pathlib.Path(sys.argv[1]).read_bytes()
 document = json.loads(raw)['catalog']
 tracemalloc.start()
-catalog = DatasetCatalog(document)
+catalog = DatasetCatalog(document, column_schema_loader=lambda ref: pathlib.Path(sys.argv[1]).with_name(ref.location).read_bytes())
 peak = tracemalloc.get_traced_memory()[1]
 tracemalloc.stop()
 assert not {'pyarrow', 'duckdb', 'teadata.engine', 'sqlalchemy'} & set(sys.modules)
@@ -687,14 +696,14 @@ def catalog_with_methodology(edition_fixture, tmp_path, *, suppression=False):
     method_sha = file_identity(method)["sha256"]
     method_id = store.record_acquisition(method, ResolvedDataset("method", "reference", None, None, str(method), DatasetMetadata()))
     metadata = DatasetMetadata.from_dict({**entry["metadata"],
-        "references": [{"reference_id": "method", "role": "methodology", "path": method.name,
+        "references": [*entry["metadata"]["references"], {"reference_id": "method", "role": "methodology", "path": method.name,
                         "status": "available", "reviewed_sha256": method_sha, "provenance_ids": [method_id]}],
         "estimation": {"model_id": "synthetic", "value_per_suppressed": 5,
                        "grain": "origin_campus_destination_campus", "description": "Synthetic test model", "reference_id": "method"}})
     policy = ValuePolicy.from_dict({"policy_id": "numeric", "reference_id": "method" if suppression else None,
         "tokens": {"-1": {"status": "suppressed", "reason": "synthetic suppression"}} if suppression else {}})
     contract = ref.contract
-    schema = json.loads(document["column_schemas"][entry["column_schema_sha256"]])
+    schema = json.loads(edition_fixture["catalog"].column_schema_bytes(entry["column_schema_sha256"]))
     contract["semantics_sha256"] = _leaf_semantics(metadata,
         header_records(schema, dataset=key.dataset, edition=key.edition, table=key.table, metadata=metadata))
     contract["policy_sha256"] = sha256(canonical_json(policy.to_dict()).encode()).hexdigest()
@@ -711,8 +720,9 @@ def catalog_with_methodology(edition_fixture, tmp_path, *, suppression=False):
     return DatasetCatalog.create_editions(editions={key.identity: {**entry, "metadata": metadata.to_dict()}},
         artifacts={identity: selected.to_dict()},
         field_bindings=[{**value, "artifact_id": identity} for value in document["field_bindings"] if value["edition_id"] == key.identity],
-        column_schemas=document["column_schemas"], records=store.verify_record_closure([processing]),
-        value_policies={"numeric": policy.to_dict()})
+        column_schemas={entry["column_schema_sha256"]: document["column_schemas"][entry["column_schema_sha256"]]},
+        records={**document["provenance"], **store.verify_record_closure([processing])},
+        value_policies={"numeric": policy.to_dict()}, column_schema_loader=lambda ref: edition_fixture["resources"][ref.sha256])
 
 
 @pytest.mark.parametrize("damage", ["suppression_without_reference", "unreviewed", "not_found", "no_review_sha", "no_receipt"])
@@ -723,7 +733,7 @@ def test_v3_methodology_states_cannot_claim_qualified_policy_or_model(edition_fi
     if damage == "suppression_without_reference":
         document["value_policies"]["numeric"]["reference_id"] = None
     else:
-        method, = entry["metadata"]["references"]
+        method, = [r for r in entry["metadata"]["references"] if r["role"] == "methodology"]
         if damage in {"unreviewed", "not_found"}:
             method["status"] = damage
         elif damage == "no_review_sha":
@@ -857,3 +867,347 @@ def test_edition_metadata_roots_use_the_same_acquisition_only_gate(edition_fixtu
         forbidden.setattr(Path, "open", lambda *a, **k: pytest.fail("edition metadata opened an artifact"))
         with pytest.raises(ContractError, match="acquisition"):
             rehash_catalog(document)
+
+
+@pytest.mark.parametrize("damage", ["inline", "boolean_size", "unknown", "oversize", "traversal", "foreign_sha", "no_observation"])
+def test_external_schema_descriptors_are_strict_and_root_checkable(edition_fixture, damage, monkeypatch):
+    from teadata.dataset_metadata import COLUMN_SCHEMA_MAX_BYTES
+    document = edition_fixture["catalog"].to_dict()
+    digest, descriptor = next(iter(document["column_schemas"].items()))
+    if damage == "inline":
+        document["column_schemas"][digest] = edition_fixture["resources"][digest].decode()
+    elif damage == "boolean_size":
+        descriptor["size_bytes"] = True
+    elif damage == "unknown":
+        descriptor["format"] = "parquet"
+    elif damage == "oversize":
+        descriptor["size_bytes"] = COLUMN_SCHEMA_MAX_BYTES + 1
+    elif damage == "traversal":
+        descriptor["location"] = "../schema.json"
+    elif damage == "foreign_sha":
+        descriptor["sha256"] = "f" * 64
+    else:
+        for entry in document["editions"].values():
+            if entry["column_schema_sha256"] == digest:
+                entry["metadata"]["references"][0]["provenance_ids"] = []
+    monkeypatch.setattr(Path, "open", lambda *a, **k: pytest.fail("Root validation opened a resource"))
+    with pytest.raises(ContractError):
+        rehash_catalog(document)
+
+
+def test_selected_resource_changes_invalidate_warm_metadata_and_pickle_trust(edition_fixture):
+    from teadata.release import DataRelease
+    selected = DataRelease(edition_fixture["root"])
+    key, _, _ = edition_fixture["leaves"]["student"]
+    assert len(selected.catalog.header_records(key.dataset, edition_key=key)) == 3
+    restored_catalog = pickle.loads(pickle.dumps(selected.catalog))
+    assert not restored_catalog._validated_editions and not restored_catalog._column_schema_buffers
+    assert len(list(restored_catalog.editions())) == 2
+    with pytest.raises(ContractError, match="explicit.*resolver"):
+        list(restored_catalog.variables(edition=key))
+    restored_release = pickle.loads(pickle.dumps(selected))
+    assert not restored_release._column_schema_data and not restored_release._verified
+    digest = selected.catalog.to_dict()["editions"][key.identity]["column_schema_sha256"]
+    path = selected.path.with_name(digest + ".json")
+    raw = path.read_bytes()
+    path.write_bytes(raw[:-1] + b"!")
+    for release in (selected, restored_release):
+        with pytest.raises(ContractError, match="Column-schema resource checksum"):
+            release.catalog.header_records(key.dataset, edition_key=key)
+
+
+def damage_selected_mapping(document, edition):
+    """Well-hashed synthetic contradiction; no physical artifact is changed."""
+    artifact_id, ref = next((i, r) for i, r in document["artifacts"].items() if r["edition"]["dataset"] == edition.dataset)
+    document["artifacts"].pop(artifact_id)
+    ref["contract"]["mapping_sha256"] = "f" * 64
+    changed = sha256(canonical_json(ref["contract"]).encode()).hexdigest()
+    processing = deepcopy(document["provenance"][ref["processing_id"]])
+    processing["parameters"]["leaf_contract_sha256"] = changed
+    processing_id = sha256((canonical_json(processing) + "\n").encode()).hexdigest()
+    document["provenance"][processing_id] = processing
+    ref["processing_id"] = processing_id
+    document["artifacts"][changed] = ref
+    for binding in document["field_bindings"]:
+        if binding["artifact_id"] == artifact_id:
+            binding["artifact_id"] = changed
+    return changed
+
+
+@pytest.mark.parametrize("selection", ["direct", "dependency", "complete_verify", "publication"])
+def test_crosswalk_semantics_precede_every_selected_leaf_transport(edition_fixture, catalog_transport, tmp_path, selection):
+    from teadata.release import DataRelease, publish_release
+    base, requests = catalog_transport
+    document = edition_fixture["catalog"].to_dict()
+    student, _, _ = edition_fixture["leaves"]["student"]
+    staff, staff_ref, _ = edition_fixture["leaves"]["staff"]
+    changed = damage_selected_mapping(document, student)
+    if selection == "dependency":
+        amount = next(row for row in document["field_bindings"] if row["edition_id"] == staff.identity and row["field"] == "amount")
+        amount["dependencies"] = [[student.identity, "amount"]]
+    catalog = rehash_catalog(document, edition_fixture["resources"])
+    path = tmp_path / "contradiction.json"
+    path.write_text(canonical_json({"schema_version": 3, "catalog": catalog.to_dict()}))
+    release = DataRelease(base + "/contradiction.json", expected_sha256=file_identity(path)["sha256"])
+    assert len(list(release.catalog.editions())) == 2 and requests == ["/contradiction.json"]
+    with pytest.raises(ContractError, match="mapping or semantics"):
+        if selection == "direct":
+            release.artifact(changed)
+        elif selection == "dependency":
+            release.artifact(staff_ref.identity)
+        elif selection == "complete_verify":
+            release.verify()
+        else:
+            publish_release(tmp_path / "unpublished", catalog, schema_version=3)
+    assert not any(name.endswith(".parquet") for name in requests)
+    assert not (tmp_path / "unpublished" / "release.json").exists()
+
+
+def test_metadata_download_is_exact_bounded_and_offline_selection_is_independent(edition_fixture, catalog_transport, tmp_path, monkeypatch):
+    from teadata.release import DataRelease
+    base, requests = catalog_transport
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "separate-cache"))
+    url, pin = base + "/root.json", file_identity(edition_fixture["root"])["sha256"]
+    selected = DataRelease(url, expected_sha256=pin)
+    student, _, _ = edition_fixture["leaves"]["student"]
+    staff, _, _ = edition_fixture["leaves"]["staff"]
+    digest = selected.catalog.to_dict()["editions"][student.identity]["column_schema_sha256"]
+    resource = tmp_path / (digest + ".json")
+    raw = resource.read_bytes()
+    resource.write_bytes(raw + b"overflow")
+    with pytest.raises(ContractError, match="exceeds.*size"):
+        list(selected.catalog.variables(edition=student))
+    assert not (selected.cache / "objects" / digest).exists()
+    resource.write_bytes(raw)
+    assert len(list(selected.catalog.variables(edition=student))) == 3
+    offline = DataRelease(url, expected_sha256=pin, offline=True)
+    assert len(list(offline.catalog.variables(edition=student))) == 3
+    before = requests[:]
+    with pytest.raises(ContractError, match="not cached"):
+        list(offline.catalog.variables(edition=staff))
+    assert requests == before and not any(p.endswith(".parquet") for p in requests)
+
+
+def test_wide_native_leaf_never_stitches_admitted_source_groups(edition_fixture, tmp_path):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+    from teadata.analytical import write_leaf_artifact
+    from teadata.scripts.build_tapr_profiles import _prepared_batches
+    from teadata.tapr import TaprReadBudget
+    schema = pa.schema([(name, pa.string()) for name in ["campus_number", *(f"value_{i}" for i in range(79))]])
+    table = pa.Table.from_arrays([pa.array(["abcdefgh"] * 10) for _ in schema], schema=schema)
+    assert table.nbytes > 2048
+    source = tmp_path / "wide-source.parquet"
+    pq.write_table(table, source, row_group_size=2)
+    contract = edition_fixture["leaves"]["student"][1].contract
+    raw_schema = schema.serialize().to_pybytes()
+    import base64
+    contract.update(schema=base64.b64encode(raw_schema).decode(), schema_sha256=sha256(raw_schema).hexdigest(),
+                    columns=schema.names, rows=10)
+    budget = TaprReadBudget(batch_bytes=2048, batch_rows=2)
+    output = tmp_path / "wide-leaf.parquet"
+    with pq.ParquetFile(source) as native:
+        assert next(native.iter_batches(batch_size=4096)).nbytes > budget.batch_bytes  # old stitching counterexample
+        write_leaf_artifact(output, _prepared_batches(native, budget), contract=contract, batch_bytes=budget.batch_bytes)
+    with pq.ParquetFile(output) as native:
+        assert [native.metadata.row_group(i).num_rows for i in range(native.metadata.num_row_groups)] == [2] * 5
+        assert all(batch.nbytes <= 2048 for batch in _prepared_batches(native, budget))
+    with pq.ParquetFile(source) as native:
+        with pytest.raises(ValueError, match="one admitted"):
+            list(_prepared_batches(native, TaprReadBudget(batch_bytes=8, batch_rows=2)))
+    oversized = tmp_path / "oversized-leaf.parquet"
+    with pytest.raises(ContractError, match="admitted.*budget"):
+        write_leaf_artifact(oversized, table.to_batches(), contract=contract, batch_bytes=2048)
+    assert not oversized.exists()
+
+
+def test_non_combined_group_requirement_rejects_multiple_arrow_chunks():
+    import pyarrow as pa
+    from types import SimpleNamespace
+    from teadata.scripts.build_tapr_profiles import _prepared_batches
+    from teadata.tapr import TaprReadBudget
+    group = pa.table({"value": pa.chunked_array([["one"], ["two"]])})
+    native = SimpleNamespace(metadata=SimpleNamespace(num_row_groups=1, row_group=lambda i: SimpleNamespace(num_rows=2)),
+        read_row_group=lambda i, use_threads: group)
+    with pytest.raises(ValueError, match="non-combined"):
+        list(_prepared_batches(native, TaprReadBudget()))
+
+
+def test_shared_crosswalk_is_fetched_once_for_two_selected_editions(edition_fixture, catalog_transport, tmp_path):
+    from teadata.release import DataRelease
+    base, requests = catalog_transport
+    document = edition_fixture["catalog"].to_dict()
+    datasets = [branch for raw in edition_fixture["resources"].values() for branch in json.loads(raw)["datasets"]]
+    raw = canonical_json({"schema_version": 2, "mapping_version": 1, "datasets": datasets}).encode()
+    digest = sha256(raw).hexdigest()
+    resource = tmp_path / (digest + ".json")
+    resource.write_bytes(raw)
+    store = edition_fixture["store"]
+    observation = store.record_acquisition(resource, ResolvedDataset("shared-schema", "reference", None, None,
+        str(resource), DatasetMetadata()))
+    document["provenance"][observation] = store.read_record(observation)
+    for entry in document["editions"].values():
+        entry["column_schema_sha256"] = digest
+        entry["metadata"]["references"] = [ReferenceDocument(reference_id="columns", role="schema", status="available",
+            reviewed_sha256=digest, path=resource.name, provenance_ids=(observation,)).to_dict()]
+    document["column_schemas"] = {digest: ColumnSchemaRef(digest, len(raw), resource.name).to_dict()}
+    catalog = rehash_catalog(document)
+    path = tmp_path / "shared.json"
+    path.write_text(canonical_json({"schema_version": 3, "catalog": catalog.to_dict()}))
+    release = DataRelease(base + "/shared.json", expected_sha256=file_identity(path)["sha256"])
+    assert requests == ["/shared.json"]
+    for key, _, _ in edition_fixture["leaves"].values():
+        assert len(list(release.catalog.variables(edition=key))) == 3
+    assert requests == ["/shared.json", "/" + digest + ".json"]
+    assert len(release.catalog._column_schemas) == 1
+
+
+def test_exact_root_size_boundary_survives_externalization(edition_fixture, tmp_path):
+    from teadata.release import DataRelease
+    cap = 4 * 1024 * 1024
+    document = edition_fixture["catalog"].to_dict()
+    document["description"] = ""
+    base = len((canonical_json({"schema_version": 3, "catalog": document}) + "\n").encode())
+    document["description"] = "x" * (cap - base)
+    catalog = rehash_catalog(document)
+    raw = (canonical_json({"schema_version": 3, "catalog": catalog.to_dict()}) + "\n").encode()
+    assert len(raw) == cap
+    path = tmp_path / "exact-root-cap.json"
+    path.write_bytes(raw)
+    assert DataRelease(path).build_id == catalog.build_id
+    path.write_bytes(raw + b" ")
+    with pytest.raises(ContractError, match="too large"):
+        DataRelease(path)
+
+
+def test_metadata_publication_fsync_failure_removes_its_private_temporary(edition_fixture, tmp_path, monkeypatch):
+    from teadata.release import publish_release
+    original = file_identity(edition_fixture["root"])
+    output = tmp_path / "fsync-failure"
+    def fail_fsync(fd):
+        raise OSError("injected schema fsync failure")
+    monkeypatch.setattr("teadata.release.os.fsync", fail_fsync)
+    with pytest.raises(OSError, match="injected schema"):
+        publish_release(output, edition_fixture["catalog"], schema_version=3)
+    assert output.is_dir() and list(output.iterdir()) == []
+    assert file_identity(edition_fixture["root"]) == original
+
+
+@pytest.mark.parametrize("collision", ["root", "case_root", "portable_root", "duplicate_resource", "unicode_resource", "artifact_resource", "duplicate_artifact"])
+def test_metadata_destinations_preflight_before_every_resolution_and_write(edition_fixture, tmp_path, monkeypatch, collision):
+    from teadata.release import publish_release
+    document = edition_fixture["catalog"].to_dict()
+    resources = list(document["column_schemas"].values())
+    if collision in {"root", "case_root", "portable_root"}:
+        resources[0]["location"] = {"root": "release.json", "case_root": "ReLeAsE.JsOn", "portable_root": "release.json."}[collision]
+    elif collision in {"duplicate_resource", "unicode_resource"}:
+        first, second = (("shared.json", "Shared.json") if collision == "duplicate_resource" else ("CAFÉ.json", "cafe\u0301.json"))
+        resources[0]["location"], resources[1]["location"] = first, second
+    elif collision == "artifact_resource":
+        resources[0]["location"] = next(iter(document["artifacts"].values()))["location"]
+    else:
+        artifacts = list(document["artifacts"].values())
+        artifacts[0]["location"] = artifacts[1]["location"] = "duplicate.parquet"
+    catalog = rehash_catalog(document, edition_fixture["resources"])
+    before = file_identity(edition_fixture["root"])
+    monkeypatch.setattr(catalog, "verify_metadata", lambda: pytest.fail("Destination collision resolved metadata"))
+    monkeypatch.setattr(catalog, "column_schema_bytes", lambda *a: pytest.fail("Destination collision read metadata"))
+    output = tmp_path / "collision-output"
+    with pytest.raises(ContractError, match="destinations collide"):
+        publish_release(output, catalog, schema_version=3)
+    assert not output.exists() and file_identity(edition_fixture["root"]) == before
+
+
+@pytest.mark.parametrize("boundary", ["selected", "publisher"])
+@pytest.mark.parametrize("entry", ["fifo", "symlink", "directory", "oversize", "replacement_fifo"])
+def test_metadata_regular_file_admission_has_a_finite_filesystem_harness(edition_fixture, tmp_path, boundary, entry):
+    """A regression to blocking FIFO open fails a bounded child, never hangs pytest."""
+    script = r'''
+from pathlib import Path
+import os, sys
+from teadata.manifest import ContractError
+from teadata.release import DataRelease, publish_release
+root, boundary, entry = Path(sys.argv[1]), sys.argv[2], sys.argv[3]
+release = DataRelease(root)
+key = next(release.catalog.editions())
+from teadata.dataset_metadata import EditionKey
+edition = EditionKey.from_dict({k: key[k] for k in ('dataset','edition','revision_sha256','scope','table','grain')})
+digest = release.catalog.to_dict()['editions'][key['edition_id']]['column_schema_sha256']
+descriptor = next(r for r in release.catalog.column_schema_refs() if r.sha256 == digest)
+target = root.with_name(descriptor.location)
+# Publisher uses a fresh directory and in-memory verified input bytes, never the damaged destination as its loader.
+if boundary == 'publisher':
+    release.catalog.verify_metadata()
+    resources = {r.sha256: release.catalog.column_schema_bytes(r.sha256) for r in release.catalog.column_schema_refs()}
+    release.catalog._column_schema_loader = lambda ref: resources[ref.sha256]
+    output = root.parent / 'filesystem-output'
+    output.mkdir()
+    target = output / descriptor.location
+    target.write_bytes(resources[digest])
+    action = lambda: publish_release(output, release.catalog, schema_version=3)
+else:
+    action = lambda: list(release.catalog.variables(edition=edition))
+if entry == 'symlink':
+    source = target.with_name('symlink-target.json')
+    target.rename(source)
+    target.symlink_to(source.name)
+elif entry == 'directory':
+    target.unlink(); target.mkdir()
+elif entry == 'oversize':
+    with target.open('ab') as stream: stream.write(b'exceeds the declared metadata size')
+elif entry == 'fifo':
+    target.unlink(); os.mkfifo(target, 0o600)
+# Check the admission happens before read/open on known invalid entries, and the race open carries both flags.
+original_open = os.open
+calls = []
+def guarded_open(path, flags, *a, **k):
+    if Path(path) == target:
+        calls.append(flags)
+        assert entry == 'replacement_fifo', 'Known invalid metadata reached open before admission'
+        assert flags & os.O_NOFOLLOW and flags & os.O_NONBLOCK
+        target.unlink(); os.mkfifo(target, 0o600)
+    return original_open(path, flags, *a, **k)
+os.open = guarded_open
+try:
+    action()
+except ContractError:
+    pass
+else:
+    raise AssertionError('Invalid metadata was accepted')
+assert len(calls) == (1 if entry == 'replacement_fifo' else 0)
+if boundary == 'publisher':
+    assert not (output / 'release.json').exists()
+    # Every destination is admitted before any absent sidecar is installed.
+    assert sorted(p.name for p in output.iterdir()) == sorted([target.name] + (['symlink-target.json'] if entry == 'symlink' else []))
+print('bounded metadata rejection PASS')
+'''
+    result = subprocess.run([sys.executable, "-c", script, str(edition_fixture["root"]), boundary, entry],
+                            capture_output=True, text=True, timeout=5)
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.strip() == "bounded metadata rejection PASS"
+
+
+def test_metadata_regular_capture_reuses_only_same_file_signature(edition_fixture, monkeypatch):
+    from teadata.release import DataRelease
+    release = DataRelease(edition_fixture["root"])
+    key, _, _ = edition_fixture["leaves"]["student"]
+    assert len(list(release.catalog.variables(edition=key))) == 3
+    import teadata.release as transport
+    original = transport.os.open
+    def no_repeat_open(path, *a, **k):
+        pytest.fail("Warm metadata file was reopened instead of using verified stat cache")
+    with monkeypatch.context() as warm:
+        warm.setattr(transport.os, "open", no_repeat_open)
+        assert len(list(release.catalog.variables(edition=key))) == 3
+    descriptor = next(r for r in release.catalog.column_schema_refs()
+                      if r.sha256 == release.catalog.to_dict()["editions"][key.identity]["column_schema_sha256"])
+    path = release.path.with_name(descriptor.location)
+    raw = path.read_bytes()
+    path.write_bytes(raw)
+    calls = []
+    def count_open(path, *a, **k):
+        calls.append(path)
+        return original(path, *a, **k)
+    monkeypatch.setattr(transport.os, "open", count_open)
+    assert len(list(release.catalog.variables(edition=key))) == 3
+    assert calls == [path]

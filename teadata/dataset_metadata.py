@@ -62,6 +62,38 @@ def _record_json(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False)
 
 
+COLUMN_SCHEMA_MAX_BYTES = 8 * 1024 * 1024
+
+
+@dataclass(frozen=True)
+class ColumnSchemaRef:
+    """Exact external crosswalk bytes; distinct from a native Parquet leaf."""
+
+    sha256: str
+    size_bytes: int
+    location: str
+
+    def __post_init__(self) -> None:
+        _digest_text(self.sha256)
+        if type(self.size_bytes) is not int or not 0 < self.size_bytes <= COLUMN_SCHEMA_MAX_BYTES:
+            raise ValueError("Column-schema resource exceeds its finite metadata byte budget")
+        if not isinstance(self.location, str) or not self.location:
+            raise ValueError("Column-schema resource location is required")
+        if "://" in self.location:
+            validate_http_url(self.location)
+        elif (self.location in {".", ".."} or any(c in self.location for c in "/\\:")):
+            raise ValueError("Column-schema resource requires an adjacent filename or HTTP(S) URL")
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, Any]) -> ColumnSchemaRef:
+        if not isinstance(raw, Mapping) or set(raw) != {"sha256", "size_bytes", "location"}:
+            raise ValueError("Unsupported column-schema resource descriptor")
+        return cls(**raw)
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
 @dataclass(frozen=True)
 class EditionKey:
     """Exact source revision, separate from publisher edition and leaf identity."""

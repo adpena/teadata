@@ -261,6 +261,17 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
             shutil.rmtree(stage)
 
 
+def _prepared_batches(native, budget: TaprReadBudget):
+    """Keep one trusted producer-admitted row group as one native batch."""
+    for index in range(native.metadata.num_row_groups):
+        group = native.read_row_group(index, use_threads=False)
+        batches = group.to_batches()
+        if (len(batches) != 1 or group.num_rows != native.metadata.row_group(index).num_rows
+                or group.num_rows > budget.batch_rows or group.nbytes > budget.batch_bytes):
+            raise ValueError("Prepared row group is not one admitted non-combined batch; reprepare the source")
+        yield batches[0]
+
+
 def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
                             reference_store: ProvenanceStore | None,
                             prepared_inputs: Mapping[str, tuple[str, tuple[str, ...]]],
@@ -311,6 +322,14 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
                 or validation.get("fields") != len(table["fields"])
                 or validation.get("source_columns_accounted") != len(table["fields"])):
             raise ValueError("Processing receipt is not the selected complete source preparation")
+        raw_budget = parameters.get("source_read_budget")
+        if (not isinstance(raw_budget, dict) or set(raw_budget) != set(TaprReadBudget.__dataclass_fields__)
+                or record.get("code_version") != processor_identity()
+                or parameters.get("preparation_code_sha256") != sha256(Path(__file__).read_bytes()).hexdigest()):
+            raise ValueError("Prepared leaf requires this accepted bounded source producer and its complete read budget")
+        source_budget = TaprReadBudget(**raw_budget)
+        if source_rows * ((9 if scope == "campus" else 6) + 18) > source_budget.key_bytes:
+            raise ValueError("Prepared source identity index exceeds the admitted key byte budget")
         artifact = record["outputs"]["prepared_source"]
         raw_sha = table["input_sha256"]
         raw_refs = {value for ref in source.metadata.references
@@ -337,13 +356,26 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
                 raise ValueError("Additional dependency is not a processing receipt")
             reference_store.verify_record_closure([value])
         validated.append((dataset, scope, family, table["table"], source, identifier, keys, acquisitions,
-                          artifact, raw_sha, validation["rows"], dependencies, declared))
+                          artifact, raw_sha, validation["rows"], dependencies, declared, source_budget))
 
     import pyarrow as pa
     import pyarrow.compute as arrow_compute
     import pyarrow.parquet as pq
 
     pc: Any = arrow_compute  # Arrow registers compute kernels dynamically.
+
+    # All selected physical headers and admitted row boundaries precede the first writer.
+    for dataset, _, _, _, _, _, _, _, artifact, _, rows, _, _, source_budget in validated:
+        prepared = reference_store.verify_artifact(artifact["sha256"])
+        with pq.ParquetFile(prepared) as native:
+            schema = native.schema_arrow.remove_metadata()
+            if (schema.names != cfg.column_schema(dataset, year, reader_profile="source")
+                    or any(not (pa.types.is_string(field.type) or pa.types.is_large_string(field.type)) for field in schema)
+                    or native.metadata.num_rows != rows
+                    or sum(native.metadata.row_group(i).num_rows for i in range(native.metadata.num_row_groups)) != rows
+                    or any(not 0 < native.metadata.row_group(i).num_rows <= source_budget.batch_rows
+                           for i in range(native.metadata.num_row_groups))):
+                raise ValueError("Prepared source physical schema, rows or row groups differ from its admitted contract")
 
     output_dir.parent.mkdir(parents=True, exist_ok=True)
     stage = Path(tempfile.mkdtemp(prefix=".tapr-edition-", dir=output_dir.parent))
@@ -357,9 +389,10 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
         lock = Path(__file__).parents[2] / "uv.lock"
         if lock.is_file():
             toolchain["lock_sha256"] = sha256(lock.read_bytes()).hexdigest()
-        recipe = {"operation": "lossless_prepared_source_batches", "batch_size": 4096, "compression": "zstd",
+        base_recipe = {"operation": "lossless_admitted_source_row_groups", "compression": "zstd",
                   "preparation_code_sha256": sha256(Path(__file__).read_bytes()).hexdigest(), "values_interpreted": False}
-        for dataset, scope, family, table_name, source, identifier, keys, acquisitions, artifact, raw_sha, rows, dependencies, declared in validated:
+        for dataset, scope, family, table_name, source, identifier, keys, acquisitions, artifact, raw_sha, rows, dependencies, declared, source_budget in validated:
+            recipe = {**base_recipe, "source_read_budget": vars(source_budget)}
             for value in [identifier, *dependencies]:
                 store.copy_record_from(reference_store, value)
             prepared = store.verify_artifact(artifact["sha256"])
@@ -377,21 +410,25 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
 
                 def batches():
                     identities = []
-                    for batch in native.iter_batches(batch_size=4096, use_threads=False):
+                    key_bytes = 0
+                    for batch in _prepared_batches(native, source_budget):
                         canonical = canonical_source_identifiers(batch.column(schema.get_field_index(keys[0])),
                             width=9 if keys[0] == "campus_number" else 6)
                         if pc.any(pc.is_null(canonical)).as_py():
                             raise ValueError("Prepared source has missing physical keys")
+                        key_bytes += canonical.nbytes
+                        if key_bytes > source_budget.key_bytes:
+                            raise ValueError("Prepared source identity index exceeds its admitted key byte budget")
                         identities.append(canonical)
                         yield batch
                     all_keys = pa.chunked_array(identities)
                     if pc.count_distinct(all_keys).as_py() != rows:
                         raise ValueError("Prepared source has duplicate physical keys")
 
-                physical = write_leaf_artifact(leaf, batches(), contract=contract)
+                physical = write_leaf_artifact(leaf, batches(), contract=contract, batch_bytes=source_budget.batch_bytes)
                 with pq.ParquetFile(leaf) as reopened:
-                    for before, after in zip_longest(native.iter_batches(batch_size=4096, use_threads=False),
-                            reopened.iter_batches(batch_size=4096, use_threads=False)):
+                    for before, after in zip_longest(_prepared_batches(native, source_budget),
+                            _prepared_batches(reopened, source_budget)):
                         if before is None or after is None or not before.equals(after, check_metadata=False):
                             raise ValueError("Raw leaf native batch readback differs from selected preparation")
             if file_identity(prepared)["sha256"] != artifact["sha256"]:

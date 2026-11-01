@@ -13,9 +13,9 @@ from pathlib import Path
 import platform
 import os
 import sqlite3
-from typing import Any, Iterable, Mapping
+from typing import Any, Callable, Iterable, Mapping
 
-from .dataset_metadata import ArtifactRef, DataPeriod, DatasetMetadata, EditionKey, FieldBinding, MetricDefinition, ResolvedDataset
+from .dataset_metadata import ArtifactRef, ColumnSchemaRef, DataPeriod, DatasetMetadata, EditionKey, FieldBinding, MetricDefinition, ResolvedDataset
 from .metric_bindings import MetricBinding, parse_bindings
 from .provenance import ProvenanceStore, validate_record_graph, validate_reference_records
 from .values import Measurement, ValuePolicy, ValueStatus, measure
@@ -137,9 +137,11 @@ def _verify_input_receipt(record: Mapping[str, Any], *, dataset: str,
 class DatasetCatalog:
     """Validated, read-only metadata describing sources actually used in a build."""
 
-    def __init__(self, document: Mapping[str, Any], *, expected_build_id: str | None = None):
+    def __init__(self, document: Mapping[str, Any], *, expected_build_id: str | None = None,
+                 column_schema_loader: Callable[[ColumnSchemaRef], bytes] | None = None):
         document = json.loads(canonical_json(document))
         if type(document.get("schema_version")) is int and document["schema_version"] == 3:
+            self._column_schema_loader = column_schema_loader
             self._init_editions(document, expected_build_id)
             return
         if document.get("schema_version") != CATALOG_SCHEMA:
@@ -288,20 +290,19 @@ class DatasetCatalog:
                 raise ValueError("Dataset catalog identity mismatch")
             self._records = validate_record_graph(document["provenance"].__getitem__, list(document["provenance"]))
             self._policies = {name: ValuePolicy.from_dict(value) for name, value in document["value_policies"].items()}
+            self._column_schema_refs = {digest: ColumnSchemaRef.from_dict(value)
+                                        for digest, value in document["column_schemas"].items()}
+            if any(digest != ref.sha256 for digest, ref in self._column_schema_refs.items()):
+                raise ValueError("Column-schema resource identity differs from its registry key")
             self._column_schemas = {}
-            for digest, text in document["column_schemas"].items():
-                if sha256(text.encode()).hexdigest() != digest:
-                    raise ValueError("Catalog column-schema resource checksum mismatch")
-                self._column_schemas[digest] = parse_column_schema(text.encode())
+            self._column_schema_buffers: dict[str, bytes] = {}
+            self._validated_editions: set[str] = set()
             self._edition_entries = document["editions"]
             if not isinstance(self._edition_entries, dict) or not self._edition_entries:
                 raise ValueError("An edition catalog requires registered editions")
             self._edition_keys: dict[str, EditionKey] = {}
             self._edition_metadata: dict[str, DatasetMetadata] = {}
-            headers: dict[tuple[str, str], dict[str, Any]] = {}
             inputs: dict[str, list[str]] = {}
-            tables: dict[str, dict[str, Any]] = {}
-            semantics: dict[str, str] = {}
             for identifier, entry in self._edition_entries.items():
                 key = EditionKey.from_dict(entry["key"])
                 if key.identity != identifier:
@@ -324,26 +325,26 @@ class DatasetCatalog:
                         raise ValueError("Source provenance IDs require exact acquisition observations")
                 if EditionKey.source_revision(tuple(hashes)) != key.revision_sha256:
                     raise ValueError("Source revision differs from upstream bytes")
-                schema = self._column_schemas[entry["column_schema_sha256"]]
-                from .column_schema import crosswalk_dataset
-                table, = [value for value in crosswalk_dataset(schema, key.dataset, key.edition)["tables"] if value["table"] == key.table]
-                if table["input_sha256"] not in hashes:
-                    raise ValueError("Selected table differs from upstream source bytes")
-                selected_rows = crosswalk_records(schema, dataset=key.dataset, edition=key.edition,
-                                                   table=key.table, metadata=metadata)
+                descriptor = self._column_schema_refs[entry["column_schema_sha256"]]
+                schema_ids = [value for reference in metadata.references
+                              if reference.role == "schema" and reference.reviewed_sha256 == descriptor.sha256
+                              for value in reference.provenance_ids]
+                if not schema_ids or any(self._records[value]["kind"] != "acquisition"
+                        or self._records[value]["artifact"]["sha256"] != descriptor.sha256
+                        or self._records[value]["artifact"]["size_bytes"] != descriptor.size_bytes for value in schema_ids):
+                    raise ValueError("Column-schema resource lacks its genuine schema observation")
                 units: dict[str, set[str]] = {}
-                for value in metadata.metrics.values():
-                    if value.unit is not None:
-                        units.setdefault(value.field, set()).add(value.unit)
+                for metric in metadata.metrics.values():
+                    if metric.unit is not None:
+                        units.setdefault(metric.field, set()).add(metric.unit)
                 if any(len(values) > 1 for values in units.values()):
                     raise ValueError("Conflicting canonical metric units")
-                for row in selected_rows:
-                    headers[identifier, row["field"]] = {**{name: row[name] for name in ("code", "label", "period")},
-                        "unit": next(iter(units.get(row["field"], ())), None)}
-                semantics[identifier] = _leaf_semantics(metadata, selected_rows)
                 _validate_methodology(metadata, self._policies[metadata.value_policy] if metadata.value_policy else None)
                 self._edition_keys[identifier], self._edition_metadata[identifier] = key, metadata
-                inputs[identifier], tables[identifier] = hashes, table
+                inputs[identifier] = hashes
+            if set(self._column_schema_refs) != {entry["column_schema_sha256"] for entry in self._edition_entries.values()}:
+                raise ValueError("Column-schema registry must account for exactly the registered editions")
+            self._edition_inputs = inputs
             self._artifact_refs: dict[str, ArtifactRef] = {}
             self._artifact_keys: dict[str, tuple[str, ...]] = {}
             artifact_columns: dict[str, set[str]] = {}
@@ -356,11 +357,8 @@ class DatasetCatalog:
                 metadata = self._edition_metadata[edition]
                 policy_sha = (sha256(canonical_json(self._policies[metadata.value_policy].to_dict()).encode()).hexdigest()
                               if metadata.value_policy else None)
-                if (contract["mapping_sha256"] != sha256(canonical_json(tables[edition]).encode()).hexdigest()
-                        or contract["policy_sha256"] != policy_sha
-                        or contract["semantics_sha256"] != semantics[edition]
-                        or not set(inputs[edition]) <= set(contract["inputs"])):
-                    raise ValueError("Leaf mapping, policy or inputs differ from selected edition")
+                if (contract["policy_sha256"] != policy_sha or not set(inputs[edition]) <= set(contract["inputs"])):
+                    raise ValueError("Leaf policy or inputs differ from selected edition")
                 record = self._records[ref.processing_id]
                 output = record.get("outputs", {}).get(ref.output, {})
                 if (record["kind"] != "processing" or record["code_version"] != contract["producer"]["code_sha256"]
@@ -377,17 +375,19 @@ class DatasetCatalog:
                 self._artifact_refs[identifier] = ref
                 self._artifact_keys[identifier] = tuple(contract["key_columns"])
                 artifact_columns[identifier] = set(contract["columns"])
+            expected_fields = {(ref.edition.identity, column)
+                               for ref in self._artifact_refs.values() for column in ref.contract["columns"]}
             self._field_bindings: dict[tuple[str, str], FieldBinding] = {}
             for value in document["field_bindings"]:
                 binding = FieldBinding.from_dict(value)
                 qualified = binding.edition_id, binding.field
                 ref = self._artifact_refs[binding.artifact_id]
-                if (qualified in self._field_bindings or qualified not in headers
+                if (qualified in self._field_bindings or qualified not in expected_fields
                         or ref.edition.identity != binding.edition_id or binding.column != binding.field
                         or binding.column not in artifact_columns[binding.artifact_id]):
                     raise ValueError("Duplicate, foreign or invalid qualified field binding")
                 self._field_bindings[qualified] = binding
-            if set(self._field_bindings) != set(headers):
+            if set(self._field_bindings) != expected_fields:
                 raise ValueError("Edition index does not account for every registered field")
             visiting: set[tuple[str, str]] = set()
             visited: set[tuple[str, str]] = set()
@@ -403,7 +403,7 @@ class DatasetCatalog:
                     visited.add(qualified)
             for qualified in self._field_bindings:
                 visit(qualified)
-            self._field_headers = headers
+            self._field_headers: dict[tuple[str, str], dict[str, Any]] = {}
             self._build_id, self._serialized = identity, canonical_json(document)
             self._v3 = True
             self._field_resolutions = {}
@@ -414,13 +414,93 @@ class DatasetCatalog:
 
     @classmethod
     def create_editions(cls, *, editions: Mapping[str, Any], artifacts: Mapping[str, Any],
-                        field_bindings: Iterable[Mapping[str, Any]], column_schemas: Mapping[str, str],
-                        records: Mapping[str, Any], value_policies: Mapping[str, Any], description: str = "") -> DatasetCatalog:
+                        field_bindings: Iterable[Mapping[str, Any]], column_schemas: Mapping[str, Any],
+                        records: Mapping[str, Any], value_policies: Mapping[str, Any], description: str = "",
+                        column_schema_loader: Callable[[ColumnSchemaRef], bytes] | None = None) -> DatasetCatalog:
         """Explicit unpublished v3 construction; the default writer stays v2."""
         content = {"schema_version": 3, "editions": dict(editions), "artifacts": dict(artifacts),
                    "field_bindings": list(field_bindings), "column_schemas": dict(column_schemas),
                    "provenance": dict(records), "value_policies": dict(value_policies), "description": description}
-        return cls({**content, "build_id": sha256(canonical_json(content).encode()).hexdigest()})
+        return cls({**content, "build_id": sha256(canonical_json(content).encode()).hexdigest()},
+                   column_schema_loader=column_schema_loader)
+
+    def column_schema_refs(self) -> tuple[ColumnSchemaRef, ...]:
+        """External schema descriptors, without resolving their bytes."""
+        self._require_index()
+        return tuple(self._column_schema_refs.values())
+
+    def column_schema_bytes(self, digest: str) -> bytes:
+        """Resolve and verify the exact bounded bytes that the parser consumes."""
+        self._require_index()
+        if self._column_schema_loader is None:
+            raise ContractError("Selected metadata requires an explicit column-schema resolver")
+        try:
+            descriptor = self._column_schema_refs[digest]
+            raw = self._column_schema_loader(descriptor)
+            if type(raw) is not bytes or len(raw) != descriptor.size_bytes:
+                raise ValueError("Column-schema resource byte size mismatch")
+            if self._column_schema_buffers.get(digest) is not raw:
+                if sha256(raw).hexdigest() != digest:
+                    raise ValueError("Column-schema resource checksum mismatch")
+                self._column_schema_buffers[digest] = raw
+            return raw
+        except (KeyError, TypeError, ValueError, OSError) as error:
+            raise ContractError(f"Invalid selected column-schema resource: {error}") from error
+
+    def _ensure_edition(self, identifier: str) -> None:
+        """Validate crosswalk semantics only for explicitly selected metadata."""
+        entry = self._edition_entries[identifier]
+        digest = entry["column_schema_sha256"]
+        raw = self.column_schema_bytes(digest)  # Resolver rechecks a cached file's stat identity.
+        if identifier in self._validated_editions:
+            return
+        try:
+            if digest not in self._column_schemas:
+                self._column_schemas[digest] = parse_column_schema(raw)
+            document = self._column_schemas[digest]
+            from .column_schema import crosswalk_dataset
+            key, metadata = self._edition_keys[identifier], self._edition_metadata[identifier]
+            table, = [value for value in crosswalk_dataset(document, key.dataset, key.edition)["tables"]
+                      if value["table"] == key.table]
+            if table["input_sha256"] not in self._edition_inputs[identifier]:
+                raise ValueError("Selected table differs from upstream source bytes")
+            rows = crosswalk_records(document, dataset=key.dataset, edition=key.edition,
+                                     table=key.table, metadata=metadata)
+            if {row["field"] for row in rows} != {field for edition, field in self._field_bindings if edition == identifier}:
+                raise ValueError("Edition index differs from the complete selected crosswalk")
+            semantics = _leaf_semantics(metadata, rows)
+            mapping = sha256(canonical_json(table).encode()).hexdigest()
+            for ref in self._artifact_refs.values():
+                if ref.edition.identity == identifier and (ref.contract["mapping_sha256"] != mapping
+                        or ref.contract["semantics_sha256"] != semantics):
+                    raise ValueError("Leaf mapping or semantics differ from selected edition")
+            units = {metric.field: metric.unit for metric in metadata.metrics.values() if metric.unit is not None}
+            headers = {(identifier, row["field"]): {
+                **{name: row[name] for name in ("code", "label", "period")}, "unit": units.get(row["field"])} for row in rows}
+            self._field_headers.update(headers)
+            self._validated_editions.add(identifier)
+        except (KeyError, TypeError, ValueError) as error:
+            raise ContractError(f"Invalid selected edition crosswalk: {error}") from error
+
+    def _ensure_field_dependencies(self, fields: Iterable[tuple[str, str]]) -> None:
+        visited: set[tuple[str, str]] = set()
+        editions: set[str] = set()
+        def visit(qualified: tuple[str, str]) -> None:
+            if qualified not in visited:
+                visited.add(qualified)
+                if qualified[0] not in editions:
+                    self._ensure_edition(qualified[0])
+                    editions.add(qualified[0])
+                for dependency in self._field_bindings[qualified].dependencies:
+                    visit(dependency)
+        for qualified in fields:
+            visit(qualified)
+
+    def verify_metadata(self) -> None:
+        """Explicitly validate every registered edition's external metadata."""
+        self._require_index()
+        for identifier in self._edition_keys:
+            self._ensure_edition(identifier)
 
     def _require_index(self) -> None:
         if not getattr(self, "_v3", False):
@@ -444,10 +524,14 @@ class DatasetCatalog:
     def variables(self, *, edition: EditionKey | None = None, dataset: str | None = None, scope: str | None = None):
         """Yield the complete registered field projection, not a new dictionary."""
         self._require_index()
+        validated: set[str] = set()
         for qualified, binding in self._field_bindings.items():
             key = self._edition_keys[qualified[0]]
             if ((edition is None or edition == key) and (dataset is None or key.dataset == dataset)
                     and (scope is None or key.scope == scope)):
+                if qualified[0] not in validated:
+                    self._ensure_edition(qualified[0])
+                    validated.add(qualified[0])
                 yield self._variable(qualified)
 
     def _variable(self, qualified: tuple[str, str]) -> dict[str, Any]:
@@ -459,12 +543,16 @@ class DatasetCatalog:
     def artifact_ref(self, identifier: str) -> ArtifactRef:
         self._require_index()
         try:
-            return self._artifact_refs[identifier]
+            descriptor = self._artifact_refs[identifier]
+            self._ensure_edition(descriptor.edition.identity)
+            self._ensure_field_dependencies(qualified for qualified, binding in self._field_bindings.items()
+                                            if binding.artifact_id == identifier)
+            return descriptor
         except KeyError as error:
             raise ContractError("Unknown selected artifact ID") from error
 
     def resolve_artifacts(self, fields: Iterable[tuple[EditionKey, str]], *, period: DataPeriod | None = None) -> tuple[dict[str, Any], ...]:
-        """Resolve exact fields/dependencies and declared keys; never open a file."""
+        """Resolve exact fields/dependencies; only selected metadata may need I/O."""
         self._require_index()
         columns: dict[str, list[str]] = {}
         visited: set[tuple[str, str]] = set()
@@ -484,8 +572,9 @@ class DatasetCatalog:
                 visit(dependency)
         for key, field in fields:
             qualified = key.identity, field
-            if self._edition_keys.get(key.identity) != key or qualified not in self._field_headers:
+            if self._edition_keys.get(key.identity) != key or qualified not in self._field_bindings:
                 raise ContractError("Exact qualified field unavailable")
+            self._ensure_field_dependencies([qualified])
             actual_period = DataPeriod.from_dict(self._field_headers[qualified]["period"])
             if period is not None and (period.kind == "unknown" or actual_period != period):
                 raise ContractError("Requested reference period is unsupported")
@@ -565,8 +654,8 @@ class DatasetCatalog:
                        table: str | None = None, edition_key: EditionKey | None = None) -> list[dict[str, Any]]:
         """Return detached code/label/field records from this release's bound resource.
 
-        Only the selected source edition is available. No package YAML, files,
-        source rows or network are consulted, including for older releases.
+        Schema3 resolves only the selected external metadata resource. Legacy
+        catalogs remain entirely inline; neither path reads source rows or YAML.
         """
         if getattr(self, "_v3", False):
             candidates = [identifier for identifier, key in self._edition_keys.items()
@@ -576,6 +665,7 @@ class DatasetCatalog:
                 raise ContractError("Header crosswalk edition is missing or ambiguous")
             identifier = candidates[0]
             key = self._edition_keys[identifier]
+            self._ensure_edition(identifier)
             return crosswalk_records(self._column_schemas[self._edition_entries[identifier]["column_schema_sha256"]],
                 dataset=key.dataset, edition=key.edition, table=key.table, metadata=self._edition_metadata[identifier])
         if edition_key is not None:
@@ -694,6 +784,7 @@ class DatasetCatalog:
             if not candidates:
                 return None
             qualified = candidates[0]
+            self._ensure_edition(qualified[0])
             if qualified not in self._qualified_fields:
                 selected = self._variable(qualified)
                 selected["metadata"] = self._edition_metadata[qualified[0]].to_dict()
@@ -1130,9 +1221,13 @@ class BuildRecorder:
             raise ContractError("Processing source changed during the build")
         if schema_version == 3:
             records = self.store.verify_record_closure(sorted(self.edition_roots))
+            resources = {digest: text.encode() for digest, text in self.column_schemas.items()}
+            descriptors = {digest: ColumnSchemaRef(digest, len(raw), digest + ".json").to_dict()
+                           for digest, raw in resources.items()}
             return DatasetCatalog.create_editions(editions=self.edition_entries, artifacts=self.edition_artifacts,
-                field_bindings=self.edition_fields, column_schemas=self.column_schemas, records=records,
-                value_policies={key: value.to_dict() for key, value in self.cfg.value_policies.items()})
+                field_bindings=self.edition_fields, column_schemas=descriptors, records=records,
+                value_policies={key: value.to_dict() for key, value in self.cfg.value_policies.items()},
+                column_schema_loader=lambda ref: resources[ref.sha256])
         if schema_version != CATALOG_SCHEMA:
             raise ContractError("Unsupported catalog writer schema")
         identifiers = set()

@@ -757,10 +757,27 @@ metadata. After writing the `teadata.leaf` footer and recording the file through
 is derived from ordered upstream bytes, independently of edition text and leaf
 transform identity. These are separate from observation dates and transport URLs.
 
-On a loaded schema 3 `DatasetCatalog`, `editions(...)` and `variables(...)` yield
-detached registered metadata; `resolve_artifacts([(edition_key, field), ...])`
-returns descriptors and physical projections including declared keys and
-dependencies. These calls perform no artifact I/O. An explicit `period=DataPeriod(...)`
+Schema 3 stores each exact crosswalk once as an external `ColumnSchemaRef`
+(`sha256`, positive `size_bytes`, adjacent filename or HTTP(S) `location`). Its
+canonical original JSON bytes and genuine schema observation remain unchanged;
+it is not a Parquet `ArtifactRef`. Each metadata resource is capped at 8 MiB.
+The unpublished inline schema 3 prototype is retired: current schema 3 rejects
+inline or mixed representations. Archived prototypes remain immutable evidence;
+re-emit a new candidate from accepted bounded preparations when needed. Published
+schemas 1/2 keep their original inline representation and readers.
+
+On a loaded schema 3 `DatasetCatalog`, `editions(...)` and source metadata are
+root-only projections. `variables(...)`, crosswalk headers, field metadata and
+`resolve_artifacts([(edition_key, field), ...])` lazily resolve the selected
+crosswalk and validate its complete table/mapping/semantics before returning
+field descriptors or physical projections. Dependencies are validated before
+any selected leaf request, including direct `artifact(artifact_id)` calls.
+Unfiltered `variables()` explicitly discovers all registered metadata resources;
+none of these operations opens data leaves or imports Arrow. A standalone catalog
+needs an explicit resource resolver for selected metadata; it never consults
+package configuration implicitly. Verified resource bytes share the existing
+release download/cache transport, with parsed metadata held only as transient
+state. Pickles carry neither cached acceptance nor an implicit resolver. An explicit `period=DataPeriod(...)`
 requires exact known coverage; unknown fields remain discoverable without
 invented units/policies. Scalar interpretation is not added by this native
 reader. `metadata`, `policy`, `field_metadata` and crosswalk projections require
@@ -768,14 +785,17 @@ an exact `EditionKey` when a unique match cannot be established. Schema 2 does
 not invent a complete index by consulting current configuration.
 
 `DataRelease(uri, expected_sha256=pin, offline=True)` verifies the selected root
-in the existing URI cache slot and forbids root and leaf downloads. A missing or
+in the existing URI cache slot and forbids root, metadata-resource and leaf downloads. A missing or
 corrupt pinned root fails even with leaves cached. `artifact(artifact_id)` and
 `analytical_dataset(artifact_id)` open only selected schema 3 leaves, validating
 their own contract, native types/nullability, row count and grain. Legacy role
 and global-footer checks remain strict for schemas 1/2. The root limit remains
 4 MiB; the index covers its registered editions, with no claim that arbitrary
-future history fits this in-memory envelope. `verify()` explicitly opens every
-registered artifact and is not a discovery operation.
+future history fits this in-memory envelope. Externalization alone does not
+prove a candidate fits: publication admits the complete final canonical root,
+including every field binding, native contract and provenance record. `verify()`
+explicitly validates all metadata and opens every registered leaf; publication
+performs that complete local offline check before exposing its root.
 
 ### Unreleased raw-wide source selection
 
@@ -799,8 +819,16 @@ All selected typed closures, exact Config editions, reviewed source/header
 contracts, upstream raw identities and declared processing dependencies validate
 before native input opening. Explicit keys must match the existing TAPR
 publisher-code contract; native types, complete columns, row count and key
-uniqueness are checked before activation. The producer writes batches of at
-most 4096 rows. Preparation row claims must first match the finite reviewed
+uniqueness are checked before activation. Prepared mode requires the current
+bounded source producer's exact code identity and complete `source_read_budget`;
+legacy or missing admission requires source re-preparation. Every source row
+group remains one admitted, non-combined Arrow batch and one output row group.
+The producer never concatenates groups into a fixed 4096-row read. It checks
+native batch bytes, rows and retained canonical keys against that budget; paired
+readback preserves the same exact group boundaries. An unexpected chunked group
+is rejected rather than split or combined. These are payload/index admission
+limits, not guarantees about Parquet codecs, native allocator overhead or RSS.
+Preparation row claims must first match the finite reviewed
 data-record interval after its explicit annotation exclusions; missing or empty
 layouts cannot establish retained rows. The producer verifies exact raw-string
 readback, registers every selected source field, validates its root through `publish_release(...,
@@ -811,7 +839,8 @@ preparation dependencies remain in the closure without relabeling acquisitions.
 
 Prepared input datasets own the selection: the producer neither enumerates all
 configured datasets nor implicitly adds another scope/family. A single source
-is sufficient, and the existing four STUD/STAF selections remain valid. No
+is sufficient; STUD/STAF use the same path after accepted bounded source
+preparation. No
 declared table or field is silently dropped; ambiguous/multiple physical-table
 declarations fail before native I/O. CLI `--family` and `--scope` belong to CSV
 intake and cannot be combined with `--prepared-input`; their defaults do not
