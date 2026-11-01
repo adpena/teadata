@@ -10,6 +10,7 @@ from functools import cached_property
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
+from ._sqlite import readonly_connection
 from .manifest import ContractError, read_sqlite_catalog, read_sqlite_catalog_connection
 from .release import current_release
 from .teadata_config import canonical_district_number
@@ -145,7 +146,7 @@ def load_campus(
 ) -> Optional[dict[str, Any]]:
     """Read one public or source-qualified campus through the canonical store."""
     path = discover_entity_store(store_path)
-    with EntityStore(path) as store:
+    with EntityStore(path, immutable=store_path is None) as store:
         return store.get_campus(campus_number, include_meta=include_meta)
 
 
@@ -174,7 +175,7 @@ def load_district(
     """
 
     try:
-        with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as conn:
+        with closing(readonly_connection(path, immutable=store_path is None)) as conn:
             for key in _district_lookup_keys(district_number):
                 row = conn.execute(query, (key, key)).fetchone()
                 if not row:
@@ -215,7 +216,7 @@ def list_meta_keys(
     if limit:
         query = f"{query} LIMIT {int(limit)}"
     try:
-        with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as conn:
+        with closing(readonly_connection(path, immutable=store_path is None)) as conn:
             rows = conn.execute(query).fetchall()
             keys = [row[0] for row in rows if row and row[0]]
             if keys:

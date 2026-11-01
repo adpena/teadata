@@ -6,6 +6,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any, Iterable, Optional, Tuple
 
+from ._sqlite import readonly_connection
 from .manifest import ContractError, read_sqlite_catalog
 from .release import current_release
 from .teadata_config import canonical_district_number
@@ -22,9 +23,13 @@ def map_store_path_for_snapshot(snapshot_path: Path) -> Path:
 
 
 def discover_map_store(explicit: str | Path | None = None) -> Path:
-    path = Path(explicit) if explicit is not None else current_release().artifact("maps")
-    read_sqlite_catalog(path)
-    with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as connection:
+    if explicit is None:
+        # DataRelease owns main-file checksum/catalog validation and its stat cache.
+        path = current_release().artifact("maps")
+    else:
+        path = Path(explicit)
+        read_sqlite_catalog(path)
+    with closing(readonly_connection(path, immutable=explicit is None)) as connection:
         columns = {row[1] for row in connection.execute("PRAGMA table_info(campus_profile)")}
     if "lookup_key" not in columns:
         raise ContractError("Legacy map campus identity schema requires a source-bound rebuild")
@@ -84,7 +89,7 @@ def load_map_payload_parts(
         return None, None
 
     try:
-        with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as conn:
+        with closing(readonly_connection(path, immutable=store_path is None)) as conn:
             for key in _district_lookup_keys(district_number):
                 row = conn.execute(
                     "SELECT payload_base, payload_transfers FROM closures_map WHERE district_number = ?",
@@ -113,7 +118,7 @@ def load_campus_profile_payload(
         return None
     path = discover_map_store(store_path)
     try:
-        with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as conn:
+        with closing(readonly_connection(path, immutable=store_path is None)) as conn:
             row = conn.execute("SELECT payload FROM campus_profile WHERE lookup_key = ?", (key,)).fetchone()
             return _decode_payload(row[0]) if row else None
     except sqlite3.OperationalError as error:

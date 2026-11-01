@@ -1,19 +1,32 @@
 from dataclasses import replace
+from contextlib import closing
 import gzip
+from hashlib import sha256
 import json
+import os
 import pickle
 import sqlite3
+from unittest.mock import Mock
+from uuid import UUID
 
 import pytest
+from shapely.geometry import Point
 
 from teadata import DataEngine, ProvenanceStore
+from teadata import boundary_store, entity_store, map_store
+from teadata.entities import Campus, District
+import teadata.release as release_module
 from teadata.manifest import (
     BuildRecorder,
     ContractError,
     DatasetCatalog,
+    canonical_json,
+    file_identity,
+    read_sqlite_catalog,
     write_sqlite_catalog,
 )
 from teadata.release import DataRelease, publish_release, SNAPSHOT_MAGIC
+from teadata.persistence.sqlalchemy_store import create_engine, create_sessionmaker, ensure_schema, export_dataengine
 from teadata.teadata_config import Config
 
 
@@ -57,14 +70,38 @@ def catalog(tmp_path):
 def release(tmp_path, catalog):
     staging = tmp_path / "staging"
     staging.mkdir()
+    engine = DataEngine()
+    engine.catalog = catalog
+    district = District(id=UUID(int=1), name="MAIN DISTRICT", district_number="123456")
+    district.meta = {"district_main": 1}
+    engine.add_district(district)
+    campus = Campus(id=UUID(int=2), district_id=district.id, name="MAIN CAMPUS", charter_type="", is_charter=False)
+    campus.campus_number, campus.district_number = "123456789", "123456"
+    campus.meta = {"campus_main": 1}
+    engine.add_campus(campus)
     paths = {}
     for role in ("entities", "maps", "boundaries"):
         path = staging / (role + ".sqlite")
-        with sqlite3.connect(path) as connection:
+        with closing(sqlite3.connect(path)) as connection, connection:
             write_sqlite_catalog(connection, catalog)
+            if role == "maps":
+                connection.execute("CREATE TABLE campus_profile(lookup_key TEXT PRIMARY KEY,payload BLOB)")
+                connection.execute("CREATE TABLE closures_map(district_number TEXT PRIMARY KEY,payload_base BLOB,payload_transfers BLOB)")
+                connection.execute("INSERT INTO campus_profile VALUES('123456789','{\"campus\":1}')")
+                connection.execute("INSERT INTO closures_map VALUES('123456','{\"district\":1}','{\"transfers\":1}')")
+            elif role == "boundaries":
+                connection.execute("CREATE TABLE boundaries(district_number TEXT PRIMARY KEY,wkb BLOB)")
+                connection.execute("INSERT INTO boundaries VALUES (?,?)", ("'123456", Point(1, 1).wkb))
+        if role == "entities":
+            database = create_engine(f"sqlite:///{path}")
+            try:
+                ensure_schema(database)
+                Session = create_sessionmaker(database)
+                with Session.begin() as session:
+                    export_dataengine(engine, session, replace=True)
+            finally:
+                database.dispose()
         paths[role] = path
-    engine = DataEngine()
-    engine.catalog = catalog
     paths["snapshot"] = staging / "snapshot.pkl.gz"
     with gzip.open(paths["snapshot"], "wb") as stream:
         stream.write(SNAPSHOT_MAGIC + catalog.build_id.encode() + b"\n")
@@ -103,6 +140,255 @@ def test_tampered_artifact_is_rejected_even_after_a_successful_read(release):
         stream.write(b"corruption")
     with pytest.raises(ContractError, match="checksum or size"):
         selected.artifact("entities")
+
+
+@pytest.mark.parametrize("reader", ["discover", "campus", "district"])
+def test_default_maps_reuse_release_catalog_validation_on_cold_and_warm_reads(release, monkeypatch, reader):
+    selected = DataRelease(release)
+    validate = Mock(wraps=release_module.read_sqlite_catalog)
+    monkeypatch.setattr(release_module, "read_sqlite_catalog", validate)
+    monkeypatch.setattr(map_store, "read_sqlite_catalog", Mock(side_effect=AssertionError("Duplicate catalog construction")))
+    with release_module.using_release(selected):
+        for _ in range(2):
+            if reader == "discover":
+                assert map_store.discover_map_store().name == selected._artifacts["maps"]["filename"]
+            elif reader == "campus":
+                assert map_store.load_campus_profile_payload("123456789") == {"campus": 1}
+            else:
+                assert map_store.load_map_payload_parts("123456") == ({"district": 1}, {"transfers": 1})
+    validate.assert_called_once_with(selected.artifact("maps"), immutable=True)
+
+
+@pytest.mark.parametrize("fault", ["missing_catalog", "malformed_catalog", "build_projection", "legacy_identity"])
+def test_explicit_maps_still_validate_catalog_and_identity_schema(release, monkeypatch, fault):
+    path = DataRelease(release).artifact("maps")
+    monkeypatch.setattr(map_store, "current_release", Mock(side_effect=AssertionError("Explicit path must not select a release")))
+    assert map_store.discover_map_store(path) == path
+    with closing(sqlite3.connect(path)) as connection:
+        if fault == "missing_catalog":
+            connection.execute("DROP TABLE teadata_catalog")
+        elif fault == "malformed_catalog":
+            connection.execute("UPDATE teadata_catalog SET document='{}'")
+        elif fault == "build_projection":
+            connection.execute("UPDATE teadata_catalog SET build_id=?", ("0" * 64,))
+        else:
+            connection.execute("ALTER TABLE campus_profile RENAME COLUMN lookup_key TO campus_number")
+        connection.commit()
+    with pytest.raises(ContractError):
+        map_store.discover_map_store(path)
+
+
+def test_empty_explicit_map_path_does_not_fall_back_to_release(monkeypatch):
+    monkeypatch.setattr(map_store, "current_release", Mock(side_effect=AssertionError("Empty path is explicit")))
+    with pytest.raises(ContractError, match="required dataset catalog"):
+        map_store.discover_map_store("")
+
+
+@pytest.mark.parametrize("change", ["write", "replacement"])
+def test_default_map_discovery_rechecks_changed_artifact_after_warm_read(release, change, tmp_path):
+    selected = DataRelease(release)
+    with release_module.using_release(selected):
+        path = map_store.discover_map_store()
+        if change == "write":
+            with path.open("ab") as stream:
+                stream.write(b"tampered")
+        else:
+            replacement = tmp_path / "replacement.sqlite"
+            replacement.write_bytes(path.read_bytes())
+            with closing(sqlite3.connect(replacement)) as connection:
+                connection.execute("UPDATE campus_profile SET payload='{\"campus\":2}'")
+                connection.commit()
+            os.replace(replacement, path)
+        with pytest.raises(ContractError, match="checksum or size"):
+            map_store.discover_map_store()
+
+
+def _bind_artifact_bytes(release, path, role="maps"):
+    """Keep the tiny fixture's declared hashes/receipt consistent for build tests."""
+    document = json.loads(release.read_text())
+    identity = file_identity(path)
+    for key in ("sha256", "size_bytes"):
+        document["artifacts"][role][key] = identity[key]
+        document["processing"]["record"]["outputs"][role][key] = identity[key]
+    document["processing"]["record_id"] = sha256(
+        (canonical_json(document["processing"]["record"]) + "\n").encode()
+    ).hexdigest()
+    release.write_text(canonical_json(document))
+
+
+def test_default_maps_still_reject_legacy_identity_after_release_verification(release):
+    path = DataRelease(release).artifact("maps")
+    with closing(sqlite3.connect(path)) as connection:
+        connection.execute("ALTER TABLE campus_profile RENAME COLUMN lookup_key TO campus_number")
+        connection.commit()
+    _bind_artifact_bytes(release, path)
+    with release_module.using_release(DataRelease(release)):
+        with pytest.raises(ContractError, match="Legacy map campus identity"):
+            map_store.discover_map_store()
+
+
+def _foreign_catalog(catalog):
+    document = catalog.to_dict()
+    return DatasetCatalog.create(datasets=document["datasets"], value_policies=document["value_policies"],
+        processor="f" * 64, records=document["provenance"], environment=document["build_environment"],
+        metric_bindings=document["metric_bindings"])
+
+
+def test_explicit_foreign_catalog_is_independent_but_default_rejects_manifest_mismatch(release, catalog):
+    foreign = _foreign_catalog(catalog)
+    path = DataRelease(release).artifact("maps")
+    with closing(sqlite3.connect(path)) as connection:
+        connection.execute("UPDATE teadata_catalog SET build_id=?,document=?",
+            (foreign.build_id, canonical_json(foreign.to_dict())))
+        connection.commit()
+    assert map_store.discover_map_store(path) == path
+    _bind_artifact_bytes(release, path)
+    with release_module.using_release(DataRelease(release)):
+        with pytest.raises(ContractError, match="different data build"):
+            map_store.discover_map_store()
+
+
+@pytest.mark.parametrize("change", ["payload", "catalog", "identity_schema"])
+def test_default_map_readers_use_verified_main_file_while_explicit_paths_follow_wal(release, change):
+    path = DataRelease(release).artifact("maps")
+    with closing(sqlite3.connect(path)) as writer:
+        assert writer.execute("PRAGMA journal_mode=WAL").fetchone()[0] == "wal"
+        writer.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        _bind_artifact_bytes(release, path)
+        before = file_identity(path)
+        if change == "payload":
+            writer.execute("UPDATE campus_profile SET payload='{\"campus\":2}'")
+            writer.execute("UPDATE closures_map SET payload_base='{\"district\":2}',payload_transfers='{\"transfers\":2}'")
+        elif change == "catalog":
+            writer.execute("UPDATE teadata_catalog SET build_id=?", ("0" * 64,))
+        else:
+            writer.execute("ALTER TABLE campus_profile RENAME COLUMN lookup_key TO campus_number")
+        writer.commit()
+        assert file_identity(path) == before and path.with_name(path.name + "-wal").stat().st_size > 0
+        with release_module.using_release(DataRelease(release)):
+            assert map_store.load_campus_profile_payload("123456789") == {"campus": 1}
+            assert map_store.load_map_payload_parts("123456") == ({"district": 1}, {"transfers": 1})
+            assert read_sqlite_catalog(path, immutable=True).build_id == DataRelease(release).build_id
+        if change == "payload":
+            assert map_store.load_campus_profile_payload("123456789", store_path=path) == {"campus": 2}
+            assert map_store.load_map_payload_parts("123456", store_path=path) == ({"district": 2}, {"transfers": 2})
+        else:
+            with pytest.raises(ContractError):
+                map_store.discover_map_store(path)
+
+
+@pytest.mark.parametrize("reader", ["campus", "district", "meta_keys"])
+@pytest.mark.parametrize("change", ["payload", "catalog", "schema"])
+def test_default_entity_readers_ignore_wal_while_explicit_and_required_paths_remain_mutable(release, catalog, reader, change):
+    path = DataRelease(release).artifact("entities")
+    foreign = _foreign_catalog(catalog)
+
+    def read(explicit=None):
+        if reader == "campus":
+            return entity_store.load_campus("123456789", store_path=explicit)
+        if reader == "district":
+            return entity_store.load_district("123456", store_path=explicit)
+        return entity_store.list_meta_keys("campus", store_path=explicit)
+
+    with closing(sqlite3.connect(path)) as writer:
+        assert writer.execute("PRAGMA journal_mode=WAL").fetchone()[0] == "wal"
+        writer.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        _bind_artifact_bytes(release, path, "entities")
+        before = file_identity(path)
+        if change == "catalog":
+            writer.execute("UPDATE teadata_catalog SET build_id=?,document=?",
+                (foreign.build_id, canonical_json(foreign.to_dict())))
+        if change == "schema":
+            if reader == "campus":
+                writer.execute("ALTER TABLE campuses RENAME COLUMN lookup_key TO wal_key")
+            elif reader == "district":
+                writer.execute("ALTER TABLE districts RENAME COLUMN name TO wal_name")
+            else:
+                writer.execute("DROP TABLE campus_meta")
+        elif reader == "meta_keys":
+            writer.execute("UPDATE campus_meta SET key='wal_only' WHERE key='campus_main'")
+        else:
+            table = "campuses" if reader == "campus" else "districts"
+            writer.execute(f"UPDATE {table} SET name='WAL value'")
+        writer.commit()
+        assert file_identity(path) == before and path.with_name(path.name + "-wal").stat().st_size > 0
+        with release_module.using_release(DataRelease(release)):
+            result = read()
+            if reader == "meta_keys":
+                assert "campus_main" in result and "wal_only" not in result
+            else:
+                assert result["name"] == ("MAIN CAMPUS" if reader == "campus" else "MAIN DISTRICT")
+                if reader == "campus":
+                    assert result["source_build_id"] == catalog.build_id
+        if change == "schema":
+            if reader == "meta_keys":
+                assert read(path) == []  # Existing explicit missing-table policy.
+            else:
+                with pytest.raises(ContractError if reader == "campus" else RuntimeError):
+                    read(path)
+        else:
+            result = read(path)
+            if reader == "meta_keys":
+                assert "wal_only" in result and "campus_main" not in result
+            else:
+                assert result["name"] == "WAL value"
+                if reader == "campus" and change == "catalog":
+                    assert result["source_build_id"] == foreign.build_id
+            with entity_store.EntityStore(path) as required_path_store:
+                assert required_path_store.catalog.build_id == (foreign.build_id if change == "catalog" else catalog.build_id)
+
+
+@pytest.mark.parametrize("change", ["payload", "catalog", "schema"])
+def test_default_boundaries_ignore_wal_while_explicit_and_required_paths_remain_mutable(release, catalog, change):
+    path = DataRelease(release).artifact("boundaries")
+    foreign = _foreign_catalog(catalog)
+    with closing(sqlite3.connect(path)) as writer:
+        assert writer.execute("PRAGMA journal_mode=WAL").fetchone()[0] == "wal"
+        writer.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        _bind_artifact_bytes(release, path, "boundaries")
+        before = file_identity(path)
+        if change == "catalog":
+            writer.execute("UPDATE teadata_catalog SET build_id=?,document=?",
+                (foreign.build_id, canonical_json(foreign.to_dict())))
+        if change == "schema":
+            writer.execute("DROP TABLE boundaries")
+        else:
+            writer.execute("UPDATE boundaries SET wkb=?", (Point(2, 2).wkb,))
+        writer.commit()
+        assert file_identity(path) == before and path.with_name(path.name + "-wal").stat().st_size > 0
+        with release_module.using_release(DataRelease(release)):
+            assert boundary_store.load_boundary("123456").equals(Point(1, 1))
+        if change == "schema":
+            assert boundary_store.load_boundary("123456", store_path=path) is None
+        else:
+            assert boundary_store.load_boundary("123456", store_path=path).equals(Point(2, 2))
+            required_path_store = boundary_store.BoundaryStore(path)
+            try:
+                assert required_path_store.get("123456").equals(Point(2, 2))
+            finally:
+                required_path_store.close()
+            assert read_sqlite_catalog(path).build_id == (foreign.build_id if change == "catalog" else catalog.build_id)
+
+
+def test_publication_rejects_catalog_matching_only_in_wal_before_linking_main_file(release, catalog, tmp_path):
+    selected = DataRelease(release)
+    foreign = _foreign_catalog(catalog)
+    source = tmp_path / "wal-only-catalog.sqlite"
+    with closing(sqlite3.connect(source)) as writer:
+        write_sqlite_catalog(writer, foreign)
+        writer.commit()
+        writer.execute("PRAGMA journal_mode=WAL")
+        writer.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+        writer.execute("UPDATE teadata_catalog SET build_id=?,document=?",
+            (catalog.build_id, canonical_json(catalog.to_dict())))
+        writer.commit()
+        assert read_sqlite_catalog(source).build_id == catalog.build_id
+        assert read_sqlite_catalog(source, immutable=True).build_id == foreign.build_id
+        artifacts = {"maps": source, **{role: selected.artifact(role) for role in ("entities", "boundaries", "snapshot")}}
+        destination = tmp_path / "must-not-publish"
+        with pytest.raises(ContractError, match="Cannot publish mixed data builds: maps"):
+            publish_release(destination, catalog, artifacts, processing=selected.processing)
+        assert list(destination.iterdir()) == []
 
 
 def test_catalog_tampering_is_rejected(catalog):
