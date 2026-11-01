@@ -8,6 +8,132 @@ from teadata.dataset_metadata import DataPeriod, DatasetMetadata
 from teadata.teadata_config import Config, load_config
 
 
+def profile_metadata_document(path):
+    return {"value_policies": {"legacy": {"reference_id": "masking", "tokens": {
+        "-1": {"status": "suppressed", "reason": "legacy interpretation"}}}},
+        "data_sources": {"example": {2024: {"path": str(path), "metadata": {
+            "version": "2024", "title": "Legacy view", "period": {"kind": "calendar_year", "year": 2023},
+            "value_policy": "legacy", "references": [{"reference_id": "masking", "role": "masking_methodology", "status": "unreviewed"}],
+            "metrics": {"old": {"field": "value", "unit": "count"}}},
+            "reader": {"dtype": "str", "keep_default_na": False,
+                "profiles": {"source": {"metadata": {"version": "2024"}}}}}}}}
+
+
+def test_selected_profile_metadata_is_complete_uninterpreted_and_does_not_mutate_base(tmp_path):
+    path = tmp_path / "values.csv"
+    path.write_text("value\n-1\n.\n001\n")
+    document = profile_metadata_document(path)
+    cfg = Config.from_dict(document)
+    before = cfg.resolve_dataset("example", 2024).to_dict()
+    serialized = cfg.to_json()
+    raw = cfg.resolve_dataset("example", 2024, reader_profile="source")
+    assert raw.metadata.version == "2024" and raw.metadata.title is None
+    assert raw.metadata.period.kind == "unknown" and raw.metadata.value_policy is None
+    assert not raw.metadata.metrics and raw.metadata.estimation is None and not raw.metadata.references
+    assert cfg.reader_references("example", 2024, reader_profile="source") == []
+    assert cfg.resolve_dataset("example", 2024).to_dict() == before
+    assert cfg.to_json() == serialized
+    year, frame = cfg.load_df("example", 2024, reader_profile="source")
+    assert year == 2024 and frame["value"].tolist() == ["-1", ".", "001"]
+    assert cfg.resolve_dataset("example", 2024).metadata.value_policy == "legacy"
+
+
+@pytest.mark.parametrize("damage", ["null", "list", "unknown_field", "different_version", "missing_version", "unknown_policy", "extra_references"])
+def test_profile_metadata_invalid_or_competing_authorities_fail_before_file_io(tmp_path, monkeypatch, damage):
+    document = profile_metadata_document(tmp_path / "not-read.csv")
+    profile = document["data_sources"]["example"][2024]["reader"]["profiles"]["source"]
+    if damage == "null":
+        profile["metadata"] = None
+    elif damage == "list":
+        profile["metadata"] = []
+    elif damage == "unknown_field":
+        profile["metadata"]["raw_policy_bypass"] = True
+    elif damage == "different_version":
+        profile["metadata"]["version"] = "2023"
+    elif damage == "missing_version":
+        profile["metadata"].clear()
+    elif damage == "unknown_policy":
+        profile["metadata"]["value_policy"] = "not-declared"
+    else:
+        profile["references"] = []
+    monkeypatch.setattr(Path, "open", lambda *a, **k: pytest.fail("Invalid profile touched source file"))
+    with pytest.raises(ValueError):
+        Config.from_dict(document)
+
+
+@pytest.mark.parametrize("has_profiles", [False, True])
+@pytest.mark.parametrize("method,message", [
+    ("column_contract", "Invalid column schema for example"),
+    ("column_schema", "Invalid column schema for example"),
+    ("load_df", "Invalid reader contract for example"),
+    ("header_records", "Invalid column schema for example"),
+    ("header_mapping", "Invalid column schema for example"),
+])
+def test_missing_profile_preserves_public_contract_error_before_io(tmp_path, monkeypatch, has_profiles, method, message):
+    from teadata.manifest import ContractError
+
+    document = profile_metadata_document(tmp_path / "not-read.csv")
+    if not has_profiles:
+        document["data_sources"]["example"][2024]["reader"].pop("profiles")
+    cfg = Config.from_dict(document)
+    monkeypatch.setattr(Path, "open", lambda *a, **k: pytest.fail("Missing profile opened an artifact"))
+    arguments: dict[str, str | int] = {"edition": "2024"} if method.startswith("header_") else {"year": 2024}
+    if method == "header_mapping":
+        arguments["table"] = "example"
+    with pytest.raises(ContractError, match=message):
+        getattr(cfg, method)("example", reader_profile="absent", **arguments)
+    # The direct metadata APIs retain their original ValueError boundary.
+    with pytest.raises(ValueError, match="Reader profile absent is not declared"):
+        cfg.resolve_dataset("example", 2024, reader_profile="absent")
+    with pytest.raises(ValueError, match="Reader profile absent is not declared"):
+        cfg.reader_references("example", 2024, reader_profile="absent")
+
+
+@pytest.mark.parametrize("method", ["column_contract", "column_schema", "load_df"])
+def test_reader_boundaries_preserve_legacy_base_resolution_errors(tmp_path, method):
+    cfg = Config.from_dict(profile_metadata_document(tmp_path / "not-read.csv"))
+    for profile in (None, "source"):
+        with pytest.raises(ValueError, match="section must be"):
+            getattr(cfg, method)("example", 2024, section="unknown", reader_profile=profile)
+        with pytest.raises(KeyError, match="Unknown data_sources dataset"):
+            getattr(cfg, method)("absent", 2024, reader_profile=profile)
+
+
+def test_generic_profile_dataframe_build_uses_same_selected_metadata(tmp_path):
+    from teadata.manifest import BuildRecorder
+    from teadata.provenance import ProvenanceStore
+    path = tmp_path / "values.csv"
+    path.write_text("value\n-1\n001\n")
+    document = profile_metadata_document(path)
+    store = ProvenanceStore(tmp_path / "provenance")
+    cfg = Config.from_dict(document)
+    identifier = store.record_acquisition(path, cfg.resolve_dataset("example", 2024, reader_profile="source"))
+    document["data_sources"]["example"][2024]["reader"]["profiles"]["source"]["metadata"]["provenance_ids"] = [identifier]
+    cfg = Config.from_dict(document)
+    with BuildRecorder(cfg, store) as recorder:
+        _, frame = cfg.load_df("example", 2024, reader_profile="source")
+    assert frame["value"].tolist() == ["-1", "001"]
+    assert "value_policy" not in recorder.datasets["example"]["metadata"]
+    assert recorder.datasets["example"]["metadata"]["period"] == {"kind": "unknown"}
+    assert cfg.resolve_dataset("example", 2024).metadata.value_policy == "legacy"
+
+
+def test_selected_applied_policy_still_fails_shared_methodology_gate_before_io(tmp_path, monkeypatch):
+    from teadata.manifest import BuildRecorder, ContractError
+    from teadata.provenance import ProvenanceStore
+
+    document = profile_metadata_document(tmp_path / "not-read.csv")
+    entry = document["data_sources"]["example"][2024]
+    entry["reader"]["profiles"]["source"]["metadata"] = dict(entry["metadata"])
+    cfg = Config.from_dict(document)
+    recorder = BuildRecorder(cfg, ProvenanceStore(tmp_path / "history"))
+    monkeypatch.setattr("teadata.manifest.verify_source_receipts", lambda *a, **k: pytest.fail("Unreviewed policy touched an artifact"))
+    monkeypatch.setattr(cfg, "_load_table", lambda *a, **k: pytest.fail("Unreviewed policy loaded source rows"))
+    with recorder:
+        with pytest.raises(ContractError, match="retained reviewed methodology"):
+            cfg.load_df("example", 2024, reader_profile="source")
+
+
 def test_legacy_paths_and_load_df_keep_their_existing_contract(tmp_path):
     source = tmp_path / "source.csv"
     source.write_text("value\n42\n")

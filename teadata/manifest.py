@@ -979,11 +979,11 @@ class BuildRecorder:
         if self._token is not None:
             ACTIVE_BUILD.reset(self._token)
 
-    def before_read(self, source: ResolvedDataset) -> dict[str, Any]:
+    def before_read(self, source: ResolvedDataset, *, reader_profile: str | None = None) -> dict[str, Any]:
         if processor_identity() != self.processor_sha256:
             raise ContractError("Processing source changed during the build")
         expected = self.cfg.resolve_dataset(
-            source.dataset, source.requested_year, section=source.section
+            source.dataset, source.requested_year, section=source.section, reader_profile=reader_profile
         )
         if expected.to_dict() != source.to_dict():
             raise ContractError("Source configuration changed during the build")
@@ -1059,7 +1059,7 @@ class BuildRecorder:
         """
         if processor_identity() != self.processor_sha256:
             raise ContractError("Processing source changed during the build")
-        expected = self.cfg.resolve_dataset(source.dataset, source.requested_year, section=source.section)
+        expected = self.cfg.resolve_dataset(source.dataset, source.requested_year, section=source.section, reader_profile="source")
         if expected.to_dict() != source.to_dict() or key.dataset != source.dataset or key.edition != source.metadata.version:
             raise ContractError("Edition registration differs from selected Config source")
         if key.identity in self.edition_entries:
@@ -1108,7 +1108,7 @@ class BuildRecorder:
 
         if processor_identity() != self.processor_sha256 or key.dataset != source.dataset or key.edition != source.metadata.version:
             raise ContractError("Leaf contract differs from selected build source")
-        if self.cfg.resolve_dataset(source.dataset, source.requested_year, section=source.section).to_dict() != source.to_dict():
+        if self.cfg.resolve_dataset(source.dataset, source.requested_year, section=source.section, reader_profile="source").to_dict() != source.to_dict():
             raise ContractError("Source configuration changed during the build")
         resource = self.cfg.column_contract(source.dataset, source.requested_year, reader_profile="source")
         if resource is None:

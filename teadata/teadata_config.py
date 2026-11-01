@@ -414,20 +414,15 @@ class Config:
             metric_bindings=parse_bindings(d.get("metric_bindings")),
         )
         cfg.validate_file_types()  # fail fast
-        for catalog in (cfg.data_sources, cfg.spatial):
-            for year_map in catalog.values():
-                for definition in year_map.entries.values():
-                    policy_id = definition.metadata.value_policy
-                    if policy_id and policy_id not in cfg.value_policies:
-                        raise ValueError(f"Unknown dataset value policy: {policy_id}")
-                    if policy_id:
-                        reference = cfg.value_policies[policy_id].reference_id
-                        if reference and reference not in {
-                            ref.reference_id for ref in definition.metadata.references
-                        }:
-                            raise ValueError(
-                                f"Value policy {policy_id} refers to missing source document {reference}"
-                            )
+        for section in ("data_sources", "spatial"):
+            for dataset, year_map in getattr(cfg, section).items():
+                for year, definition in year_map.entries.items():
+                    cfg._validate_metadata_policy(definition.metadata)
+                    profiles = definition.reader.get("profiles", {})
+                    if isinstance(profiles, dict):
+                        for name, profile in profiles.items():
+                            if isinstance(profile, dict) and "metadata" in profile:
+                                cfg.resolve_dataset(dataset, year, section=section, reader_profile=name)
         return cfg
 
     # ---------- Sugar ----------
@@ -534,8 +529,12 @@ class Config:
         *,
         strict: bool = False,
         section: str = "data_sources",
+        reader_profile: str | None = None,
     ) -> ResolvedDataset:
         """Describe a configured source, preserving the actual resolved catalog year.
+
+        An explicitly selected profile's metadata replaces the complete base
+        record. Without a profile, the legacy metadata selection is unchanged.
 
         This describes configuration, not evidence that a dataset was loaded into
         an engine or snapshot. Legacy entries have an unknown reference period.
@@ -553,15 +552,39 @@ class Config:
             dataset, selection_year, strict=strict, section=section
         )
         definition = catalog[dataset].entries[resolved_year]
+        metadata = definition.metadata
+        if reader_profile is not None:
+            from .column_schema import reader_options
+
+            options = reader_options(definition.reader, reader_profile)
+            profile = definition.reader["profiles"][reader_profile]
+            if "metadata" in options:
+                if "metadata" not in profile or not isinstance(options["metadata"], dict):
+                    raise ValueError("Reader metadata requires one complete selected profile record")
+                if "references" in options:
+                    raise ValueError("Profile metadata and reader references cannot both declare reference authority")
+                metadata = DatasetMetadata.from_dict(options["metadata"])
+                if metadata.version != definition.metadata.version:
+                    raise ValueError("Reader profile metadata cannot change the declared source version")
+                self._validate_metadata_policy(metadata)
         return ResolvedDataset(
             dataset=dataset,
             section=section,
             requested_year=year,
             resolved_year=None if resolved_year == 9999 else resolved_year,
             path=path,
-            metadata=definition.metadata,
+            metadata=metadata,
             reader=definition.reader,
         )
+
+    def _validate_metadata_policy(self, metadata: DatasetMetadata) -> None:
+        policy_id = metadata.value_policy
+        if policy_id and policy_id not in self.value_policies:
+            raise ValueError(f"Unknown dataset value policy: {policy_id}")
+        if policy_id:
+            reference = self.value_policies[policy_id].reference_id
+            if reference and reference not in {ref.reference_id for ref in metadata.references}:
+                raise ValueError(f"Value policy {policy_id} refers to missing source document {reference}")
 
     # ---------- Validation ----------
     def validate_file_types(self) -> None:
@@ -694,6 +717,8 @@ class Config:
 
         source = self.resolve_dataset(dataset, year, section=section)
         try:
+            if reader_profile is not None:
+                source = self.resolve_dataset(dataset, year, section=section, reader_profile=reader_profile)
             options = reader_options(source.reader, reader_profile)
             resource = options.get("column_schema")
             if resource is None:
@@ -725,8 +750,10 @@ class Config:
         from .column_schema import reader_options
         from .dataset_metadata import ReferenceDocument
 
-        source = self.resolve_dataset(dataset, year, section=section)
+        source = self.resolve_dataset(dataset, year, section=section, reader_profile=reader_profile)
         options = reader_options(source.reader, reader_profile)
+        if "metadata" in options:
+            return list(source.metadata.references)
         extra = options.get("references", [])
         if not isinstance(extra, list) or any(not isinstance(item, dict) for item in extra):
             raise ValueError("Reader references must be reference-document records")
@@ -746,8 +773,8 @@ class Config:
         contract = self.column_contract(dataset, year, section=section, reader_profile=reader_profile)
         if contract is None:
             return None
-        source = self.resolve_dataset(dataset, year, section=section)
         try:
+            source = self.resolve_dataset(dataset, year, section=section, reader_profile=reader_profile)
             document = parse_column_schema(contract["text"].encode())
             if document["schema_version"] == 2:
                 if source.metadata.version is None:
@@ -776,11 +803,11 @@ class Config:
         if len(choices) != 1:
             raise ContractError(f"Source-contract header crosswalk edition unavailable or ambiguous: {dataset!r}, {edition!r}")
         section, year = choices[0]
-        source = self.resolve_dataset(dataset, year, section=section)
         contract = self.column_contract(dataset, year, section=section, reader_profile=reader_profile)
         if contract is None:
             raise ContractError(f"Source-contract header crosswalk unavailable: {dataset!r}")
         try:
+            source = self.resolve_dataset(dataset, year, section=section, reader_profile=reader_profile)
             return header_records(parse_column_schema(contract["text"].encode()),
                                   dataset=dataset, edition=edition, table=table, metadata=source.metadata)
         except ValueError as error:
@@ -834,7 +861,7 @@ class Config:
 
         if ACTIVE_BUILD.get() is not None:
             raise ContractError("Prepare full TAPR sources explicitly before a retained-format release build")
-        source = self.resolve_dataset(dataset, year)
+        source = self.resolve_dataset(dataset, year, reader_profile="source")
         if source.resolved_year != year or source.metadata.version != str(year):
             raise ContractError("Full TAPR source preparation requires an exact declared edition")
         options = reader_options(source.reader, "source")
@@ -883,6 +910,8 @@ class Config:
 
         source = self.resolve_dataset(dataset, year, section=section)
         try:
+            if reader_profile is not None:
+                source = self.resolve_dataset(dataset, year, section=section, reader_profile=reader_profile)
             options = reader_options(source.reader, reader_profile)
         except ValueError as error:
             raise ContractError(f"Invalid reader contract for {dataset}: {error}") from error
@@ -898,6 +927,8 @@ class Config:
             )
         options.pop("column_schema", None)
         options.pop("references", None)
+        if reader_profile is not None:
+            options.pop("metadata", None)
         raw_tapr = options.pop("tapr_source", None)
         if raw_tapr is not None:
             from .tapr import merge_tapr_tables
@@ -923,7 +954,7 @@ class Config:
             for key, value in options.items()
         }
         build = ACTIVE_BUILD.get()
-        identity = build.before_read(source) if build is not None else None
+        identity = build.before_read(source, reader_profile=reader_profile) if build is not None else None
         prefer_geo = section == "spatial"
         frame = self._load_table(source.path, prefer_geopandas=prefer_geo, **options)
         rename = {

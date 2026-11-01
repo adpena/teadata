@@ -152,14 +152,19 @@ def test_exact_registered_field_projection_refines_unknowns_and_preserves_explic
     cfg = load_config()
     dataset = 'campus_tapr_student_staff_profile'
     records = cfg.header_records(dataset, edition='2024', reader_profile='source')
+    assert all(record['period'] == UNKNOWN for record in records)
+    contract = cfg.column_contract(dataset, 2024, reader_profile='source')
+    assert contract is not None
+    document = parse_column_schema(contract['text'].encode())
+    # The legacy selection still owns its qualified metric periods; the raw
+    # profile does not inherit that interpretation.
+    records = header_records(document, dataset=dataset, edition='2024',
+                             metadata=cfg.resolve_dataset(dataset, 2024).metadata)
     period_by_code = {r['code']: r['period'] for r in records}
     assert period_by_code['CPETATTP'] == period_by_code['CPEMALLP'] == LAGGED
     assert period_by_code['CPNTALLC'] == REPORT  # registered enrollment inherits selected metadata
     assert period_by_code['CPETBLAC'] == UNKNOWN  # report/year prefix is insufficient
     assert period_by_code['CAMPUS'] == UNKNOWN
-    contract = cfg.column_contract(dataset, 2024, reader_profile='source')
-    assert contract is not None
-    document = parse_column_schema(contract['text'].encode())
     name = next(r['field'] for r in records if r['code'] == 'CPNTALLC')
     metadata = DatasetMetadata(period=DataPeriod.from_dict(REPORT), field_year=2024, metrics={
         'unrelated_selector': MetricDefinition(name, DataPeriod()),
@@ -167,6 +172,39 @@ def test_exact_registered_field_projection_refines_unknowns_and_preserves_explic
     })
     projected = header_records(document, dataset=dataset, edition='2024', metadata=metadata)
     assert all(r['period'] == UNKNOWN for r in projected)
+
+
+@pytest.mark.parametrize('scope,width,raw_id', [
+    ('campus', 407, '5c564e395e98296e0bfe6388f6b7a51743e68832e04db17ec458130f4bfcfbc1'),
+    ('district', 420, 'e206f265a486d928a815ed9ebf24c99655813c29b0bc37bc31fa74ba9604021e'),
+])
+def test_explicit_prof_metadata_binds_context_without_interpretation_or_source_io(scope, width, raw_id, monkeypatch):
+    from teadata.manifest import _validate_methodology
+    from teadata.provenance import validate_record_graph, validate_reference_records
+
+    cfg = load_config()
+    dataset = scope + '_tapr_student_staff_profile'
+    base = cfg.resolve_dataset(dataset, 2024)
+    raw = cfg.resolve_dataset(dataset, 2024, reader_profile='source')
+    assert base.metadata.value_policy == 'tapr_profile' and base.metadata.metrics
+    with pytest.raises(ContractError, match='retained reviewed methodology'):
+        _validate_methodology(base.metadata, cfg.value_policies[base.metadata.value_policy])
+    assert raw.metadata.period.to_dict() == UNKNOWN and raw.metadata.field_year is None
+    assert raw.metadata.value_policy is None and raw.metadata.estimation is None and not raw.metadata.metrics
+    _validate_methodology(raw.metadata, None)
+    assert raw.metadata.provenance_ids == (raw_id,)
+    assert cfg.reader_references(dataset, 2024, reader_profile='source') == list(raw.metadata.references)
+    assert {ref.reference_id for ref in raw.metadata.references} == {
+        'csv_headers', 'advanced_form', 'source_dictionary', 'glossary', 'masking', 'columns_source'}
+    store = ProvenanceStore(ROOT / 'provenance')
+    monkeypatch.setattr(store, 'verify_artifact', lambda *a, **k: pytest.fail('Metadata lookup hashed a source body'))
+    graph = validate_record_graph(store.read_record, [raw_id, *(
+        identifier for ref in raw.metadata.references for identifier in ref.provenance_ids)])
+    validate_reference_records(raw, graph.__getitem__, verify_all_claimed=True)
+    assert graph[raw_id]['method'] == 'download' and graph[raw_id]['downloaded_at'] is not None
+    records = cfg.header_records(dataset, edition='2024', reader_profile='source')
+    assert len(records) == width and all(record['period'] == UNKNOWN for record in records)
+    assert cfg.resolve_dataset(dataset, 2024).to_dict() == base.to_dict()
 
 
 def period_fixture(tmp_path):
@@ -389,7 +427,11 @@ def test_all_prior_dataset_contracts_bindings_options_and_defaults_stay_pinned()
            for family in ['student_profile', 'staff_profile']}
     previous = {key: after[key] for key in ['spatial', 'metric_bindings', 'options']}
     previous['data_sources'] = {key: value for key, value in after['data_sources'].items() if key not in new}
-    assert sha256(canonical_json(previous).encode()).hexdigest() == 'b81466d6c461979f483b406b3685d04d6e3146704e10896f0645c6ae12baff65'
+    # Only the two explicitly selected PROF source profiles change metadata.
+    # Base metadata, default readers and every other prior declaration stay pinned.
+    for scope in ('campus', 'district'):
+        del previous['data_sources'][scope + '_tapr_student_staff_profile'][2024]['reader']['profiles']['source']
+    assert sha256(canonical_json(previous).encode()).hexdigest() == 'eac1fe86510ded164dfc33957580479d09c20627b2bcf523a5d50e6ef346a32a'
 
 
 @pytest.mark.parametrize('edition', [2024, 2025])

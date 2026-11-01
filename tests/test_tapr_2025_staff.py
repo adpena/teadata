@@ -313,9 +313,11 @@ def prepared_cohort(tmp_path, request):
         year, annotated = selected['year'], False
         families = selected['families']
         physical_table = selected.get('physical_table')
+        profile_metadata = selected.get('profile_metadata', False)
     else:
         year, annotated = selected if isinstance(selected, tuple) else (selected, False)
         families, physical_table = ('student_profile', 'staff_profile'), None
+        profile_metadata = False
     configs, inputs, annotations = {}, {}, {}
     pooled = ProvenanceStore(tmp_path / 'selected-references')
     for scope in ('campus', 'district'):
@@ -324,6 +326,24 @@ def prepared_cohort(tmp_path, request):
             config, history = tiny_annual_source(tmp_path, year, scope=scope, family=family,
                 stem=dataset + '-', values=('.', '***'), annotated=annotated and family == 'student_profile',
                 physical_table=physical_table)
+            if profile_metadata:
+                document = json.loads(config.read_text())
+                entry = document['data_sources'][dataset][str(year)]
+                profile = entry['reader']['profiles']['source']
+                raw_metadata = deepcopy(entry['metadata'])
+                raw_metadata['references'].extend(profile.pop('references'))
+                schema_reference = raw_metadata['references'][-1]
+                schema_path = tmp_path / schema_reference['path']
+                schema_reference['provenance_ids'] = [history.record_acquisition(schema_path,
+                    ResolvedDataset(dataset + ':schema', 'reference', year, year, '',
+                                    DatasetMetadata(title='Selected complete source contract')))]
+                profile['metadata'] = raw_metadata
+                entry['metadata'] = {'version': str(year), 'value_policy': 'legacy',
+                    'period': {'kind': 'calendar_year', 'year': year - 1},
+                    'references': [{'reference_id': 'masking', 'role': 'masking_methodology', 'status': 'unreviewed'}]}
+                document['value_policies'] = {'legacy': {'reference_id': 'masking',
+                    'tokens': {'-1': {'status': 'suppressed', 'reason': 'unreviewed legacy policy'}}}}
+                config.write_text(canonical_json(document))
             configs.update(json.loads(config.read_text())['data_sources'])
             cfg = load_config(config)
             dependencies = {}
@@ -340,10 +360,13 @@ def prepared_cohort(tmp_path, request):
             identifier = receipt['scopes'][scope]['processing_record_id']
             pooled.copy_record_from(ProvenanceStore(tmp_path / (dataset + '-prepared/provenance')), identifier)
             inputs[dataset] = (identifier, (scope + '_number',))
-    cfg = Config.from_dict({'data_sources': configs})
+    cohort_document = {'data_sources': configs}
+    if profile_metadata:
+        cohort_document['value_policies'] = document['value_policies']
+    cfg = Config.from_dict(cohort_document)
     cfg.base_dir = tmp_path
     config = tmp_path / 'cohort-config.json'
-    config.write_text(canonical_json({'data_sources': configs}))
+    config.write_text(canonical_json(cohort_document))
     return cfg, pooled, inputs, annotations, config
 
 
@@ -628,3 +651,26 @@ def test_prepared_prof_keeps_shared_unreviewed_methodology_rejection(prepared_co
         prepare_profiles(cfg, edition='2024', scopes=['campus', 'district'], input_dir=None,
             output_dir=tmp_path / 'unreviewed-prof', reference_store=store, prepared_inputs={dataset: inputs[dataset]})
     assert not (tmp_path / 'unreviewed-prof').exists()
+
+
+@pytest.mark.parametrize('prepared_cohort', [
+    {'year': 2024, 'families': ('student_staff_profile',), 'physical_table': 'profile', 'profile_metadata': True},
+], indirect=True)
+def test_complete_raw_profile_metadata_flows_through_preparation_recorder_and_no_policy(prepared_cohort, tmp_path):
+    from teadata.release import DataRelease
+    cfg, store, inputs, _, _ = prepared_cohort
+    output = tmp_path / 'explicit-raw-profile'
+    result = prepare_profiles(cfg, edition='2024', scopes=['campus', 'district'], input_dir=None,
+        output_dir=output, reference_store=store, prepared_inputs=inputs)
+    release = DataRelease(output / 'release.json', offline=True)
+    for row in result['datasets'].values():
+        key = EditionKey.from_dict(row['key'])
+        assert cfg.resolve_dataset(key.dataset, 2024).metadata.value_policy == 'legacy'
+        assert cfg.resolve_dataset(key.dataset, 2024, reader_profile='source').metadata.value_policy is None
+        assert release.catalog.metadata(key.dataset, edition=key).period.kind == 'unknown'
+        assert release.analytical_dataset(row['artifact_id']).to_table(columns=['source_observation']).to_pydict() == {
+            'source_observation': ['.', '***']}
+        with pytest.raises(ContractError, match='no value policy'):
+            release.catalog.policy(key.dataset, edition=key)
+        with pytest.raises(ContractError, match='scalar interpretation'):
+            release.catalog.measurement(object(), 'source_observation')

@@ -97,7 +97,7 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
                    "preparation_code_sha256": sha256(Path(__file__).read_bytes()).hexdigest(),
                    "scopes": {}}
         for scope, dataset, sources, table in prepared:
-            source = cfg.resolve_dataset(dataset, year)
+            source = cfg.resolve_dataset(dataset, year, reader_profile="source")
             contract = cfg.column_contract(dataset, year, reader_profile="source")
             assert contract is not None
             crosswalk_path = stage / (scope + "-crosswalk.json")
@@ -231,7 +231,7 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
                 or len(selected[1]) != 1 or not isinstance(selected[1][0], str)):
             raise ValueError("Prepared input requires a processing ID and an explicit ordered singleton key")
         identifier, keys = selected
-        source = cfg.resolve_dataset(dataset, year)
+        source = cfg.resolve_dataset(dataset, year, reader_profile="source")
         if source.resolved_year != year or source.metadata.version != edition:
             raise ValueError("Prepared input requires an exact registered edition")
         selection = tapr_source_selection(reader_options(source.reader, "source"))

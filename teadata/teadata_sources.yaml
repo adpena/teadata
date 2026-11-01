@@ -412,22 +412,72 @@ data_sources:
               scope: campus
               tables:
                 profile: data/tapr/raw/CAMPPROF_2023-2024.csv
-            references:
-            - reference_id: source_dictionary
-              role: data_dictionary
-              url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&prgopt=2024%2Ftapr%2FAdvanced+Download%2Fgetdata_2024.sas&sumlev=C&setpick=PROF&ddic=Y
-              title: 2024 Campus Profile publisher Data Elements; current reference
-                link, not original acquisition URL
-              status: unreviewed
-              provenance_ids: []
-            - reference_id: columns_source
-              role: schema
-              path: schemas/tapr--2024--header-crosswalk.json
-              title: Complete retained 2024 publisher code-label-field and source
-                layout contract; not released facts
-              status: available
-              provenance_ids: []
-              reviewed_sha256: 54cc99ffc8ce29f7ea9b80f88d03c0a4c7c2b345846707e81bb897c5a02c4de0
+            metadata:
+              download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&prgopt=2024%2Ftapr%2FAdvanced+Download%2Fgetdata_2024.sas&ccyy=2024&sumlev=C&setpick=PROF
+              identifiers: []
+              metrics: {}
+              notes: Exact documented public advanced-PROF controls. Edition 2024 is distinct from the unknown mixed-table measurement period. No units, metric bindings or value policy inherited. Retained historical copies remain independent; shared code/label/value does not establish annual equivalence. Annual documents provide context only.
+              period:
+                kind: unknown
+              provenance_ids:
+              - 5c564e395e98296e0bfe6388f6b7a51743e68832e04db17ec458130f4bfcfbc1
+              publisher: Texas Education Agency
+              references:
+              - reference_id: csv_headers
+                role: source_notes
+                url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&prgopt=2024%2Ftapr%2FAdvanced+Download%2Fgetdata_2024.sas&ccyy=2024&sumlev=C&setpick=PROF
+                title: Exact acquired2024 advanced PROF CSV; retained source byte identity is separately documented
+                status: available
+                provenance_ids:
+                - 5c564e395e98296e0bfe6388f6b7a51743e68832e04db17ec458130f4bfcfbc1
+                reviewed_sha256: 36649862475a49e69d739cb938fceaef14de581d146f7862c13dfc95229fd7fa
+              - provenance_ids:
+                - 7b83f1a304d4f7339c10f48989995c5e95221ee4465e280376b14374d421e74a
+                reference_id: advanced_form
+                reviewed_sha256: c4db3109431c2b2042c9f4f08035047c51e99d46ae41681b9f7b59b4a3dad7bd
+                role: source_notes
+                status: available
+                title: Retained official 2024 Advanced Download form; exact request controls
+                url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/Advance%20Download/download-data-adv.html
+              - provenance_ids:
+                - 0b020c2d0e06b020297ec1df4b8e451103865c472525af1b094c3984bd0821c6
+                reference_id: source_dictionary
+                reviewed_sha256: 3d661f216f46b631760f9490b815c71799adbdfeacd85250fe9bae824aaff7af
+                role: data_dictionary
+                status: available
+                title: 2024 Campus Profile publisher Data Elements; retained current HTML observation
+                url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&prgopt=2024%2Ftapr%2FAdvanced+Download%2Fgetdata_2024.sas&sumlev=C&setpick=PROF&ddic=Y
+              - provenance_ids:
+                - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+                reference_id: glossary
+                reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+                role: glossary
+                status: available
+                title: 2023-2024 TAPR Glossary; contextual reference, not blanket period binding
+                url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+              - provenance_ids:
+                - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+                reference_id: masking
+                reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+                role: masking_methodology
+                status: available
+                title: 2023-2024 TAPR Masking Rules; applicability remains field-specific and unbound
+                url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+              - reference_id: columns_source
+                role: schema
+                path: schemas/tapr--2024--header-crosswalk.json
+                title: Complete retained 2024 publisher code-label-field and source layout contract; not released facts
+                status: available
+                provenance_ids:
+                - d39ff6de82aae86f03f0d9821b86440f2191abbb0f53e1a00909601b80754e8d
+                reviewed_sha256: 54cc99ffc8ce29f7ea9b80f88d03c0a4c7c2b345846707e81bb897c5a02c4de0
+              source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/Advance%20Download/download-data-adv.html
+              title: 2024 TAPR Campus Profile; new advanced-PROF raw HTTP observation
+              version: '2024'
+              value_policy: null
+              estimation: null
+              field_year: null
+
     2025:
       path: data/tapr/CAMPPROF_2024-2025_FINAL.xlsx
       metadata:
@@ -2269,22 +2319,72 @@ data_sources:
               scope: district
               tables:
                 profile: data/tapr/raw/DISTPROF_2023-2024.csv
-            references:
-            - reference_id: source_dictionary
-              role: data_dictionary
-              url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&prgopt=2024%2Ftapr%2FAdvanced+Download%2Fgetdata_2024.sas&sumlev=D&setpick=PROF&ddic=Y
-              title: 2024 District Profile publisher Data Elements; current reference
-                link, not original acquisition URL
-              status: unreviewed
-              provenance_ids: []
-            - reference_id: columns_source
-              role: schema
-              path: schemas/tapr--2024--header-crosswalk.json
-              title: Complete retained 2024 publisher code-label-field and source
-                layout contract; not released facts
-              status: available
-              provenance_ids: []
-              reviewed_sha256: 54cc99ffc8ce29f7ea9b80f88d03c0a4c7c2b345846707e81bb897c5a02c4de0
+            metadata:
+              download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&prgopt=2024%2Ftapr%2FAdvanced+Download%2Fgetdata_2024.sas&ccyy=2024&sumlev=D&setpick=PROF
+              identifiers: []
+              metrics: {}
+              notes: Exact documented public advanced-PROF controls. Edition 2024 is distinct from the unknown mixed-table measurement period. No units, metric bindings or value policy inherited. Retained historical copies remain independent; shared code/label/value does not establish annual equivalence. Annual documents provide context only.
+              period:
+                kind: unknown
+              provenance_ids:
+              - e206f265a486d928a815ed9ebf24c99655813c29b0bc37bc31fa74ba9604021e
+              publisher: Texas Education Agency
+              references:
+              - reference_id: csv_headers
+                role: source_notes
+                url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&prgopt=2024%2Ftapr%2FAdvanced+Download%2Fgetdata_2024.sas&ccyy=2024&sumlev=D&setpick=PROF
+                title: Exact acquired2024 advanced PROF CSV; retained source byte identity is separately documented
+                status: available
+                provenance_ids:
+                - e206f265a486d928a815ed9ebf24c99655813c29b0bc37bc31fa74ba9604021e
+                reviewed_sha256: dc0b51f65f5a311df77798b0091b7d66830f4e43b6b28d7dad635e47e2b01e0d
+              - provenance_ids:
+                - 7b83f1a304d4f7339c10f48989995c5e95221ee4465e280376b14374d421e74a
+                reference_id: advanced_form
+                reviewed_sha256: c4db3109431c2b2042c9f4f08035047c51e99d46ae41681b9f7b59b4a3dad7bd
+                role: source_notes
+                status: available
+                title: Retained official 2024 Advanced Download form; exact request controls
+                url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/Advance%20Download/download-data-adv.html
+              - provenance_ids:
+                - 20c59ad1a7a6328db3a98790eb36884caac9ab54d8dc1119adb72d530d1287ef
+                reference_id: source_dictionary
+                reviewed_sha256: 799c7c204a5aeff6613aa9143774441e061f85efed50aa247f363636529eea05
+                role: data_dictionary
+                status: available
+                title: 2024 District Profile publisher Data Elements; retained current HTML observation
+                url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&prgopt=2024%2Ftapr%2FAdvanced+Download%2Fgetdata_2024.sas&sumlev=D&setpick=PROF&ddic=Y
+              - provenance_ids:
+                - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+                reference_id: glossary
+                reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+                role: glossary
+                status: available
+                title: 2023-2024 TAPR Glossary; contextual reference, not blanket period binding
+                url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+              - provenance_ids:
+                - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+                reference_id: masking
+                reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+                role: masking_methodology
+                status: available
+                title: 2023-2024 TAPR Masking Rules; applicability remains field-specific and unbound
+                url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+              - reference_id: columns_source
+                role: schema
+                path: schemas/tapr--2024--header-crosswalk.json
+                title: Complete retained 2024 publisher code-label-field and source layout contract; not released facts
+                status: available
+                provenance_ids:
+                - d39ff6de82aae86f03f0d9821b86440f2191abbb0f53e1a00909601b80754e8d
+                reviewed_sha256: 54cc99ffc8ce29f7ea9b80f88d03c0a4c7c2b345846707e81bb897c5a02c4de0
+              source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/Advance%20Download/download-data-adv.html
+              title: 2024 TAPR District Profile; new advanced-PROF raw HTTP observation
+              version: '2024'
+              value_policy: null
+              estimation: null
+              field_year: null
+
     2025:
       path: data/tapr/DISTPROF_2024-2025_FINAL.xlsx
       metadata:

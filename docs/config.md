@@ -100,7 +100,7 @@ Supported metadata fields:
 | `published_at`, `revised_at` | Known publisher dates or timezone-aware ISO timestamps |
 | `license`, `citation`, `identifiers` | Verified reuse/citation information and identifiers such as DOIs |
 | `notes` | Source-specific definitions, caveats, suppression rules, or other research context |
-| `provenance_ids` | SHA-256 identifiers of immutable acquisition/processing receipts |
+| `provenance_ids` | SHA-256 identifiers of immutable acquisition receipts; typed processing dependencies belong in processing inputs |
 | `references` | Per-version dictionary, glossary, masking, column schema, or other documentation with URL, availability/review status, exact review hash, and acquisition receipts |
 | `metrics` | Physical field, unit, and optional per-metric reference period |
 | `value_policy`, `estimation` | Source token interpretation and a separately versioned estimation assumption |
@@ -392,6 +392,23 @@ source rows, for example
 `cfg.load_df(..., reader_profile="source")` explicitly reads the full raw edition;
 the default reader continues to use its exact retained prepared workbook.
 Raw source preparation cannot run inside a retained-format release build.
+An explicit profile may declare a complete `metadata` record. Selecting it with
+`cfg.resolve_dataset(..., reader_profile="source")` replaces the base
+`DatasetMetadata` through the canonical parser; no base fields or references
+are merged. Its version must match the declared source version, and references
+belong only to that record, not a second profile-level `references` list.
+Header lookup, source preparation and build recording select this same record.
+Calls without `reader_profile` retain the base metadata and reader behavior.
+
+The 2024 full PROF profiles select raw-only metadata: unknown period, no metric
+definitions, no estimation and no applied value policy. Complete raw strings,
+including masking-looking tokens, remain uninterpreted. The retained annual
+dictionary, glossary and masking references provide context, not blanket
+qualification of an indicator's scientific meaning. A catalog with no selected
+policy rejects policy interpretation; it does not synthesize a raw-token
+policy or numeric status. Legacy default metadata and its methodology gates
+remain unchanged. The fresh source observation IDs retain their genuine HTTP
+dates; the older local observations are not rewritten or newly qualified.
 Source identities and historical names are lossless period-specific attributes,
 not additional metric keys or automatic `.meta` hydration. No current geometry
 roster limits source coverage. Unknown field units and reference periods remain
