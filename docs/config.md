@@ -616,20 +616,21 @@ and global-footer checks remain strict for schemas 1/2. The root limit remains
 future history fits this in-memory envelope. `verify()` explicitly opens every
 registered artifact and is not a discovery operation.
 
-### Unreleased raw-wide source cohort
+### Unreleased raw-wide source selection
 
-The same `build_tapr_profiles` owner can consume four accepted natural source
-preparations for one registered annual edition: Student and Staff, each at
-campus and district scope. Supply the exact processing receipts and explicit
-physical keys. For example, after the ordinary source-preparation commands:
+The same `build_tapr_profiles` owner can consume one or more explicitly selected
+accepted source preparations for one registered annual edition. Each selected
+Config source profile must declare one complete reviewed physical table and its
+scope. Logical family uses the existing qualified TAPR source identity; it need
+not equal the physical table name (the retained composite's table is `profile`).
+Supply exact processing receipts and explicit physical keys. For example, after
+the ordinary source-preparation commands, select both GRAD scopes:
 
 ```bash
 uv run python -m teadata.scripts.build_tapr_profiles \
   --edition 2024 --config reviewed-sources.yaml --reference-store selected-provenance \
-  --prepared-input campus_tapr_student_profile CAMPUS_STUDENT_PROCESSING_ID campus_number \
-  --prepared-input district_tapr_student_profile DISTRICT_STUDENT_PROCESSING_ID district_number \
-  --prepared-input campus_tapr_staff_profile CAMPUS_STAFF_PROCESSING_ID campus_number \
-  --prepared-input district_tapr_staff_profile DISTRICT_STAFF_PROCESSING_ID district_number \
+  --prepared-input campus_tapr_graduation_profile CAMPUS_GRAD_PROCESSING_ID campus_number \
+  --prepared-input district_tapr_graduation_profile DISTRICT_GRAD_PROCESSING_ID district_number \
   --output-dir new-2024-raw-wide-candidate
 ```
 
@@ -641,11 +642,23 @@ uniqueness are checked before activation. The producer writes batches of at
 most 4096 rows. Preparation row claims must first match the finite reviewed
 data-record interval after its explicit annotation exclusions; missing or empty
 layouts cannot establish retained rows. The producer verifies exact raw-string
-readback, registers every source field, validates its four-leaf root through `publish_release(...,
+readback, registers every selected source field, validates its root through `publish_release(...,
 schema_version=3)`, and renames only a complete fresh staging directory. Existing
 outputs are never replaced. `--processing-input DATASET RECORD_ID` remains
 available for additional explicitly reviewed typed dependencies; inherited
 preparation dependencies remain in the closure without relabeling acquisitions.
+
+Prepared input datasets own the selection: the producer neither enumerates all
+configured datasets nor implicitly adds another scope/family. A single source
+is sufficient, and the existing four STUD/STAF selections remain valid. No
+declared table or field is silently dropped; ambiguous/multiple physical-table
+declarations fail before native I/O. CLI `--family` and `--scope` belong to CSV
+intake and cannot be combined with `--prepared-input`; their defaults do not
+filter prepared datasets. Programmatic `prepared_inputs` likewise owns selection
+instead of the legacy `family`, `scopes` and `input_dir` parameters. Existing
+exact edition, scientific methodology and closure gates still apply: this does
+not qualify the retained PROF policy's unreviewed masking reference or activate
+any source/default.
 
 Use one bounded edition/cohort root at a time, with 2024 before 2025 and later
 reviewed annual editions. This is a raw-wide selection path: edition text is

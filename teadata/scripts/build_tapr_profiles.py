@@ -20,7 +20,7 @@ import sys
 import tempfile
 from typing import Any
 
-from teadata.column_schema import crosswalk_dataset, parse_column_schema
+from teadata.column_schema import crosswalk_dataset, parse_column_schema, reader_options
 from teadata.analytical import write_leaf_artifact
 from teadata.dataset_metadata import ArtifactRef, DatasetMetadata, EditionKey
 from teadata.identifiers import canonical_source_identifiers
@@ -28,7 +28,10 @@ from teadata.manifest import BuildRecorder, _validate_methodology, canonical_jso
 from teadata.provenance import ProvenanceStore, validate_reference_records
 from teadata.release import publish_release
 from teadata.scripts.paths import data_path
-from teadata.tapr import TAPR_PROFILE_FAMILIES, merge_tapr_tables, reviewed_tapr_data_record_count, validate_tapr_key
+from teadata.tapr import (
+    TAPR_PROFILE_FAMILIES, merge_tapr_tables, qualified_tapr_family,
+    reviewed_tapr_data_record_count, tapr_source_selection, validate_tapr_key,
+)
 from teadata.teadata_config import load_config
 
 
@@ -37,23 +40,24 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
                      family: str = "student_staff_profile",
                      processing_inputs: Mapping[str, Sequence[str]] | None = None,
                      prepared_inputs: Mapping[str, tuple[str, tuple[str, ...]]] | None = None) -> dict:
-    """Validate all selected inputs, then publish one complete new generation."""
+    """Validate all selected inputs, then publish one complete new generation.
+
+    ``scopes``, ``family`` and ``input_dir`` select CSV intake only. An explicit
+    ``prepared_inputs`` mapping instead selects every output dataset itself.
+    """
     try:
         year = int(edition)
     except (TypeError, ValueError) as error:
         raise ValueError("Select a canonical annual integer edition") from error
     if not isinstance(edition, str) or edition != str(year) or year < 1:
         raise ValueError("Select a canonical annual integer edition")
-    if (not scopes or len(scopes) != len(set(scopes))
-            or set(scopes) - {"campus", "district"}
-            or family not in TAPR_PROFILE_FAMILIES):
+    if prepared_inputs is None and (not scopes or len(scopes) != len(set(scopes))
+            or set(scopes) - {"campus", "district"} or family not in TAPR_PROFILE_FAMILIES):
         raise ValueError("Select a declared family and distinct campus/district scopes")
     output_dir = Path(output_dir)
     if output_dir.exists() or output_dir.is_symlink():
         raise FileExistsError(f"Preparation output already exists: {output_dir}")
     if prepared_inputs is not None:
-        if family != "student_staff_profile" or set(scopes) != {"campus", "district"}:
-            raise ValueError("Prepared schema3 mode requires the explicit four-input cohort, without legacy family selection")
         return _prepare_edition_leaves(cfg, edition=edition, year=year, output_dir=output_dir,
             reference_store=reference_store, prepared_inputs=prepared_inputs, processing_inputs=processing_inputs)
     import pyarrow.parquet as pq
@@ -217,15 +221,12 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
                             prepared_inputs: Mapping[str, tuple[str, tuple[str, ...]]],
                             processing_inputs: Mapping[str, Sequence[str]] | None) -> dict:
     """One explicit raw-wide cohort, derived from accepted source preparations."""
-    expected = {scope + "_tapr_" + family: (scope, family)
-                for scope in ("campus", "district") for family in ("student_profile", "staff_profile")}
     extra = dict(processing_inputs or {})
-    if reference_store is None or set(prepared_inputs) != set(expected) or set(extra) - set(expected):
-        raise ValueError("Prepared mode requires one reference store and exactly four selected natural datasets")
+    if reference_store is None or not prepared_inputs or set(extra) - set(prepared_inputs):
+        raise ValueError("Prepared mode requires one reference store and explicit selected datasets")
     validated = []
     # All metadata and typed closures validate before any Arrow import/open or staging write.
-    for dataset, (scope, family) in expected.items():
-        selected = prepared_inputs[dataset]
+    for dataset, selected in prepared_inputs.items():
         if (not isinstance(selected, tuple) or len(selected) != 2 or not isinstance(selected[1], tuple)
                 or len(selected[1]) != 1 or not isinstance(selected[1][0], str)):
             raise ValueError("Prepared input requires a processing ID and an explicit ordered singleton key")
@@ -233,19 +234,22 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
         source = cfg.resolve_dataset(dataset, year)
         if source.resolved_year != year or source.metadata.version != edition:
             raise ValueError("Prepared input requires an exact registered edition")
+        selection = tapr_source_selection(reader_options(source.reader, "source"))
+        scope = selection["scope"]
+        family = qualified_tapr_family(source.dataset, scope + "_number")
         resource = cfg.column_contract(dataset, year, reader_profile="source")
         if resource is None:
             raise ValueError("Prepared input requires a reviewed source contract")
         document = parse_column_schema(resource["text"].encode())
         branch = crosswalk_dataset(document, dataset, edition)
+        if (len(branch["tables"]) != 1
+                or set(selection["tables"]) != {table["table"] for table in branch["tables"]}):
+            raise ValueError("Prepared dataset requires one complete, unambiguous declared source table")
         table, = branch["tables"]
-        if table["table"] != family:
-            raise ValueError("Prepared input does not select the natural source table")
         source_rows = reviewed_tapr_data_record_count(table)
         cfg.header_records(dataset, edition=edition, reader_profile="source")
         validate_tapr_key(table, keys[0])
-        selection = source.reader["profiles"]["source"]["tapr_source"]
-        if selection["scope"] != scope or keys != (scope + "_number",):
+        if keys != (scope + "_number",):
             raise ValueError("Explicit key differs from the selected TAPR source scope")
         graph = reference_store.verify_record_closure([identifier])
         record = graph[identifier]
@@ -287,7 +291,7 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
             if reference_store.read_record(value)["kind"] != "processing":
                 raise ValueError("Additional dependency is not a processing receipt")
             reference_store.verify_record_closure([value])
-        validated.append((dataset, scope, family, source, identifier, keys, acquisitions,
+        validated.append((dataset, scope, family, table["table"], source, identifier, keys, acquisitions,
                           artifact, raw_sha, validation["rows"], dependencies, declared))
 
     import pyarrow as pa
@@ -310,11 +314,11 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
             toolchain["lock_sha256"] = sha256(lock.read_bytes()).hexdigest()
         recipe = {"operation": "lossless_prepared_source_batches", "batch_size": 4096, "compression": "zstd",
                   "preparation_code_sha256": sha256(Path(__file__).read_bytes()).hexdigest(), "values_interpreted": False}
-        for dataset, scope, family, source, identifier, keys, acquisitions, artifact, raw_sha, rows, dependencies, declared in validated:
+        for dataset, scope, family, table_name, source, identifier, keys, acquisitions, artifact, raw_sha, rows, dependencies, declared in validated:
             for value in [identifier, *dependencies]:
                 store.copy_record_from(reference_store, value)
             prepared = store.verify_artifact(artifact["sha256"])
-            key = EditionKey(dataset, edition, EditionKey.source_revision((raw_sha,)), scope, family, "one row per " + keys[0])
+            key = EditionKey(dataset, edition, EditionKey.source_revision((raw_sha,)), scope, table_name, "one row per " + keys[0])
             with pq.ParquetFile(prepared) as native:
                 schema = native.schema_arrow.remove_metadata()
                 if (schema.names != cfg.column_schema(dataset, year, reader_profile="source")
@@ -382,7 +386,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--processing-input", action="append", nargs=2, default=[], metavar=("DATASET", "RECORD_ID"),
                         help="Explicit processing dependency for one exact selected dataset/scope; applicability is caller-reviewed")
     parser.add_argument("--prepared-input", action="append", nargs=3, metavar=("DATASET", "PROCESSING_ID", "KEY_COLUMN"),
-                        help="Opt-in raw-wide schema3 cohort: exact prepared_source processing output and explicit singleton physical key; supply all four natural datasets")
+                        help="Opt-in raw-wide schema3 selection: exact prepared_source processing output and singleton physical key for each explicitly selected Config dataset")
     parser.add_argument("--input-dir", type=Path, default=data_path("tapr", "raw"))
     parser.add_argument("--output-dir", required=True, type=Path)
     args = parser.parse_args(argv)
@@ -391,8 +395,8 @@ def main(argv: list[str] | None = None) -> None:
         processing_inputs.setdefault(dataset, []).append(identifier)
     prepared_inputs = None
     if args.prepared_input is not None:
-        if args.family is not None:
-            parser.error("Prepared cohort selection cannot be combined with legacy --family")
+        if args.family is not None or args.scope is not None:
+            parser.error("Prepared dataset selection cannot be combined with CSV --family or --scope")
         prepared_inputs = {}
         for dataset, identifier, key in args.prepared_input:
             if dataset in prepared_inputs:

@@ -222,7 +222,8 @@ def test_processing_dependency_failures_precede_source_reads_and_publication(tmp
     assert not list(tmp_path.glob('.tapr-preparation-*'))
 
 
-def tiny_annual_source(tmp_path, year, *, scope='campus', family='student_profile', stem='', values=('.',), annotated=False):
+def tiny_annual_source(tmp_path, year, *, scope='campus', family='student_profile', stem='', values=('.',), annotated=False,
+                       physical_table=None):
     """A two-column local observation; no real future-year data is asserted."""
     path = tmp_path / (stem + 'source.csv')
     labels, codes = [scope.title(), 'Opaque source observation'], ['CAMPUS' if scope == 'campus' else 'DISTRICT', 'VALUE']
@@ -236,7 +237,8 @@ def tiny_annual_source(tmp_path, year, *, scope='campus', family='student_profil
                'disposition': 'identity', 'dictionary_status': 'not_applicable', 'publisher_type': None, 'publisher_description': None},
               {'position': 2, 'code': codes[1], 'label': labels[1], 'field': 'source_observation',
                'disposition': 'fact', 'dictionary_status': 'not_documented', 'publisher_type': None, 'publisher_description': None}]
-    table = {'table': family, 'metric_period': {'kind': 'unknown'},
+    table_name = physical_table or family
+    table = {'table': table_name, 'metric_period': {'kind': 'unknown'},
         'input_sha256': sha256(path.read_bytes()).hexdigest(),
         'source_schema_sha256': source_schema_fingerprint(labels, codes),
         'fields': fields, 'layout': {'label_record': 1, 'code_record': 2, 'first_data_record': 3,
@@ -256,7 +258,7 @@ def tiny_annual_source(tmp_path, year, *, scope='campus', family='student_profil
             'reference_id': 'csv_headers', 'role': 'source_notes', 'path': path.name,
             'provenance_ids': [raw], 'reviewed_sha256': table['input_sha256']}]},
         'reader': {'profiles': {'source': {'column_schema': schema.name,
-            'tapr_source': {'scope': scope, 'tables': {family: path.name}}, 'references': [{
+            'tapr_source': {'scope': scope, 'tables': {table_name: path.name}}, 'references': [{
                 'reference_id': 'columns_source', 'role': 'schema', 'path': schema.name,
                 'reviewed_sha256': sha256(schema.read_bytes()).hexdigest()}]}}}}}}}))
     return config, store
@@ -307,14 +309,21 @@ def test_noncanonical_annual_editions_fail_before_source_read(tmp_path, monkeypa
 def prepared_cohort(tmp_path, request):
     """Four genuine tiny source preparations, including a typed review edge."""
     selected = getattr(request, 'param', 2025)
-    year, annotated = selected if isinstance(selected, tuple) else (selected, False)
+    if isinstance(selected, dict):
+        year, annotated = selected['year'], False
+        families = selected['families']
+        physical_table = selected.get('physical_table')
+    else:
+        year, annotated = selected if isinstance(selected, tuple) else (selected, False)
+        families, physical_table = ('student_profile', 'staff_profile'), None
     configs, inputs, annotations = {}, {}, {}
     pooled = ProvenanceStore(tmp_path / 'selected-references')
     for scope in ('campus', 'district'):
-        for family in ('student_profile', 'staff_profile'):
+        for family in families:
             dataset = scope + '_tapr_' + family
             config, history = tiny_annual_source(tmp_path, year, scope=scope, family=family,
-                stem=dataset + '-', values=('.', '***'), annotated=annotated and family == 'student_profile')
+                stem=dataset + '-', values=('.', '***'), annotated=annotated and family == 'student_profile',
+                physical_table=physical_table)
             configs.update(json.loads(config.read_text())['data_sources'])
             cfg = load_config(config)
             dependencies = {}
@@ -394,7 +403,7 @@ def test_prepared_cohort_contract_failures_precede_native_open_and_output(prepar
     dataset = 'campus_tapr_student_profile'
     identifier, keys = inputs[dataset]
     if damage == 'missing':
-        del inputs[dataset]
+        inputs.clear()
     elif damage == 'foreign':
         inputs['not_selected'] = (identifier, keys)
     elif damage in {'key_name', 'reordered_keys'}:
@@ -461,6 +470,8 @@ def test_prepared_cli_rejects_duplicate_selection_and_legacy_family_before_outpu
         prepare_main(selected + ['--prepared-input', 'campus_tapr_student_profile', '1' * 64, 'campus_number'])
     with pytest.raises(SystemExit):
         prepare_main(selected + ['--family', 'student_profile'])
+    with pytest.raises(SystemExit):
+        prepare_main(selected + ['--scope', 'campus'])
     assert not (tmp_path / 'out').exists()
 
 
@@ -518,3 +529,102 @@ def test_reviewed_row_count_subtracts_only_annotation_intersection():
         'annotations': [{'first_record': 4, 'last_record': 4, 'kind': 'note', 'sha256': '0' * 64},
                         {'first_record': 6, 'last_record': 8, 'kind': 'footer', 'sha256': '1' * 64}]}
     assert reviewed_tapr_data_record_count({'layout': layout}) == 2
+
+
+@pytest.mark.parametrize('prepared_cohort', [
+    {'year': 2024, 'families': ('graduation_profile',)},
+    {'year': 2024, 'families': ('student_staff_profile',), 'physical_table': 'profile'},
+], indirect=True)
+def test_explicit_prepared_selection_accepts_two_scopes_or_one_source_without_physical_family_guess(prepared_cohort, tmp_path):
+    import pyarrow.dataset as ds
+    from teadata.release import DataRelease
+
+    cfg, store, inputs, _, _ = prepared_cohort
+    for count in (2, 1):
+        selected = dict(list(inputs.items())[:count])
+        output = tmp_path / f'selected-{count}'
+        result = prepare_profiles(cfg, edition='2024', scopes=[], input_dir=None, output_dir=output,
+            reference_store=store, prepared_inputs=selected)
+        assert set(result['datasets']) == set(selected)
+        release = DataRelease(output / 'release.json', offline=True)
+        assert len(list(release.catalog.editions())) == count
+        for row in result['datasets'].values():
+            key = EditionKey.from_dict(row['key'])
+            declared = cfg.resolve_dataset(key.dataset, 2024).reader['profiles']['source']['tapr_source']
+            assert key.table == next(iter(declared['tables']))
+            projection, = release.catalog.resolve_artifacts([(key, 'source_observation')])
+            selected_rows = release.analytical_dataset(projection['artifact'].identity).scanner(
+                columns=list(projection['columns']), filter=ds.field('source_observation') == '***', batch_size=1).to_table()
+            assert selected_rows.num_rows == 1 and selected_rows.column_names == [key.scope + '_number', 'source_observation']
+            assert row['rows'] == 2 and row['fields'] == 2 and row['raw_string_readback_equal'] is True
+
+
+@pytest.mark.parametrize('prepared_cohort', [{'year': 2024, 'families': ('graduation_profile',)}], indirect=True)
+@pytest.mark.parametrize('damage', ['missing_profile', 'scope', 'table', 'ambiguous', 'family', 'unknown_family', 'no_store', 'unselected_dependency'])
+def test_prepared_selection_rejects_inconsistent_declarations_before_native_io(prepared_cohort, tmp_path, monkeypatch, damage):
+    import pyarrow.parquet as pq
+    cfg, store, inputs, _, config = prepared_cohort
+    dataset = 'campus_tapr_graduation_profile'
+    identifier, keys = inputs[dataset]
+    selected = {dataset: (identifier, keys)}
+    document = json.loads(config.read_text())
+    declaration = document['data_sources'][dataset]['2024']
+    profile = declaration['reader']['profiles']['source']
+    if damage in {'no_store', 'unselected_dependency'}:
+        pass
+    elif damage == 'missing_profile':
+        declaration['reader']['profiles'].clear()
+    elif damage == 'scope':
+        profile['tapr_source']['scope'] = 'district'
+    elif damage == 'table':
+        profile['tapr_source']['tables'] = {'not_the_reviewed_table': 'source.csv'}
+    elif damage == 'unknown_family':
+        renamed = 'campus_tapr_not_registered'
+        document['data_sources'][renamed] = document['data_sources'].pop(dataset)
+        selected = {renamed: (identifier, keys)}
+    elif damage == 'family':
+        record = store.read_record(identifier)
+        changed = store.record_processing(dataset=dataset, inputs=record['inputs'],
+            outputs={name: store.verify_artifact(value['sha256']) for name, value in record['outputs'].items()},
+            processor=record['processor'], code_version=record['code_version'],
+            parameters={**record['parameters'], 'family': 'student_profile'}, validation=record['validation'])
+        selected = {dataset: (changed, keys)}
+    else:
+        path = tmp_path / profile['column_schema']
+        crosswalk = json.loads(path.read_text())
+        tables = crosswalk['datasets'][0]['tables']
+        tables.append({**deepcopy(tables[0]), 'table': 'second_table'})
+        path.write_text(canonical_json(crosswalk))
+        profile['references'][0]['reviewed_sha256'] = sha256(path.read_bytes()).hexdigest()
+        profile['tapr_source']['tables']['second_table'] = 'second.csv'
+    cfg = Config.from_dict(document)
+    cfg.base_dir = tmp_path
+    monkeypatch.setattr(pq, 'ParquetFile', lambda *a, **k: pytest.fail('Ambiguous native source opened'))
+    with pytest.raises((ValueError, ContractError, KeyError)):
+        prepare_profiles(cfg, edition='2024', scopes=['campus', 'district'], input_dir=None,
+            output_dir=tmp_path / 'blocked-selection', reference_store=None if damage == 'no_store' else store,
+            prepared_inputs=selected, processing_inputs={'district_tapr_graduation_profile':
+                [inputs['district_tapr_graduation_profile'][0]]} if damage == 'unselected_dependency' else None)
+    assert not (tmp_path / 'blocked-selection').exists() and not list(tmp_path.glob('.tapr-edition-*'))
+
+
+@pytest.mark.parametrize('prepared_cohort', [
+    {'year': 2024, 'families': ('student_staff_profile',), 'physical_table': 'profile'},
+], indirect=True)
+def test_prepared_prof_keeps_shared_unreviewed_methodology_rejection(prepared_cohort, tmp_path, monkeypatch):
+    import pyarrow.parquet as pq
+    _, store, inputs, _, config = prepared_cohort
+    document = json.loads(config.read_text())
+    document['value_policies'] = {'masked': {'policy_id': 'masked', 'reference_id': 'masking',
+        'tokens': {'-1': {'status': 'suppressed', 'reason': 'synthetic policy'}}}}
+    dataset = 'campus_tapr_student_staff_profile'
+    metadata = document['data_sources'][dataset]['2024']['metadata']
+    metadata['value_policy'] = 'masked'
+    metadata['references'].append({'reference_id': 'masking', 'role': 'masking_methodology', 'status': 'unreviewed'})
+    cfg = Config.from_dict(document)
+    cfg.base_dir = tmp_path
+    monkeypatch.setattr(pq, 'ParquetFile', lambda *a, **k: pytest.fail('Unreviewed methodology reached native source'))
+    with pytest.raises(ContractError, match='retained reviewed methodology'):
+        prepare_profiles(cfg, edition='2024', scopes=['campus', 'district'], input_dir=None,
+            output_dir=tmp_path / 'unreviewed-prof', reference_store=store, prepared_inputs={dataset: inputs[dataset]})
+    assert not (tmp_path / 'unreviewed-prof').exists()

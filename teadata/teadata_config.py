@@ -830,7 +830,7 @@ class Config:
         """
         from .column_schema import crosswalk_dataset, parse_column_schema, reader_options
         from .manifest import ACTIVE_BUILD, ContractError
-        from .tapr import read_tapr_table
+        from .tapr import read_tapr_table, tapr_source_selection
 
         if ACTIVE_BUILD.get() is not None:
             raise ContractError("Prepare full TAPR sources explicitly before a retained-format release build")
@@ -838,14 +838,10 @@ class Config:
         if source.resolved_year != year or source.metadata.version != str(year):
             raise ContractError("Full TAPR source preparation requires an exact declared edition")
         options = reader_options(source.reader, "source")
-        selection = options.get("tapr_source")
-        if (not isinstance(selection, dict) or set(selection) != {"scope", "tables"}
-                or selection["scope"] not in {"campus", "district"}
-                or not isinstance(selection["tables"], dict)
-                or not selection["tables"]
-                or any(not isinstance(value, str) or not value or "://" in value
-                       for value in selection["tables"].values())):
-            raise ContractError("Full TAPR source profile requires an explicit scope and local table paths")
+        try:
+            selection = tapr_source_selection(options)
+        except ValueError as error:
+            raise ContractError(str(error)) from error
         contract = self.column_contract(dataset, year, reader_profile="source")
         if contract is None:
             raise ContractError("Full TAPR source preparation requires a reviewed crosswalk")

@@ -24,6 +24,27 @@ if TYPE_CHECKING:
 TAPR_PROFILE_FAMILIES = ("student_staff_profile", "graduation_profile", "student_profile", "staff_profile")
 
 
+def qualified_tapr_family(dataset: str, key_field: str) -> str:
+    """Resolve only the reader's existing exact scope-qualified family names."""
+    if key_field in {"campus_number", "district_number"}:
+        for family in TAPR_PROFILE_FAMILIES:
+            if dataset == key_field.removesuffix("_number") + "_tapr_" + family:
+                return family
+    raise ValueError("TAPR preparation requires an explicit qualified dataset and source edition")
+
+
+def tapr_source_selection(options: Mapping[str, Any]) -> dict[str, Any]:
+    """Validate the canonical reader_options result before source or leaf I/O."""
+    selection = options.get("tapr_source")
+    if (not isinstance(selection, dict) or set(selection) != {"scope", "tables"}
+            or selection["scope"] not in {"campus", "district"}
+            or not isinstance(selection["tables"], dict) or not selection["tables"]
+            or any(not isinstance(value, str) or not value or "://" in value
+                   for value in selection["tables"].values())):
+        raise ValueError("Full TAPR source profile requires an explicit scope and local table paths")
+    return selection
+
+
 def compare_tapr_tables(old: TaprSourceTable, new: TaprSourceTable, *, key_field: str,
                         old_policies: Mapping[str, ValuePolicy] | None = None,
                         new_policies: Mapping[str, ValuePolicy] | None = None,
@@ -276,10 +297,8 @@ def read_tapr_table(path: str | Path, *, mapping: Mapping[str, Any], key_field: 
 
     pc: Any = arrow_compute  # Arrow registers compute kernels dynamically.
     path = Path(path)
-    if (key_field not in {"campus_number", "district_number"}
-            or dataset not in {key_field.removesuffix("_number") + "_tapr_" + family
-                               for family in TAPR_PROFILE_FAMILIES}
-            or not isinstance(edition, str) or not edition.strip()):
+    qualified_tapr_family(dataset, key_field)
+    if not isinstance(edition, str) or not edition.strip():
         raise ValueError("TAPR preparation requires an explicit qualified dataset and source edition")
     validate_header_table(mapping)
     raw = path.read_bytes()
