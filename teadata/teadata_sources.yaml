@@ -3332,6 +3332,330 @@ data_sources:
         metrics: {}
       reader:
         column_schema: schemas/data_sources--all_districts_reference2--2025--default.json
+  campus_tapr_annual_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla:
+    2024:
+      metadata:
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        identifiers: []
+        metrics: {}
+        notes: Complete selected program response retained as raw strings. Fourteen
+          returned GF23N fields lack dictionary definitions; their publisher type
+          and description remain unknown. All 210 ordered dictionary occurrences and
+          contexts are retained. Publisher edition 2024 and literal 2023 labels are
+          distinct; field reference periods and units remain unknown, and field-specific
+          masking applicability remains unreviewed. No value policy, metric definitions
+          or estimation is applied.
+        period:
+          kind: unknown
+        provenance_ids:
+        - 4b7487ef04e74c8048317a75c784305793519c79c9aaf6df25742ad153a5d51d
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - 4b7487ef04e74c8048317a75c784305793519c79c9aaf6df25742ad153a5d51d
+          reference_id: csv_headers
+          reviewed_sha256: 9a158ab21303dbd0d191414897e5fc451d40468de12c916c76baaaaeccffff15
+          role: source_notes
+          status: available
+          title: Original 2024 campus_tapr_annual_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla
+            raw CSV; genuine HTTP observation
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        - provenance_ids:
+          - ad2de650c6b9e8d87ee921338989cb26100a4ae82879fef6e72481ca6baba6f8
+          reference_id: selection
+          reviewed_sha256: f36bdd451460090e8b4e23ddfbf9f9e78cb4be3a19e603a9b3d45a4c8e0ec259
+          role: source_notes
+          status: available
+          title: 'Official retained TEA TAPR 2024 Campus: Annual RHSP/DAP/FHSP-E/FHSP-DLA/Texas
+            First-DLA variable-selection page'
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        - provenance_ids:
+          - f9282abc5ef4c0fca7a1df8405db881ffb1eef20da38d5c56d10e328fc494384
+          reference_id: dictionary
+          reviewed_sha256: 475cda747bbe2952d760b737882b0dd2902057c4366625af2e4d649e35e62182
+          role: data_dictionary
+          status: available
+          title: 'Official retained TEA TAPR 2024 Campus: Annual RHSP/DAP/FHSP-E/FHSP-DLA/Texas
+            First-DLA dictionary'
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=C&dsname=RHSP&dd=attendgrad&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reference_id: glossary
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+          role: glossary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+        - provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reference_id: masking
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+          role: masking_methodology
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+        - path: schemas/tapr--2024--annual-longitudinal-programs-crosswalk.json
+          provenance_ids:
+          - 65b0dea680e53a5a77bfadde873f8745aedeaafc67b34a26922de8639e1e61fa
+          reference_id: columns_source
+          reviewed_sha256: c77ce3f1cf4456b7208d8bfff4331dc3ca7b18548d9ee226a43916a2b1207c31
+          role: schema
+          status: available
+          title: TEA Data-generated complete 2024 Annual/Longitudinal program source-only
+            header/layout and ordered publisher dictionary occurrences
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        title: 'Campus: Annual RHSP/DAP/FHSP-E/FHSP-DLA/Texas First-DLA'
+        version: '2024'
+      path: data/tapr/raw/2024-campus-rhsp-raw.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--annual-longitudinal-programs-crosswalk.json
+            tapr_source:
+              scope: campus
+              tables:
+                annual_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla: data/tapr/raw/2024-campus-rhsp-raw.csv
+  campus_tapr_longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla:
+    2024:
+      metadata:
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        identifiers: []
+        metrics: {}
+        notes: Complete selected program response retained as raw strings. Twenty-two
+          code-only TC4X23N/R dictionary codes have no physical column in this exact
+          response. All 204 ordered occurrences and contexts are retained; this absence
+          does not establish noncollection or absence in other editions. Publisher
+          edition 2024 and literal 2023 labels are distinct; field reference periods
+          and units remain unknown, and field-specific masking applicability remains
+          unreviewed. No value policy, metric definitions or estimation is applied.
+        period:
+          kind: unknown
+        provenance_ids:
+        - ab64e994ba04f5930606f8f765e6ab15ae69b45f0e3409c9aad7ae2d7ce9d048
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - ab64e994ba04f5930606f8f765e6ab15ae69b45f0e3409c9aad7ae2d7ce9d048
+          reference_id: csv_headers
+          reviewed_sha256: 938b248e2ed383459f2cdbb9e18b9ef5af6e076178ca72fd1aa350eb802274e3
+          role: source_notes
+          status: available
+          title: Original 2024 campus_tapr_longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla
+            raw CSV; genuine HTTP observation
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        - provenance_ids:
+          - 0ebe573649d3a9c7672e5b2fcc630843b93fa0dc5f4d2eb5cde36948e85a459d
+          reference_id: selection
+          reviewed_sha256: 155e745470faade2f0ebbdaa43cce627a99878c667848f9cea79395d0491297b
+          role: source_notes
+          status: available
+          title: 'Official retained TEA TAPR 2024 Campus: Longitudinal RHSP/DAP/FHSP-E/FHSP-DLA/Texas
+            First-DLA variable-selection page'
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        - provenance_ids:
+          - e5fb404f19fbb96271406a41ec89331e3f45c8298992e760fe29144acbec87e8
+          reference_id: dictionary
+          reviewed_sha256: bfd8ce5596f4f785d972a41b98fd171eafc83d8ea3f077392aceea980f0428cb
+          role: data_dictionary
+          status: available
+          title: 'Official retained TEA TAPR 2024 Campus: Longitudinal RHSP/DAP/FHSP-E/FHSP-DLA/Texas
+            First-DLA dictionary'
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=C&dsname=FHSP&dd=attendgrad&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reference_id: glossary
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+          role: glossary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+        - provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reference_id: masking
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+          role: masking_methodology
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+        - path: schemas/tapr--2024--annual-longitudinal-programs-crosswalk.json
+          provenance_ids:
+          - 65b0dea680e53a5a77bfadde873f8745aedeaafc67b34a26922de8639e1e61fa
+          reference_id: columns_source
+          reviewed_sha256: c77ce3f1cf4456b7208d8bfff4331dc3ca7b18548d9ee226a43916a2b1207c31
+          role: schema
+          status: available
+          title: TEA Data-generated complete 2024 Annual/Longitudinal program source-only
+            header/layout and ordered publisher dictionary occurrences
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        title: 'Campus: Longitudinal RHSP/DAP/FHSP-E/FHSP-DLA/Texas First-DLA'
+        version: '2024'
+      path: data/tapr/raw/2024-campus-fhsp-raw.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--annual-longitudinal-programs-crosswalk.json
+            tapr_source:
+              scope: campus
+              tables:
+                longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla: data/tapr/raw/2024-campus-fhsp-raw.csv
+  district_tapr_annual_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla:
+    2024:
+      metadata:
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        identifiers: []
+        metrics: {}
+        notes: Complete selected program response retained as raw strings. Fourteen
+          returned GF23N fields lack dictionary definitions; their publisher type
+          and description remain unknown. All 210 ordered dictionary occurrences and
+          contexts are retained. Publisher edition 2024 and literal 2023 labels are
+          distinct; field reference periods and units remain unknown, and field-specific
+          masking applicability remains unreviewed. No value policy, metric definitions
+          or estimation is applied.
+        period:
+          kind: unknown
+        provenance_ids:
+        - 59ed41d55bd88a7c24f0e111f4641c7a7a0033256ba69426cd2bf103bc3da5b2
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - 59ed41d55bd88a7c24f0e111f4641c7a7a0033256ba69426cd2bf103bc3da5b2
+          reference_id: csv_headers
+          reviewed_sha256: 26e83b3d0b1cccdab7e334db825835d093c336f8ab2e6682cf90c73aa427698d
+          role: source_notes
+          status: available
+          title: Original 2024 district_tapr_annual_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla
+            raw CSV; genuine HTTP observation
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        - provenance_ids:
+          - a8fa4472ff40319e98ad4b1a67bf709ab47a32c7c2e1b04d070781715e01d1aa
+          reference_id: selection
+          reviewed_sha256: ea73916179f4f81e18a2eaa1285fb7718f6b4c73213d5fbbf31af177be2266c2
+          role: source_notes
+          status: available
+          title: 'Official retained TEA TAPR 2024 District: Annual RHSP/DAP/FHSP-E/FHSP-DLA/Texas
+            First-DLA variable-selection page'
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        - provenance_ids:
+          - ffc57a2494799e275fd65f00d36b3d1315b22e09c743b2ef93a15ecbb214266d
+          reference_id: dictionary
+          reviewed_sha256: d2dce00c99a0f5a437e3c1cda1219fa252a12360d8302db5896a4bea43a7b4d1
+          role: data_dictionary
+          status: available
+          title: 'Official retained TEA TAPR 2024 District: Annual RHSP/DAP/FHSP-E/FHSP-DLA/Texas
+            First-DLA dictionary'
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=D&dsname=RHSP&dd=attendgrad&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reference_id: glossary
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+          role: glossary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+        - provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reference_id: masking
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+          role: masking_methodology
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+        - path: schemas/tapr--2024--annual-longitudinal-programs-crosswalk.json
+          provenance_ids:
+          - 65b0dea680e53a5a77bfadde873f8745aedeaafc67b34a26922de8639e1e61fa
+          reference_id: columns_source
+          reviewed_sha256: c77ce3f1cf4456b7208d8bfff4331dc3ca7b18548d9ee226a43916a2b1207c31
+          role: schema
+          status: available
+          title: TEA Data-generated complete 2024 Annual/Longitudinal program source-only
+            header/layout and ordered publisher dictionary occurrences
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        title: 'District: Annual RHSP/DAP/FHSP-E/FHSP-DLA/Texas First-DLA'
+        version: '2024'
+      path: data/tapr/raw/2024-district-rhsp-raw.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--annual-longitudinal-programs-crosswalk.json
+            tapr_source:
+              scope: district
+              tables:
+                annual_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla: data/tapr/raw/2024-district-rhsp-raw.csv
+  district_tapr_longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla:
+    2024:
+      metadata:
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        identifiers: []
+        metrics: {}
+        notes: Complete selected program response retained as raw strings. Twenty-two
+          code-only TC4X23N/R dictionary codes have no physical column in this exact
+          response. All 204 ordered occurrences and contexts are retained; this absence
+          does not establish noncollection or absence in other editions. Publisher
+          edition 2024 and literal 2023 labels are distinct; field reference periods
+          and units remain unknown, and field-specific masking applicability remains
+          unreviewed. No value policy, metric definitions or estimation is applied.
+        period:
+          kind: unknown
+        provenance_ids:
+        - 0bd27394f8e7f1dde19062887bcdd6f4a3b14491805dd337bd8a0ac96e68f53e
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - 0bd27394f8e7f1dde19062887bcdd6f4a3b14491805dd337bd8a0ac96e68f53e
+          reference_id: csv_headers
+          reviewed_sha256: e3d4608855f0ca29caa9727c582e1413f15aab0d7f5be370f6fdb75bc8f37ead
+          role: source_notes
+          status: available
+          title: Original 2024 district_tapr_longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla
+            raw CSV; genuine HTTP observation
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        - provenance_ids:
+          - a7b878969bc9889d7427edb0cfe480e244e71efad7b18a216188ac16d63bc10c
+          reference_id: selection
+          reviewed_sha256: da1647eab51455712473fd829c2d61bb123132b761edda2d43b3f73cc254fc71
+          role: source_notes
+          status: available
+          title: 'Official retained TEA TAPR 2024 District: Longitudinal RHSP/DAP/FHSP-E/FHSP-DLA/Texas
+            First-DLA variable-selection page'
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        - provenance_ids:
+          - 8a2cd9d9db2073c5b7c53defbf00042eda06da6023e24a62065d6b13b598a5e8
+          reference_id: dictionary
+          reviewed_sha256: 9f4b17aca463b1e1d0bb37926d44a1f252c0984cb66c03c8dea57322182588d4
+          role: data_dictionary
+          status: available
+          title: 'Official retained TEA TAPR 2024 District: Longitudinal RHSP/DAP/FHSP-E/FHSP-DLA/Texas
+            First-DLA dictionary'
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=D&dsname=FHSP&dd=attendgrad&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reference_id: glossary
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+          role: glossary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+        - provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reference_id: masking
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+          role: masking_methodology
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+        - path: schemas/tapr--2024--annual-longitudinal-programs-crosswalk.json
+          provenance_ids:
+          - 65b0dea680e53a5a77bfadde873f8745aedeaafc67b34a26922de8639e1e61fa
+          reference_id: columns_source
+          reviewed_sha256: c77ce3f1cf4456b7208d8bfff4331dc3ca7b18548d9ee226a43916a2b1207c31
+          role: schema
+          status: available
+          title: TEA Data-generated complete 2024 Annual/Longitudinal program source-only
+            header/layout and ordered publisher dictionary occurrences
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        title: 'District: Longitudinal RHSP/DAP/FHSP-E/FHSP-DLA/Texas First-DLA'
+        version: '2024'
+      path: data/tapr/raw/2024-district-fhsp-raw.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--annual-longitudinal-programs-crosswalk.json
+            tapr_source:
+              scope: district
+              tables:
+                longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla: data/tapr/raw/2024-district-fhsp-raw.csv
 spatial:
   districts:
     2025:
@@ -3470,6 +3794,14 @@ schema:
     - xlsx
     all_districts_reference2:
     - xlsx
+    campus_tapr_annual_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla:
+    - csv
+    campus_tapr_longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla:
+    - csv
+    district_tapr_annual_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla:
+    - csv
+    district_tapr_longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla:
+    - csv
   spatial:
     districts:
     - geojson

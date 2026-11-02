@@ -17,13 +17,19 @@ from teadata.manifest import ContractError, DatasetCatalog, _validate_methodolog
 from teadata.provenance import ProvenanceStore, validate_record_graph, validate_reference_records
 from teadata.scripts.build_tapr_profiles import prepare_profiles
 from teadata.scripts.rename_tapr_campus_headers import sanitize_header
-from teadata.tapr import TaprSourceRequest, qualified_tapr_family, read_tapr_table
+from teadata.tapr import TaprSourceRequest, qualified_tapr_family, read_tapr_table, reviewed_tapr_data_record_count
 from teadata.teadata_config import Config, load_config
 
 
 ROOT = Path(__file__).resolve().parents[1]
 RESOURCE = ROOT / 'teadata/schemas/tapr--2024--reference-dropout-attendance-crosswalk.json'
 UNKNOWN = {'kind': 'unknown'}
+PROGRAM_SOURCES = [
+    ('campus', 'annual_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla', 200, 9082, '4b7487ef04e74c8048317a75c784305793519c79c9aaf6df25742ad153a5d51d'),
+    ('campus', 'longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla', 158, 9082, 'ab64e994ba04f5930606f8f765e6ab15ae69b45f0e3409c9aad7ae2d7ce9d048'),
+    ('district', 'annual_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla', 198, 1207, '59ed41d55bd88a7c24f0e111f4641c7a7a0033256ba69426cd2bf103bc3da5b2'),
+    ('district', 'longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla', 156, 1207, '0bd27394f8e7f1dde19062887bcdd6f4a3b14491805dd337bd8a0ac96e68f53e'),
+]
 SOURCES = [
     ('campus', 'reference', 22, 9082, '46bd6f225bfb3bc1aaf2a3fd733bb212d2e6ebd19e9e8c81486be15323e37f1b'),
     ('district', 'reference', 12, 1207, 'f0841681cbf8e28a91dfe31c9653b04cf4a6d933ad6bf30d334a603362b9d0b7'),
@@ -33,6 +39,7 @@ SOURCES = [
     ('district', 'four_year_longitudinal_rate', 226, 1207, '632d7f6c24087c3f557882724229ebc68318e510ac1f206181e39b5833aef16a'),
     ('campus', 'staar_school_progress', 2212, 9082, '751c3626c097b51f2d4467950aa7f77da976083fc63169d1c19268198bd5b96c'),
     ('district', 'staar_school_progress', 2210, 1207, '72df19ef8f42a1b404e80ef528a1f9cc9cc93cc27aa466891140ed2fc374fdfb'),
+    *PROGRAM_SOURCES,
 ]
 NEW_DATASETS = {scope + '_tapr_' + family for scope, family, *_ in SOURCES}
 
@@ -67,7 +74,9 @@ def test_complete_source_only_discovery_and_typed_receipts_need_no_artifact_io(s
     acquired = graph[raw_id]
     assert acquired['dataset'] == dataset and acquired['method'] == 'download'
     date_prefix = {'four_year_longitudinal_rate': '2026-11-01T09:06:',
-                   'staar_school_progress': '2026-11-01T10:58:'}.get(family, '2026-11-01T06:11:')
+                   'staar_school_progress': '2026-11-01T10:58:',
+                   'annual_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla': '2026-11-02T02:41:',
+                   'longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla': '2026-11-02T02:41:'}.get(family, '2026-11-01T06:11:')
     assert acquired['downloaded_at'].startswith(date_prefix)
     assert acquired['response_headers']['content-type'] == 'text/&content_type.-separated-values'
     assert acquired['source_metadata']['period'] == UNKNOWN and acquired['source_metadata']['metrics'] == {}
@@ -164,15 +173,15 @@ def test_current_source_contracts_keep_explicit_one_year_csv_opt_ins():
     # Full pre-change Config preservation has one current baseline owner below.
 
 
-def test_staar_school_progress_opt_ins_preserve_the_entire_preexisting_Config():
+def test_program_opt_ins_preserve_the_entire_preexisting_Config():
     current = yaml.safe_load((ROOT / 'teadata/teadata_sources.yaml').read_text())
-    for scope in ['campus', 'district']:
-        dataset = scope + '_tapr_staar_school_progress'
+    for scope, family, *_ in PROGRAM_SOURCES:
+        dataset = scope + '_tapr_' + family
         current['data_sources'].pop(dataset)
         current['schema']['data_sources'].pop(dataset)
-    # Exact pre-change d08ff9f Config, including existing COMP4/REF/DROP opt-ins
+    # Exact pre-change e1d820a Config, including SSA/COMP4/REF/DROP opt-ins
     # and every legacy default/profile/metric binding. One baseline owns this.
-    assert sha256(canonical_json(current).encode()).hexdigest() == '440057779ba84f04070e3175623e789eafa75ab841ae888271361218b016e1a7'
+    assert sha256(canonical_json(current).encode()).hexdigest() == 'e01cdc6dcd1feb1411429be71dc82c7066391902059685a9185dc5424a228a3a'
 
 
 @pytest.mark.parametrize('scope,dictionary_sha,fields_sha', [
@@ -273,6 +282,55 @@ def test_comp4_context_names_and_annual_references_do_not_assign_methodology(sco
     assert source.metadata.value_policy is None and source.metadata.estimation is None and source.metadata.field_year is None
     assert 'field-specific COMP4 masking applicability remains unreviewed' in source.metadata.notes
     _validate_methodology(source.metadata, None)
+
+
+@pytest.mark.parametrize('scope,family,width,rows,raw_id', PROGRAM_SOURCES)
+def test_program_headers_and_dictionary_only_gaps_preserve_publisher_evidence(scope, family, width, rows, raw_id):
+    cfg = load_config()
+    dataset = scope + '_tapr_' + family
+    annual = family.startswith('annual_')
+    expected = {
+        ('campus', True): ('4f495ae87a27aee4a10d8e5af053efc735d5aca960fea6cd45ac1e337aa3aaa9',
+                           'b9cdc9ef03834ee7363acf3a6fad2ccfeadd970f6d7de4bbe0d3454ed267e46e'),
+        ('campus', False): ('7842d89c4ec6cde8d75fe1595bb3585f487b3dd92883a9c0fd4e2a2195024097',
+                            '93799ab9821e332948628ac64669b9fe3c02bc4457cf688b14dadf3f947d3905'),
+        ('district', True): ('62d08ce1499261722c17efe95f958165bce4b8454ccbaac03a3c1205f752cf66',
+                             'f8cf5b928c2cb4d6f8364439b54c9eee28bb01a10f4c78e61fcc5e20d8e5536b'),
+        ('district', False): ('9c0c90d4e03445d7181f3feba3c73b716d204e639158a4fcc4a107c47754a610',
+                              'e6476804ca4b385b5af0109481c60d40205a5d7fcfc0533065275de84f4166c9'),
+    }
+    contract = cfg.column_contract(dataset, 2024, reader_profile='source')
+    assert contract is not None
+    branch, = [branch for branch in parse_column_schema(contract['text'].encode())['datasets'] if branch['dataset'] == dataset]
+    table, = branch['tables']
+    fields, occurrences = table['fields'], table['dictionary_records']
+    field_sha, occurrence_sha = expected[scope, annual]
+    assert sha256(canonical_json([[field[key] for key in ('position', 'code', 'label', 'field', 'disposition')]
+                                  for field in fields]).encode()).hexdigest() == field_sha
+    assert sha256(canonical_json(occurrences).encode()).hexdigest() == occurrence_sha
+    assert len(fields) == width and reviewed_tapr_data_record_count(table) == rows
+    assert len(occurrences) == (210 if annual else 204)
+    assert all('publisher_length' not in field for field in fields)
+    facts = [field for field in fields if field['disposition'] == 'fact']
+    assert all(field['field'] == sanitize_header(field['label']) for field in facts)
+    unknown = [field for field in facts if field['dictionary_status'] == 'not_documented']
+    assert len(unknown) == (14 if annual else 0)
+    assert all(field['publisher_type'] is None and field['publisher_description'] is None for field in unknown)
+    actual_codes = {field['code'] for field in fields}
+    absent = [occurrence for occurrence in occurrences if occurrence['code'] not in actual_codes]
+    assert len(absent) == (0 if annual else 22)
+    assert all(occurrence['publisher_type'] is None and occurrence['publisher_description'] is None for occurrence in absent)
+    mapping = cfg.header_mapping(dataset, edition='2024', table=family, reader_profile='source')
+    assert not {occurrence['code'] for occurrence in absent} & set(mapping)
+    projected = cfg.header_records(dataset, edition='2024', reader_profile='source')
+    assert all(record['dictionary_occurrences'] == [row for row in occurrences if row['code'] == record['code']]
+               for record in projected)
+    assert all(not record['dictionary_occurrences'] for record in projected if record['code'] in {field['code'] for field in unknown})
+    known = next(record for record in projected if record['dictionary_occurrences'])
+    known['dictionary_occurrences'][0]['publisher_description'] = 'Caller mutation'
+    fresh = cfg.header_records(dataset, edition='2024', reader_profile='source')
+    assert next(record for record in fresh if record['code'] == known['code'])['dictionary_occurrences'][0]['publisher_description'] != 'Caller mutation'
+    assert cfg.resolve_dataset(dataset, 2024, reader_profile='source').metadata.provenance_ids == (raw_id,)
 
 
 @pytest.mark.parametrize('scope,family,width,rows,raw_id', SOURCES)

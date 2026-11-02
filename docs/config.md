@@ -197,6 +197,10 @@ not gain verified provenance merely because their configuration is extended.
 
 ## Maintenance Script Paths
 
+Before observing or pinning a packaged schema resource, serialize it with
+`teadata.manifest.canonical_json(document)` plus one newline and run the existing
+`test_every_packaged_version_and_declared_profile_has_an_offline_schema` check.
+
 Catalogs that bind a reviewed header crosswalk expose the publisher's source
 codes, exact human labels and canonical Python field names without reading
 source datasets or current YAML:
@@ -933,3 +937,28 @@ uv run python examples/restyle_existing_excel.py report.xlsx --sheet-name Sheet1
 Styling requires Excel and the optional `xlwings` package. The campus profile
 example's county-boundary default follows `TEADATA_DATA_DIR`; callers can still
 pass an explicit `counties_path`.
+
+### Annual and longitudinal graduation-program sources
+
+The explicit 2024 `source` profiles retain the publisher's Annual and
+Longitudinal RHSP/DAP/FHSP-E/FHSP-DLA/Texas First-DLA responses as raw strings.
+Their dataset names use the scope prefix followed by
+`tapr_annual_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla` or
+`tapr_longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla`.
+
+| Publisher group | Campus columns | District columns | Dictionary evidence per scope |
+| --- | ---: | ---: | --- |
+| Annual | 200 | 198 | 210 ordered occurrences; 14 returned fields lack definitions |
+| Longitudinal | 158 | 156 | 204 ordered occurrences; 22 code-only entries have no returned column |
+
+The responses contain 9,082 campus rows and 1,207 district rows per group.
+Identity columns occur once in each source table. Exact raw labels, codes,
+canonical names and dictionary contexts remain available through the existing
+header APIs; dictionary-only entries remain in `dictionary_records` without
+fabricated value bindings. Absence in this response does not establish
+noncollection or absence in another edition.
+
+Publisher edition 2024 and the literal 2023 labels remain distinct. Reference
+periods and units are unknown, field-specific masking applicability is
+unreviewed, and no value policy, metric definitions or estimation is applied.
+These opt-ins do not activate a default reader, release or app enrichment.
