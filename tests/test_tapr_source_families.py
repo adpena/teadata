@@ -11,13 +11,13 @@ import pyarrow.parquet as pq
 import pytest
 import yaml
 
-from teadata.column_schema import parse_column_schema, validate_header_table
+from teadata.column_schema import parse_column_schema, source_schema_fingerprint, validate_header_table
 from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
 from teadata.manifest import ContractError, DatasetCatalog, _validate_methodology, canonical_json
 from teadata.provenance import ProvenanceStore, validate_record_graph, validate_reference_records
 from teadata.scripts.build_tapr_profiles import prepare_profiles
 from teadata.scripts.rename_tapr_campus_headers import sanitize_header
-from teadata.tapr import qualified_tapr_family, read_tapr_table
+from teadata.tapr import TaprSourceRequest, qualified_tapr_family, read_tapr_table
 from teadata.teadata_config import Config, load_config
 
 
@@ -331,3 +331,31 @@ def test_foreign_family_names_fail_before_source_io(tmp_path, dataset, monkeypat
     monkeypatch.setattr(Path, 'read_bytes', lambda *a, **k: pytest.fail('Foreign family opened source bytes'))
     with pytest.raises(ValueError, match='explicit qualified dataset'):
         read_tapr_table(tmp_path / 'absent.csv', mapping={}, key_field='campus_number', dataset=dataset, edition='2024')
+
+
+@pytest.mark.parametrize('scope', ['campus', 'district'])
+@pytest.mark.parametrize('family', ['annual_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla',
+                                   'longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla'])
+def test_program_source_request_admission_preserves_scope_and_key_fences(tmp_path, monkeypatch, scope, family):
+    dataset, key = scope + '_tapr_' + family, scope + '_number'
+    code = 'CAMPUS' if scope == 'campus' else 'DISTRICT'
+    mapping = {'table': 'publisher_program_rows', 'input_sha256': 'a' * 64,
+        'source_schema_sha256': source_schema_fingerprint(['Publisher identifier'], [code]),
+        'fields': [{'position': 1, 'code': code, 'label': 'Publisher identifier', 'field': key,
+                    'disposition': 'identity'}]}
+    path = tmp_path / 'not-opened.csv'
+    monkeypatch.setattr(Path, 'open', lambda *a, **k: pytest.fail('Admission opened source bytes'))
+    monkeypatch.setattr(Path, 'stat', lambda *a, **k: pytest.fail('Admission inspected source file'))
+    with TaprSourceRequest(path, mapping, key, dataset, '2024').open() as reader:
+        assert reader.request.dataset == dataset and reader.request.key_field == key
+        with pytest.raises(ValueError, match='not completed validated EOF'):
+            _ = reader.summary
+    other = 'district' if scope == 'campus' else 'campus'
+    for refused in [other + '_tapr_' + family, dataset + '_alias']:
+        with pytest.raises(ValueError, match='explicit qualified dataset'):
+            TaprSourceRequest(path, mapping, key, refused, '2024').open()
+    wrong = deepcopy(mapping)
+    wrong['fields'][0]['code'] = 'WRONG_SOURCE_KEY'
+    wrong['source_schema_sha256'] = source_schema_fingerprint(['Publisher identifier'], ['WRONG_SOURCE_KEY'])
+    with pytest.raises(ValueError, match='source key must bind publisher code'):
+        TaprSourceRequest(path, wrong, key, dataset, '2024').open()
