@@ -30,6 +30,12 @@ PROGRAM_SOURCES = [
     ('district', 'annual_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla', 198, 1207, '59ed41d55bd88a7c24f0e111f4641c7a7a0033256ba69426cd2bf103bc3da5b2'),
     ('district', 'longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla', 156, 1207, '0bd27394f8e7f1dde19062887bcdd6f4a3b14491805dd337bd8a0ac96e68f53e'),
 ]
+EXTENDED_SOURCES = [
+    ('campus', '5_year_extended_longitudinal_rate', 200, 9082, 'ddf82ad2dcbf50acaeb654379ad29f9aed665ad0ee96dd3347fd47d7dce18bd2'),
+    ('campus', '6_year_extended_longitudinal_rate', 200, 9082, '4830b9a011ec4e6a073ee11c731b4e4a3ffe4880f709b02bef988aba013581a2'),
+    ('district', '5_year_extended_longitudinal_rate', 198, 1207, '3b589f7efda3c3f4b3eacb394c46c648837287bca74c015eaded5b84ea3f9cc6'),
+    ('district', '6_year_extended_longitudinal_rate', 198, 1207, 'cde1fa2f993995f92ec3925c626cce0438cc58148152f4a3f06bfbfcebed8505'),
+]
 SOURCES = [
     ('campus', 'reference', 22, 9082, '46bd6f225bfb3bc1aaf2a3fd733bb212d2e6ebd19e9e8c81486be15323e37f1b'),
     ('district', 'reference', 12, 1207, 'f0841681cbf8e28a91dfe31c9653b04cf4a6d933ad6bf30d334a603362b9d0b7'),
@@ -40,6 +46,7 @@ SOURCES = [
     ('campus', 'staar_school_progress', 2212, 9082, '751c3626c097b51f2d4467950aa7f77da976083fc63169d1c19268198bd5b96c'),
     ('district', 'staar_school_progress', 2210, 1207, '72df19ef8f42a1b404e80ef528a1f9cc9cc93cc27aa466891140ed2fc374fdfb'),
     *PROGRAM_SOURCES,
+    *EXTENDED_SOURCES,
 ]
 NEW_DATASETS = {scope + '_tapr_' + family for scope, family, *_ in SOURCES}
 
@@ -76,7 +83,9 @@ def test_complete_source_only_discovery_and_typed_receipts_need_no_artifact_io(s
     date_prefix = {'four_year_longitudinal_rate': '2026-11-01T09:06:',
                    'staar_school_progress': '2026-11-01T10:58:',
                    'annual_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla': '2026-11-02T02:41:',
-                   'longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla': '2026-11-02T02:41:'}.get(family, '2026-11-01T06:11:')
+                   'longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla': '2026-11-02T02:41:',
+                   '5_year_extended_longitudinal_rate': '2026-11-02T07:24:',
+                   '6_year_extended_longitudinal_rate': '2026-11-02T07:24:'}.get(family, '2026-11-01T06:11:')
     assert acquired['downloaded_at'].startswith(date_prefix)
     assert acquired['response_headers']['content-type'] == 'text/&content_type.-separated-values'
     assert acquired['source_metadata']['period'] == UNKNOWN and acquired['source_metadata']['metrics'] == {}
@@ -173,15 +182,15 @@ def test_current_source_contracts_keep_explicit_one_year_csv_opt_ins():
     # Full pre-change Config preservation has one current baseline owner below.
 
 
-def test_program_opt_ins_preserve_the_entire_preexisting_Config():
+def test_latest_source_opt_ins_preserve_the_entire_preexisting_Config():
     current = yaml.safe_load((ROOT / 'teadata/teadata_sources.yaml').read_text())
-    for scope, family, *_ in PROGRAM_SOURCES:
+    for scope, family, *_ in EXTENDED_SOURCES:
         dataset = scope + '_tapr_' + family
         current['data_sources'].pop(dataset)
         current['schema']['data_sources'].pop(dataset)
-    # Exact pre-change e1d820a Config, including SSA/COMP4/REF/DROP opt-ins
+    # Exact pre-change cd837181 Config, including Annual/Longitudinal programs
     # and every legacy default/profile/metric binding. One baseline owns this.
-    assert sha256(canonical_json(current).encode()).hexdigest() == 'e01cdc6dcd1feb1411429be71dc82c7066391902059685a9185dc5424a228a3a'
+    assert sha256(canonical_json(current).encode()).hexdigest() == 'f49575d45fcf9dcb877f60235609fcb3fcc20bbbf4c413e6ed0af90ae9e5a0b2'
 
 
 @pytest.mark.parametrize('scope,dictionary_sha,fields_sha', [
@@ -333,6 +342,65 @@ def test_program_headers_and_dictionary_only_gaps_preserve_publisher_evidence(sc
     assert cfg.resolve_dataset(dataset, 2024, reader_profile='source').metadata.provenance_ids == (raw_id,)
 
 
+@pytest.mark.parametrize('scope,family,width,rows,raw_id', EXTENDED_SOURCES)
+def test_extended_graduation_context_and_dictionary_only_codes_preserve_publisher_evidence(scope, family, width, rows, raw_id):
+    cfg = load_config()
+    dataset = scope + '_tapr_' + family
+    five_year = family.startswith('5_')
+    years, source_year = (5, 2022) if five_year else (6, 2021)
+    expected = {
+        ('campus', True): ('c8a79c457329940aa17bf1c48ce5aed78dff093ed71d659a47cf3861dbdd5729',
+                           '8fb60bce50fa8a4f2023755c9d9dfef8183863174f546f16d755cc712d4041fc'),
+        ('campus', False): ('a086b92aa590681d7c5eb5f051fbc470d1cde76be8e2e5464721874910519dd8',
+                            '25f8d5955c4dc1eab0b1b700a4c2dcfff28e51ff73439939e1017bfa2a6e5669'),
+        ('district', True): ('62e87eac5039a207f509343253559bc95c7b3a3d5ef6f6484b16f7caf02fd2ed',
+                             '5aa73a1a78e55783bfb4eaeaa58ed2b3507545341036a8ef0896d1761391de1d'),
+        ('district', False): ('21798d95f8fcde43e105530d709289bd35b4e27eb5342ab176483007ae2ff87c',
+                              '25235a6513ba66ab3a67fd5c14b2cdfef0b7e62dbe4d4b646437c14ec73fa97c'),
+    }
+    contract = cfg.column_contract(dataset, 2024, reader_profile='source')
+    assert contract is not None
+    branch, = [branch for branch in parse_column_schema(contract['text'].encode())['datasets'] if branch['dataset'] == dataset]
+    table, = branch['tables']
+    fields, occurrences = table['fields'], table['dictionary_records']
+    field_sha, occurrence_sha = expected[scope, five_year]
+    assert sha256(canonical_json([[field[key] for key in ('position', 'code', 'label', 'field', 'disposition')]
+                                  for field in fields]).encode()).hexdigest() == field_sha
+    assert sha256(canonical_json(occurrences).encode()).hexdigest() == occurrence_sha
+    assert len(fields) == width and reviewed_tapr_data_record_count(table) == rows
+    assert len(occurrences) == 224 and [record['ordinal'] for record in occurrences] == list(range(1, 225))
+    ordinary = f'{years}-Year Extended Longitudinal Rate (Gr 9-12)'
+    federal = f'{years}-Year Extended Federal Graduation Rate Without Exclusions (Gr 9-12)'
+    assert sum(record['publisher_context']['heading'] == ordinary for record in occurrences) == 182
+    assert sum(record['publisher_context']['heading'] == federal for record in occurrences) == 42
+    assert all(record.get('publisher_length') is None and record['publisher_type'] == 'Number'
+               and str(source_year) in record['publisher_description'] for record in occurrences)
+    facts = [field for field in fields if field['disposition'] == 'fact']
+    assert len(facts) == 196 and all(field['dictionary_status'] == 'documented' for field in facts)
+    assert all('publisher_length' not in field for field in fields)
+    actual_codes = {field['code'] for field in fields}
+    absent = [record for record in occurrences if record['code'] not in actual_codes]
+    assert len(absent) == 28 and all(record['publisher_description'] is not None for record in absent)
+    mapping = cfg.header_mapping(dataset, edition='2024', table=family, reader_profile='source')
+    assert not {record['code'] for record in absent} & set(mapping)
+    by_code = {record['code']: record for record in occurrences}
+    renamed = [field for field in facts if field['field'] != sanitize_header(field['label'])]
+    assert len(renamed) == (42 if five_year else 14)
+    for field in renamed:
+        assert by_code[field['code']]['publisher_context'] == {'heading': federal, 'source_line': 2492, 'source_column': 0}
+        assert field['field'] == sanitize_header(field['label'].replace(f'{years}-Year Longitudinal:', federal))
+    projected = cfg.header_records(dataset, edition='2024', reader_profile='source')
+    assert all(record['dictionary_occurrences'] == [row for row in occurrences if row['code'] == record['code']]
+               and record['period'] == UNKNOWN and record.get('publisher_length') is None for record in projected)
+    metadata = cfg.resolve_dataset(dataset, 2024, reader_profile='source').metadata
+    assert metadata.provenance_ids == (raw_id,) and metadata.value_policy is None and not metadata.metrics
+    assert 'selection-form federal group labels state 2023' in metadata.notes
+    for role in ['glossary', 'masking_methodology']:
+        reference, = [ref for ref in metadata.references if ref.role == role]
+        original, = [ref for ref in cfg.resolve_dataset(scope + '_tapr_reference', 2024, reader_profile='source').metadata.references if ref.role == role]
+        assert reference.to_dict() == original.to_dict()
+
+
 @pytest.mark.parametrize('scope,family,width,rows,raw_id', SOURCES)
 def test_tiny_ordinary_source_preparation_preserves_raw_tokens_and_physical_table_independence(tmp_path, scope, family, width, rows, raw_id):
     dataset = scope + '_tapr_' + family
@@ -393,7 +461,8 @@ def test_foreign_family_names_fail_before_source_io(tmp_path, dataset, monkeypat
 
 @pytest.mark.parametrize('scope', ['campus', 'district'])
 @pytest.mark.parametrize('family', ['annual_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla',
-                                   'longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla'])
+                                   'longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla',
+                                   '5_year_extended_longitudinal_rate', '6_year_extended_longitudinal_rate'])
 def test_program_source_request_admission_preserves_scope_and_key_fences(tmp_path, monkeypatch, scope, family):
     dataset, key = scope + '_tapr_' + family, scope + '_number'
     code = 'CAMPUS' if scope == 'campus' else 'DISTRICT'

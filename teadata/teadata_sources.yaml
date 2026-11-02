@@ -3656,6 +3656,330 @@ data_sources:
               scope: district
               tables:
                 longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla: data/tapr/raw/2024-district-fhsp-raw.csv
+  campus_tapr_5_year_extended_longitudinal_rate:
+    2024:
+      metadata:
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        identifiers: []
+        metrics: {}
+        notes: 2024 source edition. Publisher raw labels and dictionary descriptions state 2022
+          for 5-Year and 2021 for 6-Year; selection-form federal group labels state 2023. This
+          discrepancy is unresolved and does not establish a measurement period. Raw labels,
+          codes and ordered dictionary contexts are retained; only colliding federal canonical
+          names include their observed federal heading. Each scope retains 28 dictionary-only
+          codes absent from these acquired CSVs; this is not a noncollection claim. Publisher
+          Length, units, masking and field methodology remain unknown or unreviewed; no value
+          policy or estimation is applied.
+        period:
+          kind: unknown
+        provenance_ids:
+        - ddf82ad2dcbf50acaeb654379ad29f9aed665ad0ee96dd3347fd47d7dce18bd2
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - ddf82ad2dcbf50acaeb654379ad29f9aed665ad0ee96dd3347fd47d7dce18bd2
+          reference_id: csv_headers
+          reviewed_sha256: c3d5772596239a38f4e48a7f4d342a566d1e98166e661e46685192ccc4380794
+          role: source_notes
+          status: available
+          title: Retained publisher CSV labels and codes with reviewed finite logical layout
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        - provenance_ids:
+          - 23f66aafd8d009b2d97f74b1d3368ae069d8dccb912b13e8309872527d2ab487
+          reference_id: selection
+          reviewed_sha256: 0f6411cbe18cae45e618d8670be5f6502ceb8001d7749ab0e4cd3765b16c9d0c
+          role: source_notes
+          status: available
+          title: 'Official retained TEA TAPR 2024 Campus: 5-Year Extended Longitudinal Rate
+            selection'
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        - provenance_ids:
+          - c6fbafe3909e4d726defb3c822cfdb5146034714d063ffe63e3d4068b8b3c5bb
+          reference_id: dictionary
+          reviewed_sha256: 098358061248acd3c5c7f11105837b49dbebf936a8bc5fcc7481071d4e315027
+          role: data_dictionary
+          status: available
+          title: 'Official retained TEA TAPR 2024 Campus: 5-Year Extended Longitudinal Rate
+            dictionary'
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=C&dsname=COMP5&dd=attendgrad&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reference_id: glossary
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+          role: glossary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+        - provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reference_id: masking
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+          role: masking_methodology
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+        - path: schemas/tapr--2024--extended-longitudinal-rates-crosswalk.json
+          provenance_ids:
+          - 32b6b419bd13de3e61c0dbcbe927eb61fd46ec60ef3f749aa64a947109b188dd
+          reference_id: columns_source
+          reviewed_sha256: 8c946914b5cd0036eee2325fd851108e6350ba66247bc335b1401bd5b94743d4
+          role: schema
+          status: available
+          title: TEAData-generated 2024 TAPR 5-Year and 6-Year Extended Longitudinal Rate source-column
+            crosswalk
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        title: 'Campus: 5-Year Extended Longitudinal Rate'
+        version: '2024'
+      path: data/tapr/raw/2024-campus-comp5-raw.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--extended-longitudinal-rates-crosswalk.json
+            tapr_source:
+              scope: campus
+              tables:
+                5_year_extended_longitudinal_rate: data/tapr/raw/2024-campus-comp5-raw.csv
+  campus_tapr_6_year_extended_longitudinal_rate:
+    2024:
+      metadata:
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        identifiers: []
+        metrics: {}
+        notes: 2024 source edition. Publisher raw labels and dictionary descriptions state 2022
+          for 5-Year and 2021 for 6-Year; selection-form federal group labels state 2023. This
+          discrepancy is unresolved and does not establish a measurement period. Raw labels,
+          codes and ordered dictionary contexts are retained; only colliding federal canonical
+          names include their observed federal heading. Each scope retains 28 dictionary-only
+          codes absent from these acquired CSVs; this is not a noncollection claim. Publisher
+          Length, units, masking and field methodology remain unknown or unreviewed; no value
+          policy or estimation is applied.
+        period:
+          kind: unknown
+        provenance_ids:
+        - 4830b9a011ec4e6a073ee11c731b4e4a3ffe4880f709b02bef988aba013581a2
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - 4830b9a011ec4e6a073ee11c731b4e4a3ffe4880f709b02bef988aba013581a2
+          reference_id: csv_headers
+          reviewed_sha256: b07cefb290fd891df141ea4dcec99cf7f6a7eb652677ecd8442d531ba02a2c27
+          role: source_notes
+          status: available
+          title: Retained publisher CSV labels and codes with reviewed finite logical layout
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        - provenance_ids:
+          - cef030c7ae175618a7cf62870fe78d6535ffe3274ee9d2b24cb8959383601322
+          reference_id: selection
+          reviewed_sha256: 8a3c203c2c659a945d8d80973fd1d4e93d459125defc933adeed1681edec16d9
+          role: source_notes
+          status: available
+          title: 'Official retained TEA TAPR 2024 Campus: 6-Year Extended Longitudinal Rate
+            selection'
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        - provenance_ids:
+          - a8b6bbcc71badfe41beec937a3fed24bfb7f5b073769159ce159a240b6d3bc61
+          reference_id: dictionary
+          reviewed_sha256: a73ad29144bad3191e46731a6ba34dfd5c6f44a8358e6d8deb1e2dbe37c12a79
+          role: data_dictionary
+          status: available
+          title: 'Official retained TEA TAPR 2024 Campus: 6-Year Extended Longitudinal Rate
+            dictionary'
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=C&dsname=COMP6&dd=attendgrad&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reference_id: glossary
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+          role: glossary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+        - provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reference_id: masking
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+          role: masking_methodology
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+        - path: schemas/tapr--2024--extended-longitudinal-rates-crosswalk.json
+          provenance_ids:
+          - 32b6b419bd13de3e61c0dbcbe927eb61fd46ec60ef3f749aa64a947109b188dd
+          reference_id: columns_source
+          reviewed_sha256: 8c946914b5cd0036eee2325fd851108e6350ba66247bc335b1401bd5b94743d4
+          role: schema
+          status: available
+          title: TEAData-generated 2024 TAPR 5-Year and 6-Year Extended Longitudinal Rate source-column
+            crosswalk
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        title: 'Campus: 6-Year Extended Longitudinal Rate'
+        version: '2024'
+      path: data/tapr/raw/2024-campus-comp6-raw.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--extended-longitudinal-rates-crosswalk.json
+            tapr_source:
+              scope: campus
+              tables:
+                6_year_extended_longitudinal_rate: data/tapr/raw/2024-campus-comp6-raw.csv
+  district_tapr_5_year_extended_longitudinal_rate:
+    2024:
+      metadata:
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        identifiers: []
+        metrics: {}
+        notes: 2024 source edition. Publisher raw labels and dictionary descriptions state 2022
+          for 5-Year and 2021 for 6-Year; selection-form federal group labels state 2023. This
+          discrepancy is unresolved and does not establish a measurement period. Raw labels,
+          codes and ordered dictionary contexts are retained; only colliding federal canonical
+          names include their observed federal heading. Each scope retains 28 dictionary-only
+          codes absent from these acquired CSVs; this is not a noncollection claim. Publisher
+          Length, units, masking and field methodology remain unknown or unreviewed; no value
+          policy or estimation is applied.
+        period:
+          kind: unknown
+        provenance_ids:
+        - 3b589f7efda3c3f4b3eacb394c46c648837287bca74c015eaded5b84ea3f9cc6
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - 3b589f7efda3c3f4b3eacb394c46c648837287bca74c015eaded5b84ea3f9cc6
+          reference_id: csv_headers
+          reviewed_sha256: 115a5918c6150441c761733bec9d3b6bc5392965b843a6d8b2b95501bdbeb8a4
+          role: source_notes
+          status: available
+          title: Retained publisher CSV labels and codes with reviewed finite logical layout
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        - provenance_ids:
+          - f43c624d692f35d3d43f4d32086ff392ab20482dfa67b18c7652a0429461f92c
+          reference_id: selection
+          reviewed_sha256: 6cdd5e5237d640a108fe98b9f97eb036d657e36a1746c664cca377230173a17b
+          role: source_notes
+          status: available
+          title: 'Official retained TEA TAPR 2024 District: 5-Year Extended Longitudinal Rate
+            selection'
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        - provenance_ids:
+          - 2706e6fe14d7c25f58e7eaf18f16efab635d26f3643ac480b1352b689ae8b219
+          reference_id: dictionary
+          reviewed_sha256: d3b00cd838b9c67b73c86c0a613b067a872b90e5f88846143fda56d5610afd91
+          role: data_dictionary
+          status: available
+          title: 'Official retained TEA TAPR 2024 District: 5-Year Extended Longitudinal Rate
+            dictionary'
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=D&dsname=COMP5&dd=attendgrad&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reference_id: glossary
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+          role: glossary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+        - provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reference_id: masking
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+          role: masking_methodology
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+        - path: schemas/tapr--2024--extended-longitudinal-rates-crosswalk.json
+          provenance_ids:
+          - 32b6b419bd13de3e61c0dbcbe927eb61fd46ec60ef3f749aa64a947109b188dd
+          reference_id: columns_source
+          reviewed_sha256: 8c946914b5cd0036eee2325fd851108e6350ba66247bc335b1401bd5b94743d4
+          role: schema
+          status: available
+          title: TEAData-generated 2024 TAPR 5-Year and 6-Year Extended Longitudinal Rate source-column
+            crosswalk
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        title: 'District: 5-Year Extended Longitudinal Rate'
+        version: '2024'
+      path: data/tapr/raw/2024-district-comp5-raw.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--extended-longitudinal-rates-crosswalk.json
+            tapr_source:
+              scope: district
+              tables:
+                5_year_extended_longitudinal_rate: data/tapr/raw/2024-district-comp5-raw.csv
+  district_tapr_6_year_extended_longitudinal_rate:
+    2024:
+      metadata:
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        identifiers: []
+        metrics: {}
+        notes: 2024 source edition. Publisher raw labels and dictionary descriptions state 2022
+          for 5-Year and 2021 for 6-Year; selection-form federal group labels state 2023. This
+          discrepancy is unresolved and does not establish a measurement period. Raw labels,
+          codes and ordered dictionary contexts are retained; only colliding federal canonical
+          names include their observed federal heading. Each scope retains 28 dictionary-only
+          codes absent from these acquired CSVs; this is not a noncollection claim. Publisher
+          Length, units, masking and field methodology remain unknown or unreviewed; no value
+          policy or estimation is applied.
+        period:
+          kind: unknown
+        provenance_ids:
+        - cde1fa2f993995f92ec3925c626cce0438cc58148152f4a3f06bfbfcebed8505
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - cde1fa2f993995f92ec3925c626cce0438cc58148152f4a3f06bfbfcebed8505
+          reference_id: csv_headers
+          reviewed_sha256: 5d9d7710a4d1b0c21ce446e586f49eeede85ac6bc89a9046a8b084e310358fdd
+          role: source_notes
+          status: available
+          title: Retained publisher CSV labels and codes with reviewed finite logical layout
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        - provenance_ids:
+          - 145a4cd63838e5f0c635070c21717c831760d88859ae93be38e866f5dbaf95d0
+          reference_id: selection
+          reviewed_sha256: f87e1a3d193018d9c8d38885fdcde6f1954ec63a9f151459394dc82f7119aac9
+          role: source_notes
+          status: available
+          title: 'Official retained TEA TAPR 2024 District: 6-Year Extended Longitudinal Rate
+            selection'
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        - provenance_ids:
+          - c408e22469282fb15bd1874d794e6b4ac183d59d5b07f0e424d8584f1e1b3036
+          reference_id: dictionary
+          reviewed_sha256: 700b391dba244c493e44a06381454b4124afcf9c8c63e7895689b901826ef6f2
+          role: data_dictionary
+          status: available
+          title: 'Official retained TEA TAPR 2024 District: 6-Year Extended Longitudinal Rate
+            dictionary'
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=D&dsname=COMP6&dd=attendgrad&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reference_id: glossary
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+          role: glossary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+        - provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reference_id: masking
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+          role: masking_methodology
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+        - path: schemas/tapr--2024--extended-longitudinal-rates-crosswalk.json
+          provenance_ids:
+          - 32b6b419bd13de3e61c0dbcbe927eb61fd46ec60ef3f749aa64a947109b188dd
+          reference_id: columns_source
+          reviewed_sha256: 8c946914b5cd0036eee2325fd851108e6350ba66247bc335b1401bd5b94743d4
+          role: schema
+          status: available
+          title: TEAData-generated 2024 TAPR 5-Year and 6-Year Extended Longitudinal Rate source-column
+            crosswalk
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        title: 'District: 6-Year Extended Longitudinal Rate'
+        version: '2024'
+      path: data/tapr/raw/2024-district-comp6-raw.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--extended-longitudinal-rates-crosswalk.json
+            tapr_source:
+              scope: district
+              tables:
+                6_year_extended_longitudinal_rate: data/tapr/raw/2024-district-comp6-raw.csv
 spatial:
   districts:
     2025:
@@ -3801,6 +4125,14 @@ schema:
     district_tapr_annual_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla:
     - csv
     district_tapr_longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla:
+    - csv
+    campus_tapr_5_year_extended_longitudinal_rate:
+    - csv
+    campus_tapr_6_year_extended_longitudinal_rate:
+    - csv
+    district_tapr_5_year_extended_longitudinal_rate:
+    - csv
+    district_tapr_6_year_extended_longitudinal_rate:
     - csv
   spatial:
     districts:

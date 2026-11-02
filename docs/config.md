@@ -962,3 +962,23 @@ Publisher edition 2024 and the literal 2023 labels remain distinct. Reference
 periods and units are unknown, field-specific masking applicability is
 unreviewed, and no value policy, metric definitions or estimation is applied.
 These opt-ins do not activate a default reader, release or app enrichment.
+
+### Five- and six-year extended longitudinal graduation rates
+
+The 2024 `source` opt-ins use the exact suffixes
+`tapr_5_year_extended_longitudinal_rate` and
+`tapr_6_year_extended_longitudinal_rate`, each with `campus_` or `district_`.
+Each selected response retains 200 campus columns or 198 district columns,
+including its identity columns once, and 9,082 campus or 1,207 district rows.
+All 224 ordered dictionary occurrences per scope remain available; 28 have no
+column in that exact acquired response and receive no fabricated value binding.
+
+The raw labels and dictionary descriptions state 2022 for the five-year source
+and 2021 for the six-year source, while the selection-form federal group labels
+state 2023. These publisher statements remain unresolved and do not establish a
+measurement period. Only colliding federal canonical names include the observed
+federal dictionary heading; the original labels, codes and contexts are retained.
+Publisher Length, units and reference periods remain unknown, field-specific
+masking applicability is unreviewed, and no value policy or estimation is applied.
+Source absence does not establish noncollection. These profiles preserve raw
+strings without activating a default reader, release or app enrichment.
