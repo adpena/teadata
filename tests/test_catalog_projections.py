@@ -18,7 +18,7 @@ import pytest
 from teadata.engine import DataEngine
 from teadata.manifest import ContractError, DatasetCatalog, canonical_json
 from teadata.release import SNAPSHOT_MAGIC
-from teadata.dataset_metadata import ArtifactRef, ColumnSchemaRef, DataPeriod, DatasetMetadata, EditionKey, EditionMetadataRef, ReferenceDocument, ResolvedDataset
+from teadata.dataset_metadata import ArtifactRef, ColumnSchemaRef, DataPeriod, DatasetMetadata, EditionKey, EditionMetadataRef, FieldBinding, ReferenceDocument, ResolvedDataset
 from teadata.manifest import BuildRecorder, file_identity
 from teadata.provenance import ProvenanceStore
 from teadata.teadata_config import Config
@@ -138,6 +138,11 @@ def test_projection_optimization_does_not_weaken_receipt_validation(selected_cat
 @pytest.fixture
 def edition_fixture(tmp_path):
     """Two tiny native leaves built from the ordinary recorder and crosswalk."""
+    return make_edition_fixture(tmp_path)
+
+
+def make_edition_fixture(tmp_path, *, extra_fields=0):
+    """The same tiny fixture, optionally widened without adding source rows."""
     import pyarrow as pa
     from teadata.analytical import write_leaf_artifact
     from teadata.column_schema import source_schema_fingerprint
@@ -147,16 +152,21 @@ def edition_fixture(tmp_path):
     for family in ("student", "staff"):
         dataset = "campus_" + family
         raw = tmp_path / (family + ".csv")
-        raw.write_text("ID,NAME,VALUE\n001,One,5\n")
+        extra_codes = [f"EXTRA{i:03d}" for i in range(extra_fields)]
+        extra_names = [f"extra_{i:03d}" for i in range(extra_fields)]
+        raw.write_text(",".join(["ID", "NAME", "VALUE", *extra_codes]) + "\n"
+                       + ",".join(["001", "One", "5", *["1"] * extra_fields]) + "\n")
         raw_sha = file_identity(raw)["sha256"]
         labels, codes = ["Campus ID", "Campus name", "Amount"], ["ID", "NAME", "VALUE"]
+        labels += [f"Extra {i:03d}" for i in range(extra_fields)]
+        codes += extra_codes
         fields = [{"position": index, "code": code, "label": label, "field": field,
                    "disposition": "identity" if index < 3 else "fact",
                    "publisher_type": None, "publisher_description": None,
                    "dictionary_status": "not_applicable" if index < 3 else "not_documented"}
                   for index, (code, label, field) in enumerate(zip(
                       codes, labels,
-                      ["campus_number", "campus_name", "amount"]), 1)]
+                      ["campus_number", "campus_name", "amount", *extra_names]), 1)]
         table = {"table": family, "input_sha256": raw_sha,
                  "source_schema_sha256": source_schema_fingerprint(labels, codes),
                  "fields": fields, "metric_period": {"kind": "unknown"}}
@@ -187,14 +197,16 @@ def edition_fixture(tmp_path):
         acquisition = store.record_acquisition(raw, source)
         key = EditionKey(dataset, "2025", EditionKey.source_revision((raw_sha,)), "campus", family, "one row per campus")
         native = pa.schema([pa.field("campus_number", pa.string(), nullable=False),
-                            pa.field("campus_name", pa.string()), pa.field("amount", pa.string())])
+                            pa.field("campus_name", pa.string()), pa.field("amount", pa.string()),
+                            *[pa.field(row["field"], pa.string()) for row in table["fields"][3:]]])
         recipe = {"operation": "tiny native fixture", "compression": "zstd"}
         toolchain = {"python": sys.version, "pyarrow": version("pyarrow")}
         contract = recorder.leaf_contract(key, source, native_schema=native.serialize().to_pybytes(),
             columns=native.names, key_columns=["campus_number"], rows=1, inputs=[raw_sha], recipe=recipe, toolchain=toolchain)
         leaf_id = sha256(canonical_json(contract).encode()).hexdigest()
         leaf = tmp_path / (family + ".parquet")
-        write_leaf_artifact(leaf, pa.Table.from_arrays([pa.array(["001"]), pa.array(["One"]), pa.array(["5"])],
+        write_leaf_artifact(leaf, pa.Table.from_arrays([pa.array(["001"]), pa.array(["One"]), pa.array(["5"]),
+            *[pa.array(["1"]) for _ in table["fields"][3:]]],
             schema=native).to_batches(), contract=contract)
         processing = store.record_processing(dataset=dataset, inputs=[acquisition], outputs={"leaf": leaf},
             processor="native-fixture", code_version=recorder.processor_sha256,
@@ -1640,3 +1652,111 @@ def test_v4_scalar_refusal_precedes_even_selected_child_io(edition_index_fixture
     monkeypatch.setattr(catalog, "_edition_metadata_loader", lambda *a: pytest.fail("Scalar API loaded child metadata"))
     with pytest.raises(ContractError, match="Schema4 scalar interpretation"):
         catalog.measure_field("amount", "5")
+
+
+@pytest.mark.parametrize("schema_version", [3, 4])
+def test_resolution_work_scales_with_fields_without_rewalking_or_contract_hashing(tmp_path, monkeypatch, schema_version):
+    fixture = make_edition_fixture(tmp_path, extra_fields=61)
+    catalog = fixture["catalog"] if schema_version == 3 else fixture["catalog"].externalize_editions()
+    key, _, _ = fixture["leaves"]["student"]
+    fields = [row["field"] for row in catalog.variables(edition=key)]
+    assert len(fields) == 64
+    view = catalog if schema_version == 3 else catalog._edition_view(key.identity)
+    counts = {name: 0 for name in ("view", "binding", "identity", "ensure", "column_comparisons")}
+    original_view, original_binding = catalog._edition_view, FieldBinding.from_dict
+    original_identity, original_ensure = ArtifactRef.identity.fget, view._ensure_edition
+
+    def select(identifier):
+        counts["view"] += 1
+        return original_view(identifier)
+
+    def bind(cls, raw):
+        counts["binding"] += 1
+        return original_binding(raw)
+
+    def identity(ref):
+        counts["identity"] += 1
+        return original_identity(ref)
+
+    def ensure(identifier):
+        counts["ensure"] += 1
+        return original_ensure(identifier)
+
+    class CountedColumn(str):
+        __hash__ = str.__hash__
+
+        def __eq__(self, other):
+            counts["column_comparisons"] += 1
+            return str.__eq__(self, other)
+
+    # Identical field strings instrument comparisons, without changing metadata
+    # bytes, descriptors, public values or any physical file.
+    for qualified, binding in list(view._field_bindings.items()):
+        view._field_bindings[qualified] = replace(binding, column=CountedColumn(binding.column))
+    monkeypatch.setattr(catalog, "_edition_view", select)
+    monkeypatch.setattr(FieldBinding, "from_dict", classmethod(bind))
+    monkeypatch.setattr(ArtifactRef, "identity", property(identity))
+    monkeypatch.setattr(view, "_ensure_edition", ensure)
+    for size in (1, 16, 64):
+        counts.update(dict.fromkeys(counts, 0))
+        result = catalog.resolve_artifacts((key, field) for field in fields[:size])
+        assert len(result) == 1 and result[0]["columns"] == tuple(dict.fromkeys(["campus_number", *fields[:size]]))
+        assert counts["view"] <= 1 and counts["ensure"] == 1
+        assert counts["binding"] <= 64 and counts["identity"] == 0
+        assert counts["column_comparisons"] <= 8 * size
+
+
+@pytest.mark.parametrize("schema_version", [3, 4])
+def test_resolution_preserves_interleaved_requests_dependency_and_column_order(edition_fixture, monkeypatch, schema_version):
+    document = edition_fixture["catalog"].to_dict()
+    student, student_ref, _ = edition_fixture["leaves"]["student"]
+    staff, staff_ref, _ = edition_fixture["leaves"]["staff"]
+    next(row for row in document["field_bindings"] if row["edition_id"] == student.identity and row["field"] == "amount")["dependencies"] = [[staff.identity, "amount"]]
+    catalog = rehash_catalog(document, edition_fixture["resources"])
+    if schema_version == 4:
+        catalog = catalog.externalize_editions()
+    before = catalog.to_dict()
+    requests = [(student, "campus_name"), (staff, "campus_name"), (student, "amount"), (staff, "amount"),
+                (student, "campus_number"), (student, "campus_name")]
+    monkeypatch.setattr(Path, "open", lambda *a, **k: pytest.fail("Metadata resolution opened a physical file"))
+    result = catalog.resolve_artifacts(iter(requests))
+    assert result == ({"artifact": student_ref, "columns": ("campus_number", "campus_name", "amount")},
+                      {"artifact": staff_ref, "columns": ("campus_number", "campus_name", "amount")})
+    # First discover the foreign edition through a different view, then use it
+    # as a dependency of the later edition without changing discovery order.
+    result = catalog.resolve_artifacts([(staff, "campus_name"), (student, "amount")])
+    assert result == ({"artifact": staff_ref, "columns": ("campus_number", "campus_name", "amount")},
+                      {"artifact": student_ref, "columns": ("campus_number", "amount")})
+    assert catalog.to_dict() == before  # No persistent ordering or acceptance cache.
+    assert catalog.resolve_artifacts([]) == ()
+    with pytest.raises(ContractError, match="Exact qualified field"):
+        catalog.resolve_artifacts([(replace(student, revision_sha256="f" * 64), "amount")])
+    with pytest.raises(ContractError, match="Exact qualified field"):
+        catalog.resolve_artifacts([(student, "missing")])
+    with pytest.raises(ContractError, match="period"):
+        catalog.resolve_artifacts([(student, "amount")], period=DataPeriod(kind="unknown"))
+
+
+@pytest.mark.parametrize("schema_version,resource", [(3, "schema"), (4, "schema"), (4, "child")])
+def test_resolution_rechecks_resources_changed_by_lazy_selection(edition_index_fixture, schema_version, resource):
+    from teadata.release import DataRelease
+    fixture = edition_index_fixture
+    catalog = fixture["legacy"] if schema_version == 3 else fixture["catalog"]
+    root = fixture["root"].with_name("selection-resource-check.json")
+    root.write_text(canonical_json({"schema_version": schema_version, "catalog": catalog.to_dict()}))
+    release = DataRelease(root, offline=True)
+    key, _, _ = fixture["leaves"]["student"]
+    if resource == "schema":
+        digest = fixture["legacy"].to_dict()["editions"][key.identity]["column_schema_sha256"]
+        path = root.with_name(digest + ".json")
+    else:
+        path = root.with_name(catalog.to_dict()["editions"][key.identity]["metadata"]["location"])
+
+    def selection():
+        yield key, "campus_name"
+        raw = path.read_bytes()
+        path.write_bytes(raw[:-1] + b"!")
+        yield key, "amount"
+
+    with pytest.raises(ContractError, match="checksum"):
+        release.catalog.resolve_artifacts(selection())

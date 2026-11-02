@@ -830,6 +830,17 @@ period requests fail before leaf opening. Policies remain scoped to their exact
 edition, even when historical policy names repeat. There are no policy aliases,
 implicit current-Config lookups or new scalar interpretation APIs.
 
+`resolve_artifacts()` shares dependency validation within each call and reuses
+each selected edition's validated view. One ordered walk preserves the original
+request/dependency discovery order, native key columns and duplicate elimination;
+membership sets avoid repeated scans of growing projections. It uses the already
+validated artifact IDs without rehashing full native contracts per field. This
+state is local to the call. Selected child/schema resources are still rechecked
+before returning, including when a lazy selection iterable changes a file during
+resolution. Catalog bytes, build IDs, pickle state and native data files are
+unchanged. This reduces metadata work; it establishes no measured latency, RSS
+or runtime resource qualification.
+
 Explicit migration is `schema3_catalog.externalize_editions()`; alternatively,
 `DatasetCatalog.create_editions(..., schema_version=4)` and
 `BuildRecorder.catalog(schema_version=4)` opt in after ordinary v3 validation.

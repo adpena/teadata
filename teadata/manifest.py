@@ -700,16 +700,20 @@ class DatasetCatalog:
         except (KeyError, TypeError, ValueError) as error:
             raise ContractError(f"Invalid selected edition crosswalk: {error}") from error
 
-    def _ensure_field_dependencies(self, fields: Iterable[tuple[str, str]]) -> None:
-        visited: set[tuple[str, str]] = set()
-        editions: set[str] = set()
+    def _ensure_field_dependencies(self, fields: Iterable[tuple[str, str]], *,
+                                   catalog_for: Callable[[str], DatasetCatalog] | None = None,
+                                   visited: set[tuple[str, str]] | None = None,
+                                   editions: set[str] | None = None) -> None:
+        visited = set() if visited is None else visited
+        editions = set() if editions is None else editions
         def visit(qualified: tuple[str, str]) -> None:
             if qualified not in visited:
                 visited.add(qualified)
+                catalog = self if catalog_for is None else catalog_for(qualified[0])
                 if qualified[0] not in editions:
-                    self._ensure_edition(qualified[0])
+                    catalog._ensure_edition(qualified[0])
                     editions.add(qualified[0])
-                for dependency in self._field_bindings[qualified].dependencies:
+                for dependency in catalog._field_bindings[qualified].dependencies:
                     visit(dependency)
         for qualified in fields:
             visit(qualified)
@@ -796,44 +800,68 @@ class DatasetCatalog:
     def resolve_artifacts(self, fields: Iterable[tuple[EditionKey, str]], *, period: DataPeriod | None = None) -> tuple[dict[str, Any], ...]:
         """Resolve exact fields/dependencies; only selected metadata may need I/O."""
         self._require_index()
-        if getattr(self, "_v4", False):
-            selected = {}
-            for key, field in fields:
-                if self._edition_keys.get(key.identity) != key:
-                    raise ContractError("Exact qualified field unavailable")
-                for row in self._edition_view(key.identity).resolve_artifacts([(key, field)], period=period):
-                    ref = row["artifact"]
-                    projection = selected.setdefault(ref.identity, {"artifact": ref, "columns": []})
-                    for column in row["columns"]:
-                        if column not in projection["columns"]:
-                            projection["columns"].append(column)
-            return tuple({"artifact": row["artifact"], "columns": tuple(row["columns"])} for row in selected.values())
         columns: dict[str, list[str]] = {}
+        column_sets: dict[str, set[str]] = {}
+        artifacts: dict[str, ArtifactRef] = {}
         visited: set[tuple[str, str]] = set()
+        validated_fields: set[tuple[str, str]] = set()
+        validated_editions: set[str] = set()
+        catalogs: dict[str, DatasetCatalog] = {}
+
+        def catalog_for(identifier: str) -> DatasetCatalog:
+            if not getattr(self, "_v4", False):
+                return self
+            if identifier not in catalogs:
+                view = self._edition_view(identifier)
+                for selected in view._edition_keys:
+                    catalogs.setdefault(selected, view)
+            return catalogs[identifier]
 
         def visit(qualified: tuple[str, str]) -> None:
             if qualified in visited:
                 return
             visited.add(qualified)
             try:
-                binding = self._field_bindings[qualified]
+                catalog = catalog_for(qualified[0])
+                binding = catalog._field_bindings[qualified]
             except KeyError as error:
                 raise ContractError("Qualified field unavailable") from error
-            projection = columns.setdefault(binding.artifact_id, list(self._artifact_keys[binding.artifact_id]))
-            if binding.column not in projection:
-                projection.append(binding.column)
+            identifier = binding.artifact_id
+            if identifier not in columns:
+                artifacts[identifier] = catalog._artifact_refs[identifier]
+                columns[identifier] = list(catalog._artifact_keys[identifier])
+                column_sets[identifier] = set(columns[identifier])
+            if binding.column not in column_sets[identifier]:
+                columns[identifier].append(binding.column)
+                column_sets[identifier].add(binding.column)
             for dependency in binding.dependencies:
                 visit(dependency)
         for key, field in fields:
             qualified = key.identity, field
-            if self._edition_keys.get(key.identity) != key or qualified not in self._field_bindings:
+            if self._edition_keys.get(key.identity) != key:
                 raise ContractError("Exact qualified field unavailable")
-            self._ensure_field_dependencies([qualified])
-            actual_period = DataPeriod.from_dict(self._field_headers[qualified]["period"])
+            catalog = catalog_for(qualified[0])
+            if qualified not in catalog._field_bindings:
+                raise ContractError("Exact qualified field unavailable")
+            self._ensure_field_dependencies([qualified], catalog_for=catalog_for,
+                                            visited=validated_fields, editions=validated_editions)
+            actual_period = DataPeriod.from_dict(catalog._field_headers[qualified]["period"])
             if period is not None and (period.kind == "unknown" or actual_period != period):
                 raise ContractError("Requested reference period is unsupported")
             visit(qualified)
-        return tuple({"artifact": self._artifact_refs[identifier], "columns": tuple(selected)}
+        # Keep revalidation per operation: even a lazy input iterable may change
+        # a resource between requested fields. Recheck bytes/stat, not the graph.
+        for identifier in catalogs:
+            self.edition_metadata_bytes(identifier)
+        checked_schemas: set[ColumnSchemaRef] = set()
+        for identifier in validated_editions:
+            catalog = catalog_for(identifier)
+            digest = catalog._edition_entries[identifier]["column_schema_sha256"]
+            descriptor = catalog._column_schema_refs[digest]
+            if descriptor not in checked_schemas:
+                catalog.column_schema_bytes(digest)
+                checked_schemas.add(descriptor)
+        return tuple({"artifact": artifacts[identifier], "columns": tuple(selected)}
                      for identifier, selected in columns.items())
 
     @classmethod
