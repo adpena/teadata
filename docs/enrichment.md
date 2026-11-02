@@ -44,7 +44,7 @@ outcome = stats["campus_accountability"]["outcome"]
 print(outcome["status"], outcome["matched"], outcome["unmatched"])
 ```
 
-The campus/district table joins report `expected` repository objects visited,
+The campus/district table joins report `expected` eligible repository objects,
 `matched` objects receiving a source row, `unmatched` objects with a usable
 identifier but no matching row, and `missing_identifier` objects that cannot be
 joined. They also retain the requested/resolved catalog years and observed
@@ -53,12 +53,21 @@ population, proof that every source row was used, or validation of every field.
 An unmatched object does not imply a zero, inapplicability, or a publisher error.
 Numeric zero and negative source tokens retain their original values and policies.
 
-Statuses distinguish `succeeded`, `partial`, `unmatched`, `unsupported`, and
+Campus-number joins exclude explicitly private campuses from the eligible
+population and count them separately as `not_applicable`, not as missing public
+identifiers. Public objects without a usable identifier remain
+`missing_identifier`; no identifier or population is inferred from an opaque
+source ID. A completed campus join reports `not_applicable=0` when none were
+excluded; enrichers that do not observe this dimension retain `None`.
+
+Statuses distinguish `succeeded`, `partial`, `unmatched`, `not_applicable`, `unsupported`, and
 `failed`. Missing source files are labelled `source_status="missing"`; a loaded
 zero-row table is `empty`. A registered legacy enricher that returns only an
 update count has unknown (`None`) coverage counts, even when it succeeds.
 Unknown source availability remains `unknown`. Error text is limited to 4,096
 characters, with `error_truncated=True` when shortened. Interrupts still propagate.
+An optional all-private campus join reports `not_applicable` with zero eligible
+objects. Required enrichments still reject zero matches, including this case.
 
 Outcomes remain on the engine and are copied into the existing release processing
 record's `validation.enrichment_outcomes`. Required enrichments still raise on

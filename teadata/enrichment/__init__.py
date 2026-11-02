@@ -11,7 +11,7 @@ class EnrichmentOutcome:
 
     dataset: str
     requested_year: int | None
-    status: Literal["succeeded", "partial", "unmatched", "unsupported", "failed"]
+    status: Literal["succeeded", "partial", "unmatched", "not_applicable", "unsupported", "failed"]
     scope: str | None = None
     required: bool = False
     resolved_year: int | None = None
@@ -19,6 +19,7 @@ class EnrichmentOutcome:
     matched: int | None = None
     unmatched: int | None = None
     missing_identifier: int | None = None
+    not_applicable: int | None = None
     source_rows: int | None = None
     source_status: Literal["available", "empty", "missing", "unknown"] = "unknown"
     updated: int | None = None
@@ -39,13 +40,15 @@ def _record_outcome(repo, outcome: EnrichmentOutcome) -> dict[str, Any]:
 
 
 def _record_matches(repo, dataset, year, resolved_year, scope, *, matched,
-                    unmatched, missing_identifier, source_rows):
+                    unmatched, missing_identifier, source_rows, not_applicable=None):
     """Retain the exact counters observed by an entity-join loop."""
     return _record_outcome(repo, EnrichmentOutcome(
         dataset=dataset, requested_year=year, resolved_year=resolved_year, scope=scope,
-        status=("partial" if unmatched or missing_identifier else "succeeded") if matched else "unmatched",
+        status=(("partial" if unmatched or missing_identifier else "succeeded") if matched else
+                "not_applicable" if not_applicable and not (unmatched or missing_identifier) else "unmatched"),
         expected=matched + unmatched + missing_identifier,
         matched=matched, unmatched=unmatched, missing_identifier=missing_identifier,
+        not_applicable=not_applicable,
         source_rows=source_rows, source_status="available" if source_rows else "empty",
         updated=matched,
     ))

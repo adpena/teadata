@@ -34,6 +34,7 @@ def test_optional_failures_and_unsupported_selections_are_not_dropped(monkeypatc
     assert stats["legacy"]["outcome"]["matched"] is None
     assert stats["legacy"]["outcome"]["expected"] is None
     assert stats["legacy"]["outcome"]["unmatched"] is None
+    assert stats["legacy"]["outcome"]["not_applicable"] is None
     validation = load_data._release_validation(repo)
     assert validation["enrichment_outcomes"] == [value["outcome"] for value in stats.values()]
     assert validation["quality_status"] == "needs_review"
@@ -71,6 +72,7 @@ def test_real_join_counts_preserve_zero_negative_and_absent_rows(tmp_path, scope
     outcome, = repo._enrichment_outcomes
     assert outcome["requested_year"] == 2026 and outcome["resolved_year"] == 2025
     assert outcome["expected"] == 4 and outcome["missing_identifier"] == 1
+    assert outcome["not_applicable"] == (0 if scope == "campus" else None)
     assert outcome["matched"] == (0 if empty else 2)
     assert outcome["unmatched"] == (3 if empty else 1)
     assert outcome["source_rows"] == (0 if empty else 2)
@@ -80,6 +82,59 @@ def test_real_join_counts_preserve_zero_negative_and_absent_rows(tmp_path, scope
         assert entities[0].meta["value"] == 0
         assert entities[1].meta["value"] == -999
     assert "value" not in entities[2].meta
+
+
+@pytest.mark.parametrize("dataset", ["campus_tapr_student_staff_profile", "campus_peims_financials"])
+@pytest.mark.parametrize("all_private", [False, True])
+def test_campus_joins_separate_private_population_from_public_coverage(tmp_path, monkeypatch, dataset, all_private):
+    columns = campuses.DEFAULT_PEIMS_FINANCIAL_COLUMNS if dataset == "campus_peims_financials" else ["value"]
+    path = tmp_path / "campuses.csv"
+    path.write_text(
+        ",".join(["campus_number", *columns]) + "\n"
+        + "001902001," + ",".join("0" for _ in columns) + "\n"
+        + "001902002," + ",".join("-999" for _ in columns) + "\n"
+    )
+    cfg_path = tmp_path / "sources.yaml"
+    cfg_path.write_text(yaml.safe_dump({"data_sources": {dataset: {2025: str(path)}}}))
+    private = SimpleNamespace(campus_number=None, is_private=True, source_namespace="tefa",
+                              source_id="opaque-private", meta={"private_token": 19})
+    public = [SimpleNamespace(campus_number=number, is_private=False, meta={})
+              for number in ("001902001", "001902002", "001902003", None)]
+    repo = SimpleNamespace(_campuses=dict(enumerate([private] if all_private else [*public, private])))
+    result = enrichment.run_enrichment(repo, str(cfg_path), 2025, datasets=[dataset])[dataset]
+    outcome = result["outcome"]
+    assert outcome["not_applicable"] == 1
+    assert outcome["expected"] == (0 if all_private else 4)
+    assert outcome["matched"] == result["updated"] == (0 if all_private else 2)
+    assert outcome["unmatched"] == outcome["missing_identifier"] == (0 if all_private else 1)
+    assert outcome["status"] == ("not_applicable" if all_private else "partial")
+    assert outcome["source_rows"] == 2
+    assert private.meta == {"private_token": 19}
+    if not all_private:
+        assert public[0].meta[columns[0]] == 0 and public[1].meta[columns[0]] == -999
+        assert public[2].meta == public[3].meta == {}
+        return
+
+    # Optional population exclusion cannot bypass the required zero-match gate.
+    def apply(repo, config, name, year, **kwargs):
+        if name == dataset:
+            result = enrichment._registry[dataset].apply(repo, config, year)
+            return result["year"], result["updated"]
+        return 2025, 1
+
+    monkeypatch.setattr(load_data, "CFG", str(cfg_path))
+    monkeypatch.setattr(load_data, "YEAR", 2025)
+    monkeypatch.setattr(load_data, "load_config", lambda _: SimpleNamespace(
+        load_df=lambda *a: (2025, pd.DataFrame()), value_policies={"campus_transfers": None},
+    ))
+    monkeypatch.setattr(load_data, "enrich_districts_from_config", apply)
+    monkeypatch.setattr(load_data, "enrich_campuses_from_config", apply)
+    required = SimpleNamespace(_campuses={0: private}, apply_transfers_from_dataframe=lambda *a, **k: 1)
+    with pytest.raises(ContractError, match="No campus records matched"):
+        load_data.run_enrichments(required)
+    failure = required._enrichment_outcomes[-1]
+    assert failure["status"] == "failed" and failure["required"]
+    assert failure["not_applicable"] == 1 and failure["missing_identifier"] == 0
 
 
 @pytest.mark.parametrize("dataset,scope", [

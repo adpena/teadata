@@ -188,8 +188,12 @@ def _apply_campus_enrichment_table(
     updated = 0
     missing_no_number = 0
     missing_no_match = 0
+    not_applicable = 0
     sample_missing: list[str] = []
     for cobj in repo._campuses.values():
+        if getattr(cobj, "is_private", False):
+            not_applicable += 1
+            continue
         cn = getattr(cobj, "campus_number", None)
         if not cn:
             missing_no_number += 1
@@ -237,7 +241,8 @@ def _apply_campus_enrichment_table(
 
     _record_matches(repo, dataset, year, resolved_year, "campus",
                     matched=updated, unmatched=missing_no_match,
-                    missing_identifier=missing_no_number, source_rows=source_rows)
+                    missing_identifier=missing_no_number, source_rows=source_rows,
+                    not_applicable=not_applicable)
     return resolved_year, updated
 
 
@@ -322,8 +327,12 @@ def _apply_campus_peims_financials(
     updated = 0
     missing_no_number = 0
     missing_no_match = 0
+    not_applicable = 0
     sample_missing: list[str] = []
     for campus in repo._campuses.values():
+        if getattr(campus, "is_private", False):
+            not_applicable += 1
+            continue
         cn = getattr(campus, "campus_number", None)
         if not cn:
             missing_no_number += 1
@@ -361,7 +370,8 @@ def _apply_campus_peims_financials(
 
     _record_matches(repo, dataset, year, resolved_year, "campus",
                     matched=updated, unmatched=missing_no_match,
-                    missing_identifier=missing_no_number, source_rows=source_rows)
+                    missing_identifier=missing_no_number, source_rows=source_rows,
+                    not_applicable=not_applicable)
     return resolved_year, updated
 
 
