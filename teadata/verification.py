@@ -618,12 +618,105 @@ def _validate_release_provenance(release: DataRelease) -> int:
         raise ReceiptError(f"Release provenance record graph is incomplete or invalid: {error}") from error
 
 
+def _validate_tefa_cases(release: DataRelease) -> dict[str, Any]:
+    """Check the acquired official listing snapshot, not the legacy workbook."""
+    from importlib.resources import files
+    from types import SimpleNamespace
+
+    from teadata.entity_store import EntityStore
+    from teadata.provenance import validate_record_graph
+
+    reference = json.loads(files("teadata").joinpath("reference_cases/tefa_2026_27.json").read_text())
+    document = release.catalog.to_dict()
+    source = document.get("datasets", {}).get("tefa")
+    if source is None:
+        if any(entry.get("key", {}).get("dataset") == "tefa" for entry in document.get("editions", {}).values()):
+            raise ReceiptError("TEFA private source edition lacks this reviewed scalar acceptance contract")
+        return {"status": "not_present", "cases": 0,
+                "uncovered": ["No TEFA dataset; private listing acceptance was not checked."]}
+    expected = reference["source"]
+    metadata = source["metadata"]
+    source_fields = {"status": "loaded", "section": "data_sources", "resolved_year": expected["resolved_year"]}
+    metadata_fields = {key: expected[key] for key in ("publisher", "source_url", "version", "period")}
+    metadata_fields.update(download_url=expected["request_url"], identifiers=["tefa_listing_id"])
+    if (any(source.get(key) != value for key, value in source_fields.items())
+            or source.get("requested_year") not in (None, expected["requested_year"])
+            or any(metadata.get(key) != value for key, value in metadata_fields.items())
+            or any(source.get("artifact", {}).get(key) != value for key, value in expected["artifact"].items())):
+        raise ReceiptError("TEFA private source metadata or artifact differs from the reviewed official snapshot")
+    reads = source.get("reads", [])
+    if (source.get("reader", {}).get("columns") != reference["reader_columns"] or not reads
+            or any(read.get("columns") != list(reference["reader_columns"]) for read in reads)
+            or not any(item.get("role") == "schema" and item.get("status") == "available"
+                       and item.get("reviewed_sha256") == expected["column_schema_sha256"]
+                       for item in metadata.get("references", []))):
+        raise ReceiptError("TEFA private source reader/schema differs from the reviewed 16-field contract")
+    try:
+        records = document["provenance"]
+        closure = validate_record_graph(records.__getitem__, metadata["provenance_ids"])
+        observation = closure[expected["acquisition_record_id"]]
+    except (KeyError, TypeError, ValueError) as error:
+        raise ReceiptError("TEFA private source lacks its verified official HTTP acquisition") from error
+    http_fields = {"kind": "acquisition", "method": "download", "dataset": "tefa", "section": "data_sources",
+                   "requested_year": expected["requested_year"], "resolved_year": expected["resolved_year"],
+                   "requested_url": expected["request_url"], "resolved_url": expected["request_url"]}
+    parameters = {"http_method": expected["http_method"], "http_status": 200,
+                  "form_url": expected["form_url"], "form_controls": expected["form_controls"]}
+    if (any(observation.get(key) != value for key, value in http_fields.items())
+            or any(observation.get("parameters", {}).get(key) != value for key, value in parameters.items())
+            or any(observation.get("artifact", {}).get(key) != value for key, value in expected["artifact"].items())):
+        raise ReceiptError("TEFA private source HTTP acquisition binding differs")
+
+    raw_fields = measurements = 0
+    entity_ids = set()
+    with EntityStore(release.artifact("entities"), immutable=True) as store:
+        for case in reference["cases"]:
+            projected, raw = case["expected"], case["raw"]
+            record = store.get_campus(projected["lookup_key"], include_meta=True, cache=False)
+            if record is None:
+                raise ReceiptError(f"TEFA private case is absent: {case['case_id']}")
+            core = {key: projected[key] for key in ("lookup_key", "source_namespace", "source_id", "name", "grade_range", "lat", "lon")}
+            core.update(source_build_id=release.build_id, is_private=True, is_charter=False,
+                        campus_number=None, campus_number_canon=None, district_id=None, district_name=None,
+                        district_number=None, district_number_canon=None, enrollment=None, rating=None)
+            for key, value in core.items():
+                if record.get(key) != value or type(record.get(key)) is not type(value):
+                    raise ReceiptError(f"TEFA private {case['case_id']} core {key} differs")
+            identity = record.get("id")
+            if not isinstance(identity, str) or not identity or identity in entity_ids:
+                raise ReceiptError(f"TEFA private {case['case_id']} stored identity is missing or collapsed")
+            entity_ids.add(identity)
+            meta = record.get("meta", {})
+            for field, original in reference["reader_columns"].items():
+                if field not in meta or _canonical(meta[field]) != _canonical(raw[original]):
+                    raise ReceiptError(f"TEFA private {case['case_id']} raw field {field} differs")
+                raw_fields += 1
+            derived = {key: projected[key] for key in ("private_listing_location_status", "private_listing_grade_status", "school_full_address")}
+            derived.update(private_source_dataset="tefa", private_source_version=expected["version"],
+                           school_website=raw["website"], display_grade_range=raw["displayGradeRange"])
+            for key, value in derived.items():
+                if key not in meta or _canonical(meta[key]) != _canonical(value):
+                    raise ReceiptError(f"TEFA private {case['case_id']} presentation {key} differs")
+            for metric, dataset in reference["private_metrics"].items():
+                value = release.catalog.measurement(SimpleNamespace(**record), metric, scope="campus")
+                origin = value.source or {}
+                if (value.status.value != "not_applicable" or value.value is not None or value.raw is not None
+                        or value.reason != "outside_metric_population" or origin.get("build_id") != release.build_id
+                        or origin.get("dataset") != dataset):
+                    raise ReceiptError(f"TEFA private {case['case_id']} public metric {metric} is not release-bound N/A")
+                measurements += 1
+    return {"status": "checked", "cases": len(reference["cases"]), "raw_fields": raw_fields,
+            "private_measurements": measurements, "source_acquisition": expected["acquisition_record_id"],
+            "uncovered": reference["limits"]}
+
+
 def _validate_release(path: str, kind: str) -> None:
     from teadata.release import DataRelease
     release = DataRelease(Path(path).expanduser())
     provenance_records = _validate_release_provenance(release)
     release.verify()
     publisher_checks = _validate_publisher_cases(release)
+    private_checks = _validate_tefa_cases(release)
     if kind == "library":
         from teadata.manifest import processor_identity
         if release.catalog.to_dict()["processor_sha256"] != processor_identity():
@@ -631,6 +724,7 @@ def _validate_release(path: str, kind: str) -> None:
     print(f"Verified data release {release.build_id}")
     print(f"Verified provenance record graph: {provenance_records} records")
     print("Publisher example coverage: " + json.dumps(publisher_checks, sort_keys=True))
+    print("TEFA private example coverage: " + json.dumps(private_checks, sort_keys=True))
 
 
 def main() -> None:

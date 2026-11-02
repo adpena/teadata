@@ -31,6 +31,44 @@ Catalog schema 2 stores `metric_bindings` with the release: canonical names and 
 
 Canonical public enrollment uses the TAPR student enrollment field for both campuses and districts. The accountability report's Number of Students is a separate `accountability.student_count` population and must not replace enrollment. Public-source metrics are not applicable to private schools. A metric without its own period inherits the dataset period; an explicitly unknown period stays unknown.
 
+## Private school-finder listings
+
+The private producer selects the latest curated `tefa` edition independently of
+the public build year. Catalog key `2027` identifies the official Comptroller
+school-finder snapshot for the stated 2026–27 program school year. It includes
+only records explicitly tagged `Schools`, `Private School`, and `EFA-Eligible`;
+these are directory listings, including pre-K and online providers. They do not
+establish one listing per physical campus, all Texas private schools, actual
+student enrollment, payments, approval dates, or governing public districts.
+The snapshot's actual download time is retained separately from unknown
+publisher publication/revision dates, upstream as-of time, and reuse license.
+
+One `reader.columns` contract preserves all 16 publisher fields under
+`tefa_listing_*` names, including original arrays, nested objects, nulls, and
+coordinate values. Exact source IDs and names also project into the existing
+`Campus.source_id` and `Campus.name` attributes; the latter uses the model's
+existing uppercase presentation normalization. The namespaced source name
+retains its original case. IDs remain opaque and
+case-sensitive in the `tefa` namespace; matching names or addresses do not merge
+listings or prove continuity with older identifiers. Common address, website,
+and display-grade presentation fields derive only from those source fields.
+
+An online-only listing has no physical map point even when the source supplies
+coordinates. Local-capable listings use valid supplied coordinates without
+geocoding, axis swapping, or sign repair. A Texas address with nonnegative
+longitude or nonpositive latitude is quarantined from mapping; its raw
+coordinates remain available. Missing, online-only, invalid, and unverified
+source-provided points have distinct `private_listing_location_status` values.
+Unrecognized or reversed display-grade ranges remain unknown in `grade_range`,
+with the original label and `private_listing_grade_status` retained. Private
+listings remain outside public TAPR, accountability, and finance populations.
+
+The legacy `2025` spreadsheet remains accessible only through its explicit
+`source` reader profile for historical research. Its original acquisition URL,
+download date, and reference period remain unknown. It is not a fallback for the
+official roster and is not retroactively attributed to the Comptroller. Older
+released catalogs retain their original source contract and identities.
+
 ## Arrow analytical datasets
 
 New schema-2 releases materialize the canonical scalar catalog once, from the

@@ -1,0 +1,724 @@
+{
+  "schema_version": 1,
+  "dataset": "tefa",
+  "source": {
+    "publisher": "Texas Comptroller of Public Accounts",
+    "source_url": "https://finder.educationfreedom.texas.gov/",
+    "request_url": "https://finder.educationfreedom.texas.gov/api/vendors?t=schools",
+    "http_method": "GET",
+    "form_url": "https://finder.educationfreedom.texas.gov/api/vendors",
+    "form_controls": [
+      [
+        "t",
+        "schools"
+      ]
+    ],
+    "requested_year": 2027,
+    "resolved_year": 2027,
+    "version": "2026-27",
+    "period": {
+      "kind": "school_year",
+      "start_year": 2026,
+      "end_year": 2027
+    },
+    "acquisition_record_id": "6b53456102ae184d2b62a5442fcfee9234c66e7332c2a634ec8325a355be1674",
+    "artifact": {
+      "sha256": "6e899a89ebc03471728b8d7405f3692c9168a0e390abe1e7aa25f260f74bb111",
+      "size_bytes": 1888393
+    },
+    "column_schema_sha256": "ebc93b14c7034a7f0488356f5f421c2ca70f247be3a7a5e44cab30e51f92f563"
+  },
+  "reader_columns": {
+    "tefa_listing_id": "id",
+    "tefa_listing_name": "name",
+    "tefa_listing_description": "description",
+    "tefa_listing_pdses_status": "pdsesStatus",
+    "tefa_listing_direct_pay_marketplace": "directPayMarketplace",
+    "tefa_listing_service_type": "serviceType",
+    "tefa_listing_specialties": "specialties",
+    "tefa_listing_website": "website",
+    "tefa_listing_cost_options": "costOptions",
+    "tefa_listing_type": "type",
+    "tefa_listing_display_grade_range": "displayGradeRange",
+    "tefa_listing_address": "address",
+    "tefa_listing_location": "location",
+    "tefa_listing_vendor_types": "vendorTypes",
+    "tefa_listing_vendor_type": "vendorType",
+    "tefa_listing_distance_mi": "distance_mi"
+  },
+  "private_metrics": {
+    "enrollment": "campus_tapr_student_staff_profile",
+    "overall_rating": "accountability",
+    "tapr.student_enrollment_asian_count": "campus_tapr_student_staff_profile",
+    "tapr.student_membership_asian_count": "campus_tapr_student_staff_profile"
+  },
+  "cases": [
+    {
+      "case_id": "pre-k-local",
+      "source_array_index_0_based": 0,
+      "raw": {
+        "id": "qdgEKylWUBk0u6",
+        "name": "Firm Foundation Early Learning Center",
+        "description": "Firm Foundation Early Learning Center stands as a beacon of hope, growth, and unwavering support for families seeking an environme",
+        "pdsesStatus": null,
+        "directPayMarketplace": null,
+        "serviceType": [
+          "local"
+        ],
+        "specialties": {
+          "enrichment": [],
+          "therapy": [],
+          "supplies": [],
+          "curriculum": [],
+          "classes": [],
+          "tutoring": []
+        },
+        "website": "https://www.ffelc1.com",
+        "costOptions": "EFA-Eligible",
+        "type": "Private School",
+        "displayGradeRange": "Grades PreK–PreK",
+        "address": {
+          "street": "1013 Cherry Blossom St",
+          "city": "ANNA",
+          "state": "TX",
+          "zipcode": "75409-4684",
+          "county": "Collin County",
+          "region": "Dallas-Fort Worth"
+        },
+        "location": {
+          "lat": 33.32362080000001,
+          "lng": -96.5663624
+        },
+        "vendorTypes": [
+          "Schools"
+        ],
+        "vendorType": "Schools",
+        "distance_mi": 0
+      },
+      "expected": {
+        "lookup_key": "tefa:qdgEKylWUBk0u6",
+        "source_namespace": "tefa",
+        "source_id": "qdgEKylWUBk0u6",
+        "grade_range": "Pre-K",
+        "lat": 33.32362080000001,
+        "lon": -96.5663624,
+        "private_listing_location_status": "source_provided_unverified",
+        "private_listing_grade_status": "source_provided",
+        "school_full_address": "1013 Cherry Blossom St, ANNA, TX 75409-4684",
+        "name": "FIRM FOUNDATION EARLY LEARNING CENTER"
+      }
+    },
+    {
+      "case_id": "mixed-local-online",
+      "source_array_index_0_based": 23,
+      "raw": {
+        "id": "38hyXwdxwyJqgX",
+        "name": "American Leadership Academy - Tx",
+        "description": "ALA delivers quality academics, character building and leadership development to students as global citizens.\n\nALA is committed to",
+        "pdsesStatus": null,
+        "directPayMarketplace": null,
+        "serviceType": [
+          "local",
+          "online"
+        ],
+        "specialties": {
+          "enrichment": [],
+          "therapy": [],
+          "supplies": [],
+          "curriculum": [],
+          "classes": [],
+          "tutoring": []
+        },
+        "website": "https://ala-schools.us",
+        "costOptions": "EFA-Eligible",
+        "type": "Private School",
+        "displayGradeRange": "Grades PreK–12",
+        "address": {
+          "street": "909 Allen Central Dr",
+          "city": "Allen",
+          "state": "TX",
+          "zipcode": "75013",
+          "county": "Collin County",
+          "region": "Dallas-Fort Worth"
+        },
+        "location": {
+          "lat": 33.0970533,
+          "lng": -96.6836411
+        },
+        "vendorTypes": [
+          "Schools"
+        ],
+        "vendorType": "Schools",
+        "distance_mi": 0
+      },
+      "expected": {
+        "lookup_key": "tefa:38hyXwdxwyJqgX",
+        "source_namespace": "tefa",
+        "source_id": "38hyXwdxwyJqgX",
+        "grade_range": "Pre-K-12",
+        "lat": 33.0970533,
+        "lon": -96.6836411,
+        "private_listing_location_status": "source_provided_unverified",
+        "private_listing_grade_status": "source_provided",
+        "school_full_address": "909 Allen Central Dr, Allen, TX 75013",
+        "name": "AMERICAN LEADERSHIP ACADEMY - TX"
+      }
+    },
+    {
+      "case_id": "online-office-not-instruction-pin",
+      "source_array_index_0_based": 24,
+      "raw": {
+        "id": "7EH0FnFFCKT4bl",
+        "name": "Academy Of Business And Innovation",
+        "description": "The Academy of Business and Innovation is a business-focused high school designed for students who are ready to build leadership, ",
+        "pdsesStatus": null,
+        "directPayMarketplace": null,
+        "serviceType": [
+          "online"
+        ],
+        "specialties": {
+          "enrichment": [],
+          "therapy": [],
+          "supplies": [],
+          "curriculum": [],
+          "classes": [],
+          "tutoring": []
+        },
+        "website": "https://abiacademy.org",
+        "costOptions": "EFA-Eligible",
+        "type": "Private School",
+        "displayGradeRange": "Grades 9–12",
+        "address": {
+          "street": "206 High Meadow Dr",
+          "city": "Allen",
+          "state": "TX",
+          "zipcode": "75072",
+          "county": "Collin County",
+          "region": "Dallas-Fort Worth"
+        },
+        "location": {
+          "lat": 33.1974054,
+          "lng": -96.6528902
+        },
+        "vendorTypes": [
+          "Schools"
+        ],
+        "vendorType": "Schools",
+        "distance_mi": 0
+      },
+      "expected": {
+        "lookup_key": "tefa:7EH0FnFFCKT4bl",
+        "source_namespace": "tefa",
+        "source_id": "7EH0FnFFCKT4bl",
+        "grade_range": "9-12",
+        "lat": null,
+        "lon": null,
+        "private_listing_location_status": "online_only",
+        "private_listing_grade_status": "source_provided",
+        "school_full_address": "206 High Meadow Dr, Allen, TX 75072",
+        "name": "ACADEMY OF BUSINESS AND INNOVATION"
+      }
+    },
+    {
+      "case_id": "reverse-service-order-schelastic",
+      "source_array_index_0_based": 84,
+      "raw": {
+        "id": "M0tA4gdiaMrEhd",
+        "name": "Schelastic Academy",
+        "description": "Schelastic Academy is a faith-based private school in Arlington, Texas serving students in grades 6–12. Our program uses a self-pa",
+        "pdsesStatus": null,
+        "directPayMarketplace": null,
+        "serviceType": [
+          "online",
+          "local"
+        ],
+        "specialties": {
+          "enrichment": [],
+          "therapy": [],
+          "supplies": [],
+          "curriculum": [],
+          "classes": [],
+          "tutoring": []
+        },
+        "website": "https://www.schelastic.com",
+        "costOptions": "EFA-Eligible",
+        "type": "Private School",
+        "displayGradeRange": "Grades 6–12",
+        "address": {
+          "street": "5732 W Interstate 20",
+          "city": "Arlington",
+          "state": "TX",
+          "zipcode": "76017",
+          "county": "Tarrant County",
+          "region": "Dallas-Fort Worth"
+        },
+        "location": {
+          "lat": 32.6738084,
+          "lng": -97.1955321
+        },
+        "vendorTypes": [
+          "Schools"
+        ],
+        "vendorType": "Schools",
+        "distance_mi": 0
+      },
+      "expected": {
+        "lookup_key": "tefa:M0tA4gdiaMrEhd",
+        "source_namespace": "tefa",
+        "source_id": "M0tA4gdiaMrEhd",
+        "grade_range": "6-12",
+        "lat": 32.6738084,
+        "lon": -97.1955321,
+        "private_listing_location_status": "source_provided_unverified",
+        "private_listing_grade_status": "source_provided",
+        "school_full_address": "5732 W Interstate 20, Arlington, TX 76017",
+        "name": "SCHELASTIC ACADEMY"
+      }
+    },
+    {
+      "case_id": "missing-source-location",
+      "source_array_index_0_based": 264,
+      "raw": {
+        "id": "m3dnV0ENXzzNKH",
+        "name": "Cornerstone Christian Academy",
+        "description": "",
+        "pdsesStatus": null,
+        "directPayMarketplace": null,
+        "serviceType": [
+          "local"
+        ],
+        "specialties": {
+          "enrichment": [],
+          "therapy": [],
+          "supplies": [],
+          "curriculum": [],
+          "classes": [],
+          "tutoring": []
+        },
+        "website": null,
+        "costOptions": "EFA-Eligible",
+        "type": "Private School",
+        "displayGradeRange": "Grades PreK–3",
+        "address": {
+          "street": "P O Box 1203",
+          "city": "Bastrop",
+          "state": "TX",
+          "zipcode": "78602"
+        },
+        "location": null,
+        "vendorTypes": [
+          "Schools"
+        ],
+        "vendorType": "Schools",
+        "distance_mi": 0
+      },
+      "expected": {
+        "lookup_key": "tefa:m3dnV0ENXzzNKH",
+        "source_namespace": "tefa",
+        "source_id": "m3dnV0ENXzzNKH",
+        "grade_range": "Pre-K-3",
+        "lat": null,
+        "lon": null,
+        "private_listing_location_status": "missing",
+        "private_listing_grade_status": "source_provided",
+        "school_full_address": "P O Box 1203, Bastrop, TX 78602",
+        "name": "CORNERSTONE CHRISTIAN ACADEMY"
+      }
+    },
+    {
+      "case_id": "inconsistent-grade-sunrise",
+      "source_array_index_0_based": 859,
+      "raw": {
+        "id": "Nfz81oSdXU5EUb",
+        "name": "Sunrise Early Learning And Development Center",
+        "description": "",
+        "pdsesStatus": null,
+        "directPayMarketplace": null,
+        "serviceType": [
+          "local"
+        ],
+        "specialties": {
+          "enrichment": [],
+          "therapy": [],
+          "supplies": [],
+          "curriculum": [],
+          "classes": [],
+          "tutoring": []
+        },
+        "website": null,
+        "costOptions": "EFA-Eligible",
+        "type": "Private School",
+        "displayGradeRange": "Grades K–PreK",
+        "address": {
+          "street": "3108 Stalcup Rd",
+          "city": "Fort Worth",
+          "state": "TX",
+          "zipcode": "76119",
+          "county": "Tarrant County",
+          "region": "Dallas-Fort Worth"
+        },
+        "location": {
+          "lat": 32.7159913,
+          "lng": -97.2381333
+        },
+        "vendorTypes": [
+          "Schools"
+        ],
+        "vendorType": "Schools",
+        "distance_mi": 0
+      },
+      "expected": {
+        "lookup_key": "tefa:Nfz81oSdXU5EUb",
+        "source_namespace": "tefa",
+        "source_id": "Nfz81oSdXU5EUb",
+        "grade_range": "",
+        "lat": 32.7159913,
+        "lon": -97.2381333,
+        "private_listing_location_status": "source_provided_unverified",
+        "private_listing_grade_status": "inconsistent",
+        "school_full_address": "3108 Stalcup Rd, Fort Worth, TX 76119",
+        "name": "SUNRISE EARLY LEARNING AND DEVELOPMENT CENTER"
+      }
+    },
+    {
+      "case_id": "reverse-service-order-psat",
+      "source_array_index_0_based": 1062,
+      "raw": {
+        "id": "7NhcktqxLDyGLj",
+        "name": "Psat Academy (Preparatory Student Academic Training, Inc.)",
+        "description": "At PSAT Academy, every child thrives in the right environment, whether neurodivergent, above level, or below level. We are a COGNI",
+        "pdsesStatus": null,
+        "directPayMarketplace": null,
+        "serviceType": [
+          "online",
+          "local"
+        ],
+        "specialties": {
+          "enrichment": [],
+          "therapy": [],
+          "supplies": [],
+          "curriculum": [],
+          "classes": [],
+          "tutoring": []
+        },
+        "website": "https://psat.education",
+        "costOptions": "EFA-Eligible",
+        "type": "Private School",
+        "displayGradeRange": "Grades K–12",
+        "address": {
+          "street": "8800 W Sam Houston Pkwy S, Ste 107",
+          "city": "Houston",
+          "state": "TX",
+          "zipcode": "77099",
+          "county": "Harris County",
+          "region": "Houston Area"
+        },
+        "location": {
+          "lat": 29.6825253,
+          "lng": -95.5614844
+        },
+        "vendorTypes": [
+          "Schools"
+        ],
+        "vendorType": "Schools",
+        "distance_mi": 0
+      },
+      "expected": {
+        "lookup_key": "tefa:7NhcktqxLDyGLj",
+        "source_namespace": "tefa",
+        "source_id": "7NhcktqxLDyGLj",
+        "grade_range": "K-12",
+        "lat": 29.6825253,
+        "lon": -95.5614844,
+        "private_listing_location_status": "source_provided_unverified",
+        "private_listing_grade_status": "source_provided",
+        "school_full_address": "8800 W Sam Houston Pkwy S, Ste 107, Houston, TX 77099",
+        "name": "PSAT ACADEMY (PREPARATORY STUDENT ACADEMIC TRAINING, INC.)"
+      }
+    },
+    {
+      "case_id": "positive-texas-longitude-not-flipped",
+      "source_array_index_0_based": 1159,
+      "raw": {
+        "id": "P9FB7ifiRDdeJk",
+        "name": "Primrose School Of Copperfield",
+        "description": "",
+        "pdsesStatus": null,
+        "directPayMarketplace": null,
+        "serviceType": [
+          "local"
+        ],
+        "specialties": {
+          "enrichment": [],
+          "therapy": [],
+          "supplies": [],
+          "curriculum": [],
+          "classes": [],
+          "tutoring": []
+        },
+        "website": "https://www.primroseschools.com/schools/copperfield",
+        "costOptions": "EFA-Eligible",
+        "type": "Private School",
+        "displayGradeRange": "Grades PreK–K",
+        "address": {
+          "street": "15550 Ridge Park Dr",
+          "city": "Houston",
+          "state": "TX",
+          "zipcode": "77095",
+          "county": "Harris County",
+          "region": "Houston Area"
+        },
+        "location": {
+          "lat": 29.887227786869026,
+          "lng": 95.64239514232791
+        },
+        "vendorTypes": [
+          "Schools"
+        ],
+        "vendorType": "Schools",
+        "distance_mi": 0
+      },
+      "expected": {
+        "lookup_key": "tefa:P9FB7ifiRDdeJk",
+        "source_namespace": "tefa",
+        "source_id": "P9FB7ifiRDdeJk",
+        "grade_range": "Pre-K-K",
+        "lat": null,
+        "lon": null,
+        "private_listing_location_status": "invalid_source_coordinates",
+        "private_listing_grade_status": "source_provided",
+        "school_full_address": "15550 Ridge Park Dr, Houston, TX 77095",
+        "name": "PRIMROSE SCHOOL OF COPPERFIELD"
+      }
+    },
+    {
+      "case_id": "reverse-service-order-knowledge-first",
+      "source_array_index_0_based": 1272,
+      "raw": {
+        "id": "jDFAYnWEyiVQde",
+        "name": "Knowledge-First Empowerment Academy (Digital Learning School)",
+        "description": "Knowledge-First employs a 4-day academic week with 5th day used for enriching, extra-curricular and engaging activities.  Students",
+        "pdsesStatus": null,
+        "directPayMarketplace": null,
+        "serviceType": [
+          "online",
+          "local"
+        ],
+        "specialties": {
+          "enrichment": [],
+          "therapy": [],
+          "supplies": [],
+          "curriculum": [],
+          "classes": [],
+          "tutoring": []
+        },
+        "website": "https://www.knowledge-first.org",
+        "costOptions": "EFA-Eligible",
+        "type": "Private School",
+        "displayGradeRange": "Grades K–12",
+        "address": {
+          "street": "3300 S Gessner, # 201",
+          "city": "Houston",
+          "state": "TX",
+          "zipcode": "77063",
+          "county": "Harris County",
+          "region": "Houston Area"
+        },
+        "location": {
+          "lat": 29.7269989,
+          "lng": -95.53990979999999
+        },
+        "vendorTypes": [
+          "Schools"
+        ],
+        "vendorType": "Schools",
+        "distance_mi": 0
+      },
+      "expected": {
+        "lookup_key": "tefa:jDFAYnWEyiVQde",
+        "source_namespace": "tefa",
+        "source_id": "jDFAYnWEyiVQde",
+        "grade_range": "K-12",
+        "lat": 29.7269989,
+        "lon": -95.53990979999999,
+        "private_listing_location_status": "source_provided_unverified",
+        "private_listing_grade_status": "source_provided",
+        "school_full_address": "3300 S Gessner, # 201, Houston, TX 77063",
+        "name": "KNOWLEDGE-FIRST EMPOWERMENT ACADEMY (DIGITAL LEARNING SCHOOL)"
+      }
+    },
+    {
+      "case_id": "duplicate-name-first-id",
+      "source_array_index_0_based": 2253,
+      "raw": {
+        "id": "5EihFVKUqIj5W2",
+        "name": "Good Samaritan Center",
+        "description": "",
+        "pdsesStatus": null,
+        "directPayMarketplace": null,
+        "serviceType": [
+          "local"
+        ],
+        "specialties": {
+          "enrichment": [],
+          "therapy": [],
+          "supplies": [],
+          "curriculum": [],
+          "classes": [],
+          "tutoring": []
+        },
+        "website": "https://goodsamaritancommunityservices.org",
+        "costOptions": "EFA-Eligible",
+        "type": "Private School",
+        "displayGradeRange": "Grades PreK–PreK",
+        "address": {
+          "street": "1600 Saltillo St",
+          "city": "San Antonio",
+          "state": "TX",
+          "zipcode": "78207",
+          "county": "Bexar County",
+          "region": "San Antonio Area"
+        },
+        "location": {
+          "lat": 29.411495,
+          "lng": -98.5392169
+        },
+        "vendorTypes": [
+          "Schools"
+        ],
+        "vendorType": "Schools",
+        "distance_mi": 0
+      },
+      "expected": {
+        "lookup_key": "tefa:5EihFVKUqIj5W2",
+        "source_namespace": "tefa",
+        "source_id": "5EihFVKUqIj5W2",
+        "grade_range": "Pre-K",
+        "lat": 29.411495,
+        "lon": -98.5392169,
+        "private_listing_location_status": "source_provided_unverified",
+        "private_listing_grade_status": "source_provided",
+        "school_full_address": "1600 Saltillo St, San Antonio, TX 78207",
+        "name": "GOOD SAMARITAN CENTER"
+      }
+    },
+    {
+      "case_id": "inconsistent-grade-abc",
+      "source_array_index_0_based": 2305,
+      "raw": {
+        "id": "K2d5jWj8i1pnOx",
+        "name": "Abc Daycare",
+        "description": "",
+        "pdsesStatus": null,
+        "directPayMarketplace": null,
+        "serviceType": [
+          "local"
+        ],
+        "specialties": {
+          "enrichment": [],
+          "therapy": [],
+          "supplies": [],
+          "curriculum": [],
+          "classes": [],
+          "tutoring": []
+        },
+        "website": null,
+        "costOptions": "EFA-Eligible",
+        "type": "Private School",
+        "displayGradeRange": "Grades K–PreK",
+        "address": {
+          "street": "1810 Thorain Blvd",
+          "city": "San Antonio",
+          "state": "TX",
+          "zipcode": "78201",
+          "county": "Bexar County",
+          "region": "San Antonio Area"
+        },
+        "location": {
+          "lat": 29.4815233,
+          "lng": -98.524718
+        },
+        "vendorTypes": [
+          "Schools"
+        ],
+        "vendorType": "Schools",
+        "distance_mi": 0
+      },
+      "expected": {
+        "lookup_key": "tefa:K2d5jWj8i1pnOx",
+        "source_namespace": "tefa",
+        "source_id": "K2d5jWj8i1pnOx",
+        "grade_range": "",
+        "lat": 29.4815233,
+        "lon": -98.524718,
+        "private_listing_location_status": "source_provided_unverified",
+        "private_listing_grade_status": "inconsistent",
+        "school_full_address": "1810 Thorain Blvd, San Antonio, TX 78201",
+        "name": "ABC DAYCARE"
+      }
+    },
+    {
+      "case_id": "duplicate-name-second-id",
+      "source_array_index_0_based": 2411,
+      "raw": {
+        "id": "vDRKUxdXPTnKEE",
+        "name": "Good Samaritan Center",
+        "description": "",
+        "pdsesStatus": null,
+        "directPayMarketplace": null,
+        "serviceType": [
+          "local"
+        ],
+        "specialties": {
+          "enrichment": [],
+          "therapy": [],
+          "supplies": [],
+          "curriculum": [],
+          "classes": [],
+          "tutoring": []
+        },
+        "website": "https://goodsamaritancommunityservices.org",
+        "costOptions": "EFA-Eligible",
+        "type": "Private School",
+        "displayGradeRange": "Grades PreK–PreK",
+        "address": {
+          "street": "1600 Saltillo St",
+          "city": "San Antonio",
+          "state": "TX",
+          "zipcode": "78207",
+          "county": "Bexar County",
+          "region": "San Antonio Area"
+        },
+        "location": {
+          "lat": 29.411495,
+          "lng": -98.5392169
+        },
+        "vendorTypes": [
+          "Schools"
+        ],
+        "vendorType": "Schools",
+        "distance_mi": 0
+      },
+      "expected": {
+        "lookup_key": "tefa:vDRKUxdXPTnKEE",
+        "source_namespace": "tefa",
+        "source_id": "vDRKUxdXPTnKEE",
+        "grade_range": "Pre-K",
+        "lat": 29.411495,
+        "lon": -98.5392169,
+        "private_listing_location_status": "source_provided_unverified",
+        "private_listing_grade_status": "source_provided",
+        "school_full_address": "1600 Saltillo St, San Antonio, TX 78207",
+        "name": "GOOD SAMARITAN CENTER"
+      }
+    }
+  ],
+  "limits": [
+    "Exact acquired official listing snapshot; program year is not a revision or approval date.",
+    "Raw excerpts retain all 16 fields and array order. Normalized expectations were manually specified independently of the adapter.",
+    "Listing identities are not certified physical campus identities; duplicate names/addresses do not authorize merging.",
+    "Online office coordinates do not establish instructional points; invalid source coordinates are not silently corrected.",
+    "No attribution or identity continuity is asserted for the retained legacy workbook. No upstream update date or dataset reuse license is invented.",
+    "Core Campus names follow the unchanged uppercase constructor convention; the exact publisher name is retained separately in tefa_listing_name."
+  ]
+}

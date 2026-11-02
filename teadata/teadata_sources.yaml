@@ -5167,7 +5167,101 @@ data_sources:
         value_policy: numeric
         metrics: {}
       reader:
-        column_schema: schemas/data_sources--tefa--2025--default.json
+        profiles:
+          source:
+            column_schema: schemas/data_sources--tefa--2025--default.json
+    2027:
+      path: data/tefa/official-school-listings-2026-27.json
+      metadata:
+        title: Texas Education Freedom Accounts school-finder listings, 2026-27
+        publisher: Texas Comptroller of Public Accounts
+        version: 2026-27
+        period:
+          kind: school_year
+          start_year: 2026
+          end_year: 2027
+        source_url: https://finder.educationfreedom.texas.gov/
+        download_url: https://finder.educationfreedom.texas.gov/api/vendors?t=schools
+        identifiers:
+        - tefa_listing_id
+        notes: Official Comptroller resource developed with Outschool.org and Odyssey.
+          Version indexes the stated program school year, not a publisher revision.
+          This is a rolling listing snapshot; upstream as-of, publication/revision
+          dates and dataset reuse license are not supplied. Private School and EFA-Eligible
+          tags require validation. Listings include pre-K and online providers and
+          do not establish one record per physical campus, approval dates, student
+          enrollment, payments, governing districts, or continuity with legacy IDs.
+          This directory has no student-count measures; suppression documents for
+          separate participant-count publications do not apply to these roster fields.
+        provenance_ids:
+        - 6b53456102ae184d2b62a5442fcfee9234c66e7332c2a634ec8325a355be1674
+        - b294a1165f07b09c09b146e1110e6a3c1b06ab3e4954316496972437a530dbfc
+        references:
+        - reference_id: program_scope
+          role: source_notes
+          url: https://finder.educationfreedom.texas.gov/
+          title: Official finder statement of 2026-27 participation scope
+          status: available
+          provenance_ids:
+          - aeaf78f4c6493b2350891e4d29dfda0b9d682c2d12aca1582937e50b58c2e8d9
+          reviewed_sha256: 84f7cc14ac8e2be5df19807e620753cf2f5b45b0a0e36d407e3eafd6e253cc24
+        - reference_id: publisher_attribution
+          role: source_notes
+          url: https://finder.educationfreedom.texas.gov/contact
+          title: Official finder attribution to Comptroller and partners
+          status: available
+          provenance_ids:
+          - 9fb1520df667abd803b7e58451e9d91b17260f1484eabe81c518f3a002c686ad
+          reviewed_sha256: 69e1a38930e1f441853d3e876036dc76b0feede599d12e57948fae78979c6839
+        - reference_id: eligibility
+          role: methodology
+          url: https://educationfreedom.texas.gov/schools/
+          title: Official school and pre-K provider eligibility requirements
+          status: available
+          provenance_ids:
+          - efaecb37f4083364a6e31df898a7c2476083014937c6914eb14f2044fb73c1bf
+          reviewed_sha256: 54b3048e5e508d1ec1dadf8626f1783927a67b42563f2e466ac914ff088514d7
+        - reference_id: dictionary
+          role: data_dictionary
+          status: unreviewed
+          provenance_ids: []
+        - reference_id: masking
+          role: masking_methodology
+          status: not_applicable
+          provenance_ids: []
+        - reference_id: columns_default
+          role: schema
+          path: schemas/data_sources--tefa--2027--default.json
+          title: TEA Data namespaced official-listing reader columns; not a publisher
+            dictionary
+          status: available
+          provenance_ids:
+          - be44289cb739f52d056e223901d28a65da13005eef8631184ac7b9db69a3304f
+          reviewed_sha256: ebc93b14c7034a7f0488356f5f421c2ca70f247be3a7a5e44cab30e51f92f563
+        value_policy: numeric
+        metrics: {}
+      reader:
+        dtype: false
+        lines: false
+        precise_float: true
+        columns:
+          tefa_listing_id: id
+          tefa_listing_name: name
+          tefa_listing_description: description
+          tefa_listing_pdses_status: pdsesStatus
+          tefa_listing_direct_pay_marketplace: directPayMarketplace
+          tefa_listing_service_type: serviceType
+          tefa_listing_specialties: specialties
+          tefa_listing_website: website
+          tefa_listing_cost_options: costOptions
+          tefa_listing_type: type
+          tefa_listing_display_grade_range: displayGradeRange
+          tefa_listing_address: address
+          tefa_listing_location: location
+          tefa_listing_vendor_types: vendorTypes
+          tefa_listing_vendor_type: vendorType
+          tefa_listing_distance_mi: distance_mi
+        column_schema: schemas/data_sources--tefa--2027--default.json
   all_districts_reference:
     2025:
       path: data/all_districts_reference/ALL_DISTRICTS_ACTIVE.xlsx
@@ -6034,6 +6128,7 @@ schema:
     - csv
     tefa:
     - xlsx
+    - json
     all_districts_reference:
     - xlsx
     all_districts_reference2:

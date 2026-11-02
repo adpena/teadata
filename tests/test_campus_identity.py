@@ -3,21 +3,32 @@ from pathlib import Path
 from types import SimpleNamespace
 import uuid
 
-import pandas as pd
 import pytest
 from shapely.geometry import Polygon
 
 from teadata import Campus, DataEngine, District
 from teadata.attributes import attribute_value
 from teadata.identifiers import MAX_CAMPUS_LOOKUP_KEY_BYTES, campus_lookup_key, normalize_campus_lookup_key
-from teadata.load_data import _add_tefa_entities, build_campus_profile_map_payload
+from teadata.load_data import build_campus_profile_map_payload
 from teadata.manifest import ContractError
 
 
-def ace_record():
+def historical_ace_campus():
+    """Retained consumer fixture; never an adapter for the active official roster."""
     document = json.loads((Path(__file__).parents[1] / "teadata/reference_cases/publisher_2025.json").read_text())
     case = next(c for c in document["cases"] if c["entity"].get("source_id") == "rec1kXXvIucG7UkoA")
-    return {name: cell["raw_token"] for name, cell in case["source_cells"].items()}
+    cells = {name: cell["raw_token"] for name, cell in case["source_cells"].items()}
+    key = campus_lookup_key(source_namespace="tefa", source_id=cells["ID"], is_private=True)
+    return Campus(
+        id=uuid.uuid5(uuid.NAMESPACE_URL, "teadata:private:" + key), district_id=None,
+        name=cells["Name"], charter_type="", is_charter=False, is_private=True,
+        source_namespace="tefa", source_id=cells["ID"], grade_range="K-8",
+        location=(float(cells["Location Lng"]), float(cells["Location Lat"])),
+        meta={"private_source_dataset": "tefa", "private_source_version": "2025",
+              "reported_directory_district_number": cells["School District Number"],
+              "reported_directory_district_name": cells["School District Name"],
+              "directory_affiliation_origin": "unverified_legacy_enrichment"},
+    )
 
 
 @pytest.mark.parametrize("value", ["227901180", "'227901180", "227901180.0"])
@@ -60,7 +71,7 @@ def test_lookup_key_bound_is_encoded_bytes_not_current_identifier_length():
 def test_actual_ace_listing_has_source_identity_and_no_public_governance(catalog):
     repo = DataEngine()
     repo.catalog = catalog
-    assert _add_tefa_entities(repo, pd.DataFrame([ace_record()]), version=2025) == 1
+    repo.add_campus(historical_ace_campus())
     campus = next(iter(repo._campuses.values()))
     assert campus.lookup_key == "tefa:rec1kXXvIucG7UkoA"
     assert campus.id == uuid.uuid5(uuid.NAMESPACE_URL, "teadata:private:tefa:rec1kXXvIucG7UkoA")
@@ -75,13 +86,6 @@ def test_actual_ace_listing_has_source_identity_and_no_public_governance(catalog
     assert attribute_value(campus, "campus_number", scope="campus") is None
     assert attribute_value(campus, "campus_source_id", scope="campus") == "rec1kXXvIucG7UkoA"
     assert catalog.measurement(campus, "enrollment").status.value == "not_applicable"
-
-
-def test_duplicate_source_ids_fail_before_any_private_listing_is_added():
-    repo = DataEngine()
-    with pytest.raises(ContractError, match="duplicate"):
-        _add_tefa_entities(repo, pd.DataFrame([ace_record(), ace_record()]), version=2025)
-    assert not repo._campuses
 
 
 @pytest.mark.parametrize("point,expected", [((1, 1), 2), ((0, 0), 2), ((2, 1), 2), ((4, 4), 0), (None, 0)])
@@ -110,7 +114,7 @@ def test_raw_directory_name_never_becomes_governing_name(catalog):
     assert attribute_value(entity, "district_name", scope="campus") is None
     repo = DataEngine()
     repo.catalog = catalog
-    _add_tefa_entities(repo, pd.DataFrame([ace_record()]), version=2025)
+    repo.add_campus(historical_ace_campus())
     private = next(iter(repo._campuses.values()))
     private.meta["district_name"] = "Raw directory claim"
     assert private.district_name is None
@@ -142,7 +146,7 @@ def test_actual_private_identity_survives_store_lazy_json_and_analytical_roundtr
 
     repo = DataEngine()
     repo.catalog = catalog
-    _add_tefa_entities(repo, pd.DataFrame([ace_record()]), version=2025)
+    repo.add_campus(historical_ace_campus())
     source = tmp_path / "entities.sqlite"
     engine = create_engine("sqlite:///" + str(source))
     ensure_schema(engine)
@@ -217,10 +221,9 @@ def test_private_without_point_keeps_profile_and_snapshot_identity(tmp_path, cat
 
     repo = DataEngine()
     repo.catalog = catalog
-    row = ace_record()
-    row["Location Lat"] = None
-    row["Location Lng"] = None
-    _add_tefa_entities(repo, pd.DataFrame([row]), version=2025)
+    campus = historical_ace_campus()
+    campus.location = None
+    repo.add_campus(campus)
     campus = next(iter(repo._campuses.values()))
     assert campus.point is None and campus.location is None
     monkeypatch.setattr(load_data, "BUILD_MAP_STORE", True)
@@ -241,7 +244,7 @@ def test_private_without_point_keeps_profile_and_snapshot_identity(tmp_path, cat
 def test_actual_private_listing_only_overlays_traditional_public_comparisons(catalog, subtype, expected):
     repo = DataEngine()
     repo.catalog = catalog
-    _add_tefa_entities(repo, pd.DataFrame([ace_record()]), version=2025)
+    repo.add_campus(historical_ace_campus())
     private = next(iter(repo._campuses.values()))
     x, y = private.point.x, private.point.y
     district = District(id=uuid.uuid4(), name="Comparison boundary control", district_number="227901",
@@ -261,7 +264,7 @@ def test_split_snapshot_relocates_and_hydrates_boundary_index_once(tmp_path, cat
 
     repo = DataEngine()
     repo.catalog = catalog
-    _add_tefa_entities(repo, pd.DataFrame([ace_record()]), version=2025)
+    repo.add_campus(historical_ace_campus())
     private = next(iter(repo._campuses.values()))
     x, y = private.point.x, private.point.y
     polygon = Polygon([(x - 1, y - 1), (x + 1, y - 1), (x + 1, y + 1), (x - 1, y + 1)])

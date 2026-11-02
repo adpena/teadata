@@ -1,6 +1,7 @@
 import uuid
 import math
 import pickle
+import re
 from pathlib import Path
 import gzip
 import json
@@ -236,31 +237,6 @@ def _district_lookup_keys(district_number: Optional[str]) -> list[str]:
 
 
 
-def _private_coerce_int(val: Any) -> Optional[int]:
-    if val is None:
-        return None
-    try:
-        if pd.isna(val):
-            return None
-    except Exception:
-        pass
-    if isinstance(val, bool):
-        return int(val)
-    if isinstance(val, int):
-        return val
-    if isinstance(val, float):
-        if not math.isfinite(val):
-            return None
-        return int(val)
-    text = str(val).strip()
-    if not text:
-        return None
-    try:
-        return int(float(text))
-    except Exception:
-        return None
-
-
 def _private_coerce_float(val: Any) -> Optional[float]:
     if val is None:
         return None
@@ -286,42 +262,6 @@ def _private_coerce_float(val: Any) -> Optional[float]:
     return None
 
 
-def _private_coerce_bool_flag(val: Any) -> bool:
-    if val is None:
-        return False
-    try:
-        if pd.isna(val):
-            return False
-    except Exception:
-        pass
-    if isinstance(val, bool):
-        return val
-    if isinstance(val, (int, float)):
-        return bool(val)
-    text = str(val).strip().lower()
-    if not text:
-        return False
-    if text in {"1", "y", "yes", "true", "t"}:
-        return True
-    if text in {"0", "n", "no", "false", "f"}:
-        return False
-    return False
-
-
-
-
-def _tefa_grade_label(code: Optional[int]) -> Optional[str]:
-    if code is None:
-        return None
-    if code == -1:
-        return "Pre-K"
-    if code == 0:
-        return "K"
-    if 1 <= code <= 12:
-        return str(code)
-    return None
-
-
 def _normalize_tefa_display_grade(display_grade_range: Any) -> Optional[str]:
     if display_grade_range is None:
         return None
@@ -340,82 +280,6 @@ def _normalize_tefa_display_grade(display_grade_range: Any) -> Optional[str]:
     text = text.replace("PreK", "Pre-K").replace("PREK", "Pre-K")
     text = text.replace("Pre K", "Pre-K")
     return text or None
-
-
-def _tefa_grade_range(
-    min_grade: Any,
-    max_grade: Any,
-    display_grade_range: Any,
-) -> Optional[str]:
-    low = _private_coerce_int(min_grade)
-    high = _private_coerce_int(max_grade)
-
-    if low is not None and high is not None and low > high:
-        low, high = high, low
-
-    low_label = _tefa_grade_label(low)
-    high_label = _tefa_grade_label(high)
-
-    if low_label and high_label:
-        if low_label == high_label:
-            return low_label
-        return f"{low_label}-{high_label}"
-    if low_label:
-        return low_label
-    if high_label:
-        return high_label
-
-    return _normalize_tefa_display_grade(display_grade_range)
-
-
-def _tefa_school_type(
-    min_grade: Any,
-    max_grade: Any,
-    is_pre_k: Any,
-    is_elementary: Any,
-    is_middle: Any,
-    is_high: Any,
-) -> str:
-    low = _private_coerce_int(min_grade)
-    high = _private_coerce_int(max_grade)
-    if low is not None and high is not None and low > high:
-        low, high = high, low
-
-    pre_k = _private_coerce_bool_flag(is_pre_k)
-    elementary = _private_coerce_bool_flag(is_elementary)
-    middle = _private_coerce_bool_flag(is_middle)
-    high_flag = _private_coerce_bool_flag(is_high)
-    core_flags = sum(int(flag) for flag in (elementary, middle, high_flag))
-
-    if core_flags >= 2:
-        return "Elementary/Secondary"
-    if high_flag:
-        return "High School"
-    if middle:
-        if low is not None and low >= 7:
-            return "Junior High School"
-        return "Middle School"
-    if elementary or pre_k:
-        return "Elementary School"
-
-    if high is not None and high <= 5:
-        return "Elementary School"
-    if low is not None and low >= 9:
-        return "High School"
-    if low is not None and high is not None:
-        if low <= 5 and high >= 6:
-            return "Elementary/Secondary"
-        if low >= 7 and high <= 9:
-            return "Junior High School"
-        if low >= 6 and high <= 8:
-            return "Middle School"
-    return "Other"
-
-
-
-
-
-
 
 
 def _private_coords(lon_raw: Any, lat_raw: Any) -> Optional[tuple[float, float]]:
@@ -2517,61 +2381,116 @@ def _add_reporting_entities(repo: DataEngine, frame: pd.DataFrame) -> dict[str, 
     return added
 
 
-def _add_tefa_entities(repo: DataEngine, frame: pd.DataFrame, *, version: int | None) -> int:
-    """Retain the selected legacy source's exact private listing identities.
+def _tefa_listing_grade_range(raw: Any) -> tuple[str | None, str]:
+    text = _normalize_tefa_display_grade(raw)
+    if text is None:
+        return None, "missing"
+    match = re.fullmatch(r"(Pre-K|K|[1-9]|1[0-2])(?:-(Pre-K|K|[1-9]|1[0-2]))?", text)
+    if match is None:
+        return None, "unrecognized"
+    low, high = match.group(1), match.group(2) or match.group(1)
+    ranks = {"Pre-K": -1, "K": 0}
+    start = ranks[low] if low in ranks else int(low)
+    end = ranks[high] if high in ranks else int(high)
+    if start > end:
+        return None, "inconsistent"
+    return low if low == high else f"{low}-{high}", "source_provided"
 
-    Directory district enrichment is a raw claim, never public governance.
-    This does not reconcile old IDs with a different roster or infer locations.
-    """
-    required = {"ID", "Name", "Vendor Type"}
+
+def _add_tefa_entities(repo: DataEngine, frame: pd.DataFrame, *, version: str | None) -> int:
+    """Project the reviewed official listing contract, never legacy spreadsheet IDs."""
+    required = {"tefa_listing_id", "tefa_listing_name", "tefa_listing_vendor_type",
+                "tefa_listing_vendor_types", "tefa_listing_type", "tefa_listing_cost_options",
+                "tefa_listing_service_type"}
     if not required.issubset(frame.columns):
         raise ContractError("Private TEFA source lacks required identity/type columns")
-    selected = frame[frame["Vendor Type"].fillna("").astype(str).str.strip().str.lower() == "schools"]
-    records = selected.to_dict(orient="records")
+    if any(not isinstance(column, str) or not column.startswith("tefa_listing_") for column in frame.columns):
+        raise ContractError("Private TEFA source requires its namespaced reader contract")
+    # pandas represents JSON nulls with NA scalars. Restore null without changing
+    # nested arrays/objects or numeric values from the reviewed JSON reader.
+    records = frame.astype(object).where(pd.notna(frame), None).to_dict(orient="records")
     seen: set[str] = set()
+    selected: list[tuple[str, dict[str, Any]]] = []
     for record in records:
-        source_id = record["ID"]
+        source_id = record["tefa_listing_id"]
         try:
             key = campus_lookup_key(source_namespace="tefa", source_id=source_id, is_private=True)
         except (ValueError, TypeError) as error:
             raise ContractError("Private TEFA listing has an invalid opaque source ID") from error
+        if key is None:
+            raise ContractError("Private TEFA listing has no opaque lookup key")
         if key in seen:
             raise ContractError("Private TEFA source has duplicate listing IDs")
         seen.add(key)
-        if not isinstance(record["Name"], str) or not record["Name"].strip():
+        if not isinstance(record["tefa_listing_name"], str) or not record["tefa_listing_name"].strip():
             raise ContractError("Private TEFA listing has no source name")
-    for record in records:
-        source_id = record["ID"]
-        key = campus_lookup_key(source_namespace="tefa", source_id=source_id, is_private=True)
-        meta = {
-            "private_source_dataset": "tefa", "private_source_version": str(version) if version is not None else None,
-            "reported_directory_district_number": _get_record_value(record, ["School District Number"]),
-            "reported_directory_district_name": _get_record_value(record, ["School District Name20", "School District Name"]),
-            "directory_affiliation_origin": "unverified_legacy_enrichment",
-        }
-        for output, candidates in (
-            ("school_full_address", ["Address Formatted", "Address City State Zip"]),
-            ("school_website", ["Contact Website"]),
-            ("display_grade_range", ["Display Grade Range"]),
-        ):
-            value = _get_record_value(record, candidates)
-            if value is not None:
-                meta[output] = value
+        for field in ("tefa_listing_vendor_types", "tefa_listing_service_type"):
+            if not isinstance(record[field], list) or any(not isinstance(value, str) for value in record[field]):
+                raise ContractError(f"Private TEFA {field} must be an array of strings")
+        if set(record["tefa_listing_service_type"]) not in ({"local"}, {"online"}, {"local", "online"}):
+            raise ContractError("Private TEFA service type requires review")
+        if (record["tefa_listing_vendor_type"] == "Schools"
+                and "Schools" in record["tefa_listing_vendor_types"]
+                and record["tefa_listing_type"] == "Private School"
+                and record["tefa_listing_cost_options"] == "EFA-Eligible"):
+            selected.append((key, record))
+    if not selected:
+        raise ContractError("Private TEFA source has no eligible private-school listings")
+    for key, record in selected:
+        source_id = record["tefa_listing_id"]
+        meta = dict(record)
+        address = record.get("tefa_listing_address")
+        address = address if isinstance(address, dict) else {}
+        address_parts = [address.get(field) for field in ("street", "city")]
+        state_zip = " ".join(value.strip() for field in ("state", "zipcode")
+                             if isinstance(value := address.get(field), str) and value.strip())
+        full_address = ", ".join(value.strip() for value in [*address_parts, state_zip]
+                                 if isinstance(value, str) and value.strip()) or None
+        grade_range, grade_status = _tefa_listing_grade_range(record.get("tefa_listing_display_grade_range"))
+        local = "local" in record["tefa_listing_service_type"]
+        raw_point = record.get("tefa_listing_location")
+        location = None
+        location_status = "missing" if local else "online_only"
+        if local and raw_point is not None:
+            if (isinstance(raw_point, dict)
+                    and type(raw_point.get("lat")) in {int, float}
+                    and type(raw_point.get("lng")) in {int, float}):
+                candidate = _private_coords(raw_point.get("lng"), raw_point.get("lat"))
+                if (candidate is not None and _valid_latlon(candidate[1], candidate[0])
+                        and not (address.get("state") == "TX" and (candidate[0] >= 0 or candidate[1] <= 0))):
+                    location = candidate
+            location_status = "source_provided_unverified" if location is not None else "invalid_source_coordinates"
+        meta.update(
+            private_source_dataset="tefa", private_source_version=version,
+            school_full_address=full_address, school_website=record.get("tefa_listing_website"),
+            display_grade_range=record.get("tefa_listing_display_grade_range"),
+            private_listing_grade_status=grade_status, private_listing_location_status=location_status,
+        )
         campus = Campus(
             id=uuid.uuid5(uuid.NAMESPACE_URL, "teadata:private:" + key),
             district_id=None, district_number=None, campus_number=None,
             source_namespace="tefa", source_id=source_id,
-            name=record["Name"], charter_type="", is_charter=False, is_private=True,
+            name=record["tefa_listing_name"], charter_type="", is_charter=False, is_private=True,
             enrollment=None,
-            grade_range=_tefa_grade_range(record.get("Min Grade"), record.get("Max Grade"), record.get("Display Grade Range")),
-            school_type=_tefa_school_type(record.get("Min Grade"), record.get("Max Grade"),
-                record.get("Is Pre K", record.get("Is Pre-K")), record.get("Is Elementary"),
-                record.get("Is Middle"), record.get("Is High")),
-            location=_private_coords(record.get("Location Lng"), record.get("Location Lat")),
+            grade_range=grade_range,
+            school_type="Early Childhood" if grade_range == "Pre-K" else "Private School",
+            location=location,
             meta=meta,
         )
         repo.add_campus(campus)
-    return len(records)
+    return len(selected)
+
+
+def _load_private_entities(repo: DataEngine, cfg: _cfg_mod.Config) -> int:
+    """Select the curated private edition independently of the public build year."""
+    dataset = cfg.options.get("private_dataset")
+    if dataset != "tefa":
+        raise ContractError("Selected private source lacks a supported opaque identity contract")
+    source = cfg.resolve_dataset(dataset, None)
+    _, frame = cfg.load_df(dataset, None)
+    count = _add_tefa_entities(repo, frame, version=source.metadata.version)
+    print(f"[private] loaded {count} private listings from {source.metadata.version} (dataset={dataset})")
+    return count
 
 
 def _release_validation(repo: DataEngine) -> dict[str, Any]:
@@ -2824,36 +2743,7 @@ def _build_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
             for key in _district_lookup_keys(district.district_number) if key
         }
 
-        # Optional private school campuses
-        private_loaded = 0
-        private_year = None
-        private_dataset_name = None
-        private_fp = None
-        try:
-            cfg_obj = load_config(CFG)
-            private_dataset_name = cfg_obj.options["private_dataset"]
-            if private_dataset_name and private_dataset_name != "tefa":
-                raise ContractError("Selected private source lacks a supported opaque identity contract")
-            if private_dataset_name:
-                private_year, private_fp = cfg_obj.resolve(
-                    private_dataset_name, YEAR, section="data_sources"
-                )
-        except ContractError:
-            raise
-        except Exception as exc:
-            raise ContractError("Private school source is not configured") from exc
-
-        if private_fp:
-            try:
-                _, df_private = cfg_obj.load_df(private_dataset_name, YEAR)
-            except Exception as exc:
-                raise ContractError("Private school source failed to load") from exc
-            else:
-                private_loaded = _add_tefa_entities(repo, df_private, version=private_year)
-
-                print(
-                    f"[private] loaded {private_loaded} private campuses from {private_year} (dataset={private_dataset_name})"
-                )
+        _load_private_entities(repo, cfg_obj)
 
     # Run all enrichments once data is loaded
     run_enrichments(repo)
