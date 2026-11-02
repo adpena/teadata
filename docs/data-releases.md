@@ -120,6 +120,15 @@ uv run python -m teadata.load_data
 
 Source observation is explicit. It archives existing bytes without inventing original download dates. Metadata improvements preserve earlier actual download receipts for the same bytes alongside the new observation. Reference HTTP requests happen only with `--fetch-references`; builds make no implicit network requests. Local methodology files are versioned and archived. Changing reviewed methodology bytes requires explicit review and a changed `reviewed_sha256`; observation cannot approve that change. Receipts under `provenance/records/` are immutable and tracked; raw content-addressed objects under `provenance/objects/` are retained separately. Original acquisition URLs, download dates, licensing, and upstream transformation lineage remain unknown where migration evidence is insufficient. Local observation dates are not freshness evidence.
 
+New retained-format builds embed the complete selected receipt graph, including
+historical acquisition parents, nested reference receipts and processing inputs.
+The explicit release qualification gate verifies that embedded graph with the
+same canonical record checker before opening release artifacts. This checks
+record identities, typed references and graph integrity; it does not establish
+historical artifact availability or publisher authenticity. Existing consumer
+constructors remain unchanged, and original receipt bytes and unknown timestamps
+are preserved.
+
 A changed ordered header layout fails its column schema. Review the source dictionary, parser, period, units, masking rules, and joins before updating that resource and its review hash. Do not replace a schema simply to silence a failure. The processing receipt separates structural coverage and join checks from pending source review; structural success is not researcher-grade certification. Current processing starts from the retained curated inputs; recovering and validating every upstream download/transformation is the next dataset-by-dataset audit.
 
 Repeat-build comparisons apply to the recorded producer environment. Spreadsheet numeric inference can differ by one floating-point unit between operating systems, even with the same Python package versions. The current dependency migration preserves the retained macOS producer's analytical values exactly; it does not establish cross-platform floating-point identity. Dataset intake must review numeric parsing explicitly rather than silently accept comparison tolerances or change conversion rules. The catalog currently records Python, platform, and selected package versions; native-library versions and installed-wheel identities remain additional provenance work.

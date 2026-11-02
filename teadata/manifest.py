@@ -1551,10 +1551,7 @@ class BuildRecorder:
             },
             processor=self.processor_sha256,
             metric_bindings=self.cfg.resolved_metric_bindings(),
-            records={
-                identifier: self.store.read_record(identifier)
-                for identifier in sorted(identifiers)
-            },
+            records=validate_record_graph(self.store.read_record, sorted(identifiers)),
             environment={
                 "python": platform.python_version(),
                 "hash_seed": os.environ.get("PYTHONHASHSEED", "random"),

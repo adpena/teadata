@@ -595,9 +595,33 @@ def _validate_publisher_cases(release: DataRelease) -> dict[str, Any]:
             "uncovered": coverage["uncovered"]}
 
 
+def _validate_release_provenance(release: DataRelease) -> int:
+    """Gate the embedded record graph without opening historical artifact bytes."""
+    from teadata.manifest import ContractError
+    from teadata.provenance import validate_record_graph
+
+    document = release.catalog.to_dict()
+    records = dict(document["provenance"])
+    roots = set(records)
+    for source in document.get("datasets", {}).values():
+        metadata = source["metadata"]
+        roots.update(metadata.get("provenance_ids", ()))
+        for reference in metadata.get("references", ()):
+            roots.update(reference.get("provenance_ids", ()))
+    if document["schema_version"] == 2:
+        processing = release.processing
+        records[processing["record_id"]] = processing["record"]
+        roots.add(processing["record_id"])
+    try:
+        return len(validate_record_graph(records.__getitem__, sorted(roots)))
+    except (KeyError, TypeError, ValueError, ContractError) as error:
+        raise ReceiptError(f"Release provenance record graph is incomplete or invalid: {error}") from error
+
+
 def _validate_release(path: str, kind: str) -> None:
     from teadata.release import DataRelease
     release = DataRelease(Path(path).expanduser())
+    provenance_records = _validate_release_provenance(release)
     release.verify()
     publisher_checks = _validate_publisher_cases(release)
     if kind == "library":
@@ -605,6 +629,7 @@ def _validate_release(path: str, kind: str) -> None:
         if release.catalog.to_dict()["processor_sha256"] != processor_identity():
             raise ReceiptError("Release was built from different processing code or lockfile; rebuild it")
     print(f"Verified data release {release.build_id}")
+    print(f"Verified provenance record graph: {provenance_records} records")
     print("Publisher example coverage: " + json.dumps(publisher_checks, sort_keys=True))
 
 
