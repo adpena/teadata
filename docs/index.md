@@ -2,7 +2,7 @@
 
 **Unofficial Python toolkit for Texas public education data — spatially-aware, object-oriented, fast.**
 
-It ships a cache-first “data repo” you can load in seconds, then query with clean, Pythonic primitives (including a fluent `>>` operator).
+Load a catalog-bound release, then query its district and campus objects with a fluent `>>` operator.
 
 ---
 
@@ -11,58 +11,66 @@ It ships a cache-first “data repo” you can load in seconds, then query with 
 ### 1) Clone & install (editable)
 
 ```bash
-git clone https://github.com/adpena/teadata.git
+GIT_LFS_SKIP_SMUDGE=1 git clone https://github.com/adpena/teadata.git
 cd teadata
 # Install with uv (recommended)
 uv sync
-# OR with pip
-pip install -e .
 ```
 
-### 2) Install from GitHub (for Render/CI)
+### 2) Install an application dependency
 
-If you are using this in a Django application deployed on **Render**, add it to your `requirements.txt`:
+Select a published version and retain your application's lockfile:
 
-```text
-teadata @ git+https://github.com/adpena/teadata.git
+```bash
+uv add "teadata==0.0.127"
 ```
 
-### 3) Load the prebuilt snapshot
+### 3) Load the configured release
 
-The engine will automatically discover a `.pkl` or `.pkl.gz` snapshot in either:
+Set `TEADATA_RELEASE` to a local release manifest or `TEADATA_RELEASE_URL` to an
+immutable remote release manifest. Python packages contain code and metadata,
+with data bundles distributed separately. For example:
 
-- `./.cache/` under your repository root, or
-- `<site-packages>/teadata/.cache/` shipping with the library.
+```bash
+export TEADATA_RELEASE_URL="https://github.com/adpena/teadata/releases/download/v0.0.127/release.json"
+```
+
+A source checkout may instead have a local `teadata/.cache/release.json`;
+ordinary wheel installs do not include that bundle. A release pinned by `using_release()` takes
+precedence. The manifest selects the snapshot and sidecars; selected artifact
+hashes are checked when they are loaded.
 
 ```python
 from teadata import DataEngine
 
-# Fast-path: load the latest discovered snapshot
-engine = DataEngine.from_snapshot(search=True)
+engine = DataEngine.load_default()
 
 print(len(engine.districts), len(engine.campuses))
-# -> e.g. 1207 9739
+# Counts depend on the selected release.
 ```
 
-> If you prefer the implicit path: `engine = DataEngine()` also tries to auto-load a snapshot.
+`DataEngine()` creates an empty engine by default (`autoload=False`).
+`DataEngine.from_snapshot()` without a path uses the same configured release.
+An explicit `from_snapshot(path)` is for a trusted local catalog-bound snapshot.
 
-### 3) First query in 10 seconds
+### 4) Look up a district
 
 ```python
-# Retrieve district by TEA campus number (integer, digits only, or 6-digit left-zero padded string with leading apostrophe all work)
-aldine = engine.get_district("101902")
+# 101902 is a six-digit TEA district number.
+aldine = (engine >> ("district", "101902")).first()
+if aldine is not None:
+    print(aldine.name, aldine.rating)
+    for campus in aldine.campuses:
+        print(campus.name, campus.rating)
 
-# Retrieve district by district name (case insensitive - returns multiple results if there are multiple districts with the same name, such as "Northside ISD")
-aldine = engine.get_district("Aldine ISD")
-
-print(aldine)                 # District(...)
-print(aldine.rating)          # canonical (may be enriched via alias)
-print(aldine.overall_rating_2025)  # enriched attribute, if present
-
-# Iterate campuses physically inside the district
-for c in aldine.campuses:
-    print(c.name, c.rating)
+# Name matching is case-insensitive and can return multiple districts.
+for district in (engine >> ("district", "Northside ISD")):
+    print(district.district_number, district.name)
 ```
+
+The district operation returns a `Query`. `.first()` selects the first match or
+returns `None`; iterate the query to inspect all matches for an ambiguous name
+or wildcard. `district.campuses` lists campuses assigned to that district.
 
 ## What you get
 

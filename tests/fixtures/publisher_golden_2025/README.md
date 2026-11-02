@@ -23,11 +23,12 @@ unknown. These limitations are intentional, not fields to fill by inference.
 
 | Case | Independent cells and expected interpretation |
 | --- | --- |
-| Austin ISD `227901` | District Student CSV record 1093: DPNTALLC = 72272 enrollment; DPETALLC = 72175 membership. Summary G9333 = C. |
+| Austin ISD `227901` | District Student CSV record 1093: DPNTALLC = 72272 enrollment; DPETALLC = 72175 membership. All seven racial count/percentage pairs are checked separately for both populations. Summary G9333 = C. |
 | Kiker EL `227901180` | Campus Student CSV record 8350: CPNTALLC = 750 enrollment, CPETALLC = 748 membership; CPETSAUC = -3 and CPETSNOC = -1 are suppressed, not counts. Summary G9440 = A. |
 | BASIS San Antonio–Shavano `015834001` | Campus record 379: CPNTALLC = CPETALLC = 1057. CPETATTP = 21.2 percent describes **2023–24**, despite the source's 2025 label. Summary G448 = A. |
 | Rocketship Explore EL `220820102` | Campus record 7474: enrollment 289, membership 288. Summary G8507 = `Not Rated: Minimum Size rules`, an observed official category; numeric score H8507 is `.`. |
 | Ace Academy `rec1kXXvIucG7UkoA` | Legacy Vendors row 62 identifies a private school. Public TAPR enrollment and rating are not applicable, not missing or zero. This does not validate its released district affiliation. |
+| Highland Park EL `227901119` | Campus Student CSV record 8301: CPNTALLC = 649 enrollment; CPETALLC = 648 membership. All seven racial count/percentage pairs are checked separately for both populations; no rating is invented for this case. |
 
 Enrollment/membership refer to school year 2024–25. The ratings refer to
 calendar year 2025. The 2024–25 TAPR glossary distinguishes enrollment and
@@ -35,6 +36,22 @@ membership; it does not establish why exactly two pupils differ at Kiker.
 The year-specific masking document establishes -1/-3 suppression; these cases
 infer no disclosure interval. References and exact hashes are in `sources`.
 The generated `data_elements.xlsx` crosswalk is not publisher truth.
+
+The Austin ISD and Highland Park demographic expectations were independently
+checked against fresh official Student Information HTML reports. Their exact
+URLs, acquisition records and artifact hashes are in the reference JSON. The
+two small `*-STUD.csv` fixtures preserve the original physical header, code and
+selected entity records without reserialization. Their fixture hashes, full
+parent hashes and original record coordinates are recorded separately.
+
+`test_tapr_demographic_lineage.py` runs those fixtures through canonical TAPR
+source preparation, Parquet readback, ordinary Config loading and campus/district
+enrichment, then persists a real EntityStore and checks all 60 demographic
+measurements against the independent expectations. It never seeds `entity.meta`
+from expected values. A separate tiny XLSX path exercises the four simultaneous
+legacy prepared-header renames per scope. Restoring the old crosswalk destinations
+fails the Asian oracle. Test-created receipts are explicit local observations;
+they do not impersonate the full-source acquisitions or qualify a rebuilt release.
 
 The four Kiker transfer rows are 18581–18584 of the 2024–25 campus transfer
 report, column 14. Three distinct BASIS destination **campuses** have -999;
@@ -56,23 +73,24 @@ signed zero, duplicate indices and row order.
 
 ## Acceptance work still open
 
-These items are **not** xfailed/skipped passing tests, and this small pack does
-not certify release 0.0.125. That release is held for the accountability failure
-and the unresolved affiliation below. Rebuilding has not been authorized here.
+These items are **not** xfailed/skipped passing tests. The accountability cleanup
+and private-school governing-affiliation repairs were separately qualified for
+0.0.126; the old 0.0.125 failures below describe historical regressions, not an
+active hold on 0.0.126. This small pack does not certify every released fact.
+The corrected demographic build still requires its own artifact qualification.
 
 - **TAPR field units:** the publisher explicitly labels the curated CPET
-  membership/autism/non-categorical fields as counts. The catalog's wildcard
-  fields currently lack unit declarations. Their tests check values, raw tokens,
+  autism/non-categorical fields as counts. The remaining wildcard fields lack a
+  complete unit dictionary. Their tests check values, raw tokens,
   statuses and periods, while the fixture retains independent `count` truth.
   Tests check API units for governed canonical enrollment, rating and attrition
-  metrics. Fill the unit gap through a reviewed source-field dictionary covering
+  metrics and the 60 reviewed demographic fields. Fill the remaining unit gap through a reviewed source-field dictionary covering
   supported TAPR fields, not suffix guesses or a few case-specific declarations.
-- **Ace institutional affiliation:** the retained TEFA row contains geographic
-  Austin ISD enrichment. A point inside Austin ISD is not evidence that this
-  private school belongs to the public district. The desired governing public
-  district is absent. The released `227901` value must not be blessed as truth.
-  Accept and implement the domain repair, then add the actual retained-entity
-  regression. The population-applicability test currently covers only TAPR N/A.
+- **Ace institutional affiliation:** the retained source row contains geographic
+  Austin ISD enrichment. A point inside Austin ISD does not establish public
+  governing affiliation. The 0.0.126 repair keeps those concepts separate and was
+  checked against retained entities. This publisher-example gate covers TAPR
+  applicability, not the entire affiliation-ingestion or private-school roster.
 - **Reporting-only Rocketship:** it appears in TAPR and accountability but not
   among the 9,739 retained GIS campus identifiers. Preserve it with no invented
   point; absence in this file alone does not establish closure or status. The
@@ -96,15 +114,15 @@ and the unresolved affiliation below. Rebuilding has not been authorized here.
 ## Retained-release gate
 
 `scripts/check --release <manifest>` remains the single entry point. Its existing
-retained-release validation reads the four public cases from the actual
-EntityStore, checks enrollment/rating attributes and canonical measurements,
+retained-release validation reads the five public cases from the actual
+EntityStore, checks 73 canonical measurements and nine case-specific attributes,
 and refuses changed input SHA-256 values until the publisher examples receive
 manual review. The packaged JSON is the single reference used by both tests
 and release checks, including installed consumers. There is no auto-record
 command or whole-store hydration. The known 0.0.125 artifact must fail these
 rating assertions; matching producer/repeat bytes was not scientific evidence.
 
-This is a small publisher-example gate. The uncovered affiliation, complete
-field-unit dictionary, spatial and current TEFA cases above remain open and are
-reported as outside this gate's coverage. A passing example gate does not
-certify every entity or dataset.
+This is a small publisher-example gate. Full affiliation ingestion, the complete
+field-unit dictionary, spatial coverage and current TEFA adoption remain outside
+this gate's coverage. A passing example gate does not certify every entity or
+dataset or qualify newly rebuilt artifacts by itself.

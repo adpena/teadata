@@ -244,6 +244,13 @@ def test_status_frame_preserves_zero_missing_and_suppressed_raw_values(catalog):
 
 def test_omitted_metric_period_inherits_but_explicit_unknown_does_not(catalog):
     dataset, _ = catalog.source_for_metric("enrollment", "campus")
+
+    def omit(document):
+        document["datasets"][dataset]["metadata"]["metrics"][
+            "student_enrollment_all_students_count"
+        ].pop("period", None)
+
+    catalog = revised(catalog, omit)
     definition = catalog.metadata(dataset).metrics[
         "student_enrollment_all_students_count"
     ]

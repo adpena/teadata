@@ -236,13 +236,20 @@ class YearMap:
     def available_years(self) -> List[int]:
         return sorted(y for y in self.entries.keys() if y != 9999)
 
-    def resolve(self, year: int, *, strict: bool = False) -> Optional[Tuple[int, str]]:
+    def resolve(
+        self, year: int, *, strict: bool = False, exact: bool = False
+    ) -> Optional[Tuple[int, str]]:
+        """Select a catalog year; strict keeps prior fallback, exact forbids it."""
+        if exact and year == 9999:
+            raise ValueError("Exact resolution requires an explicit dated catalog year")
         if year < self.year_min:
-            if strict:
+            if strict or exact:
                 raise KeyError(f"Requested year {year} < {self.year_min}")
             return None
         if year in self.entries:
             return year, self.entries[year].path
+        if exact:
+            raise KeyError(f"No exact data available for catalog year {year}")
         prior_years = [
             y for y in self.entries.keys() if isinstance(y, int) and y <= year
         ]
@@ -476,15 +483,18 @@ class Config:
         year: int | None,
         *,
         strict: bool = False,
+        exact: bool = False,
         section: str = "data_sources",
     ) -> Tuple[int, str]:
+        if exact and year is None:
+            raise ValueError("Exact resolution requires an explicit catalog year")
         catalog = self.data_sources if section == "data_sources" else self.spatial
         if dataset not in catalog:
             raise KeyError(f"{section} does not contain dataset '{dataset}'.")
         if year is None:
             years = catalog[dataset].available_years()
             year = max(years) if years else 9999
-        resolved = catalog[dataset].resolve(year, strict=strict)
+        resolved = catalog[dataset].resolve(year, strict=strict, exact=exact)
         if not resolved:
             raise KeyError(
                 f"No entry for {dataset} in {section} for year {year} (and no prior fallback)."
@@ -531,6 +541,7 @@ class Config:
         year: int | None = None,
         *,
         strict: bool = False,
+        exact: bool = False,
         section: str = "data_sources",
         reader_profile: str | None = None,
     ) -> ResolvedDataset:
@@ -541,18 +552,22 @@ class Config:
 
         This describes configuration, not evidence that a dataset was loaded into
         an engine or snapshot. Legacy entries have an unknown reference period.
+        ``exact=True`` requires the requested catalog key, not a matching metric
+        reference period. The default, including ``strict=True``, allows prior years.
         """
         if section not in {"data_sources", "spatial"}:
             raise ValueError("section must be data_sources or spatial")
         catalog = self.data_sources if section == "data_sources" else self.spatial
         if dataset not in catalog:
             raise KeyError(f"Unknown {section} dataset: {dataset}")
+        if exact and year is None:
+            raise ValueError("Exact resolution requires an explicit catalog year")
         selection_year = year
         if selection_year is None:
             years = catalog[dataset].available_years()
             selection_year = max(years) if years else 9999
         resolved_year, path = self.resolve(
-            dataset, selection_year, strict=strict, section=section
+            dataset, selection_year, strict=strict, exact=exact, section=section
         )
         definition = catalog[dataset].entries[resolved_year]
         metadata = definition.metadata
@@ -912,6 +927,7 @@ class Config:
         *,
         section: str = "data_sources",
         reader_profile: str | None = None,
+        exact: bool = False,
         **reader_kwargs,
     ):
         """
@@ -921,10 +937,10 @@ class Config:
         from .column_schema import has_default_reader, reader_options
         from .manifest import ACTIVE_BUILD, ContractError
 
-        source = self.resolve_dataset(dataset, year, section=section)
+        source = self.resolve_dataset(dataset, year, section=section, exact=exact)
         try:
             if reader_profile is not None:
-                source = self.resolve_dataset(dataset, year, section=section, reader_profile=reader_profile)
+                source = self.resolve_dataset(dataset, year, section=section, reader_profile=reader_profile, exact=exact)
             options = reader_options(source.reader, reader_profile)
         except ValueError as error:
             raise ContractError(f"Invalid reader contract for {dataset}: {error}") from error

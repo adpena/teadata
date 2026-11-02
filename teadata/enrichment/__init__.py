@@ -1,7 +1,54 @@
-from typing import Dict
+from dataclasses import asdict, dataclass
+from typing import Any, Dict, Literal
 from .base import Enricher
 
 _registry: Dict[str, Enricher] = {}
+
+
+@dataclass(frozen=True)
+class EnrichmentOutcome:
+    """Observed join coverage, not a claim about every source field/population."""
+
+    dataset: str
+    requested_year: int | None
+    status: Literal["succeeded", "partial", "unmatched", "unsupported", "failed"]
+    scope: str | None = None
+    required: bool = False
+    resolved_year: int | None = None
+    expected: int | None = None
+    matched: int | None = None
+    unmatched: int | None = None
+    missing_identifier: int | None = None
+    source_rows: int | None = None
+    source_status: Literal["available", "empty", "missing", "unknown"] = "unknown"
+    updated: int | None = None
+    error_type: str | None = None
+    error: str | None = None
+    error_truncated: bool = False
+
+    def to_dict(self) -> dict[str, Any]:
+        return asdict(self)
+
+
+def _record_outcome(repo, outcome: EnrichmentOutcome) -> dict[str, Any]:
+    if not hasattr(repo, "_enrichment_outcomes"):
+        repo._enrichment_outcomes = []
+    document = outcome.to_dict()
+    repo._enrichment_outcomes.append(document)
+    return document
+
+
+def _record_matches(repo, dataset, year, resolved_year, scope, *, matched,
+                    unmatched, missing_identifier, source_rows):
+    """Retain the exact counters observed by an entity-join loop."""
+    return _record_outcome(repo, EnrichmentOutcome(
+        dataset=dataset, requested_year=year, resolved_year=resolved_year, scope=scope,
+        status=("partial" if unmatched or missing_identifier else "succeeded") if matched else "unmatched",
+        expected=matched + unmatched + missing_identifier,
+        matched=matched, unmatched=unmatched, missing_identifier=missing_identifier,
+        source_rows=source_rows, source_status="available" if source_rows else "empty",
+        updated=matched,
+    ))
 
 
 def enricher(name: str):
@@ -17,16 +64,33 @@ def enricher(name: str):
 def run_enrichment(
     repo, cfg_path: str, year: int, *, datasets: list[str] | None = None
 ):
-    # If datasets is None, run all registered
-    selected = datasets or list(_registry.keys())
+    """Run optional enrichers and retain failures/unsupported selections in stats.
+
+    Existing enricher result keys are preserved. ``outcome`` contains observed
+    coverage; null counts mean the enricher did not report that coverage.
+    """
+    selected = list(_registry) if datasets is None else datasets
     stats = {}
     for name in selected:
         enr = _registry.get(name)
         if not enr:
-            print(f"[enrich] '{name}' not registered; skipping")
+            stats[name] = {"outcome": _record_outcome(repo, EnrichmentOutcome(
+                name, year, "unsupported", error="Enricher is not registered",
+            ))}
             continue
+        start = len(getattr(repo, "_enrichment_outcomes", ()))
         try:
-            stats[name] = enr.apply(repo, cfg_path, year)
+            result = enr.apply(repo, cfg_path, year)
+            observed = getattr(repo, "_enrichment_outcomes", ())[start:]
+            outcome = observed[-1] if observed else _record_outcome(repo, EnrichmentOutcome(
+                name, year, "succeeded", resolved_year=result.get("year"), updated=result.get("updated"),
+            ))
+            stats[name] = {**result, "outcome": dict(outcome)}
         except Exception as e:
+            stats[name] = {"outcome": _record_outcome(repo, EnrichmentOutcome(
+                name, year, "failed", error_type=type(e).__name__, error=str(e)[:4096],
+                error_truncated=len(str(e)) > 4096,
+                source_status="missing" if isinstance(e, FileNotFoundError) else "unknown",
+            ))}
             print(f"[enrich] {name} failed: {e}")
     return stats

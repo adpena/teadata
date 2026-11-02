@@ -3,7 +3,7 @@ from typing import Dict, Any, Callable
 
 import teadata.classes as classes_mod
 import pandas as pd
-from . import enricher
+from . import enricher, _record_matches
 from .base import Enricher, clean_value_columns
 
 from teadata.teadata_config import load_config
@@ -108,6 +108,7 @@ def _apply_campus_enrichment_table(
     resolved_year, df = cfg.load_df(
         dataset, year, section="data_sources", **(reader_kwargs or {})
     )
+    source_rows = len(df)
 
     if _profile_enabled():
         _debug(
@@ -118,20 +119,14 @@ def _apply_campus_enrichment_table(
     if rename:
         df = df.rename(columns=rename)
 
-    # Ensure we have a campus_number column; try standard helper, then fallbacks
+    # The normalizer creates a null placeholder when no source alias is found.
     df, found = normalize_campus_number_column(df, new_col="campus_number")
-    if found is None and "campus_number" not in df.columns:
-        # Try common variations
-        for guess in ("Campus Number", "CAMPUS", "campus", "Campus"):
-            if guess in df.columns:
-                df = df.rename(columns={guess: "campus_number"})
-                break
-    if "campus_number" not in df.columns:
+    if found is None:
         if _profile_enabled():
             _debug(
                 f"[enrich:{dataset}] abort: campus_number column missing after normalization (found={found})"
             )
-        return resolved_year, 0
+        raise KeyError("campus enrichment missing required join column: campus_number")
 
     # Canonicalize to leading-apostrophe format used across the repo
     df["campus_number"] = _canon_series(df["campus_number"])
@@ -240,6 +235,9 @@ def _apply_campus_enrichment_table(
                 f"[enrich:{dataset}] sample unmatched campus_numbers: {sample_missing}"
             )
 
+    _record_matches(repo, dataset, year, resolved_year, "campus",
+                    matched=updated, unmatched=missing_no_match,
+                    missing_identifier=missing_no_number, source_rows=source_rows)
     return resolved_year, updated
 
 
@@ -267,6 +265,7 @@ def _apply_campus_peims_financials(
     resolved_year, df = cfg.load_df(
         dataset, year, section="data_sources", **(reader_kwargs or {})
     )
+    source_rows = len(df)
 
     if _profile_enabled():
         _debug(
@@ -277,17 +276,12 @@ def _apply_campus_peims_financials(
         df = df.rename(columns=rename)
 
     df, found = normalize_campus_number_column(df, new_col="campus_number")
-    if found is None and "campus_number" not in df.columns:
-        for guess in ("Campus Number", "CAMPUS", "campus", "Campus"):
-            if guess in df.columns:
-                df = df.rename(columns={guess: "campus_number"})
-                break
-    if "campus_number" not in df.columns:
+    if found is None:
         if _profile_enabled():
             _debug(
                 f"[enrich:{dataset}] abort: campus_number column missing after normalization (found={found})"
             )
-        return resolved_year, 0
+        raise KeyError("campus PEIMS financial enrichment missing required join column: campus_number")
 
     df["campus_number"] = _canon_series(df["campus_number"])
     df = df[df["campus_number"].notna()]
@@ -365,6 +359,9 @@ def _apply_campus_peims_financials(
                 f"[enrich:{dataset}] sample unmatched campus_numbers: {sample_missing}"
             )
 
+    _record_matches(repo, dataset, year, resolved_year, "campus",
+                    matched=updated, unmatched=missing_no_match,
+                    missing_identifier=missing_no_number, source_rows=source_rows)
     return resolved_year, updated
 
 

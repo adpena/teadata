@@ -319,12 +319,13 @@ def test_source_only_metadata_period_mismatch_fails_before_reading_rows(tmp_path
 
 def test_existing_default_contracts_and_public_metric_bindings_remain_pinned(catalog):
     cfg = yaml.safe_load((ROOT / 'teadata/teadata_sources.yaml').read_bytes())
-    # Fixed from fee47071's canonical default projection, including its path
-    # and complete base metadata; named opt-in profiles are separate contracts.
+    # Historical 2024 defaults remain fixed. The reviewed 127 correction updates
+    # 2025 demographic/lagged bindings, schema references and local observations;
+    # named graduation opt-ins remain separate and unchanged.
     expected = {('campus', 2024): '6a0893a78bd67167d596a8bb135f712d8ce07e358d4408c82e0b7736c5c7edbe',
-        ('campus', 2025): 'a2cc8992744dbd615a96f01bcb76d7999ddaa8ce45c227d8ede3e3f9ea7ba436',
+        ('campus', 2025): 'f132cf384c1afc7daf855392fe031663a9a35cde5928cfc663e1bf6204b78966',
         ('district', 2024): '0c43e0e72f3cb7483b26977ab4e90cb5c1dbdabd3d988f4cb61d640db4f1d438',
-        ('district', 2025): 'be72f63ca5612fa122004b7c060be01b0559cbc852f6ce4daf84fe682b43c8bf'}
+        ('district', 2025): 'd9126f9e14bc7363bbeedab01669340b0a04ef8393c961f6a8cbd63f71eaee9d'}
     for (scope, year), digest in expected.items():
         entry = cfg['data_sources'][scope + '_tapr_student_staff_profile'][year]
         default_entry = {**entry, 'reader': reader_options(entry.get('reader', {}), None)}

@@ -3,6 +3,7 @@ include LICENSE README.md AGENTS.md pyproject.toml uv.lock mkdocs.yml
 include scripts/check
 recursive-include tests *.py
 recursive-include tests/fixtures/tapr_dictionary *.html
+recursive-include tests/fixtures/publisher_golden_2025 *.csv *.md
 recursive-include examples *.py
 recursive-include docs *.md
 recursive-include provenance/records *.json

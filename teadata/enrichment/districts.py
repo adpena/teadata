@@ -3,7 +3,7 @@ from typing import Dict, Any, Optional
 
 import teadata.classes as classes_mod
 
-from . import enricher
+from . import enricher, _record_matches
 from .base import Enricher, clean_value_columns
 
 from teadata.teadata_config import load_config
@@ -65,6 +65,7 @@ def _apply_district_enrichment_table(
     resolved_year, df = cfg.load_df(
         dataset, year, section="data_sources", **(reader_kwargs or {})
     )
+    source_rows = len(df)
 
     if _profile_enabled():
         _debug(
@@ -78,12 +79,12 @@ def _apply_district_enrichment_table(
     # Ensure we have a clean, machine-joinable district_number column
     df, found = normalize_district_number_column(df, new_col="district_number")
 
-    if "district_number" not in df.columns:
+    if found is None:
         if _profile_enabled():
             _debug(
                 f"[enrich:{dataset}] abort: district_number column missing after normalization (found={found})"
             )
-        return resolved_year, 0
+        raise KeyError("district enrichment missing required join column: district_number")
 
     # Canonicalize to leading-apostrophe format used across the repo
     df["district_number"] = df["district_number"].map(_canon_district_number)
@@ -204,6 +205,9 @@ def _apply_district_enrichment_table(
         )
     print(summary_msg)
 
+    _record_matches(repo, dataset, year, resolved_year, "district",
+                    matched=updated, unmatched=missing_no_match,
+                    missing_identifier=missing_no_number, source_rows=source_rows)
     return resolved_year, updated
 
 

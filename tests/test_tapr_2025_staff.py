@@ -50,7 +50,7 @@ def test_staff_crosswalk_retains_every_actual_column_without_default_activation(
     assert all(type(r['source_line']) is int and r['source_line'] > 0
                and type(r['source_column']) is int and r['source_column'] >= 0 for r in table['dictionary_records'])
     historical_path = ROOT / 'teadata/schemas/tapr--2025--header-crosswalk.json'
-    assert sha256(historical_path.read_bytes()).hexdigest() == 'fdbdbb24ab218063d46cb5d4781ef9cca55b9e448020f01b8b7264e8c292e339'
+    assert sha256(historical_path.read_bytes()).hexdigest() == '1a4617fd41e504b1791f21926c5f9a648ca684cebbabd9a80ce2b833934dced9'
     old_dataset = next(d for d in parse_column_schema(historical_path.read_bytes())['datasets'] if d['dataset'].startswith(scope + '_'))
     old_codes = {f['code'] for t in old_dataset['tables'] if t['table'] == 'staff' for f in t['fields']}
     assert old_codes < {r['code'] for r in records}
@@ -116,8 +116,11 @@ def test_student_source_contract_preserves_observed_headers_and_historical_names
     cfg = load_config()
     source = cfg.resolve_dataset(selected['dataset'], 2025)
     records = cfg.header_records(selected['dataset'], edition='2025', reader_profile='source')
-    assert len(records) == width and all(r['period'] == {'kind': 'unknown'} for r in records)
-    assert not source.metadata.metrics and source.metadata.value_policy is None and source.metadata.field_year is None
+    assert len(records) == width
+    reviewed_periods = {definition.field: (definition.period or source.metadata.period).to_dict()
+                        for definition in source.metadata.metrics.values()}
+    assert all(r['period'] == reviewed_periods.get(r['field'], {'kind': 'unknown'}) for r in records)
+    assert source.metadata.value_policy is None and source.metadata.field_year is None
     assert not source.metadata.provenance_ids
     raw_reference = next(r for r in source.metadata.references if r.reference_id == 'csv_headers')
     assert raw_reference.provenance_ids == (raw_id,) and raw_reference.reviewed_sha256 == raw_sha

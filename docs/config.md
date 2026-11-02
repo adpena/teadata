@@ -125,6 +125,21 @@ metadata_for_json = source.to_dict()
 ```
 
 `resolve()` and `load_df()` keep returning `(resolved_year, path_or_dataframe)`.
+Their default selection allows the nearest prior catalog year. `strict=True`
+on `resolve()` or `resolve_dataset()` preserves that prior-year fallback; it
+rejects unavailable/undated fallback rather than requiring an exact year.
+Use `exact=True` on `resolve()`, `resolve_dataset()`, or `load_df()` to require
+an explicit numeric catalog year and raise before source I/O if it is absent:
+
+```python
+source = cfg.resolve_dataset("campus_tapr_student_staff_profile", 2025, exact=True)
+year, frame = cfg.load_df("campus_tapr_student_staff_profile", 2025, exact=True)
+```
+
+An exact catalog key does not establish a metric's reference period. Read the
+selected source metadata and per-metric periods separately; an undated `current`
+entry cannot satisfy an exact-year request.
+
 `to_json()` preserves structured metadata and the shorthand for legacy entries.
 An undated `current` entry has `resolved_year=None` and `is_fallback=None` in the
 new API; its legacy synthetic `9999` year is not presented as a real year.

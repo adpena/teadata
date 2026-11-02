@@ -6,14 +6,12 @@ Bring in external datasets (accountability, finance, etc.) and attach fields dir
 
 ```python
 from teadata.enrichment.districts import enrich_districts_from_config
-from teadata.teadata_config import load_config
-
-CFG = load_config("teadata_sources.yaml")
+CFG = "teadata/teadata_sources.yaml"
 year, updated = enrich_districts_from_config(
     engine, CFG, dataset="accountability", year=2025,
-    select=["2025 Overall Rating"],
-    rename={"2025 Overall Rating": "overall_rating_2025"},
-    aliases={"overall_rating_2025": "rating"},  # also write canonical slot
+    select=["overall_rating"],
+    aliases={"overall_rating": "rating"},  # also write canonical slot
+    reader_kwargs={"reader_profile": "ratings", "exact": True},
 )
 print(f"Enriched {updated} districts from {year}")
 ```
@@ -25,12 +23,53 @@ from teadata.enrichment.campuses import enrich_campuses_from_config
 
 year, updated = enrich_campuses_from_config(
     engine, CFG, dataset="accountability", year=2025,
-    select=["2025 Overall Rating"],
-    rename={"2025 Overall Rating": "overall_rating_2025"},
-    aliases={"overall_rating_2025": "rating"},
+    select=["overall_rating"],
+    aliases={"overall_rating": "rating"},
+    reader_kwargs={"reader_profile": "ratings", "exact": True},
 )
 print(f"Enriched {updated} campuses from {year}")
 ```
+
+## Outcomes and Coverage
+
+`run_enrichment()` runs optional registered enrichers. Its returned mapping keeps
+each successful enricher's existing result keys (such as `year` and `updated`)
+and adds `outcome`. Failed and unregistered selections also receive entries:
+
+```python
+from teadata.enrichment import run_enrichment
+
+stats = run_enrichment(engine, CFG, 2025, datasets=["campus_accountability"])
+outcome = stats["campus_accountability"]["outcome"]
+print(outcome["status"], outcome["matched"], outcome["unmatched"])
+```
+
+The campus/district table joins report `expected` repository objects visited,
+`matched` objects receiving a source row, `unmatched` objects with a usable
+identifier but no matching row, and `missing_identifier` objects that cannot be
+joined. They also retain the requested/resolved catalog years and observed
+`source_rows`. These are object-join counts, not an expected statewide reporting
+population, proof that every source row was used, or validation of every field.
+An unmatched object does not imply a zero, inapplicability, or a publisher error.
+Numeric zero and negative source tokens retain their original values and policies.
+
+Statuses distinguish `succeeded`, `partial`, `unmatched`, `unsupported`, and
+`failed`. Missing source files are labelled `source_status="missing"`; a loaded
+zero-row table is `empty`. A registered legacy enricher that returns only an
+update count has unknown (`None`) coverage counts, even when it succeeds.
+Unknown source availability remains `unknown`. Error text is limited to 4,096
+characters, with `error_truncated=True` when shortened. Interrupts still propagate.
+
+Outcomes remain on the engine and are copied into the existing release processing
+record's `validation.enrichment_outcomes`. Required enrichments still raise on
+failure or zero matches, and failed required outcomes block release validation.
+During an active build with successfully verified input receipts, a required
+failure archives its actual outcome JSON (maximum 2 MiB) as a diagnostic output
+of a failed processing record. That record does not publish a release and does
+not become a source acquisition. If diagnostic retention fails, the original
+exception is preserved with a note. Outside an active build, the caller receives
+the exception and engine outcomes; no processing receipt is claimed. A stopped
+pipeline reports attempted stages only and does not imply later stages ran.
 
 ## Snapshots
 

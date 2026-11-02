@@ -220,8 +220,9 @@ def test_embedded_crosswalk_is_bound_to_source_and_schema(bound_catalog, change)
 
 def test_packaged_crosswalk_preserves_qualified_publisher_headers_and_current_fields():
     data = files("teadata").joinpath(RESOURCE).read_bytes()
-    assert sha256(data).hexdigest() == "fdbdbb24ab218063d46cb5d4781ef9cca55b9e448020f01b8b7264e8c292e339"
+    assert sha256(data).hexdigest() == "1a4617fd41e504b1791f21926c5f9a648ca684cebbabd9a80ce2b833934dced9"
     document = parse_column_schema(data)
+    assert document["mapping_version"] == 2
     campus = header_records(document, dataset="campus_tapr_student_staff_profile", edition="2025", table="student")
     assert campus[0]["code"] == "CAMPUS" and campus[0]["label"] == "9 Digit Campus Number"
     assert campus[0]["field"] == "campus_number" and campus[0]["position"] == 1
@@ -233,15 +234,26 @@ def test_packaged_crosswalk_preserves_qualified_publisher_headers_and_current_fi
     ):
         columns = schema_columns(document, dataset=dataset, edition="2025")
         assert len(columns) == size
-        # Exact previously reviewed names/order, without maintaining a second list.
-        assert sha256((canonical_json({"schema_version": 1, "columns": columns}) + "\n").encode()).hexdigest() == legacy_schema_sha
+        # Preserve every previous name/order except the four reviewed IND/ASI
+        # destinations. Literal source headers are unchanged by the correction.
+        scope = dataset.split("_", 1)[0]
+        prior_destinations = {
+            f"{scope}_2025_student_enrollment_american_indian_count": f"{scope}_2025_student_enrollment_asian_count",
+            f"{scope}_2025_student_enrollment_american_indian_percent": f"{scope}_2025_student_enrollment_asian_percent",
+            f"{scope}_2025_student_enrollment_asian_count": f"{scope}_2024_25_asian_students_count",
+            f"{scope}_2025_student_enrollment_asian_percent": f"{scope}_2024_25_asian_students_percent",
+        }
+        assert set(prior_destinations) <= set(columns)
+        prior_columns = [prior_destinations.get(column, column) for column in columns]
+        assert sha256((canonical_json({"schema_version": 1, "columns": prior_columns}) + "\n").encode()).hexdigest() == legacy_schema_sha
     with pytest.raises(ValueError, match="unavailable"):
         header_records(document, dataset="campus_tapr_student_staff_profile", edition="2024")
 
 
-def test_current_published_catalog_does_not_infer_new_package_crosswalk():
-    from teadata.release import DataRelease
-    catalog = DataRelease(ROOT / "teadata/.cache/release.json").catalog
+def test_legacy_catalog_does_not_infer_new_package_crosswalk(catalog):
+    # This valid legacy catalog has no frozen header resource. Its behavior must
+    # not depend on whichever local release manifest a later build activates.
+    assert not catalog.to_dict().get("column_schemas")
     with pytest.raises(ContractError, match="crosswalk unavailable"):
         catalog.header_records("campus_tapr_student_staff_profile", edition="2025")
 

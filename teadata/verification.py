@@ -512,6 +512,7 @@ def _validate_publisher_cases(release: DataRelease) -> dict[str, Any]:
     from types import SimpleNamespace
 
     from teadata.entity_store import EntityStore
+    from teadata.manifest import ContractError
 
     reference = _publisher_reference()
     coverage = reference["release_validation"]
@@ -527,6 +528,27 @@ def _validate_publisher_cases(release: DataRelease) -> dict[str, Any]:
         artifact = datasets.get(selected_input["dataset"], {}).get("artifact", {})
         if artifact.get("sha256") != selected_input["sha256"]:
             raise ReceiptError(f"Publisher reference source changed: {selected_input['dataset']}; manually review its cases")
+    headers = {}
+    for case in cases:
+        for fact in case["facts"]:
+            locator = fact["source"]
+            if "code" not in locator:
+                continue
+            source = reference["sources"][locator["source_id"]]
+            dataset = source["release_input"]["dataset"]
+            if dataset not in headers:
+                try:
+                    headers[dataset] = release.catalog.header_records(dataset)
+                except ContractError as error:
+                    raise ReceiptError(f"Publisher reference source lineage unavailable: {dataset}") from error
+            matches = [row for row in headers[dataset] if row["field"] == fact["field"]]
+            if len(matches) != 1:
+                raise ReceiptError(f"Publisher reference {case['case_id']} source lineage field missing or ambiguous: {fact['field']}")
+            expected_lineage = {"code": locator["code"], "label": locator["header_row1"],
+                                "position": locator["column_1_based"], "input_sha256": source["sha256"]}
+            for component, expected in expected_lineage.items():
+                if matches[0].get(component) != expected:
+                    raise ReceiptError(f"Publisher reference {case['case_id']} source lineage {component} differs: {fact['field']}")
     facts_checked = attributes_checked = 0
     with EntityStore(release.artifact("entities"), immutable=True) as store:
         for case in cases:
@@ -537,7 +559,12 @@ def _validate_publisher_cases(release: DataRelease) -> dict[str, Any]:
                 raise ReceiptError(f"Publisher reference entity is absent: {case['case_id']}")
             context = SimpleNamespace(**record)
             expected_by_metric = {fact["expected"]["metric"]: fact["expected"] for fact in case["facts"]}
-            for attribute, metric in coverage["attribute_metrics"].items():
+            # Cases may cover different publisher measures. A race/population
+            # case must not invent a rating merely to join this bounded gate.
+            attributes = case.get("attribute_metrics", coverage["attribute_metrics"])
+            if not isinstance(attributes, dict) or any(metric not in expected_by_metric for metric in attributes.values()):
+                raise ReceiptError(f"Publisher reference {case['case_id']} has invalid attribute expectations")
+            for attribute, metric in attributes.items():
                 expected = expected_by_metric[metric]["value"]
                 if record.get(attribute) != expected or type(record.get(attribute)) is not type(expected):
                     raise ReceiptError(f"Publisher reference {case['case_id']} attribute {attribute} differs")

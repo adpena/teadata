@@ -23,15 +23,16 @@ PyYAML's supported pure Python implementation is tested on 3.15.
 ### PyPI
 
 ```bash
-pip install teadata
+uv venv
+uv pip install teadata==0.0.127
 ```
 
 ### Development (recommended)
 
 ```bash
-git clone https://github.com/adpena/teadata.git
+GIT_LFS_SKIP_SMUDGE=1 git clone https://github.com/adpena/teadata.git
 cd teadata
-uv sync --all-extras
+uv sync --extra dev --extra database --extra scripts --extra speedups
 ```
 
 Source datasets are separate from the checkout; a verified release bundle is enough
@@ -100,20 +101,41 @@ default SQLite checks because SQLite does not enforce declared `VARCHAR` widths.
 
 ## Quick Start
 
+Python packages contain code and metadata; data bundles are distributed
+separately. Select an immutable bundle before running the example:
+
+```bash
+export TEADATA_RELEASE_URL="https://github.com/adpena/teadata/releases/download/v0.0.127/release.json"
+```
+
+For a downloaded bundle, set `TEADATA_RELEASE` to its local `release.json`
+instead. The manifest binds the selected artifacts to their content hashes.
+
 ```python
 from teadata import DataEngine
 
 # Load the configured, hash-verified release.
 engine = DataEngine.load_default()
 
-# District lookup by district number, campus number, or name.
-aldine = engine.get_district("101902")
-print(aldine.name)
+# Look up a six-digit TEA district number.
+aldine = (engine >> ("district", "101902")).first()
+if aldine is not None:
+    print(aldine.name)
 
-# Campuses physically inside district boundaries.
-for campus in aldine.campuses[:5]:
-    print(campus.name, campus.campus_number)
+    # Campuses assigned to this district.
+    for campus in aldine.campuses[:5]:
+        print(campus.name, campus.campus_number)
 ```
+
+The district operation returns a `Query`. `.first()` selects its first match or
+returns `None`; iterate the query to inspect every match when a name or wildcard
+can identify multiple districts.
+
+`DataEngine()` creates an empty engine by default (`autoload=False`).
+`load_default()` and `from_snapshot()` without a path use the configured release:
+`TEADATA_RELEASE`, then `TEADATA_RELEASE_URL`, then the package's
+`teadata/.cache/release.json`, unless a release is already pinned by
+`using_release()`.
 
 ## Public API Surface
 
@@ -125,8 +147,9 @@ from teadata import DataEngine, District, Campus
 
 Core behaviors:
 
-- `DataEngine.from_snapshot(...)` loads catalog-bound snapshots with verified release framing.
-- One release manifest selects and verifies every artifact; independent discovery is retired.
+- `DataEngine.load_default()` loads the snapshot and boundary store selected by the configured release manifest.
+- `DataEngine.from_snapshot(path)` loads a trusted local catalog-bound snapshot; omit the path to use the configured release.
+- One release manifest binds the snapshot and sidecars to a catalog; selected artifact hashes are checked as they are loaded.
 - `District` and `Campus` support dynamic metadata attributes through `meta`.
 - `Campus.to_dict()` always includes `percent_enrollment_change` (numeric when available, otherwise `"N/A"`).
 

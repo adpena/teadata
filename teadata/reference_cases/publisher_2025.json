@@ -104,6 +104,874 @@
             "sheet": "2011-2025 Summary",
             "source_id": "accountability_2025"
           }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_african_american_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 4331
+          },
+          "field": "district_2025_student_membership_african_american_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPETBLAC",
+            "code_header_row": 2,
+            "column_1_based": 42,
+            "header_row1": "District 2025 Student Membership: African American Count",
+            "publisher_report": {
+              "column_1_based": 2,
+              "population": "membership",
+              "row_label": "African American",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "4331",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_african_american_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 6
+          },
+          "field": "district_2025_student_membership_african_american_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPETBLAP",
+            "code_header_row": 2,
+            "column_1_based": 94,
+            "header_row1": "District 2025 Student Membership: African American Percent",
+            "publisher_report": {
+              "column_1_based": 3,
+              "population": "membership",
+              "row_label": "African American",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "6",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_african_american_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 4342
+          },
+          "field": "district_2025_student_enrollment_african_american_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPNTBLAC",
+            "code_header_row": 2,
+            "column_1_based": 173,
+            "header_row1": "District 2025 Student Enrollment: African American Count",
+            "publisher_report": {
+              "column_1_based": 6,
+              "population": "enrollment",
+              "row_label": "African American",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "4342",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_african_american_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 6
+          },
+          "field": "district_2025_student_enrollment_african_american_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPNTBLAP",
+            "code_header_row": 2,
+            "column_1_based": 174,
+            "header_row1": "District 2025 Student Enrollment: African American Percent",
+            "publisher_report": {
+              "column_1_based": 7,
+              "population": "enrollment",
+              "row_label": "African American",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "6",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_hispanic_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 39250
+          },
+          "field": "district_2025_student_membership_hispanic_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPETHISC",
+            "code_header_row": 2,
+            "column_1_based": 43,
+            "header_row1": "District 2025 Student Membership: Hispanic Count",
+            "publisher_report": {
+              "column_1_based": 2,
+              "population": "membership",
+              "row_label": "Hispanic",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "39250",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_hispanic_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 54.4
+          },
+          "field": "district_2025_student_membership_hispanic_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPETHISP",
+            "code_header_row": 2,
+            "column_1_based": 95,
+            "header_row1": "District 2025 Student Membership: Hispanic Percent",
+            "publisher_report": {
+              "column_1_based": 3,
+              "population": "membership",
+              "row_label": "Hispanic",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "54.4",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_hispanic_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 39305
+          },
+          "field": "district_2025_student_enrollment_hispanic_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPNTHISC",
+            "code_header_row": 2,
+            "column_1_based": 175,
+            "header_row1": "District 2025 Student Enrollment: Hispanic Count",
+            "publisher_report": {
+              "column_1_based": 6,
+              "population": "enrollment",
+              "row_label": "Hispanic",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "39305",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_hispanic_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 54.4
+          },
+          "field": "district_2025_student_enrollment_hispanic_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPNTHISP",
+            "code_header_row": 2,
+            "column_1_based": 176,
+            "header_row1": "District 2025 Student Enrollment: Hispanic Percent",
+            "publisher_report": {
+              "column_1_based": 7,
+              "population": "enrollment",
+              "row_label": "Hispanic",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "54.4",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_white_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 21966
+          },
+          "field": "district_2025_student_membership_white_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPETWHIC",
+            "code_header_row": 2,
+            "column_1_based": 44,
+            "header_row1": "District 2025 Student Membership: White Count",
+            "publisher_report": {
+              "column_1_based": 2,
+              "population": "membership",
+              "row_label": "White",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "21966",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_white_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 30.4
+          },
+          "field": "district_2025_student_membership_white_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPETWHIP",
+            "code_header_row": 2,
+            "column_1_based": 93,
+            "header_row1": "District 2025 Student Membership: White Percent",
+            "publisher_report": {
+              "column_1_based": 3,
+              "population": "membership",
+              "row_label": "White",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "30.4",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_white_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 21991
+          },
+          "field": "district_2025_student_enrollment_white_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPNTWHIC",
+            "code_header_row": 2,
+            "column_1_based": 177,
+            "header_row1": "District 2025 Student Enrollment: White Count",
+            "publisher_report": {
+              "column_1_based": 6,
+              "population": "enrollment",
+              "row_label": "White",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "21991",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_white_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 30.4
+          },
+          "field": "district_2025_student_enrollment_white_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPNTWHIP",
+            "code_header_row": 2,
+            "column_1_based": 178,
+            "header_row1": "District 2025 Student Enrollment: White Percent",
+            "publisher_report": {
+              "column_1_based": 7,
+              "population": "enrollment",
+              "row_label": "White",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "30.4",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_american_indian_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 125
+          },
+          "field": "district_2025_student_membership_american_indian_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPETINDC",
+            "code_header_row": 2,
+            "column_1_based": 38,
+            "header_row1": "District 2025 Student Membership: American Indian Count",
+            "publisher_report": {
+              "column_1_based": 2,
+              "population": "membership",
+              "row_label": "American Indian",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "125",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_american_indian_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 0.2
+          },
+          "field": "district_2025_student_membership_american_indian_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPETINDP",
+            "code_header_row": 2,
+            "column_1_based": 96,
+            "header_row1": "District 2025 Student Membership: American Indian Percent",
+            "publisher_report": {
+              "column_1_based": 3,
+              "population": "membership",
+              "row_label": "American Indian",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "0.2",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_american_indian_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 125
+          },
+          "field": "district_2025_student_enrollment_american_indian_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPNTINDC",
+            "code_header_row": 2,
+            "column_1_based": 179,
+            "header_row1": "District 2025 Student Enrollment: Asian Count",
+            "publisher_report": {
+              "column_1_based": 6,
+              "population": "enrollment",
+              "row_label": "American Indian",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "125",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_american_indian_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 0.2
+          },
+          "field": "district_2025_student_enrollment_american_indian_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPNTINDP",
+            "code_header_row": 2,
+            "column_1_based": 180,
+            "header_row1": "District 2025 Student Enrollment: Asian Percent",
+            "publisher_report": {
+              "column_1_based": 7,
+              "population": "enrollment",
+              "row_label": "American Indian",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "0.2",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_asian_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 3443
+          },
+          "field": "district_2025_student_membership_asian_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPETASIC",
+            "code_header_row": 2,
+            "column_1_based": 39,
+            "header_row1": "District 2025 Student Membership: Asian Count",
+            "publisher_report": {
+              "column_1_based": 2,
+              "population": "membership",
+              "row_label": "Asian",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "3443",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_asian_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 4.8
+          },
+          "field": "district_2025_student_membership_asian_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPETASIP",
+            "code_header_row": 2,
+            "column_1_based": 97,
+            "header_row1": "District 2025 Student Membership: Asian Percent",
+            "publisher_report": {
+              "column_1_based": 3,
+              "population": "membership",
+              "row_label": "Asian",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "4.8",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_asian_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 3448
+          },
+          "field": "district_2025_student_enrollment_asian_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPNTASIC",
+            "code_header_row": 2,
+            "column_1_based": 181,
+            "header_row1": "District 2024-25 Asian Students Count",
+            "publisher_report": {
+              "column_1_based": 6,
+              "population": "enrollment",
+              "row_label": "Asian",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "3448",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_asian_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 4.8
+          },
+          "field": "district_2025_student_enrollment_asian_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPNTASIP",
+            "code_header_row": 2,
+            "column_1_based": 182,
+            "header_row1": "District 2024-25 Asian Students Percent",
+            "publisher_report": {
+              "column_1_based": 7,
+              "population": "enrollment",
+              "row_label": "Asian",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "4.8",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_pacific_islander_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 69
+          },
+          "field": "district_2025_student_membership_pacific_islander_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPETPCIC",
+            "code_header_row": 2,
+            "column_1_based": 40,
+            "header_row1": "District 2025 Student Membership: Pacific Islander Count",
+            "publisher_report": {
+              "column_1_based": 2,
+              "population": "membership",
+              "row_label": "Pacific Islander",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "69",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_pacific_islander_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 0.1
+          },
+          "field": "district_2025_student_membership_pacific_islander_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPETPCIP",
+            "code_header_row": 2,
+            "column_1_based": 98,
+            "header_row1": "District 2025 Student Membership: Pacific Islander Percent",
+            "publisher_report": {
+              "column_1_based": 3,
+              "population": "membership",
+              "row_label": "Pacific Islander",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "0.1",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_pacific_islander_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 69
+          },
+          "field": "district_2025_student_enrollment_pacific_islander_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPNTPCIC",
+            "code_header_row": 2,
+            "column_1_based": 183,
+            "header_row1": "District 2025 Student Enrollment: Pacific Islander Count",
+            "publisher_report": {
+              "column_1_based": 6,
+              "population": "enrollment",
+              "row_label": "Pacific Islander",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "69",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_pacific_islander_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 0.1
+          },
+          "field": "district_2025_student_enrollment_pacific_islander_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPNTPCIP",
+            "code_header_row": 2,
+            "column_1_based": 184,
+            "header_row1": "District 2025 Student Enrollment: Pacific Islander Percent",
+            "publisher_report": {
+              "column_1_based": 7,
+              "population": "enrollment",
+              "row_label": "Pacific Islander",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "0.1",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_two_or_more_races_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 2991
+          },
+          "field": "district_2025_student_membership_two_or_more_races_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPETTWOC",
+            "code_header_row": 2,
+            "column_1_based": 41,
+            "header_row1": "District 2025 Student Membership: Two or More Races Count",
+            "publisher_report": {
+              "column_1_based": 2,
+              "population": "membership",
+              "row_label": "Two or More Races",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "2991",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_two_or_more_races_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 4.1
+          },
+          "field": "district_2025_student_membership_two_or_more_races_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPETTWOP",
+            "code_header_row": 2,
+            "column_1_based": 99,
+            "header_row1": "District 2025 Student Membership: Two or More Races Percent",
+            "publisher_report": {
+              "column_1_based": 3,
+              "population": "membership",
+              "row_label": "Two or More Races",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "4.1",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_two_or_more_races_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 2992
+          },
+          "field": "district_2025_student_enrollment_two_or_more_races_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPNTTWOC",
+            "code_header_row": 2,
+            "column_1_based": 185,
+            "header_row1": "District 2025 Student Enrollment: Two or More Races Count",
+            "publisher_report": {
+              "column_1_based": 6,
+              "population": "enrollment",
+              "row_label": "Two or More Races",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "2992",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_two_or_more_races_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 4.1
+          },
+          "field": "district_2025_student_enrollment_two_or_more_races_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "DPNTTWOP",
+            "code_header_row": 2,
+            "column_1_based": 186,
+            "header_row1": "District 2025 Student Enrollment: Two or More Races Percent",
+            "publisher_report": {
+              "column_1_based": 7,
+              "population": "enrollment",
+              "row_label": "Two or More Races",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_district_student_report_2025"
+            },
+            "raw_token": "4.1",
+            "record_row_1_based": 1093,
+            "source_id": "tapr_district_csv"
+          }
         }
       ]
     },
@@ -571,6 +1439,950 @@
           "raw_token": "Schools"
         }
       }
+    },
+    {
+      "attribute_metrics": {
+        "enrollment": "enrollment"
+      },
+      "case_id": "highland-park-race-populations-2025",
+      "entity": {
+        "governing_district": "227901",
+        "name": "HIGHLAND PARK EL",
+        "number": "227901119",
+        "type": "campus"
+      },
+      "facts": [
+        {
+          "expected": {
+            "metric": "tapr.student_membership_all_students_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 648
+          },
+          "field": "campus_2025_student_membership_all_students_count",
+          "note": "Independent official report total; enrollment and membership are different populations.",
+          "source": {
+            "code": "CPETALLC",
+            "code_header_row": 2,
+            "column_1_based": 62,
+            "header_row1": "Campus 2025 Student Membership: All Students Count",
+            "publisher_report": {
+              "column_1_based": 2,
+              "population": "membership",
+              "row_label": "Total Students",
+              "section": "Total Students",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "648",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "enrollment",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 649
+          },
+          "field": "campus_2025_student_enrollment_all_students_count",
+          "note": "Independent official report total; enrollment and membership are different populations.",
+          "source": {
+            "code": "CPNTALLC",
+            "code_header_row": 2,
+            "column_1_based": 139,
+            "header_row1": "Campus 2025 Student Enrollment: All Students Count",
+            "publisher_report": {
+              "column_1_based": 6,
+              "population": "enrollment",
+              "row_label": "Total Students",
+              "section": "Total Students",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "649",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_african_american_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 7
+          },
+          "field": "campus_2025_student_membership_african_american_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPETBLAC",
+            "code_header_row": 2,
+            "column_1_based": 78,
+            "header_row1": "Campus 2025 Student Membership: African American Count",
+            "publisher_report": {
+              "column_1_based": 2,
+              "population": "membership",
+              "row_label": "African American",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "7",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_african_american_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 1.1
+          },
+          "field": "campus_2025_student_membership_african_american_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPETBLAP",
+            "code_header_row": 2,
+            "column_1_based": 99,
+            "header_row1": "Campus 2025 Student Membership: African American Percent",
+            "publisher_report": {
+              "column_1_based": 3,
+              "population": "membership",
+              "row_label": "African American",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "1.1",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_african_american_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 7
+          },
+          "field": "campus_2025_student_enrollment_african_american_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPNTBLAC",
+            "code_header_row": 2,
+            "column_1_based": 174,
+            "header_row1": "Campus 2025 Student Enrollment: African American Count",
+            "publisher_report": {
+              "column_1_based": 6,
+              "population": "enrollment",
+              "row_label": "African American",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "7",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_african_american_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 1.1
+          },
+          "field": "campus_2025_student_enrollment_african_american_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPNTBLAP",
+            "code_header_row": 2,
+            "column_1_based": 175,
+            "header_row1": "Campus 2025 Student Enrollment: African American Percent",
+            "publisher_report": {
+              "column_1_based": 7,
+              "population": "enrollment",
+              "row_label": "African American",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "1.1",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_hispanic_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 105
+          },
+          "field": "campus_2025_student_membership_hispanic_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPETHISC",
+            "code_header_row": 2,
+            "column_1_based": 79,
+            "header_row1": "Campus 2025 Student Membership: Hispanic Count",
+            "publisher_report": {
+              "column_1_based": 2,
+              "population": "membership",
+              "row_label": "Hispanic",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "105",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_hispanic_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 16.2
+          },
+          "field": "campus_2025_student_membership_hispanic_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPETHISP",
+            "code_header_row": 2,
+            "column_1_based": 100,
+            "header_row1": "Campus 2025 Student Membership: Hispanic Percent",
+            "publisher_report": {
+              "column_1_based": 3,
+              "population": "membership",
+              "row_label": "Hispanic",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "16.2",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_hispanic_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 105
+          },
+          "field": "campus_2025_student_enrollment_hispanic_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPNTHISC",
+            "code_header_row": 2,
+            "column_1_based": 176,
+            "header_row1": "Campus 2025 Student Enrollment: Hispanic Count",
+            "publisher_report": {
+              "column_1_based": 6,
+              "population": "enrollment",
+              "row_label": "Hispanic",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "105",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_hispanic_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 16.2
+          },
+          "field": "campus_2025_student_enrollment_hispanic_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPNTHISP",
+            "code_header_row": 2,
+            "column_1_based": 177,
+            "header_row1": "Campus 2025 Student Enrollment: Hispanic Percent",
+            "publisher_report": {
+              "column_1_based": 7,
+              "population": "enrollment",
+              "row_label": "Hispanic",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "16.2",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_white_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 459
+          },
+          "field": "campus_2025_student_membership_white_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPETWHIC",
+            "code_header_row": 2,
+            "column_1_based": 80,
+            "header_row1": "Campus 2025 Student Membership: White Count",
+            "publisher_report": {
+              "column_1_based": 2,
+              "population": "membership",
+              "row_label": "White",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "459",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_white_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 70.8
+          },
+          "field": "campus_2025_student_membership_white_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPETWHIP",
+            "code_header_row": 2,
+            "column_1_based": 98,
+            "header_row1": "Campus 2025 Student Membership: White Percent",
+            "publisher_report": {
+              "column_1_based": 3,
+              "population": "membership",
+              "row_label": "White",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "70.8",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_white_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 459
+          },
+          "field": "campus_2025_student_enrollment_white_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPNTWHIC",
+            "code_header_row": 2,
+            "column_1_based": 178,
+            "header_row1": "Campus 2025 Student Enrollment: White Count",
+            "publisher_report": {
+              "column_1_based": 6,
+              "population": "enrollment",
+              "row_label": "White",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "459",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_white_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 70.7
+          },
+          "field": "campus_2025_student_enrollment_white_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPNTWHIP",
+            "code_header_row": 2,
+            "column_1_based": 179,
+            "header_row1": "Campus 2025 Student Enrollment: White Percent",
+            "publisher_report": {
+              "column_1_based": 7,
+              "population": "enrollment",
+              "row_label": "White",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "70.7",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_american_indian_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 0
+          },
+          "field": "campus_2025_student_membership_american_indian_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPETINDC",
+            "code_header_row": 2,
+            "column_1_based": 74,
+            "header_row1": "Campus 2025 Student Membership: American Indian Count",
+            "publisher_report": {
+              "column_1_based": 2,
+              "population": "membership",
+              "row_label": "American Indian",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "0",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_american_indian_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 0
+          },
+          "field": "campus_2025_student_membership_american_indian_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPETINDP",
+            "code_header_row": 2,
+            "column_1_based": 101,
+            "header_row1": "Campus 2025 Student Membership: American Indian Percent",
+            "publisher_report": {
+              "column_1_based": 3,
+              "population": "membership",
+              "row_label": "American Indian",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "0",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_american_indian_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 0
+          },
+          "field": "campus_2025_student_enrollment_american_indian_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPNTINDC",
+            "code_header_row": 2,
+            "column_1_based": 180,
+            "header_row1": "Campus 2025 Student Enrollment: Asian Count",
+            "publisher_report": {
+              "column_1_based": 6,
+              "population": "enrollment",
+              "row_label": "American Indian",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "0",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_american_indian_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 0
+          },
+          "field": "campus_2025_student_enrollment_american_indian_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPNTINDP",
+            "code_header_row": 2,
+            "column_1_based": 181,
+            "header_row1": "Campus 2025 Student Enrollment: Asian Percent",
+            "publisher_report": {
+              "column_1_based": 7,
+              "population": "enrollment",
+              "row_label": "American Indian",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "0",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_asian_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 32
+          },
+          "field": "campus_2025_student_membership_asian_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPETASIC",
+            "code_header_row": 2,
+            "column_1_based": 75,
+            "header_row1": "Campus 2025 Student Membership: Asian Count",
+            "publisher_report": {
+              "column_1_based": 2,
+              "population": "membership",
+              "row_label": "Asian",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "32",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_asian_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 4.9
+          },
+          "field": "campus_2025_student_membership_asian_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPETASIP",
+            "code_header_row": 2,
+            "column_1_based": 102,
+            "header_row1": "Campus 2025 Student Membership: Asian Percent",
+            "publisher_report": {
+              "column_1_based": 3,
+              "population": "membership",
+              "row_label": "Asian",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "4.9",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_asian_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 32
+          },
+          "field": "campus_2025_student_enrollment_asian_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPNTASIC",
+            "code_header_row": 2,
+            "column_1_based": 182,
+            "header_row1": "Campus 2024-25 Asian Students Count",
+            "publisher_report": {
+              "column_1_based": 6,
+              "population": "enrollment",
+              "row_label": "Asian",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "32",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_asian_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 4.9
+          },
+          "field": "campus_2025_student_enrollment_asian_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPNTASIP",
+            "code_header_row": 2,
+            "column_1_based": 183,
+            "header_row1": "Campus 2024-25 Asian Students Percent",
+            "publisher_report": {
+              "column_1_based": 7,
+              "population": "enrollment",
+              "row_label": "Asian",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "4.9",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_pacific_islander_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 1
+          },
+          "field": "campus_2025_student_membership_pacific_islander_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPETPCIC",
+            "code_header_row": 2,
+            "column_1_based": 76,
+            "header_row1": "Campus 2025 Student Membership: Pacific Islander Count",
+            "publisher_report": {
+              "column_1_based": 2,
+              "population": "membership",
+              "row_label": "Pacific Islander",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "1",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_pacific_islander_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 0.2
+          },
+          "field": "campus_2025_student_membership_pacific_islander_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPETPCIP",
+            "code_header_row": 2,
+            "column_1_based": 103,
+            "header_row1": "Campus 2025 Student Membership: Pacific Islander Percent",
+            "publisher_report": {
+              "column_1_based": 3,
+              "population": "membership",
+              "row_label": "Pacific Islander",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "0.2",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_pacific_islander_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 1
+          },
+          "field": "campus_2025_student_enrollment_pacific_islander_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPNTPCIC",
+            "code_header_row": 2,
+            "column_1_based": 184,
+            "header_row1": "Campus 2025 Student Enrollment: Pacific Islander Count",
+            "publisher_report": {
+              "column_1_based": 6,
+              "population": "enrollment",
+              "row_label": "Pacific Islander",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "1",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_pacific_islander_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 0.2
+          },
+          "field": "campus_2025_student_enrollment_pacific_islander_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPNTPCIP",
+            "code_header_row": 2,
+            "column_1_based": 185,
+            "header_row1": "Campus 2025 Student Enrollment: Pacific Islander Percent",
+            "publisher_report": {
+              "column_1_based": 7,
+              "population": "enrollment",
+              "row_label": "Pacific Islander",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "0.2",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_two_or_more_races_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 44
+          },
+          "field": "campus_2025_student_membership_two_or_more_races_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPETTWOC",
+            "code_header_row": 2,
+            "column_1_based": 77,
+            "header_row1": "Campus 2025 Student Membership: Two or More Races Count",
+            "publisher_report": {
+              "column_1_based": 2,
+              "population": "membership",
+              "row_label": "Two or More Races",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "44",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_membership_two_or_more_races_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 6.8
+          },
+          "field": "campus_2025_student_membership_two_or_more_races_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPETTWOP",
+            "code_header_row": 2,
+            "column_1_based": 104,
+            "header_row1": "Campus 2025 Student Membership: Two or More Races Percent",
+            "publisher_report": {
+              "column_1_based": 3,
+              "population": "membership",
+              "row_label": "Two or More Races",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "6.8",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_two_or_more_races_count",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "count",
+            "value": 45
+          },
+          "field": "campus_2025_student_enrollment_two_or_more_races_count",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPNTTWOC",
+            "code_header_row": 2,
+            "column_1_based": 186,
+            "header_row1": "Campus 2025 Student Enrollment: Two or More Races Count",
+            "publisher_report": {
+              "column_1_based": 6,
+              "population": "enrollment",
+              "row_label": "Two or More Races",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "45",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        },
+        {
+          "expected": {
+            "metric": "tapr.student_enrollment_two_or_more_races_percent",
+            "period": {
+              "end_year": 2025,
+              "kind": "school_year",
+              "start_year": 2024
+            },
+            "status": "observed",
+            "unit": "percent",
+            "value": 6.9
+          },
+          "field": "campus_2025_student_enrollment_two_or_more_races_percent",
+          "note": "Expected value transcribed from independently acquired official report. Original CSV label remains literal, including the IND/ASI enrollment conflict.",
+          "source": {
+            "code": "CPNTTWOP",
+            "code_header_row": 2,
+            "column_1_based": 187,
+            "header_row1": "Campus 2025 Student Enrollment: Two or More Races Percent",
+            "publisher_report": {
+              "column_1_based": 7,
+              "population": "enrollment",
+              "row_label": "Two or More Races",
+              "section": "Ethnic Distribution",
+              "source_id": "tapr_campus_student_report_2025"
+            },
+            "raw_token": "6.9",
+            "record_row_1_based": 8301,
+            "source_id": "tapr_campus_csv"
+          }
+        }
+      ]
     }
   ],
   "description": "Hand-selected publisher excerpts and handwritten expected truth. No library export generated these expectations.",
@@ -583,7 +2395,8 @@
       "austin-isd-2025",
       "kiker-disclosure-and-five-model",
       "basis-san-antonio-year-and-spatial",
-      "rocketship-reporting-only-notrated"
+      "rocketship-reporting-only-notrated",
+      "highland-park-race-populations-2025"
     ],
     "uncovered": [
       "Complete TAPR field-unit dictionary",
@@ -596,7 +2409,36 @@
     "unit_metrics": [
       "enrollment",
       "overall_rating",
-      "tapr.student_membership_attrition_all_students_percent"
+      "tapr.student_membership_attrition_all_students_percent",
+      "tapr.student_membership_african_american_count",
+      "tapr.student_membership_african_american_percent",
+      "tapr.student_enrollment_african_american_count",
+      "tapr.student_enrollment_african_american_percent",
+      "tapr.student_membership_hispanic_count",
+      "tapr.student_membership_hispanic_percent",
+      "tapr.student_enrollment_hispanic_count",
+      "tapr.student_enrollment_hispanic_percent",
+      "tapr.student_membership_white_count",
+      "tapr.student_membership_white_percent",
+      "tapr.student_enrollment_white_count",
+      "tapr.student_enrollment_white_percent",
+      "tapr.student_membership_american_indian_count",
+      "tapr.student_membership_american_indian_percent",
+      "tapr.student_enrollment_american_indian_count",
+      "tapr.student_enrollment_american_indian_percent",
+      "tapr.student_membership_asian_count",
+      "tapr.student_membership_asian_percent",
+      "tapr.student_enrollment_asian_count",
+      "tapr.student_enrollment_asian_percent",
+      "tapr.student_membership_pacific_islander_count",
+      "tapr.student_membership_pacific_islander_percent",
+      "tapr.student_enrollment_pacific_islander_count",
+      "tapr.student_enrollment_pacific_islander_percent",
+      "tapr.student_membership_two_or_more_races_count",
+      "tapr.student_membership_two_or_more_races_percent",
+      "tapr.student_enrollment_two_or_more_races_count",
+      "tapr.student_enrollment_two_or_more_races_percent",
+      "tapr.student_membership_all_students_count"
     ]
   },
   "sources": {
@@ -648,6 +2490,18 @@
     },
     "tapr_campus_csv": {
       "custody": "As-retained publisher-formatted two-header CSV; original acquisition timestamp/exact download URL unknown.",
+      "fixture_selection": {
+        "logical_records_1_based": [
+          1,
+          2,
+          8301
+        ],
+        "method": "Exact original physical bytes: label record, code record, and selected entity record; no reserialization.",
+        "parent_sha256": "7e0e762a8f2ba50687fd8c6a59e8052d5740ba57abbedecddfca064bbd77548e",
+        "path": "tests/fixtures/publisher_golden_2025/campus-227901119-STUD.csv",
+        "sha256": "887d29077de5613db9db18741a0cc789af48da444f29ada6e03ee752224be188",
+        "size_bytes": 15735
+      },
       "path": "teadata/data/tapr/raw/2025 Campus Student Information.csv",
       "release_input": {
         "custody_note": "Selected normalized local workbook; original transformation event is unknown. Publisher values were independently checked in the retained CSV. Its identity is distinct from that CSV.",
@@ -661,8 +2515,30 @@
       "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html",
       "source_year": 2025
     },
+    "tapr_campus_student_report_2025": {
+      "acquisition_record_id": "b7405cf94a0fc80f3b9f5faa44610870acfcc4ff1e18a68d8bddfac08e254176",
+      "custody": "Fresh rolling TPRS Student Information report; mixed periods must be read per heading. This date does not establish historical prepared-workbook acquisition.",
+      "downloaded_at": "2026-11-02T19:39:44.284153+00:00",
+      "path": "provenance/objects/7dbe9ffb7c7fcc30d2555d464d7a73deb2028608071e25fe34d14fb89e075fa3",
+      "sha256": "7dbe9ffb7c7fcc30d2555d464d7a73deb2028608071e25fe34d14fb89e075fa3",
+      "size_bytes": 98724,
+      "source_url": "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=227901119&lev=C&prgopt=reports/tapr/student.sas",
+      "source_year": 2025
+    },
     "tapr_district_csv": {
       "custody": "As-retained publisher-formatted two-header CSV; original acquisition unknown.",
+      "fixture_selection": {
+        "logical_records_1_based": [
+          1,
+          2,
+          1093
+        ],
+        "method": "Exact original physical bytes: label record, code record, and selected entity record; no reserialization.",
+        "parent_sha256": "8ccd14fb2eaff8c73d94960950cc359d44bf4b81edb721975edf6795b8995811",
+        "path": "tests/fixtures/publisher_golden_2025/district-227901-STUD.csv",
+        "sha256": "026640d49132e5f0189f019e6297baa4844e6d2cb7d120941b6b770e1f85a060",
+        "size_bytes": 16591
+      },
       "path": "teadata/data/tapr/raw/2025 District Student Information.csv",
       "release_input": {
         "custody_note": "Selected normalized local workbook; original transformation event is unknown. Publisher values were independently checked in the retained CSV. Its identity is distinct from that CSV.",
@@ -674,6 +2550,16 @@
       "sha256": "8ccd14fb2eaff8c73d94960950cc359d44bf4b81edb721975edf6795b8995811",
       "size_bytes": 1057804,
       "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html",
+      "source_year": 2025
+    },
+    "tapr_district_student_report_2025": {
+      "acquisition_record_id": "a83c507d701b9b77a9128ca7c8d62d1d229cdfabe8bb0f1cdcdbf8a6090a5202",
+      "custody": "Fresh rolling TPRS Student Information report; mixed periods must be read per heading. This date does not establish historical prepared-workbook acquisition.",
+      "downloaded_at": "2026-11-02T19:39:36.662501+00:00",
+      "path": "provenance/objects/b3a9383958500d32c16e39e8b9dfc12d633ed50b53894dcd4bc6510e567ee534",
+      "sha256": "b3a9383958500d32c16e39e8b9dfc12d633ed50b53894dcd4bc6510e567ee534",
+      "size_bytes": 105720,
+      "source_url": "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=227901&lev=D&prgopt=reports/tapr/student.sas",
       "source_year": 2025
     },
     "tapr_glossary": {

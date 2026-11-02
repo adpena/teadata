@@ -2,3 +2,9 @@
 *.pkl.gz filter=lfs diff=lfs merge=lfs -text
 *.sqlite filter=lfs diff=lfs merge=lfs -text
 *.parquet filter=lfs diff=lfs merge=lfs -text
+
+# Keep byte-addressed metadata and publisher regression inputs unchanged.
+provenance/records/*.json -text
+teadata/schemas/*.json -text
+teadata/methodologies/*.md -text
+tests/fixtures/publisher_golden_2025/*.csv -text

@@ -13,7 +13,8 @@ from contextvars import ContextVar
 from urllib.parse import quote
 from teadata.attributes import campus_district_name, is_traditional_district
 
-from teadata.manifest import BuildRecorder, ContractError, write_sqlite_catalog
+from teadata.manifest import ACTIVE_BUILD, BuildRecorder, ContractError, write_sqlite_catalog
+from teadata.enrichment import EnrichmentOutcome, _record_outcome
 from teadata.provenance import ProvenanceStore
 from teadata.identifiers import canonical_source_identifier, campus_lookup_key, normalize_campus_lookup_key
 from teadata.release import publish_release, SNAPSHOT_MAGIC
@@ -470,38 +471,87 @@ def _materialize_percent_enrollment_change(repo: DataEngine) -> int:
 def run_enrichments(repo: DataEngine) -> None:
     """Run required enrichments using each source's selected contract."""
     cfg = load_config(CFG)
+
+    def required(scope, dataset, apply, **kwargs):
+        start = len(getattr(repo, "_enrichment_outcomes", ()))
+        try:
+            resolved_year, count = apply(repo, CFG, dataset, YEAR, **kwargs)
+            observed = getattr(repo, "_enrichment_outcomes", ())[start:]
+            outcome = observed[-1] if observed else _record_outcome(repo, EnrichmentOutcome(
+                dataset, YEAR, "succeeded", scope=scope, resolved_year=resolved_year, updated=count,
+            ))
+            outcome["required"] = True
+            if count == 0:
+                raise ContractError(f"No {scope} records matched: {dataset}")
+        except Exception as error:
+            observed = getattr(repo, "_enrichment_outcomes", ())[start:]
+            outcome = observed[-1] if observed else _record_outcome(repo, EnrichmentOutcome(
+                dataset, YEAR, "failed", scope=scope,
+                source_status="missing" if isinstance(error, FileNotFoundError) else "unknown",
+            ))
+            outcome.update(required=True, status="failed", error_type=type(error).__name__,
+                           error=str(error)[:4096], error_truncated=len(str(error)) > 4096)
+            try:
+                receipt = _retain_failed_enrichment(repo)
+                if receipt is not None:
+                    error.add_note(f"Failed enrichment diagnostic receipt: {receipt}")
+            except Exception as recording_error:
+                error.add_note(f"Could not retain enrichment diagnostic: {type(recording_error).__name__}")
+            raise
+
     for scope, enrich in (
         ("district", enrich_districts_from_config),
         ("campus", enrich_campuses_from_config),
     ):
-        _, count = enrich(
-            repo,
-            CFG,
+        required(
+            scope,
             "accountability",
-            YEAR,
+            enrich,
             select=["overall_rating"],
             aliases={"overall_rating": "rating"},
             reader_kwargs={"reader_profile": "ratings"},
         )
-        if count == 0:
-            raise ContractError(f"No {scope} accountability records matched")
-        _, count = enrich(repo, CFG, f"{scope}_tapr_student_staff_profile", YEAR)
-        if count == 0:
-            raise ContractError(f"No {scope} TAPR records matched")
-    _, frame = cfg.load_df("campus_transfer_reports", YEAR)
-    count = repo.apply_transfers_from_dataframe(
-        frame, value_policy=cfg.value_policies["campus_transfers"]
-    )
-    if count == 0:
-        raise ContractError("No campus transfer records matched")
+        required(scope, f"{scope}_tapr_student_staff_profile", enrich)
+
+    def transfers(repo, _cfg_path, dataset, year):
+        resolved_year, frame = cfg.load_df(dataset, year)
+        count = repo.apply_transfers_from_dataframe(
+            frame, value_policy=cfg.value_policies["campus_transfers"]
+        )
+        # This legacy count is outgoing source campuses, not complete entity coverage.
+        return resolved_year, count
+
+    required("campus_transfer_sources", "campus_transfer_reports", transfers)
     for dataset, select in (
         ("campus_peims_financials", DEFAULT_PEIMS_FINANCIAL_COLUMNS),
         ("campus_tapr_historical_enrollment", None),
         ("campus_planned_closures", None),
     ):
-        _, count = enrich_campuses_from_config(repo, CFG, dataset, YEAR, select=select)
-        if count == 0:
-            raise ContractError(f"No campus records matched: {dataset}")
+        required("campus", dataset, enrich_campuses_from_config, select=select)
+
+
+def _retain_failed_enrichment(repo: DataEngine) -> str | None:
+    """Archive actual failure diagnostics in the existing graph, never publish them."""
+    build = ACTIVE_BUILD.get()
+    if build is None:
+        return None
+    inputs = sorted({identifier for source in build.datasets.values()
+                     for identifier in source["metadata"]["provenance_ids"]})
+    if not inputs:
+        return None
+    validation = {"status": "failed", "phase": "enrichment",
+                  "enrichment_outcomes": getattr(repo, "_enrichment_outcomes", [])}
+    raw = json.dumps(validation, sort_keys=True, ensure_ascii=True).encode("utf-8")
+    if len(raw) > 2 * 1024 * 1024:
+        raise ContractError("Enrichment diagnostic exceeds the 2 MiB metadata budget")
+    with tempfile.TemporaryDirectory(prefix="enrichment-failure-", dir=_repo_cache_dir()) as temporary:
+        path = Path(temporary) / "enrichment-outcomes.json"
+        path.write_bytes(raw)
+        return build.store.record_processing(
+            dataset="teadata_release", inputs=inputs, outputs={"enrichment_diagnostic": path},
+            processor="teadata.load_data", code_version=build.processor_sha256,
+            parameters={"build_status": "failed", "phase": "enrichment"}, validation=validation,
+        )
 
 
 _BUILD_DIRECTORY: ContextVar[Path | None] = ContextVar(
@@ -2526,6 +2576,10 @@ def _add_tefa_entities(repo: DataEngine, frame: pd.DataFrame, *, version: int | 
 
 def _release_validation(repo: DataEngine) -> dict[str, Any]:
     """Gate structural completeness while keeping source review explicitly pending."""
+    outcomes = getattr(repo, "_enrichment_outcomes", [])
+    if any(outcome["required"] and outcome["status"] in {"failed", "unsupported", "unmatched"}
+           for outcome in outcomes):
+        raise ContractError("Release has a failed required enrichment")
     if any(repo._xfers_missing.values()) or getattr(repo, "_xfers_unresolved", ()):
         raise ContractError("Release has unresolved transfer endpoints; review the reporting roster before publication")
     return {
@@ -2534,6 +2588,7 @@ def _release_validation(repo: DataEngine) -> dict[str, Any]:
         "artifact_binding": "passed",
         "quality_status": "needs_review",
         "source_review_status": "pending",
+        "enrichment_outcomes": [dict(outcome) for outcome in outcomes],
         "district_count": len(repo._districts),
         "campus_count": len(repo._campuses),
         "reporting_only_campus_count": sum(c.meta.get("identity_source") == "accountability" for c in repo._campuses.values()),

@@ -76,7 +76,7 @@ def test_mixed_publisher_summary_rows_attach_ratings_to_the_right_campus(monkeyp
     assert all(entity.meta["overall_rating"] == entity.rating for entity in entities.values())
 
 
-@pytest.mark.parametrize("case", EXCERPTS["cases"][:4], ids=lambda c: c["case_id"])
+@pytest.mark.parametrize("case", [case for case in EXCERPTS["cases"] if "facts" in case], ids=lambda c: c["case_id"])
 def test_publisher_values_statuses_units_and_reference_periods(catalog, case):
     scope = case["entity"]["type"]
     entity = SimpleNamespace(
@@ -150,8 +150,9 @@ def test_kiker_midpoint_is_per_masked_destination_campus_not_charter_district(ca
 def test_ace_private_school_public_tapr_is_not_applicable(catalog):
     case = EXCERPTS["cases"][4]
     assert case["source_cells"]["Type"]["raw_token"] == "Private School"
-    # This tests population applicability only. The released public-district
-    # affiliation is a separate unresolved acceptance case, never golden truth.
+    # This tests population applicability only. Actual private governance was
+    # separately qualified in 126; the geographic district in the legacy source
+    # must never become a golden governing affiliation.
     entity = SimpleNamespace(is_private=True, campus_number=None, meta={})
     for metric in ("enrollment", "overall_rating"):
         value = catalog.measurement(entity, metric)

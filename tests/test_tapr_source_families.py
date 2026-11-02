@@ -182,15 +182,19 @@ def test_current_source_contracts_keep_explicit_one_year_csv_opt_ins():
     # Full pre-change Config preservation has one current baseline owner below.
 
 
-def test_latest_source_opt_ins_preserve_the_entire_preexisting_Config():
+def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     current = yaml.safe_load((ROOT / 'teadata/teadata_sources.yaml').read_text())
     for scope, family, *_ in EXTENDED_SOURCES:
         dataset = scope + '_tapr_' + family
         current['data_sources'].pop(dataset)
         current['schema']['data_sources'].pop(dataset)
-    # Exact pre-change cd837181 Config, including Annual/Longitudinal programs
-    # and every legacy default/profile/metric binding. One baseline owns this.
-    assert sha256(canonical_json(current).encode()).hexdigest() == 'f49575d45fcf9dcb877f60235609fcb3fcc20bbbf4c413e6ed0af90ae9e5a0b2'
+    # Remove only the four deliberately revised 2025 entries. Their corrected
+    # mappings, periods and provenance have dedicated publisher-grounded checks.
+    # Freeze all remaining cd837181 content, including 2024 and legacy bindings.
+    for scope in ('campus', 'district'):
+        for family in ('student_staff_profile', 'student_profile'):
+            current['data_sources'][scope + '_tapr_' + family].pop(2025)
+    assert sha256(canonical_json(current).encode()).hexdigest() == '34a7b6d5bf97111d9de442a60a6c446361b8501aab44851429660cb12f91ea8c'
 
 
 @pytest.mark.parametrize('scope,dictionary_sha,fields_sha', [
