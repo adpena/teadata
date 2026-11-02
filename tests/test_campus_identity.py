@@ -13,7 +13,7 @@ from teadata.load_data import build_campus_profile_map_payload
 from teadata.manifest import ContractError
 
 
-def historical_ace_campus():
+def historical_ace_campus(*, include_location: bool = True):
     """Retained consumer fixture; never an adapter for the active official roster."""
     document = json.loads((Path(__file__).parents[1] / "teadata/reference_cases/publisher_2025.json").read_text())
     case = next(c for c in document["cases"] if c["entity"].get("source_id") == "rec1kXXvIucG7UkoA")
@@ -23,7 +23,7 @@ def historical_ace_campus():
         id=uuid.uuid5(uuid.NAMESPACE_URL, "teadata:private:" + key), district_id=None,
         name=cells["Name"], charter_type="", is_charter=False, is_private=True,
         source_namespace="tefa", source_id=cells["ID"], grade_range="K-8",
-        location=(float(cells["Location Lng"]), float(cells["Location Lat"])),
+        location=(float(cells["Location Lng"]), float(cells["Location Lat"])) if include_location else None,
         meta={"private_source_dataset": "tefa", "private_source_version": "2025",
               "reported_directory_district_number": cells["School District Number"],
               "reported_directory_district_name": cells["School District Name"],
@@ -221,8 +221,7 @@ def test_private_without_point_keeps_profile_and_snapshot_identity(tmp_path, cat
 
     repo = DataEngine()
     repo.catalog = catalog
-    campus = historical_ace_campus()
-    campus.location = None
+    campus = historical_ace_campus(include_location=False)
     repo.add_campus(campus)
     campus = next(iter(repo._campuses.values()))
     assert campus.point is None and campus.location is None
