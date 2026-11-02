@@ -2,10 +2,6 @@ import argparse
 import json
 from typing import List
 
-import geopandas as gpd  # type: ignore[import-untyped]
-from shapely.geometry import shape, mapping, MultiPolygon, Polygon  # type: ignore[import-untyped]
-from shapely.validation import make_valid  # type: ignore[import-untyped]
-
 from teadata.scripts.paths import data_path
 
 DEFAULT_INPUT = str(data_path("shapes", "Current_Districts_2025.geojson"))
@@ -34,6 +30,9 @@ def flatten_and_filter_geojson(
     filter_value : str | None
         Value to match in `filter_field` (e.g., "AUSTIN ISD"). Case-insensitive comparison.
     """
+    from shapely.geometry import shape, mapping, MultiPolygon, Polygon  # type: ignore[import-untyped]
+    from shapely.validation import make_valid  # type: ignore[import-untyped]
+
     # Load raw GeoJSON data
     with open(input_path, "r") as f:
         data = json.load(f)
@@ -99,6 +98,8 @@ def flatten_and_filter_geojson(
         json.dump(out_fc, f)
 
     # Verify with GeoPandas (optional but helpful)
+    import geopandas as gpd  # type: ignore[import-untyped]
+
     gdf = gpd.read_file(output_path)
     print(f"✅ Flattened successfully with {len(gdf)} feature(s).")
     print("Columns:", gdf.columns.tolist())
