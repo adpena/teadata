@@ -123,6 +123,37 @@ stay unknown. Earlier immutable metadata, receipts and leaf semantic hashes
 retain their original bytes when `source_qualifiers` is absent. These APIs do
 not activate or qualify a new financial dataset.
 
+## File organization and names
+
+TEA Data uses the following project conventions. They apply the consistency,
+descriptive context, documented organization and unique identifiers discussed by
+[Harvard](https://guides.library.harvard.edu/hgsefilenaming),
+[Princeton](https://researchdata.princeton.edu/research-lifecycle-guide/data-acquisition/file-organization)
+and [Stanford](https://guides.library.stanford.edu/c.php?g=1186700); those guides
+describe best practices, not one mandated universal naming schema.
+
+| Namespace | Existing name or identity | Authority |
+| --- | --- | --- |
+| Retained original bytes | `provenance/objects/<byte-SHA-256>` | Exact bytes; descriptive discovery comes from the receipt and catalog. |
+| Acquisition and processing receipts | `provenance/records/<record-SHA-256>.json` | Canonical receipt identity, including its actual observation and typed parents. |
+| Logical source editions | `EditionKey(dataset, edition, revision_sha256, scope, table, grain)` | Qualified source identity; the revision binds ordered input bytes. |
+| Native leaves and external metadata | `<leaf-contract-SHA-256>.parquet`; `<resource-byte-SHA-256>.json` | `ArtifactRef` separates contract identity from physical byte identity; metadata descriptors bind their own bytes. |
+| Release bundles | `<role>_<build_id>.pkl.gz`, `.sqlite` or `.parquet`, beside `release.json` | The release manifest binds roles, exact names, bytes and one build identity. |
+
+Opaque internal CAS names remain useful unique identifiers. Dataset titles,
+periods, publisher state, source URLs and exact edition selections in the same
+catalog supply their descriptive context. An artifact's retained basename may
+be chosen during acquisition; it is not automatically the publisher's original
+attachment name. Retained URLs and response headers provide separate evidence.
+
+Use ISO dates such as `YYYY-MM-DD` when a known date is needed, with its meaning
+documented. Unknown publication dates stay unknown; an acquisition timestamp
+must not supply one. A mixed-period release snapshot has no implied global
+source year. Future display or download labels should derive from the existing
+`EditionKey` and `DatasetMetadata`, using the existing publication name/location
+guards. These conventions introduce no name registry or aliases and do not
+rename datasets, retained evidence or published assets.
+
 ## Private school-finder listings
 
 The private producer selects the latest curated `tefa` edition independently of
