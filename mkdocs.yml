@@ -36,6 +36,9 @@ nav:
     - Configuration: config.md
     - Dataset Contracts and Releases: data-releases.md
     - Versioning: versioning.md
+  - Source Audits:
+    - Transfer Preparation: transfer-sources.md
+    - Spatial Sources (2026-11): spatial-source-quality-2026-11.md
   - Reference: reference.md
 
 plugins:

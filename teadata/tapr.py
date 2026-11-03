@@ -14,10 +14,11 @@ from hashlib import sha256
 import io
 from pathlib import Path
 import re
-from typing import TYPE_CHECKING, Any, BinaryIO, Mapping
+from typing import TYPE_CHECKING, Any, Mapping
 
 from .column_schema import validate_header_table, validate_source_layout
 from .identifiers import canonical_source_identifiers
+from .source_csv import SourceLines
 
 if TYPE_CHECKING:
     from .values import ValuePolicy
@@ -228,49 +229,6 @@ def _source_stat(path: Path) -> tuple[int, ...]:
     return (value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns, value.st_ctime_ns)
 
 
-class _SourceLines:
-    """Bounded original physical lines for the C CSV logical-record decoder."""
-
-    def __init__(self, stream: BinaryIO, limit: int, error: str):
-        self.stream, self.limit = stream, limit
-        self.error = error
-        self.pending = bytearray()
-        self.record = bytearray()
-        self.digest = sha256()
-        self.eof = False
-        self.first = True
-
-    def __iter__(self):
-        return self
-
-    def __next__(self) -> str:
-        while True:
-            match = re.search(rb"\r\n|\r|\n", self.pending)
-            # A CR at the end of a block may be half of a CRLF.
-            if match and (match.end() < len(self.pending) or self.eof or self.pending[-1] != 13):
-                end = match.end()
-                break
-            if self.eof:
-                if not self.pending:
-                    raise StopIteration
-                end = len(self.pending)
-                break
-            if len(self.record) + len(self.pending) > self.limit:
-                raise ValueError(self.error)
-            block = self.stream.read(min(65536, self.limit + 1))
-            self.digest.update(block)
-            self.pending.extend(block)
-            self.eof = not block
-        if len(self.record) + end > self.limit:
-            raise ValueError(self.error)
-        segment = bytes(self.pending[:end])
-        del self.pending[:end]
-        self.record.extend(segment)
-        text = segment.decode("utf-8-sig" if self.first else "utf-8")
-        self.first = False
-        return text
-
-
 class TaprSourceReader(Iterator[Any]):
     """One canonical source scanner; only a fully exhausted scan has a summary.
 
@@ -374,7 +332,7 @@ class TaprSourceReader(Iterator[Any]):
 
         with path.open("rb") as stream:
             record_error = f"{path}: logical CSV record exceeds record byte budget"
-            lines = _SourceLines(stream, budget.record_bytes, record_error)
+            lines = SourceLines(stream, budget.record_bytes, record_error)
             reader = csv.reader(lines, strict=True)
             try:
                 while True:

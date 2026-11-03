@@ -699,6 +699,11 @@ def test_offline_cli_reports_and_closed_history_are_append_only_without_config_a
     closure = store.verify_record_closure([result['processing_record_id']])
     assert old[2] in closure and new[2] in closure
     assert closure[old[2]] == old[1].read_record(old[2])
+    report = json.loads(args.output.read_bytes())
+    reader = Path(__file__).resolve().parents[1] / 'teadata/source_csv.py'
+    assert report['implementation_sha256']['source_csv.py'] == sha256(reader.read_bytes()).hexdigest()
+    assert closure[result['processing_record_id']]['code_version'] == sha256(
+        json.dumps(report['implementation_sha256'], sort_keys=True).encode()).hexdigest()
     before = args.output.read_bytes()
     with pytest.raises(FileExistsError):
         compare_inputs(args)

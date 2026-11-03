@@ -77,11 +77,140 @@ group-200 rows were missing-value separators. This is parsed directional
 equivalence for that source, not byte identity of every field or proof about a
 newer response.
 
-Future structural preparation must validate that relationship before selecting
+Structural preparation validates that relationship before selecting
 one canonical campus edge. It must retain independent reported directions and
 raw row locators in its audit, and fail visibly on one-sided, duplicate, count,
 status, or historical district-ID conflicts. The fresh original publisher campus
 CSV, SHA `ea11eaf275f6c5abb79ead6213ded0223b17b70511798a4dc81f8abe03936372`,
 receipt `785606f825deb15011a31afaa03bcdb17683021f9be062ef28b93fe0392ea8ee`,
-has different bytes and requires its own structural preparation and comparison;
-unchanged values have not been established by the older audit.
+has different bytes. Its separate retained preparation and old/new comparison
+are documented below; they do not turn the older audit into proof of raw-byte
+identity.
+
+## Retained 2026-11-03 preparation results
+
+The two district preparations each consumed all 20 acquired regional originals.
+Their observed table coverage was:
+
+| Publisher school year | Table rows | Detail rows | Publisher TOTAL rows | Reporting district IDs observed |
+| --- | ---: | ---: | ---: | ---: |
+| 2023-2024 | 41,801 | 35,192 | 2,203 | 1,206 |
+| 2024-2025 | 43,179 | 36,564 | 2,205 | 1,208 |
+
+Both passed structural/year/region checks with zero duplicate detail keys,
+duplicate total keys, or reporting districts assigned to multiple report
+regions. Publisher totals were retained independently, without computation from
+masked details. These counts describe the responses' observed reporting IDs;
+they do not prove equality to every expected LEA or to the current entity catalog.
+The canonical processing records are
+`20b4640c31a135b55c435725f50f75d8798f769ad2790a20b10447d182cfd1da`
+for 2023-2024 and
+`a79a1f84b46c02b4929f3ec0dc942fa2adce8d6e3ca9f60539bf6ede31549fb5`
+for 2024-2025.
+
+The fresh campus original prepared 316,657 table rows. Its independent In and
+Out reports each contained 150,365 pairs: 14,215 observed and 136,150 suppressed.
+The direction gate found zero unknown-count rows, duplicate or one-sided pairs,
+count/status or historical district-ID mismatches, or raw count-token differences.
+Across 300,730 paired detail observations, the old-prepared/fresh-original
+comparison found zero one-sided rows or changed counts, statuses, historical
+district IDs, raw count tokens, names or other compared non-ID fields. Raw ID
+lexemes differed while their normalized IDs remained equal. Original quoting,
+headings, footnotes and byte identities remain distinct; non-detail row contents
+are outside that pair-detail comparison. The campus processing record is
+`87624230d536d19f63a4583ce62eacbaf6399d79607ecd20784f7138a49e0e2a`.
+
+All three preparations passed native readback equality. This verifies the
+retained source projection, not every field's external correctness or exhaustive
+LEA coverage. Their reports retain `field_correctness_qualified: false` and
+`activation: false`; these source preparations are not an activated release.
+
+## Offline structural preparation
+
+`prepare` consumes either explicitly pinned source acquisition/SHA pairs or one
+SHA-pinned completed regional batch index. District parsing is independent of
+partitioning: an independently acquired statewide district original, if found,
+can use `--input` without a regional index. No speculative statewide endpoint is
+assumed. All 20 regional originals have been acquired for each of 2023-2024 and
+2024-2025; acquisition alone does not prove every expected district has report
+rows. Any E3 district examples are additional goldens, not the statewide scope.
+
+For a regional batch:
+
+```sh
+uv run --locked --offline python -m teadata.scripts.refresh_transfers prepare \
+  --store /absolute/path/to/provenance --grain district --year 2024 \
+  --batch-index /absolute/path/to/2024-batch/BATCH_INDEX.json \
+  --batch-index-sha256 64a8075743db3719c0ef2fe60873429858f13b987cfbea51bf6c03296ec8d9bd \
+  --encoding utf-8 --policy-config /absolute/path/to/teadata_sources.yaml \
+  --policy-config-sha256 ACTUAL_CONFIG_SHA256 --policy campus_transfers \
+  --output /absolute/path/to/new-preparation
+```
+
+The explicit codec is an operator selection when retained MIME has no charset;
+the preparation records the original header and selection basis. A conflicting
+MIME/argument selection fails. The shared byte-framing primitive supports UTF-8,
+ASCII, ISO-8859-1 and Windows-1252; UTF-16/32 and other unsupported newline
+encodings fail visibly. UTF-8 is not inferred from an absent header. The command
+above is a recipe; the retained runs reported above passed strict UTF-8 decoding
+as an explicit operator selection. Their original CSV MIME headers did not
+declare a charset, so this is not a publisher-declared encoding claim.
+
+For the fresh campus original, use `--grain campus --year 2025 --input
+785606f825deb15011a31afaa03bcdb17683021f9be062ef28b93fe0392ea8ee
+ea11eaf275f6c5abb79ead6213ded0223b17b70511798a4dc81f8abe03936372` and
+`--compare-legacy-input
+d8fb8c735fdc89749c1593c494c8f73f6c8ef966ab885771af68717650e3871b
+acd304693b0e93865d12add2909bd015e7c5f1e4c04370a75202ad4117a35cce
+--compare-encoding utf-8`. The separately admitted legacy input has a header-first
+layout; its removed notes and unknown acquisition dates are not reconstructed.
+
+The reader preserves all original 10 district or 14 campus columns as strings.
+Table grain and physical report scope are distinct: an explicit regional
+district selection requires `Region Level Transfer Report`; an individual
+district input requires `District Level Transfer Report`, and a campus input
+requires `Campus Level Transfer Report`. A different title is not silently
+accepted as another scope.
+It checks the selected school-year label and, for regional inputs, the actual
+selected region. A bounded structural CSV scan retains original titles, blank
+records, exact footnotes and physical/logical row coordinates; Arrow performs
+whole-column identity and numeric/status interpretation. District combined
+labels require an anchored six-digit identifier; the raw label stays intact.
+Unexpected headers, row kinds, malformed IDs, invalid counts and unknown notes
+fail visibly. Zero remains observed zero. Suppression never becomes zero or an
+estimate. Publisher TOTAL rows remain independent of detail rows.
+
+Input admission is 64 MiB per retained source, with 1 MiB logical records,
+8 MiB native batches and 2 MiB annotations. These are buffer/input admissions,
+not a whole-process memory guarantee. Campus direction validation and comparison
+use native joins; they do not hydrate the entity engine or geocode records.
+
+`prepared-source.parquet` retains every table row, including separators and
+published totals, plus namespaced normalized IDs/statuses and row locators.
+`transfer_source_input` indexes the corresponding original receipt in
+`PREPARATION.json`; `ANNOTATIONS.json` retains the original non-table text and
+its raw-record hashes. Native readback must equal the written source projection.
+The campus gate rejects duplicate, one-sided, unknown-count or conflicting
+count/status/historical-district observations. Raw count-token spelling changes
+are reported separately from interpreted equality. The old/new comparison uses
+normalized direction/pair keys, reports one-sided rows and changed counts,
+statuses, historical districts and other raw fields, and distinguishes identifier
+padding changes. It does not infer unchanged values from the prior audit.
+
+Successful outputs and their validation/annotation reports are retained with
+`ProvenanceStore.record_processing`, using actual source receipts and captured
+policy/index/schema inputs as typed parents. Structural reads and legacy
+comparison reads retain the attempted input, error and parsed-prefix status in
+`PREPARATION.json` on failure. Structural or validation failures retain a HOLD
+diagnostic processing record with no `prepared_source` output; a parsed prefix
+is not published as a prepared dataset. Original
+acquisition events, timestamps and metadata remain unchanged. The processing
+identity includes the shared `source_csv.py`; the TAPR comparison also fingerprints
+that dependency explicitly after its extraction.
+
+These outputs are unpublished source preparations. `BuildRecorder` currently
+requires an acquisition matching the exact bytes of a selected retained input;
+its acquisition-only metadata fields cannot be used for processing IDs. A later
+activation must explicitly bind the existing typed processing/artifact authority
+and pass release qualification. This command creates no parallel release
+manifest, source catalog, engine state or active configuration.

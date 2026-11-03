@@ -196,7 +196,7 @@ def compare_inputs(args) -> dict:
     output.parent.mkdir(parents=True, exist_ok=True)
     root = Path(__file__).resolve().parents[1]
     report['implementation_sha256'] = {name: sha256((root / name).read_bytes()).hexdigest()
-        for name in ['scripts/refresh_tapr.py', 'tapr.py', 'values.py', 'column_schema.py',
+        for name in ['scripts/refresh_tapr.py', 'tapr.py', 'source_csv.py', 'values.py', 'column_schema.py',
                      'identifiers.py', 'provenance.py']}
     code = sha256(json.dumps(report['implementation_sha256'], sort_keys=True).encode()).hexdigest()
     with tempfile.TemporaryDirectory(prefix='.tapr-comparison-', dir=output.parent) as directory:

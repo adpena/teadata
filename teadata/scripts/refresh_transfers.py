@@ -1,12 +1,13 @@
-"""Explicit regional transfer acquisition. No source activation or engine work."""
+"""Explicit transfer acquisition/preparation. No source activation or engine work."""
 
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 from teadata.provenance import ProvenanceStore
-from teadata.transfer_sources import acquire_regional_transfers, read_regional_form
+from teadata.transfer_sources import acquire_regional_transfers, prepare_transfer_sources, read_regional_form
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -24,8 +25,36 @@ def main(argv: list[str] | None = None) -> int:
     acquire.add_argument("--timeout", type=float, default=20)
     acquire.add_argument("--max-bytes", type=int, default=8 * 1024 * 1024)
     acquire.add_argument("--output", type=Path, required=True, help="New exclusive batch-index directory")
+    prepare = sub.add_parser("prepare", help="Prepare pinned originals offline; never activate Config or an engine")
+    prepare.add_argument("--store", type=Path, required=True)
+    prepare.add_argument("--grain", choices=["campus", "district"], required=True)
+    prepare.add_argument("--year", type=int, required=True)
+    sources = prepare.add_mutually_exclusive_group(required=True)
+    sources.add_argument("--input", nargs=2, action="append", default=[], metavar=("RECORD", "SHA256"))
+    sources.add_argument("--batch-index", type=Path)
+    prepare.add_argument("--batch-index-sha256")
+    prepare.add_argument("--encoding", help="Explicit codec required when original HTTP MIME has no charset")
+    prepare.add_argument("--policy-config", type=Path, required=True)
+    prepare.add_argument("--policy-config-sha256", required=True)
+    prepare.add_argument("--policy", required=True, help="Existing Config ValuePolicy ID")
+    prepare.add_argument("--compare-legacy-input", nargs=2, metavar=("RECORD", "SHA256"))
+    prepare.add_argument("--compare-encoding", help="Explicit codec for the separately retained legacy CSV")
+    prepare.add_argument("--max-examples", type=int, default=10)
+    prepare.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
     store = ProvenanceStore(args.store)
+    if args.command == "prepare":
+        if (args.batch_index is None) != (args.batch_index_sha256 is None):
+            parser.error("--batch-index and --batch-index-sha256 must be supplied together")
+        result = prepare_transfer_sources(store, grain=args.grain, year=args.year, output=args.output,
+            policy_config=args.policy_config, policy_config_sha256=args.policy_config_sha256, value_policy=args.policy,
+            inputs=[(identifier, digest) for identifier, digest in args.input],
+            batch_index=(args.batch_index, args.batch_index_sha256) if args.batch_index is not None else None,
+            encoding=args.encoding,
+            compare_input=(args.compare_legacy_input[0], args.compare_legacy_input[1]) if args.compare_legacy_input is not None else None,
+            compare_encoding=args.compare_encoding, max_examples=args.max_examples)
+        print(json.dumps({name: result.get(name) for name in ["status", "rows", "processing_record_id"]}, sort_keys=True))
+        return 0 if result["status"] == "prepared" else 2
     form = read_regional_form(store, args.form_record, args.form_sha256)
     resume = dict(args.resume)
     if len(resume) != len(args.resume):
