@@ -11,7 +11,7 @@ import json
 from typing import Any, Literal, Mapping
 from urllib.parse import urlparse
 
-from .values import EstimationPolicy
+from .values import EstimationPolicy, MeasurementUnit
 
 
 def _known_fields(raw: Mapping[str, Any], allowed: set[str], label: str) -> None:
@@ -516,18 +516,14 @@ class MetricDefinition:
         _known_fields(raw, {"field", "period", "unit"}, "metric definition")
         if not isinstance(raw.get("field"), str) or not raw["field"].strip():
             raise ValueError("Metric definitions require a field")
-        if raw.get("unit") not in {
-            None,
-            "count",
-            "percent",
-            "currency",
-            "text",
-            "ratio",
-            "years",
-        }:
-            raise ValueError("Unknown metric unit")
+        unit = raw.get("unit")
+        if unit is not None:
+            try:
+                unit = MeasurementUnit(unit).value
+            except (TypeError, ValueError) as error:
+                raise ValueError("Unknown metric unit") from error
         return cls(
-            raw["field"], DataPeriod.from_dict(raw["period"]) if raw.get("period") is not None else None, raw.get("unit")
+            raw["field"], DataPeriod.from_dict(raw["period"]) if raw.get("period") is not None else None, unit
         )
 
     def to_dict(self) -> dict[str, Any]:

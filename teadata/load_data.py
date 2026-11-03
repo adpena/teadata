@@ -2524,12 +2524,13 @@ def _district_classification_counts(repo: DataEngine) -> dict[str, int]:
     }
 
 
-def _build_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
+def _build_repo(districts_fp: str, campuses_fp: str, *, cfg_obj: _cfg_mod.Config | None = None) -> DataEngine:
     repo = DataEngine()
 
-    cfg_obj = load_config(CFG)
-    _, gdf_districts = cfg_obj.load_df("districts", YEAR, section="spatial")
-    _, gdf_campuses = cfg_obj.load_df("campuses", YEAR, section="spatial")
+    if cfg_obj is None:
+        cfg_obj = load_config(CFG)
+    _, gdf_districts = cfg_obj.load_df("districts", section="spatial", **cfg_obj.spatial_selection("districts", YEAR))
+    _, gdf_campuses = cfg_obj.load_df("campuses", section="spatial", **cfg_obj.spatial_selection("campuses", YEAR))
 
     # (Optional) vectorized normalize for districts (small but tidy)
     gdf_districts["district_number_norm"] = gdf_districts["DISTRICT_C"].apply(
@@ -2759,7 +2760,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
     cfg = load_config(CFG)
     for dataset, path in (("districts", districts_fp), ("campuses", campuses_fp)):
         if (
-            Path(cfg.resolve_dataset(dataset, YEAR, section="spatial").path).resolve()
+            Path(cfg.resolve_dataset(dataset, section="spatial", **cfg.spatial_selection(dataset, YEAR)).path).resolve()
             != Path(path).resolve()
         ):
             raise ContractError("Build paths must match the selected source contracts")
@@ -2782,7 +2783,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
     ):
         token = _BUILD_DIRECTORY.set(Path(temporary))
         try:
-            repo = _build_repo(districts_fp, campuses_fp)
+            repo = _build_repo(districts_fp, campuses_fp, cfg_obj=cfg)
             expected = (
                 ({name for name in cfg.data_sources
                   if not cfg.is_source_only(name, YEAR)} - {"tepsac", "tefa"})
@@ -2869,8 +2870,8 @@ if __name__ == "__main__":
         )
     cfg = load_config(CFG)
     repo = load_repo(
-        cfg.resolve_dataset("districts", YEAR, section="spatial").path,
-        cfg.resolve_dataset("campuses", YEAR, section="spatial").path,
+        cfg.resolve_dataset("districts", section="spatial", **cfg.spatial_selection("districts", YEAR)).path,
+        cfg.resolve_dataset("campuses", section="spatial", **cfg.spatial_selection("campuses", YEAR)).path,
     )
     print(
         f"Loaded {len(repo._districts)} districts and {len(repo._campuses)} campuses; build {repo.catalog.build_id}"

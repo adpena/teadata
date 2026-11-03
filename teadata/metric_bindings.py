@@ -6,6 +6,8 @@ from dataclasses import asdict, dataclass, field
 import math
 from typing import Any, Mapping
 
+from .values import MeasurementUnit
+
 
 @dataclass(frozen=True)
 class MetricBinding:
@@ -37,21 +39,33 @@ class MetricBinding:
         if not isinstance(scopes, (list, tuple)) or not scopes or set(scopes) - {"campus", "district"}:
             raise ValueError("Unknown metric binding scopes")
         values["scopes"] = tuple(scopes)
-        units = {"count", "percent", "currency", "text", "ratio", "years"}
-        if values.get("unit") is not None and values["unit"] not in units:
-            raise ValueError("Unknown metric binding unit")
+        if values.get("unit") is not None:
+            try:
+                values["unit"] = MeasurementUnit(values["unit"]).value
+            except (TypeError, ValueError) as error:
+                raise ValueError("Unknown metric binding unit") from error
         suffixes = values.get("unit_suffixes", {})
         if not isinstance(suffixes, Mapping) or any(
-            not isinstance(key, str) or not key or value not in units for key, value in suffixes.items()
+            not isinstance(key, str) or not key for key in suffixes
         ):
             raise ValueError("Invalid metric unit suffix rules")
+        try:
+            for unit in suffixes.values():
+                MeasurementUnit(unit)
+        except (TypeError, ValueError) as error:
+            raise ValueError("Invalid metric unit suffix rules") from error
         for name in ("minimum", "maximum"):
             value = values.get(name)
             if value is not None and (type(value) not in {int, float} or not math.isfinite(value)):
                 raise ValueError("Metric bounds must be finite numbers")
         bounds = values.get("unit_bounds", {})
-        if not isinstance(bounds, Mapping) or any(key not in units for key in bounds):
+        if not isinstance(bounds, Mapping):
             raise ValueError("Invalid metric unit bounds")
+        try:
+            for unit in bounds:
+                MeasurementUnit(unit)
+        except (TypeError, ValueError) as error:
+            raise ValueError("Invalid metric unit bounds") from error
         for domain in bounds.values():
             if not isinstance(domain, Mapping) or set(domain) - {"minimum", "maximum"}:
                 raise ValueError("Invalid metric unit bounds")

@@ -106,7 +106,7 @@ def test_private_map_containment_is_all_match_boundary_inclusive_and_not_governa
     assert payload["private"]["campusNumber"] is None
     assert payload["private"]["lookupKey"] == private.lookup_key
     assert all(r["relation"] == "point_covered_by" and r["boundary_predicate"] == "covers" for r in payload["containingDistricts"])
-    assert all(r["boundary_dataset"] == "districts" and r["boundary_version"] == "2025" for r in payload["containingDistricts"])
+    assert all(r["boundary_dataset"] == "districts" and r["boundary_version"] == "2026" for r in payload["containingDistricts"])
 
 
 def test_raw_directory_name_never_becomes_governing_name(catalog):

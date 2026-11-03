@@ -205,6 +205,27 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     private[2025]['reader'] = legacy_reader['profiles']['source']
     assert current['schema']['data_sources']['tefa'] == ['xlsx', 'json']
     current['schema']['data_sources']['tefa'] = ['xlsx']
+    # Reconstruct only the intentionally revised spatial source contracts. Their
+    # current editions and reader schema are checked by test_spatial_sources.
+    spatial_years = current['options'].pop('spatial_years')
+    assert spatial_years == {'districts': 2026, 'campuses': 2025}
+    assert all(type(year) is int for year in spatial_years.values())
+    assert set(current['spatial']['districts']) == {2025, 2026}
+    current['spatial']['districts'].pop(2026)
+    assert set(current['spatial']['campuses']) == {2025}
+    historical_id = '0921b22eeca7d6b5c9211af116d2fcf5b8554103228b52b27a39118ed37196c1'
+    # read_record verifies the immutable record's content ID, not the raw GIS body.
+    historical = ProvenanceStore(ROOT / 'provenance').read_record(historical_id)
+    assert historical['kind'] == 'acquisition' and historical['dataset'] == 'campuses'
+    assert historical['section'] == 'spatial' and historical['resolved_year'] == 2025
+    assert historical['artifact']['sha256'] == '96ab1476d745eafee42a0fa8c2f8d934996a3f45d886816ea8de8753c46a466b'
+    metadata = deepcopy(historical['source_metadata'])
+    metadata['provenance_ids'] = ['b781fe9fd52b060b9336814df0932a22ec07ce47801998b7a24f7160adbc571a', historical_id]
+    schema, = [ref for ref in metadata['references'] if ref['reference_id'] == 'columns_default']
+    campus = current['spatial']['campuses'][2025]
+    campus['path'] = 'data/shapes/' + historical['artifact']['filename']
+    campus['metadata'] = metadata
+    campus['reader']['column_schema'] = schema['path']
     assert sha256(canonical_json(current).encode()).hexdigest() == '34a7b6d5bf97111d9de442a60a6c446361b8501aab44851429660cb12f91ea8c'
 
 

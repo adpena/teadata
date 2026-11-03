@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable, Optional
 
+from ._sqlite import readonly_connection
 from .manifest import read_sqlite_catalog
 from .release import current_release
 from .teadata_config import canonical_district_number
@@ -62,7 +63,7 @@ def load_boundary(
     if not path:
         return None
     try:
-        with closing(sqlite3.connect(path.resolve().as_uri() + "?mode=ro", uri=True)) as conn:
+        with closing(readonly_connection(path, immutable=store_path is None)) as conn:
             for key in _district_lookup_keys(district_number):
                 row = conn.execute(
                     "SELECT wkb FROM boundaries WHERE district_number = ?",

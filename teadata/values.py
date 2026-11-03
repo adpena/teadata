@@ -7,12 +7,26 @@ as suppression merely because of their sign, and missing values are not zero.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from enum import Enum
+from decimal import Decimal, InvalidOperation
+from enum import Enum, StrEnum
 import json
 import math
 import numbers
 import re
+import sys
 from typing import Any, Iterable, Mapping
+
+
+class MeasurementUnit(StrEnum):
+    """Declared metadata units; scalar measure() also accepts custom units."""
+
+    COUNT = "count"
+    PERCENT = "percent"
+    CURRENCY = "currency"
+    TEXT = "text"
+    RATIO = "ratio"
+    YEARS = "years"
+    FTE = "fte"
 
 
 class ValueStatus(str, Enum):
@@ -318,11 +332,30 @@ def measure(
             unit=unit,
         )
     normalized = text.replace(",", "")
-    number = (
-        int(normalized) if re.fullmatch(r"[+-]?\d+", normalized) else float(normalized)
-    )
+    fractional_count = False
+    if re.fullmatch(r"[+-]?\d+", normalized):
+        number = int(normalized)
+    else:
+        try:
+            exact = Decimal(normalized)
+        except (InvalidOperation, ValueError):
+            number = math.inf
+        else:
+            # Bound expansion before int(): a tiny token such as 1e1000000
+            # must not allocate a million-digit integer. The existing finite
+            # domain check below still owns the final numeric admission.
+            if not exact.is_finite() or (not exact.is_zero() and exact.adjusted() > sys.float_info.max_10_exp):
+                number = math.inf
+            elif exact.is_zero():
+                number = 0
+            elif exact == exact.to_integral_value():
+                number = int(exact)
+            else:
+                number = float(normalized)
+                fractional_count = unit == "count"
     if (
         not _finite_number(number)
+        or fractional_count
         or (unit == "count" and number != int(number))
         or (minimum is not None and number < minimum)
         or (maximum is not None and number > maximum)

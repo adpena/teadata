@@ -16,6 +16,7 @@ import sqlite3
 import unicodedata
 from typing import Any, Callable, Iterable, Mapping
 
+from ._sqlite import readonly_connection
 from .dataset_metadata import ArtifactRef, ColumnSchemaRef, DataPeriod, DatasetMetadata, EditionKey, EditionMetadataRef, FieldBinding, LeafColumnSupport, MetricDefinition, ResolvedDataset
 from .metric_bindings import MetricBinding, parse_bindings
 from .provenance import ProvenanceStore, validate_record_graph, validate_reference_records
@@ -1361,10 +1362,10 @@ def write_sqlite_catalog(
     )
 
 
-def read_sqlite_catalog(path: str | Path) -> DatasetCatalog:
+def read_sqlite_catalog(path: str | Path, *, immutable: bool = False) -> DatasetCatalog:
     path = Path(path).resolve()
     try:
-        with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as connection:
+        with closing(readonly_connection(path, immutable=immutable)) as connection:
             return read_sqlite_catalog_connection(connection)
     except sqlite3.Error as exc:
         raise ContractError(

@@ -1,5 +1,14 @@
 # Repository Guidelines
 
+## Main Authority and Task Closeout
+
+- `origin/main` is the sole integration authority. Start by inspecting live remote main, local branches/worktrees, dirty changes and existing work ownership. Prefer parallel work in one checkout with disjoint file ownership. Create a temporary branch/worktree only when isolation is necessary; record its owner, base and purpose before use. Do not build chains of dependent review branches or create another checkout to recover existing work.
+- Land each coherent change promptly after independent adversarial review and applicable checks. Merge or fast-forward to `main`, push, and verify the live remote commit. Source integration and production deployment are separate gates; inspect automatic deployment before pushing application changes.
+- Before ending a normal task turn, leave one checkout on `main`, with local `HEAD` and `main` equal to live `origin/main`, a clean working tree, and no remaining task branches locally or remotely. Close completed PRs and remove superseded worktrees/branches as part of the work, not as a later optional cleanup.
+- Inventory unique commits, dirty/untracked changes, retained source bytes, provenance, qualification receipts and deliverables before removal. Move necessary evidence to its canonical retained location and verify custody. Never discard unfinished work, another owner's changes, or published tags/releases/assets to make the closeout check pass.
+- Run the canonical read-only workspace closeout auditor, `scripts/check_workspace_closeout.py`, against every repository in the task, including independent clones in the workspace. Its failures are unresolved work. It does not merge, push, delete or certify tests. If authorization, authentication or a conflicting owner prevents safe closure, report the exact retained state and blocker; do not claim completion.
+- Keep this policy synchronized across TEA Data, TEA Data app, ReproQ Django and ReproQ Worker. Reuse the canonical auditor rather than introducing competing cleanup scripts or automatic destructive hooks.
+
 ## Project Structure & Module Organization
 - Core engine lives in `teadata/engine.py`, `entities.py`, `query.py`, and `geometry.py`; they define the `DataEngine`, entity models, query operators, and spatial helpers.
 - Enrichment logic sits in `teadata/enrichment/`; database bridges are under `teadata/persistence/`; utility runners live in `teadata/scripts/`.

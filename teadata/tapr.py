@@ -16,7 +16,7 @@ from pathlib import Path
 import re
 from typing import TYPE_CHECKING, Any, Mapping
 
-from .column_schema import table_input_sha256s, validate_header_table, validate_source_layout
+from .column_schema import table_header_identity, table_input_sha256s, validate_header_table, validate_source_layout
 from .identifiers import canonical_source_identifiers
 from .source_csv import SourceLines
 
@@ -73,7 +73,7 @@ def compare_tapr_tables(old: TaprSourceTable, new: TaprSourceTable, *, key_field
     policies = [dict(old_policies or {}), dict(new_policies or {})]
     fields, identities = [], []
     for source, selected_policy in zip([old, new], policies, strict=True):
-        validate_header_table(source.mapping)
+        validate_header_table(source.mapping, expected_identity="code")
         if len(table_input_sha256s(source.mapping)) != 1:
             raise ValueError("TAPR source comparison requires a single raw input per physical table")
         if (not source.dataset.startswith(scope + "_tapr_")
@@ -244,7 +244,7 @@ class TaprSourceReader(Iterator[Any]):
             raise ValueError("TAPR preparation requires an explicit qualified dataset and source edition")
         self.request = request
         self.mapping = deepcopy(request.mapping)
-        validate_header_table(self.mapping)
+        validate_header_table(self.mapping, expected_identity="code")
         inputs = table_input_sha256s(self.mapping)
         if len(inputs) != 1:
             raise ValueError("TAPR physical source reader requires a single raw input")
@@ -427,6 +427,7 @@ class TaprSourceReader(Iterator[Any]):
 
 
 def _verify_dictionary(path: Path, mapping: Mapping[str, Any], *, max_bytes: int) -> None:
+    table_header_identity(mapping, expected="code")
     import pandas as pd
 
     descriptor = mapping["dictionary"]
@@ -451,6 +452,7 @@ def _verify_dictionary(path: Path, mapping: Mapping[str, Any], *, max_bytes: int
 
 def validate_tapr_key(mapping: Mapping[str, Any], key_field: str) -> None:
     """Share the existing reviewed publisher-code/physical-key binding."""
+    table_header_identity(mapping, expected="code")
     headers = [field["field"] for field in mapping["fields"]]
     if key_field not in {"campus_number", "district_number"} or key_field not in headers:
         raise ValueError(f"missing or unsupported source key {key_field!r}")
@@ -461,6 +463,7 @@ def validate_tapr_key(mapping: Mapping[str, Any], key_field: str) -> None:
 
 def reviewed_tapr_data_record_count(mapping: Mapping[str, Any]) -> int:
     """Count a finite reviewed interval with the reader's annotation precedence."""
+    table_header_identity(mapping, expected="code")
     if ("input_sha256" in mapping or "input_sha256s" in mapping) and len(table_input_sha256s(mapping)) != 1:
         raise ValueError("TAPR physical record layout requires a single raw input")
     layout = mapping.get("layout")
@@ -515,7 +518,7 @@ def merge_tapr_tables(sources: list[TaprSourceTable], *, key_field: str):
     if len({source.mapping["table"] for source in sources}) != len(sources):
         raise ValueError("Different revisions or repeated observations of one TAPR table must remain independent")
     for source in sources:
-        validate_header_table(source.mapping)
+        validate_header_table(source.mapping, expected_identity="code")
         if len(table_input_sha256s(source.mapping)) != 1:
             raise ValueError("TAPR source merge requires a single raw input per physical table")
         if source.table.column_names != [field["field"] for field in source.mapping["fields"]] or key_field not in source.table.column_names:

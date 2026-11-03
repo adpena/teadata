@@ -6,8 +6,44 @@ from pathlib import Path
 
 import pytest
 
-from teadata.dataset_metadata import DataPeriod, DatasetMetadata, SourceQualifiers
+from teadata.dataset_metadata import DataPeriod, DatasetMetadata, MetricDefinition, SourceQualifiers
+from teadata.metric_bindings import MetricBinding
 from teadata.teadata_config import Config, load_config
+from teadata.values import MeasurementUnit
+
+
+@pytest.mark.parametrize("unit", [None, *MeasurementUnit])
+def test_metric_metadata_and_bindings_share_declared_units_with_string_roundtrip(unit):
+    literal = unit.value if unit is not None else None
+    definition = MetricDefinition.from_dict({"field": "reported_value", "unit": unit})
+    binding = MetricBinding.from_dict({"dataset": "source", "field": "reported_value", "unit": unit})
+    assert definition.to_dict() == {"field": "reported_value", "unit": literal}
+    assert definition.unit is None or type(definition.unit) is str
+    assert binding.unit is None or type(binding.unit) is str
+    assert json.loads(json.dumps(definition.to_dict()))["unit"] == literal
+    assert json.loads(json.dumps(binding.to_dict()))["unit"] == literal
+    assert MetricDefinition.from_dict(definition.to_dict()) == definition
+    assert MetricBinding.from_dict(binding.to_dict()) == binding
+
+
+@pytest.mark.parametrize("unit", ["FTE", "headcount", "fraction", 12, True, [], {}])
+def test_unknown_declared_units_are_rejected_by_both_metadata_consumers(unit):
+    with pytest.raises(ValueError, match="unit"):
+        MetricDefinition.from_dict({"field": "reported_value", "unit": unit})
+    with pytest.raises(ValueError, match="unit"):
+        MetricBinding.from_dict({"dataset": "source", "field": "reported_value", "unit": unit})
+
+
+def test_metric_suffix_and_bounds_validate_through_the_same_fte_unit_authority():
+    document = {"dataset": "source", "field": "reported_value", "unit_suffixes": {"_fte": "fte"},
+                "unit_bounds": {"fte": {"minimum": 0, "maximum": None}}}
+    binding = MetricBinding.from_dict(document)
+    assert binding.bounds(MeasurementUnit.FTE) == (0, None)
+    assert MetricBinding.from_dict(binding.to_dict()) == binding
+    with pytest.raises(ValueError, match="suffix"):
+        MetricBinding.from_dict({**document, "unit_suffixes": {"_fte": "unknown"}})
+    with pytest.raises(ValueError, match="bounds"):
+        MetricBinding.from_dict({**document, "unit_bounds": {"unknown": {"minimum": 0}}})
 
 
 def test_absent_source_qualifiers_preserve_legacy_metadata_receipt_and_semantics_bytes():

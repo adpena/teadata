@@ -20,7 +20,7 @@ Features:
 
 from __future__ import annotations
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Dict, Any, Optional, Tuple, List, Sequence, Mapping, Iterable, Literal
+from typing import TYPE_CHECKING, Dict, Any, Optional, Tuple, List, Sequence, Mapping, Iterable, Literal, TypedDict
 from pathlib import Path
 from urllib.parse import urlparse
 import os
@@ -349,6 +349,11 @@ class SchemaHints:
 # ---------- Config root ----------
 
 
+class SpatialSelection(TypedDict):
+    year: int | None
+    exact: bool
+
+
 @dataclass
 class Config:
     data_sources: Dict[str, YearMap] = field(default_factory=dict)
@@ -423,6 +428,7 @@ class Config:
             value_policies=policies,
             metric_bindings=parse_bindings(d.get("metric_bindings")),
         )
+        cfg._validated_spatial_years()
         cfg.validate_file_types()  # fail fast
         for section in ("data_sources", "spatial"):
             for dataset, year_map in getattr(cfg, section).items():
@@ -477,6 +483,27 @@ class Config:
         return self.spatial.get("campuses")
 
     # ---------- Core APIs ----------
+    def _validated_spatial_years(self) -> dict[str, int]:
+        overrides = self.options.get("spatial_years", {})
+        if not isinstance(overrides, Mapping):
+            raise ValueError("options.spatial_years must be a mapping")
+        selected: dict[str, int] = {}
+        for dataset, year in overrides.items():
+            if not isinstance(dataset, str) or dataset not in self.spatial:
+                raise ValueError(f"Unknown options.spatial_years spatial dataset: {dataset!r}")
+            if type(year) is not int:
+                raise ValueError(f"options.spatial_years.{dataset} must be an integer catalog year, not bool")
+            self.resolve_dataset(dataset, year, section="spatial", exact=True)
+            selected[dataset] = year
+        return selected
+
+    def spatial_selection(self, dataset: str, reporting_year: int | None) -> SpatialSelection:
+        """Build request: explicit geometry editions are exact; defaults keep prior fallback."""
+        overrides = self._validated_spatial_years()
+        if dataset not in self.spatial:
+            raise KeyError(f"Unknown spatial dataset: {dataset}")
+        return {"year": overrides.get(dataset, reporting_year), "exact": dataset in overrides}
+
     def resolve(
         self,
         dataset: str,

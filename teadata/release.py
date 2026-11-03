@@ -300,7 +300,7 @@ class DataRelease:
         identity = file_identity(path)
         if any(identity[key] != expected[key] for key in ("sha256", "size_bytes")):
             raise ContractError(f"Release artifact checksum or size mismatch: {role}")
-        if role in ROLES - {"snapshot"} and read_sqlite_catalog(path).build_id != self.build_id:
+        if role in ROLES - {"snapshot"} and read_sqlite_catalog(path, immutable=True).build_id != self.build_id:
             raise ContractError(f"Artifact belongs to a different data build: {role}")
         if role in ANALYTICAL_ROLES:
             validate_artifact(path, self.catalog, role, entities_sha256=self._artifacts["entities"]["sha256"])
@@ -435,7 +435,7 @@ def publish_release(
             destination = directory / name
             if (
                 role in ROLES - {"snapshot"}
-                and read_sqlite_catalog(source).build_id != catalog.build_id
+                and read_sqlite_catalog(source, immutable=True).build_id != catalog.build_id
             ):
                 raise ContractError(f"Cannot publish mixed data builds: {role}")
             if role in ANALYTICAL_ROLES:

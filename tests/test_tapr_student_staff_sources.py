@@ -377,6 +377,24 @@ def test_raw_revision_goldens_preserve_dot_blank_zero_six_values_and_historical_
         merge_tapr_tables([source, replace(source, dataset='campus_tapr_staff_profile')], key_field='campus_number')
 
 
+def test_coded_tapr_read_compare_and_merge_reject_position_identity(tmp_path):
+    from teadata.tapr import compare_tapr_tables, read_tapr_table, reviewed_tapr_data_record_count, validate_tapr_key
+
+    cfg, _, _, path, _, _ = source_fixture(tmp_path)
+    source = cfg.read_tapr_sources('campus_tapr_student_profile', 2024)[0]
+    positional = replace(source, mapping={**source.mapping, 'header_identity': 'position'})
+    with pytest.raises(ValueError, match='requires code header identity'):
+        read_tapr_table(path, mapping=positional.mapping, key_field='campus_number', dataset=source.dataset, edition=source.edition)
+    with pytest.raises(ValueError, match='requires code header identity'):
+        compare_tapr_tables(source, positional, key_field='campus_number')
+    with pytest.raises(ValueError, match='requires code header identity'):
+        merge_tapr_tables([positional], key_field='campus_number')
+    with pytest.raises(ValueError, match='requires code header identity'):
+        reviewed_tapr_data_record_count(positional.mapping)
+    with pytest.raises(ValueError, match='requires code header identity'):
+        validate_tapr_key(positional.mapping, 'campus_number')
+
+
 @pytest.mark.parametrize('problem', [None, 'missing_binding', 'wrong_sha', 'wrong_url', 'wrong_kind',
                                     'unrelated_reference', 'wrong_role', 'foreign_direct_observation'])
 def test_explicit_raw_derivation_reference_preserves_original_receipt_and_rejects_unbound_events(tmp_path, problem):

@@ -5,6 +5,7 @@ recursive-include tests *.py
 recursive-include tests/fixtures/tapr_dictionary *.html
 recursive-include tests/fixtures/publisher_golden_2025 *.csv *.md
 recursive-include tests/fixtures/tefa *.json
+recursive-include tests/fixtures/spatial *.json
 recursive-include examples *.py
 recursive-include docs *.md
 recursive-include provenance/records *.json

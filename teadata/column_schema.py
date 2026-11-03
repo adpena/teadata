@@ -7,10 +7,28 @@ import json
 import keyword
 from pathlib import Path, PurePosixPath
 import re
-from typing import TYPE_CHECKING, Any, Iterable, Mapping
+from typing import TYPE_CHECKING, Any, Iterable, Literal, Mapping
 
 if TYPE_CHECKING:
     from .dataset_metadata import DatasetMetadata
+
+
+HeaderIdentity = Literal["code", "position"]
+
+
+def table_header_identity(table: Mapping[str, Any], *, expected: HeaderIdentity | None = None) -> HeaderIdentity:
+    """One opt-in interpretation; never rewrite an absent legacy wire field."""
+    raw = table.get("header_identity", "code")
+    identity: HeaderIdentity
+    if raw == "code":
+        identity = "code"
+    elif raw == "position":
+        identity = "position"
+    else:
+        raise ValueError("Header identity must be code or position")
+    if expected is not None and identity != expected:
+        raise ValueError(f"This workflow requires {expected} header identity")
+    return identity
 
 
 def has_default_reader(reader: Mapping[str, Any]) -> bool:
@@ -105,15 +123,18 @@ def table_input_sha256s(table: Mapping[str, Any], *, acquisition_sha256s: Iterab
     return inputs
 
 
-def validate_header_table(table: Mapping[str, Any]) -> None:
+def validate_header_table(table: Mapping[str, Any], *, expected_identity: HeaderIdentity | None = None) -> None:
     """Validate one explicit mapping; never synthesize or deduplicate names."""
     if (not isinstance(table, dict)
             or not {"table", "source_schema_sha256", "fields"} <= set(table)
-            or set(table) - {"table", "input_sha256", "input_sha256s", "source_schema_sha256", "fields", "layout", "dictionary", "metric_period", "dictionary_records"}
+            or set(table) - {"table", "input_sha256", "input_sha256s", "source_schema_sha256", "fields", "layout", "dictionary", "metric_period", "dictionary_records", "header_identity"}
             or not isinstance(table["table"], str) or not table["table"].strip()
             or not _checksum(table["source_schema_sha256"])
             or not isinstance(table["fields"], list) or not table["fields"]):
         raise ValueError("Invalid header crosswalk table")
+    identity = table_header_identity(table, expected=expected_identity)
+    if identity == "position" and ("dictionary" in table or "dictionary_records" in table):
+        raise ValueError("Code-keyed publisher dictionaries require code header identity")
     inputs = table_input_sha256s(table)
     if "layout" in table:
         if len(inputs) != 1:
@@ -216,7 +237,9 @@ def validate_header_table(table: Mapping[str, Any]) -> None:
         name = field["field"]
         if re.fullmatch(r"[a-z_][a-z0-9_]*", name) is None or keyword.iskeyword(name):
             raise ValueError(f"Invalid canonical header in column {position}: {name!r}; ASCII snake_case is required")
-        if field["code"].strip() in seen_codes:
+        if identity == "position" and field["code"] != field["label"]:
+            raise ValueError("Position identity requires the literal publisher header as code and label")
+        if identity == "code" and field["code"].strip() in seen_codes:
             raise ValueError(f"Duplicate source code in header column {position}: {field['code']!r}")
         if name in seen_fields:
             raise ValueError(f"Canonical header collision in column {position}: {name!r}")
@@ -394,6 +417,8 @@ def header_records(document: Mapping[str, Any], *, dataset: str, edition: str,
                       "mapping_version": document["mapping_version"],
                       **({"input_sha256": inputs[0]} if "input_sha256" in item else {"input_sha256s": list(inputs)}),
                       "source_schema_sha256": item["source_schema_sha256"], "period": period.to_dict()}
+            if "header_identity" in item:
+                record["header_identity"] = table_header_identity(item)
             if "dictionary_records" in item:
                 detached = []
                 for row in occurrences.get(field["code"], ()):

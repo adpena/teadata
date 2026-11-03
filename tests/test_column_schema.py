@@ -7,8 +7,8 @@ import pandas as pd
 import pytest
 
 from teadata.column_schema import (
-    header_records, portable_schema_path, source_schema_fingerprint,
-    table_input_sha256s, validate_header_table,
+    header_records, header_rename_map, portable_schema_path, source_schema_fingerprint,
+    table_header_identity, table_input_sha256s, validate_header_table,
 )
 from teadata.manifest import ContractError, canonical_json
 from teadata.teadata_config import Config, load_config
@@ -23,6 +23,52 @@ def input_table(**inputs):
         "source_schema_sha256": source_schema_fingerprint(labels, codes),
         "fields": [{"position": i, "code": code, "label": label, "field": field}
                    for i, (code, label, field) in enumerate(zip(codes, labels, ["identifier", "value"], strict=True), 1)]}
+
+
+def test_position_identity_retains_literal_occurrences_and_refuses_ambiguous_rename():
+    literal = "GF Capital Outlay (Object 61xx-64xx)"
+    table = {"table": "actual", "input_sha256": "a" * 64, "header_identity": "position",
+        "source_schema_sha256": source_schema_fingerprint([literal, literal], [literal, literal]),
+        "fields": [{"position": index, "code": literal, "label": literal, "field": field}
+            for index, field in enumerate(["capital_outlay_at_a", "capital_outlay_at_b"], 1)]}
+    before = canonical_json(table)
+    validate_header_table(table)
+    assert table_header_identity(table) == "position" and canonical_json(table) == before
+    document = {"schema_version": 2, "mapping_version": 1, "datasets": [{"dataset": "finance", "edition": "2024",
+        "prepared_input_sha256": "b" * 64, "tables": [table]}]}
+    rows = header_records(document, dataset="finance", edition="2024")
+    assert [(row["position"], row["code"], row["header_identity"]) for row in rows] == [(1, literal, "position"), (2, literal, "position")]
+    for source in ("code", "label"):
+        with pytest.raises(ValueError, match="Ambiguous header"):
+            header_rename_map(rows, from_=source)
+    coded = deepcopy(table)
+    coded.pop("header_identity")
+    with pytest.raises(ValueError, match="Duplicate source code"):
+        validate_header_table(coded)
+    assert "header_identity" not in coded
+    with pytest.raises(ValueError, match="requires code header identity"):
+        validate_header_table(table, expected_identity="code")
+
+
+@pytest.mark.parametrize("problem", ["unknown_mode", "duplicate_field", "bad_position", "synthetic_code", "coded_dictionary"])
+def test_position_mode_does_not_relax_field_position_literal_or_dictionary_binding(problem):
+    table = input_table(input_sha256="a" * 64)
+    table["header_identity"] = "position"
+    for field in table["fields"]:
+        field["label"] = field["code"]
+    table["source_schema_sha256"] = source_schema_fingerprint(["ID", "VALUE"], ["ID", "VALUE"])
+    if problem == "unknown_mode":
+        table["header_identity"] = "auto"
+    elif problem == "duplicate_field":
+        table["fields"][1]["field"] = "identifier"
+    elif problem == "bad_position":
+        table["fields"][1]["position"] = 1
+    elif problem == "synthetic_code":
+        table["fields"][1]["code"] = "VALUE_2"
+    else:
+        table["dictionary_records"] = []
+    with pytest.raises(ValueError):
+        validate_header_table(table)
 
 
 @pytest.mark.parametrize("inputs", [{"input_sha256": "a" * 64}, {"input_sha256s": ["a" * 64, "b" * 64]}])

@@ -7,6 +7,7 @@ from teadata.teadata_config import load_config
 from teadata.values import (
     EstimationPolicy,
     Measurement,
+    MeasurementUnit,
     ValuePolicy,
     ValueStatus,
     aggregate,
@@ -39,6 +40,23 @@ def test_tapr_documented_codes(policies, token, status):
 def test_negative_financial_adjustment_is_observed(policies):
     value = measure("-1", policies["numeric"], unit="currency")
     assert value.numeric == -1 and value.status == ValueStatus.OBSERVED
+
+
+def test_fractional_fte_is_observed_without_relaxing_integral_count():
+    fte = measure("12.5", unit=MeasurementUnit.FTE, minimum=0)
+    count = measure("12.5", unit=MeasurementUnit.COUNT, minimum=0)
+    assert fte.status == ValueStatus.OBSERVED and fte.numeric == 12.5
+    assert fte.raw == "12.5" and fte.unit == "fte"
+    assert json.loads(json.dumps(fte.to_dict()))["unit"] == "fte"
+    assert count.status == ValueStatus.INVALID and count.numeric is None
+    assert count.reason == "outside_metric_domain" and count.raw == "12.5"
+    assert measure("12", unit=MeasurementUnit.COUNT).numeric == 12
+
+
+def test_declared_unit_enum_does_not_restrict_scalar_custom_units():
+    scalar = measure("1.25", unit="caller_defined_unit")
+    assert scalar.status == ValueStatus.OBSERVED and scalar.numeric == 1.25
+    assert scalar.unit == "caller_defined_unit"
 
 
 def test_period_is_not_universally_suppression(policies):
@@ -160,3 +178,57 @@ def test_unresolved_transfer_rows_are_retained_and_do_not_get_imputed(catalog):
         ]
         == 17
     )
+
+
+@pytest.mark.parametrize("raw,expected", [
+    ("9007199254740993.0", 9007199254740993),
+    ("9007199254740993e0", 9007199254740993),
+    ("9.007199254740993e15", 9007199254740993),
+    ("-9007199254740993.000", -9007199254740993),
+    ("9,007,199,254,740,993.0", 9007199254740993),
+])
+@pytest.mark.parametrize("unit", [None, "count"])
+def test_integral_decimal_and_exponent_tokens_remain_exact_without_float_rounding(raw, expected, unit):
+    value = measure(raw, unit=unit)
+    assert value.status == ValueStatus.OBSERVED and type(value.value) is int
+    assert value.value == value.numeric == expected and value.raw == raw
+    assert json.loads(json.dumps(value.to_dict()))["value"] == expected
+
+
+@pytest.mark.parametrize("raw", ["9007199254740992.5", "1.0000000000000000000001", "1e-400"])
+def test_exact_fractional_count_cannot_become_observed_by_float_rounding(raw):
+    value = measure(raw, unit="count")
+    assert value.status == ValueStatus.INVALID and value.numeric is None
+    assert value.reason == "outside_metric_domain" and value.raw == raw
+
+
+@pytest.mark.parametrize("raw", ["1e1000000", "-1e1000000", "1e9999999999999999999999999999"])
+def test_huge_exponent_is_rejected_before_expanding_an_integer(raw):
+    value = measure(raw, unit="count")
+    assert value.status == ValueStatus.INVALID and value.value is None
+    assert value.reason == "outside_metric_domain" and value.raw == raw
+
+
+@pytest.mark.parametrize("raw,expected", [(0, 0), (0.0, 0), (12.5, 12.5), (-12.5, -12.5), (2**53 + 1, 2**53 + 1)])
+def test_integral_token_fix_preserves_existing_real_and_integer_values(raw, expected):
+    value = measure(raw)
+    assert value.status == ValueStatus.OBSERVED and value.numeric == expected and value.raw == raw
+
+
+def test_exact_integer_parsing_preserves_policy_precedence_and_literal_thresholds():
+    policy = ValuePolicy.from_dict({"policy_id": "synthetic-precision-policy", "tokens": {
+        "9007199254740993.0": {"status": "suppressed", "reason": "synthetic_declared_token"}}})
+    protected = measure("9007199254740993.0", policy, unit="count")
+    assert protected.status == ValueStatus.SUPPRESSED and protected.numeric is None
+    assert protected.raw == "9007199254740993.0"
+    for token in ("<10", "<2790"):
+        threshold = measure(token, unit="count")
+        assert threshold.status == ValueStatus.INVALID and threshold.raw == token and threshold.numeric is None
+    threshold_policy = ValuePolicy.from_dict({"policy_id": "synthetic-threshold-policy", "tokens": {
+        "<2790": {"status": "suppressed", "reason": "synthetic_declared_complementary_mask"}}})
+    masked = measure("<2790", threshold_policy, unit="count")
+    assert masked.status == ValueStatus.SUPPRESSED and masked.raw == "<2790" and masked.numeric is None
+    assert masked.lower is None and masked.upper is None
+    assert measure("-12.5", unit="currency").numeric == -12.5
+    assert measure("12.5", unit="fte").numeric == 12.5
+    assert measure("0e1000000", unit="count").numeric == 0

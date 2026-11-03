@@ -510,3 +510,76 @@ def test_named_campus_without_identifier_is_not_a_district_summary(missing):
     repo = DataEngine()
     with pytest.raises(ContractError, match="campus.*identifier|identifier.*campus"):
         _add_reporting_entities(repo, pd.DataFrame([roster_row(campus_number=missing)]))
+
+
+# This is a deliberately small in-memory graph, not a source load or snapshot.
+def _enrollment_scope_subject(catalog, scope, raw, *, private=False):
+    import uuid
+    from teadata.entities import Campus, District
+
+    repo = DataEngine(indexes_enabled=False)
+    repo.catalog = catalog
+    district = District(id=uuid.uuid4(), name="Synthetic enrollment district", district_number="123456", enrollment=999)
+    repo.add_district(district)
+    if scope == "district":
+        subject = district
+    else:
+        subject = Campus(id=uuid.uuid4(), district_id=None if private else district.id,
+            name="Synthetic enrollment campus", charter_type="private" if private else "isd", is_charter=False,
+            is_private=private, district_number=None if private else "123456",
+            campus_number=None if private else "123456001", source_namespace="tefa" if private else None,
+            source_id="synthetic-enrollment-fixture" if private else None, enrollment=999)
+        repo.add_campus(subject)
+    _, field = catalog.source_for_metric("enrollment", scope)
+    subject.meta[field] = raw
+    return repo, subject, field
+
+
+@pytest.mark.parametrize("scope", ["campus", "district"])
+def test_selected_tapr_total_wins_over_separate_masked_peims_component_without_unmasking(catalog, scope):
+    from teadata.dataset_metadata import DatasetMetadata
+
+    repo, subject, field = _enrollment_scope_subject(catalog, scope, "8")
+    # A synthetic OTHER source declaration, not a real PEIMS policy/variable.
+    # Keep its newer year and literal threshold independent of the TAPR total.
+    peims = DatasetMetadata.from_dict({"version": "2026", "period": {
+        "kind": "school_year", "start_year": 2025, "end_year": 2026}})
+    component = {"raw": "<10", "source_metadata": peims.to_dict()}
+    subject.meta["synthetic_peims_sex_ethnicity_component"] = deepcopy(component)
+    before = deepcopy(subject.meta)
+    selected = (repo >> (lambda value: value.id == subject.id)).first()
+    assert selected is subject
+    result = catalog.measurement(selected, "enrollment", scope=scope)
+    assert result.status == ValueStatus.OBSERVED and result.numeric == 8 and result.raw == "8"
+    assert result.source["dataset"] == f"{scope}_tapr_student_staff_profile"
+    assert result.source["period"] == {"kind": "school_year", "start_year": 2024, "end_year": 2025}
+    assert peims.period.to_dict() != result.source["period"]
+    assert subject.enrollment == 999  # Compatibility attribute was not silently rewritten by a read.
+    dto = subject.to_dict()
+    assert dto[field] == "8" and dto["synthetic_peims_sex_ethnicity_component"] == component
+    decoded = catalog.measure_field(dto[field], field, scope=scope, entity=subject)
+    assert decoded is not None
+    assert (decoded.value, decoded.status, decoded.raw, decoded.unit) == (result.value, result.status, result.raw, result.unit)
+    assert decoded.source["period"] == result.source["period"]
+    assert decoded.source["dataset"] == result.source["dataset"]
+    assert decoded.source["input_binding"] == "caller_supplied"
+    assert result.source["input_binding"] == "release_entity"
+    assert subject.meta == before and component["raw"] == "<10"
+
+
+@pytest.mark.parametrize("scope", ["campus", "district"])
+def test_present_tapr_suppression_never_falls_back_to_stale_enrollment_attribute(catalog, scope):
+    _, subject, field = _enrollment_scope_subject(catalog, scope, -1)
+    result = catalog.measurement(subject, "enrollment", scope=scope)
+    assert result.status == ValueStatus.SUPPRESSED and result.numeric is None
+    assert result.raw == -1 and subject.meta[field] == -1 and subject.enrollment == 999
+    assert result.source["dataset"] == f"{scope}_tapr_student_staff_profile"
+    assert result.source["period"] == catalog.metric_period("enrollment", scope=scope).to_dict()
+
+
+def test_private_campus_tapr_total_is_not_applicable_without_changing_raw_source(catalog):
+    _, subject, field = _enrollment_scope_subject(catalog, "campus", "8", private=True)
+    result = catalog.measurement(subject, "enrollment", scope="campus")
+    assert result.status == ValueStatus.NOT_APPLICABLE and result.numeric is None
+    assert result.reason == "outside_metric_population"
+    assert subject.meta[field] == "8" and subject.enrollment == 999
