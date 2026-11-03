@@ -220,8 +220,8 @@ def test_old_prepared_comparison_separates_padding_and_actual_changed_counts(tmp
     assert changed["count_value_changes"] == 2 and len(changed["changed_data_examples"]) == 1
 
 
-def retained_source(tmp_path, *, mismatch=False):
-    path, digest = original(tmp_path, pair_rows("0", "1" if mismatch else None))
+def retained_source(tmp_path, *, rows=None):
+    path, digest = original(tmp_path, pair_rows() if rows is None else rows)
     store = ProvenanceStore(tmp_path / "archive")
     identifier = store.record_acquisition(path, ResolvedDataset("campus_transfer_reports", "data_sources", 2025, 2025, "",
         DatasetMetadata(version="2025", period=DataPeriod("school_year", 2024, 2025))),
@@ -257,6 +257,8 @@ def test_structural_failure_retains_failed_input_error_and_parsed_prefix(tmp_pat
     assert persisted == result
     processing = store.read_record(result["processing_record_id"])
     assert set(processing["outputs"]) == {"validation_report"}
+    assert not result["prepared_source_qualified"] and result["canonical_edges_qualified"] is None
+    assert not processing["validation"]["prepared_source_qualified"]
     assert all(identifier in processing["inputs"] for identifier, _ in inputs)
     assert not (tmp_path / "structural-hold/prepared-source.parquet").exists()
     assert store.read_record(inputs[failed_position][0]) == failed_record
@@ -269,6 +271,7 @@ def test_preparation_closes_real_raw_and_policy_edges_and_does_not_activate_cata
         inputs=[(identifier, digest)], encoding="utf-8", policy_config=config,
         policy_config_sha256=config_sha, value_policy="campus_transfers")
     assert result["status"] == "prepared" and result["raw_string_readback_equal"]
+    assert result["prepared_source_qualified"] and result["canonical_edges_qualified"]
     assert not result["activation"] and not result["field_correctness_qualified"]
     closure = store.verify_record_closure([result["processing_record_id"]])
     processing = closure[result["processing_record_id"]]
@@ -307,15 +310,107 @@ def test_explicit_legacy_comparison_accepts_unknown_requested_year_without_rewri
             policy_config_sha256=config_sha, value_policy="campus_transfers")
 
 
-def test_failed_gate_retains_diagnostic_processing_without_a_prepared_output(tmp_path):
-    store, identifier, digest, config, config_sha = retained_source(tmp_path, mismatch=True)
+@pytest.mark.parametrize("out,incoming", [("0", "1"), ("-999", "10"), ("10", "-999"), ("-999", "11"), ("11", "-999")])
+def test_edge_hold_retains_independent_reported_values_without_coalescing(tmp_path, out, incoming):
+    import pyarrow.parquet as pq
+
+    store, identifier, digest, config, config_sha = retained_source(tmp_path, rows=pair_rows(out, incoming))
+    original_record = store.read_record(identifier)
     result = prepare_transfer_sources(store, grain="campus", year=2025, output=tmp_path / "held",
         inputs=[(identifier, digest)], encoding="utf-8", policy_config=config,
         policy_config_sha256=config_sha, value_policy="campus_transfers")
     processing = store.read_record(result["processing_record_id"])
     assert result["status"] == "HOLD" and processing["validation"]["status"] == "HOLD"
+    assert result["prepared_source_qualified"] and not result["canonical_edges_qualified"]
+    assert processing["validation"]["prepared_source_qualified"]
+    assert not processing["validation"]["canonical_edges_qualified"]
+    assert result["failed_phase"] == processing["validation"]["failed_phase"] == "source_validation"
+    assert "one canonical edge" in result["error"]["message"]
+    assert result["source_validation"]["status"] == "HOLD"
+    assert result["raw_string_readback_equal"] and not result["field_correctness_qualified"] and not result["activation"]
+    assert set(processing["outputs"]) == {"prepared_source", "annotations", "validation_report"}
+    table = pq.read_table(tmp_path / "held/prepared-source.parquet")
+    assert table["TRANSFERS_IN_OR_OUT"].to_pylist() == [out, incoming]
+    assert table["transfer_count_value"].to_pylist() == [None if value == "-999" else int(value) for value in (out, incoming)]
+    assert table["transfer_count_status"].to_pylist() == ["suppressed" if value == "-999" else "observed" for value in (out, incoming)]
+    assert table["transfer_direction"].to_pylist() == ["out", "in"]
+    assert table["transfer_source_record"].to_pylist() == [8, 9]
+    assert table["transfer_first_line"].to_pylist() == [8, 10]
+    assert table["transfer_last_line"].to_pylist() == [9, 11]
+    assert table["transfer_source_input"].to_pylist() == [0, 0]
+    closure = store.verify_record_closure([result["processing_record_id"]])
+    assert closure[identifier] == original_record
+    assert json.loads((tmp_path / "held/PREPARATION.json").read_text()) == result
+    with pytest.raises(TransferValidationError):
+        validate_campus_directions(read(store.verify_artifact(digest), digest))
+
+
+@pytest.mark.parametrize("new_hold,legacy_hold", [(False, True), (True, False), (True, True)])
+def test_optional_comparison_cannot_erase_observations_or_override_edge_hold(tmp_path, new_hold, legacy_hold):
+    import pyarrow.parquet as pq
+
+    rows = pair_rows("-999", "10") if new_hold else pair_rows()
+    store, identifier, digest, config, config_sha = retained_source(tmp_path, rows=rows)
+    old_path, old_sha = original(tmp_path, pair_rows("0", "1") if legacy_hold else pair_rows(), legacy=True, filename="old.csv")
+    legacy_id = store.record_acquisition(old_path, ResolvedDataset("campus_transfer_reports", "data_sources", None, 2025, "",
+        DatasetMetadata(version="2025", period=DataPeriod("school_year", 2024, 2025), notes="Original HTTP/date unknown")))
+    result = prepare_transfer_sources(store, grain="campus", year=2025, output=tmp_path / "held",
+        inputs=[(identifier, digest)], encoding="utf-8", policy_config=config,
+        policy_config_sha256=config_sha, value_policy="campus_transfers",
+        compare_input=(legacy_id, old_sha), compare_encoding="utf-8")
+    processing = store.read_record(result["processing_record_id"])
+    assert result["status"] == processing["validation"]["status"] == "HOLD"
+    assert result["prepared_source_qualified"] and result["canonical_edges_qualified"] is (not new_hold)
+    assert result["source_validation"]["status"] == ("HOLD" if new_hold else "PASS")
+    assert result["failed_phase"] == ("source_validation" if new_hold else "legacy_comparison")
+    assert result["old_source"]["status"] == ("failed" if legacy_hold else "parsed")
+    if legacy_hold:
+        assert result["old_source"]["error"]["type"] == "TransferValidationError"
+        assert result["failed_validation"]["status"] == "HOLD"
+    else:
+        assert result["old_prepared_comparison"]["status"] == "compared"
+    table = pq.read_table(tmp_path / "held/prepared-source.parquet")
+    assert table["TRANSFERS_IN_OR_OUT"].to_pylist() == [row[-1] for row in rows]
+    assert set(processing["outputs"]) == {"prepared_source", "annotations", "validation_report"}
+    assert legacy_id in store.verify_record_closure([result["processing_record_id"]])
+
+
+@pytest.mark.parametrize("edge_hold", [False, True])
+def test_failed_native_readback_remains_diagnostic_only(tmp_path, monkeypatch, edge_hold):
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    rows = pair_rows("-999", "10") if edge_hold else pair_rows()
+    store, identifier, digest, config, config_sha = retained_source(tmp_path, rows=rows)
+    original_write = pq.write_table
+
+    def corrupt_count(table, where, **kwargs):
+        name = "transfer_count_value"
+        changed = table.set_column(table.schema.get_field_index(name), name, pa.array([99, 99], type=pa.int64()))
+        return original_write(changed, where, **kwargs)
+
+    monkeypatch.setattr(pq, "write_table", corrupt_count)
+    result = prepare_transfer_sources(store, grain="campus", year=2025, output=tmp_path / "held",
+        inputs=[(identifier, digest)], encoding="utf-8", policy_config=config,
+        policy_config_sha256=config_sha, value_policy="campus_transfers")
+    processing = store.read_record(result["processing_record_id"])
+    assert result["status"] == processing["validation"]["status"] == "HOLD"
+    assert not result["prepared_source_qualified"] and not processing["validation"]["prepared_source_qualified"]
+    assert "readback differs" in result["readback_error"]["message"]
+    assert result["failed_phase"] == ("source_validation" if edge_hold else "native_readback")
     assert set(processing["outputs"]) == {"validation_report"}
     assert not (tmp_path / "held/prepared-source.parquet").exists()
+
+
+def test_prepare_cli_preserves_edge_hold_exit_status_with_retained_observations(tmp_path, capsys):
+    store, identifier, digest, config, config_sha = retained_source(tmp_path, rows=pair_rows("-999", "10"))
+    assert main(["prepare", "--store", str(store.root), "--grain", "campus", "--year", "2025",
+        "--input", identifier, digest, "--encoding", "utf-8", "--policy-config", str(config),
+        "--policy-config-sha256", config_sha, "--policy", "campus_transfers", "--output", str(tmp_path / "cli")]) == 2
+    summary = json.loads(capsys.readouterr().out)
+    assert summary["status"] == "HOLD" and summary["rows"] == 2
+    processing = store.read_record(summary["processing_record_id"])
+    assert processing["validation"]["prepared_source_qualified"] and not processing["validation"]["canonical_edges_qualified"]
 
 
 def test_prepare_cli_uses_canonical_core_without_network_or_engine(tmp_path, capsys):

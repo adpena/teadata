@@ -77,9 +77,9 @@ group-200 rows were missing-value separators. This is parsed directional
 equivalence for that source, not byte identity of every field or proof about a
 newer response.
 
-Structural preparation validates that relationship before selecting
-one canonical campus edge. It must retain independent reported directions and
-raw row locators in its audit, and fail visibly on one-sided, duplicate, count,
+Canonical-edge qualification validates that relationship before selecting
+one campus edge. Source preparation retains independent reported directions and
+raw row locators in its audit, and fails visibly on one-sided, duplicate, count,
 status, or historical district-ID conflicts. The fresh original publisher campus
 CSV, SHA `ea11eaf275f6c5abb79ead6213ded0223b17b70511798a4dc81f8abe03936372`,
 receipt `785606f825deb15011a31afaa03bcdb17683021f9be062ef28b93fe0392ea8ee`,
@@ -124,6 +124,22 @@ All three preparations passed native readback equality. This verifies the
 retained source projection, not every field's external correctness or exhaustive
 LEA coverage. Their reports retain `field_correctness_qualified: false` and
 `activation: false`; these source preparations are not an activated release.
+
+The independently acquired 2023-2024 campus original has SHA
+`40df05470d7a2cf117ec793ab24a85c5e70b62338b6ca1785a6a8643c354ef34`
+and acquisition
+`5349c45b292fc5d2e4d564412a9917ace24100b1883afdb1c34f3bd636bc690b`.
+The original preparation
+`7cbae23f47643cc952635d95eb065dff8e3d4073328954f8305d5645e78e1398`
+parsed 297,734 rows and found 140,975 pairs per direction, with zero duplicate,
+one-sided or historical district-ID conflicts. Four oriented pairs had different
+masking between the reported In and Out views. Root's original-row audit, SHA
+`4d8efd2adff35e3420114b830af05819531776cb8f226f81563de6b7d466f3a4`,
+verified all eight source rows. These observations establish a reporting-view
+difference, not its cause or a publisher error. A count visible in one view must
+not fill a suppressed cell in the other. That immutable preparation remains
+HOLD; the source-only retention behavior below requires a new preparation and
+does not change the original record or activate this edition.
 
 ## Offline structural preparation
 
@@ -197,13 +213,31 @@ normalized direction/pair keys, reports one-sided rows and changed counts,
 statuses, historical districts and other raw fields, and distinguishes identifier
 padding changes. It does not infer unchanged values from the prior audit.
 
-Successful outputs and their validation/annotation reports are retained with
+Readback-verified observations and their validation/annotation reports are retained with
 `ProvenanceStore.record_processing`, using actual source receipts and captured
 policy/index/schema inputs as typed parents. Structural reads and legacy
 comparison reads retain the attempted input, error and parsed-prefix status in
-`PREPARATION.json` on failure. Structural or validation failures retain a HOLD
-diagnostic processing record with no `prepared_source` output; a parsed prefix
-is not published as a prepared dataset. Original
+`PREPARATION.json` on failure. Structural/schema failures or failed native
+readback retain only a HOLD diagnostic processing record, without a
+`prepared_source` output; a parsed prefix is not a prepared dataset.
+
+New preparations distinguish two narrow outcomes in the same report and
+processing validation. `prepared_source_qualified: true` means every selected
+original passed structural parsing and the full prepared table passed exact
+native readback. It does not qualify external field correctness.
+`canonical_edges_qualified` reports the campus direction gate's agreement:
+`true` for PASS, `false` for HOLD, and `null` when no campus edge gate ran
+(including district reports). It does not override a readback failure.
+An edge HOLD retains the complete independent directional observations,
+annotations, raw tokens, statuses and locators when their preparation passes
+readback; it does not select or reconcile one edge. Overall status remains
+HOLD and the CLI exits 2. An optional legacy-comparison failure also retains
+valid new-source observations, and cannot replace an earlier edge HOLD or make
+it PASS. Both outcomes retain `field_correctness_qualified: false` and
+`activation: false`. Existing successful campus preparations remain
+`prepared`/PASS; district source-grain validation and native admission remain
+unchanged. Earlier immutable preparation records keep their original contracts
+and are not rewritten to add these flags. Original
 acquisition events, timestamps and metadata remain unchanged. The processing
 identity includes the shared `source_csv.py`; the TAPR comparison also fingerprints
 that dependency explicitly after its extraction.

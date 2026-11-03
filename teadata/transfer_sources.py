@@ -887,7 +887,8 @@ def prepare_transfer_sources(
         "cli_sha256": sha256((Path(__file__).parent / "scripts/refresh_transfers.py").read_bytes()).hexdigest()}
     output.mkdir(mode=0o700, parents=False, exist_ok=False)
     report: dict = {"schema_version": 1, "status": "HOLD", "activation": False,
-        "field_correctness_qualified": False, "grain": grain, "year": year,
+        "field_correctness_qualified": False, "prepared_source_qualified": False,
+        "canonical_edges_qualified": None, "grain": grain, "year": year,
         "inputs": [], "implementation": implementation,
         "policy_id": policy.policy_id, "policy_sha256": sha256(json.dumps(policy.to_dict(), sort_keys=True).encode()).hexdigest(),
         "toolchain": {"python": platform.python_version(), "pyarrow": version("pyarrow"),
@@ -919,20 +920,29 @@ def prepare_transfer_sources(
     tables = []
     annotations = []
 
-    def retain_failure(error: Exception, *, phase: str, failed_input: dict | None = None) -> dict:
-        report["error"] = {"type": type(error).__name__, "message": str(error)[:2000]}
-        report["failed_phase"] = phase
+    def note_failure(error: Exception, *, phase: str, failed_input: dict | None = None) -> None:
+        detail = {"type": type(error).__name__, "message": str(error)[:2000]}
+        # A later optional comparison cannot replace the original edge HOLD.
+        report.setdefault("error", detail)
+        report.setdefault("failed_phase", phase)
+        if phase == "native_readback":
+            report["readback_error"] = detail
         if failed_input is not None:
             failed_input["status"] = "failed"
-            failed_input["error"] = report["error"]
-            report["failed_input"] = failed_input
+            failed_input["error"] = detail
+            report.setdefault("failed_input", failed_input)
         if isinstance(error, TransferValidationError):
             report["source_validation" if phase == "source_validation" else "failed_validation"] = error.report
+
+    def retain_failure(error: Exception, *, phase: str, failed_input: dict | None = None) -> dict:
+        note_failure(error, phase=phase, failed_input=failed_input)
         _write_index(output, report, filename="VALIDATION.json")
         processing = store.record_processing(dataset=expected_dataset, inputs=[*roots, *local_inputs],
             outputs={"validation_report": output / "VALIDATION.json"}, processor="teadata.scripts.refresh_transfers",
             code_version=code, parameters={"no_config_activation": True, **implementation},
-            validation={"status": "HOLD", "prepared_source_qualified": False, "failed_phase": phase})
+            validation={"status": "HOLD", "prepared_source_qualified": report["prepared_source_qualified"],
+                        "canonical_edges_qualified": report["canonical_edges_qualified"],
+                        "failed_phase": report["failed_phase"], "field_correctness_qualified": False})
         store.verify_record_closure([processing])
         report["processing_record_id"] = processing
         _write_index(output, report, filename="PREPARATION.json")
@@ -966,7 +976,13 @@ def prepare_transfer_sources(
             gate = validate_campus_directions(combined, max_examples=max_examples)
         report["source_validation"] = gate or validate_district_rows(merged, max_examples=max_examples)
     except TransferValidationError as error:
-        return retain_failure(error, phase="source_validation")
+        if grain != "campus":
+            return retain_failure(error, phase="source_validation")
+        # These are independent publisher observations even when they cannot
+        # qualify one reconciled edge. Retain every view without coalescing it.
+        note_failure(error, phase="source_validation")
+    if grain == "campus":
+        report["canonical_edges_qualified"] = report["source_validation"]["status"] == "PASS"
     if compare_input is not None:
         assert combined is not None
         old_id, old_sha = compare_input
@@ -981,24 +997,33 @@ def prepare_transfer_sources(
             report["old_source_direction_validation"] = validate_campus_directions(old, max_examples=max_examples)
             report["old_prepared_comparison"] = compare_campus_sources(old, combined, max_examples=max_examples)
         except Exception as error:
-            return retain_failure(error, phase="legacy_comparison", failed_input=legacy_attempt)
-        legacy_attempt.update(status="parsed", rows=old.table.num_rows)
+            note_failure(error, phase="legacy_comparison", failed_input=legacy_attempt)
+        else:
+            legacy_attempt.update(status="parsed", rows=old.table.num_rows)
         report["old_source_encoding"] = old_evidence
     artifact = output / "prepared-source.parquet"
-    descriptor = os.open(artifact, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
-    with os.fdopen(descriptor, "wb") as stream:
-        pq.write_table(merged, stream, compression="zstd", row_group_size=4096)
-    offset = 0
-    with pq.ParquetFile(artifact) as reopened:
-        for batch in reopened.iter_batches(batch_size=4096, use_threads=False):
-            actual = pa.Table.from_batches([batch])
-            if not actual.equals(merged.slice(offset, batch.num_rows), check_metadata=True):
-                raise ValueError("Transfer prepared native readback differs from retained raw strings/projections")
-            offset += batch.num_rows
-    if (offset != merged.num_rows or processor_identity() != code
-            or (wire_schema is not None and (Path(__file__).parent / "schemas/data_sources--campus_transfer_reports--2025--default.json").read_bytes() != wire_schema)):
-        raise ValueError("Transfer preparation source/row coverage changed before retention")
-    report.update(status="prepared", rows=merged.num_rows, columns=merged.column_names,
+    artifact_created = False
+    try:
+        descriptor = os.open(artifact, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+        artifact_created = True
+        with os.fdopen(descriptor, "wb") as stream:
+            pq.write_table(merged, stream, compression="zstd", row_group_size=4096)
+        offset = 0
+        with pq.ParquetFile(artifact) as reopened:
+            for batch in reopened.iter_batches(batch_size=4096, use_threads=False):
+                actual = pa.Table.from_batches([batch])
+                if not actual.equals(merged.slice(offset, batch.num_rows), check_metadata=True):
+                    raise ValueError("Transfer prepared native readback differs from retained raw strings/projections")
+                offset += batch.num_rows
+        if (offset != merged.num_rows or processor_identity() != code
+                or (wire_schema is not None and (Path(__file__).parent / "schemas/data_sources--campus_transfer_reports--2025--default.json").read_bytes() != wire_schema)):
+            raise ValueError("Transfer preparation source/row coverage changed before retention")
+    except Exception as error:
+        if artifact_created:
+            artifact.unlink()
+        return retain_failure(error, phase="native_readback")
+    report.update(status="HOLD" if "failed_phase" in report else "prepared",
+                  rows=merged.num_rows, columns=merged.column_names, prepared_source_qualified=True,
                   raw_string_readback_equal=True, publisher_totals_computed=False)
     _write_index(output, {"sources": annotations}, filename="ANNOTATIONS.json")
     _write_index(output, report, filename="VALIDATION.json")
@@ -1008,7 +1033,11 @@ def prepare_transfer_sources(
         processor="teadata.scripts.refresh_transfers", code_version=code,
         parameters={"no_config_activation": True, "value_policy": policy.to_dict(), **implementation,
                     "toolchain": report["toolchain"]},
-        validation={"status": "PASS", "raw_string_readback_equal": True,
+        validation={"status": "PASS" if report["status"] == "prepared" else "HOLD",
+                    "prepared_source_qualified": report["prepared_source_qualified"],
+                    "canonical_edges_qualified": report["canonical_edges_qualified"],
+                    **({"failed_phase": report["failed_phase"]} if "failed_phase" in report else {}),
+                    "raw_string_readback_equal": True,
                     "rows": merged.num_rows, "field_correctness_qualified": False})
     store.verify_record_closure([processing])
     report["processing_record_id"] = processing
