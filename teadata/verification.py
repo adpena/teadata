@@ -362,8 +362,11 @@ def run_checks(
     document = {**receipt, "record_id": sha256(_canonical(receipt)).hexdigest()}
     path = directory / "receipt.json"
     _write_document(path, document)
-    _write_document(checks_root / f"latest-{kind}-{'paired' if paired_library else 'locked'}.json",
-                    {"receipt": f"{run_id}/receipt.json", "record_id": document["record_id"]})
+    # Focused callers retain their receipt path; they must not displace the
+    # default-policy receipt used by --verify-latest and the push guard.
+    if checks is None:
+        _write_document(checks_root / f"latest-{kind}-{'paired' if paired_library else 'locked'}.json",
+                        {"receipt": f"{run_id}/receipt.json", "record_id": document["record_id"]})
     print(f"Receipt: {path}", flush=True)
     if before != after:
         print("Source changed during checks; this receipt cannot be used for landing.", file=sys.stderr)

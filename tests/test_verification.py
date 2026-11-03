@@ -216,6 +216,30 @@ def test_passing_receipt_is_bound_to_source_logs_and_policy(project):
     assert receipt.stat().st_mode & 0o777 == 0o600
 
 
+@pytest.mark.parametrize("kind,paired", [("library", False), ("app", False), ("app", True)])
+def test_focused_checks_preserve_the_default_policy_pointer(project, monkeypatch, kind, paired):
+    # Exercise actual receipt publication and verification without provisioning
+    # app dependencies; routing is covered independently above.
+    monkeypatch.setattr("teadata.verification.default_checks", lambda *args, **kwargs: passing())
+    monkeypatch.setattr("teadata.verification._check_runtime",
+                        lambda *args, **kwargs: (_controller_python_version(), sys.executable, None, []))
+    library = project if paired else None
+    pointer = project / ".local" / "checks" / f"latest-{kind}-{'paired' if paired else 'locked'}.json"
+    focused = [Check("focused", ("@python", "-c", "print('focused')"))]
+    first = run_checks(project, kind=kind, paired_library=library, checks=focused)
+    assert not pointer.exists()
+    assert verify_receipt(first, project, kind=kind, paired_library=library, checks=focused)["status"] == "passed"
+
+    full = run_checks(project, kind=kind, paired_library=library)
+    published = pointer.read_bytes()
+    assert (pointer.parent / json.loads(published)["receipt"]).resolve() == full.resolve()
+    for checks in (focused, [Check("failure", ("@python", "-c", "raise SystemExit(7)"))]):
+        receipt = run_checks(project, kind=kind, paired_library=library, checks=checks)
+        assert receipt.is_file()
+        assert pointer.read_bytes() == published
+    assert verify_receipt(full, project, kind=kind, paired_library=library)["status"] == "passed"
+
+
 def test_source_and_lockfile_changes_reject_receipt(project):
     receipt = run_checks(project, kind="library", checks=passing())
     (project / "example.py").write_text("VALUE = 2\n")

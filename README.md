@@ -274,6 +274,8 @@ pytest in a locked, isolated uv environment without replacing the development
 Verification rejects receipts after the Git revision, source, lockfile, check
 policy, tool/dependency environment, or captured logs change. A commit requires
 a fresh run even when it contains previously checked working-tree contents.
+Focused checks supplied programmatically retain their own receipts without
+replacing the full-policy pointer used by `--verify-latest` and the push guard.
 
 After rebuilding changed serialized data, also verify the retained release:
 
