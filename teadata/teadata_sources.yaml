@@ -4026,6 +4026,86 @@ data_sources:
               scope: district
               tables:
                 four_year_longitudinal_rate: data/tapr/raw/2024-d-COMP4.csv
+    2025:
+      path: "data/tapr/raw/2025-d-COMP4-offered-original.csv"
+      metadata:
+        title: "2025 TAPR District Four-Year Longitudinal Rates; Class of 2024 (COMP4)"
+        publisher: "Texas Education Agency"
+        version: "2025"
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        download_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        period:
+          kind: "unknown"
+        identifiers: []
+        metrics: {}
+        value_policy: null
+        estimation: null
+        provenance_ids: []
+        references:
+          - reference_id: "csv_headers"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+            title: "Complete offered original 2025 district COMP4 CSV; immutable acquisition identity"
+            status: "available"
+            provenance_ids:
+              - "00dea0bd885ab09780eb3a4df987bdc2252a837527639726883f9bfa3a60142e"
+            reviewed_sha256: "08ef046dbc4b2e3b6b0cb7705882851ec42035891ba98fe3a5ebc441e0eb13da"
+          - reference_id: "menu"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&tapr=all_d&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr.sas"
+            title: "Actual 2025 all-district family menu"
+            status: "available"
+            provenance_ids:
+              - "6a91fefc5433c8d0590dec6b96dfe8adea09609e24a4b1248050e27e83c34130"
+            reviewed_sha256: "69306dfdbe6b2f4d52b93f078e7b33ac1598d84ff8cf659f84b4da28c8b804d7"
+          - reference_id: "selection"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker"
+            title: "Actual 2025 COMP4 selector; literal Class 2024 context"
+            status: "available"
+            provenance_ids:
+              - "bf130429fc50926831165271f3b65db04918c3308a80373aae7bf7dabe25102a"
+            reviewed_sha256: "3f829bd002e15f62deb16d08b9273ee0d5e0602f63ce6d83a9b031500d855a98"
+          - reference_id: "dictionary"
+            role: "data_dictionary"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=D&dsname=COMP4&dd=attendgrad&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+            title: "Actual 2025 COMP4 dictionary; all ordered occurrences"
+            status: "available"
+            provenance_ids:
+              - "4ef59214f2c1cb7d78f897515cc24ab5ff801b246cd9beef199f7ac803aa1d95"
+            reviewed_sha256: "91749f8f8c34d30c7c24b41bf1b5e3bf54c9aadf71b1393ef70b0338a74bddc2"
+          - reference_id: "glossary"
+            role: "glossary"
+            url: "https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf"
+            title: "Applicable 2024–25 TAPR glossary; reference only"
+            status: "available"
+            provenance_ids:
+              - "e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db"
+            reviewed_sha256: "846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416"
+          - reference_id: "masking"
+            role: "masking_methodology"
+            url: "https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html"
+            title: "Applicable 2024–25 masking; selected applicability pending"
+            status: "available"
+            provenance_ids:
+              - "6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554"
+            reviewed_sha256: "7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8"
+          - reference_id: "columns_source"
+            role: "schema"
+            path: "schemas/tapr--2025--four-year-longitudinal-rate-crosswalk.json"
+            title: "TEA Data complete source-only header/layout and ordered dictionary-occurrence contract"
+            status: "available"
+            provenance_ids: []
+            reviewed_sha256: "2497b7848f3bc79cdbd7d760b6c1935dddf6196326f0330a4e0970a5cf12f155"
+        notes: "Source-only complete original with every offered checked variable and numerator/denominator/rate. All raw fields remain exact strings. Publisher edition 2025 is not a field measurement period. Table/field period, units, applied value policy and estimation remain unknown; dictionary Number is descriptive, not scientific qualification. All ordered dictionary occurrences and literal headings/locators are retained, including shared denominator contexts. Immutable original acquisition dataset names, controls and download dates are bound through csv_headers without relabeling the HTTP receipts. No default reader, enrichment registration, entity hydration, released 127 replacement or activation is introduced. No State/Region aggregate, Bonus funding, ERC graduate-ever-course proxy, E3 correction or temporal comparability is claimed. Literal Class 2024 labels. The applicable 2024–25 glossary describes first ninth grade 2020–21 and diploma cutoff August 31, 2024; cohort/cutoff context remains distinct from report edition. Federal without-exclusions fields use their exact separate dictionary heading as a reviewed naming qualifier; no population equivalence is inferred."
+      reader:
+        profiles:
+          source:
+            column_schema: "schemas/tapr--2025--four-year-longitudinal-rate-crosswalk.json"
+            tapr_source:
+              scope: "district"
+              tables:
+                four_year_longitudinal_rate: "data/tapr/raw/2025-d-COMP4-offered-original.csv"
   campus_tapr_reference:
     2024:
       path: data/tapr/raw/2024-c-REF.csv
@@ -6089,6 +6169,168 @@ data_sources:
               scope: district
               tables:
                 6_year_extended_longitudinal_rate: data/tapr/raw/2024-district-comp6-raw.csv
+  district_tapr_college_career_military_readiness:
+    2025:
+      path: "data/tapr/raw/2025-d-GRAD1-offered-original.csv"
+      metadata:
+        title: "2025 TAPR District College, Career, and Military Readiness; annual graduates labelled 2024 (GRAD1)"
+        publisher: "Texas Education Agency"
+        version: "2025"
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        download_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        period:
+          kind: "unknown"
+        identifiers: []
+        metrics: {}
+        value_policy: null
+        estimation: null
+        provenance_ids: []
+        references:
+          - reference_id: "csv_headers"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+            title: "Complete offered original 2025 district GRAD1 CSV; immutable acquisition identity"
+            status: "available"
+            provenance_ids:
+              - "37e230f48bca38eb35763ce13201203ecd14a9bfc1173b45ce78d6e188147423"
+            reviewed_sha256: "7ae8e10c3c64ccba8723411334bf0ab069959ae40856a0388b27d123eb87cf49"
+          - reference_id: "menu"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&tapr=all_d&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr.sas"
+            title: "Actual 2025 all-district family menu"
+            status: "available"
+            provenance_ids:
+              - "6a91fefc5433c8d0590dec6b96dfe8adea09609e24a4b1248050e27e83c34130"
+            reviewed_sha256: "69306dfdbe6b2f4d52b93f078e7b33ac1598d84ff8cf659f84b4da28c8b804d7"
+          - reference_id: "selection"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker"
+            title: "Actual 2025 GRAD1 selector; literal Class 2024 context"
+            status: "available"
+            provenance_ids:
+              - "259f7518992856231c7ea6b6333119d013e32ebd0da809b3475c6aab9e7123c6"
+            reviewed_sha256: "32a041521888de3db6b7574bcb5f06e27e5aa2cae1307af6c2b97a890cf2dc79"
+          - reference_id: "dictionary"
+            role: "data_dictionary"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=D&dsname=GRAD1&dd=ccmr&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+            title: "Actual 2025 GRAD1 dictionary; all ordered occurrences"
+            status: "available"
+            provenance_ids:
+              - "6a83274bce209fa286896df190375983c1ae48628d7d89841e9c70f533bcefce"
+            reviewed_sha256: "c1cc1b9b286a67e01f9a95225b1ea505a04099a2c0a14953f22889c9403253e7"
+          - reference_id: "glossary"
+            role: "glossary"
+            url: "https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf"
+            title: "Applicable 2024–25 TAPR glossary; reference only"
+            status: "available"
+            provenance_ids:
+              - "e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db"
+            reviewed_sha256: "846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416"
+          - reference_id: "masking"
+            role: "masking_methodology"
+            url: "https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html"
+            title: "Applicable 2024–25 masking; selected applicability pending"
+            status: "available"
+            provenance_ids:
+              - "6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554"
+            reviewed_sha256: "7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8"
+          - reference_id: "columns_source"
+            role: "schema"
+            path: "schemas/tapr--2025--college-career-military-readiness-crosswalk.json"
+            title: "TEA Data complete source-only header/layout and ordered dictionary-occurrence contract"
+            status: "available"
+            provenance_ids: []
+            reviewed_sha256: "5f6e4eb0765e954157b096de63a11a10333883195ca4677dbca03fb8a03a00e8"
+        notes: "Source-only complete original with every offered checked variable and numerator/denominator/rate. All raw fields remain exact strings. Publisher edition 2025 is not a field measurement period. Table/field period, units, applied value policy and estimation remain unknown; dictionary Number is descriptive, not scientific qualification. All ordered dictionary occurrences and literal headings/locators are retained, including shared denominator contexts. Immutable original acquisition dataset names, controls and download dates are bound through csv_headers without relabeling the HTTP receipts. No default reader, enrichment registration, entity hydration, released 127 replacement or activation is introduced. No State/Region aggregate, Bonus funding, ERC graduate-ever-course proxy, E3 correction or temporal comparability is claimed. Annual-graduate CCMR/college-ready/TSI report, not current student Membership or Outcomes Bonus. DA0GP24N/D/R describe numerator/denominator/reported rate in the College, Career, and Military Ready Graduates (Student Achievement) section. Applicable 2024–25 glossary formulas describe 2023–24 annual graduates. This is context for selected-field review, not a blanket period binding or identity with accepted accountability Working Submission adjustments."
+      reader:
+        profiles:
+          source:
+            column_schema: "schemas/tapr--2025--college-career-military-readiness-crosswalk.json"
+            tapr_source:
+              scope: "district"
+              tables:
+                college_career_military_readiness: "data/tapr/raw/2025-d-GRAD1-offered-original.csv"
+  district_tapr_college_readiness_components:
+    2025:
+      path: "data/tapr/raw/2025-d-GRAD2-offered-original.csv"
+      metadata:
+        title: "2025 TAPR District College Readiness Components; annual graduates labelled 2024 (GRAD2)"
+        publisher: "Texas Education Agency"
+        version: "2025"
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        download_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        period:
+          kind: "unknown"
+        identifiers: []
+        metrics: {}
+        value_policy: null
+        estimation: null
+        provenance_ids: []
+        references:
+          - reference_id: "csv_headers"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+            title: "Complete offered original 2025 district GRAD2 CSV; immutable acquisition identity"
+            status: "available"
+            provenance_ids:
+              - "17bf30bf3b30b1b8e7d5bb165eb972f79c26bb54dfd83bfc418df9a6a7ca0c47"
+            reviewed_sha256: "6a2df8bf0781ca7e8ed365f4d64cd9a925a73d05197b0bef7e6cf518af898735"
+          - reference_id: "menu"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&tapr=all_d&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr.sas"
+            title: "Actual 2025 all-district family menu"
+            status: "available"
+            provenance_ids:
+              - "6a91fefc5433c8d0590dec6b96dfe8adea09609e24a4b1248050e27e83c34130"
+            reviewed_sha256: "69306dfdbe6b2f4d52b93f078e7b33ac1598d84ff8cf659f84b4da28c8b804d7"
+          - reference_id: "selection"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker"
+            title: "Actual 2025 GRAD2 selector; literal Class 2024 context"
+            status: "available"
+            provenance_ids:
+              - "6b5ba95e2f2cdda8763d0f4acc5f6ffc83dff910ae779077a25cd225818b4cb1"
+            reviewed_sha256: "3a3a509b3a016745464abf1b1f3aad9145cb6d842535abfcc02d120ad5842e71"
+          - reference_id: "dictionary"
+            role: "data_dictionary"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=D&dsname=GRAD2&dd=ccmr&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+            title: "Actual 2025 GRAD2 dictionary; all ordered occurrences"
+            status: "available"
+            provenance_ids:
+              - "008271fb4c1cf272cf6123d36516188d329463439058903718ed545a25ee6f60"
+            reviewed_sha256: "354093d5801354413c5003bdfa805b5afac679a02c6502fa7a5ee42a9ca3c4ec"
+          - reference_id: "glossary"
+            role: "glossary"
+            url: "https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf"
+            title: "Applicable 2024–25 TAPR glossary; reference only"
+            status: "available"
+            provenance_ids:
+              - "e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db"
+            reviewed_sha256: "846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416"
+          - reference_id: "masking"
+            role: "masking_methodology"
+            url: "https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html"
+            title: "Applicable 2024–25 masking; selected applicability pending"
+            status: "available"
+            provenance_ids:
+              - "6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554"
+            reviewed_sha256: "7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8"
+          - reference_id: "columns_source"
+            role: "schema"
+            path: "schemas/tapr--2025--college-readiness-components-crosswalk.json"
+            title: "TEA Data complete source-only header/layout and ordered dictionary-occurrence contract"
+            status: "available"
+            provenance_ids: []
+            reviewed_sha256: "7fde7d9858ea83b7cbfb06aaac115884cb578c2d6c869cc7564e88b293f0f7a0"
+        notes: "Source-only complete original with every offered checked variable and numerator/denominator/rate. All raw fields remain exact strings. Publisher edition 2025 is not a field measurement period. Table/field period, units, applied value policy and estimation remain unknown; dictionary Number is descriptive, not scientific qualification. All ordered dictionary occurrences and literal headings/locators are retained, including shared denominator contexts. Immutable original acquisition dataset names, controls and download dates are bound through csv_headers without relabeling the HTTP receipts. No default reader, enrichment registration, entity hydration, released 127 replacement or activation is introduced. No State/Region aggregate, Bonus funding, ERC graduate-ever-course proxy, E3 correction or temporal comparability is claimed. Annual-graduate college-readiness components, not course participation. DA0GY24N/R describe AP/IB examination criterion; DA0GUA24N/R and DA0GP24D describe dual credit3hoursELA/math or9hoursany subject. Applicable 2024–25 glossary formulas describe 2023–24 annual graduates. Neither is E3 ERC ever-enrolled-in-one-course participation. No field period/unit/status or cohort equivalence is assigned from a label alone."
+      reader:
+        profiles:
+          source:
+            column_schema: "schemas/tapr--2025--college-readiness-components-crosswalk.json"
+            tapr_source:
+              scope: "district"
+              tables:
+                college_readiness_components: "data/tapr/raw/2025-d-GRAD2-offered-original.csv"
 spatial:
   districts:
     2025:
@@ -6283,6 +6525,10 @@ spatial:
         column_schema: schemas/spatial--campuses--2025--4826bcd2--default.json
 schema:
   data_sources:
+    district_tapr_college_career_military_readiness:
+    - csv
+    district_tapr_college_readiness_components:
+    - csv
     accountability:
     - parquet
     - csv

@@ -73,7 +73,8 @@ def test_complete_source_only_discovery_and_typed_receipts_need_no_artifact_io(s
     assert not metadata.metrics and metadata.provenance_ids == (raw_id,)
     _validate_methodology(metadata, None)
     assert cfg.is_source_only(dataset, 2024) and cfg.column_schema(dataset, 2024) is None
-    assert cfg.availability_report()['data_sources'][dataset]['years'] == [2024]
+    assert cfg.availability_report()['data_sources'][dataset]['years'] == (
+        [2024, 2025] if dataset == 'district_tapr_four_year_longitudinal_rate' else [2024])
     assert cfg.reader_references(dataset, 2024, reader_profile='source') == list(metadata.references)
     roots = [raw_id, *(identifier for ref in metadata.references for identifier in ref.provenance_ids)]
     graph = validate_record_graph(store.read_record, roots)
@@ -116,10 +117,14 @@ def test_complete_source_only_discovery_and_typed_receipts_need_no_artifact_io(s
         catalog.policy(dataset)
     with pytest.raises(ContractError, match='Reader profile is required'):
         cfg.load_df(dataset, 2024)
-    with pytest.raises(ContractError, match='edition unavailable'):
-        cfg.header_records(dataset, edition='2025', reader_profile='source')
-    with pytest.raises(ContractError, match='exact declared edition'):
-        cfg.read_tapr_sources(dataset, 2025)
+    if dataset == 'district_tapr_four_year_longitudinal_rate':
+        assert len(cfg.header_records(dataset, edition='2025', reader_profile='source')) == 226
+        assert cfg.is_source_only(dataset, 2025)
+    else:
+        with pytest.raises(ContractError, match='edition unavailable'):
+            cfg.header_records(dataset, edition='2025', reader_profile='source')
+        with pytest.raises(ContractError, match='exact declared edition'):
+            cfg.read_tapr_sources(dataset, 2025)
 
 
 def test_human_readable_names_preserve_exact_code_label_maps_and_literal_lengths():
@@ -174,16 +179,23 @@ def test_unknowns_and_reviewed_names_cannot_be_repaired_by_alias_or_inference(da
         validate_header_table(table)
 
 
-def test_current_source_contracts_keep_explicit_one_year_csv_opt_ins():
+def test_current_source_contracts_keep_explicit_edition_csv_opt_ins():
     current = yaml.safe_load((ROOT / 'teadata/teadata_sources.yaml').read_text())
     for dataset in NEW_DATASETS:
-        assert list(current['data_sources'].pop(dataset)) == [2024]
+        assert list(current['data_sources'].pop(dataset)) == (
+            [2024, 2025] if dataset == 'district_tapr_four_year_longitudinal_rate' else [2024])
         assert current['schema']['data_sources'].pop(dataset) == ['csv']
     # Full pre-change Config preservation has one current baseline owner below.
 
 
 def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     current = yaml.safe_load((ROOT / 'teadata/teadata_sources.yaml').read_text())
+    # Remove only the explicitly added 2025 outcome opt-ins before reconstructing history.
+    for family in ('college_career_military_readiness', 'college_readiness_components'):
+        dataset = 'district_tapr_' + family
+        assert list(current['data_sources'].pop(dataset)) == [2025]
+        assert current['schema']['data_sources'].pop(dataset) == ['csv']
+    current['data_sources']['district_tapr_four_year_longitudinal_rate'].pop(2025)
     for scope, family, *_ in EXTENDED_SOURCES:
         dataset = scope + '_tapr_' + family
         current['data_sources'].pop(dataset)

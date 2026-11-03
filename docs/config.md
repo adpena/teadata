@@ -540,6 +540,51 @@ bounded producer migration. No released/default catalog or app behavior is
 activated by this source contract.
 Registration does not prepare, publish or activate these sources.
 
+The 2025 district outcome originals are also explicit `source` opt-ins:
+
+| Dataset / preparation family suffix | Publisher file | Returned columns | Ordered dictionary occurrences |
+| --- | --- | ---: | ---: |
+| `four_year_longitudinal_rate` | COMP4 | 226 | 224 |
+| `college_career_military_readiness` | GRAD1 | 277 | 396 |
+| `college_readiness_components` | GRAD2 | 123 | 165 |
+
+Prefix each dataset with `district_tapr_`. The exact raw CSV labels, codes,
+1,208 district records and every dictionary occurrence are retained. COMP4
+labels identify Class of 2024; the applicable glossary describes entry into
+ninth grade in 2020–21 and a diploma cutoff of August 31, 2024. Its ordinary
+longitudinal and federal without-exclusions populations retain separate code
+identities and context-qualified names. GRAD1 and GRAD2 describe annual
+graduates labelled 2024, not current student Membership or Outcomes Bonus.
+GRAD2 AP/IB criteria and dual-credit readiness are not E3/ERC graduate-ever-course
+participation measures. Repeated denominator dictionary contexts remain
+discoverable without duplicating physical columns.
+
+These complete contracts do not assign a whole-family measurement period,
+unit, value policy or estimation. Literal publisher descriptions remain
+unchanged. A report edition, dictionary `Number` type or linked masking page
+does not qualify every field scientifically. Selected-field interpretation and
+cohort comparability require a separate reviewed binding. No State or regional
+aggregate is inferred from the district rows. Existing default readers,
+enrichers, snapshots and released data are unchanged.
+
+Prepare each family separately with the existing bounded native producer:
+
+```sh
+uv run --locked --offline --python 3.14.10 python -m teadata.scripts.build_tapr_profiles \
+  --config teadata/teadata_sources.yaml --edition 2025 --scope district \
+  --family college_career_military_readiness \
+  --reference-store <canonical-provenance-store> \
+  --input-dir <owned-named-input-view> --output-dir <new-output-directory>
+```
+
+Select either of the other literal family names from the table to prepare that
+original instead. The named input files must match the configured basenames
+and reviewed raw checksums; the output directory must not exist. The original
+HTTP receipt is retained through the `csv_headers` reference, even when its
+immutable acquisition dataset name predates this family declaration. Preparation
+adds actual local observations and processing receipts without rewriting that
+history or activating a default build.
+
 Raw TAPR intake uses one logical-record scanner for both the eager
 `read_tapr_table()` API and bounded source preparation. Quoted multiline
 headers and values, original whitespace, UTF8 BOMs, CR/LF separators and
