@@ -8,7 +8,7 @@ from datetime import date, datetime
 from hashlib import sha256
 from functools import cached_property
 import json
-from typing import Any, Mapping
+from typing import Any, Literal, Mapping
 from urllib.parse import urlparse
 
 from .values import EstimationPolicy
@@ -536,6 +536,56 @@ class MetricDefinition:
 
 
 @dataclass(frozen=True)
+class SourceQualifiers:
+    """Publisher source state, separate from our processing qualification.
+
+    Publication-run identity never asserts one run across every source row.
+    Unknown values stay absent; publisher release wording is retained verbatim.
+    """
+
+    family: Literal["sof", "peims_financial", "accountability"]
+    reference_id: str | None = None
+    publisher_release_status: str | None = None
+    publication_run_id: str | None = None
+    row_run_column: str | None = None
+    financial_basis: Literal["actual", "budget"] | None = None
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.family, str) or self.family not in {"sof", "peims_financial", "accountability"}:
+            raise ValueError("Unknown source-qualifier family")
+        for name in ("reference_id", "publisher_release_status", "publication_run_id", "row_run_column", "financial_basis"):
+            value = getattr(self, name)
+            if value is not None and (not isinstance(value, str) or not value.strip()):
+                raise ValueError(f"Source qualifier {name} must be a nonempty string or unknown")
+        if self.family != "sof" and (self.publication_run_id is not None or self.row_run_column is not None):
+            raise ValueError("Publication/row run qualifiers require the SOF family")
+        if self.financial_basis is not None and (
+            self.family != "peims_financial" or self.financial_basis not in {"actual", "budget"}
+        ):
+            raise ValueError("PEIMS financial basis must be actual or budget")
+        if any(value is not None for value in (self.publisher_release_status, self.publication_run_id, self.financial_basis)) and self.reference_id is None:
+            raise ValueError("Publisher source qualifiers require an existing evidence reference")
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, Any]) -> SourceQualifiers:
+        if not isinstance(raw, Mapping):
+            raise ValueError("Source qualifiers must be a mapping")
+        family = raw.get("family")
+        if not isinstance(family, str) or family not in {"sof", "peims_financial", "accountability"}:
+            raise ValueError("Unknown source-qualifier family")
+        allowed = {"family", "reference_id", "publisher_release_status"}
+        if family == "sof":
+            allowed.update(("publication_run_id", "row_run_column"))
+        elif family == "peims_financial":
+            allowed.add("financial_basis")
+        _known_fields(raw, allowed, "source qualifier")
+        return cls(**raw)
+
+    def to_dict(self) -> dict[str, Any]:
+        return {name: value for name, value in asdict(self).items() if value is not None}
+
+
+@dataclass(frozen=True)
 class DatasetMetadata:
     title: str | None = None
     publisher: str | None = None
@@ -555,6 +605,7 @@ class DatasetMetadata:
     value_policy: str | None = None
     metrics: Mapping[str, MetricDefinition] = field(default_factory=dict)
     estimation: EstimationPolicy | None = None
+    source_qualifiers: SourceQualifiers | None = None
 
     @classmethod
     def from_dict(cls, raw: Mapping[str, Any] | None) -> DatasetMetadata:
@@ -565,6 +616,8 @@ class DatasetMetadata:
         _known_fields(raw, set(cls.__dataclass_fields__), "dataset metadata")
         values = dict(raw)
         values["period"] = DataPeriod.from_dict(values.get("period"))
+        if values.get("source_qualifiers") is not None:
+            values["source_qualifiers"] = SourceQualifiers.from_dict(values["source_qualifiers"])
         if values.get("estimation") is not None:
             values["estimation"] = EstimationPolicy.from_dict(values["estimation"])
         metrics = values.get("metrics", {})
@@ -595,6 +648,11 @@ class DatasetMetadata:
             raise ValueError(
                 "Estimation policy requires a source methodology reference"
             )
+        qualifiers = values.get("source_qualifiers")
+        if qualifiers is not None and qualifiers.reference_id is not None and qualifiers.reference_id not in {
+            item.reference_id for item in values["references"]
+        }:
+            raise ValueError("Source qualifiers require an existing evidence reference")
         if values.get("field_year") is not None and (
             type(values["field_year"]) is not int
             or not 1 <= values["field_year"] <= 9999
@@ -652,6 +710,8 @@ class DatasetMetadata:
         values["metrics"] = {
             key: value.to_dict() for key, value in self.metrics.items()
         }
+        if self.source_qualifiers is not None:
+            values["source_qualifiers"] = self.source_qualifiers.to_dict()
         return values
 
 

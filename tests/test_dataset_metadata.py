@@ -1,11 +1,81 @@
+from dataclasses import FrozenInstanceError
 from datetime import date
+from hashlib import sha256
 import json
 from pathlib import Path
 
 import pytest
 
-from teadata.dataset_metadata import DataPeriod, DatasetMetadata
+from teadata.dataset_metadata import DataPeriod, DatasetMetadata, SourceQualifiers
 from teadata.teadata_config import Config, load_config
+
+
+def test_absent_source_qualifiers_preserve_legacy_metadata_receipt_and_semantics_bytes():
+    from teadata.manifest import _leaf_semantics, canonical_json
+
+    expected = '{"identifiers":[],"metrics":{},"period":{"kind":"unknown"},"provenance_ids":[],"references":[],"version":"2025"}'
+    for raw in ({"version": "2025"}, {"version": "2025", "source_qualifiers": None}):
+        metadata = DatasetMetadata.from_dict(raw)
+        assert metadata.source_qualifiers is None
+        assert canonical_json(metadata.to_dict()) == expected
+        receipt = {"source_metadata": metadata.to_dict()}
+        assert canonical_json(receipt) == '{"source_metadata":' + expected + '}'
+        old_semantics = b'{"estimation":null,"metrics":{},"periods":{"value":{"kind":"unknown"}}}'
+        assert _leaf_semantics(metadata, [{"field": "value", "period": {"kind": "unknown"}}]) == sha256(old_semantics).hexdigest()
+
+
+@pytest.mark.parametrize("qualifiers", [
+    {"family": "sof", "publication_run_id": "046820", "row_run_column": "SOF_RUN_ID", "publisher_release_status": "Near Final (revised)"},
+    {"family": "peims_financial", "financial_basis": "actual"},
+    {"family": "peims_financial", "financial_basis": "budget"},
+    {"family": "accountability", "publisher_release_status": "Final resubmission"},
+])
+def test_source_qualifiers_are_typed_frozen_and_preserve_publisher_wording(qualifiers):
+    raw = {"version": "separate edition identity", "source_qualifiers": {**qualifiers, "reference_id": "publication"},
+        "references": [{"reference_id": "publication", "role": "source_notes", "status": "available",
+            "url": "https://example.test/publication", "reviewed_sha256": "a" * 64, "provenance_ids": ["b" * 64]}]}
+    metadata = DatasetMetadata.from_dict(raw)
+    assert isinstance(metadata.source_qualifiers, SourceQualifiers)
+    assert metadata.source_qualifiers.to_dict() == raw["source_qualifiers"]
+    assert DatasetMetadata.from_dict(metadata.to_dict()) == metadata
+    assert metadata.version == "separate edition identity"
+    with pytest.raises(FrozenInstanceError):
+        setattr(metadata.source_qualifiers, "publisher_release_status", "changed by caller")
+
+
+@pytest.mark.parametrize("family", ["sof", "peims_financial", "accountability"])
+def test_unknown_source_qualifiers_do_not_infer_defaults(family):
+    metadata = DatasetMetadata.from_dict({"version": "46820", "source_qualifiers": {"family": family}})
+    assert metadata.source_qualifiers is not None
+    assert metadata.source_qualifiers.to_dict() == {"family": family}
+    assert metadata.source_qualifiers.publisher_release_status is None
+    assert metadata.source_qualifiers.publication_run_id is None
+    assert metadata.source_qualifiers.financial_basis is None
+
+
+@pytest.mark.parametrize("qualifiers", [
+    [], {"family": []}, {"family": "unknown"}, {"family": "sof", "latest": True},
+    {"family": "sof", "financial_basis": None},
+    {"family": "peims_financial", "publication_run_id": "46820"},
+    {"family": "accountability", "row_run_column": None},
+    {"family": "sof", "publication_run_id": True},
+    {"family": "sof", "publication_run_id": 46820},
+    {"family": "sof", "row_run_column": " "},
+    {"family": "sof", "publisher_release_status": ""},
+    {"family": "peims_financial", "financial_basis": "estimated"},
+    {"family": "accountability", "publisher_release_status": False},
+])
+def test_source_qualifier_unknown_fields_types_and_family_mismatches_fail(qualifiers):
+    with pytest.raises(ValueError):
+        SourceQualifiers.from_dict(qualifiers)
+
+
+def test_source_qualifier_claims_need_a_declared_evidence_reference():
+    with pytest.raises(ValueError, match="evidence reference"):
+        SourceQualifiers.from_dict({"family": "sof", "publication_run_id": "46820"})
+    with pytest.raises(ValueError, match="existing evidence reference"):
+        DatasetMetadata.from_dict({"source_qualifiers": {
+            "family": "sof", "publication_run_id": "46820", "reference_id": "not-declared"}})
 
 
 def profile_metadata_document(path):

@@ -80,6 +80,49 @@ documented route. Existing leaves without `column_support` retain their original
 contract bytes, field discovery, and projection behavior. This contract support
 does not itself activate transfer datasets or qualify a new release.
 
+### Publisher source qualifiers
+
+`DatasetMetadata.source_qualifiers` is optional, frozen source metadata. It
+distinguishes the `sof`, `peims_financial`, and `accountability` families without
+creating another provenance registry. A known publisher state names an existing
+reviewed source reference and its retained acquisition evidence. The ordinary
+catalog/reference gates verify that binding; storing a label does not establish
+external field correctness or successful release qualification.
+
+For an exact selected edition with these declarations:
+
+```python
+metadata = catalog.metadata(key.dataset, edition=key)
+qualifiers = metadata.source_qualifiers
+observations = catalog.acquisitions(key.dataset, edition=key)
+field = catalog.field_metadata(selected_field, edition=key)
+if qualifiers is not None:
+    publisher_status = qualifiers.publisher_release_status
+    publication_run = qualifiers.publication_run_id
+    row_run_column = qualifiers.row_run_column
+    financial_basis = qualifiers.financial_basis
+```
+
+The same detached qualifier data appears in `metadata.to_dict()`, acquisition
+`source_metadata`, and `field["metadata"]`. SOF publication run and the actual
+per-row run are distinct: mixed row runs are retained, never rewritten to the
+advertised publication run. A declared `row_run_column` must name a real
+publisher-bound physical field or existing shared leaf context. Selecting a
+field automatically projects that column, and `field["support"]["row_run_column"]`
+identifies it. It does not add a key, copy cells into entity metadata, or load
+unrelated fields. Source editions without a declared row-run column do not
+acquire one by inference.
+
+PEIMS `financial_basis` is explicitly `actual` or `budget`; SOF and accountability
+publisher release wording is retained verbatim, including preliminary, near-final
+or other source-specific labels. It is not a universal status enum or our
+processing PASS/HOLD. Publication run IDs are explicit strings, not numerical
+ordering rules. Edition identity, source periods, publisher release state,
+acquisition time and processing qualification remain separate. Unknown values
+stay unknown. Earlier immutable metadata, receipts and leaf semantic hashes
+retain their original bytes when `source_qualifiers` is absent. These APIs do
+not activate or qualify a new financial dataset.
+
 ## Private school-finder listings
 
 The private producer selects the latest curated `tefa` edition independently of

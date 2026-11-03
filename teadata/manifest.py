@@ -102,6 +102,8 @@ def _leaf_semantics(metadata: DatasetMetadata, rows: Iterable[Mapping[str, Any]]
     semantic = {"periods": periods,
         "metrics": {name: value.to_dict() for name, value in metadata.metrics.items() if value.field in periods},
         "estimation": metadata.to_dict().get("estimation")}
+    if metadata.source_qualifiers is not None:
+        semantic["source_qualifiers"] = metadata.source_qualifiers.to_dict()
     return sha256(canonical_json(semantic).encode()).hexdigest()
 
 
@@ -115,20 +117,29 @@ def _validate_methodology(metadata: DatasetMetadata, policy: ValuePolicy | None)
             required.add(policy.reference_id)
     if metadata.estimation is not None:
         required.add(metadata.estimation.reference_id)
+    if metadata.source_qualifiers is not None and metadata.source_qualifiers.reference_id is not None:
+        required.add(metadata.source_qualifiers.reference_id)
     references = {reference.reference_id: reference for reference in metadata.references}
     for identifier in required:
         reference = references.get(identifier)
         if (reference is None or reference.status != "available" or reference.reviewed_sha256 is None
                 or not reference.provenance_ids):
-            raise ContractError("Value policy or estimation requires retained reviewed methodology bytes")
+            raise ContractError("Value policy, estimation or source qualifiers require retained reviewed methodology bytes")
 
 
 def _validate_leaf_support(contract: Mapping[str, Any], rows: Iterable[Mapping[str, Any]], metadata: DatasetMetadata) -> None:
     support = LeafColumnSupport.from_contract(contract)
-    if support is not None:
+    row_run = metadata.source_qualifiers.row_run_column if metadata.source_qualifiers is not None else None
+    if support is not None or row_run is not None:
         columns = set(contract["columns"])
-        support.validate_fields({row["field"] for row in rows if row["field"] in columns},
-            count_fields={value.field for value in metadata.metrics.values() if value.unit == "count" and value.field in columns})
+        fields = {row["field"] for row in rows if row["field"] in columns}
+        if support is not None:
+            support.validate_fields(fields,
+                count_fields={value.field for value in metadata.metrics.values() if value.unit == "count" and value.field in columns})
+        if row_run is not None and (
+            row_run not in columns or (row_run not in fields and (support is None or row_run not in support.context))
+        ):
+            raise ValueError("SOF row-run column must be a publisher-bound field or existing leaf context")
 
 
 def _verify_input_receipt(record: Mapping[str, Any], *, dataset: str,
@@ -791,6 +802,9 @@ class DatasetCatalog:
         support = self._artifact_refs[binding.artifact_id].column_support
         if support is not None:
             result["support"] = support.projection(binding.field)
+        qualifiers = self._edition_metadata[qualified[0]].source_qualifiers
+        if qualifiers is not None and qualifiers.row_run_column is not None:
+            result.setdefault("support", {})["row_run_column"] = qualifiers.row_run_column
         return result
 
     def artifact_ref(self, identifier: str) -> ArtifactRef:
@@ -854,6 +868,12 @@ class DatasetCatalog:
                     if column not in column_sets[identifier]:
                         columns[identifier].append(column)
                         column_sets[identifier].add(column)
+            qualifiers = catalog._edition_metadata[qualified[0]].source_qualifiers
+            if qualifiers is not None and qualifiers.row_run_column is not None:
+                column = qualifiers.row_run_column
+                if column not in column_sets[identifier]:
+                    columns[identifier].append(column)
+                    column_sets[identifier].add(column)
             for dependency in binding.dependencies:
                 visit(dependency)
         for key, field in fields:

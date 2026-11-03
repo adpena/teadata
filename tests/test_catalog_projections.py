@@ -143,7 +143,8 @@ def edition_fixture(tmp_path):
 
 
 def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staff"), multiple_inputs=False, damage_inputs=None,
-                         normalized=False, support_damage=None):
+                         normalized=False, support_damage=None, source_qualifiers=None, row_runs=None,
+                         qualifier_reference_damage=None):
     """The same tiny fixture, optionally widened without adding source rows."""
     import pyarrow as pa
     import pyarrow.csv as pacsv
@@ -161,6 +162,14 @@ def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staf
         raw.write_text(("ID,NAME,VALUE\n001,Zero,0\n002,Suppressed,-999\n003,Missing,.\n004,Observed,5\n") if normalized else
                        ",".join(["ID", "NAME", "VALUE", *extra_codes]) + "\n"
                        + ",".join(["001", "One", "5", *["1"] * extra_fields]) + "\n")
+        if row_runs is not None:
+            assert normalized and not extra_fields and len(row_runs) == 4
+            raw.write_text("ID,NAME,VALUE,SOF_RUN_ID\n" + "".join(
+                f"{identifier},{name},{amount},{run}\n" for (identifier, name, amount), run in zip(
+                    [("001", "Zero", "0"), ("002", "Suppressed", "-999"),
+                     ("003", "Missing", "."), ("004", "Observed", "5")], row_runs, strict=True)))
+            extra_codes.append("SOF_RUN_ID")
+            extra_names.append("sof_run_id")
         raw_sha = file_identity(raw)["sha256"]
         raws, raw_hashes = [raw], [raw_sha]
         if multiple_inputs:
@@ -171,11 +180,13 @@ def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staf
             raw_hashes.append(file_identity(other)["sha256"])
         labels, codes = ["Campus ID", "Campus name", "Amount"], ["ID", "NAME", "VALUE"]
         labels += [f"Extra {i:03d}" for i in range(extra_fields)]
+        if row_runs is not None:
+            labels.append("SOF_RUN_ID")
         codes += extra_codes
         fields = [{"position": index, "code": code, "label": label, "field": field,
-                   "disposition": "identity" if index < 3 else "fact",
+                   "disposition": "identity" if index < 3 or code == "SOF_RUN_ID" else "fact",
                    "publisher_type": None, "publisher_description": None,
-                   "dictionary_status": "not_applicable" if index < 3 else "not_documented"}
+                   "dictionary_status": "not_applicable" if index < 3 or code == "SOF_RUN_ID" else "not_documented"}
                   for index, (code, label, field) in enumerate(zip(
                       codes, labels,
                       ["campus_number", "campus_name", "amount", *extra_names]), 1)]
@@ -212,6 +223,24 @@ def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staf
                 str(methodology), DatasetMetadata(title="Synthetic fixture masking reference")))
             datasets[dataset][2025]["metadata"]["references"].append({"reference_id": "masking", "role": "masking_methodology",
                 "path": methodology.name, "status": "available", "provenance_ids": [methodology_id], "reviewed_sha256": methodology_sha})
+        if source_qualifiers is not None:
+            publication = tmp_path / (family + "-publication.txt")
+            publication.write_text("Synthetic publication: run 46820, Near Final; individual source rows retain their own runs.\n")
+            publication_sha = file_identity(publication)["sha256"]
+            publication_id = store.record_acquisition(publication, ResolvedDataset(dataset + ":publication", "reference", None, None,
+                str(publication), DatasetMetadata(title="Synthetic fixture source publication reference")))
+            reference = {"reference_id": "publication", "role": "source_notes", "path": publication.name,
+                "status": "available", "reviewed_sha256": publication_sha, "provenance_ids": [publication_id]}
+            if qualifier_reference_damage == "unreviewed":
+                reference["status"] = "unreviewed"
+            elif qualifier_reference_damage == "wrong_sha":
+                reference["reviewed_sha256"] = "f" * 64
+            elif qualifier_reference_damage == "missing_receipt":
+                reference["provenance_ids"] = []
+            elif qualifier_reference_damage == "wrong_url":
+                reference["url"] = "https://example.test/unrelated-publication"
+            datasets[dataset][2025]["metadata"]["references"].append(reference)
+            datasets[dataset][2025]["metadata"]["source_qualifiers"] = deepcopy(source_qualifiers)
         specs.append((family, dataset, raws, raw_hashes, table))
     policy = {"reference_id": "masking", "tokens": {
         "-999": {"status": "suppressed", "reason": "synthetic publisher masking token"},
@@ -303,6 +332,70 @@ def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staf
 def rehash_catalog(document, resources=None):
     document["build_id"] = sha256(canonical_json({k: v for k, v in document.items() if k != "build_id"}).encode()).hexdigest()
     return DatasetCatalog(document, column_schema_loader=(lambda ref: resources[ref.sha256]) if resources is not None else None)
+
+
+@pytest.mark.parametrize("schema_version", [3, 4])
+def test_source_qualifiers_keep_mixed_row_runs_in_one_selected_native_projection(tmp_path, schema_version):
+    from teadata.manifest import _leaf_semantics
+    from teadata.release import DataRelease, publish_release
+
+    runs = ("46820", "46767", "44215", "46820")
+    qualifiers = {"family": "sof", "reference_id": "publication", "publication_run_id": "46820",
+                  "publisher_release_status": "Near Final", "row_run_column": "sof_run_id"}
+    fixture = make_edition_fixture(tmp_path, families=("student",), normalized=True,
+                                  source_qualifiers=qualifiers, row_runs=runs)
+    catalog, root = fixture["catalog"], fixture["root"]
+    if schema_version == 4:
+        catalog = catalog.externalize_editions()
+        root = publish_release(tmp_path, catalog, schema_version=4)
+    key, ref, _ = fixture["leaves"]["student"]
+    metadata = catalog.metadata(key.dataset, edition=key)
+    assert metadata.source_qualifiers is not None
+    assert metadata.source_qualifiers.to_dict() == qualifiers
+    assert metadata.version == "2025"  # The edition identity is not inferred from publication run.
+    observations = catalog.acquisitions(key.dataset, edition=key)
+    assert observations[0]["source_metadata"]["source_qualifiers"] == qualifiers
+    observations[0]["source_metadata"]["source_qualifiers"]["publisher_release_status"] = "caller-only change"
+    assert catalog.acquisitions(key.dataset, edition=key)[0]["source_metadata"]["source_qualifiers"] == qualifiers
+    field = catalog.field_metadata("amount", edition=key)
+    assert field is not None
+    assert field["metadata"]["source_qualifiers"] == qualifiers
+    assert field["support"]["row_run_column"] == "sof_run_id"
+    field["support"]["row_run_column"] = "caller-only change"
+    assert catalog.field_metadata("amount", edition=key)["support"]["row_run_column"] == "sof_run_id"
+    plan, = catalog.resolve_artifacts([(key, "amount")])
+    assert plan["columns"] == ("source_record", "amount", "VALUE", "amount_status", "row_kind", "sof_run_id")
+    assert ref.contract["key_columns"] == ["source_record"]  # No artificial run key or copied cell.
+    projected = DataRelease(root).analytical_dataset(ref.identity).to_table(columns=list(plan["columns"]))
+    assert projected["sof_run_id"].to_pylist() == list(runs)
+    assert projected["amount"].to_pylist() == [0, None, None, 5]
+    assert projected.column_names.count("sof_run_id") == 1 and "SOF_RUN_ID" not in projected.column_names
+    run_field = next(row for row in catalog.variables(edition=key) if row["field"] == "sof_run_id")
+    assert run_field["code"] == "SOF_RUN_ID"
+    run_plan, = catalog.resolve_artifacts([(key, "sof_run_id")])
+    assert run_plan["columns"].count("sof_run_id") == 1
+    headers = catalog.header_records(key.dataset, edition_key=key)
+    changed = replace(metadata, source_qualifiers=replace(metadata.source_qualifiers, publisher_release_status="Final"))
+    assert _leaf_semantics(metadata, headers) != _leaf_semantics(changed, headers)
+    processing = fixture["store"].read_record(ref.processing_id)
+    assert set(fixture["store"].verify_record_closure([ref.processing_id])) >= set(processing["inputs"])
+
+
+@pytest.mark.parametrize("row_run", ["absent_run", "NAME", "name_support"])
+def test_row_run_requires_real_publisher_field_or_existing_shared_context(tmp_path, row_run):
+    qualifiers = {"family": "sof", "row_run_column": row_run}
+    with pytest.raises(ValueError, match="row-run column"):
+        make_edition_fixture(tmp_path, families=("student",), normalized=True,
+            source_qualifiers=qualifiers, row_runs=("46820", "46767", "44215", "46820"))
+
+
+@pytest.mark.parametrize("damage", ["unreviewed", "wrong_sha", "missing_receipt", "wrong_url"])
+def test_source_qualifier_evidence_uses_existing_review_and_receipt_gates(tmp_path, damage):
+    qualifiers = {"family": "sof", "reference_id": "publication", "publication_run_id": "46820",
+                  "publisher_release_status": "Near Final", "row_run_column": "sof_run_id"}
+    with pytest.raises((ValueError, ContractError), match="[Rr]eference|methodology"):
+        make_edition_fixture(tmp_path, families=("student",), normalized=True,
+            source_qualifiers=qualifiers, row_runs=("46820", "46767", "44215", "46820"), qualifier_reference_damage=damage)
 
 
 @pytest.mark.parametrize("schema_version", [3, 4])
