@@ -65,6 +65,8 @@ def test_absent_source_qualifiers_preserve_legacy_metadata_receipt_and_semantics
     {"family": "peims_financial", "financial_basis": "actual"},
     {"family": "peims_financial", "financial_basis": "budget"},
     {"family": "accountability", "publisher_release_status": "Final resubmission"},
+    {"family": "ccmr_outcomes_bonus", "graduate_class_year": 2024, "publisher_release_status": "Final"},
+    {"family": "ccmr_outcomes_bonus", "graduate_class_year": 2025, "publisher_release_status": "Early"},
 ])
 def test_source_qualifiers_are_typed_frozen_and_preserve_publisher_wording(qualifiers):
     raw = {"version": "separate edition identity", "source_qualifiers": {**qualifiers, "reference_id": "publication"},
@@ -79,7 +81,7 @@ def test_source_qualifiers_are_typed_frozen_and_preserve_publisher_wording(quali
         setattr(metadata.source_qualifiers, "publisher_release_status", "changed by caller")
 
 
-@pytest.mark.parametrize("family", ["sof", "peims_financial", "accountability"])
+@pytest.mark.parametrize("family", ["sof", "peims_financial", "accountability", "ccmr_outcomes_bonus"])
 def test_unknown_source_qualifiers_do_not_infer_defaults(family):
     metadata = DatasetMetadata.from_dict({"version": "46820", "source_qualifiers": {"family": family}})
     assert metadata.source_qualifiers is not None
@@ -87,6 +89,113 @@ def test_unknown_source_qualifiers_do_not_infer_defaults(family):
     assert metadata.source_qualifiers.publisher_release_status is None
     assert metadata.source_qualifiers.publication_run_id is None
     assert metadata.source_qualifiers.financial_basis is None
+    assert metadata.source_qualifiers.graduate_class_year is None
+
+
+@pytest.mark.parametrize("year", [True, False, "2024", 2024.0, 0, 10000, [], {}])
+def test_bonus_class_year_requires_a_strict_metadata_year_in_both_entry_points(year):
+    raw = {"family": "ccmr_outcomes_bonus", "graduate_class_year": year, "reference_id": "publication"}
+    with pytest.raises(ValueError, match="graduate_class_year"):
+        SourceQualifiers(**raw)
+    with pytest.raises(ValueError, match="graduate_class_year"):
+        SourceQualifiers.from_dict(raw)
+
+
+@pytest.mark.parametrize("family", ["sof", "peims_financial", "accountability"])
+def test_graduate_class_year_is_not_a_run_or_an_accountability_or_financial_year(family):
+    raw = {"family": family, "graduate_class_year": 2024, "reference_id": "publication"}
+    with pytest.raises(ValueError, match="graduate_class_year"):
+        SourceQualifiers(**raw)
+    with pytest.raises(ValueError, match="graduate_class_year"):
+        SourceQualifiers.from_dict(raw)
+    with pytest.raises(ValueError, match="graduate_class_year"):
+        SourceQualifiers.from_dict({**raw, "graduate_class_year": None})
+
+
+@pytest.mark.parametrize("field,value", [
+    ("financial_basis", "actual"), ("publication_run_id", "46820"), ("row_run_column", "SOF_RUN_ID"),
+])
+def test_bonus_family_rejects_financial_and_sof_qualifiers_in_both_entry_points(field, value):
+    raw = {"family": "ccmr_outcomes_bonus", "reference_id": "publication", field: value}
+    with pytest.raises(ValueError):
+        SourceQualifiers(**raw)
+    with pytest.raises(ValueError):
+        SourceQualifiers.from_dict(raw)
+
+
+def test_known_bonus_class_requires_a_reference_without_inferring_other_years():
+    raw = {"family": "ccmr_outcomes_bonus", "graduate_class_year": 2024}
+    with pytest.raises(ValueError, match="evidence reference"):
+        SourceQualifiers(**raw)
+    with pytest.raises(ValueError, match="evidence reference"):
+        SourceQualifiers.from_dict(raw)
+    with pytest.raises(ValueError, match="existing evidence reference"):
+        DatasetMetadata.from_dict({"source_qualifiers": {**raw, "reference_id": "missing"}})
+    metadata = DatasetMetadata.from_dict({"source_qualifiers": {**raw, "reference_id": "methodology"},
+        "references": [{"reference_id": "methodology", "role": "methodology", "status": "unreviewed"}]})
+    assert metadata.period.kind == "unknown" and metadata.field_year is None
+    assert metadata.source_qualifiers is not None
+    assert metadata.source_qualifiers.to_dict() == {**raw, "reference_id": "methodology"}
+
+
+def test_bonus_class_is_accessible_in_local_acquisition_metadata_without_invented_dates(tmp_path):
+    from teadata.provenance import ProvenanceStore
+
+    path = tmp_path / "reported.csv"
+    path.write_text("reported_count\n23\n")
+    qualifiers = {"family": "ccmr_outcomes_bonus", "graduate_class_year": 2024,
+        "publisher_release_status": "Final", "reference_id": "methodology"}
+    cfg = Config.from_dict({"data_sources": {"bonus": {2024: {"path": str(path), "metadata": {
+        "source_qualifiers": qualifiers, "references": [
+            {"reference_id": "methodology", "role": "methodology", "status": "unreviewed"}]}}}}})
+    store = ProvenanceStore(tmp_path / "provenance")
+    record_id = store.record_acquisition(path, cfg.resolve_dataset("bonus", 2024))
+    record = store.read_record(record_id)
+    assert record["source_metadata"]["source_qualifiers"] == qualifiers
+    assert record["source_metadata"]["period"] == {"kind": "unknown"}
+    assert record["downloaded_at"] is None and record["requested_url"] is None
+    restored = DatasetMetadata.from_dict(record["source_metadata"])
+    assert restored.source_qualifiers is not None
+    assert restored.source_qualifiers.to_dict() == qualifiers
+
+
+@pytest.mark.parametrize("damage", ["unreviewed", "missing_sha", "missing_receipt", None])
+def test_bonus_claim_reuses_the_existing_reviewed_methodology_gate(damage):
+    from teadata.manifest import ContractError, _validate_methodology
+
+    reference = {"reference_id": "methodology", "role": "methodology", "status": "available",
+        "url": "https://example.test/methodology", "reviewed_sha256": "a" * 64, "provenance_ids": ["b" * 64]}
+    if damage == "unreviewed":
+        reference["status"] = "unreviewed"
+    elif damage == "missing_sha":
+        reference.pop("reviewed_sha256")
+    elif damage == "missing_receipt":
+        reference["provenance_ids"] = []
+    metadata = DatasetMetadata.from_dict({"source_qualifiers": {"family": "ccmr_outcomes_bonus",
+        "graduate_class_year": 2025, "publisher_release_status": "Early", "reference_id": "methodology"},
+        "references": [reference]})
+    if damage is not None:
+        with pytest.raises(ContractError, match="reviewed methodology"):
+            _validate_methodology(metadata, None)
+    else:
+        _validate_methodology(metadata, None)
+
+
+@pytest.mark.parametrize("expected", [
+    '{"family":"sof","publication_run_id":"046820","reference_id":"publication","row_run_column":"SOF_RUN_ID"}',
+    '{"family":"peims_financial","financial_basis":"actual","reference_id":"publication"}',
+    '{"family":"accountability","publisher_release_status":"Final resubmission","reference_id":"publication"}',
+])
+def test_existing_qualifier_wire_and_leaf_hashes_omit_the_new_unknown_class_year(expected):
+    from teadata.manifest import _leaf_semantics, canonical_json
+
+    qualifiers = SourceQualifiers.from_dict(json.loads(expected))
+    assert qualifiers.graduate_class_year is None
+    assert canonical_json(qualifiers.to_dict()) == expected
+    metadata = DatasetMetadata(source_qualifiers=qualifiers)
+    old_semantics = ('{"estimation":null,"metrics":{},"periods":{"value":{"kind":"unknown"}},'
+                     '"source_qualifiers":' + expected + '}')
+    assert _leaf_semantics(metadata, [{"field": "value", "period": {"kind": "unknown"}}]) == sha256(old_semantics.encode()).hexdigest()
 
 
 @pytest.mark.parametrize("qualifiers", [

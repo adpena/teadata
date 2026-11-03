@@ -8,7 +8,7 @@ from datetime import date, datetime
 from hashlib import sha256
 from functools import cached_property
 import json
-from typing import Any, Literal, Mapping
+from typing import Any, Literal, Mapping, get_args
 from urllib.parse import urlparse
 
 from .values import EstimationPolicy, MeasurementUnit
@@ -531,6 +531,10 @@ class MetricDefinition:
                 **({"period": self.period.to_dict()} if self.period is not None else {})}
 
 
+_SourceQualifierFamily = Literal["sof", "peims_financial", "accountability", "ccmr_outcomes_bonus"]
+_SOURCE_QUALIFIER_FAMILIES = frozenset(get_args(_SourceQualifierFamily))
+
+
 @dataclass(frozen=True)
 class SourceQualifiers:
     """Publisher source state, separate from our processing qualification.
@@ -539,15 +543,16 @@ class SourceQualifiers:
     Unknown values stay absent; publisher release wording is retained verbatim.
     """
 
-    family: Literal["sof", "peims_financial", "accountability"]
+    family: _SourceQualifierFamily
     reference_id: str | None = None
     publisher_release_status: str | None = None
     publication_run_id: str | None = None
     row_run_column: str | None = None
     financial_basis: Literal["actual", "budget"] | None = None
+    graduate_class_year: int | None = None
 
     def __post_init__(self) -> None:
-        if not isinstance(self.family, str) or self.family not in {"sof", "peims_financial", "accountability"}:
+        if not isinstance(self.family, str) or self.family not in _SOURCE_QUALIFIER_FAMILIES:
             raise ValueError("Unknown source-qualifier family")
         for name in ("reference_id", "publisher_release_status", "publication_run_id", "row_run_column", "financial_basis"):
             value = getattr(self, name)
@@ -559,7 +564,13 @@ class SourceQualifiers:
             self.family != "peims_financial" or self.financial_basis not in {"actual", "budget"}
         ):
             raise ValueError("PEIMS financial basis must be actual or budget")
-        if any(value is not None for value in (self.publisher_release_status, self.publication_run_id, self.financial_basis)) and self.reference_id is None:
+        if self.graduate_class_year is not None and (
+            self.family != "ccmr_outcomes_bonus"
+            or type(self.graduate_class_year) is not int
+            or not 1 <= self.graduate_class_year <= 9999
+        ):
+            raise ValueError("Outcomes Bonus graduate_class_year must be a valid year")
+        if any(value is not None for value in (self.publisher_release_status, self.publication_run_id, self.financial_basis, self.graduate_class_year)) and self.reference_id is None:
             raise ValueError("Publisher source qualifiers require an existing evidence reference")
 
     @classmethod
@@ -567,13 +578,15 @@ class SourceQualifiers:
         if not isinstance(raw, Mapping):
             raise ValueError("Source qualifiers must be a mapping")
         family = raw.get("family")
-        if not isinstance(family, str) or family not in {"sof", "peims_financial", "accountability"}:
+        if not isinstance(family, str) or family not in _SOURCE_QUALIFIER_FAMILIES:
             raise ValueError("Unknown source-qualifier family")
         allowed = {"family", "reference_id", "publisher_release_status"}
         if family == "sof":
             allowed.update(("publication_run_id", "row_run_column"))
         elif family == "peims_financial":
             allowed.add("financial_basis")
+        elif family == "ccmr_outcomes_bonus":
+            allowed.add("graduate_class_year")
         _known_fields(raw, allowed, "source qualifier")
         return cls(**raw)
 

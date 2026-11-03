@@ -83,7 +83,8 @@ does not itself activate transfer datasets or qualify a new release.
 ### Publisher source qualifiers
 
 `DatasetMetadata.source_qualifiers` is optional, frozen source metadata. It
-distinguishes the `sof`, `peims_financial`, and `accountability` families without
+distinguishes the `sof`, `peims_financial`, `accountability`, and
+`ccmr_outcomes_bonus` families without
 creating another provenance registry. A known publisher state names an existing
 reviewed source reference and its retained acquisition evidence. The ordinary
 catalog/reference gates verify that binding; storing a label does not establish
@@ -101,6 +102,7 @@ if qualifiers is not None:
     publication_run = qualifiers.publication_run_id
     row_run_column = qualifiers.row_run_column
     financial_basis = qualifiers.financial_basis
+    graduate_class_year = qualifiers.graduate_class_year
 ```
 
 The same detached qualifier data appears in `metadata.to_dict()`, acquisition
@@ -122,6 +124,17 @@ acquisition time and processing qualification remain separate. Unknown values
 stay unknown. Earlier immutable metadata, receipts and leaf semantic hashes
 retain their original bytes when `source_qualifiers` is absent. These APIs do
 not activate or qualify a new financial dataset.
+
+For `ccmr_outcomes_bonus`, `graduate_class_year` is an explicitly declared
+annual-graduate class year, validated as an integer from 1 to 9999. It requires
+the existing reviewed source reference, as does known publisher release wording
+such as `Early` or `Final`. It is distinct from a four-year graduation cohort,
+the outcome-data windows, a calendar observation year and a funding fiscal year;
+none of those are inferred from it. Keep Early and Final source contexts
+separate, and retain an unknown measurement period when its window is not
+established. The family does not accept SOF run or PEIMS financial-basis fields.
+An absent class year remains omitted, including on existing qualifier families;
+their serialized metadata and leaf semantic hashes remain unchanged.
 
 ## File organization and names
 
