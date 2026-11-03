@@ -221,6 +221,30 @@ def _regional_receipt(store: ProvenanceStore, form: RegionalTransferForm, record
     return record
 
 
+def district_batch_inputs(store: ProvenanceStore, raw: bytes, year: int, *, all_offered: bool = False) -> tuple[list[tuple[str, str]], dict[str, str]]:
+    """One admission path for a captured regional index, before any source read."""
+    index = json.loads(raw)
+    if index.get("schema_version") != 1 or index.get("status") != "PASS" or index.get("year") != year:
+        raise ValueError("District preparation requires a complete exact-year acquisition index")
+    form = read_regional_form(store, index["form"]["record_id"], index["form"]["sha256"])
+    period, offered = form.selection(year, index["regions"])
+    if all_offered and offered != tuple(form.regions):
+        raise ValueError("Statewide district materialization requires every offered region in source order")
+    if index.get("period") != period.to_dict() or len(index.get("items", [])) != len(offered):
+        raise ValueError("District index period/region coverage differs from its pinned form")
+    selected, regions = [], {}
+    for region, item in zip(offered, index["items"], strict=True):
+        if item.get("region") != region or item.get("status") not in {"acquired", "resumed"}:
+            raise ValueError("District index has an unaccepted or reordered region")
+        record = _regional_receipt(store, form, item["record_id"], year, region, period,
+            _limits(**{name: index["transport_limits"][name] for name in ("timeout", "max_bytes")}))
+        if record["artifact"] != item["artifact"]:
+            raise ValueError("District index artifact differs from its original acquisition")
+        selected.append((item["record_id"], record["artifact"]["sha256"]))
+        regions[item["record_id"]] = region
+    return selected, regions
+
+
 def _write_index(directory: Path, report: dict, *, filename: str = "BATCH_INDEX.json") -> None:
     descriptor, name = tempfile.mkstemp(dir=directory, prefix="." + filename + ".", suffix=".tmp")
     temporary = Path(name)
@@ -352,6 +376,15 @@ class TransferSourceTable:
     annotations: tuple[dict[str, Any], ...]
 
 
+def transfer_value_columns(grain: str) -> dict[str, str]:
+    """The existing projector's publisher inputs and normalized value outputs."""
+    transfer_columns(grain)
+    return {"REPORT_REGION": "transfer_reporting_region", "REPORT_TYPE": "transfer_direction",
+        "REPORT_CAMPUS" if grain == "campus" else "REPORT_DISTNAME_NUMBER": "transfer_reporting_number",
+        "CAMPUS_RES_OR_ATTEND" if grain == "campus" else "DISTNAME_NUMBER_RES_ATTEND": "transfer_partner_number",
+        "TRANSFERS_IN_OR_OUT" if grain == "campus" else "TRANSFERS_IN_OUT": "transfer_count_value"}
+
+
 def _transfer_projection(table, *, grain: str, period: DataPeriod, policy: ValuePolicy, region: str | None):
     """Interpret whole Arrow columns; scalar values.py runs only per token."""
     import pyarrow as pa
@@ -429,14 +462,16 @@ def _transfer_projection(table, *, grain: str, period: DataPeriod, policy: Value
     values = pc.take(pa.array([value.numeric for value in interpreted], type=pa.int64()), indices)
     require(pc.or_(pc.invert(separator), pc.equal(statuses, ValueStatus.MISSING.value)),
             "Transfer separator carries a nonmissing count")
+    names = transfer_value_columns(grain)
     columns = {
-        "transfer_reporting_region": regions,
+        names["REPORT_REGION"]: regions,
         "transfer_row_kind": pc.if_else(detail, "detail", pc.if_else(total, "publisher_total", "separator")),
-        "transfer_direction": pc.if_else(incoming, "in", pc.if_else(outgoing, "out", pa.scalar(None, type=pa.string()))),
-        "transfer_reporting_number": reporting, "transfer_partner_number": partner,
+        names["REPORT_TYPE"]: pc.if_else(incoming, "in", pc.if_else(outgoing, "out", pa.scalar(None, type=pa.string()))),
+        names["REPORT_CAMPUS" if grain == "campus" else "REPORT_DISTNAME_NUMBER"]: reporting,
+        names["CAMPUS_RES_OR_ATTEND" if grain == "campus" else "DISTNAME_NUMBER_RES_ATTEND"]: partner,
         "transfer_reporting_district_number": reporting_district,
         "transfer_partner_district_number": partner_district,
-        "transfer_count_status": statuses, "transfer_count_value": values,
+        "transfer_count_status": statuses, names[count_column]: values,
     }
     for name, values in columns.items():
         table = table.append_column(name, values)
@@ -823,22 +858,7 @@ def prepare_transfer_sources(
         if grain != "district":
             raise ValueError("Regional district indices cannot select campus reports")
         index_raw = _captured_input(*batch_index)
-        index = json.loads(index_raw)
-        if index.get("schema_version") != 1 or index.get("status") != "PASS" or index.get("year") != year:
-            raise ValueError("District preparation requires a complete exact-year acquisition index")
-        form = read_regional_form(store, index["form"]["record_id"], index["form"]["sha256"])
-        period, offered = form.selection(year, index["regions"])
-        if index.get("period") != period.to_dict() or len(index.get("items", [])) != len(offered):
-            raise ValueError("District index period/region coverage differs from its pinned form")
-        for region, item in zip(offered, index["items"], strict=True):
-            if item.get("region") != region or item.get("status") not in {"acquired", "resumed"}:
-                raise ValueError("District index has an unaccepted or reordered region")
-            record = _regional_receipt(store, form, item["record_id"], year, region, period,
-                                        _limits(**{name: index["transport_limits"][name] for name in ("timeout", "max_bytes")}))
-            if record["artifact"] != item["artifact"]:
-                raise ValueError("District index artifact differs from its original acquisition")
-            selected.append((item["record_id"], record["artifact"]["sha256"]))
-            regions[item["record_id"]] = region
+        selected, regions = district_batch_inputs(store, index_raw, year)
     if not selected or len({identifier for identifier, _ in selected}) != len(selected):
         raise ValueError("Transfer preparation requires distinct explicit source receipts")
     expected_dataset = grain + "_transfer_reports"

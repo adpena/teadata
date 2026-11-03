@@ -1,4 +1,4 @@
-"""Explicit transfer acquisition/preparation. No source activation or engine work."""
+"""Explicit transfer intake and unpublished native candidates; no source activation or engine work."""
 
 from __future__ import annotations
 
@@ -41,8 +41,24 @@ def main(argv: list[str] | None = None) -> int:
     prepare.add_argument("--compare-encoding", help="Explicit codec for the separately retained legacy CSV")
     prepare.add_argument("--max-examples", type=int, default=10)
     prepare.add_argument("--output", type=Path, required=True)
+    materialize = sub.add_parser("materialize", help="Build unpublished native district leaves from exact accepted preparations")
+    materialize.add_argument("--store", type=Path, required=True)
+    materialize.add_argument("--config", type=Path, required=True, help="Explicit reviewed source Config; never changes default YAML")
+    materialize.add_argument("--config-sha256", required=True)
+    materialize.add_argument("--prepared-input", nargs=2, action="append", required=True, metavar=("YEAR", "PROCESSING_RECORD"))
+    materialize.add_argument("--output", type=Path, required=True, help="New exclusive unpublished candidate directory")
     args = parser.parse_args(argv)
     store = ProvenanceStore(args.store)
+    if args.command == "materialize":
+        from teadata.transfer_leaves import materialize_district_transfers
+        try:
+            preparations = [(int(year), identifier) for year, identifier in args.prepared_input]
+        except ValueError:
+            parser.error("--prepared-input YEAR requires an integer annual edition")
+        result = materialize_district_transfers(store, config=args.config, config_sha256=args.config_sha256,
+            preparations=preparations, output=args.output)
+        print(json.dumps({name: result[name] for name in ("status", "build_id", "release_activation")}, sort_keys=True))
+        return 0
     if args.command == "prepare":
         if (args.batch_index is None) != (args.batch_index_sha256 is None):
             parser.error("--batch-index and --batch-index-sha256 must be supplied together")

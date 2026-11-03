@@ -208,9 +208,57 @@ acquisition events, timestamps and metadata remain unchanged. The processing
 identity includes the shared `source_csv.py`; the TAPR comparison also fingerprints
 that dependency explicitly after its extraction.
 
-These outputs are unpublished source preparations. `BuildRecorder` currently
-requires an acquisition matching the exact bytes of a selected retained input;
-its acquisition-only metadata fields cannot be used for processing IDs. A later
-activation must explicitly bind the existing typed processing/artifact authority
-and pass release qualification. This command creates no parallel release
-manifest, source catalog, engine state or active configuration.
+These outputs remain unpublished source preparations. Acquisition-only metadata
+fields cannot be used for processing IDs. The explicit native step below binds
+the existing typed processing/artifact authority; it does not activate datasets,
+change the default source configuration, or qualify a release scientifically.
+
+## Offline district native candidates
+
+`refresh_transfers materialize` accepts exact annual preparation processing IDs
+and a separately reviewed, SHA-pinned source Config. It requires every offered
+region from the preparation's captured index/form, in source order. The actual
+2024 and 2025 batches each contain all 20 regional originals. Regions are
+physical acquisition partitions: the result contains one statewide district
+logical table and native leaf per selected year, not 20 regional tables.
+
+The reviewed source profile must enumerate every original SHA in the ordered
+header contract, retain genuine schema/masking-reference acquisitions, identify
+the exact school-year period, and declare the one transfer-count field's units.
+The publisher's ten literal headers are the only research-variable entries.
+Their canonical fields can bind the existing normalized values; unchanged
+columns receive lossless canonical renames. All 23 prepared columns and all
+detail, publisher-total and separator rows remain. The single `column_support`
+contract retains raw/status/locator columns without inventing publisher headers.
+Selected counts include their raw token, status and row kind automatically;
+extracted district IDs retain the original combined name/number labels.
+
+For a new, separately reviewed source contract and exclusive candidate directory:
+
+```sh
+uv run python -m teadata.scripts.refresh_transfers materialize \
+  --store "$TRANSFER_PROVENANCE_STORE" \
+  --config "$TRANSFER_REVIEWED_CONFIG" \
+  --config-sha256 "$TRANSFER_REVIEWED_CONFIG_SHA256" \
+  --prepared-input 2024 20b4640c31a135b55c435725f50f75d8798f769ad2790a20b10447d182cfd1da \
+  --prepared-input 2025 a79a1f84b46c02b4929f3ec0dc942fa2adce8d6e3ca9f60539bf6ede31549fb5 \
+  --output "$TRANSFER_NEW_CANDIDATE_DIR"
+```
+
+Historical preparations are admitted against their own recorded producer/CLI,
+policy, toolchain, validation and exact outputs; equality with current global
+source code is not required. Missing original lineage remains unknown. The new
+leaf processing record has the original preparation and reviewed source-control
+acquisitions as typed parents. `ArtifactRef.processing_id`, `BuildRecorder` and
+the ordinary edition publisher create an adjacent unpublished candidate with
+composite `(transfer_source_input, transfer_source_record)` keys. They create no
+parallel provenance DAG, active release pointer or engine state.
+
+Admission is 2 MiB for each control/report JSON, 16 MiB per prepared artifact,
+8 MiB for the compact row-key index, 4096 rows per native batch, and 8 MiB per
+emitted batch. These are input/buffer checks, not a whole-process RSS or duration
+guarantee. Native readback must equal the accepted preparation after only the
+declared column projection. The earlier preparations' `field_correctness_qualified`
+value is false; PASS/readback and native materialization do not upgrade it or
+establish all-LEA coverage. Default YAML activation, engine/app consumer cutover,
+field correctness and release qualification remain separate reviewed steps.
