@@ -20,7 +20,7 @@ import sys
 import tempfile
 from typing import Any
 
-from teadata.column_schema import crosswalk_dataset, parse_column_schema, reader_options
+from teadata.column_schema import crosswalk_dataset, parse_column_schema, reader_options, table_input_sha256s
 from teadata.analytical import write_leaf_artifact
 from teadata.dataset_metadata import ArtifactRef, DatasetMetadata, EditionKey
 from teadata.identifiers import canonical_source_identifiers
@@ -302,6 +302,9 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
                 or set(selection["tables"]) != {table["table"] for table in branch["tables"]}):
             raise ValueError("Prepared dataset requires one complete, unambiguous declared source table")
         table, = branch["tables"]
+        table_inputs = table_input_sha256s(table)
+        if len(table_inputs) != 1:
+            raise ValueError("Prepared TAPR leaf requires a single raw input")
         source_rows = reviewed_tapr_data_record_count(table)
         cfg.header_records(dataset, edition=edition, reader_profile="source")
         validate_tapr_key(table, keys[0])
@@ -331,7 +334,7 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
         if source_rows * ((9 if scope == "campus" else 6) + 18) > source_budget.key_bytes:
             raise ValueError("Prepared source identity index exceeds the admitted key byte budget")
         artifact = record["outputs"]["prepared_source"]
-        raw_sha = table["input_sha256"]
+        raw_sha = table_inputs[0]
         raw_refs = {value for ref in source.metadata.references
                     if ref.reference_id == "csv_headers" and ref.role == "source_notes" and ref.reviewed_sha256 == raw_sha
                     for value in ref.provenance_ids}

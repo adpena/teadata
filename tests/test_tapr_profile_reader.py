@@ -122,6 +122,39 @@ def test_original_content_revision_is_not_replaced_under_one_contract(tmp_path):
         read_source(path, mapping=mapping)
 
 
+def test_tapr_singleton_list_keeps_the_same_physical_reader_contract(tmp_path):
+    path = write_source(tmp_path, [LABELS, CODES, ["001902001", "42"]])
+    mapping = mapping_for(path)
+    digest = mapping.pop("input_sha256")
+    mapping["input_sha256s"] = [digest]
+    result = read_source(path, mapping=mapping)
+    assert result.input_sha256 == digest
+    assert result.table.to_pylist() == [{"campus_number": "001902001", "example_value": "42"}]
+
+
+@pytest.mark.parametrize("workflow", ["reader", "comparison", "merge", "record_count"])
+def test_tapr_single_file_workflows_refuse_multi_input_tables(tmp_path, monkeypatch, workflow):
+    from teadata.tapr import compare_tapr_tables, reviewed_tapr_data_record_count
+
+    path = write_source(tmp_path, [LABELS, CODES, ["001902001", "42"]])
+    mapping = mapping_for(path)
+    mapping["input_sha256s"] = [mapping.pop("input_sha256"), "b" * 64]
+    with monkeypatch.context() as guarded:
+        guarded.setattr(Path, "open", lambda *args, **kwargs: pytest.fail("Multi-input physical source opened"))
+        with pytest.raises(ValueError, match="single raw input"):
+            if workflow == "reader":
+                TaprSourceRequest(path, mapping, "campus_number", DATASET, "2025").open(budget=TaprReadBudget())
+            elif workflow == "record_count":
+                reviewed_tapr_data_record_count(mapping)
+            else:
+                source = TaprSourceTable(pa.table({"campus_number": ["001902001"], "example_value": ["42"]}),
+                    path, mapping["input_sha256s"][0], DATASET, "2025", (), mapping)
+                if workflow == "comparison":
+                    compare_tapr_tables(source, source, key_field="campus_number")
+                else:
+                    merge_tapr_tables([source], key_field="campus_number")
+
+
 def test_csv_quoting_error_is_not_silently_accepted(tmp_path):
     path = tmp_path / "source.csv"
     path.write_text('9 Digit Campus Number,Example Value\nCAMPUS,VALUE\n001902001,"unfinished\n')

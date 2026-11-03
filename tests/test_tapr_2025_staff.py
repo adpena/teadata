@@ -465,6 +465,25 @@ def test_prepared_cohort_contract_failures_precede_native_open_and_output(prepar
     assert not (tmp_path / 'blocked').exists() and not list(tmp_path.glob('.tapr-edition-*'))
 
 
+def test_prepared_tapr_leaf_rejects_multi_input_contract_before_native_io(prepared_cohort, tmp_path, monkeypatch):
+    import pyarrow.parquet as pq
+    cfg, store, inputs, _, _ = prepared_cohort
+    dataset = 'campus_tapr_student_profile'
+    contract = dict(cfg.column_contract(dataset, 2025, reader_profile='source'))
+    document = json.loads(contract['text'])
+    table = document['datasets'][0]['tables'][0]
+    table['input_sha256s'] = [table.pop('input_sha256'), 'b' * 64]
+    table.pop('layout', None)
+    contract['text'] = canonical_json(document)
+    contract['sha256'] = sha256(contract['text'].encode()).hexdigest()
+    monkeypatch.setattr(cfg, 'column_contract', lambda *args, **kwargs: contract)
+    monkeypatch.setattr(pq, 'ParquetFile', lambda *args, **kwargs: pytest.fail('Multi-input TAPR native input opened'))
+    with pytest.raises(ValueError, match='single raw input'):
+        prepare_profiles(cfg, edition='2025', scopes=[], input_dir=None, output_dir=tmp_path / 'multi-blocked',
+            reference_store=store, prepared_inputs={dataset: inputs[dataset]})
+    assert not (tmp_path / 'multi-blocked').exists()
+
+
 @pytest.mark.parametrize('damage', ['duplicate_key', 'wrong_type', 'writer_failure'])
 def test_raw_cohort_native_failure_discards_only_its_stage(prepared_cohort, tmp_path, monkeypatch, damage):
     import pyarrow as pa

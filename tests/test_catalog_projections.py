@@ -11,6 +11,7 @@ import subprocess
 import sys
 from importlib.metadata import version
 from io import BytesIO
+from typing import Any
 from urllib.parse import urlparse
 
 import pytest
@@ -141,15 +142,16 @@ def edition_fixture(tmp_path):
     return make_edition_fixture(tmp_path)
 
 
-def make_edition_fixture(tmp_path, *, extra_fields=0):
+def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staff"), multiple_inputs=False, damage_inputs=None):
     """The same tiny fixture, optionally widened without adding source rows."""
     import pyarrow as pa
+    import pyarrow.csv as pacsv
     from teadata.analytical import write_leaf_artifact
     from teadata.column_schema import source_schema_fingerprint
 
     store = ProvenanceStore(tmp_path / "provenance")
     specs, datasets, schemas = [], {}, {}
-    for family in ("student", "staff"):
+    for family in families:
         dataset = "campus_" + family
         raw = tmp_path / (family + ".csv")
         extra_codes = [f"EXTRA{i:03d}" for i in range(extra_fields)]
@@ -157,6 +159,13 @@ def make_edition_fixture(tmp_path, *, extra_fields=0):
         raw.write_text(",".join(["ID", "NAME", "VALUE", *extra_codes]) + "\n"
                        + ",".join(["001", "One", "5", *["1"] * extra_fields]) + "\n")
         raw_sha = file_identity(raw)["sha256"]
+        raws, raw_hashes = [raw], [raw_sha]
+        if multiple_inputs:
+            other = tmp_path / (family + "-second.csv")
+            other.write_text(",".join(["ID", "NAME", "VALUE", *extra_codes]) + "\n"
+                             + ",".join(["002", "Two", "7", *["1"] * extra_fields]) + "\n")
+            raws.append(other)
+            raw_hashes.append(file_identity(other)["sha256"])
         labels, codes = ["Campus ID", "Campus name", "Amount"], ["ID", "NAME", "VALUE"]
         labels += [f"Extra {i:03d}" for i in range(extra_fields)]
         codes += extra_codes
@@ -167,9 +176,14 @@ def make_edition_fixture(tmp_path, *, extra_fields=0):
                   for index, (code, label, field) in enumerate(zip(
                       codes, labels,
                       ["campus_number", "campus_name", "amount", *extra_names]), 1)]
-        table = {"table": family, "input_sha256": raw_sha,
+        table: dict[str, Any] = {"table": family, "input_sha256": raw_sha,
                  "source_schema_sha256": source_schema_fingerprint(labels, codes),
                  "fields": fields, "metric_period": {"kind": "unknown"}}
+        if multiple_inputs:
+            table.pop("input_sha256")
+            table["input_sha256s"] = list(raw_hashes)
+        if damage_inputs == "header_conflict":
+            table["fields"][1]["label"] = "Conflicting header label"
         schema_doc = {"schema_version": 2, "mapping_version": 1,
                       "datasets": [{"dataset": dataset, "edition": "2025", "source_only": True, "tables": [table]}]}
         resource = tmp_path / (family + "-schema.json")
@@ -187,34 +201,51 @@ def make_edition_fixture(tmp_path, *, extra_fields=0):
                     "reviewed_sha256": schema_sha, "status": "available", "provenance_ids": [schema_observation]}]}}}}}
         profile = datasets[dataset][2025]["reader"]["profiles"]["source"]
         datasets[dataset][2025]["metadata"]["references"] = profile.pop("references")
-        specs.append((family, dataset, raw, raw_sha, table))
+        specs.append((family, dataset, raws, raw_hashes, table))
     cfg = Config.from_dict({"data_sources": datasets, "value_policies": {"numeric": {}}})
     cfg.base_dir = tmp_path
     recorder = BuildRecorder(cfg, store)
     leaves = {}
-    for family, dataset, raw, raw_sha, table in specs:
+    for family, dataset, raws, raw_hashes, table in specs:
         source = cfg.resolve_dataset(dataset, 2025)
-        acquisition = store.record_acquisition(raw, source)
-        key = EditionKey(dataset, "2025", EditionKey.source_revision((raw_sha,)), "campus", family, "one row per campus")
+        acquisitions = [store.record_acquisition(raw, replace(source, path=str(raw))) for raw in raws]
+        selected_hashes = list(raw_hashes)
+        if damage_inputs in {"extra", "transplanted"}:
+            unrelated = tmp_path / (family + "-unrelated.csv")
+            unrelated.write_text("ID,NAME,VALUE\n999,Unrelated,99\n")
+            acquisition = store.record_acquisition(unrelated, replace(source, path=str(unrelated)))
+            unrelated_sha = file_identity(unrelated)["sha256"]
+            if damage_inputs == "extra":
+                acquisitions.append(acquisition)
+                selected_hashes.append(unrelated_sha)
+            else:
+                acquisitions[-1], selected_hashes[-1] = acquisition, unrelated_sha
+        elif damage_inputs == "missing":
+            acquisitions, selected_hashes = acquisitions[:1], selected_hashes[:1]
+        elif damage_inputs == "reordered":
+            acquisitions.reverse()
+            selected_hashes.reverse()
+        key = EditionKey(dataset, "2025", EditionKey.source_revision(tuple(selected_hashes)), "campus", family, "one row per campus")
         native = pa.schema([pa.field("campus_number", pa.string(), nullable=False),
                             pa.field("campus_name", pa.string()), pa.field("amount", pa.string()),
                             *[pa.field(row["field"], pa.string()) for row in table["fields"][3:]]])
         recipe = {"operation": "tiny native fixture", "compression": "zstd"}
         toolchain = {"python": sys.version, "pyarrow": version("pyarrow")}
+        raw_codes = [row["code"] for row in table["fields"]]
+        actual = pa.concat_tables([pacsv.read_csv(raw, convert_options=pacsv.ConvertOptions(
+            column_types=dict.fromkeys(raw_codes, pa.string()))).rename_columns(native.names).cast(native) for raw in raws])
         contract = recorder.leaf_contract(key, source, native_schema=native.serialize().to_pybytes(),
-            columns=native.names, key_columns=["campus_number"], rows=1, inputs=[raw_sha], recipe=recipe, toolchain=toolchain)
+            columns=native.names, key_columns=["campus_number"], rows=actual.num_rows, inputs=selected_hashes, recipe=recipe, toolchain=toolchain)
         leaf_id = sha256(canonical_json(contract).encode()).hexdigest()
         leaf = tmp_path / (family + ".parquet")
-        write_leaf_artifact(leaf, pa.Table.from_arrays([pa.array(["001"]), pa.array(["One"]), pa.array(["5"]),
-            *[pa.array(["1"]) for _ in table["fields"][3:]]],
-            schema=native).to_batches(), contract=contract)
-        processing = store.record_processing(dataset=dataset, inputs=[acquisition], outputs={"leaf": leaf},
+        write_leaf_artifact(leaf, actual.to_batches(), contract=contract)
+        processing = store.record_processing(dataset=dataset, inputs=acquisitions, outputs={"leaf": leaf},
             processor="native-fixture", code_version=recorder.processor_sha256,
             parameters={"leaf_contract_sha256": leaf_id, "recipe": recipe, "toolchain": toolchain})
         identity = file_identity(leaf)
         ref = ArtifactRef(key, identity["sha256"], identity["size_bytes"], leaf.name,
                           canonical_json(contract), processing, "leaf")
-        recorder.record_edition(key, source, artifacts=[ref], acquisition_ids=[acquisition])
+        recorder.record_edition(key, source, artifacts=[ref], acquisition_ids=acquisitions)
         leaves[family] = (key, ref, leaf)
     catalog = recorder.catalog(schema_version=3)
     catalog.verify_metadata()
@@ -226,6 +257,83 @@ def make_edition_fixture(tmp_path, *, extra_fields=0):
 def rehash_catalog(document, resources=None):
     document["build_id"] = sha256(canonical_json({k: v for k, v in document.items() if k != "build_id"}).encode()).hexdigest()
     return DatasetCatalog(document, column_schema_loader=(lambda ref: resources[ref.sha256]) if resources is not None else None)
+
+
+def test_one_logical_native_leaf_binds_two_genuine_raw_inputs_and_exposes_both(tmp_path, monkeypatch):
+    from teadata.release import DataRelease
+    fixture = make_edition_fixture(tmp_path, families=("student",), multiple_inputs=True)
+    catalog = fixture["catalog"]
+    key, ref, _ = fixture["leaves"]["student"]
+    assert len(list(catalog.editions())) == len(catalog.to_dict()["artifacts"]) == 1
+    acquisitions = catalog.acquisitions(key.dataset, edition=key)
+    assert len(acquisitions) == 2 and len({row["record_id"] for row in acquisitions}) == 2
+    raw_hashes = [row["artifact"]["sha256"] for row in acquisitions]
+    assert key.revision_sha256 == EditionKey.source_revision(tuple(raw_hashes))
+    assert ref.contract["inputs"] == raw_hashes
+    records = catalog.header_records(key.dataset, edition_key=key)
+    assert records[0]["input_sha256s"] == raw_hashes and "input_sha256" not in records[0]
+    records[0]["input_sha256s"].clear()
+    assert records[1]["input_sha256s"] == catalog.header_records(key.dataset, edition_key=key)[0]["input_sha256s"] == raw_hashes
+    native = DataRelease(fixture["root"]).analytical_dataset(ref.identity).to_table()
+    assert native["campus_number"].to_pylist() == ["001", "002"]
+    assert native["amount"].to_pylist() == ["5", "7"]
+    processing = fixture["store"].read_record(ref.processing_id)
+    assert processing["inputs"] == [row["record_id"] for row in acquisitions]
+    monkeypatch.setattr("teadata.manifest.processor_identity", lambda: "f" * 64)
+    # Reading a retained contract verifies its recorded producer, not whatever
+    # unrelated code happens to be installed when the reader runs.
+    assert DataRelease(fixture["root"]).verify()[ref.identity].name == ref.location
+    assert fixture["store"].read_record(ref.processing_id) == processing
+
+
+@pytest.mark.parametrize("damage", ["missing", "transplanted", "extra", "reordered", "header_conflict"])
+def test_multi_input_native_writer_rejects_missing_foreign_extra_order_or_header_conflicts(tmp_path, damage):
+    with pytest.raises((ValueError, ContractError), match="selected acquisition bytes/order|source-schema checksum"):
+        make_edition_fixture(tmp_path, families=("student",), multiple_inputs=True, damage_inputs=damage)
+
+
+@pytest.mark.parametrize("damage", ["missing", "transplanted", "extra", "reordered", "header_conflict"])
+def test_multi_input_catalog_rechecks_full_binding_before_leaf_io(tmp_path, monkeypatch, damage):
+    fixture = make_edition_fixture(tmp_path, families=("student",), multiple_inputs=True)
+    catalog, store = fixture["catalog"], fixture["store"]
+    key, ref, _ = fixture["leaves"]["student"]
+    document = catalog.to_dict()
+    entry = document["editions"][key.identity]
+    resource = json.loads(fixture["resources"][entry["column_schema_sha256"]])
+    table = resource["datasets"][0]["tables"][0]
+    foreign = tmp_path / "foreign.csv"
+    foreign.write_text("ID,NAME,VALUE\n999,Foreign,99\n")
+    foreign_id = store.record_acquisition(foreign, ResolvedDataset(key.dataset, "data_sources", 2025, 2025, "",
+        DatasetMetadata(version="2025")))
+    foreign_sha = store.read_record(foreign_id)["artifact"]["sha256"]
+    if damage == "missing":
+        table["input_sha256s"].pop()
+    elif damage == "transplanted":
+        table["input_sha256s"][-1] = foreign_sha
+    elif damage == "extra":
+        table["input_sha256s"].append(foreign_sha)
+    elif damage == "reordered":
+        table["input_sha256s"].reverse()
+    else:
+        table["fields"][1]["label"] = "Conflicting header label"
+    raw = canonical_json(resource).encode()
+    schema_sha = sha256(raw).hexdigest()
+    schema_path = tmp_path / (schema_sha + ".json")
+    schema_path.write_bytes(raw)
+    schema_id = store.record_acquisition(schema_path, ResolvedDataset(key.dataset + ":schema", "reference", None, None, "",
+        DatasetMetadata(title="Synthetic conflicting reviewed metadata")))
+    metadata = DatasetMetadata.from_dict(entry["metadata"])
+    entry["metadata"] = replace(metadata, references=(ReferenceDocument(reference_id="columns", role="schema",
+        path=schema_path.name, reviewed_sha256=schema_sha, provenance_ids=(schema_id,)),)).to_dict()
+    entry["column_schema_sha256"] = schema_sha
+    document["column_schemas"] = {schema_sha: ColumnSchemaRef(schema_sha, len(raw), schema_path.name).to_dict()}
+    document["provenance"].update(store.verify_record_closure([schema_id, foreign_id]))
+    selected = rehash_catalog(document, {schema_sha: raw})
+    with monkeypatch.context() as guarded:
+        guarded.setattr(Path, "open", lambda *args, **kwargs: pytest.fail("Unqualified leaf/source opened"))
+        with pytest.raises(ContractError, match="selected acquisition bytes/order|source-schema checksum"):
+            selected.resolve_artifacts([(key, "amount")])
+    assert ref.processing_id in document["provenance"]
 
 
 def test_edition_index_resolves_explicit_keys_periods_dependencies_and_detaches(edition_fixture, monkeypatch):

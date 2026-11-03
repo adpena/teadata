@@ -725,7 +725,7 @@ def test_explicit_policy_capacity_limit_is_reported_as_comparison_block_not_sour
     assert 'distinct-token' in report['diagnostic']
 
 
-@pytest.mark.parametrize('drift', ['source_sha', 'header', 'layout', 'schema_sha', 'edition', 'unexpected_dictionary', 'dictionary_definitions'])
+@pytest.mark.parametrize('drift', ['source_sha', 'header', 'layout', 'schema_sha', 'edition', 'unexpected_dictionary', 'dictionary_definitions', 'multiple_inputs'])
 def test_structural_or_pin_drift_preserves_bytes_and_blocked_report_without_keyed_comparison(tmp_path, monkeypatch, drift):
     old = source(tmp_path, 'old', [['001902001', '.']])
     new = source(tmp_path, 'new', [['001902001', '0']])
@@ -735,6 +735,9 @@ def test_structural_or_pin_drift_preserves_bytes_and_blocked_report_without_keye
     table = document['datasets'][0]['tables'][0]
     if drift == 'source_sha':
         table['input_sha256'] = '0' * 64
+    elif drift == 'multiple_inputs':
+        table['input_sha256s'] = [table.pop('input_sha256'), 'b' * 64]
+        table.pop('layout', None)
     elif drift == 'header':
         table['fields'][1]['label'] = 'Unreviewed actual header'
         table['source_schema_sha256'] = source_schema_fingerprint([f['label'] for f in table['fields']], [f['code'] for f in table['fields']])
@@ -757,6 +760,8 @@ def test_structural_or_pin_drift_preserves_bytes_and_blocked_report_without_keye
     assert result['status'] == 'blocked_contract_drift' and report['keyed_comparison_attempted'] is False
     assert report['keyed_comparison_completed'] is False
     assert not report.get('comparison') and '/Users/' not in report['diagnostic']
+    if drift == 'multiple_inputs':
+        assert 'single raw input' in report['diagnostic']
     archive = ProvenanceStore(args.store)
     closure = archive.verify_record_closure([result['processing_record_id']])
     assert old[2] in closure and new[2] in closure

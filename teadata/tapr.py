@@ -16,7 +16,7 @@ from pathlib import Path
 import re
 from typing import TYPE_CHECKING, Any, Mapping
 
-from .column_schema import validate_header_table, validate_source_layout
+from .column_schema import table_input_sha256s, validate_header_table, validate_source_layout
 from .identifiers import canonical_source_identifiers
 from .source_csv import SourceLines
 
@@ -74,6 +74,8 @@ def compare_tapr_tables(old: TaprSourceTable, new: TaprSourceTable, *, key_field
     fields, identities = [], []
     for source, selected_policy in zip([old, new], policies, strict=True):
         validate_header_table(source.mapping)
+        if len(table_input_sha256s(source.mapping)) != 1:
+            raise ValueError("TAPR source comparison requires a single raw input per physical table")
         if (not source.dataset.startswith(scope + "_tapr_")
                 or source.table.column_names != [f["field"] for f in source.mapping["fields"]]
                 or key_field not in source.table.column_names
@@ -243,6 +245,10 @@ class TaprSourceReader(Iterator[Any]):
         self.request = request
         self.mapping = deepcopy(request.mapping)
         validate_header_table(self.mapping)
+        inputs = table_input_sha256s(self.mapping)
+        if len(inputs) != 1:
+            raise ValueError("TAPR physical source reader requires a single raw input")
+        self.input_sha256 = inputs[0]
         try:
             validate_tapr_key(self.mapping, request.key_field)
         except ValueError as error:
@@ -388,7 +394,7 @@ class TaprSourceReader(Iterator[Any]):
                 raise ValueError(f"{path}: invalid CSV near physical line {reader.line_num}: {error}") from error
             if numbers:
                 yield decode()
-            if lines.digest.hexdigest() != mapping["input_sha256"]:
+            if lines.digest.hexdigest() != self.input_sha256:
                 raise ValueError(f"{path}: input differs from the reviewed header crosswalk")
         if _source_stat(path) != before:
             raise ValueError(f"{path}: input changed during source preparation")
@@ -416,7 +422,7 @@ class TaprSourceReader(Iterator[Any]):
             example = records.slice(0, 20).to_pylist()
             suffix = " (first20)" if len(records) > 20 else ""
             raise ValueError(f"{path}: invalid {request.key_field}: duplicate {request.key_field} at records {example}{suffix}")
-        self._summary = TaprSourceSummary(path, mapping["input_sha256"], request.dataset,
+        self._summary = TaprSourceSummary(path, self.input_sha256, request.dataset,
             request.edition, tuple(observed), mapping, rows, before)
 
 
@@ -455,6 +461,8 @@ def validate_tapr_key(mapping: Mapping[str, Any], key_field: str) -> None:
 
 def reviewed_tapr_data_record_count(mapping: Mapping[str, Any]) -> int:
     """Count a finite reviewed interval with the reader's annotation precedence."""
+    if ("input_sha256" in mapping or "input_sha256s" in mapping) and len(table_input_sha256s(mapping)) != 1:
+        raise ValueError("TAPR physical record layout requires a single raw input")
     layout = mapping.get("layout")
     if layout is None:
         raise ValueError("Prepared source requires a finite reviewed record layout")
@@ -508,6 +516,8 @@ def merge_tapr_tables(sources: list[TaprSourceTable], *, key_field: str):
         raise ValueError("Different revisions or repeated observations of one TAPR table must remain independent")
     for source in sources:
         validate_header_table(source.mapping)
+        if len(table_input_sha256s(source.mapping)) != 1:
+            raise ValueError("TAPR source merge requires a single raw input per physical table")
         if source.table.column_names != [field["field"] for field in source.mapping["fields"]] or key_field not in source.table.column_names:
             raise ValueError("TAPR native table differs from its reviewed field mapping")
         identity = canonical_source_identifiers(source.table[key_field], width=width)

@@ -17,7 +17,7 @@ import tempfile
 from urllib.request import build_opener
 
 from teadata.acquisition import AcquisitionClient, NoRedirect, acquire_form, replay_acquisition
-from teadata.column_schema import crosswalk_dataset, parse_column_schema
+from teadata.column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
 from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
 from teadata.provenance import ProvenanceStore, _identifier
 from teadata.tapr import compare_tapr_tables, read_tapr_table
@@ -153,7 +153,10 @@ def compare_inputs(args) -> dict:
             if len(choices) != 1:
                 raise ValueError(side + ' selected source table is unavailable or ambiguous')
             mapping = choices[0]
-            if mapping['input_sha256'] != record['artifact']['sha256']:
+            table_inputs = table_input_sha256s(mapping)
+            if len(table_inputs) != 1:
+                raise ValueError(side + ' TAPR comparison requires a single raw input')
+            if table_inputs[0] != record['artifact']['sha256']:
                 raise ValueError(side + ' acquired revision differs from the reviewed crosswalk input')
             original_version = record['source_metadata'].get('version')
             if original_version != edition:

@@ -23,7 +23,7 @@ from .values import Measurement, ValuePolicy, ValueStatus, measure
 from .transfer_summary import charter_transfer_observations
 from .column_schema import (
     parse_column_schema, reader_options, validate_selected_crosswalk,
-    header_records as crosswalk_records, header_rename_map,
+    header_records as crosswalk_records, header_rename_map, crosswalk_dataset, table_input_sha256s,
 )
 
 
@@ -680,8 +680,7 @@ class DatasetCatalog:
             key, metadata = self._edition_keys[identifier], self._edition_metadata[identifier]
             table, = [value for value in crosswalk_dataset(document, key.dataset, key.edition)["tables"]
                       if value["table"] == key.table]
-            if table["input_sha256"] not in self._edition_inputs[identifier]:
-                raise ValueError("Selected table differs from upstream source bytes")
+            table_input_sha256s(table, acquisition_sha256s=self._edition_inputs[identifier])
             rows = crosswalk_records(document, dataset=key.dataset, edition=key.edition,
                                      table=key.table, metadata=metadata)
             if {row["field"] for row in rows} != {field for edition, field in self._field_bindings if edition == identifier}:
@@ -1468,6 +1467,7 @@ class BuildRecorder:
         if contract is None:
             raise ContractError("Edition registration requires a reviewed source crosswalk")
         document = parse_column_schema(contract["text"].encode())
+        selected, = [table for table in crosswalk_dataset(document, key.dataset, key.edition)["tables"] if table["table"] == key.table]
         rows = crosswalk_records(document, dataset=key.dataset, edition=key.edition, table=key.table, metadata=source.metadata)
         refs = list(artifacts)
         if not refs or any(ref.edition != key for ref in refs):
@@ -1486,7 +1486,17 @@ class BuildRecorder:
         acquisitions = list(acquisition_ids)
         roots = [*acquisitions, *(ref.processing_id for ref in refs),
                  *(identifier for reference in source.metadata.references for identifier in reference.provenance_ids)]
-        self.store.verify_record_closure(roots)
+        records = self.store.verify_record_closure(roots)
+        raw_hashes = []
+        for identifier in acquisitions:
+            record = records[identifier]
+            if record["kind"] != "acquisition" or record.get("source_metadata", {}).get("version") != key.edition:
+                raise ContractError("Edition source inputs require exact-edition acquisition receipts")
+            raw_hashes.append(record["artifact"]["sha256"])
+        try:
+            table_input_sha256s(selected, acquisition_sha256s=raw_hashes)
+        except ValueError as error:
+            raise ContractError(str(error)) from error
         self.edition_entries[key.identity] = {"key": key.to_dict(), "metadata": source.metadata.to_dict(),
             "acquisition_ids": acquisitions,
             "column_schema_sha256": contract["sha256"]}

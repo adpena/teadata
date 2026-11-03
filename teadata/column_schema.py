@@ -78,16 +78,46 @@ def _checksum(value: Any) -> bool:
     return isinstance(value, str) and re.fullmatch(r"[0-9a-f]{64}", value) is not None
 
 
+def table_input_sha256s(table: Mapping[str, Any], *, acquisition_sha256s: Iterable[str] | None = None) -> tuple[str, ...]:
+    """One immutable input view; preserve the reviewed resource's wire bytes.
+
+    Legacy scalar tables select one physical input from an edition. New list
+    tables declare the complete ordered set of acquisition content identities.
+    Neither normalization nor binding chooses a representative first input.
+    """
+    scalar, plural = "input_sha256" in table, "input_sha256s" in table
+    if scalar == plural:
+        raise ValueError("Header table requires exactly one scalar or ordered input SHA form")
+    raw = [table["input_sha256"]] if scalar else table["input_sha256s"]
+    if (not isinstance(raw, list) or not raw or any(not _checksum(value) for value in raw)
+            or len(set(raw)) != len(raw)):
+        raise ValueError("Header table inputs require a nonempty ordered list of distinct SHA-256 identities")
+    inputs = tuple(raw)
+    if acquisition_sha256s is not None:
+        if isinstance(acquisition_sha256s, (str, bytes)):
+            raise ValueError("Acquisition content identities require an ordered SHA sequence")
+        observed = tuple(acquisition_sha256s)
+        if any(not _checksum(value) for value in observed):
+            raise ValueError("Acquisition content identities require valid SHA-256 values")
+        acquired = tuple(dict.fromkeys(observed))
+        if (plural and inputs != acquired) or (scalar and inputs[0] not in acquired):
+            raise ValueError("Reviewed table inputs differ from selected acquisition bytes/order")
+    return inputs
+
+
 def validate_header_table(table: Mapping[str, Any]) -> None:
     """Validate one explicit mapping; never synthesize or deduplicate names."""
     if (not isinstance(table, dict)
-            or not {"table", "input_sha256", "source_schema_sha256", "fields"} <= set(table)
-            or set(table) - {"table", "input_sha256", "source_schema_sha256", "fields", "layout", "dictionary", "metric_period", "dictionary_records"}
+            or not {"table", "source_schema_sha256", "fields"} <= set(table)
+            or set(table) - {"table", "input_sha256", "input_sha256s", "source_schema_sha256", "fields", "layout", "dictionary", "metric_period", "dictionary_records"}
             or not isinstance(table["table"], str) or not table["table"].strip()
-            or not _checksum(table["input_sha256"]) or not _checksum(table["source_schema_sha256"])
+            or not _checksum(table["source_schema_sha256"])
             or not isinstance(table["fields"], list) or not table["fields"]):
         raise ValueError("Invalid header crosswalk table")
+    inputs = table_input_sha256s(table)
     if "layout" in table:
+        if len(inputs) != 1:
+            raise ValueError("A physical CSV layout requires a single raw input")
         validate_source_layout(table["layout"])
     if "metric_period" in table:
         from .dataset_metadata import DataPeriod
@@ -345,6 +375,7 @@ def header_records(document: Mapping[str, Any], *, dataset: str, edition: str,
                 raise ValueError(f"Conflicting reviewed field periods for {definition.field!r}")
     result = []
     for item in tables:
+        inputs = table_input_sha256s(item)
         default = DataPeriod.from_dict(item.get("metric_period"))
         if (metadata is not None and metadata.period.kind != "unknown" and default.kind != "unknown"
                 and metadata.period != default):
@@ -360,7 +391,8 @@ def header_records(document: Mapping[str, Any], *, dataset: str, edition: str,
                 raise ValueError(f"Conflicting known table/field periods for {field['field']!r}")
             period = DataPeriod() if identity else reviewed if reviewed is not None else default
             record = {**field, "dataset": dataset, "edition": edition, "table": item["table"],
-                      "mapping_version": document["mapping_version"], "input_sha256": item["input_sha256"],
+                      "mapping_version": document["mapping_version"],
+                      **({"input_sha256": inputs[0]} if "input_sha256" in item else {"input_sha256s": list(inputs)}),
                       "source_schema_sha256": item["source_schema_sha256"], "period": period.to_dict()}
             if "dictionary_records" in item:
                 detached = []

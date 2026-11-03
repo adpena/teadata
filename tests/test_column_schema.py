@@ -6,12 +6,72 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from teadata.column_schema import portable_schema_path
+from teadata.column_schema import (
+    header_records, portable_schema_path, source_schema_fingerprint,
+    table_input_sha256s, validate_header_table,
+)
 from teadata.manifest import ContractError, canonical_json
 from teadata.teadata_config import Config, load_config
 
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def input_table(**inputs):
+    labels, codes = ["Identifier", "Value"], ["ID", "VALUE"]
+    return {"table": "statewide", **inputs,
+        "source_schema_sha256": source_schema_fingerprint(labels, codes),
+        "fields": [{"position": i, "code": code, "label": label, "field": field}
+                   for i, (code, label, field) in enumerate(zip(codes, labels, ["identifier", "value"], strict=True), 1)]}
+
+
+@pytest.mark.parametrize("inputs", [{"input_sha256": "a" * 64}, {"input_sha256s": ["a" * 64, "b" * 64]}])
+def test_one_input_view_preserves_original_wire_bytes_and_header_record_shape(inputs):
+    table = input_table(**inputs)
+    document = {"schema_version": 2, "mapping_version": 1, "datasets": [{"dataset": "sample",
+        "edition": "2025", "prepared_input_sha256": "c" * 64, "tables": [table]}]}
+    before = canonical_json(document)
+    validate_header_table(table)
+    expected = ("a" * 64,) if "input_sha256" in inputs else ("a" * 64, "b" * 64)
+    assert table_input_sha256s(table) == expected
+    rows = header_records(document, dataset="sample", edition="2025")
+    assert canonical_json(document) == before
+    if "input_sha256" in inputs:
+        assert rows[0]["input_sha256"] == expected[0] and "input_sha256s" not in rows[0]
+    else:
+        assert rows[0]["input_sha256s"] == list(expected) and "input_sha256" not in rows[0]
+        rows[0]["input_sha256s"].append("d" * 64)
+        assert rows[1]["input_sha256s"] == list(expected)
+        assert table_input_sha256s(table) == expected
+
+
+@pytest.mark.parametrize("inputs", [
+    {}, {"input_sha256": "a" * 64, "input_sha256s": ["a" * 64]},
+    {"input_sha256": ["a" * 64]}, {"input_sha256s": "a" * 64}, {"input_sha256s": []},
+    {"input_sha256s": ["a" * 64, "a" * 64]}, {"input_sha256s": ["a" * 64, True]},
+    {"input_sha256s": ["a" * 64, "B" * 64]}, {"input_sha256s": ("a" * 64, "b" * 64)},
+])
+def test_reviewed_input_forms_reject_ambiguity_empty_duplicates_and_invalid_digests(inputs):
+    with pytest.raises(ValueError):
+        validate_header_table(input_table(**inputs))
+
+
+@pytest.mark.parametrize("acquired", [["a" * 64], ["a" * 64, "c" * 64],
+    ["a" * 64, "b" * 64, "c" * 64], ["b" * 64, "a" * 64]])
+def test_multi_input_binding_requires_complete_ordered_acquisition_content_set(acquired):
+    table = input_table(input_sha256s=["a" * 64, "b" * 64])
+    with pytest.raises(ValueError, match="selected acquisition bytes/order"):
+        table_input_sha256s(table, acquisition_sha256s=acquired)
+    assert table_input_sha256s(table, acquisition_sha256s=["a" * 64, "b" * 64]) == ("a" * 64, "b" * 64)
+    assert table_input_sha256s(input_table(input_sha256="a" * 64), acquisition_sha256s=acquired) == ("a" * 64,)
+
+
+def test_multiple_inputs_cannot_share_one_physical_csv_layout():
+    table = input_table(input_sha256s=["a" * 64, "b" * 64])
+    table["layout"] = {"code_record": 1, "label_record": None, "first_data_record": 2,
+                       "last_data_record": 2, "annotations": []}
+    with pytest.raises(ValueError, match="physical CSV layout requires a single raw input"):
+        validate_header_table(table)
 
 
 def test_complete_2024_source_crosswalk_is_offline_and_keeps_legacy_projection(monkeypatch):
