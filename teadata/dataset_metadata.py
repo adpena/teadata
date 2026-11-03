@@ -6,6 +6,7 @@ from dataclasses import asdict, dataclass, field
 import base64
 from datetime import date, datetime
 from hashlib import sha256
+from functools import cached_property
 import json
 from typing import Any, Mapping
 from urllib.parse import urlparse
@@ -157,6 +158,81 @@ class EditionKey:
 
 
 @dataclass(frozen=True)
+class FieldColumnSupport:
+    field: str
+    raw: str
+    status: str | None = None
+    auxiliary: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class LeafColumnSupport:
+    """One optional physical partition; technical columns are not source headers."""
+
+    columns: tuple[str, ...]
+    fields: tuple[FieldColumnSupport, ...]
+    context: tuple[str, ...]
+
+    @classmethod
+    def from_contract(cls, contract: Mapping[str, Any]) -> LeafColumnSupport | None:
+        if "column_support" not in contract:
+            return None
+        raw = contract["column_support"]
+        columns = contract["columns"]
+        if (not isinstance(raw, dict) or set(raw) != {"fields", "context"}
+                or not isinstance(raw["fields"], dict) or not isinstance(raw["context"], list)
+                or not isinstance(columns, list) or not columns
+                or any(not isinstance(name, str) or not name for name in columns) or len(set(columns)) != len(columns)):
+            raise ValueError("Invalid leaf column-support map")
+        fields = []
+        for name, entry in raw["fields"].items():
+            if (not isinstance(name, str) or not name or not isinstance(entry, dict)
+                    or "raw" not in entry or set(entry) - {"raw", "status", "auxiliary"}
+                    or any(not isinstance(entry[key], str) or not entry[key] for key in ("raw", "status") if key in entry)
+                    or ("auxiliary" in entry and (not isinstance(entry["auxiliary"], list) or not entry["auxiliary"]
+                        or any(not isinstance(value, str) or not value for value in entry["auxiliary"])))):
+                raise ValueError("Normalized fields require explicit raw and optional status support")
+            fields.append(FieldColumnSupport(name, entry["raw"], entry.get("status"), tuple(entry.get("auxiliary", ()))))
+        if any(not isinstance(name, str) or not name for name in raw["context"]):
+            raise ValueError("Leaf context requires explicit physical column names")
+        support = cls(tuple(columns), tuple(fields), tuple(raw["context"]))
+        technical = support.technical_columns
+        if (not technical or len(set(technical)) != len(technical)
+                or not set(technical) <= set(columns)
+                or not {field.field for field in fields} <= set(support.public_columns)):
+            raise ValueError("Leaf support columns overlap or reference foreign/public columns")
+        return support
+
+    @property
+    def technical_columns(self) -> tuple[str, ...]:
+        return tuple(name for field in self.fields for name in (field.raw, field.status, *field.auxiliary) if name is not None) + self.context
+
+    @property
+    def public_columns(self) -> tuple[str, ...]:
+        technical = set(self.technical_columns)
+        return tuple(name for name in self.columns if name not in technical)
+
+    def validate_fields(self, fields: set[str], *, count_fields: set[str]) -> None:
+        if set(self.public_columns) != fields:
+            raise ValueError("Publisher-bound and technical columns must account for the complete physical schema")
+        normalized = {field.field: field for field in self.fields}
+        if any(name not in normalized or normalized[name].status is None for name in count_fields):
+            raise ValueError("Normalized count fields require explicit raw and status support")
+
+    def projection(self, field: str) -> dict[str, Any]:
+        result: dict[str, Any] = {"context": list(self.context)}
+        for entry in self.fields:
+            if entry.field == field:
+                result.update(representation="normalized", raw=entry.raw)
+                if entry.status is not None:
+                    result["status"] = entry.status
+                if entry.auxiliary:
+                    result["auxiliary"] = list(entry.auxiliary)
+                break
+        return result
+
+
+@dataclass(frozen=True)
 class ArtifactRef:
     """Transport bytes plus an independent, immutable native leaf contract.
 
@@ -187,7 +263,8 @@ class ArtifactRef:
         contract = json.loads(self.contract_json)
         required = {"edition", "schema", "schema_sha256", "columns", "key_columns", "rows", "inputs", "mapping_sha256",
                     "recipe_sha256", "policy_sha256", "semantics_sha256", "producer"}
-        if not isinstance(contract, dict) or set(contract) != required or contract["edition"] != self.edition.to_dict():
+        if (not isinstance(contract, dict) or not required <= set(contract)
+                or set(contract) - required - {"column_support"} or contract["edition"] != self.edition.to_dict()):
             raise ValueError("Leaf contract does not bind its exact edition")
         schema = base64.b64decode(contract["schema"], validate=True)
         if not schema or sha256(schema).hexdigest() != _digest_text(contract["schema_sha256"]):
@@ -196,6 +273,7 @@ class ArtifactRef:
         if (not isinstance(columns, list) or not columns
                 or any(not isinstance(v, str) or not v for v in columns) or len(set(columns)) != len(columns)):
             raise ValueError("Leaf contract requires ordered native columns")
+        LeafColumnSupport.from_contract(contract)
         keys = contract["key_columns"]
         if (not isinstance(keys, list) or not keys or any(not isinstance(k, str) for k in keys)
                 or len(set(keys)) != len(keys) or not set(keys) <= set(columns)):
@@ -228,6 +306,15 @@ class ArtifactRef:
     @property
     def contract(self) -> dict[str, Any]:
         return json.loads(self.contract_json)
+
+    @cached_property
+    def column_support(self) -> LeafColumnSupport | None:
+        return LeafColumnSupport.from_contract(self.contract)
+
+    @cached_property
+    def public_columns(self) -> tuple[str, ...]:
+        support = self.column_support
+        return tuple(self.contract["columns"]) if support is None else support.public_columns
 
     @property
     def identity(self) -> str:

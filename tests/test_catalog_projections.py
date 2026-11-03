@@ -142,12 +142,14 @@ def edition_fixture(tmp_path):
     return make_edition_fixture(tmp_path)
 
 
-def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staff"), multiple_inputs=False, damage_inputs=None):
+def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staff"), multiple_inputs=False, damage_inputs=None,
+                         normalized=False, support_damage=None):
     """The same tiny fixture, optionally widened without adding source rows."""
     import pyarrow as pa
     import pyarrow.csv as pacsv
     from teadata.analytical import write_leaf_artifact
     from teadata.column_schema import source_schema_fingerprint
+    from teadata.values import measure
 
     store = ProvenanceStore(tmp_path / "provenance")
     specs, datasets, schemas = [], {}, {}
@@ -156,7 +158,8 @@ def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staf
         raw = tmp_path / (family + ".csv")
         extra_codes = [f"EXTRA{i:03d}" for i in range(extra_fields)]
         extra_names = [f"extra_{i:03d}" for i in range(extra_fields)]
-        raw.write_text(",".join(["ID", "NAME", "VALUE", *extra_codes]) + "\n"
+        raw.write_text(("ID,NAME,VALUE\n001,Zero,0\n002,Suppressed,-999\n003,Missing,.\n004,Observed,5\n") if normalized else
+                       ",".join(["ID", "NAME", "VALUE", *extra_codes]) + "\n"
                        + ",".join(["001", "One", "5", *["1"] * extra_fields]) + "\n")
         raw_sha = file_identity(raw)["sha256"]
         raws, raw_hashes = [raw], [raw_sha]
@@ -201,8 +204,19 @@ def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staf
                     "reviewed_sha256": schema_sha, "status": "available", "provenance_ids": [schema_observation]}]}}}}}
         profile = datasets[dataset][2025]["reader"]["profiles"]["source"]
         datasets[dataset][2025]["metadata"]["references"] = profile.pop("references")
+        if normalized:
+            methodology = tmp_path / (family + "-masking.txt")
+            methodology.write_text("Synthetic fixture: -999 suppressed; . missing; no inferred count bounds.\n")
+            methodology_sha = file_identity(methodology)["sha256"]
+            methodology_id = store.record_acquisition(methodology, ResolvedDataset(dataset + ":masking", "reference", None, None,
+                str(methodology), DatasetMetadata(title="Synthetic fixture masking reference")))
+            datasets[dataset][2025]["metadata"]["references"].append({"reference_id": "masking", "role": "masking_methodology",
+                "path": methodology.name, "status": "available", "provenance_ids": [methodology_id], "reviewed_sha256": methodology_sha})
         specs.append((family, dataset, raws, raw_hashes, table))
-    cfg = Config.from_dict({"data_sources": datasets, "value_policies": {"numeric": {}}})
+    policy = {"reference_id": "masking", "tokens": {
+        "-999": {"status": "suppressed", "reason": "synthetic publisher masking token"},
+        ".": {"status": "missing", "reason": "synthetic publisher missing token"}}} if normalized else {}
+    cfg = Config.from_dict({"data_sources": datasets, "value_policies": {"numeric": policy}})
     cfg.base_dir = tmp_path
     recorder = BuildRecorder(cfg, store)
     leaves = {}
@@ -234,8 +248,40 @@ def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staf
         raw_codes = [row["code"] for row in table["fields"]]
         actual = pa.concat_tables([pacsv.read_csv(raw, convert_options=pacsv.ConvertOptions(
             column_types=dict.fromkeys(raw_codes, pa.string()))).rename_columns(native.names).cast(native) for raw in raws])
+        support = None
+        keys = ["campus_number"]
+        if normalized:
+            amounts = [measure(token, cfg.value_policies["numeric"], unit="count", minimum=0) for token in actual["amount"].to_pylist()]
+            raw_amount = actual["amount"]
+            actual = actual.set_column(2, "amount", pa.array([value.numeric for value in amounts], type=pa.int64()))
+            for name, values in [("VALUE", raw_amount), ("amount_status", pa.array([value.status.value for value in amounts])),
+                                 ("source_record", pa.array(range(2, actual.num_rows + 2), type=pa.int64())),
+                                 ("row_kind", pa.array(["detail"] * actual.num_rows)), ("NAME", actual["campus_name"]),
+                                 ("name_support", pa.array(["fixture name context"] * actual.num_rows))]:
+                actual = actual.append_column(name, values)
+            native = actual.schema.remove_metadata()
+            keys = ["source_record"]
+            support = {"fields": {"amount": {"raw": "VALUE", "status": "amount_status"},
+                                  "campus_name": {"raw": "NAME", "auxiliary": ["name_support"]}},
+                       "context": ["source_record", "row_kind"]}
+            recipe = {**recipe, "operation": "canonical values.measure of raw amount plus lossless names and source-record locators"}
+            if support_damage == "overlap":
+                support["context"].append("amount")
+            elif support_damage == "foreign":
+                support["context"].append("foreign_column")
+            elif support_damage == "duplicate":
+                support["context"].append("VALUE")
+            elif support_damage == "unclaimed":
+                support["fields"]["campus_name"].pop("auxiliary")
+            elif support_damage == "missing_status":
+                support["fields"]["amount"].pop("status")
+                support["context"].append("amount_status")
+            elif support_damage == "missing_count_support":
+                support["fields"].pop("amount")
+                support["context"].extend(["VALUE", "amount_status"])
         contract = recorder.leaf_contract(key, source, native_schema=native.serialize().to_pybytes(),
-            columns=native.names, key_columns=["campus_number"], rows=actual.num_rows, inputs=selected_hashes, recipe=recipe, toolchain=toolchain)
+            columns=native.names, key_columns=keys, rows=actual.num_rows, inputs=selected_hashes, recipe=recipe, toolchain=toolchain,
+            column_support=support)
         leaf_id = sha256(canonical_json(contract).encode()).hexdigest()
         leaf = tmp_path / (family + ".parquet")
         write_leaf_artifact(leaf, actual.to_batches(), contract=contract)
@@ -257,6 +303,105 @@ def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staf
 def rehash_catalog(document, resources=None):
     document["build_id"] = sha256(canonical_json({k: v for k, v in document.items() if k != "build_id"}).encode()).hexdigest()
     return DatasetCatalog(document, column_schema_loader=(lambda ref: resources[ref.sha256]) if resources is not None else None)
+
+
+@pytest.mark.parametrize("schema_version", [3, 4])
+def test_normalized_publisher_field_projects_raw_status_and_row_context_without_unrelated_support(tmp_path, schema_version):
+    from teadata.release import DataRelease, publish_release
+    from teadata.values import ValueStatus, measure
+
+    fixture = make_edition_fixture(tmp_path, families=("student",), normalized=True)
+    catalog = fixture["catalog"]
+    root = fixture["root"]
+    if schema_version == 4:
+        catalog = catalog.externalize_editions()
+        root = publish_release(tmp_path, catalog, schema_version=4)
+    key, ref, _ = fixture["leaves"]["student"]
+    variables = {row["field"]: row for row in catalog.variables(edition=key)}
+    assert set(variables) == {"campus_number", "campus_name", "amount"}
+    amount = variables["amount"]
+    assert amount["code"] == "VALUE" and amount["unit"] == "count"
+    assert amount["support"] == {"representation": "normalized", "raw": "VALUE", "status": "amount_status",
+                                 "context": ["source_record", "row_kind"]}
+    amount["support"]["context"].clear()
+    assert catalog.field_metadata("amount", edition=key)["support"]["context"] == ["source_record", "row_kind"]
+    plan, = catalog.resolve_artifacts([(key, "amount")])
+    assert plan["columns"] == ("source_record", "amount", "VALUE", "amount_status", "row_kind")
+    release = DataRelease(root)
+    native = release.analytical_dataset(ref.identity).to_table(columns=list(plan["columns"]))
+    assert "NAME" not in native.column_names and "name_support" not in native.column_names
+    assert native["amount"].to_pylist() == [0, None, None, 5]
+    assert native["VALUE"].to_pylist() == ["0", "-999", ".", "5"]
+    assert native["amount_status"].to_pylist() == ["observed", "suppressed", "missing", "observed"]
+    decoded = [measure(raw, catalog.policy(key.dataset, edition=key), unit="count", minimum=0)
+               for raw in native["VALUE"].to_pylist()]
+    assert [value.status for value in decoded] == [ValueStatus.OBSERVED, ValueStatus.SUPPRESSED,
+                                                  ValueStatus.MISSING, ValueStatus.OBSERVED]
+    assert [value.numeric for value in decoded] == native["amount"].to_pylist()
+    with pytest.raises(ContractError, match="Qualified field unavailable|Exact qualified field unavailable"):
+        catalog.resolve_artifacts([(key, "amount_status")])
+    with pytest.raises(ContractError, match="scalar interpretation is unavailable"):
+        catalog.measure_field(None, "amount")
+    processing = fixture["store"].read_record(ref.processing_id)
+    assert processing["parameters"]["leaf_contract_sha256"] == ref.identity
+    assert processing["parameters"]["recipe"]["operation"].startswith("canonical values.measure")
+    assert set(fixture["store"].verify_record_closure([ref.processing_id])) >= set(processing["inputs"])
+
+
+@pytest.mark.parametrize("damage", ["overlap", "foreign", "duplicate", "unclaimed", "missing_status", "missing_count_support"])
+def test_support_partition_rejects_unclaimed_overlapping_foreign_or_incomplete_measure_columns(tmp_path, damage):
+    with pytest.raises((ValueError, ContractError), match="support|complete physical schema"):
+        make_edition_fixture(tmp_path, families=("student",), normalized=True, support_damage=damage)
+    assert not list(tmp_path.glob("student.parquet"))
+
+
+@pytest.mark.parametrize("column,type_name", [("VALUE", "int64"), ("amount_status", "int64"), ("amount", "string")])
+def test_support_native_types_are_checked_before_writing(tmp_path, column, type_name):
+    import base64
+    import pyarrow as pa
+    from teadata.analytical import write_leaf_artifact
+
+    fixture = make_edition_fixture(tmp_path, families=("student",), normalized=True)
+    _, ref, _ = fixture["leaves"]["student"]
+    contract = ref.contract
+    schema = pa.ipc.read_schema(pa.BufferReader(base64.b64decode(contract["schema"])))
+    changed = pa.schema([pa.field(field.name, pa.int64() if type_name == "int64" else pa.string())
+                         if field.name == column else field for field in schema])
+    wire = changed.serialize().to_pybytes()
+    contract.update(schema=base64.b64encode(wire).decode("ascii"), schema_sha256=sha256(wire).hexdigest())
+    target = tmp_path / "bad-types.parquet"
+    with pytest.raises(ContractError, match="support"):
+        write_leaf_artifact(target, (), contract=contract)
+    assert not target.exists()
+
+
+@pytest.mark.parametrize("status,value", [("unrecognized", None), (None, None), ("observed", None), ("suppressed", 0)])
+def test_support_writer_rejects_unknown_status_and_inconsistent_value_presence(tmp_path, status, value):
+    import pyarrow as pa
+    from teadata.analytical import write_leaf_artifact
+    from teadata.release import DataRelease
+
+    fixture = make_edition_fixture(tmp_path, families=("student",), normalized=True)
+    _, ref, _ = fixture["leaves"]["student"]
+    table = DataRelease(fixture["root"]).analytical_dataset(ref.identity).to_table().replace_schema_metadata(None)
+    statuses, values = table["amount_status"].to_pylist(), table["amount"].to_pylist()
+    statuses[0], values[0] = status, value
+    table = table.set_column(table.schema.get_field_index("amount_status"), "amount_status", pa.array(statuses, type=pa.string()))
+    table = table.set_column(table.schema.get_field_index("amount"), "amount", pa.array(values, type=pa.int64()))
+    target = tmp_path / "bad-status.parquet"
+    with pytest.raises(ContractError, match="status support"):
+        write_leaf_artifact(target, table.to_batches(), contract=ref.contract)
+    assert not target.exists()
+
+
+def test_legacy_leaf_without_support_map_keeps_wire_and_projection_shape(edition_fixture):
+    catalog = edition_fixture["catalog"]
+    key, ref, _ = edition_fixture["leaves"]["student"]
+    assert "column_support" not in ref.contract and ref.column_support is None
+    assert ArtifactRef.from_dict(ref.to_dict()).contract_json == ref.contract_json
+    assert all("support" not in row for row in catalog.variables(edition=key))
+    plan, = catalog.resolve_artifacts([(key, "amount")])
+    assert plan["columns"] == ("campus_number", "amount")
 
 
 def test_one_logical_native_leaf_binds_two_genuine_raw_inputs_and_exposes_both(tmp_path, monkeypatch):

@@ -16,7 +16,7 @@ import sqlite3
 import unicodedata
 from typing import Any, Callable, Iterable, Mapping
 
-from .dataset_metadata import ArtifactRef, ColumnSchemaRef, DataPeriod, DatasetMetadata, EditionKey, EditionMetadataRef, FieldBinding, MetricDefinition, ResolvedDataset
+from .dataset_metadata import ArtifactRef, ColumnSchemaRef, DataPeriod, DatasetMetadata, EditionKey, EditionMetadataRef, FieldBinding, LeafColumnSupport, MetricDefinition, ResolvedDataset
 from .metric_bindings import MetricBinding, parse_bindings
 from .provenance import ProvenanceStore, validate_record_graph, validate_reference_records
 from .values import Measurement, ValuePolicy, ValueStatus, measure
@@ -121,6 +121,14 @@ def _validate_methodology(metadata: DatasetMetadata, policy: ValuePolicy | None)
         if (reference is None or reference.status != "available" or reference.reviewed_sha256 is None
                 or not reference.provenance_ids):
             raise ContractError("Value policy or estimation requires retained reviewed methodology bytes")
+
+
+def _validate_leaf_support(contract: Mapping[str, Any], rows: Iterable[Mapping[str, Any]], metadata: DatasetMetadata) -> None:
+    support = LeafColumnSupport.from_contract(contract)
+    if support is not None:
+        columns = set(contract["columns"])
+        support.validate_fields({row["field"] for row in rows if row["field"] in columns},
+            count_fields={value.field for value in metadata.metrics.values() if value.unit == "count" and value.field in columns})
 
 
 def _verify_input_receipt(record: Mapping[str, Any], *, dataset: str,
@@ -385,9 +393,9 @@ class DatasetCatalog:
                     raise ValueError("Leaf derivation does not close its physical inputs")
                 self._artifact_refs[identifier] = ref
                 self._artifact_keys[identifier] = tuple(contract["key_columns"])
-                artifact_columns[identifier] = set(contract["columns"])
+                artifact_columns[identifier] = set(ref.public_columns)
             expected_fields = {(ref.edition.identity, column)
-                               for ref in self._artifact_refs.values() for column in ref.contract["columns"]}
+                               for ref in self._artifact_refs.values() for column in ref.public_columns}
             self._field_bindings: dict[tuple[str, str], FieldBinding] = {}
             for value in document["field_bindings"]:
                 binding = FieldBinding.from_dict(value)
@@ -688,9 +696,10 @@ class DatasetCatalog:
             semantics = _leaf_semantics(metadata, rows)
             mapping = sha256(canonical_json(table).encode()).hexdigest()
             for ref in self._artifact_refs.values():
-                if ref.edition.identity == identifier and (ref.contract["mapping_sha256"] != mapping
-                        or ref.contract["semantics_sha256"] != semantics):
-                    raise ValueError("Leaf mapping or semantics differ from selected edition")
+                if ref.edition.identity == identifier:
+                    if (ref.contract["mapping_sha256"] != mapping or ref.contract["semantics_sha256"] != semantics):
+                        raise ValueError("Leaf mapping or semantics differ from selected edition")
+                    _validate_leaf_support(ref.contract, rows, metadata)
             units = {metric.field: metric.unit for metric in metadata.metrics.values() if metric.unit is not None}
             headers = {(identifier, row["field"]): {
                 **{name: row[name] for name in ("code", "label", "period")}, "unit": units.get(row["field"])} for row in rows}
@@ -776,9 +785,13 @@ class DatasetCatalog:
 
     def _variable(self, qualified: tuple[str, str]) -> dict[str, Any]:
         binding, row = self._field_bindings[qualified], self._field_headers[qualified]
-        return {**binding.to_dict(), "edition": self._edition_keys[qualified[0]].to_dict(),
+        result: dict[str, Any] = {**binding.to_dict(), "edition": self._edition_keys[qualified[0]].to_dict(),
                 "code": row["code"], "label": row["label"], "period": deepcopy(row["period"]),
                 "unit": row["unit"], "policy_id": self._edition_metadata[qualified[0]].value_policy}
+        support = self._artifact_refs[binding.artifact_id].column_support
+        if support is not None:
+            result["support"] = support.projection(binding.field)
+        return result
 
     def artifact_ref(self, identifier: str) -> ArtifactRef:
         self._require_index()
@@ -833,6 +846,14 @@ class DatasetCatalog:
             if binding.column not in column_sets[identifier]:
                 columns[identifier].append(binding.column)
                 column_sets[identifier].add(binding.column)
+            support = artifacts[identifier].column_support
+            if support is not None:
+                projection = support.projection(binding.field)
+                for column in [*(projection[name] for name in ("raw", "status") if name in projection),
+                               *projection.get("auxiliary", ()), *projection["context"]]:
+                    if column not in column_sets[identifier]:
+                        columns[identifier].append(column)
+                        column_sets[identifier].add(column)
             for dependency in binding.dependencies:
                 visit(dependency)
         for key, field in fields:
@@ -1476,7 +1497,9 @@ class BuildRecorder:
         if set(selected_dependencies) - {row["field"] for row in rows}:
             raise ContractError("Dependencies name an unregistered field")
         additions = []
-        native_columns = {ref.identity: set(ref.contract["columns"]) for ref in refs}
+        native_columns = {ref.identity: set(ref.public_columns) for ref in refs}
+        for ref in refs:
+            _validate_leaf_support(ref.contract, rows, source.metadata)
         for row in rows:
             owning = [ref for ref in refs if row["field"] in native_columns[ref.identity]]
             if len(owning) != 1:
@@ -1507,7 +1530,8 @@ class BuildRecorder:
 
     def leaf_contract(self, key: EditionKey, source: ResolvedDataset, *, native_schema: bytes,
                       columns: Iterable[str], key_columns: Iterable[str], rows: int,
-                      inputs: Iterable[str], recipe: Mapping[str, Any], toolchain: Mapping[str, str]) -> dict[str, Any]:
+                      inputs: Iterable[str], recipe: Mapping[str, Any], toolchain: Mapping[str, str],
+                      column_support: Mapping[str, Any] | None = None) -> dict[str, Any]:
         """Derive leaf meaning from the same Config/crosswalk and native writer.
 
         Writers supply metadata-free Arrow IPC bytes, not another type system.
@@ -1527,13 +1551,17 @@ class BuildRecorder:
         selected, = [table for table in crosswalk_dataset(document, key.dataset, key.edition)["tables"] if table["table"] == key.table]
         field_rows = crosswalk_records(document, dataset=key.dataset, edition=key.edition, table=key.table, metadata=source.metadata)
         policy = self.cfg.value_policies.get(source.metadata.value_policy)
-        return {"edition": key.to_dict(), "schema": base64.b64encode(native_schema).decode("ascii"),
+        result: dict[str, Any] = {"edition": key.to_dict(), "schema": base64.b64encode(native_schema).decode("ascii"),
             "schema_sha256": sha256(native_schema).hexdigest(), "columns": list(columns), "key_columns": list(key_columns),
             "rows": rows, "inputs": list(inputs), "mapping_sha256": sha256(canonical_json(selected).encode()).hexdigest(),
             "semantics_sha256": _leaf_semantics(source.metadata, field_rows),
             "policy_sha256": sha256(canonical_json(policy.to_dict()).encode()).hexdigest() if policy is not None else None,
             "recipe_sha256": sha256(canonical_json(recipe).encode()).hexdigest(),
             "producer": {"code_sha256": self.processor_sha256, "toolchain": dict(toolchain)}}
+        if column_support is not None:
+            result["column_support"] = deepcopy(dict(column_support))
+            _validate_leaf_support(result, field_rows, source.metadata)
+        return result
 
     def catalog(self, *, schema_version: int = CATALOG_SCHEMA) -> DatasetCatalog:
         if processor_identity() != self.processor_sha256:

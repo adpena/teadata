@@ -16,7 +16,7 @@ from typing import Any, TYPE_CHECKING
 
 from .manifest import ContractError, DatasetCatalog, canonical_json, file_identity
 from .values import Measurement, ValueStatus, presentation_value
-from .dataset_metadata import ArtifactRef
+from .dataset_metadata import ArtifactRef, LeafColumnSupport
 
 if TYPE_CHECKING:
     import pyarrow as pa
@@ -395,6 +395,18 @@ def _leaf_schema(contract):
             or not contract["key_columns"] or len(set(contract["key_columns"])) != len(contract["key_columns"])
             or not set(contract["key_columns"]) <= set(schema.names)):
         raise ContractError("Leaf contract requires metadata-free native schema and explicit keys")
+    try:
+        support = LeafColumnSupport.from_contract(contract)
+        if support is not None:
+            for field in support.fields:
+                if not (pa.types.is_string(schema.field(field.raw).type) or pa.types.is_large_string(schema.field(field.raw).type)):
+                    raise ValueError("Raw support must preserve source string tokens")
+                if field.status is not None:
+                    if (not (pa.types.is_string(schema.field(field.status).type) or pa.types.is_large_string(schema.field(field.status).type))
+                            or not (pa.types.is_integer(schema.field(field.field).type) or pa.types.is_floating(schema.field(field.field).type))):
+                        raise ValueError("Status support requires a string status and numeric normalized value")
+    except (KeyError, TypeError, ValueError) as error:
+        raise ContractError(f"Invalid leaf column support: {error}") from error
     return schema
 
 
@@ -410,6 +422,7 @@ def write_leaf_artifact(path: str | Path, batches, *, contract: Mapping[str, Any
     if path.exists() or path.is_symlink():
         raise FileExistsError("Leaf output already exists")
     schema = _leaf_schema(contract)
+    support = LeafColumnSupport.from_contract(contract)
     identity = sha256(canonical_json(contract).encode()).hexdigest()
     footer = {LEAF_METADATA: canonical_json({"schema_version": 3, "leaf_contract_sha256": identity}).encode()}
     temporary = None
@@ -423,6 +436,19 @@ def write_leaf_artifact(path: str | Path, batches, *, contract: Mapping[str, Any
                     raise ContractError("Leaf batch differs from its complete native schema")
                 if batch.num_rows < 1 or (batch_bytes is not None and batch.nbytes > batch_bytes):
                     raise ContractError("Leaf batch exceeds its admitted native byte budget")
+                if support is not None:
+                    import pyarrow as pa
+                    import pyarrow.compute as arrow_compute
+                    pc: Any = arrow_compute
+                    for field in support.fields:
+                        if field.status is not None:
+                            status = batch.column(batch.schema.get_field_index(field.status))
+                            values = batch.column(batch.schema.get_field_index(field.field))
+                            known = pc.is_in(status, value_set=pa.array([item.value for item in ValueStatus]))
+                            present = pc.equal(pc.equal(status, ValueStatus.OBSERVED.value), pc.is_valid(values))
+                            if (not pc.all(pc.fill_null(known, False)).as_py()
+                                    or not pc.all(pc.fill_null(present, False)).as_py()):
+                                raise ContractError("Leaf status support is unknown or disagrees with normalized value presence")
                 rows += batch.num_rows
                 writer.write_batch(batch.replace_schema_metadata(footer), row_group_size=batch.num_rows)
         if type(contract["rows"]) is not int or rows != contract["rows"]:

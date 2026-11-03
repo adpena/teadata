@@ -31,6 +31,55 @@ Catalog schema 2 stores `metric_bindings` with the release: canonical names and 
 
 Canonical public enrollment uses the TAPR student enrollment field for both campuses and districts. The accountability report's Number of Students is a separate `accountability.student_count` population and must not replace enrollment. Public-source metrics are not applicable to private schools. A metric without its own period inherits the dataset period; an explicitly unknown period stays unknown.
 
+### Native fields with retained technical support
+
+An optional `column_support` in a native leaf contract separates real reviewed
+publisher-header fields from physical raw/status/row-context columns. Each
+`fields` entry names a normalized public field and its exact `raw` companion,
+optional `status`, and optional field-specific `auxiliary` columns. Ordered
+`context` columns carry only shared row/grain/locator information. These names
+form one disjoint partition with the public fields and account for the complete
+physical Arrow schema. Technical columns receive no invented publisher codes,
+labels, positions, or additional research-variable entries. Extracting a district
+ID from a combined name/number label is a recorded transformation; the original
+label remains in its raw companion.
+
+For these leaves, `variables()` and `field_metadata()` return detached `support`
+pointers. `resolve_artifacts()` automatically selects a requested normalized
+field's raw/status/auxiliary companions, required row context, and keys. It does
+not select unrelated fields' support. Normalized count fields require both raw
+and status columns: nullable values alone cannot distinguish suppression from
+missing data. Given an exact selected `EditionKey` and count field:
+
+```python
+from teadata.values import measure
+
+variable = next(row for row in catalog.variables(edition=key)
+                if row["field"] == count_field)
+plan, = catalog.resolve_artifacts([(key, count_field)])
+table = release.analytical_dataset(plan["artifact"].identity).to_table(
+    columns=list(plan["columns"]))
+support = variable["support"]
+raw = table[support["raw"]][0].as_py()
+status = table[support["status"]][0].as_py()
+value = measure(raw, catalog.policy(key.dataset, edition=key),
+                unit="count", minimum=0)
+assert value.status.value == status
+```
+
+The existing value policy remains the interpretation authority. Zero remains
+observed; a suppressed token and a missing token may both have a null normalized
+value and retain distinct statuses. Source-preparation/producer qualification
+binds those transformations to the pinned processing recipe and inputs. The
+native writer checks status vocabulary, value-presence consistency, and support
+types; it does not invent or reapply a second masking policy. Publisher totals,
+details and separators still require their explicit row-kind scope before any
+aggregation. Schema3/4 scalar measurement APIs remain unavailable; selected
+native projection and canonical `values.measure(raw, policy, ...)` are the
+documented route. Existing leaves without `column_support` retain their original
+contract bytes, field discovery, and projection behavior. This contract support
+does not itself activate transfer datasets or qualify a new release.
+
 ## Private school-finder listings
 
 The private producer selects the latest curated `tefa` edition independently of
