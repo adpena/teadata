@@ -11,7 +11,7 @@ from types import SimpleNamespace
 import pyarrow as pa
 import pytest
 
-from teadata.acquisition import AcquisitionClient, acquire_form, replay_acquisition
+from teadata.acquisition import AcquisitionClient, NoRedirect, acquire_form, replay_acquisition
 from teadata.column_schema import source_schema_fingerprint
 from teadata.dataset_metadata import DatasetMetadata, ReferenceDocument, ResolvedDataset
 from teadata.manifest import canonical_json
@@ -144,7 +144,7 @@ def test_acquire_cli_captures_actual_shape_metadata_config_controls_and_closed_h
         return response
     def client(store, **kwargs):
         assert kwargs['attempts'] == 1 and kwargs['max_retry_wait'] == 0
-        assert any(isinstance(handler, refresh._NoRedirect) for handler in kwargs['opener'].handlers)
+        assert any(isinstance(handler, NoRedirect) for handler in kwargs['opener'].handlers)
         kwargs['opener'] = SimpleNamespace(open=opened)
         return AcquisitionClient(store, **kwargs)
     monkeypatch.setattr(refresh, 'AcquisitionClient', client)
@@ -203,10 +203,9 @@ def test_acquire_reference_section_rejects_config_flags_and_old_unbound_cli(tmp_
 def test_acquire_no_redirect_handler_rejects_followup():
     from urllib.error import HTTPError
     from urllib.request import Request
-    from teadata.scripts.refresh_tapr import _NoRedirect
 
     with pytest.raises(HTTPError, match='redirect blocked'):
-        _NoRedirect().redirect_request(Request('https://example.test/original'), None,
+        NoRedirect().redirect_request(Request('https://example.test/original'), None,
             302, 'Found', {}, 'https://example.test/not-authorized')
 
 

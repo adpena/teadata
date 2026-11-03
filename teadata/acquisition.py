@@ -11,7 +11,7 @@ import tempfile
 import time
 from typing import Callable, Mapping, Sequence
 from urllib.error import HTTPError, URLError
-from urllib.request import Request, build_opener
+from urllib.request import HTTPRedirectHandler, Request, build_opener
 from urllib.parse import urlencode
 
 from .dataset_metadata import ResolvedDataset, validate_http_url
@@ -20,6 +20,13 @@ from .provenance import ProvenanceStore
 
 class AcquisitionError(RuntimeError):
     """A source could not be acquired without violating its transport contract."""
+
+
+class NoRedirect(HTTPRedirectHandler):
+    """Refuse a follow-up request when a source requires its exact selected URL."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        raise HTTPError(req.full_url, code, "Acquisition redirect blocked", headers, fp)
 
 
 @dataclass(frozen=True)

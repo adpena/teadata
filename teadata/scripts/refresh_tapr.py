@@ -14,10 +14,9 @@ import os
 from pathlib import Path
 import sys
 import tempfile
-from urllib.error import HTTPError
-from urllib.request import HTTPRedirectHandler, build_opener
+from urllib.request import build_opener
 
-from teadata.acquisition import AcquisitionClient, acquire_form, replay_acquisition
+from teadata.acquisition import AcquisitionClient, NoRedirect, acquire_form, replay_acquisition
 from teadata.column_schema import crosswalk_dataset, parse_column_schema
 from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
 from teadata.provenance import ProvenanceStore, _identifier
@@ -86,11 +85,6 @@ def acquisition_source(args, archive: ProvenanceStore) -> ResolvedDataset:
     archive.verify_record_closure(source.metadata.provenance_ids)
     verify_reference_receipts(source, archive, check_local_paths=False, verify_all_claimed=True)
     return source
-
-
-class _NoRedirect(HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        raise HTTPError(req.full_url, code, 'Acquisition redirect blocked', headers, fp)
 
 
 def compare_inputs(args) -> dict:
@@ -334,7 +328,7 @@ def main(argv: list[str] | None = None) -> int:
             source = acquisition_source(args, archive)
             client = AcquisitionClient(archive, timeout=args.timeout, attempts=1,
                 max_bytes=args.max_bytes, max_retry_wait=0,
-                opener=build_opener(_NoRedirect()) if args.no_redirects else None)
+                opener=build_opener(NoRedirect()) if args.no_redirects else None)
             acquired = acquire_form(client, args.url, source, filename=args.filename, method=args.method,
                                     fields=args.field, content_type=args.content_type)
             archive.verify_record_closure([acquired.record_id])
