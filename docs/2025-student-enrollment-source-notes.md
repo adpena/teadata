@@ -1,8 +1,10 @@
 # 2025 student enrollment race labels
 
-Status: source correction and independent selected-source comparisons are
-prepared; corrected-artifact qualification and release rebuild are pending.
-This note does not activate new app data or modify published 0.0.126.
+Status: the corrected mappings and reviewed lagged periods were published in
+[0.0.127](https://github.com/adpena/teadata/releases/tag/v0.0.127), with rebuilt
+artifacts and retained release checks. This note preserves the investigation's evidence
+and limits. Downstream applications must select that corrected build explicitly;
+published 0.0.126 artifacts remain unchanged.
 
 The retained 2025 STUD CSV headers and dictionary descriptions label both
 `CPNTINDC/P` and `CPNTASIC/P` as Asian, with the corresponding district codes
@@ -68,7 +70,7 @@ field spelling nor publisher edition assigns a new measurement period or policy.
 The existing composite reader's `columns` contract maps corrected canonical
 names to the immutable prepared workbook's old headers. Its ordinary
 simultaneous rename and schema check perform the normalization; the raw `source`
-profile explicitly clears that map. A future processing receipt must record the
+profile explicitly clears that map. Rebuild processing receipts must record the
 effective reader and the evidence used. No compatibility alias or converter is
 introduced.
 
@@ -106,8 +108,9 @@ canonical source preparation to Parquet, ordinary Config enrichment and actual
 EntityStore persistence before comparing all 60 measurements. A separate XLSX
 regression checks the four old-header renames per scope through `Config.load_df`.
 Its local fixture observations do not claim original HTTP events. This verifies
-the exercised processing path; a new full corrected catalog and artifact bundle
-still need their own processing receipts and retained-release checks.
+the exercised processing path. Full-bundle qualification is separate: release
+0.0.127 includes its own processing receipt and retained-release checks, and
+subsequent rebuilds require their own evidence.
 
 The old standard `*_2025_student_enrollment_asian_*` fields and the separate
 `*_2024_25_asian_students_*` fields must not be silently combined or aliased.
