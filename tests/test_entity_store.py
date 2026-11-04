@@ -14,7 +14,7 @@ from teadata.persistence.sqlalchemy_store import (
 from teadata import entity_store
 
 
-def _build_entity_store(tmp_path, catalog):
+def _build_entity_store(tmp_path, catalog, *, subtype="CHARTER"):
     repo = DataEngine()
     repo.catalog = catalog
     district = District(
@@ -24,7 +24,8 @@ def _build_entity_store(tmp_path, catalog):
         enrollment=1200,
         rating="A",
     )
-    district.meta = {"district_2025_demo": "ok", "district_extra": "extra"}
+    district.meta = {"district_2025_demo": "ok", "district_extra": "extra",
+                     "organization_sub_type": subtype}
     repo.add_district(district)
 
     campus = Campus(
@@ -67,6 +68,23 @@ def test_entity_store_round_trip(tmp_path, catalog):
 
     keys = entity_store.list_meta_keys("campus", store_path=path)
     assert "campus_2025_demo" in keys
+
+
+@pytest.mark.parametrize(("subtype", "label", "charter"), [
+    ("INDEPENDENT", "ISD", False),
+    ("COMMON", "Common school district", False),
+    ("TJJD", "State agency", False),
+    (None, "Unknown", None),
+])
+def test_district_identity_uses_reported_subtype_despite_charter_campus(tmp_path, catalog, subtype, label, charter):
+    path = _build_entity_store(tmp_path, catalog, subtype=subtype)
+    with entity_store.EntityStore(path) as store:
+        row = store.get_district("123456", include_meta=False)
+        assert row["meta"] == {}
+        assert row["organization_sub_type"] == subtype
+        assert row["district_type"] == label
+        assert row["is_charter"] is charter
+        assert next(iter(store.iter_districts(include_meta=False))) == row
 
 
 @pytest.mark.parametrize(("alternative", "message"), [
@@ -276,7 +294,8 @@ def test_scoped_store_reuses_connection_and_catalog_without_implicit_memoization
             assert campus["is_charter"] is True and campus["is_private"] is False
             assert district["district_type"] == "Charter" and district["campus_count"] == 1
             assert campus["meta"] == ({"campus_2025_demo": 5} if include_meta else {})
-            assert district["meta"] == ({"district_2025_demo": "ok", "district_extra": "extra"} if include_meta else {})
+            assert district["meta"] == ({"district_2025_demo": "ok", "district_extra": "extra",
+                                        "organization_sub_type": "CHARTER"} if include_meta else {})
         # Catalog and source queries share exactly one owned reader.
         assert len(connections_opened) == 1
         assert connections_opened[0].execute("SELECT 1").fetchone() == (1,)

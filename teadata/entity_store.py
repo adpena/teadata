@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Iterable, Optional
 
 from ._sqlite import readonly_connection
+from .attributes import district_type_from_subtype, district_type_label
 from .manifest import ContractError, read_sqlite_catalog, read_sqlite_catalog_connection
 from .release import current_release
 from .identifiers import (
@@ -35,19 +36,22 @@ def _campus_select(*, include_meta: bool) -> str:
 """
 
 
-def _district_select(*, include_meta: bool, lookup: bool = False) -> str:
+def _district_select(*, include_meta: bool, has_projection: bool, lookup: bool = False) -> str:
     meta = "d.meta" if include_meta else "NULL AS meta"
+    fields = ("a.organization_sub_type, a.district_boundary_status, a.district_boundary_reason, a.district_id"
+              if has_projection else "NULL, NULL, NULL, NULL")
+    join = "LEFT JOIN district_source_projection a ON a.district_id = d.id" if has_projection else ""
     query = f"""
         SELECT d.name, d.district_number, d.district_number_canon, d.enrollment, d.rating, d.aea, d.aea_raw, {meta},
-               COALESCE(counts.campus_count, 0), COALESCE(counts.has_charter, 0)
+               COALESCE(counts.campus_count, 0), d.id, {fields}
         FROM districts d
         LEFT JOIN (
             SELECT district_id,
-                   COUNT(*) AS campus_count,
-                   MAX(CASE WHEN is_charter THEN 1 ELSE 0 END) AS has_charter
+                   COUNT(*) AS campus_count
             FROM campuses
             GROUP BY district_id
         ) counts ON counts.district_id = d.id
+        {join}
     """
     if lookup:
         query += " WHERE d.district_number_canon IN (?, ?) OR d.district_number IN (?, ?)"
@@ -163,8 +167,26 @@ def _collect_meta_keys_from_json(
     return sorted(keys)
 
 
-def _district_type_from_flag(flag: bool | None) -> str:
-    return "Charter" if flag else "ISD"
+def _district_record(row, *, include_meta: bool, build_id: str) -> dict[str, Any]:
+    meta = _decode_json(row[7]) if include_meta else {}
+    if include_meta or row[13] is None:
+        subtype = meta.get("organization_sub_type")
+        boundary_status = meta.get("district_boundary_status")
+        boundary_reason = meta.get("district_boundary_reason")
+    else:
+        subtype, boundary_status, boundary_reason = row[10:13]
+    kind = district_type_from_subtype(subtype)
+    return {
+        "id": row[9], "source_build_id": build_id, "name": row[0] or "",
+        "district_number": _strip_leading_apostrophe(row[1] or row[2]),
+        "district_number_canon": row[2] or "", "enrollment": row[3], "rating": row[4],
+        "aea": _nullable_bool(row[5]), "aea_raw": row[6],
+        "meta": meta, "campus_count": row[8] or 0,
+        "organization_sub_type": subtype, "district_boundary_status": boundary_status,
+        "district_boundary_reason": boundary_reason,
+        "is_charter": None if kind == "unknown" else kind == "charter",
+        "district_type": district_type_label(kind),
+    }
 
 
 def _nullable_bool(value: Any) -> bool | None:
@@ -396,26 +418,11 @@ class EntityStore:
         conn = self._connect()
         if conn is None:
             return []
-        query = _district_select(include_meta=include_meta)
+        query = _district_select(include_meta=include_meta, has_projection=self._has_district_projection)
         rows = conn.execute(query)
         _ = self._validated_district_numbers
         for row in rows:
-            has_charter = bool(row[9])
-            meta = _decode_json(row[7]) if include_meta else {}
-            yield {
-                "source_build_id": self.catalog.build_id,
-                "name": row[0] or "",
-                "district_number": _strip_leading_apostrophe(row[1] or row[2]),
-                "district_number_canon": row[2] or "",
-                "enrollment": row[3],
-                "rating": row[4],
-                "aea": _nullable_bool(row[5]),
-                "aea_raw": row[6],
-                "meta": meta,
-                "campus_count": row[8] or 0,
-                "is_charter": has_charter,
-                "district_type": _district_type_from_flag(has_charter),
-            }
+            yield _district_record(row, include_meta=include_meta, build_id=self.catalog.build_id)
 
     def list_meta_keys(self, entity_type: str, *, limit: int | None = None) -> list[str]:
         self._ensure_open()
@@ -459,26 +466,18 @@ class EntityStore:
         if conn is None:
             return None
         _ = self._validated_district_numbers
-        query = _district_select(include_meta=include_meta, lookup=True)
+        query = _district_select(include_meta=include_meta, has_projection=self._has_district_projection, lookup=True)
         keys = (key, key[1:])
         row = _unique_row(conn.execute(query, (*keys, *keys)), "district number", key)
         if not row:
             return None
-        has_charter = bool(row[9])
-        meta = _decode_json(row[7]) if include_meta else {}
-        return {
-            "name": row[0] or "",
-            "district_number": _strip_leading_apostrophe(row[1] or row[2]),
-            "district_number_canon": row[2] or "",
-            "enrollment": row[3],
-            "rating": row[4],
-            "aea": _nullable_bool(row[5]),
-            "aea_raw": row[6],
-            "meta": meta,
-            "campus_count": row[8] or 0,
-            "is_charter": has_charter,
-            "district_type": _district_type_from_flag(has_charter),
-        }
+        return _district_record(row, include_meta=include_meta, build_id=self.catalog.build_id)
+
+    @cached_property
+    def _has_district_projection(self) -> bool:
+        return self.connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'district_source_projection'"
+        ).fetchone() is not None
 
     @cached_property
     def _validated_district_numbers(self) -> None:

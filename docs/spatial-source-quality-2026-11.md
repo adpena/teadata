@@ -157,6 +157,19 @@ pending a publisher rule or source-specific resolution.
 
 ## Planned application behavior
 
+Newly built snapshots and entity sidecars record district boundary availability
+as `available`, `unavailable`, or `invalid`. Invalid publisher geometry
+remains available through the raw WKB sidecar, with the validation reason in
+the district metadata. District and campus profile map projections omit held
+geometry. Indexed containment uses only eligible geometry.
+
+District presentation follows the retained AskTED organization subtype.
+Independent districts, common school districts, charter districts, and
+state agencies have distinct labels. Missing or unmapped subtypes are
+unknown. Campus flags and polygon presence do not determine district type.
+Sparse reads on older entity stores can lack these attributes because they
+never open the full metadata column.
+
 When a focal campus lacks usable coordinates, a transfer-partners-only map may
 be useful **only when actual retained transfer data and locatable partner rows
 exist**. It should identify the missing focal location, show those partners

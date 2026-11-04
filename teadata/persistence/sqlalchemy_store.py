@@ -164,6 +164,19 @@ class DistrictRecord(Base):
     )
 
 
+class DistrictSourceProjection(Base):
+    """Sparse district fields for readers that exclude the full metadata."""
+
+    __tablename__ = "district_source_projection"
+
+    district_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("districts.id", ondelete="CASCADE"), primary_key=True
+    )
+    organization_sub_type: Mapped[str | None] = mapped_column(Text)
+    district_boundary_status: Mapped[str | None] = mapped_column(String(16))
+    district_boundary_reason: Mapped[str | None] = mapped_column(Text)
+
+
 class CampusRecord(Base):
     __tablename__ = "campuses"
 
@@ -1113,7 +1126,11 @@ def export_dataengine(
     with session.no_autoflush:
         _bind_catalog(repo, session, replace=replace)
     session.flush()
+    projection = DistrictSourceProjection.__table__
+    has_projection = inspect(session.connection()).has_table(projection.name)
     if replace:
+        if has_projection:
+            session.connection().execute(delete(projection))
         for model in (
             CampusMetaRecord,
             DistrictMetaRecord,
@@ -1134,6 +1151,14 @@ def export_dataengine(
         include_meta_entries=include_meta_entries,
         batch_size=batch_size,
     )
+    if has_projection:
+        fields = ("organization_sub_type", "district_boundary_status", "district_boundary_reason")
+        _write_rows(
+            session, projection,
+            ({"district_id": district.id, **{field: district.meta.get(field) for field in fields}}
+             for district in repo._districts.values()),
+            replace=replace, batch_size=batch_size,
+        )
     if not replace:
         # The catalog lock serializes supported writers, including when an
         # older destination lacks the unique index or stores quoted numbers.

@@ -10,6 +10,7 @@ import pytest
 from teadata import Campus, DataEngine, District
 from teadata.identifiers import canonical_source_identifier
 from teadata.load_data import (
+    _record_district_boundary_status,
     build_closures_map_payload,
     build_campus_profile_map_payload,
 )
@@ -58,6 +59,26 @@ def frame(destination="123456002", count=12):
             "TRANSFERS_IN_OR_OUT": [count],
         }
     )
+
+
+def test_invalid_publisher_boundary_stays_raw_and_is_held_from_maps_and_engine_comparison(transfer_repo, catalog):
+    from shapely.geometry import Polygon
+
+    repo, district, campuses = transfer_repo
+    repo.catalog = catalog
+    district.meta["organization_sub_type"] = "INDEPENDENT"
+    raw = Polygon([(-98, 30), (-97, 31), (-98, 31), (-97, 30), (-98, 30)])
+    district.boundary = raw
+    district.polygon = Polygon([(-98, 30), (-97, 31), (-98, 31), (-98, 30)])
+    _record_district_boundary_status(repo)
+    assert district.boundary.wkb == raw.wkb
+    assert district.meta["district_boundary_status"] == "invalid"
+    assert "Self-intersection" in district.meta["district_boundary_reason"]
+    for payload in (build_closures_map_payload(repo, district), build_campus_profile_map_payload(repo, campuses[0])):
+        assert payload["districtBoundary"] is None
+        assert payload["districtBoundaryStatus"] == "invalid"
+    with pytest.raises(ValueError, match="Self-intersection"):
+        repo.private_campuses_within(district)
 
 
 @pytest.mark.parametrize("district_type", ["isd", "charter"])

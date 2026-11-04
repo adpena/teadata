@@ -29,7 +29,7 @@ def campus_district_name(campus) -> str | None:
 
 def is_traditional_district(district) -> bool:
     """AskTED organization subtype, never campus flags or polygon presence."""
-    return getattr(district, "meta", {}).get("organization_sub_type") in {"INDEPENDENT", "COMMON"}
+    return district_type(district) in {"isd", "common"}
 
 def valid_latlon(lat: float, lon: float) -> bool:
     try:
@@ -84,14 +84,22 @@ def district_number(entity) -> str:
     return ""
 
 def district_type(entity) -> str:
-    raw_type = getattr(entity, "district_type", None) or getattr(entity, "districtType", None)
-    if raw_type:
-        normalized = str(raw_type).strip().lower()
-        if normalized in {"charter", "isd"}:
-            return normalized
-    if is_charter(entity):
-        return "charter"
-    return "isd"
+    """Classify a district by AskTED subtype, independently of its campus roster."""
+    return district_type_from_subtype((getattr(entity, "meta", None) or {}).get("organization_sub_type"))
+
+
+def district_type_from_subtype(subtype: object) -> str:
+    if not isinstance(subtype, str):
+        return "unknown"
+    return {
+        "INDEPENDENT": "isd", "COMMON": "common", "CHARTER": "charter",
+        "TSD/TSBVI": "state", "TJJD": "state",
+    }.get(subtype.strip().upper(), "unknown")
+
+
+def district_type_label(kind: str) -> str:
+    return {"isd": "ISD", "common": "Common school district",
+            "charter": "Charter", "state": "State agency"}.get(kind, "Unknown")
 
 def is_charter(entity) -> bool:
     flag = getattr(entity, "is_charter", None)
@@ -119,6 +127,9 @@ def attribute_value(entity, name: str, *, scope: str) -> object:
     if name == "district_name":
         return campus_district_name(entity) if scope == "campus" else district_name(entity)
     if name == "is_charter":
+        if scope == "district":
+            kind = district_type(entity)
+            return None if kind == "unknown" else kind == "charter"
         return is_charter(entity)
     if scope == "campus":
         if name in {"campus_name", "campus_grade_range"}:

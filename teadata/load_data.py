@@ -13,7 +13,8 @@ import sys
 import tempfile
 from contextvars import ContextVar
 from urllib.parse import quote
-from teadata.attributes import campus_district_name, is_traditional_district
+from teadata.attributes import campus_district_name, district_type as classify_district, is_traditional_district
+from teadata.geometry import district_boundary_geometry, district_boundary_issue
 
 from teadata.manifest import ACTIVE_BUILD, BuildRecorder, ContractError, write_sqlite_catalog
 from teadata.enrichment import EnrichmentOutcome, _record_outcome
@@ -527,9 +528,7 @@ def _save_boundary_store(
             )
             if not district_number:
                 continue
-            boundary = getattr(district, "boundary", None) or getattr(
-                district, "polygon", None
-            )
+            boundary = district_boundary_geometry(district)
             if boundary is None:
                 continue
             try:
@@ -599,20 +598,6 @@ def _map_campus_name(record_name: Any, campus: Optional[Campus], campus_number: 
     value = (getattr(campus, "name", None) or getattr(campus, "campus_name", None)
              or getattr(campus, "campus_name_long", None))
     return value.strip() if isinstance(value, str) else ""
-
-
-def _is_charter_district(district: District) -> bool:
-    return district.meta.get("organization_sub_type") == "CHARTER"
-
-
-def _resolve_district_type(
-    district: District, district_type: Optional[str] = None
-) -> str:
-    if district_type:
-        normalized = str(district_type).strip().lower()
-        if normalized in {"isd", "charter"}:
-            return normalized
-    return "charter" if _is_charter_district(district) else "isd"
 
 
 def _build_campus_lookup(
@@ -917,6 +902,7 @@ def _build_charter_map_payload(repo: DataEngine, district: District) -> dict:
         "maxTransferCount": 0,
         "bounds": None,
         "districtBoundary": None,
+        **_district_boundary_fields(district),
     }
 
     if district is None:
@@ -1154,12 +1140,8 @@ def build_closures_map_payload(
     repo: DataEngine, district: District, *, district_type: Optional[str] = None
 ) -> dict:
     catalog = repo.catalog
-    try:
-        from shapely.geometry import mapping as shapely_mapping  # type: ignore
-    except Exception:
-        shapely_mapping = None
-
-    district_mode = _resolve_district_type(district, district_type)
+    mode = str(district_type or "").strip().lower()
+    district_mode = mode if mode in {"isd", "charter"} else classify_district(district)
     if district_mode == "charter":
         return _build_charter_map_payload(repo, district)
 
@@ -1168,37 +1150,10 @@ def build_closures_map_payload(
         "charterCampuses": [],
         "privateCampuses": [],
         "maxTransferCount": 0,
-        "bounds": None,
-        "districtBoundary": None,
+        **_district_boundary_payload(repo, district),
     }
-
     if district is None:
         return payload
-
-    boundary = getattr(district, "boundary", None) or getattr(district, "polygon", None)
-    if boundary is None:
-        try:
-            repo.ensure_boundary(district)
-            boundary = getattr(district, "boundary", None) or getattr(
-                district, "polygon", None
-            )
-        except Exception:
-            boundary = None
-    if boundary is not None:
-        try:
-            if shapely_mapping:
-                payload["districtBoundary"] = shapely_mapping(boundary)
-        except Exception:
-            payload["districtBoundary"] = None
-        try:
-            if hasattr(boundary, "bounds"):
-                minx, miny, maxx, maxy = boundary.bounds
-                sw = (float(miny), float(minx))
-                ne = (float(maxy), float(maxx))
-                if _valid_latlon(*sw) and _valid_latlon(*ne):
-                    payload["bounds"] = [sw, ne]
-        except Exception:
-            payload["bounds"] = None
 
     transfer_rows = repo >> ("campuses_in", district) >> ("transfers_out", True)
     required_columns = {
@@ -1751,46 +1706,47 @@ def _grades_overlap(campus_a: Campus, campus_b: Campus) -> bool:
     return False
 
 
+def _district_boundary_fields(district: District | None) -> dict[str, str | None]:
+    meta = district.meta if district is not None else {}
+    return {
+        "districtBoundaryStatus": meta.get("district_boundary_status"),
+        "districtBoundaryReason": meta.get("district_boundary_reason"),
+    }
+
+
+def _record_district_boundary_status(repo: DataEngine) -> None:
+    """Record publisher-geometry eligibility while preserving original WKB."""
+    for district in repo._districts.values():
+        geometry = district_boundary_geometry(district)
+        issue = district_boundary_issue(geometry) if geometry is not None else None
+        if issue is not None:
+            status = "invalid"
+            logger.warning("district_boundary_held district_number=%s reason=%s",
+                           district.district_number, issue)
+        else:
+            status = "available" if geometry is not None else "unavailable"
+        district.meta.update(district_boundary_status=status, district_boundary_reason=issue)
+
+
 def _district_boundary_payload(
     repo: Optional[DataEngine], district: Optional[District]
 ):
-    if district is None:
-        return (None, None)
-    try:
-        from shapely.geometry import mapping as shapely_mapping  # type: ignore
-    except Exception:
-        shapely_mapping = None
+    from shapely.geometry import mapping
 
-    boundary = getattr(district, "boundary", None) or getattr(district, "polygon", None)
-    if boundary is None and repo is not None:
-        try:
-            repo.ensure_boundary(district)
-        except Exception:
-            boundary = None
-        else:
-            boundary = getattr(district, "boundary", None) or getattr(
-                district, "polygon", None
-            )
+    metadata = _district_boundary_fields(district)
+    boundary = district_boundary_geometry(district)
+    if boundary is None and district is not None and repo is not None:
+        boundary = repo.ensure_boundary(district)
     if boundary is None:
-        return (None, None)
-
-    geojson = None
-    bounds = None
-    if shapely_mapping:
-        try:
-            geojson = shapely_mapping(boundary)
-        except Exception:
-            geojson = None
-    try:
-        if hasattr(boundary, "bounds"):
-            minx, miny, maxx, maxy = boundary.bounds
-            sw = (float(miny), float(minx))
-            ne = (float(maxy), float(maxx))
-            if _valid_latlon(*sw) and _valid_latlon(*ne):
-                bounds = [sw, ne]
-    except Exception:
-        bounds = None
-    return (geojson, bounds)
+        if metadata["districtBoundaryStatus"] is None:
+            metadata["districtBoundaryStatus"] = "unavailable"
+        return {"districtBoundary": None, "bounds": None, **metadata}
+    if (issue := district_boundary_issue(boundary)) is not None:
+        return {"districtBoundary": None, "bounds": None,
+                "districtBoundaryStatus": "invalid", "districtBoundaryReason": issue}
+    minx, miny, maxx, maxy = boundary.bounds
+    return {"districtBoundary": mapping(boundary), "bounds": [(miny, minx), (maxy, maxx)],
+            "districtBoundaryStatus": "available", "districtBoundaryReason": None}
 
 
 def _collect_private_campuses(
@@ -1918,7 +1874,7 @@ def _build_isd_profile_map_payload(repo: DataEngine, campus: Campus) -> dict:
     )
 
     district = getattr(campus, "district", None)
-    boundary_geojson, boundary_bounds = _district_boundary_payload(repo, district)
+    boundary_payload = _district_boundary_payload(repo, district)
 
     private_overlays = _collect_private_campuses(repo, [campus])
     for item in private_overlays:
@@ -1926,7 +1882,7 @@ def _build_isd_profile_map_payload(repo: DataEngine, campus: Campus) -> dict:
         if priv_lat is not None and priv_lon is not None:
             points.append((priv_lat, priv_lon))
 
-    bounds = boundary_bounds or _bounds_from_points(points)
+    bounds = boundary_payload["bounds"] or _bounds_from_points(points)
 
     return {
         "origin": origin_entry,
@@ -1935,7 +1891,7 @@ def _build_isd_profile_map_payload(repo: DataEngine, campus: Campus) -> dict:
         "isdOrigins": isd_origins,
         "privateCampuses": private_overlays,
         "maxTransferCount": max_transfer,
-        "districtBoundary": boundary_geojson,
+        **boundary_payload,
         "bounds": bounds,
     }
 
@@ -2005,7 +1961,8 @@ def _build_private_profile_map_payload(repo: DataEngine, campus: Campus) -> dict
     boundary_geojson, boundary_bounds = None, None
     features, boundary_points = [], []
     for district, relation in zip(containing, relations, strict=True):
-        geometry, bounds = _district_boundary_payload(repo, district)
+        projected = _district_boundary_payload(repo, district)
+        geometry, bounds = projected["districtBoundary"], projected["bounds"]
         if geometry:
             if geometry.get("type") == "FeatureCollection":
                 features.extend({**feature, "properties": {**feature.get("properties", {}), **relation}}
@@ -2524,7 +2481,7 @@ def _release_validation(repo: DataEngine) -> dict[str, Any]:
 
 def _district_classification_counts(repo: DataEngine) -> dict[str, int]:
     return {
-        "traditional_boundary_count": sum(is_traditional_district(d) and d.polygon is not None for d in repo._districts.values()),
+        "traditional_boundary_count": sum(is_traditional_district(d) and d.meta.get("district_boundary_status") == "available" for d in repo._districts.values()),
         "district_missing_subtype_count": sum(not d.meta.get("organization_sub_type") for d in repo._districts.values()),
     }
 
@@ -2804,6 +2761,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
             _materialize_percent_enrollment_change(repo)
             for campus in repo._campuses.values():
                 campus.meta.update(repo.catalog.charter_transfer_summary(campus))
+            _record_district_boundary_status(repo)
             validation = _release_validation(repo)
             boundaries = _save_boundary_store(repo, districts_fp, campuses_fp)
             maps = _save_map_store(repo, districts_fp, campuses_fp)

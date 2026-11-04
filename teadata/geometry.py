@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import Any, List, Tuple
+from collections.abc import Mapping
 import math
 
 try:
@@ -31,7 +32,34 @@ __all__ = [
     "district_centroid_xy",
     "probably_lonlat",
     "GeoField",
+    "district_boundary_geometry",
+    "district_boundary_issue",
 ]
+
+def district_boundary_geometry(district: Any) -> Any:
+    """Read the original geometry, including a polygon held from use."""
+    boundary = getattr(district, "boundary", None)
+    return getattr(district, "polygon", None) if boundary is None else boundary
+
+
+def district_boundary_issue(boundary: Any) -> str | None:
+    """Return the reason a supplied publisher geometry cannot be used."""
+    from shapely.errors import ShapelyError
+    from shapely.geometry import shape
+    from shapely.validation import explain_validity
+
+    try:
+        geometry = shape(boundary) if isinstance(boundary, Mapping) else boundary
+        if geometry.geom_type not in {"Polygon", "MultiPolygon"} or geometry.is_empty:
+            return "Expected a nonempty polygon or multipolygon"
+        if not geometry.is_valid:
+            return explain_validity(geometry)
+        minx, miny, maxx, maxy = geometry.bounds
+        if not (-180 <= minx <= maxx <= 180 and -90 <= miny <= maxy <= 90):
+            return "Boundary coordinates are outside WGS84 limits"
+    except (ShapelyError, AttributeError, IndexError, KeyError, TypeError, ValueError) as error:
+        return str(error) or type(error).__name__
+    return None
 
 
 def point_in_polygon(

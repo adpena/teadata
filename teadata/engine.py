@@ -41,6 +41,8 @@ from .geometry import (
     MultiPolygon,
     ShapelyPoint,
     ShapelyPolygon,
+    district_boundary_geometry,
+    district_boundary_issue,
     euclidean,
     haversine_miles,
     point_in_polygon,
@@ -937,10 +939,10 @@ class DataEngine:
                     )
                 )
             return None
-        boundary = getattr(district, "boundary", None) or getattr(
-            district, "polygon", None
-        )
+        boundary = district_boundary_geometry(district)
         if boundary is not None:
+            if required and SHAPELY and hasattr(boundary, "geom_type") and (issue := district_boundary_issue(boundary)):
+                raise ValueError(f"Cannot use boundary for {district.district_number}: {issue}")
             if getattr(district, "boundary", None) is None:
                 try:
                     district.boundary = boundary
@@ -980,6 +982,8 @@ class DataEngine:
                     )
                 )
             return None
+        if required and SHAPELY and (issue := district_boundary_issue(geom)):
+            raise ValueError(f"Cannot use boundary for {key}: {issue}")
         try:
             district.boundary = geom
         except Exception:
@@ -2039,8 +2043,7 @@ class DataEngine:
         if district is None:
             return []
 
-        self.ensure_boundary(district, required=True, context=label)
-        poly = getattr(district, "polygon", None) or getattr(district, "boundary", None)
+        poly = self.ensure_boundary(district, required=True, context=label)
         if poly is None:
             return []
 
@@ -2048,7 +2051,7 @@ class DataEngine:
         if SHAPELY and hasattr(poly, "bounds"):
             bbox_cands = self._bbox_candidates(poly)
             if bbox_cands:
-                prep = getattr(district, "prepared", None)
+                prep = getattr(district, "prepared", None) if poly is getattr(district, "polygon", None) else None
                 out_bb: List[Campus] = []
                 for c in bbox_cands:
                     try:
@@ -2186,7 +2189,7 @@ class DataEngine:
             districts, geometries = [], []
             for district in self._districts.values():
                 geometry = self.ensure_boundary(district)
-                if geometry is not None and hasattr(geometry, "is_empty") and not geometry.is_empty:
+                if geometry is not None and district_boundary_issue(geometry) is None:
                     districts.append(district)
                     geometries.append(geometry)
             cached = (STRtree(geometries), districts)
