@@ -3958,6 +3958,131 @@ data_sources:
               scope: campus
               tables:
                 four_year_longitudinal_rate: data/tapr/raw/2024-c-COMP4.csv
+    2025:
+      path: data/tapr/raw/2025-c-COMP4-offered-original.csv
+      metadata:
+        title: 2025 TAPR Campus Four-Year Longitudinal Rates, Class of 2024 (COMP4)
+        publisher: Texas Education Agency
+        version: '2025'
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        period:
+          kind: unknown
+        metrics:
+          four_year_longitudinal_graduation_rate_all_students:
+            field: campus_2024_4_year_longitudinal_graduates_all_students_rate
+            unit: percent
+            period:
+              kind: as_of
+              as_of: '2024-08-31'
+          four_year_federal_graduation_rate_without_exclusions_all_students:
+            field: campus_2024_4_year_federal_graduation_rate_without_exclusions_gr_9_12_graduates_all_students_rate
+            unit: percent
+            period:
+              kind: as_of
+              as_of: '2024-08-31'
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          title: Complete original 2024–25 campus COMP4 CSV and ordered controls
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          provenance_ids:
+          - dd89547712eb89f921577cce52010de349c9ded5d718d2364eb11ce307550f23
+          reviewed_sha256: 2af9b3442e026d09136945a869416376a705cc9caae5ee070346bc5216442d46
+        - reference_id: menu
+          role: source_notes
+          title: 2024–25 all-campus TAPR family menu
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&tapr=all_c&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr.sas
+          provenance_ids:
+          - af730f6caf7c16a3e6fc7b111021f03a9e840ca69ffe129a5d8348dccae8b18b
+          reviewed_sha256: e6135b4c5b86d292a7bec614003c6427705f8bacce568f8e413b34c1f4492f43
+        - reference_id: selection
+          role: source_notes
+          title: 2024–25 campus COMP4 selector and checked controls
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+          provenance_ids:
+          - b63cf5c4269d19e6166de4305a351b0572fb349ce59b15b1b4919e0f27a0b857
+          reviewed_sha256: 638737df84442f88629ed0e577c202c2eb7d252e57cd792f86250b9934cf7bca
+        - reference_id: dictionary
+          role: data_dictionary
+          title: 2024–25 campus COMP4 publisher dictionary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=C&dsname=COMP4&dd=attendgrad&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          provenance_ids:
+          - 4fd934231c52fce656dac5a66ee2ac006d9dc7d601bba60520a30d41cc565fec
+          reviewed_sha256: a9fa0004e2246e003d02c3e352b03b5406f3016b544a83508f05cf35f7124fe9
+        - reference_id: glossary
+          role: glossary
+          url: https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf
+          title: Applicable 2024–25 TAPR glossary; reference only
+          status: available
+          provenance_ids:
+          - e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db
+          reviewed_sha256: 846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416
+        - reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html
+          title: Applicable 2024–25 TAPR masking methodology
+          status: available
+          provenance_ids:
+          - 6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554
+          reviewed_sha256: 7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8
+        - reference_id: garland_high_attendance_graduation_report
+          role: source_notes
+          title: Garland High School 2024–25 TPRS attendance, graduation, and dropout rates
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=057909002&lev=C&prgopt=reports%2Ftapr%2Fattendgrad.sas
+          provenance_ids:
+          - 2204ce373764c492f46e35f61b8b58e376aa5fbb3f2bfa1521d429c856b9bd02
+          reviewed_sha256: 62c912dfa7afed49b9cd79b7a07383a56c0a6ceccbf4764dd10add3ac0d5b53c
+        - reference_id: marathon_attendance_graduation_report
+          role: source_notes
+          title: Marathon campus 2024–25 TPRS attendance, graduation, and dropout rates
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=022902001&lev=C&prgopt=reports%2Ftapr%2Fattendgrad.sas
+          provenance_ids:
+          - ed8b60fee4cfd0e3b542ff0a6e9bd605a9fc5ef99f0404e9a2d501229a44748f
+          reviewed_sha256: 43e4f29f94b990ca132307498c0dbdc4cbe0902bb13422aa6f3f858d20769cd4
+        - reference_id: garland_middle_attendance_graduation_report
+          role: source_notes
+          title: Sam Houston Middle School 2024–25 TPRS attendance, graduation, and dropout rates
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=057909043&lev=C&prgopt=reports%2Ftapr%2Fattendgrad.sas
+          provenance_ids:
+          - 52c989676a2cc4423f423f4ef13d247a0cc081fe4ea65a296edbb930a71d272d
+          reviewed_sha256: 2f381a3f6bbb1be6da0b7d8c2d84b37841418c2afccf7d3bdcc77fdfff5d936c
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2025--four-year-longitudinal-rate-crosswalk.json
+          title: TEA Data complete source-only header/layout and ordered dictionary-occurrence contract
+          status: available
+          provenance_ids: []
+          reviewed_sha256: bcdf49a1156031cdabd3e8c4093c1b8d18c8af072ef5d21d127b6111e2137cb0
+        notes: >-
+          Complete source-only campus COMP4 download. The 2024–25 TPRS campus
+          report confirms the Class of 2024 all-students ordinary longitudinal
+          graduation rate (CAGC4X24R, 93.4%) and federal graduation rate without
+          exclusions (CAGC424R, 91.7%) for Garland High School. The applicable
+          glossary gives a 2020–21 first ninth grade and August 31, 2024 diploma
+          cutoff for both. The cohorts follow distinct inclusion rules. Marathon
+          shows an asterisk in both campus rate fields, corresponding to raw -1.
+          Sam Houston Middle School shows dashes where both raw fields are blank. The
+          reason for other blanks remains unknown. These checks cover the two
+          rate fields. Raw strings, identity columns, headings, ordered dictionary
+          occurrences and original acquisition dates are preserved. The other
+          periods and units stay unknown. The source profile applies no value
+          policy or estimation.
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2025--four-year-longitudinal-rate-crosswalk.json
+            tapr_source:
+              scope: campus
+              tables:
+                four_year_longitudinal_rate: data/tapr/raw/2025-c-COMP4-offered-original.csv
   district_tapr_four_year_longitudinal_rate:
     2024:
       path: data/tapr/raw/2024-d-COMP4.csv
@@ -4172,7 +4297,7 @@ data_sources:
             title: "TEA Data complete source-only header/layout and ordered dictionary-occurrence contract"
             status: "available"
             provenance_ids: []
-            reviewed_sha256: "2497b7848f3bc79cdbd7d760b6c1935dddf6196326f0330a4e0970a5cf12f155"
+            reviewed_sha256: "bcdf49a1156031cdabd3e8c4093c1b8d18c8af072ef5d21d127b6111e2137cb0"
         notes: >-
           Complete source-only COMP4 download. The same-edition Austin ISD TPRS
           report confirms the Class of 2024 all-students ordinary longitudinal

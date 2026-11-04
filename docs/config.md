@@ -545,16 +545,18 @@ bounded producer migration. No released/default catalog or app behavior is
 activated by this source contract.
 Registration does not prepare, publish or activate these sources.
 
-The 2025 district outcome originals are also explicit `source` opt-ins:
+The 2025 outcome originals are also explicit `source` opt-ins:
 
-| Dataset / preparation family suffix | Publisher file | Returned columns | Ordered dictionary occurrences |
-| --- | --- | ---: | ---: |
-| `four_year_longitudinal_rate` | COMP4 | 226 | 224 |
-| `college_career_military_readiness` | GRAD1 | 277 | 396 |
-| `college_readiness_components` | GRAD2 | 123 | 165 |
+| Dataset / preparation family suffix | Scope | Publisher file | Returned columns | Ordered dictionary occurrences |
+| --- | --- | --- | ---: | ---: |
+| `four_year_longitudinal_rate` | Campus | COMP4 | 228 | 224 |
+| `four_year_longitudinal_rate` | District | COMP4 | 226 | 224 |
+| `college_career_military_readiness` | District | GRAD1 | 277 | 396 |
+| `college_readiness_components` | District | GRAD2 | 123 | 165 |
 
-Prefix each dataset with `district_tapr_`. The exact raw CSV labels, codes,
-1,208 district records and every dictionary occurrence are retained. COMP4
+Prefix each dataset with `campus_tapr_` or `district_tapr_` by scope. The sources
+retain the exact CSV labels, codes, 9,084 campus COMP4 rows, 1,208 district rows
+per family, and every dictionary occurrence. COMP4
 labels identify Class of 2024; the applicable glossary describes entry into
 ninth grade in 2020–21 and a diploma cutoff of August 31, 2024. Its ordinary
 longitudinal and federal without-exclusions populations retain separate code
@@ -564,11 +566,15 @@ GRAD2 AP/IB criteria and dual-credit readiness are not E3/ERC graduate-ever-cour
 participation measures. Repeated denominator dictionary contexts remain
 discoverable without duplicating physical columns.
 
-Two COMP4 Class of 2024 rates have a reviewed percent unit and an August 31,
-2024 diploma cutoff. The Austin ISD attendance and graduation report matches
-the raw download for the ordinary longitudinal rate (`DAGC4X24R`, 92.3%) and
-the federal rate without exclusions (`DAGC424R`, 90.2%). The cohorts follow
-different rules.
+Two COMP4 Class of 2024 rates per scope have a reviewed percent unit and an
+August 31, 2024 diploma cutoff. The Austin ISD attendance and graduation report
+matches the ordinary longitudinal rate (`DAGC4X24R`, 92.3%) and the federal rate
+without exclusions (`DAGC424R`, 90.2%). Garland High School confirms the campus
+rates (`CAGC4X24R`, 93.4%, and `CAGC424R`, 91.7%). Marathon's two campus rates
+show asterisks in the report and `-1` in the CSV. Sam Houston Middle School's
+two campus rates show dashes in the report and blank CSV fields. The reason
+for other blanks remains unknown. The two graduation cohorts follow different
+inclusion rules.
 
 Five GRAD1 and GRAD2 rates have a reviewed percent unit and 2023–24 annual-graduate period.
 The same-edition Austin ISD TPRS report matches the raw downloads for each:

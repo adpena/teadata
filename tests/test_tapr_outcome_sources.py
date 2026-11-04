@@ -59,12 +59,12 @@ def no_network(monkeypatch):
     monkeypatch.setattr(socket, 'create_connection', reject)
 
 
-def source_table(cfg, family):
-    dataset = 'district_tapr_' + family
+def source_table(cfg, family, scope='district'):
+    dataset = f'{scope}_tapr_{family}'
     contract = cfg.column_contract(dataset, 2025, reader_profile='source')
     assert contract is not None
-    branch, = parse_column_schema(contract['text'].encode())['datasets']
-    assert branch['dataset'] == dataset and branch['edition'] == '2025'
+    branch, = (item for item in parse_column_schema(contract['text'].encode())['datasets']
+               if item['dataset'] == dataset and item['edition'] == '2025')
     assert branch['source_only'] is True
     table, = branch['tables']
     return table
@@ -125,6 +125,61 @@ def test_complete_outcome_discovery_stays_source_only(family, width, occurrences
             pytest.fail('Default reader attempted to open a source-only CSV')
         return original_open(path, *args, **kwargs)
     monkeypatch.setattr(Path, 'open', no_source_open)
+    with pytest.raises(ContractError, match='Reader profile is required'):
+        cfg.load_df(dataset, 2025)
+
+
+def test_campus_comp4_preserves_scope_and_qualifies_only_two_rates():
+    cfg = load_config()
+    family = 'four_year_longitudinal_rate'
+    dataset = 'campus_tapr_' + family
+    table = source_table(cfg, family, 'campus')
+    assert table['layout'] == {'label_record': 1, 'code_record': 2, 'first_data_record': 3,
+                               'last_data_record': 9086, 'annotations': []}
+    assert len(table['fields']) == 228 and len(table['dictionary_records']) == 224
+    assert [(row['code'], row['field']) for row in table['fields'][:4]] == [
+        ('CAMPUS', 'campus_number'), ('CAMPNAME', 'campus_name'),
+        ('DISTRICT', 'district_number'), ('DISTNAME', 'district_name'),
+    ]
+    assert all(row['disposition'] == 'identity' for row in table['fields'][:4])
+    records = cfg.header_records(dataset, edition='2025', reader_profile='source')
+    by_code = {row['code']: row for row in records}
+    ordinary, federal = by_code['CAGC4X24R'], by_code['CAGC424R']
+    assert ordinary['label'] == federal['label']
+    assert ordinary['field'] != federal['field']
+    assert ordinary['dictionary_occurrences'][0]['publisher_context']['heading'] == '4-Year Longitudinal Rate (Gr 9-12)'
+    assert federal['dictionary_occurrences'][0]['publisher_context']['heading'] == '4-Year Federal Graduation Rate Without Exclusions (Gr 9-12)'
+    assert {row['code']: row['period'] for row in records if row['period'] != UNKNOWN} == {
+        'CAGC4X24R': COMP4_RATE_PERIOD, 'CAGC424R': COMP4_RATE_PERIOD,
+    }
+
+    metadata = cfg.resolve_dataset(dataset, 2025, reader_profile='source').metadata
+    assert metadata.period.to_dict() == UNKNOWN
+    assert metadata.value_policy is None and metadata.estimation is None
+    assert {name: metric.to_dict() for name, metric in metadata.metrics.items()} == {
+        name: {'field': by_code['C' + district_code[1:]]['field'], 'period': COMP4_RATE_PERIOD, 'unit': 'percent'}
+        for name, district_code in QUALIFIED_RATES[family].items()
+    }
+    references = {ref.reference_id: ref for ref in metadata.references}
+    original = references['csv_headers']
+    assert original.reviewed_sha256 == table['input_sha256']
+    store = ProvenanceStore(ROOT / 'provenance')
+    graph = validate_record_graph(store.read_record, [
+        receipt for ref in metadata.references for receipt in ref.provenance_ids])
+    raw, = (graph[receipt] for receipt in original.provenance_ids)
+    assert raw['artifact']['sha256'] == table['input_sha256']
+    assert ('sumlev', 'C') in map(tuple, raw['parameters']['form_controls'])
+    assert ('dsname', 'COMP4') in map(tuple, raw['parameters']['form_controls'])
+    for name, campus in (('garland_high', '057909002'), ('marathon', '022902001'),
+                         ('garland_middle', '057909043')):
+        witness = references[f'{name}_attendance_graduation_report']
+        report, = (graph[receipt] for receipt in witness.provenance_ids)
+        assert report['requested_url'] == witness.url
+        assert f'ccyy=2025&id={campus}&lev=C' in report['requested_url']
+        assert report['artifact']['sha256'] == witness.reviewed_sha256
+
+    assert cfg.is_source_only(dataset, 2025) and cfg.column_schema(dataset, 2025) is None
+    assert dataset not in _registry
     with pytest.raises(ContractError, match='Reader profile is required'):
         cfg.load_df(dataset, 2025)
 
