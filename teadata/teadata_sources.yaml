@@ -4093,7 +4093,19 @@ data_sources:
         period:
           kind: "unknown"
         identifiers: []
-        metrics: {}
+        metrics:
+          four_year_longitudinal_graduation_rate_all_students:
+            field: district_2024_4_year_longitudinal_graduates_all_students_rate
+            unit: percent
+            period:
+              kind: as_of
+              as_of: '2024-08-31'
+          four_year_federal_graduation_rate_without_exclusions_all_students:
+            field: district_2024_4_year_federal_graduation_rate_without_exclusions_gr_9_12_graduates_all_students_rate
+            unit: percent
+            period:
+              kind: as_of
+              as_of: '2024-08-31'
         value_policy: null
         estimation: null
         provenance_ids: []
@@ -4146,6 +4158,14 @@ data_sources:
             provenance_ids:
               - "6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554"
             reviewed_sha256: "7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8"
+          - reference_id: austin_isd_attendance_graduation_report
+            role: source_notes
+            title: Austin ISD 2024–25 TPRS attendance, graduation, and dropout rates report
+            status: available
+            url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=227901&lev=D&prgopt=reports/tapr/attendgrad.sas
+            provenance_ids:
+              - eb10a4c80ae60282e1f6ae612af13ede82aaffe93740011f4dde9cf438060a21
+            reviewed_sha256: 4ff11945c060d9a3c0f7d33eaffb9fbf6417ec583ad29231abe402c5b927fe5a
           - reference_id: "columns_source"
             role: "schema"
             path: "schemas/tapr--2025--four-year-longitudinal-rate-crosswalk.json"
@@ -4153,7 +4173,18 @@ data_sources:
             status: "available"
             provenance_ids: []
             reviewed_sha256: "2497b7848f3bc79cdbd7d760b6c1935dddf6196326f0330a4e0970a5cf12f155"
-        notes: "Source-only complete original with every offered checked variable and numerator/denominator/rate. All raw fields remain exact strings. Publisher edition 2025 is not a field measurement period. Table/field period, units, applied value policy and estimation remain unknown; dictionary Number is descriptive, not scientific qualification. All ordered dictionary occurrences and literal headings/locators are retained, including shared denominator contexts. Immutable original acquisition dataset names, controls and download dates are bound through csv_headers without relabeling the HTTP receipts. No default reader, enrichment registration, entity hydration, released 127 replacement or activation is introduced. No State/Region aggregate, Bonus funding, ERC graduate-ever-course proxy, E3 correction or temporal comparability is claimed. Literal Class 2024 labels. The applicable 2024–25 glossary describes first ninth grade 2020–21 and diploma cutoff August 31, 2024; cohort/cutoff context remains distinct from report edition. Federal without-exclusions fields use their exact separate dictionary heading as a reviewed naming qualifier; no population equivalence is inferred."
+        notes: >-
+          Complete source-only COMP4 download. The same-edition Austin ISD TPRS
+          report confirms the Class of 2024 all-students ordinary longitudinal
+          graduation rate (DAGC4X24R, 92.3%) and federal graduation rate without
+          exclusions (DAGC424R, 90.2%). The applicable glossary gives a 2020–21
+          first ninth grade and August 31, 2024 diploma cutoff for both. The
+          ordinary and federal cohorts retain distinct rules. The report does
+          not independently confirm the count fields. The family period and
+          other field periods and units remain unknown. Raw strings, literal
+          headings, dictionary occurrences and original acquisitions are
+          preserved. No value policy, estimate, State or regional aggregate,
+          temporal equivalence, default reader, enrichment or release is added.
       reader:
         profiles:
           source:
@@ -6319,6 +6350,8 @@ data_sources:
           87.8% for this rate. The family period and other field periods and units
           remain unknown. The public report does not independently confirm the
           numerator or denominator. No value policy or estimate is applied.
+          In the same Austin report, the 2023–24 American Indian rate is masked
+          with an asterisk, corresponding to the CSV value -1 in DI0GP24R.
           All raw fields, including blanks and -1, stay exact strings. Ordered
           dictionary occurrences retain shared denominator contexts. Original
           acquisition receipts preserve the publisher's controls and dates.
@@ -6451,7 +6484,9 @@ data_sources:
           same-edition Austin ISD TPRS report. The public report does not
           independently confirm the numerator or denominator. The family
           period, other field periods and units, and temporal comparability
-          remain unknown. No value policy or estimate is applied. Raw strings,
+          remain unknown. The same Austin report masks the 2023–24 American
+          Indian rates with asterisks, corresponding to CSV -1 values in
+          DI0GY24R and DI0GUA24R. No value policy or estimate is applied. Raw strings,
           ordered dictionary occurrences, shared denominator contexts and
           original acquisition receipts are preserved. These criteria are
           separate from ERC course participation and Outcomes Bonus funding.

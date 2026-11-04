@@ -22,7 +22,12 @@ from teadata.teadata_config import Config, load_config
 ROOT = Path(__file__).resolve().parents[1]
 UNKNOWN = {'kind': 'unknown'}
 CCMR_RATE_PERIOD = {'kind': 'school_year', 'start_year': 2023, 'end_year': 2024}
+COMP4_RATE_PERIOD = {'kind': 'as_of', 'as_of': '2024-08-31'}
 QUALIFIED_RATES = {
+    'four_year_longitudinal_rate': {
+        'four_year_longitudinal_graduation_rate_all_students': 'DAGC4X24R',
+        'four_year_federal_graduation_rate_without_exclusions_all_students': 'DAGC424R',
+    },
     'college_career_military_readiness': {
         'ccmr_annual_graduates_all_students_rate': 'DA0GP24R',
     },
@@ -74,23 +79,26 @@ def test_complete_outcome_discovery_stays_source_only(family, width, occurrences
     assert metadata.version == '2025' and metadata.period.to_dict() == UNKNOWN
     assert metadata.value_policy is None and metadata.estimation is None
     assert metadata.field_year is None and metadata.provenance_ids == ()
-    qualified = QUALIFIED_RATES.get(family, {})
+    qualified = QUALIFIED_RATES[family]
+    is_comp4 = family == 'four_year_longitudinal_rate'
+    period = COMP4_RATE_PERIOD if is_comp4 else CCMR_RATE_PERIOD
+    reference_id = 'austin_isd_attendance_graduation_report' if is_comp4 else 'austin_isd_ccmr_report'
     fields_by_code = {field['code']: field['field'] for field in table['fields']}
     assert {name: metric.to_dict() for name, metric in metadata.metrics.items()} == {
-        name: {'field': fields_by_code[code], 'period': CCMR_RATE_PERIOD, 'unit': 'percent'}
+        name: {'field': fields_by_code[code], 'period': period, 'unit': 'percent'}
         for name, code in qualified.items()
     }
-    if qualified:
-        witness, = [ref for ref in metadata.references if ref.reference_id == 'austin_isd_ccmr_report']
-        record_id, = witness.provenance_ids
-        store = ProvenanceStore(ROOT / 'provenance')
-        graph = validate_record_graph(store.read_record, [record_id])
-        record = graph[record_id]
-        assert witness.role == 'source_notes' and witness.status == 'available'
-        assert record['method'] == 'download' and record['source_metadata']['version'] == '2025'
-        assert witness.url and witness.url == record['requested_url']
-        assert 'ccyy=2025&id=227901&lev=D' in witness.url
-        assert witness.reviewed_sha256 == record['artifact']['sha256']
+    witness, = [ref for ref in metadata.references if ref.reference_id == reference_id]
+    record_id, = witness.provenance_ids
+    store = ProvenanceStore(ROOT / 'provenance')
+    graph = validate_record_graph(store.read_record, [record_id])
+    record = graph[record_id]
+    assert witness.role == 'source_notes' and witness.status == 'available'
+    assert record['method'] == 'download' and record['source_metadata']['version'] == '2025'
+    assert witness.url and witness.url == record['requested_url']
+    assert 'ccyy=2025&id=227901&lev=D' in witness.url
+    assert witness.url.endswith('/attendgrad.sas' if is_comp4 else '%2Fccmr.sas')
+    assert witness.reviewed_sha256 == record['artifact']['sha256']
     original, = [ref for ref in metadata.references if ref.reference_id == 'csv_headers']
     assert original.role == 'source_notes' and original.provenance_ids == (receipt,)
     assert original.reviewed_sha256 == table['input_sha256'] == raw_sha
@@ -103,7 +111,7 @@ def test_complete_outcome_discovery_stays_source_only(family, width, occurrences
     records = cfg.header_records(dataset, edition='2025', reader_profile='source')
     assert len(records) == width
     assert {row['code']: row['period'] for row in records if row['period'] != UNKNOWN} == {
-        code: CCMR_RATE_PERIOD for code in qualified.values()
+        code: period for code in qualified.values()
     }
     for record in records:
         assert record['dictionary_occurrences'] == [row for row in table['dictionary_records']

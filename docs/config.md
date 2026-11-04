@@ -564,7 +564,13 @@ GRAD2 AP/IB criteria and dual-credit readiness are not E3/ERC graduate-ever-cour
 participation measures. Repeated denominator dictionary contexts remain
 discoverable without duplicating physical columns.
 
-Five rates have a reviewed percent unit and 2023–24 annual-graduate period.
+Two COMP4 Class of 2024 rates have a reviewed percent unit and an August 31,
+2024 diploma cutoff. The Austin ISD attendance and graduation report matches
+the raw download for the ordinary longitudinal rate (`DAGC4X24R`, 92.3%) and
+the federal rate without exclusions (`DAGC424R`, 90.2%). The cohorts follow
+different rules.
+
+Five GRAD1 and GRAD2 rates have a reviewed percent unit and 2023–24 annual-graduate period.
 The same-edition Austin ISD TPRS report matches the raw downloads for each:
 
 | Family | Rate | All students | Economically disadvantaged |
@@ -573,9 +579,11 @@ The same-edition Austin ISD TPRS report matches the raw downloads for each:
 | GRAD2 | AP/IB exam criterion | `DA0GY24R` (36.4%) | `DE0GY24R` (16.0%) |
 | GRAD2 | Dual-credit criterion | `DA0GUA24R` (35.6%) | `DE0GUA24R` (24.4%) |
 
-The report does not provide independent numerator or denominator counts. Family
-periods and remaining field periods and units stay unknown. The source reader
-preserves blanks and `-1` as received and applies no value policy or estimation.
+The CCMR report also shows asterisks for Austin ISD's American Indian rates for
+all three measures. Those cells match `-1` in `DI0GP24R`, `DI0GY24R`, and
+`DI0GUA24R`. The reports do not provide independent numerator or denominator
+counts. Family periods and remaining field periods and units stay unknown. The
+source reader preserves blanks and `-1` and applies no value policy or estimation.
 The district rows carry no State or regional aggregate. The reviewed rates are
 available through the explicit source profile and do not enter the default release.
 
