@@ -7279,7 +7279,8 @@ data_sources:
           path: schemas/tapr--2025--college-career-military-readiness-crosswalk.json
           title: TEA Data complete source-only header/layout and ordered dictionary-occurrence contract
           status: available
-          provenance_ids: []
+          provenance_ids:
+          - "60ec90c63f74f6e3ce4a351991d4d2b4d136832a9679bfcf281aef4f5f8cb6ec"
           reviewed_sha256: 41f7550bd5dd18cce1f8c96615992d14bf00420a4c848bef78724958f4a65676
         notes: >-
           Complete source-only campus download. The listed percentage rates
@@ -7383,7 +7384,8 @@ data_sources:
             path: "schemas/tapr--2025--college-career-military-readiness-crosswalk.json"
             title: "TEA Data complete source-only header/layout and ordered dictionary-occurrence contract"
             status: "available"
-            provenance_ids: []
+            provenance_ids:
+              - "64e94e2be637c92403c695af89d8c0d53812327f489355368628c02fd2293954"
             reviewed_sha256: "41f7550bd5dd18cce1f8c96615992d14bf00420a4c848bef78724958f4a65676"
         notes: >-
           Annual-graduate CCMR, college readiness, and TSI source-only download.
@@ -7685,6 +7687,96 @@ data_sources:
               scope: "district"
               tables:
                 college_readiness_components: "data/tapr/raw/2025-d-GRAD2-offered-original.csv"
+  state_tapr_college_career_military_readiness:
+    2025:
+      path: "data/tapr/raw/2025-s-GRAD1-overall-ccmr.csv"
+      metadata:
+        title: "2024–25 TAPR State GRAD1 overall CCMR selection for 2023–24 annual graduates"
+        publisher: "Texas Education Agency"
+        version: "2025"
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        period:
+          kind: school_year
+          start_year: 2023
+          end_year: 2024
+        metrics:
+          ccmr_annual_graduates_all_students_rate:
+            field: state_2024_college_career_and_military_ready_graduates_all_students_rate
+            unit: percent
+          ccmr_annual_graduates_economically_disadvantaged_rate:
+            field: state_2024_college_career_and_military_ready_graduates_econ_disadv_rate
+            unit: percent
+        references:
+          - reference_id: "csv_headers"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+            title: "Published statewide overall CCMR CSV selection"
+            status: "available"
+            provenance_ids:
+              - "6f10975caeaf88bc25d9ada84399ab3c0add19e84544d3b8525f87ca19d57b95"
+            reviewed_sha256: "31c553d8ccb4b76c0856abdae68610ccbb1a2454326e4a7d2febcb8d8f527202"
+          - reference_id: "selection"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker"
+            title: "Published statewide GRAD1 controls"
+            status: "available"
+            provenance_ids:
+              - "e12f982a2fe0219a777254366fc851c9993e85ebb49b1a4033f52bd6482917fc"
+            reviewed_sha256: "908398f91f1ea7bc93e3625b8bffb4c5620f3cebe8bb8c6df0deeaeddee703f0"
+          - reference_id: "dictionary"
+            role: "data_dictionary"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=S&dsname=GRAD1&dd=ccmr&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+            title: "Published statewide GRAD1 data dictionary"
+            status: "available"
+            provenance_ids:
+              - "b5379cb99e8cc176f04d00ed38b679a0566bb57dfa00735a1080d336b1075a3a"
+            reviewed_sha256: "1a4dc5bf110eadf2dcf9c8f4e5f1c1b7bb3a67bf80e1396453c85876a3f8343f"
+          - reference_id: "state_ccmr_report"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=S&lev=S&prgopt=reports%2Ftapr%2Fccmr.sas"
+            title: "2024–25 statewide TPRS CCMR report"
+            status: "available"
+            provenance_ids:
+              - "8a610da9967dd2f7260e0e3c24be4a511bfbde185ffde35d07fc018585b297d2"
+            reviewed_sha256: "6882c2a981921acc5abab7d8da966ffe26ec40f0fe5062447fd304592c6405e7"
+          - reference_id: "glossary"
+            role: "glossary"
+            url: "https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf"
+            title: "2024–25 TAPR glossary"
+            status: "available"
+            provenance_ids:
+              - "e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db"
+            reviewed_sha256: "846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416"
+          - reference_id: "masking"
+            role: "masking_methodology"
+            url: "https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html"
+            title: "2024–25 TAPR masking methodology"
+            status: "available"
+            provenance_ids:
+              - "6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554"
+            reviewed_sha256: "7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8"
+          - reference_id: "columns_source"
+            role: "schema"
+            path: "schemas/tapr--2025--state-college-career-military-readiness-crosswalk.json"
+            title: "TEA Data statewide overall CCMR crosswalk"
+            status: "available"
+            provenance_ids:
+              - "429dfb98bfc48ff36520dc88b15a94e580c972308915f796c9c65ffcef50e11d"
+            reviewed_sha256: "09a482b7b9978ccb7f47512000ec1fb7e13116f855a35677636f9101533ec14d"
+        notes: >-
+          One statewide publisher observation for 2023–24 annual graduates.
+          The original selection requests only the overall CCMR fields.
+          The full statewide GRAD1 response ends with a publisher execution
+          error and is outside this source contract. The public report corroborates
+          the displayed rates. The CSV supplies the counts. This source is opt-in.
+      reader:
+        profiles:
+          source:
+            column_schema: "schemas/tapr--2025--state-college-career-military-readiness-crosswalk.json"
+            tapr_source:
+              scope: "state"
+              tables:
+                college_career_military_readiness: "data/tapr/raw/2025-s-GRAD1-overall-ccmr.csv"
   state_tapr_college_readiness_components:
     2025:
       path: "data/tapr/raw/2025-s-GRAD2-offered-original.csv"
@@ -9454,6 +9546,8 @@ schema:
     campus_tapr_college_readiness_components:
     - csv
     district_tapr_college_readiness_components:
+    - csv
+    state_tapr_college_career_military_readiness:
     - csv
     state_tapr_college_readiness_components:
     - csv

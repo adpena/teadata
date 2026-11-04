@@ -15,6 +15,7 @@ from .dataset_metadata import STATEWIDE_SINGLETON_GRAIN, ArtifactRef, DataPeriod
 from .entities import Campus, District
 from .identifiers import canonical_source_identifiers
 from .manifest import ContractError, canonical_json
+from .peims_courses import DATASET as COURSES, course_key_columns
 from .peims_leaves import PRIMARY_DISABILITY, SCOPES_BY_DATASET, _key_columns
 from .teadata_config import load_config
 from .values import MeasurementUnit, TokenRule, ValuePolicy, ValueStatus, measure
@@ -22,10 +23,10 @@ from .values import MeasurementUnit, TokenRule, ValuePolicy, ValueStatus, measur
 if TYPE_CHECKING:
     from .release import DataRelease
 
-FAMILY = "college_readiness_components"
+_TAPR_READINESS_FAMILIES = {"college_career_military_readiness", "college_readiness_components"}
 EDITION = 2025
-_GRAD2_RATE_POLICY = ValuePolicy(
-    "tapr_2025_grad2_reviewed_rates",
+_TAPR_RATE_POLICY = ValuePolicy(
+    "tapr_2025_reviewed_readiness_rates",
     {"-1": TokenRule(ValueStatus.SUPPRESSED, "TEA masked the postsecondary readiness rate")},
     reference_id="masking",
 )
@@ -34,10 +35,10 @@ _VALUE_STATUSES = frozenset(item.value for item in ValueStatus)
 Number = int | float
 
 
-@lru_cache(maxsize=3)
-def _reviewed_grad2(scope: str) -> tuple[str, str, DatasetMetadata]:
+@lru_cache(maxsize=6)
+def _reviewed_tapr(scope: str, family: str) -> tuple[str, str, DatasetMetadata]:
     config = load_config()
-    dataset = f"{scope}_tapr_{FAMILY}"
+    dataset = f"{scope}_tapr_{family}"
     request, = config.tapr_source_requests(dataset, EDITION)
     metadata = config.resolve_dataset(dataset, EDITION, exact=True, reader_profile="source").metadata
     revision = EditionKey.source_revision((request.mapping["input_sha256"],))
@@ -114,8 +115,8 @@ class _Projection:
         if not self.support:
             raw = row[field]
             if not isinstance(raw, str):
-                raise ContractError("GRAD2 rate must preserve its publisher token")
-            value = measure(raw, _GRAD2_RATE_POLICY, unit="percent", minimum=0, maximum=100)
+                raise ContractError("TAPR readiness rate must preserve its publisher token")
+            value = measure(raw, _TAPR_RATE_POLICY, unit="percent", minimum=0, maximum=100)
             status = "uninterpreted" if value.status == ValueStatus.INVALID else value.status.value
             return raw, status, value.numeric
 
@@ -145,7 +146,7 @@ def _projection(release: DataRelease, key: EditionKey, fields: list[str], *,
     field_support = {}
     if policy is None:
         if support is not None or set(plan["columns"]) != set(keys + fields):
-            raise ContractError("GRAD2 comparison requires exact raw columns")
+            raise ContractError("TAPR comparison requires exact raw columns")
     else:
         if support is None:
             raise ContractError("PEIMS comparison requires normalized values with raw and status support")
@@ -185,15 +186,18 @@ def _statistics(local: EditionKey, local_metadata: DatasetMetadata,
 def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionKey, metric: str,
                     dimensions: Mapping[str, str]) -> tuple[list[_Statistic], _Projection, _Projection]:
     key_column = f"{local.scope}_number"
+    course_pair = local.dataset == statewide.dataset == COURSES
+    if course_pair and local.scope != "district":
+        raise ContractError("Campus course comparisons are on hold pending publisher geography qualification")
     catalog = release.catalog
     local_metadata = catalog.metadata(local.dataset, edition=local)
     state_metadata = catalog.metadata(statewide.dataset, edition=statewide)
-    if local.dataset == statewide.dataset and local.dataset in SCOPES_BY_DATASET:
-        scopes = SCOPES_BY_DATASET[local.dataset]
+    if course_pair or (local.dataset == statewide.dataset and local.dataset in SCOPES_BY_DATASET):
+        scopes = {"state", "district"} if course_pair else SCOPES_BY_DATASET[local.dataset]
         if local.scope not in scopes or local.table != local.scope or statewide.table != "state":
             raise ContractError("Publisher PEIMS statistics are unavailable for the selected scope")
-        local_keys = _key_columns(local.dataset, local.scope)
-        state_keys = _key_columns(local.dataset, "state")
+        local_keys = course_key_columns(local.scope) if course_pair else _key_columns(local.dataset, local.scope)
+        state_keys = course_key_columns("state") if course_pair else _key_columns(local.dataset, "state")
         for edition, keys in ((local, local_keys), (statewide, state_keys)):
             if edition.grain != "one publisher row per " + " and ".join(keys):
                 raise ContractError("PEIMS comparison requires the reviewed publisher grain")
@@ -202,15 +206,16 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
         expected_dimensions = set(state_keys) - {"school_year"}
         if set(dimensions) != expected_dimensions:
             raise ContractError(f"Expected exact publisher dimensions {sorted(expected_dimensions)}")
-    elif (local.dataset == f"{local.scope}_tapr_{FAMILY}" and statewide.dataset == f"state_tapr_{FAMILY}"
-          and local.table == statewide.table == FAMILY and local.edition == str(EDITION)):
+    elif (local.table in _TAPR_READINESS_FAMILIES and local.table == statewide.table
+          and local.dataset == f"{local.scope}_tapr_{local.table}"
+          and statewide.dataset == f"state_tapr_{local.table}" and local.edition == str(EDITION)):
         if local.grain != f"one row per {key_column}" or statewide.grain != STATEWIDE_SINGLETON_GRAIN or dimensions:
-            raise ContractError("GRAD2 comparison requires the reviewed local grain and statewide singleton")
+            raise ContractError("TAPR comparison requires the reviewed local grain and statewide singleton")
         local_keys, state_keys = [key_column], []
-        left_revision, left_mapping, left_review = _reviewed_grad2(local.scope)
-        right_revision, right_mapping, right_review = _reviewed_grad2("state")
+        left_revision, left_mapping, left_review = _reviewed_tapr(local.scope, local.table)
+        right_revision, right_mapping, right_review = _reviewed_tapr("state", local.table)
         left_policy = right_policy = None
-        masking = next((ref for ref in left_review.references if ref.reference_id == _GRAD2_RATE_POLICY.reference_id), None)
+        masking = next((ref for ref in left_review.references if ref.reference_id == _TAPR_RATE_POLICY.reference_id), None)
         if masking is None or not masking.provenance_ids or masking not in local_metadata.references:
             raise ContractError("Statewide comparison requires the retained TAPR rate masking methodology")
     else:

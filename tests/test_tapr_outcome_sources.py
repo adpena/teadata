@@ -303,6 +303,27 @@ def test_literal_class_and_annual_graduate_contexts_do_not_become_other_populati
         assert 'Annual-graduate' in metadata.notes and 'Bonus' in metadata.notes and 'ERC' in metadata.notes
 
 
+def test_state_overall_ccmr_is_a_separate_successful_publisher_selection():
+    cfg = load_config()
+    dataset = 'state_tapr_college_career_military_readiness'
+    table = source_table(cfg, 'college_career_military_readiness', 'state')
+    source = cfg.resolve_dataset(dataset, 2025, exact=True, reader_profile='source')
+    fields = {row['code']: row['field'] for row in table['fields']}
+    assert len(fields) == 33 and len(table['dictionary_records']) == 396
+    assert table['layout']['first_data_record'] == table['layout']['last_data_record'] == 3
+    assert table['metric_period'] == source.metadata.period.to_dict() == CCMR_RATE_PERIOD
+    assert {name: definition.field for name, definition in source.metadata.metrics.items()} == {
+        'ccmr_annual_graduates_all_students_rate': fields['SA0GP24R'],
+        'ccmr_annual_graduates_economically_disadvantaged_rate': fields['SE0GP24R'],
+    }
+    raw_ref, = [ref for ref in source.metadata.references if ref.reference_id == 'csv_headers']
+    receipt, = raw_ref.provenance_ids
+    raw = ProvenanceStore(ROOT / 'provenance').read_record(receipt)
+    assert raw['artifact']['sha256'] == table['input_sha256']
+    assert [pair for pair in raw['parameters']['form_controls'] if pair[0] == 'key'] == [['key', '0GP24']]
+    assert cfg.is_source_only(dataset, 2025)
+
+
 def test_state_graduate_components_are_one_independent_source_observation():
     cfg = load_config()
     family = 'college_readiness_components'

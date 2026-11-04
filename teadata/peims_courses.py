@@ -41,6 +41,10 @@ _GEOGRAPHY_CONTEXT = {"state": (), "district": ("district_name", "charter_status
 _AGGREGATION = {"state": "STATE", "district": "COUNTYREGIONDISTRICT", "campus": "COUNTYREGIONDISTRICTCAMPUS"}
 
 
+def course_key_columns(scope: str) -> list[str]:
+    return ["school_year", *_GEOGRAPHY_KEYS[scope], "course_code"]
+
+
 @dataclass(frozen=True)
 class _CourseSource:
     year: int
@@ -57,7 +61,7 @@ class _CourseSource:
 
     @property
     def keys(self) -> list[str]:
-        return ["school_year", *_GEOGRAPHY_KEYS[self.scope], "course_code"]
+        return course_key_columns(self.scope)
 
     @property
     def rows(self) -> int:

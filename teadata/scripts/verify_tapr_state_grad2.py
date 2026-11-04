@@ -1,4 +1,4 @@
-"""Replay the reviewed 2024–25 statewide GRAD2 source and TPRS control offline."""
+"""Replay the reviewed 2024–25 statewide TAPR readiness selections offline."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from teadata.tapr_dictionary import extract_tapr_dictionary
 from teadata.teadata_config import load_config
 
 DATASET = "state_tapr_college_readiness_components"
+GRAD1_DATASET = "state_tapr_college_career_military_readiness"
 EDITION = 2025
 GROUPS = {
     "A": "State", "B": "AfricanAmerican", "H": "Hispanic", "W": "White",
@@ -31,12 +32,12 @@ MEASURES = {
 }
 
 
-def verify_rates(values: dict[str, str], rows: list[list[str]]) -> int:
+def verify_rates(values: dict[str, str], rows: list[list[str]], *, measures: dict[str, str] = MEASURES) -> int:
     heading = ["2024-25 College, Career, and Military Readiness (CCMR)"]
     if (rows.count(heading) != 1 or rows[rows.index(heading) + 1:rows.index(heading) + 2] != [["State"]]
             or rows.count(["AcademicYear", *GROUPS.values()]) != 1):
         raise ValueError("Unexpected statewide CCMR report edition, scope, or groups")
-    for measure, label in MEASURES.items():
+    for measure, label in measures.items():
         if rows.count([label]) != 1:
             raise ValueError(f"Expected one statewide CCMR heading for {measure}")
         observed = rows[rows.index([label]) + 1:rows.index([label]) + 2]
@@ -54,17 +55,18 @@ def verify_rates(values: dict[str, str], rows: list[list[str]]) -> int:
             expected.append(f"{rate:.1f}%")
         if observed != [expected]:
             raise ValueError(f"Statewide report rates differ for {measure}")
-    for group in GROUPS:
-        dual, onramps, union = (int(values[f"S{group}{measure}24N"])
-                                 for measure in ("0GUA", "0GZ", "DGG"))
-        if not max(dual, onramps) <= union <= dual + onramps:
-            raise ValueError(f"Invalid statewide dual-credit or OnRamps count for {group}")
-    return len(MEASURES) * len(GROUPS)
+    if "DGG" in measures:
+        for group in GROUPS:
+            dual, onramps, union = (int(values[f"S{group}{measure}24N"])
+                                     for measure in ("0GUA", "0GZ", "DGG"))
+            if not max(dual, onramps) <= union <= dual + onramps:
+                raise ValueError(f"Invalid statewide dual-credit or OnRamps count for {group}")
+    return len(measures) * len(GROUPS)
 
 
-def verify_state_grad2(store: ProvenanceStore) -> dict[str, int]:
+def _verify_source(store: ProvenanceStore, dataset: str, measures: dict[str, str]) -> dict[str, int]:
     cfg = load_config()
-    metadata = cfg.resolve_dataset(DATASET, EDITION, exact=True, reader_profile="source").metadata
+    metadata = cfg.resolve_dataset(dataset, EDITION, exact=True, reader_profile="source").metadata
     refs = {ref.reference_id: ref for ref in metadata.references if ref.provenance_ids}
     records = store.verify_record_closure([identifier for ref in refs.values() for identifier in ref.provenance_ids])
 
@@ -74,36 +76,46 @@ def verify_state_grad2(store: ProvenanceStore) -> dict[str, int]:
         record = records[identifier]
         digest = record["artifact"]["sha256"]
         if ref.reviewed_sha256 != digest or ref.url != record["requested_url"]:
-            raise ValueError(f"Statewide GRAD2 reference does not match its acquisition: {role}")
+            raise ValueError(f"Statewide TAPR reference does not match its acquisition: {role}")
         return store.verify_artifact(digest)
 
-    with TemporaryDirectory(prefix="teadata-state-grad2-") as temporary:
-        request, = cfg.tapr_source_requests(DATASET, EDITION, input_dir=temporary)
+    with TemporaryDirectory(prefix="teadata-state-readiness-") as temporary:
+        request, = cfg.tapr_source_requests(dataset, EDITION, input_dir=temporary)
         raw = original("csv_headers")
         copyfile(raw, request.path)
-        source, = cfg.read_tapr_sources(DATASET, EDITION, input_dir=temporary)
+        source, = cfg.read_tapr_sources(dataset, EDITION, input_dir=temporary)
     with raw.open(encoding="cp1252", newline="") as stream:
         labels, codes, values = csv.reader(stream, strict=True)
     fields = request.mapping["fields"]
     if (labels != [field["label"] for field in fields] or codes != [field["code"] for field in fields]
             or source.table.to_pylist() != [dict(zip(source.table.column_names, values, strict=True))]):
-        raise ValueError("Statewide GRAD2 source reader differs from the original CSV")
+        raise ValueError("Statewide TAPR source reader differs from the original CSV")
     occurrences = extract_tapr_dictionary(original("dictionary").read_bytes(), encoding="cp1252")
     if [item.column_record() for item in occurrences] != request.mapping["dictionary_records"]:
-        raise ValueError("Statewide GRAD2 dictionary differs from the reviewed occurrence mapping")
+        raise ValueError("Statewide TAPR dictionary differs from the reviewed occurrence mapping")
     rows = _Rows(original("state_ccmr_report").read_text(encoding="cp1252")).rows
     return {
         "raw_cells": len(values),
         "dictionary_occurrences": len(occurrences),
-        "displayed_rates": verify_rates(dict(zip(codes, values, strict=True)), rows),
+        "displayed_rates": verify_rates(dict(zip(codes, values, strict=True)), rows, measures=measures),
     }
+
+
+def verify_state_grad2(store: ProvenanceStore) -> dict[str, int]:
+    return _verify_source(store, DATASET, MEASURES)
+
+
+def verify_state_grad1(store: ProvenanceStore) -> dict[str, int]:
+    return _verify_source(store, GRAD1_DATASET, {"0GP": "College, Career, or Military Ready (Annual Graduates)"})
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--store", required=True, type=Path)
+    parser.add_argument("--family", choices=["GRAD1", "GRAD2"], default="GRAD2")
     args = parser.parse_args()
-    print(json.dumps(verify_state_grad2(ProvenanceStore(args.store)), sort_keys=True))
+    verifier = verify_state_grad1 if args.family == "GRAD1" else verify_state_grad2
+    print(json.dumps(verifier(ProvenanceStore(args.store)), sort_keys=True))
 
 
 if __name__ == "__main__":

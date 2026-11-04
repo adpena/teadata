@@ -596,6 +596,7 @@ The 2025 outcome originals are also explicit `source` opt-ins:
 | `four_year_longitudinal_rate` | District | COMP4 | 226 | 224 |
 | `college_career_military_readiness` | Campus | GRAD1 | 279 | 396 |
 | `college_career_military_readiness` | District | GRAD1 | 277 | 396 |
+| `college_career_military_readiness` | State | GRAD1 overall CCMR selection | 33 | 396 |
 | `college_readiness_components` | Campus | GRAD2 | 125 | 165 |
 | `college_readiness_components` | District | GRAD2 | 123 | 165 |
 | `college_readiness_components` | State | GRAD2 | 121 | 165 |
@@ -668,7 +669,14 @@ Replay the statewide evidence from a populated provenance store:
 
 ```sh
 uv run python -m teadata.scripts.verify_tapr_state_grad2 --store provenance
+uv run python -m teadata.scripts.verify_tapr_state_grad2 --family GRAD1 --store provenance
 ```
+
+The statewide GRAD1 selection retains all 33 requested overall CCMR fields
+for 2023–24 annual graduates and the complete publisher dictionary. All
+11 displayed rates match the separate statewide report. TEA's full GRAD1
+response ends with a SAS execution error. The comparison uses the separate
+successful overall CCMR download.
 
 Compare a district or campus query against the state with a pinned native
 release containing the two exact GRAD2 editions:
@@ -696,15 +704,20 @@ following families when the release contains both scopes.
 | Publisher family | Local scopes | Required dimensions |
 | --- | --- | --- |
 | TAPR 2025 GRAD2 | District, campus | None |
+| TAPR 2025 GRAD1 overall CCMR | District, campus | None |
 | PEIMS Student Program and Special Populations | District, campus | None |
 | PEIMS Student Enrollment by Ethnicity | District, campus | `ethnicity`, such as `"Hispanic/Latino"` |
 | PEIMS Primary Disability | District | None |
 | PEIMS Staff FTE and Salary | District | `staff_category` and `staff_role`, as published |
+| PEIMS Teacher FTE and Course Enrollment | District | `course_code`, as published |
 
 Pass dimensions as a sixth tuple element or the `dimensions` keyword.
 The result includes local and statewide values, their raw tokens and statuses,
 their unit and period, and local minus statewide. Percent comparisons also
 expose `difference_pp`. Counts, currency and FTE retain their own units.
+Course comparisons use the separate district and statewide reports for the
+same course code and school year. Course enrollment counts memberships at
+the PEIMS reporting date. Campus course comparison remains on geography hold.
 The 2023 and 2024 Developmental Delay interpretation hold excludes those
 observations from comparison.
 

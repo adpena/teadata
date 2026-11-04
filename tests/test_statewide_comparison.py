@@ -9,12 +9,13 @@ from teadata.column_schema import source_schema_fingerprint
 from teadata.dataset_metadata import DatasetMetadata, EditionKey, ResolvedDataset
 from teadata.entities import Campus, District
 from teadata.manifest import ContractError, canonical_json
+from teadata.peims_courses import DATASET as COURSES
 from teadata.provenance import ProvenanceStore
 from teadata.query import Query
 from teadata.release import DataRelease
 from teadata.scripts.build_tapr_profiles import prepare_profiles
 from teadata.source_parity import validate_source_parity
-from teadata.statewide import _reviewed_grad2
+from teadata.statewide import _reviewed_tapr
 from teadata.teadata_config import Config
 
 FAMILY = "college_readiness_components"
@@ -90,9 +91,9 @@ def comparison_release(tmp_path, monkeypatch):
     assert built["datasets"][editions["state"].dataset]["key_columns"] == []
     assert len(release.verify()) == 3
     monkeypatch.setattr("teadata.statewide.load_config", lambda: cfg)
-    _reviewed_grad2.cache_clear()
+    _reviewed_tapr.cache_clear()
     yield release, editions
-    _reviewed_grad2.cache_clear()
+    _reviewed_tapr.cache_clear()
 
 
 def test_statewide_operator_keeps_exact_values_and_distinguishes_unavailable(comparison_release):
@@ -150,3 +151,12 @@ def test_raw_parity_replays_the_statewide_row_without_a_geographic_key(compariso
                                    edition_ids=[editions["state"].identity])
     assert result["status"] == "PASS_RAW_PARITY"
     assert (result["coverage"]["raw_cells"], result["coverage"]["compared_cells"]) == (1, 2)
+
+
+def test_campus_course_geography_hold_precedes_any_leaf_or_catalog_read():
+    campus = Campus(uuid4(), None, "School", "", False, campus_number="057909002")
+    local = EditionKey(COURSES, "2025", "1" * 64, "campus", "campus", "reported campus course")
+    statewide = EditionKey(COURSES, "2025", "2" * 64, "state", "state", "reported state course")
+    with pytest.raises(ContractError, match="geography qualification"):
+        Query([campus], repo=None).compare_statewide(
+            release=None, local=local, statewide=statewide, dimensions={"course_code": "03100500"})

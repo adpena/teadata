@@ -232,9 +232,10 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
             dataset = scope + '_tapr_' + family
             assert list(current['data_sources'].pop(dataset)) == [2025]
             assert current['schema']['data_sources'].pop(dataset) == ['csv']
-    statewide = 'state_tapr_college_readiness_components'
-    assert list(current['data_sources'].pop(statewide)) == [2025]
-    assert current['schema']['data_sources'].pop(statewide) == ['csv']
+    for family in ('college_career_military_readiness', 'college_readiness_components'):
+        statewide = 'state_tapr_' + family
+        assert list(current['data_sources'].pop(statewide)) == [2025]
+        assert current['schema']['data_sources'].pop(statewide) == ['csv']
     for scope in ('campus', 'district'):
         versions = current['data_sources'][scope + '_tapr_four_year_longitudinal_rate']
         versions.pop(2025)
