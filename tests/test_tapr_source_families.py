@@ -193,6 +193,11 @@ def test_current_source_contracts_keep_explicit_edition_csv_opt_ins():
 
 def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     current = yaml.safe_load((ROOT / 'teadata/teadata_sources.yaml').read_text())
+    # The two 2026 PEIMS source-only registrations have their own exact contract tests.
+    for dataset in ('peims_student_enrollment_by_ethnicity', 'peims_student_programs_and_special_populations'):
+        assert list(current['data_sources'].pop(dataset)) == [2026]
+        assert current['schema']['data_sources'].pop(dataset) == ['csv']
+        assert current['value_policies'].pop(dataset + '_2026')['reference_id'] == 'peims_masking'
     # Remove only the explicitly added 2025 outcome opt-ins before reconstructing history.
     for scope in ('campus', 'district'):
         for family in ('college_career_military_readiness', 'college_readiness_components'):
