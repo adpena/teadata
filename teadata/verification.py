@@ -815,6 +815,19 @@ def _validate_native_release(path: Path, pin: str, source_store: Path) -> dict[s
             "structural_integrity": True, "parity": parity, "publisher_witnesses": witnesses}
 
 
+def _validate_actual_pwr_controls(path: Path, pin: str, source_store: Path) -> dict[str, Any]:
+    from teadata.manifest import ContractError
+    from teadata.native_financial_accounts import qualify_actual_pwr
+    from teadata.release import DataRelease
+
+    try:
+        release = DataRelease(path, expected_sha256=pin, offline=True)
+        return qualify_actual_pwr(release, _retained_store(release.path.parent / "provenance"),
+                                  _retained_store(source_store))
+    except ContractError as error:
+        raise ReceiptError(str(error)) from error
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--kind", choices=("library", "app"), required=True)
@@ -829,6 +842,8 @@ def main() -> None:
     parser.add_argument("--source-parity", type=Path, help="Offline raw fidelity check for selected supported native release editions")
     parser.add_argument("--native-release", type=Path, help="Qualify an exact reviewed native bundle offline")
     parser.add_argument("--native-pin", help="Trusted manifest SHA-256 for --native-release")
+    parser.add_argument("--actual-pwr-controls", action="store_true",
+                        help="Check only the reviewed FY2023 and FY2025 district Actual PWR operating-dollar controls")
     parser.add_argument("--source-store", type=Path, help="Existing retained ProvenanceStore for source or native checks")
     parser.add_argument("--source-edition", action="append", default=[], help="Exact edition ID for --source-parity; repeat explicitly")
     args = parser.parse_args()
@@ -838,6 +853,8 @@ def main() -> None:
         parser.error("Paired mode applies to the app")
     if args.verify and args.verify_latest:
         parser.error("Choose --verify or --verify-latest")
+    if args.actual_pwr_controls and (args.native_release is None or args.source_parity is not None):
+        parser.error("Actual PWR controls require --native-release and run separately from source parity")
     if args.install_hook and (args.verify or args.verify_latest or args.release):
         parser.error("Install the hook separately from verification or release checks")
     if args.source_parity or args.native_release:
@@ -862,6 +879,14 @@ def main() -> None:
                 raise SystemExit(2)
             return
         if args.native_release:
+            if args.actual_pwr_controls:
+                from teadata.native_financial_accounts import PASS_ACTUAL_PWR_CONTROLS
+
+                report = _validate_actual_pwr_controls(args.native_release, args.native_pin, args.source_store)
+                print(json.dumps(report, sort_keys=True, ensure_ascii=False, allow_nan=False))
+                if report["status"] != PASS_ACTUAL_PWR_CONTROLS:
+                    raise SystemExit(2)
+                return
             report = _validate_native_release(args.native_release, args.native_pin, args.source_store)
             print(json.dumps(report, sort_keys=True, ensure_ascii=False, allow_nan=False))
             if report["status"] != "PASS_REVIEWED_NATIVE":

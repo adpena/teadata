@@ -1,4 +1,4 @@
-"""Check retained budget proof boundaries with small synthetic witnesses."""
+"""Check retained financial account proof boundaries with synthetic witnesses."""
 
 from collections import Counter
 from hashlib import sha256
@@ -7,6 +7,7 @@ from unittest.mock import Mock
 from zipfile import ZipFile
 
 import pytest
+import pyarrow as pa
 
 from teadata import native_financial_accounts as gate
 from teadata import release, verification
@@ -86,3 +87,94 @@ def test_canonical_budget_gate_requires_a_reviewed_manifest_and_separate_witness
     assert not gate.is_reviewed_budget("unreviewed")
     assert verification._validate_native_release(manifest, "trusted", witness_store)["status"] == "PASS_REVIEWED_NATIVE"
     qualifies.assert_called_once_with(selected, manifest.parent / "provenance", witness_store)
+
+
+def test_actual_operating_control_keeps_signed_values_and_fund_scope():
+    table = pa.table({
+        "district_number": ["001902"] * 8,
+        "fund_code": ["199", "199", "224", "699", "199", "199", "199", "199"],
+        "object_code": ["6100", "6499", "6100", "6100", "6500", "6100", "6100", "6099"],
+        "function_code": ["11", "11", "11", "11", "11", "71", "11", "11"],
+        "program_intent_code": ["23", "33", "43", "23", "23", "23", "24", "23"],
+        "actual_amount": [100, -20, 30, 40, 50, 60, 70, 80],
+    })
+    totals: Counter[tuple[str, str]] = Counter()
+    gate._accumulate_actual_control(table, totals)
+    assert totals == {("001902", "GF"): 80, ("001902", "AF"): 110, ("001902", "excluded_fund_699"): 40}
+
+
+@pytest.mark.parametrize("damage", [None, "amount", "missing-raw", "extra-raw", "retyped", "duplicate", "period"])
+def test_actual_pwr_compares_exact_operating_amounts_and_validates_full_roster(tmp_path, monkeypatch, damage):
+    from openpyxl import Workbook
+
+    url = "https://tea.texas.gov/example.xlsx"
+    path = tmp_path / "witness.xlsx"
+    workbook = Workbook()
+    assert workbook.active is not None
+    workbook.remove(workbook.active)
+    for group in ("GF", "AF"):
+        sheet = workbook.create_sheet(f"24_25 {group} Act")
+        sheet.append(["SOURCE", "TAB NAME", "DISTRICT NUMBER", "DISTRICT NAME", "District Type",
+                      f"{group} Students with Disabilities (PICs 23,33,43)"])
+        edition = "2024 Actual PWR" if damage == "period" else "2025 Actual PWR"
+        for cdn, population, amount in (
+            ("001902", "INDEPENDENT", -20 if damage == "amount" else -10),
+            ("001903", "COMMON" if damage == "retyped" and group == "AF" else "INDEPENDENT", 0),
+            ("001904", "INDEPENDENT" if damage == "retyped" and group == "AF" else "COMMON", 0),
+            ("001902" if damage == "duplicate" else "002801", "CHARTER", 999),
+        ):
+            sheet.append([edition, sheet.title, cdn, "Fixture", population, amount])
+    workbook.save(path)
+    store = Mock(spec=ProvenanceStore)
+    store.verify_artifact.return_value = path
+    store.read_record.return_value = {
+        "kind": "acquisition", "method": "download", "section": "reference", "requested_url": url,
+        "resolved_url": url, "source_metadata": {"source_url": url},
+        "downloaded_at": "2026-11-04T19:34:19+00:00",
+        "parameters": {"http_method": "GET", "http_status": 200},
+        "response_headers": {"content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+        "artifact": {"sha256": sha256(path.read_bytes()).hexdigest(), "size_bytes": path.stat().st_size},
+    }
+    entities = {"001902", "001903", "001904"}
+    if damage == "missing-raw":
+        entities.remove("001903")
+    if damage == "extra-raw":
+        entities.add("002801")
+    totals = Counter({("001902", "GF"): -10, ("001902", "AF"): -10, ("001902", "excluded_fund_699"): 21})
+    monkeypatch.setattr(gate, "_ACTUAL_PWR", {2025: ("1" * 64, 2)})
+    if damage is None:
+        report = gate._actual_workbook_control(store, 2025, entities, totals)
+        assert report["compared_cells"] == 4
+        assert report["fund_groups"]["AF"]["common_unchecked"] == 1
+        assert report["fund_groups"]["AF"]["charter_unchecked"] == 1
+        assert report["independent_districts_with_nonzero_excluded_fund_699"] == 1
+    else:
+        with pytest.raises(ContractError):
+            gate._actual_workbook_control(store, 2025, entities, totals)
+
+
+def test_canonical_actual_pwr_dispatch_uses_explicit_separate_status(monkeypatch):
+    import sys
+
+    manifest = Path("actuals/release.json")
+    witness_store = Path("independent")
+    selected = Mock(path=manifest)
+    qualifies = Mock(return_value={"status": gate.PASS_ACTUAL_PWR_CONTROLS})
+    monkeypatch.setattr(release, "DataRelease", Mock(return_value=selected))
+    monkeypatch.setattr(gate, "qualify_actual_pwr", qualifies)
+    monkeypatch.setattr(verification, "_retained_store", lambda path: path)
+    args = ["check", "--kind", "library", "--native-release", str(manifest), "--native-pin", "trusted",
+            "--source-store", str(witness_store), "--actual-pwr-controls"]
+    monkeypatch.setattr(sys, "argv", args)
+    verification.main()
+    qualifies.assert_called_once_with(selected, manifest.parent / "provenance", witness_store)
+
+    qualifies.return_value = {"status": "PASS_REVIEWED_NATIVE"}
+    with pytest.raises(SystemExit) as error:
+        verification.main()
+    assert error.value.code == 2
+
+    monkeypatch.setattr(sys, "argv", ["check", "--kind", "library", "--actual-pwr-controls"])
+    with pytest.raises(SystemExit) as error:
+        verification.main()
+    assert error.value.code == 2
