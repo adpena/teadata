@@ -7732,8 +7732,8 @@ data_sources:
           status: available
           title: Reviewed PEIMS course CSV positional crosswalk and physical framing
           path: schemas/peims--2023-2026--teacher-course-enrollment-crosswalk.json
-          reviewed_sha256: 7f8279470ef2d326024ab17ade6ffd98575e37d3eb3a33018bb23e34f7956ee0
-          provenance_ids: [667367fc03b874c703589c797f93afd546ac74851a229c2dc101d8c4ff94eb82]
+          reviewed_sha256: 352eb7795136cf41c91087ca897069d87447233de0c6c525b5076d251ebbec3a
+          provenance_ids: [6bd1dd36b4fc4a65e6aac048a493c755aa5ecf5374a4218c1764ca1dc019f99c]
         source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html
         title: 2022–23 PEIMS Teacher FTE and Course Enrollment
         value_policy: peims_course_csv
@@ -7751,6 +7751,8 @@ data_sources:
         notes: Course enrollment is a reporting-date course membership count. Masked cells remain suppressed.
           No state sum is derived. The captures postdate the September 2026 regeneration. Publisher finality
           is unspecified. This edition includes charter partner teachers in FTE.
+          Campus DISTRICT and CAMPUS are literal source fields. The administrative relationship and attribution
+          represented by DISTRICT are unconfirmed. No campus affiliation or total is inferred.
         period:
           kind: school_year
           start_year: 2023
@@ -7769,12 +7771,15 @@ data_sources:
             acquisition_ids:
               state: 0f4645a4f6919b48ed9653ad6ae8fa07abb500cb74891edc0fe45faa49b0f683
               district: 93c96e9c71b2201e09ba1abde6b0c8f3fb1da2c4befa71d662c1766ff2dda0d2
+              campus: ae2d4079fcd7647b1645c63848c87cb9a4278877ee896ebfb8e43795c5fbf086
     2025:
       metadata:
         metrics: *peims_course_facts
         notes: Course enrollment is a reporting-date course membership count. Masked cells remain suppressed.
           No state sum is derived. The captures postdate the September 2026 regeneration. Publisher finality
           is unspecified. This edition includes charter partner teachers in FTE.
+          Campus DISTRICT and CAMPUS are literal source fields. The administrative relationship and attribution
+          represented by DISTRICT are unconfirmed. No campus affiliation or total is inferred.
         period:
           kind: school_year
           start_year: 2024
@@ -7793,12 +7798,15 @@ data_sources:
             acquisition_ids:
               state: dbe04d144f99c9d54f6f98b01b89a85b2b04f2ac46c9d58b5621d2d9f6ad3a2c
               district: 7963ec85cdfdce4e02849ec53520caed1df31588fd3c0c2b26161cc061c5773c
+              campus: 0ca396d94c1bf6bb871a6bea4c31e73da726af62246ffd2b8acb9c68702b59af
     2026:
       metadata:
         metrics: *peims_course_facts
         notes: Course enrollment is a reporting-date course membership count. Masked cells remain suppressed.
           No state sum is derived. The captures postdate the September 2026 regeneration. Publisher finality
           is unspecified. This edition includes charter partner teachers in FTE.
+          Campus DISTRICT and CAMPUS are literal source fields. The administrative relationship and attribution
+          represented by DISTRICT are unconfirmed. No campus affiliation or total is inferred.
         period:
           kind: school_year
           start_year: 2025
@@ -7817,6 +7825,8 @@ data_sources:
             acquisition_ids:
               state: b83eb582021312eaf322d97e0ea081085258d9f89e26e11cbdd9c2efa8b82cc1
               district: c54740974d39fdbc3c461120aba68db87b3af07fa3615eb91c868bd2d1c0ae81
+              campus: b167d12d5376336b863e7553b604247e184f6df389d85f24f64114089e418293
+
   peims_staff_fte_and_salary:
     2023:
       metadata:

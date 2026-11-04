@@ -1,4 +1,5 @@
 from decimal import Decimal
+import sys
 from types import SimpleNamespace
 from unittest.mock import Mock
 
@@ -7,8 +8,10 @@ import pytest
 
 from teadata.dataset_metadata import EditionKey
 from teadata.manifest import ContractError
-from teadata.native_courses import _compare_batch, _replay
+from teadata.native_courses import HOLD_CAMPUS_GEOGRAPHY, PASS_COURSE_CONTROLS, _campus_blocks, _compare_batch, _replay
 from teadata.peims_course_sources import DATASET
+from teadata.scripts.verify_peims_courses import _HTML_HEADER
+from teadata.verification import main
 
 
 def _native_batch():
@@ -74,3 +77,44 @@ def test_course_replay_rejects_candidate_owned_replacement_receipt(monkeypatch):
     with pytest.raises(ContractError, match="packaged source edition and scope"):
         _replay(release, store, witnesses, config, key, {})
     store.verify_record_closure.assert_not_called()
+
+
+def test_campus_blocks_match_values_without_reassigning_conflicting_headings(monkeypatch):
+    monkeypatch.setattr("teadata.native_courses._check_footer", lambda footer, year, fmt: None)
+    common = ["019901102", "DEKALB EL", "TRADITIONAL ISD/CSD", "08", "OTHER", "SE000001", "SPECIAL EDUCATION, GENERIC",
+              "ALL GRADE LEVELS", "1"]
+    rows = [
+        ["STATE", "COUNTYREGIONDISTRICTCAMPUS", "2025-2026", "019901", "DEKALB ISD", *common, "0.08", "0", "0", "-999"],
+        ["STATE", "COUNTYREGIONDISTRICTCAMPUS", "2025-2026", "019905", "NEW BOSTON ISD", *common, "0.26", "0", "0", "0"],
+    ]
+    label = "DEKALB EL (019901102)"
+    heading = "District: NEW BOSTON ISD (019905) - Region: 08"
+    prefix = [[heading], ["Charter Status: TRADITIONAL ISD/CSD"], ["Campus Name/Campus", *_HTML_HEADER]]
+    shown = [*prefix, [label, *rows[0][9:-1], "N/A"], *prefix, [label, *rows[1][9:]]]
+    blocks = _campus_blocks(shown, 2026, label, rows)
+    assert [(block["matched_source_district_number"], block["heading_matches_bulk"]) for block in blocks] == [
+        ("019901", False), ("019905", True),
+    ]
+    assert all(block["displayed_district_heading"] == heading for block in blocks)
+    shown[5] = ["Charter Status: OPEN ENROLLMENT CHARTER"]
+    second = _campus_blocks(shown, 2026, label, rows)[1]
+    assert second["heading_matches_bulk"] and not second["charter_status_matches_bulk"]
+    shown[3][-1] = "0"
+    with pytest.raises(ContractError, match="unique bulk district block"):
+        _campus_blocks(shown, 2026, label, rows)
+
+
+@pytest.mark.parametrize("status", [PASS_COURSE_CONTROLS, HOLD_CAMPUS_GEOGRAPHY])
+def test_course_controls_never_exit_success_for_a_campus_hold(monkeypatch, capsys, status):
+    monkeypatch.setattr(sys, "argv", [
+        "check", "--kind", "library", "--course-controls", "--native-release", "release.json",
+        "--native-pin", "f" * 64, "--source-store", "provenance",
+    ])
+    monkeypatch.setattr("teadata.verification._validate_course_controls", lambda *args: {"status": status})
+    if status == HOLD_CAMPUS_GEOGRAPHY:
+        with pytest.raises(SystemExit) as error:
+            main()
+        assert error.value.code == 2
+    else:
+        main()
+    assert status in capsys.readouterr().out

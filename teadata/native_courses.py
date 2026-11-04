@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Iterator
 import csv
 from hashlib import sha256
@@ -10,7 +11,8 @@ from itertools import islice
 import json
 from pathlib import Path
 import re
-from typing import Any
+from typing import Any, Literal
+from urllib.parse import urlencode
 
 import pyarrow as pa
 import pyarrow.compute as arrow_compute
@@ -28,9 +30,15 @@ from .values import ValueStatus
 
 pc: Any = arrow_compute
 PASS_COURSE_CONTROLS = "PASS_REVIEWED_PEIMS_COURSE_CONTROLS"
+HOLD_CAMPUS_GEOGRAPHY = "HOLD_PEIMS_CAMPUS_GEOGRAPHY"
 _BATCH_ROWS = 4096
 _MAX_LINE_BYTES = 8192
-_GEO_FIELDS = ("district_number", "district_name", "charter_status", "region_number")
+_GEO_FIELDS = {
+    "state": (),
+    "district": ("district_number", "district_name", "charter_status", "region_number"),
+    "campus": ("source_district_number", "source_district_name", "campus_number", "campus_name",
+               "charter_status", "region_number"),
+}
 _IDENTITY_FIELDS = ("school_year", "source_scope", "aggregation_level")
 _COURSE_FIELDS = ("subject", "course_code", "course_title", "grade_level")
 _MEASURE_FIELDS = tuple(COURSE_FACT_UNITS)
@@ -89,7 +97,7 @@ def _typed_measure(raw: pa.Array, status: pa.Array, value: pa.Array, index: int)
 def _compare_batch(rows: list[list[str]], native: pa.RecordBatch, scope: str, first: int) -> int:
     if native.num_rows != len(rows):
         raise ContractError("Course raw and native batch sizes differ")
-    geo_fields = _GEO_FIELDS if scope == "district" else ()
+    geo_fields = _GEO_FIELDS[scope]
     raw = list(zip(*rows, strict=True))
     identity = (raw[2], raw[0], raw[1], *raw[3:3 + len(geo_fields) + len(_COURSE_FIELDS)])
     for name, tokens in zip((*_IDENTITY_FIELDS, *geo_fields, *_COURSE_FIELDS), identity, strict=True):
@@ -108,51 +116,124 @@ def _compare_batch(rows: list[list[str]], native: pa.RecordBatch, scope: str, fi
     return masked
 
 
-def _district_witness(store: ProvenanceStore, identifier: str, year: int, district: str, name: str,
-                      charter: str, region: str) -> tuple[list[list[str]], dict[str, Any]]:
-    from .native_witnesses import _Rows
-
+def _open_selected_witness(store: ProvenanceStore, identifier: str, year: int, selection: str,
+                           method: Literal["GET", "POST"], controls: list[tuple[str, str]]) -> tuple[str, dict[str, Any]]:
     record = store.read_record(identifier)
     artifact = record["artifact"]
     parameters = record["parameters"]
     metadata = record["source_metadata"]
-    controls = [
-        ["_service", "marykay"], ["prev_htrefer", " "], ["referrer", " "], ["PageTitle", "."],
-        ["RptClass", "FteEnroll"], ["SchoolYr", f"{year % 100:02}"], ["report", "DistrictDistrict"],
-        ["format", "html"], ["sequence", "&sequence."], ["_debug", "0"],
-        ["_program", "adhoc.std_driver2.sas"], ["district", f"{district} {name}"],
-    ]
+    url = f"{BROKER}?{urlencode(controls)}" if method == "GET" else BROKER
+    content_type = "application/x-www-form-urlencoded" if method == "POST" else None
     if (record["kind"] != "acquisition" or record["method"] != "download" or record["dataset"] != DATASET
             or record["section"] != "data_sources" or (record["requested_year"], record["resolved_year"]) != (year, year)
-            or (record["requested_url"], record["resolved_url"], parameters.get("form_url")) != (BROKER,) * 3
-            or parameters.get("http_method") != "POST" or parameters.get("http_status") != 200
-            or parameters.get("form_controls") != controls
-            or parameters.get("form_content_type") != "application/x-www-form-urlencoded"
+            or (record["requested_url"], record["resolved_url"], parameters.get("form_url")) != (url, url, BROKER)
+            or parameters.get("http_method") != method or parameters.get("http_status") != 200
+            or parameters.get("form_controls") != [list(field) for field in controls]
+            or parameters.get("form_content_type") != content_type
             or metadata["source_url"] != SELECTOR or metadata["version"] != str(year)
             or metadata["period"] != DataPeriod("school_year", year - 1, year).to_dict()
             or metadata["publisher"] != "Texas Education Agency" or not record["downloaded_at"]
             or record["response_headers"]["content-type"].split(";")[0] != "text/html"
             or not 0 < artifact["size_bytes"] <= 8 * 1024**2):
-        raise ContractError(f"Course district witness does not bind {year} and {district}")
+        raise ContractError(f"Course witness does not bind {year} and {selection}")
     source = store.verify_artifact(artifact["sha256"])
     if source.stat().st_size != artifact["size_bytes"]:
-        raise ContractError("Course district witness byte count differs")
+        raise ContractError("Course witness byte count differs")
     text = source.read_text(encoding=ENCODING)
     headings = re.findall(r"<h1\b[^>]*>\s*([^<]*?)\s*</h1>", text, re.IGNORECASE)
+    if headings != [f"{year - 1}-{year} Teacher FTE Counts and Course Enrollment Reports"]:
+        raise ContractError("Course witness edition differs")
+    return text, {"receipt_id": identifier, "sha256": artifact["sha256"], "downloaded_at": record["downloaded_at"]}
+
+
+def _district_witness(store: ProvenanceStore, identifier: str, year: int, district: str, name: str,
+                      charter: str, region: str) -> tuple[list[list[str]], dict[str, Any]]:
+    from .native_witnesses import _Rows
+
+    controls = [
+        ("_service", "marykay"), ("prev_htrefer", " "), ("referrer", " "), ("PageTitle", "."),
+        ("RptClass", "FteEnroll"), ("SchoolYr", f"{year % 100:02}"), ("report", "DistrictDistrict"),
+        ("format", "html"), ("sequence", "&sequence."), ("_debug", "0"),
+        ("_program", "adhoc.std_driver2.sas"), ("district", f"{district} {name}"),
+    ]
+    text, evidence = _open_selected_witness(store, identifier, year, district, "POST", controls)
     table = _Rows(text).rows
     label = f"{name} ({district})"
-    if (headings != [f"{year - 1}-{year} Teacher FTE Counts and Course Enrollment Reports"]
-            or table[:3] != [[f"Districtwide for {label}"], [f"Charter Status: {charter}"],
-                             ["District Name/District", "Region", *_HTML_HEADER]]):
-        raise ContractError("Course district witness geography, edition or headings differ")
+    if table[:3] != [[f"Districtwide for {label}"], [f"Charter Status: {charter}"],
+                     ["District Name/District", "Region", *_HTML_HEADER]]:
+        raise ContractError("Course district witness geography or headings differ")
     footer_at = next((i for i, row in enumerate(table[3:], 3) if len(row) != 2 + len(_HTML_HEADER)), len(table))
     _check_footer(table[footer_at:], year, "html")
     visible = table[3:footer_at]
     if (not visible or visible[0][:2] != [label, region]
             or any(row[0] not in (label, "") or row[1] not in (region, "") for row in visible)):
         raise ContractError("Course district witness row identity differs")
-    return [row[2:] for row in visible], {"receipt_id": identifier, "sha256": artifact["sha256"],
-                                          "downloaded_at": record["downloaded_at"]}
+    return [row[2:] for row in visible], evidence
+
+
+def _campus_blocks(table: list[list[str]], year: int, campus_label: str,
+                   originals: list[list[str]]) -> list[dict[str, Any]]:
+    grouped: dict[str, list[list[str]]] = defaultdict(list)
+    for row in originals:
+        grouped[row[3]].append(row)
+    expected = {district: _course_rows([row[9:] for row in raw], "csv") for district, raw in grouped.items()}
+    header = ["Campus Name/Campus", *_HTML_HEADER]
+    blocks: list[dict[str, Any]] = []
+    offset = 0
+    while offset + 2 < len(table) and table[offset + 2] == header:
+        heading, charter, _ = table[offset:offset + 3]
+        match = re.fullmatch(r"District: (.+) \(([0-9]{6})\) - Region: ([0-9]{2})",
+                             heading[0] if len(heading) == 1 else "")
+        if match is None or len(charter) != 1 or not charter[0].startswith("Charter Status: "):
+            raise ContractError("Course campus witness district or charter heading differs")
+        start = offset + 3
+        stop = next((i for i in range(start, len(table)) if len(table[i]) != len(header)), len(table))
+        visible = table[start:stop]
+        if (not visible or visible[0][0] != campus_label
+                or any(row[0] not in (campus_label, "") for row in visible)):
+            raise ContractError("Course campus witness row identity differs")
+        displayed = _course_rows([row[1:] for row in visible], "html")
+        matches = [district for district, original in expected.items() if displayed == original]
+        if len(matches) != 1:
+            raise ContractError("Course campus witness values do not identify a unique bulk district block")
+        district = matches[0]
+        original_rows = grouped[district]
+        context = original_rows[0][4:9]
+        if any(row[4:9] != context for row in original_rows):
+            raise ContractError("Course campus bulk context varies within the matched district block")
+        name, _, _, status, region = context
+        blocks.append({"displayed_district_heading": heading[0], "matched_source_district_number": district,
+                       "heading_matches_bulk": match.groups() == (name, district, region),
+                       "charter_status_matches_bulk": charter == [f"Charter Status: {status}"],
+                       "rows": len(displayed)})
+        del expected[district]
+        offset = stop
+    _check_footer(table[offset:], year, "html")
+    if not blocks or expected:
+        raise ContractError("Course campus witness does not cover all selected bulk district blocks")
+    return blocks
+
+
+def _campus_witness(store: ProvenanceStore, identifier: str, year: int, campus: str,
+                    originals: list[list[str]]) -> dict[str, Any]:
+    from .native_witnesses import _Rows
+
+    if not originals:
+        raise ContractError(f"Course campus witness {campus} is absent from the bulk source")
+    names = {row[6] for row in originals}
+    if len(names) != 1:
+        raise ContractError(f"Course campus witness {campus} has multiple names in the bulk source")
+    (name,) = names
+    controls = [
+        ("_service", "marykay"), ("prev_htrefer", " "), ("referrer", " "), ("PageTitle", "."),
+        ("RptClass", "FteEnroll"), ("SchoolYr", f"{year % 100:02}"), ("report", "CampusCampus"),
+        ("format", "html"), ("_debug", "0"), ("_program", "adhoc.std_driver2.sas"), ("campus", f"{campus} {name}"),
+    ]
+    text, evidence = _open_selected_witness(store, identifier, year, campus, "GET", controls)
+    blocks = _campus_blocks(_Rows(text).rows, year, f"{name} ({campus})", originals)
+    return {**evidence, "campus_number": campus, "rows": sum(block["rows"] for block in blocks),
+            "source_district_heading_conflicts": sum(not block["heading_matches_bulk"] for block in blocks),
+            "blocks": blocks}
 
 
 def _replay(release: DataRelease, store: ProvenanceStore, witnesses: ProvenanceStore,
@@ -195,26 +276,26 @@ def _replay(release: DataRelease, store: ProvenanceStore, witnesses: ProvenanceS
             or {f.field: (f.raw, f.status, f.auxiliary) for f in support.fields}
             != {name: (f"peims_raw_{name}", f"peims_status_{name}", ()) for name in _MEASURE_FIELDS}):
         raise ContractError("Course native leaf does not bind its reviewed source, processing or support contract")
-    keys = ["school_year", *(["district_number"] if key.scope == "district" else []), "course_code"]
     headings = release.catalog.header_records(key.dataset, edition_key=key)
     names = ("source_scope", "aggregation_level", "school_year",
-             *(_GEO_FIELDS if key.scope == "district" else ()), *_COURSE_FIELDS, *_MEASURE_FIELDS)
-    if (contract["key_columns"] != keys or metadata.period != DataPeriod("school_year", year - 1, year)
+             *_GEO_FIELDS[key.scope], *_COURSE_FIELDS, *_MEASURE_FIELDS)
+    if (contract["key_columns"] != reviewed.keys or metadata.period != DataPeriod("school_year", year - 1, year)
             or {name: item.unit for name, item in metadata.metrics.items()} != COURSE_FACT_UNITS
             or [(row["code"], row["field"]) for row in headings] != list(zip(CSV_HEADERS[key.scope], names, strict=True))):
         raise ContractError("Course native leaf grain, crosswalk or period differs")
 
     source = store.verify_artifact(reviewed.digest)
-    district_rows: dict[str, list[list[str]]] = {name: [] for name in review} if key.scope == "district" else {}
+    selections: dict[str, list[list[str]]] = {name: [] for name in review} if key.scope != "state" else {}
+    selection_position = 5 if key.scope == "campus" else 3
     rows = masked = 0
     with pq.ParquetFile(release.artifact(ref.identity)) as leaf:
         original = _raw_batches(source, year, key.scope, contract["rows"])
         for raw, native in zip(original, leaf.iter_batches(batch_size=_BATCH_ROWS, use_threads=False), strict=True):
             masked += _compare_batch(raw, native, key.scope, rows + 10)
             rows += len(raw)
-            for row in raw if district_rows else ():
-                if row[3] in district_rows:
-                    district_rows[row[3]].append(row)
+            for row in raw if selections else ():
+                if (selected := selections.get(row[selection_position])) is not None:
+                    selected.append(row)
     if rows != contract["rows"]:
         raise ContractError("Course native and source record counts differ")
 
@@ -226,7 +307,7 @@ def _replay(release: DataRelease, store: ProvenanceStore, witnesses: ProvenanceS
         if evidence["sha256"] in contract["inputs"] or published != _course_rows(original_rows, "csv"):
             raise ContractError("Course statewide HTML witness differs from the native leaf's source")
         controls.append({**evidence, "rows": rows})
-    for district, original_rows in district_rows.items():
+    for district, original_rows in selections.items() if key.scope == "district" else ():
         if not original_rows:
             raise ContractError(f"Course district witness {district} is absent from the bulk source")
         _, name, charter, region = original_rows[0][3:7]
@@ -235,10 +316,19 @@ def _replay(release: DataRelease, store: ProvenanceStore, witnesses: ProvenanceS
                 or _course_rows(displayed, "html") != _course_rows([row[7:] for row in original_rows], "csv")):
             raise ContractError(f"Course district HTML witness {district} differs from the native leaf's source")
         controls.append({**evidence, "district_number": district, "rows": len(displayed)})
-    return {"edition": key.to_dict(), "artifact_id": ref.identity, "source_receipt": receipt_id,
-            "rows": rows, "masked_cells": masked, "raw_cells": rows * len(CSV_HEADERS[key.scope]),
-            "publisher_witnesses": controls,
-            "publisher_compared_cells": sum(item["rows"] for item in controls) * len(_MEASURE_FIELDS)}
+    for campus, original_rows in selections.items() if key.scope == "campus" else ():
+        witness = _campus_witness(witnesses, review[campus], year, campus, original_rows)
+        if witness["sha256"] in contract["inputs"]:
+            raise ContractError("Course campus publisher witness is not independent of the bulk source")
+        controls.append(witness)
+    result = {"edition": key.to_dict(), "artifact_id": ref.identity, "source_receipt": receipt_id,
+              "rows": rows, "masked_cells": masked, "raw_cells": rows * len(CSV_HEADERS[key.scope]),
+              "publisher_witnesses": controls,
+              "publisher_compared_cells": sum(item["rows"] for item in controls) * len(_MEASURE_FIELDS)}
+    if key.scope == "campus":
+        result.update(raw_parity="PASS_RAW_PARITY", qualification=HOLD_CAMPUS_GEOGRAPHY,
+                      qualification_reason="Publisher district-field semantics and repeated HTML headings remain unresolved")
+    return result
 
 
 def qualify_courses(release: DataRelease, store: ProvenanceStore, witnesses: ProvenanceStore) -> dict[str, Any]:
@@ -254,7 +344,8 @@ def qualify_courses(release: DataRelease, store: ProvenanceStore, witnesses: Pro
     release.verify()
     config = load_config()
     results = [_replay(release, store, witnesses, config, key, reviews[key.scope][key.edition]) for key in editions]
-    return {"status": PASS_COURSE_CONTROLS, "manifest_sha256": release.manifest_sha256, "build_id": release.build_id,
+    status = HOLD_CAMPUS_GEOGRAPHY if any(key.scope == "campus" for key in editions) else PASS_COURSE_CONTROLS
+    return {"status": status, "manifest_sha256": release.manifest_sha256, "build_id": release.build_id,
             "release_activation": False, "rows": sum(item["rows"] for item in results),
             "raw_cells": sum(item["raw_cells"] for item in results),
             "masked_cells": sum(item["masked_cells"] for item in results),

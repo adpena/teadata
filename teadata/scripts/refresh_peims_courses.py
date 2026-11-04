@@ -1,4 +1,4 @@
-"""Build receipt-pinned statewide and district PEIMS course leaves offline."""
+"""Build receipt-pinned statewide, district and campus PEIMS course leaves offline."""
 
 from __future__ import annotations
 

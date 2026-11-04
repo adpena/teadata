@@ -20,6 +20,8 @@ _GEOGRAPHY = ("SCOPE", "AGGREGATION LEVEL", "YEAR")
 _COURSE = ("SUBJECT", "COURSE", "COURSE TITLE", "GRADE LEVEL", *MEASURES)
 CSV_HEADERS = {"state": (*_GEOGRAPHY, *_COURSE), "district": (
     *_GEOGRAPHY, "DISTRICT", "DISTRICT NAME", "CHARTER STATUS", "REGION", *_COURSE,
+), "campus": (
+    *_GEOGRAPHY, "DISTRICT", "DISTRICT NAME", "CAMPUS", "CAMPUS NAME", "CHARTER STATUS", "REGION", *_COURSE,
 )}
 
 GRADE_LABELS = frozenset({
@@ -31,7 +33,7 @@ GRADE_LABELS = frozenset({
 
 
 def course_csv_preamble(year: int, scope: str) -> list[list[str]]:
-    geography = {"state": "STATEWIDE", "district": "STATEWIDE BY DISTRICT"}[scope]
+    geography = {"state": "STATEWIDE", "district": "STATEWIDE BY DISTRICT", "campus": "STATEWIDE BY CAMPUS"}[scope]
     return [["TEXAS EDUCATION AGENCY"], [], ["TOTAL ENROLLMENT AND TEACHER FTE COUNTS BY SUBJECT AND COURSE"],
             [], [f"PEIMS DATA {year - 1}-{year}"], [], [geography], [], list(CSV_HEADERS[scope])]
 
@@ -42,14 +44,14 @@ def open_course_report(store: ProvenanceStore, identifier: str, year: int, scope
     parameters = record["parameters"]
     metadata = record["source_metadata"]
     artifact = record["artifact"]
-    report = {"state": "StateState", "district": "StateDistrict"}[scope]
+    report = {"state": "StateState", "district": "StateDistrict", "campus": "StateCampus"}[scope]
     controls = [["_service", "marykay"], ["_program", "adhoc.std_driver1.sas"], ["RptClass", "FteEnroll"],
                 ["_debug", "0"], ["SchoolYr", f"{year % 100:02}"], ["report", report], ["Campus", ""],
                 ["format", fmt], ["submit", "Next"]]
     headers = record["response_headers"]
     content_type = headers.get("content-type", "").split(";", 1)[0]
     csv_disposition = f"attachment; filename=FteEnroll{report}{year % 100:02}state.csv"
-    maximum = (64 if scope == "district" else 8) * 1024**2
+    maximum = {"state": 8, "district": 64, "campus": 128}[scope] * 1024**2
     if (record["kind"] != "acquisition" or record["method"] != "download" or record["dataset"] != DATASET
             or record["section"] != "data_sources" or (record["requested_year"], record["resolved_year"]) != (year, year)
             or (record["requested_url"], record["resolved_url"], parameters.get("form_url")) != (BROKER,) * 3

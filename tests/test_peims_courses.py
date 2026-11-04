@@ -13,10 +13,11 @@ from teadata.peims_course_sources import DATASET, course_csv_preamble
 from teadata.teadata_config import load_config
 
 
-@pytest.mark.parametrize(("year", "state_rows", "district_rows"), [
-    (2023, 1386, None), (2024, 1397, 201999), (2025, 1422, 204303), (2026, 1453, 207751),
+@pytest.mark.parametrize(("year", "state_rows", "district_rows", "campus_rows"), [
+    (2023, 1386, None, None), (2024, 1397, 201999, 511268),
+    (2025, 1422, 204303, 519697), (2026, 1453, 207751, 533161),
 ])
-def test_packaged_course_sources_are_exact_and_opt_in(year, state_rows, district_rows):
+def test_packaged_course_sources_are_exact_and_opt_in(year, state_rows, district_rows, campus_rows):
     config = load_config()
     assert config.is_source_only(DATASET, year)
     assert config.column_schema(DATASET, year) is None
@@ -28,6 +29,18 @@ def test_packaged_course_sources_are_exact_and_opt_in(year, state_rows, district
     else:
         assert district["layout"]["last_data_record"] - 9 == district_rows
         assert district["input_sha256"] != state["input_sha256"]
+    campus = courses._table(config, year, "campus")
+    if campus_rows is None:
+        assert campus == {}
+    else:
+        assert campus["layout"]["last_data_record"] - 9 == campus_rows
+        assert campus["input_sha256"] not in (state["input_sha256"], district["input_sha256"])
+        assert [(row["code"], row["field"]) for row in campus["fields"][3:7]] == [
+            ("DISTRICT", "source_district_number"), ("DISTRICT NAME", "source_district_name"),
+            ("CAMPUS", "campus_number"), ("CAMPUS NAME", "campus_name"),
+        ]
+        metadata = config.resolve_dataset(DATASET, year, reader_profile="source", exact=True).metadata
+        assert "represented by DISTRICT are unconfirmed" in (metadata.notes or "")
 
 
 def _raw_source(tmp_path, scope, records):
@@ -103,3 +116,36 @@ def test_native_course_stream_rejects_mismatched_scope_identity_and_values(tmp_p
         path.write_bytes(path.read_bytes().replace(b"Reviewed footer", b"Changed footer"))
     with pytest.raises(ContractError, match=match):
         list(courses._batches(path, selection))
+
+
+@pytest.mark.parametrize(("damage", "match"), [
+    (None, ""), ("same-group", "Duplicate PEIMS course code"), ("campus-id", "Malformed campus ID"),
+    ("campus-suffix", "Zero campus ID suffix"), ("campus-name", "Conflicting PEIMS course campus identity"),
+])
+def test_campus_source_district_and_campus_are_separate_key_parts(tmp_path, monkeypatch, damage, match):
+    monkeypatch.setattr(courses, "_CSV_BLOCK_BYTES", 192)
+    prefix = ["STATE", "COUNTYREGIONDISTRICTCAMPUS", "2025-2026"]
+    campus = ["019901102", "DEKALB EL", "TRADITIONAL ISD/CSD", "08"]
+    values = ["SPECIAL EDUCATION", "SE000001", "SPECIAL EDUCATION", "ALL GRADE LEVELS", "1", "0.30", "0", "0", "-999"]
+    first = [*prefix, "019901", "DEKALB ISD", *campus, *values]
+    second = [*prefix, "019905", "NEW BOSTON ISD", *campus, *values]
+    if damage in {"same-group", "campus-name"}:
+        second[3:5] = first[3:5]
+    if damage == "campus-id":
+        second[5] = "19901102"
+    if damage == "campus-suffix":
+        second[5] = "019901000"
+    if damage == "campus-name":
+        second[6] = "WRONG NAME"
+    path, selection = _raw_source(tmp_path, "campus", [first, second])
+    if damage:
+        with pytest.raises(ContractError, match=match):
+            list(courses._batches(path, selection))
+        return
+    table = pa.Table.from_batches(list(courses._batches(path, selection)))
+    assert selection.keys == ["school_year", "source_district_number", "campus_number", "course_code"]
+    assert "district_number" not in table.schema.names
+    assert table["source_district_number"].to_pylist() == ["019901", "019905"]
+    assert table["campus_number"].to_pylist() == ["019901102", "019901102"]
+    assert table["course_code"].to_pylist() == ["SE000001", "SE000001"]
+    assert table["peims_raw_course_enrollment_count"].to_pylist() == ["-999", "-999"]

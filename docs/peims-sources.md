@@ -143,12 +143,11 @@ uv run --locked --offline python -m teadata.scripts.verify_peims_courses --store
 An [individual campus extract](../provenance/records/50bdbb47f990375b35b64c5fa2e92c92edff30d4c267a5388b814854a78c97b6.json)
 returned 59 course rows for A+ Academy Elementary (`057829001`) in 2023–24.
 The [selection receipt](../provenance/records/a5d05dd3d90060f054d41962f18d8df08e73ff37ee0f1477469102597256632e.json)
-records how TEA resolved that campus number. This establishes that a historical
-campus report can be retrieved. Campus remains outside the native candidate.
+records how TEA resolved that campus number.
 
 ### Build and verify a course candidate
 
-The source profile admits separate state and district leaves. It preserves the
+The source profile admits separate state, district and campus leaves. It preserves the
 publisher course code, leading-zero district number, raw measure tokens and
 physical source row. Head counts and course membership use integers, and FTE
 uses fixed-precision decimals. The reviewed `-999` course-membership token has
@@ -157,12 +156,12 @@ TEA defines the measures in its criteria page. The crosswalk's native storage
 types reflect the reviewed CSV tokens because TEA does not publish formal
 types for this export.
 
-| School year | State course rows | District course rows | District IDs |
-| --- | ---: | ---: | ---: |
-| 2022–23 | 1,386 | — | — |
-| 2023–24 | 1,397 | [201,999](../provenance/records/93c96e9c71b2201e09ba1abde6b0c8f3fb1da2c4befa71d662c1766ff2dda0d2.json) | 1,209 |
-| 2024–25 | 1,422 | [204,303](../provenance/records/7963ec85cdfdce4e02849ec53520caed1df31588fd3c0c2b26161cc061c5773c.json) | 1,207 |
-| 2025–26 | 1,453 | [207,751](../provenance/records/c54740974d39fdbc3c461120aba68db87b3af07fa3615eb91c868bd2d1c0ae81.json) | 1,203 |
+| School year | State course rows | District course rows | District IDs | Campus course rows |
+| --- | ---: | ---: | ---: | ---: |
+| 2022–23 | 1,386 | — | — | — |
+| 2023–24 | 1,397 | [201,999](../provenance/records/93c96e9c71b2201e09ba1abde6b0c8f3fb1da2c4befa71d662c1766ff2dda0d2.json) | 1,209 | [511,268](../provenance/records/ae2d4079fcd7647b1645c63848c87cb9a4278877ee896ebfb8e43795c5fbf086.json) |
+| 2024–25 | 1,422 | [204,303](../provenance/records/7963ec85cdfdce4e02849ec53520caed1df31588fd3c0c2b26161cc061c5773c.json) | 1,207 | [519,697](../provenance/records/0ca396d94c1bf6bb871a6bea4c31e73da726af62246ffd2b8acb9c68702b59af.json) |
+| 2025–26 | 1,453 | [207,751](../provenance/records/c54740974d39fdbc3c461120aba68db87b3af07fa3615eb91c868bd2d1c0ae81.json) | 1,203 | [533,161](../provenance/records/b167d12d5376336b863e7553b604247e184f6df389d85f24f64114089e418293.json) |
 
 `TEADATA_PROVENANCE_DIR` must contain the selected acquisition and reference
 closures. Build into a new directory and pin its manifest before verification.
@@ -189,3 +188,33 @@ district years and A+ Academy in 2025–26. The [publisher witness inventory](..
 identifies the exact HTML receipts. District publisher agreement is scoped to
 those selections. These checks support explicit catalog reads from the
 unpublished candidate. Dataset activation and release publication are separate.
+
+### Campus source rows and geography hold
+
+To include the campus source rows, add `--edition 2024 campus`,
+`--edition 2025 campus` and `--edition 2026 campus` to the build.
+The campus grain is school year, `source_district_number`,
+`campus_number` and `course_code`. The district field preserves the value
+printed in TEA's bulk CSV. Campus ownership and the administrative meaning
+of that field require separate evidence. A campus may appear under more
+than one source district. Keep those facts separate when analyzing them.
+
+Four separately selected TEA HTML reports reproduce the course values of
+two distinct bulk district groups while printing the same district heading
+over both. For example, DeKalb Elementary's 2025–26 bulk CSV contains two
+`SE000001` records. One has suppressed enrollment and the other has an
+observed zero. TEA's [monitoring report](../provenance/records/03192c1d0591443eeace54456d8162f0f589f1562630cb533a0743d197f3d4e3.json)
+identifies a fiscal agent for 2023–24, and its [staff assignment rules](../provenance/records/0cd44065979f6b8dd860402840ce9ca545d3170a8aecf508edd0c1940a559d84.json)
+anticipate assignments across districts. These references provide context
+for the rows while the report's repeated heading remains unresolved.
+
+`--course-controls` checks the complete campus leaf against the retained
+bulk CSV, including the source district and campus IDs, raw tokens and
+physical locators.
+It also matches the detailed values in the selected HTML blocks and reports
+heading conflicts separately. A candidate containing campus rows returns
+`HOLD_PEIMS_CAMPUS_GEOGRAPHY` and exits with status 2 after successful raw
+parity. Use these opt-in leaves as source observations. Campus totals,
+canonical affiliations and dataset activation remain outside the verified
+contract. Preserve earlier manifest bytes and use the corresponding
+checkout when replaying a candidate tied to an earlier crosswalk revision.

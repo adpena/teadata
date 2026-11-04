@@ -858,7 +858,7 @@ def main() -> None:
     controls.add_argument("--actual-pwr-controls", action="store_true",
                           help="Check only the reviewed FY2023–FY2025 district Actual PWR operating-dollar controls")
     controls.add_argument("--course-controls", action="store_true",
-                          help="Replay exact unpublished PEIMS course leaves and reviewed publisher reports")
+                          help="Replay exact unpublished PEIMS course leaves, retaining unresolved campus geography holds")
     parser.add_argument("--source-store", type=Path, help="Existing retained ProvenanceStore for source or native checks")
     parser.add_argument("--source-edition", action="append", default=[], help="Exact edition ID for --source-parity; repeat explicitly")
     args = parser.parse_args()
@@ -897,8 +897,12 @@ def main() -> None:
             return
         if args.native_release:
             if args.course_controls:
+                from teadata.native_courses import PASS_COURSE_CONTROLS
+
                 report = _validate_course_controls(args.native_release, args.native_pin, args.source_store)
                 print(json.dumps(report, sort_keys=True, ensure_ascii=False, allow_nan=False))
+                if report["status"] != PASS_COURSE_CONTROLS:
+                    raise SystemExit(2)
                 return
             if args.actual_pwr_controls:
                 from teadata.native_financial_accounts import PASS_ACTUAL_PWR_CONTROLS

@@ -33,9 +33,12 @@ COURSE_FACT_UNITS = {"teacher_head_count": "count", "teacher_fte_count": "fte", 
 SOURCE_RECORD = "peims_source_record"
 _CSV_BLOCK_BYTES = 512 * 1024
 _MAX_PHYSICAL_LINE = 16 * 1024
-_MAX_RECORDS = 300_000
+_MAX_RECORDS = {"state": 5_000, "district": 300_000, "campus": 600_000}
 _MAX_BATCH_BYTES = 8 * 1024**2
-_DISTRICT_CONTEXT = ("district_name", "charter_status", "region_number")
+_GEOGRAPHY_KEYS = {"state": (), "district": ("district_number",), "campus": ("source_district_number", "campus_number")}
+_GEOGRAPHY_CONTEXT = {"state": (), "district": ("district_name", "charter_status", "region_number"),
+                      "campus": ("source_district_name", "campus_name", "charter_status", "region_number")}
+_AGGREGATION = {"state": "STATE", "district": "COUNTYREGIONDISTRICT", "campus": "COUNTYREGIONDISTRICTCAMPUS"}
 
 
 @dataclass(frozen=True)
@@ -54,7 +57,7 @@ class _CourseSource:
 
     @property
     def keys(self) -> list[str]:
-        return ["school_year", *(["district_number"] if self.scope == "district" else []), "course_code"]
+        return ["school_year", *_GEOGRAPHY_KEYS[self.scope], "course_code"]
 
     @property
     def rows(self) -> int:
@@ -106,7 +109,7 @@ def _admit(config: Config, canonical: Config, store: ProvenanceStore, year: int,
         raise ContractError("PEIMS course edition or scope differs from the packaged crosswalk")
     layout = table["layout"]
     if (layout["code_record"] != 9 or layout["label_record"] is not None or layout["first_data_record"] != 10
-            or not 9 < layout["last_data_record"] <= _MAX_RECORDS):
+            or not 9 < layout["last_data_record"] <= _MAX_RECORDS[scope]):
         raise ContractError("PEIMS course physical framing differs")
     references = tuple(dict.fromkeys(identifier for ref in metadata.references for identifier in ref.provenance_ids))
     records = store.verify_record_closure(references)
@@ -165,10 +168,12 @@ def _batches(path: Path, source: _CourseSource) -> Iterator[pa.RecordBatch]:
     names, schema = source.names, source.schema
     support = source.support["fields"]
     next_record = 10
-    seen_districts: set[str] = set()
-    active_district: str | None = None
+    seen_geographies: set[str] = set()
+    active_geography: str | None = None
     active_context: tuple[str, ...] = ()
     seen_courses: set[str] = set()
+    geography_keys = _GEOGRAPHY_KEYS[source.scope]
+    geography_context = _GEOGRAPHY_CONTEXT[source.scope]
     with pa.memory_map(str(path)) as archive, archive.get_stream(offset, size) as body:
         with arrow_csv.open_csv(body,
             read_options=arrow_csv.ReadOptions(column_names=names, encoding=ENCODING, block_size=_CSV_BLOCK_BYTES,
@@ -179,8 +184,7 @@ def _batches(path: Path, source: _CourseSource) -> Iterator[pa.RecordBatch]:
                                                      null_values=[])) as rows:
             for batch in rows:
                 values = dict(zip(names, batch.columns, strict=True))
-                aggregation = "STATE" if source.scope == "state" else "COUNTYREGIONDISTRICT"
-                for name, token in (("source_scope", "STATE"), ("aggregation_level", aggregation),
+                for name, token in (("source_scope", "STATE"), ("aggregation_level", _AGGREGATION[source.scope]),
                                     ("school_year", source.source.metadata.period.label)):
                     require(pc.equal(values[name], token), "PEIMS course row differs from its selected scope or year")
                 require(pc.match_substring_regex(values["course_code"], r"^[A-Z0-9]{8}$"), "Malformed course code")
@@ -188,28 +192,38 @@ def _batches(path: Path, source: _CourseSource) -> Iterator[pa.RecordBatch]:
                 for name in ("subject", "course_title"):
                     require(pc.match_substring_regex(values[name], r"\S"), "Blank PEIMS course subject or title")
                 runs = [(batch.num_rows, None)]
-                if source.scope == "district":
-                    require(pc.match_substring_regex(values["district_number"], r"^[0-9]{6}$"), "Malformed district ID")
-                    require(pc.not_equal(values["district_number"], "000000"), "Zero district ID")
+                if geography_keys:
+                    district = values[geography_keys[0]]
+                    require(pc.match_substring_regex(district, r"^[0-9]{6}$"), "Malformed district ID")
+                    require(pc.not_equal(district, "000000"), "Zero district ID")
                     require(pc.match_substring_regex(values["region_number"], r"^(?:0[1-9]|1[0-9]|20)$"), "Malformed region code")
                     require(pc.is_in(values["charter_status"], value_set=pa.array(["OPEN ENROLLMENT CHARTER", "TRADITIONAL ISD/CSD"])),
-                            "Unreviewed district charter status")
-                    require(pc.match_substring_regex(values["district_name"], r"\S"), "Blank district name")
-                    encoded = pc.run_end_encode(values["district_number"])
+                            "Unreviewed course charter status")
+                    require(pc.match_substring_regex(values[geography_context[0]], r"\S"), "Blank district name")
+                    geography = district
+                    if source.scope == "campus":
+                        campus = values["campus_number"]
+                        require(pc.match_substring_regex(campus, r"^[0-9]{9}$"), "Malformed campus ID")
+                        require(pc.invert(pc.ends_with(campus, "000")), "Zero campus ID suffix")
+                        require(pc.match_substring_regex(values["campus_name"], r"\S"), "Blank campus name")
+                        # Both codes are publisher facts. A campus ID prefix does not establish the source district.
+                        geography = pc.binary_join_element_wise(district, campus, ":")
+                    encoded = pc.run_end_encode(geography)
                     runs = list(zip(encoded.run_ends.to_pylist(), encoded.values.to_pylist(), strict=True))
                 start = 0
-                for stop, district in runs:
+                for stop, geography in runs:
                     width = stop - start
-                    if district is not None:
-                        if district != active_district:
-                            if district in seen_districts:
-                                raise ContractError("PEIMS course district group reappeared out of order")
-                            seen_districts.add(district)
-                            active_district = district
-                            active_context = tuple(values[name][start].as_py() for name in _DISTRICT_CONTEXT)
+                    if geography is not None:
+                        if geography != active_geography:
+                            if geography in seen_geographies:
+                                raise ContractError(f"PEIMS course {source.scope} group reappeared out of order")
+                            seen_geographies.add(geography)
+                            active_geography = geography
+                            active_context = tuple(values[name][start].as_py() for name in geography_context)
                             seen_courses.clear()
-                        for name, token in zip(_DISTRICT_CONTEXT, active_context, strict=True):
-                            require(pc.equal(values[name].slice(start, width), token), "Conflicting PEIMS course district identity")
+                        for name, token in zip(geography_context, active_context, strict=True):
+                            require(pc.equal(values[name].slice(start, width), token),
+                                    f"Conflicting PEIMS course {source.scope} identity")
                     old_count = len(seen_courses)
                     seen_courses.update(values["course_code"].slice(start, width).to_pylist())
                     if len(seen_courses) != old_count + width:
@@ -233,7 +247,7 @@ def _batches(path: Path, source: _CourseSource) -> Iterator[pa.RecordBatch]:
 
 def materialize_peims_courses(store: ProvenanceStore, *, config: Path, config_sha256: str,
                              editions: Sequence[tuple[int, str]], output: Path) -> dict[str, Any]:
-    """Build source-only state and district course leaves and verify native readback."""
+    """Build source-only course leaves and verify native readback."""
     import pyarrow as pa
     import pyarrow.parquet as pq
 
@@ -242,7 +256,7 @@ def materialize_peims_courses(store: ProvenanceStore, *, config: Path, config_sh
 
     if (not editions or len(set(editions)) != len(editions)
             or any(type(year) is not int or not 2 <= year <= 9999 or scope not in CSV_HEADERS for year, scope in editions)):
-        raise ValueError("Select distinct exact PEIMS course school years and state/district scopes")
+        raise ValueError("Select distinct exact PEIMS course school years and state/district/campus scopes")
     if output.exists() or output.is_symlink():
         raise FileExistsError("PEIMS course candidate requires a new exclusive output directory")
     with config.open("rb") as stream:
