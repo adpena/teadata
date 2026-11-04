@@ -291,6 +291,14 @@ def _controller_python_version() -> str:
     return ".".join(str(part) for part in sys.version_info[:3])
 
 
+def _latest_pointer(checks_root: Path, kind: str, *, paired: bool, version: str, release: str | None) -> Path:
+    mode = "paired" if paired else "locked"
+    name = f"latest-{kind}-{mode}-{version}"
+    if release is not None:
+        name += f"-release-{sha256(os.fsencode(release)).hexdigest()}"
+    return checks_root / f"{name}.json"
+
+
 def _check_runtime(root: Path, *, paired: bool) -> tuple[str, str, Path | None, list[Check]]:
     """One interpreter/setup authority for executing and verifying checks."""
     version = _controller_python_version()
@@ -365,7 +373,8 @@ def run_checks(
     # Focused callers retain their receipt path; they must not displace the
     # default-policy receipt used by --verify-latest and the push guard.
     if checks is None:
-        _write_document(checks_root / f"latest-{kind}-{'paired' if paired_library else 'locked'}.json",
+        _write_document(_latest_pointer(checks_root, kind, paired=paired_library is not None,
+                                        version=version, release=release),
                         {"receipt": f"{run_id}/receipt.json", "record_id": document["record_id"]})
     print(f"Receipt: {path}", flush=True)
     if before != after:
@@ -865,16 +874,24 @@ def main() -> None:
             path = install_pre_push_hook(args.root, kind=args.kind, paired=args.paired_library is not None)
             print(f"Installed local check hook: {path}")
             return
+        pointer_record_id = None
         if args.verify_latest:
-            mode = "paired" if args.paired_library else "locked"
             checks_root = args.root / ".local/checks"
-            pointer = json.loads((checks_root / f"latest-{args.kind}-{mode}.json").read_text())
+            pointer_path = _latest_pointer(checks_root, args.kind, paired=args.paired_library is not None,
+                                           version=_controller_python_version(), release=args.release)
+            pointer = json.loads(pointer_path.read_text())
+            if (not isinstance(pointer, dict) or not isinstance(pointer.get("receipt"), str)
+                    or not isinstance(pointer.get("record_id"), str)):
+                raise ReceiptError("Invalid latest receipt pointer")
             relative = Path(pointer["receipt"])
             if relative.is_absolute() or ".." in relative.parts:
                 raise ReceiptError("Invalid latest receipt path")
+            pointer_record_id = pointer["record_id"]
             args.verify = checks_root / relative
         if args.verify:
             document = verify_receipt(args.verify, args.root, kind=args.kind, paired_library=args.paired_library, release=args.release)
+            if pointer_record_id is not None and pointer_record_id != document["record_id"]:
+                raise ReceiptError("Latest receipt pointer does not match the verified record")
             print(f"Verified local checks for {document['inputs']['project']['head']}")
         else:
             path = run_checks(args.root, kind=args.kind, paired_library=args.paired_library, release=args.release, timeout=args.timeout)

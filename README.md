@@ -281,6 +281,8 @@ policy, tool/dependency environment, or captured logs change. A commit requires
 a fresh run even when it contains previously checked working-tree contents.
 Focused checks supplied programmatically retain their own receipts without
 replacing the full-policy pointer used by `--verify-latest` and the push guard.
+Each Python runtime and selected release has a separate pointer. An earlier
+receipt from the same check scope still needs to match the current inputs.
 
 After rebuilding changed serialized data, also verify the retained release:
 

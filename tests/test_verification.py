@@ -10,7 +10,7 @@ import sys
 import pytest
 
 from teadata.verification import Check, GIT_LFS_PRE_PUSH, ReceiptError, install_pre_push_hook, run_checks, source_identity, verify_receipt
-from teadata.verification import _controller_python_version, _environment_identity, _test_environment
+from teadata.verification import _controller_python_version, _environment_identity, _test_environment, main
 
 
 @pytest.fixture
@@ -224,7 +224,7 @@ def test_focused_checks_preserve_the_default_policy_pointer(project, monkeypatch
     monkeypatch.setattr("teadata.verification._check_runtime",
                         lambda *args, **kwargs: (_controller_python_version(), sys.executable, None, []))
     library = project if paired else None
-    pointer = project / ".local" / "checks" / f"latest-{kind}-{'paired' if paired else 'locked'}.json"
+    pointer = project / ".local" / "checks" / f"latest-{kind}-{'paired' if paired else 'locked'}-{_controller_python_version()}.json"
     focused = [Check("focused", ("@python", "-c", "print('focused')"))]
     first = run_checks(project, kind=kind, paired_library=library, checks=focused)
     assert not pointer.exists()
@@ -238,6 +238,54 @@ def test_focused_checks_preserve_the_default_policy_pointer(project, monkeypatch
         assert receipt.is_file()
         assert pointer.read_bytes() == published
     assert verify_receipt(full, project, kind=kind, paired_library=library)["status"] == "passed"
+
+
+def test_latest_full_checks_keep_runtime_and_release_receipts_separate(project, monkeypatch):
+    module = "teadata.verification"
+    monkeypatch.setattr(f"{module}.default_checks", lambda *args, **kwargs: passing())
+    baseline = run_checks(project, kind="library")
+    output = project / ".local"
+    (output / "data.bin").write_bytes(b"retained data")
+    manifests = [output / name for name in ("first.json", "second.json")]
+    for manifest in manifests:
+        manifest.write_text(json.dumps({"artifacts": {"data": {"filename": "data.bin"}}}))
+        run_checks(project, kind="library", release=str(manifest))
+
+    with monkeypatch.context() as other:
+        other.setattr(f"{module}._controller_python_version", lambda: "9.8.7")
+        other.setattr(f"{module}._environment_identity", lambda *args: {"python": "9.8.7"})
+        other.setattr(f"{module}.default_checks",
+                      lambda *args, **kwargs: [Check("failure", ("@python", "-c", "raise SystemExit(7)"))])
+        failed = run_checks(project, kind="library")
+        assert json.loads(failed.read_text())["status"] == "failed"
+
+    flags = ["verification", "--kind", "library", "--root", str(project), "--verify-latest"]
+    for args in ([], *[["--release", str(path)] for path in manifests]):
+        monkeypatch.setattr(sys, "argv", [*flags, *args])
+        main()
+    assert verify_receipt(baseline, project, kind="library")["status"] == "passed"
+
+
+def test_latest_pointer_requires_the_scoped_file_and_exact_receipt_id(project, monkeypatch, capsys):
+    monkeypatch.setattr("teadata.verification.default_checks", lambda *args, **kwargs: passing())
+    receipt = run_checks(project, kind="library")
+    root = receipt.parent.parent
+    current = root / f"latest-library-locked-{_controller_python_version()}.json"
+    monkeypatch.setattr(sys, "argv", ["verification", "--kind", "library", "--root", str(project), "--verify-latest"])
+    main()
+    pointer = json.loads(current.read_text())
+    pointer["record_id"] = "0" * 64
+    current.write_text(json.dumps(pointer))
+    with pytest.raises(SystemExit) as failed:
+        main()
+    assert failed.value.code == 1
+    assert "pointer does not match the verified record" in capsys.readouterr().err
+
+    current.rename(root / "latest-library-locked.json")
+    with pytest.raises(SystemExit) as missing:
+        main()
+    assert missing.value.code == 1
+    assert current.name in capsys.readouterr().err
 
 
 def test_source_and_lockfile_changes_reject_receipt(project):
