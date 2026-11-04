@@ -91,21 +91,24 @@ def test_canonical_budget_gate_requires_a_reviewed_manifest_and_separate_witness
 
 def test_actual_operating_control_keeps_signed_values_and_fund_scope():
     table = pa.table({
-        "district_number": ["001902"] * 8,
-        "fund_code": ["199", "199", "224", "699", "199", "199", "199", "199"],
-        "object_code": ["6100", "6499", "6100", "6100", "6500", "6100", "6100", "6099"],
-        "function_code": ["11", "11", "11", "11", "11", "71", "11", "11"],
-        "program_intent_code": ["23", "33", "43", "23", "23", "23", "24", "23"],
-        "actual_amount": [100, -20, 30, 40, 50, 60, 70, 80],
+        "district_number": ["001902"] * 12,
+        "fund_code": ["199", "199", "224", "699", "199", "199", "199", "199", "199", "224", "699", "199"],
+        "object_code": ["6100", "6499", "6100", "6100", "6500", "6100", "6100", "6099", "6499", "6100", "6100", "6100"],
+        "function_code": ["11", "11", "11", "11", "11", "71", "11", "11", "11", "11", "11", "71"],
+        "program_intent_code": ["23", "33", "43", "23", "23", "23", "24", "23", "37", "37", "37", "37"],
+        "actual_amount": [100, -20, 30, 40, 50, 60, 70, 80, -5, 11, 9, 900],
     })
     totals: Counter[tuple[str, str]] = Counter()
-    gate._accumulate_actual_control(table, totals)
+    dyslexia_totals: Counter[tuple[str, str]] = Counter()
+    gate._accumulate_actual_control(table, totals, dyslexia_totals)
     assert totals == {("001902", "GF"): 80, ("001902", "AF"): 110, ("001902", "excluded_fund_699"): 40}
+    assert dyslexia_totals == {("001902", "GF"): -5, ("001902", "AF"): 6, ("001902", "excluded_fund_699"): 9}
 
 
 @pytest.mark.parametrize(("year", "damage"), [
     (2024, None), (2024, "tab-name"), (2024, "wrong-download"), (2025, None), (2025, "amount"),
     (2025, "missing-raw"), (2025, "extra-raw"), (2025, "retyped"), (2025, "duplicate"), (2025, "period"),
+    (2025, "dyslexia-amount"), (2025, "dyslexia-header"),
 ])
 def test_actual_pwr_compares_exact_operating_amounts_and_validates_full_roster(tmp_path, monkeypatch, year, damage):
     from openpyxl import Workbook
@@ -118,8 +121,10 @@ def test_actual_pwr_compares_exact_operating_amounts_and_validates_full_roster(t
     for group in ("GF", "AF"):
         tab_name = f"{(year - 1) % 100:02}_{year % 100:02} {group} Act"
         sheet = workbook.create_sheet("2024 AF Act" if year == 2024 and group == "AF" else tab_name)
+        dyslexia_pic = 43 if damage == "dyslexia-header" else 37
         sheet.append(["SOURCE", "TAB NAME", "DISTRICT NUMBER", "DISTRICT NAME", "District Type",
-                      f"{group} Students with Disabilities (PICs 23,33,43)"])
+                      f"{group} Students with Disabilities (PICs 23,33,43)",
+                      f"{group} Dyslexia or Related Disorder Services (PIC {dyslexia_pic})"])
         edition = f"{year - 1 if damage == 'period' else year} Actual PWR"
         for cdn, population, amount in (
             ("001902", "INDEPENDENT", -20 if damage == "amount" else -10),
@@ -127,8 +132,9 @@ def test_actual_pwr_compares_exact_operating_amounts_and_validates_full_roster(t
             ("001904", "INDEPENDENT" if damage == "retyped" and group == "AF" else "COMMON", 0),
             ("001902" if damage == "duplicate" else "002801", "CHARTER", 999),
         ):
+            dyslexia = (-1 if damage == "dyslexia-amount" else -2) if cdn == "001902" else 0
             sheet.append([edition, sheet.title if damage == "tab-name" else tab_name,
-                          cdn, "Fixture", population, amount])
+                          cdn, "Fixture", population, amount, dyslexia])
     workbook.save(path)
     store = Mock(spec=ProvenanceStore)
     store.verify_artifact.return_value = path
@@ -150,19 +156,25 @@ def test_actual_pwr_compares_exact_operating_amounts_and_validates_full_roster(t
     if damage == "extra-raw":
         entities.add("002801")
     totals = Counter({("001902", "GF"): -10, ("001902", "AF"): -10, ("001902", "excluded_fund_699"): 21})
+    dyslexia_totals = Counter({("001902", "GF"): -2, ("001902", "AF"): -2, ("001902", "excluded_fund_699"): 31})
     monkeypatch.setattr(gate, "_ACTUAL_PWR", {year: ("1" * 64, 2)})
     if damage is None:
-        report = gate._actual_workbook_control(store, year, entities, totals)
+        report = gate._actual_workbook_control(store, year, entities, totals, dyslexia_totals)
         assert report["compared_cells"] == 4
         assert report["fund_groups"]["AF"]["common_unchecked"] == 1
         assert report["fund_groups"]["AF"]["charter_unchecked"] == 1
         assert report["independent_districts_with_nonzero_excluded_fund_699"] == 1
+        dyslexia = report["dyslexia_pic37"]
+        assert dyslexia["compared_cells"] == 4
+        assert dyslexia["independent_districts_with_nonzero_excluded_fund_699"] == 1
+        assert dyslexia["fund_groups"]["AF"]["column"] == "AF Dyslexia or Related Disorder Services (PIC 37)"
         if year == 2024:
             assert report["fund_groups"]["AF"]["sheet"] == "2024 AF Act"
             assert report["fund_groups"]["AF"]["publisher_tab_name"] == "23_24 AF Act"
     else:
-        with pytest.raises(ContractError):
-            gate._actual_workbook_control(store, year, entities, totals)
+        message = {"dyslexia-amount": r"\(PIC 37\)", "dyslexia-header": "headings differ"}.get(damage)
+        with pytest.raises(ContractError, match=message):
+            gate._actual_workbook_control(store, year, entities, totals, dyslexia_totals)
 
 
 def test_canonical_actual_pwr_dispatch_uses_explicit_separate_status(monkeypatch):

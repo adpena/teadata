@@ -44,6 +44,7 @@ _ACTUAL_PWR = {
     2025: ("f8a3128a833512452dfaef9af8030f07854f7f02fe8c2fa69d7f157c5d109b23", 1013),
 }
 _ACTUAL_PROGRAMS = ["23", "33", "43"]
+_DYSLEXIA_PIC = "37"
 _ACTUAL_EXCLUDED_FUNCTIONS = ["71", "81", "91", "93", "97", "99"]
 _CAPITAL_PROJECTS_FUND = "699"
 _GENERAL_FUNDS = ["100", "101", "199"]
@@ -235,23 +236,25 @@ def qualify_budget(release: DataRelease, parity_store: ProvenanceStore, witness_
             "publisher_witnesses": publisher}
 
 
-def _accumulate_actual_control(table: pa.Table, totals: Counter[tuple[str, str]]) -> None:
-    selected = table.filter(pc.and_(
-        pc.and_(_operating_objects(table["object_code"]),
-                pc.is_in(table["program_intent_code"], value_set=pa.array(_ACTUAL_PROGRAMS))),
+def _accumulate_actual_control(table: pa.Table, totals: Counter[tuple[str, str]],
+                               dyslexia_totals: Counter[tuple[str, str]]) -> None:
+    operating = pc.and_(
+        _operating_objects(table["object_code"]),
         pc.invert(pc.is_in(table["function_code"], value_set=pa.array(_ACTUAL_EXCLUDED_FUNCTIONS))),
-    ))
-    _accumulate(selected.filter(pc.is_in(selected["fund_code"], value_set=pa.array(_GENERAL_FUNDS))),
-                _ACTUALS.amount, "GF", totals)
-    # The reviewed All Funds presentations exclude this fund. Preserve its
-    # signed contribution independently; the raw account leaf is never changed.
-    capital_projects = pc.equal(selected["fund_code"], _CAPITAL_PROJECTS_FUND)
-    _accumulate(selected.filter(pc.invert(capital_projects)), _ACTUALS.amount, "AF", totals)
-    _accumulate(selected.filter(capital_projects), _ACTUALS.amount, "excluded_fund_699", totals)
+    )
+    for codes, measure_totals in ((_ACTUAL_PROGRAMS, totals), ([_DYSLEXIA_PIC], dyslexia_totals)):
+        selected = table.filter(pc.and_(operating, pc.is_in(table["program_intent_code"], value_set=pa.array(codes))))
+        _accumulate(selected.filter(pc.is_in(selected["fund_code"], value_set=pa.array(_GENERAL_FUNDS))),
+                    _ACTUALS.amount, "GF", measure_totals)
+        # The reviewed All Funds presentations exclude this fund. Preserve its
+        # signed contribution independently; the raw account leaf is never changed.
+        capital_projects = pc.equal(selected["fund_code"], _CAPITAL_PROJECTS_FUND)
+        _accumulate(selected.filter(pc.invert(capital_projects)), _ACTUALS.amount, "AF", measure_totals)
+        _accumulate(selected.filter(capital_projects), _ACTUALS.amount, "excluded_fund_699", measure_totals)
 
 
 def _actual_workbook_control(store: ProvenanceStore, year: int, entities: set[str],
-                             totals: Counter[tuple[str, str]]) -> dict[str, Any]:
+                             totals: Counter[tuple[str, str]], dyslexia_totals: Counter[tuple[str, str]]) -> dict[str, Any]:
     from openpyxl import load_workbook
 
     identifier, independent_count = _ACTUAL_PWR[year]
@@ -270,6 +273,7 @@ def _actual_workbook_control(store: ProvenanceStore, year: int, entities: set[st
     if path.stat().st_size != artifact["size_bytes"]:
         raise ContractError("Actual PWR workbook size differs from its receipt")
     fund_groups = {}
+    dyslexia_fund_groups = {}
     rosters: dict[str, dict[str, str]] = {}
     with path.open("rb") as stream:
         workbook = load_workbook(stream, read_only=True, keep_links=False)
@@ -280,11 +284,12 @@ def _actual_workbook_control(store: ProvenanceStore, year: int, entities: set[st
                 records = iter(workbook[sheet].rows)
                 headings = [cell.value for cell in next(records)]
                 title = f"{group} Students with Disabilities (PICs {','.join(_ACTUAL_PROGRAMS)})"
+                dyslexia_title = f"{group} Dyslexia or Related Disorder Services (PIC {_DYSLEXIA_PIC})"
                 type_heading = "DISTRICT TYPE" if year == 2023 else "District Type"
                 if (headings[1:5] != ["TAB NAME", "DISTRICT NUMBER", "DISTRICT NAME", type_heading]
-                        or headings.count("DISTRICT NUMBER") != 1 or headings.count(title) != 1):
+                        or any(headings.count(name) != 1 for name in ("DISTRICT NUMBER", title, dyslexia_title))):
                     raise ContractError("Actual PWR headings differ")
-                column = headings.index(title)
+                controls = ((headings.index(title), totals), (headings.index(dyslexia_title), dyslexia_totals))
                 roster: dict[str, str] = {}
                 types: Counter[str] = Counter()
                 for row in records:
@@ -297,9 +302,11 @@ def _actual_workbook_control(store: ProvenanceStore, year: int, entities: set[st
                     roster[entity] = population
                     types[population] += 1
                     if population == "INDEPENDENT":
-                        amount = row[column]
-                        if amount.data_type != "n" or type(amount.value) is not int or amount.value != totals[entity, group]:
-                            raise ContractError(f"Actual PWR amount differs for FY{year} {entity} {group}")
+                        for column, measure_totals in controls:
+                            amount = row[column]
+                            if (amount.data_type != "n" or type(amount.value) is not int
+                                    or amount.value != measure_totals[entity, group]):
+                                raise ContractError(f"Actual PWR amount differs for FY{year} {entity}: {headings[column]}")
                 if (types["INDEPENDENT"] != independent_count
                         or {entity for entity, population in roster.items() if population != "CHARTER"} != entities):
                     raise ContractError("Actual PWR district account population differs from the publisher roster")
@@ -307,17 +314,20 @@ def _actual_workbook_control(store: ProvenanceStore, year: int, entities: set[st
                 fund_groups[group] = {"sheet": sheet, "publisher_tab_name": tab_name, "column": title,
                                       "compared_cells": types["INDEPENDENT"],
                                       "common_unchecked": types["COMMON"], "charter_unchecked": types["CHARTER"]}
+                dyslexia_fund_groups[group] = {"column": dyslexia_title, "compared_cells": types["INDEPENDENT"]}
         finally:
             workbook.close()
     if rosters["GF"] != rosters["AF"]:
         raise ContractError("Actual PWR General Fund and All Funds rosters differ")
+    independent = {entity for entity, population in rosters["AF"].items() if population == "INDEPENDENT"}
     return {"fiscal_end_year": year, "receipt_id": identifier, "source_url": url, "source_sha256": artifact["sha256"],
             "retrieved_at": record["downloaded_at"],
             "fund_groups": fund_groups, "compared_cells": 2 * independent_count,
             "independent_districts_with_nonzero_excluded_fund_699": sum(
-                bool(totals[entity, "excluded_fund_699"]) for entity, population in rosters["AF"].items()
-                if population == "INDEPENDENT"
-            )}
+                bool(totals[entity, "excluded_fund_699"]) for entity in independent),
+            "dyslexia_pic37": {"fund_groups": dyslexia_fund_groups, "compared_cells": 2 * independent_count,
+                               "independent_districts_with_nonzero_excluded_fund_699": sum(
+                                   bool(dyslexia_totals[entity, "excluded_fund_699"]) for entity in independent)}}
 
 
 def _check_actual_binding(config: Config, release: DataRelease, ref: ArtifactRef, year: int) -> None:
@@ -362,10 +372,11 @@ def qualify_actual_pwr(release: DataRelease, parity_store: ProvenanceStore,
             ref = selected[0]
             _check_actual_binding(config, release, ref, year)
             totals: Counter[tuple[str, str]] = Counter()
+            dyslexia_totals: Counter[tuple[str, str]] = Counter()
             result, entities = _replay_accounts(release, parity_store, ref, _ACTUALS,
-                                                lambda table: _accumulate_actual_control(table, totals))
+                                                lambda table: _accumulate_actual_control(table, totals, dyslexia_totals))
             results.append(result)
-            witness = _actual_workbook_control(witness_store, year, entities, totals)
+            witness = _actual_workbook_control(witness_store, year, entities, totals, dyslexia_totals)
             if witness["source_sha256"] in ref.contract["inputs"]:
                 raise ContractError("Actual PWR workbook is not a separate publisher presentation")
             witnesses[str(year)] = witness
@@ -380,6 +391,8 @@ def qualify_actual_pwr(release: DataRelease, parity_store: ProvenanceStore,
                                     "compared_cells": sum(item["compared_cells"] for item in results)}},
             "publisher_witnesses": {"editions": witnesses,
                                     "compared_cells": sum(item["compared_cells"] for item in witnesses.values()),
+                                    "dyslexia_pic37": {"program_intent_code": _DYSLEXIA_PIC, "compared_cells": sum(
+                                        item["dyslexia_pic37"]["compared_cells"] for item in witnesses.values())},
                                     "program_intent_codes": _ACTUAL_PROGRAMS,
                                     "objects": f"{_OBJECT_MIN}–{_OBJECT_MAX}",
                                     "excluded_functions": _ACTUAL_EXCLUDED_FUNCTIONS,

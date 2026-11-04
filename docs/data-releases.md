@@ -334,6 +334,15 @@ the original account values intact. The FY2024 notes explicitly mention Fund
 699 for operating revenue. The expenditure scope was established by the dollar
 comparisons above. [FY2024 Actual report methodology](https://rptsvr1.tea.texas.gov/school.finance/forecasting/financial_reports/AbtAct24.docx) and [FY2025 Actual report methodology](https://rptsvr1.tea.texas.gov/school.finance/forecasting/financial_reports/AbtAct25.docx).
 
+The same replay separately compares **Dyslexia or Related Disorder Services
+(PIC 37)** using the same objects, function exclusions, fund filters and
+Independent ISD roster. The `dyslexia_pic37` report contains 6,080 additional
+publisher comparisons and retains its own Fund 699 counts. PIC 43 remains in
+the published Students with Disabilities line. PIC 37 alone measures spending
+coded to that line in each edition. Total dyslexia spending, the combined
+allotment compliance measure, and cross-year comparability under changing
+coding guidance require separate evidence. [TEA accounting guide, PIC 37 and 43](https://tea.texas.gov/data-reports/financial-accountability/fasrg/fasrg19-module1-far-appendices-0.pdf#page=226) and [TEA state allotment guidance](https://tea.texas.gov/data-reports/financial-compliance/state-allotment-programs).
+
 Both presentations use PEIMS. This result leaves full-bundle semantic
 qualification, signed-audit reconciliation, the narrower PIC 23+33 totals,
 per-student rates and release activation outside its scope.
