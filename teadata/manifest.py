@@ -983,6 +983,12 @@ class DatasetCatalog:
     def to_dict(self) -> dict[str, Any]:
         return json.loads(self._serialized)
 
+    def _scalar_metadata(self, dataset: str) -> DatasetMetadata:
+        try:
+            return self._metadata[dataset]
+        except KeyError as exc:
+            raise ContractError(f"Dataset was not loaded in this release: {dataset}") from exc
+
     def metadata(self, dataset: str, *, edition: EditionKey | None = None) -> DatasetMetadata:
         if getattr(self, "_v4", False):
             identifier = self._selected_edition(dataset, edition)
@@ -1067,7 +1073,8 @@ class DatasetCatalog:
         return period.label
 
     def field_year(self, dataset: str) -> int:
-        year = self.metadata(dataset).field_year
+        metadata = self.metadata(dataset) if getattr(self, "_v3", False) else self._scalar_metadata(dataset)
+        year = metadata.field_year
         if year is None:
             raise ContractError(f"Dataset {dataset} has no declared field year")
         return year
@@ -1076,7 +1083,9 @@ class DatasetCatalog:
         if getattr(self, "_v4", False):
             identifier = self._selected_edition(dataset, edition)
             return self._edition_view(identifier).policy(dataset, edition=self._edition_keys[identifier])
-        policy_id = self.metadata(dataset, edition=edition).value_policy
+        metadata = (self.metadata(dataset, edition=edition) if getattr(self, "_v3", False) or edition is not None
+                    else self._scalar_metadata(dataset))
+        policy_id = metadata.value_policy
         if policy_id is None:
             raise ContractError(f"Dataset {dataset} has no value policy")
         policy = self._policy_for_edition(self._selected_edition(dataset, edition)) if getattr(self, "_v3", False) else self._policies[policy_id]
@@ -1331,7 +1340,6 @@ class DatasetCatalog:
     def metric_label(
         self, metric: str, label: str, *, scope: str = "campus", short: bool = True
     ) -> str:
-        dataset, _ = self.source_for_metric(metric, scope)
         value = self.metric_period(metric, scope=scope)
         period = value.label or "Period not specified"
         if short and value.start_year is not None:
