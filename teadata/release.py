@@ -162,7 +162,8 @@ class DataRelease:
             raw = stream.read(4 * 1024 * 1024 + 1)
         if len(raw) > 4 * 1024 * 1024:
             raise ContractError("Release manifest is too large")
-        if expected_sha256 is not None and sha256(raw).hexdigest() != expected_sha256:
+        self._manifest_sha256 = sha256(raw).hexdigest()
+        if expected_sha256 is not None and self._manifest_sha256 != expected_sha256:
             raise ContractError("Release manifest checksum differs from its trusted pin")
         document = json.loads(raw)
         version = document.get("schema_version")
@@ -175,7 +176,6 @@ class DataRelease:
             self._verified = {}
             self._verified_bytes: dict[str, tuple[Path, tuple[int, int, int, int]]] = {}
             self._column_schema_data: dict[str, tuple[Path, tuple[int, ...], bytes]] = {}
-            self._manifest_sha256 = sha256(raw).hexdigest()
             self.catalog = DatasetCatalog(document["catalog"], column_schema_loader=self._column_schema_bytes,
                                           edition_metadata_loader=self._column_schema_bytes)
             return
@@ -232,6 +232,11 @@ class DataRelease:
     def build_id(self) -> str:
         return self.catalog.build_id
 
+    @property
+    def manifest_sha256(self) -> str:
+        """SHA-256 of the manifest bytes parsed by this release."""
+        return self._manifest_sha256
+
     def _resource_path(self, location: str, digest: str, size: int) -> Path:
         """One location/cache/download path for selected v3 bytes."""
         if "://" in location or self.remote:
@@ -252,7 +257,7 @@ class DataRelease:
 
     def __getstate__(self) -> dict:
         if self._v3:
-            return {"_v3": True, "source": self.source, "pin": self._manifest_sha256, "offline": self.offline}
+            return {"_v3": True, "source": self.source, "pin": self.manifest_sha256, "offline": self.offline}
         return self.__dict__.copy()
 
     def __setstate__(self, state: dict) -> None:
@@ -345,8 +350,12 @@ def current_release() -> DataRelease:
     source = os.environ.get("TEADATA_RELEASE") or os.environ.get("TEADATA_RELEASE_URL")
     if not source:
         source = str(Path(__file__).with_name(".cache") / "release.json")
+    expected_sha256 = os.environ.get("TEADATA_RELEASE_SHA256")
+    offline = os.environ.get("TEADATA_RELEASE_OFFLINE", "0")
+    if offline not in {"0", "1"}:
+        raise ContractError("TEADATA_RELEASE_OFFLINE must be 0 or 1")
     stamp = 0 if "://" in source else Path(source).expanduser().stat().st_mtime_ns
-    return _load_release(source, stamp)
+    return _load_release(source, stamp, expected_sha256, offline == "1")
 
 
 @contextmanager

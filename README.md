@@ -180,6 +180,8 @@ in plain text or BibTeX with `teadata.citation()`.
 
 - `TEADATA_RELEASE`: local release manifest.
 - `TEADATA_RELEASE_URL`: immutable remote release manifest.
+- `TEADATA_RELEASE_SHA256`: trusted lowercase SHA-256 of the selected release manifest.
+- `TEADATA_RELEASE_OFFLINE`: set to `1` for cache-only access to remote release files or `0` to allow downloads. Offline remote manifests require a SHA-256 pin.
 - `TEADATA_DATA_DIR`: source data root for scripts and configured `data/...` inputs.
 - `TEADATA_CONFIG`, `TEADATA_PROVENANCE_DIR`, `TEADATA_OUTPUT_DIR`: build locations.
 - `TEADATA_DISABLE_INDEXES`: disable spatial acceleration indexes.

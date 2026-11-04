@@ -2,6 +2,7 @@ from dataclasses import replace
 from contextlib import closing
 import gzip
 from hashlib import sha256
+from io import BytesIO
 import json
 import os
 import pickle
@@ -131,6 +132,65 @@ def test_release_binds_all_artifacts(release, catalog):
     assert engine.catalog.build_id == selected.build_id
     with pytest.raises(ContractError, match="no analytical read model"):
         selected.analytical_dataset("campus")
+
+
+def test_current_release_reuses_a_pinned_build_cache_offline(release, tmp_path, monkeypatch):
+    monkeypatch.delenv("TEADATA_RELEASE", raising=False)
+    monkeypatch.setenv("TEADATA_RELEASE_URL", "https://example.invalid/v1/release.json")
+    monkeypatch.setenv("TEADATA_RELEASE_SHA256", sha256(release.read_bytes()).hexdigest())
+    monkeypatch.setenv("TEADATA_RELEASE_OFFLINE", "0")
+    monkeypatch.setattr(release_module, "user_cache_path", lambda _: tmp_path / "cache")
+
+    def response(url, *, timeout):
+        filename = url.removeprefix("https://example.invalid/v1/")
+        return BytesIO((release.parent / filename).read_bytes())
+
+    monkeypatch.setattr(release_module, "urlopen", response)
+    try:
+        build = release_module.current_release()
+        assert build.manifest_sha256 == sha256(release.read_bytes()).hexdigest()
+        staged = build.verify()
+        release_module._load_release.cache_clear()
+        monkeypatch.setenv("TEADATA_RELEASE_OFFLINE", "1")
+        network = Mock(side_effect=AssertionError("Offline startup must not use the network"))
+        monkeypatch.setattr(release_module, "urlopen", network)
+        runtime = release_module.current_release()
+        assert runtime.offline and runtime.build_id == build.build_id
+        assert runtime.manifest_sha256 == build.manifest_sha256
+        assert runtime.verify() == staged
+
+        monkeypatch.setenv("TEADATA_RELEASE_SHA256", "f" * 64)
+        with pytest.raises(ContractError, match="trusted pin"):
+            release_module.current_release()
+        monkeypatch.delenv("TEADATA_RELEASE_SHA256")
+        with pytest.raises(ContractError, match="expected manifest SHA-256"):
+            release_module.current_release()
+        monkeypatch.setenv("TEADATA_RELEASE_OFFLINE", "true")
+        with pytest.raises(ContractError, match="must be 0 or 1"):
+            release_module.current_release()
+        with release_module.using_release(runtime):
+            assert release_module.current_release() is runtime
+        network.assert_not_called()
+    finally:
+        release_module._load_release.cache_clear()
+
+
+def test_current_release_applies_pin_to_the_selected_local_manifest(release, monkeypatch):
+    monkeypatch.setenv("TEADATA_RELEASE", str(release))
+    monkeypatch.setenv("TEADATA_RELEASE_URL", "https://example.invalid/release.json")
+    original = release.read_bytes()
+    pin = sha256(original).hexdigest()
+    monkeypatch.setenv("TEADATA_RELEASE_SHA256", pin)
+    monkeypatch.setenv("TEADATA_RELEASE_OFFLINE", "1")
+    selected = release_module.current_release()
+    assert selected.path == release
+    release.write_bytes(original + b" ")
+    assert selected.manifest_sha256 == pin
+    with pytest.raises(ContractError, match="trusted pin"):
+        DataRelease(release, expected_sha256=selected.manifest_sha256, offline=True)
+    monkeypatch.setenv("TEADATA_RELEASE_SHA256", "")
+    with pytest.raises(ContractError, match="Manifest pin must be a SHA-256 identity"):
+        release_module.current_release()
 
 
 def test_citation_pins_release_without_emitting_private_locations(release, tmp_path, monkeypatch):

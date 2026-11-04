@@ -398,4 +398,15 @@ The builder sets `PYTHONHASHSEED=0`, records code and lockfile content identity 
 
 Set `TEADATA_RELEASE` to a local manifest or `TEADATA_RELEASE_URL` to a version-pinned remote manifest URL. A source checkout defaults to `teadata/.cache/release.json` and must hydrate its Git LFS artifacts. Wheels contain code, source contracts, and methodology documents; configure their data release explicitly. For HTTP delivery, publish the unchanged `release.json` and all of its hash-bound artifacts as adjacent files under one base URL, such as a GitHub Release asset directory. Raw GitHub URLs for Git LFS files serve pointer text rather than artifact bytes, so they fail checksum validation; the reader does not combine a raw manifest URL with a separate media base. Remote files are cached by content hash and verified before use. A process pins a configured remote release until restart; requests and cache rebuilds pin one release for their duration.
 
+For a deployment that can download at build time, set `TEADATA_RELEASE_URL` to
+the manifest URL and `TEADATA_RELEASE_SHA256` to its trusted lowercase SHA-256. Run
+`current_release().verify()` at build time with `TEADATA_RELEASE_OFFLINE=0` to
+populate and verify the cache. Use the same URL, pin, and cache location with
+`TEADATA_RELEASE_OFFLINE=1` at runtime. The reader uses the cached remote
+manifest and checks its pin in each new process. Missing or corrupt cached
+files fail when the reader verifies or opens them. The offline setting defaults
+to `0` and accepts only `0` or `1`. The manifest pin also applies when
+`TEADATA_RELEASE` selects a local file. Use `release.manifest_sha256` to pass the
+identity of the loaded manifest to a background job.
+
 The application requires the coordinated library version, schema migrations, and release manifest. Publish and pin those together before deployment. Never merge the app against an older library tag. Preserve the previous deployed code and data bundle for rollback. The migration's missing joins, unreviewed documentation, unknown original download dates, and incomplete upstream lineage must remain visible; they prevent claiming this baseline has completed researcher-grade dataset certification.
