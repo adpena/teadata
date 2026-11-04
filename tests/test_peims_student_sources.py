@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from teadata.column_schema import crosswalk_dataset, parse_column_schema
+from teadata.column_schema import crosswalk_dataset, parse_column_schema, reader_options, table_input_sha256s
 from teadata.manifest import ContractError
 from teadata.provenance import ProvenanceStore, validate_record_graph, validate_reference_records
 from teadata.teadata_config import load_config
@@ -36,14 +36,16 @@ def test_source_discovery_is_exact_and_excluded_from_retained_builds(
     assert selected.metadata.metrics[total_field].unit == "count"
     assert selected.metadata.period.label == "2025-2026"
     assert selected.resolved_year == 2026
-    assert {reference.role for reference in selected.metadata.references} == {"source_notes", "masking_methodology"}
-    assert len(selected.metadata.provenance_ids) == 3
+    assert {reference.role for reference in selected.metadata.references} == {"source_notes", "masking_methodology", "schema"}
+    assert not selected.metadata.provenance_ids
+    acquisitions = reader_options(selected.reader, "source")["acquisition_ids"]
+    assert set(acquisitions) == {"state", "district", "campus"}
     assert cfg.column_schema(dataset, 2026) is None
     provenance = ProvenanceStore(Path(__file__).resolve().parents[1] / "provenance")
-    roots = list(selected.metadata.provenance_ids)
+    roots = list(acquisitions.values())
     roots.extend(identifier for reference in selected.metadata.references for identifier in reference.provenance_ids)
-    validate_record_graph(provenance.read_record, roots)
-    validate_reference_records(selected, provenance.read_record, verify_all_claimed=True)
+    graph = validate_record_graph(provenance.read_record, roots)
+    validate_reference_records(selected, graph.__getitem__, verify_all_claimed=True)
 
     # Retained builds can request an older year without attempting an
     # unavailable future-only source. Historical exact lookup still fails.
@@ -58,11 +60,17 @@ def test_source_discovery_is_exact_and_excluded_from_retained_builds(
         cfg.load_df(dataset, 2026, reader_profile="source", exact=True)
 
     contract = cfg.column_contract(dataset, 2026, reader_profile="source")
+    assert contract is not None
     selected_crosswalk = crosswalk_dataset(parse_column_schema(contract["text"].encode()), dataset, "2026")
     tables = selected_crosswalk["tables"]
     assert [table["table"] for table in tables] == ["state", "district", "campus"]
     assert len({table["input_sha256"] for table in tables}) == 3
     for table, width, row_count in zip(tables, widths, row_counts, strict=True):
+        receipt = graph[acquisitions[table["table"]]]
+        assert receipt["dataset"] == dataset and receipt["resolved_year"] == 2026
+        assert receipt["source_metadata"]["version"] == "2026"
+        assert receipt["parameters"]["replayed_from"] in graph
+        assert table_input_sha256s(table) == (receipt["artifact"]["sha256"],)
         layout = table["layout"]
         assert layout["last_data_record"] - layout["first_data_record"] + 1 == row_count
         fields = cfg.header_records(dataset, edition="2026", table=table["table"], reader_profile="source")
@@ -107,5 +115,6 @@ def test_mixed_editions_never_hide_required_retained_sources():
 def test_peims_masking_is_report_specific(dataset, raw, status, expected):
     cfg = load_config()
     source = cfg.resolve_dataset(dataset, 2026, exact=True)
+    assert source.metadata.value_policy is not None
     value = measure(raw, cfg.value_policies[source.metadata.value_policy], unit="count", minimum=0)
     assert (value.status, value.value, value.raw) == (status, expected, raw)

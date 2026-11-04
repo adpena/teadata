@@ -7221,21 +7221,13 @@ data_sources:
               kind: school_year
               start_year: 2025
             unit: count
-        notes: Public statewide scope files from the October PEIMS Enrollment snapshot. Publisher
-          finality is unspecified. This series is distinct from TPRS Membership. Metadata and
-          header discovery only. Scope table hashes bind the original public acquisitions. Those
-          acquisitions predate versioned catalog registration and retain their original names
-          and metadata. The district path is the source contract location; campus and statewide
-          selections remain separate receipt-bound tables. Native catalog leaves and row access
-          are pending.
+        notes: October 2025 PEIMS Enrollment snapshot. Publisher finality is unspecified. Separate
+          from TPRS Membership. The three scope files have distinct acquisitions and native leaves.
+          Source discovery and explicit candidate builds do not hydrate the default engine.
         period:
           end_year: 2026
           kind: school_year
           start_year: 2025
-        provenance_ids:
-        - 1ba7432a432dde2efe79b363781b98087bf65b38edfb169d23c6ee9f32008faa
-        - 2dbe85c9bdcd60537eea5563f8292e05a107b489914e5926033450609730ad9c
-        - 2185f07c3a7b3544c83f9cc4e14b76b0612445c5bea9e32f11825547ae1f1fc4
         published_at: '2026-03-06'
         publisher: Texas Education Agency
         references:
@@ -7263,6 +7255,14 @@ data_sources:
           status: available
           title: Publisher PEIMS Standard Reports dates
           url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - path: schemas/peims--2026--student-enrollment-by-ethnicity-crosswalk.json
+          provenance_ids:
+          - 7f43f2a250d8d4cd0ceff57d82c87555abd1633ba967f07cab365887927a8c55
+          reference_id: column_crosswalk
+          reviewed_sha256: 475022f808536e16f3678600ee5377e6b2c677236981d7e26e628bb953e4636d
+          role: schema
+          status: available
+          title: PEIMS Student Enrollment by Ethnicity literal headers and physical framing
         source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adste.html
         title: 2025–26 PEIMS Student Enrollment by Ethnicity
         value_policy: peims_student_enrollment_by_ethnicity_2026
@@ -7272,13 +7272,10 @@ data_sources:
         profiles:
           source:
             column_schema: schemas/peims--2026--student-enrollment-by-ethnicity-crosswalk.json
-            references:
-            - path: schemas/peims--2026--student-enrollment-by-ethnicity-crosswalk.json
-              reference_id: column_crosswalk
-              reviewed_sha256: 475022f808536e16f3678600ee5377e6b2c677236981d7e26e628bb953e4636d
-              role: schema
-              status: available
-              title: PEIMS Student Enrollment by Ethnicity literal headers and physical framing
+            acquisition_ids:
+              state: 55c311f424fc5d7e772f19cea988ea810462ba40d0f508f5cf61db1328849e37
+              district: 96dcd948a7c02b34be090c9e9263f9298925bb03dfff6fa62a326186ecc56221
+              campus: b85d0a297159df460a4d928034f9d1096d77be132b1903f4dfcbda031c7ef134
   peims_student_programs_and_special_populations:
     2026:
       metadata:
@@ -7381,21 +7378,13 @@ data_sources:
               kind: school_year
               start_year: 2025
             unit: count
-        notes: Public statewide scope files from the October PEIMS Enrollment snapshot. Publisher
-          finality is unspecified. This series is distinct from TPRS Membership. Metadata and
-          header discovery only. Scope table hashes bind the original public acquisitions. Those
-          acquisitions predate versioned catalog registration and retain their original names
-          and metadata. The district path is the source contract location; campus and statewide
-          selections remain separate receipt-bound tables. Native catalog leaves and row access
-          are pending.
+        notes: October 2025 PEIMS Enrollment snapshot. Publisher finality is unspecified. Separate
+          from TPRS Membership. The three scope files have distinct acquisitions and native leaves.
+          Program populations can overlap. Source discovery and explicit candidate builds do not hydrate the default engine.
         period:
           end_year: 2026
           kind: school_year
           start_year: 2025
-        provenance_ids:
-        - 1a2fd407882a73582ad129b4081bc274ac2ba319cc36c80c0ee7011b5f364180
-        - 5a2287646ec05dabdbcc8ed8a427811cf61dbbdc052d62e067fe7c81bf326b1e
-        - 0dd20866dae38973252b86e62c6cf6a23177ee1b56b3680105b021c51478b15e
         published_at: '2026-03-13'
         publisher: Texas Education Agency
         references:
@@ -7423,6 +7412,14 @@ data_sources:
           status: available
           title: Publisher PEIMS Standard Reports dates
           url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - path: schemas/peims--2026--student-programs-and-special-populations-crosswalk.json
+          provenance_ids:
+          - 37ec814975e0d2d37cf1208ad9dd821ea3e1bb2e4a8cdfd44ad881d38dbb7887
+          reference_id: column_crosswalk
+          reviewed_sha256: f6033ac955fde88a30f0ea2ecd53ef4dd05a615d6a883b5163343c0ef9469822
+          role: schema
+          status: available
+          title: PEIMS Student Program and Special Populations literal headers and physical framing
         source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adspr.html
         title: 2025–26 PEIMS Student Program and Special Populations
         value_policy: peims_student_programs_and_special_populations_2026
@@ -7432,14 +7429,10 @@ data_sources:
         profiles:
           source:
             column_schema: schemas/peims--2026--student-programs-and-special-populations-crosswalk.json
-            references:
-            - path: schemas/peims--2026--student-programs-and-special-populations-crosswalk.json
-              reference_id: column_crosswalk
-              reviewed_sha256: f6033ac955fde88a30f0ea2ecd53ef4dd05a615d6a883b5163343c0ef9469822
-              role: schema
-              status: available
-              title: PEIMS Student Program and Special Populations literal headers and physical
-                framing
+            acquisition_ids:
+              state: cb8abe33c626796eafaa89395129cb9b4df5297adcbd1f18c2cc5bc7e13f4e7d
+              district: 9b4ed15e6fab5cbf79fdfc58585147666e9bc1c28080b419109bc05e9e43c46b
+              campus: 540c12a72c6373e8a073a7203158a5a5b1c7e872b835a1c6e8490ac5289b07fb
 spatial:
   districts:
     2025:
