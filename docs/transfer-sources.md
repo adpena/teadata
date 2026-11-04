@@ -277,11 +277,12 @@ change the default source configuration, or qualify a release scientifically.
 ## Offline district native candidates
 
 `refresh_transfers materialize` accepts exact annual preparation processing IDs
-and a separately reviewed, SHA-pinned source Config. It requires every offered
-region from the preparation's captured index/form, in source order. The actual
-2024 and 2025 batches each contain all 20 regional originals. Regions are
-physical acquisition partitions: the result contains one statewide district
-logical table and native leaf per selected year, not 20 regional tables.
+and a reviewed, SHA-pinned source Config. The packaged `teadata_sources.yaml`
+includes source discovery for the 2023–24, 2024–25, and 2025–26 district reports.
+The builder requires every offered region from the preparation's captured
+index/form, in source order. Each annual batch contains all 20 regional originals.
+The result contains one statewide district logical table and native leaf per
+selected year. Regions are physical acquisition partitions.
 
 The reviewed source profile must enumerate every original SHA in the ordered
 header contract, retain genuine schema/masking-reference acquisitions, identify
@@ -294,16 +295,37 @@ contract retains raw/status/locator columns without inventing publisher headers.
 Selected counts include their raw token, status and row kind automatically;
 extracted district IDs retain the original combined name/number labels.
 
-For a new, separately reviewed source contract and exclusive candidate directory:
+The store must contain the prepared artifacts and their complete original
+receipt and object closure. For the retained inputs, use the packaged source
+Config and its exact SHA-256, and choose a new candidate directory:
 
 ```sh
-uv run python -m teadata.scripts.refresh_transfers materialize \
+uv run --locked --offline python -m teadata.scripts.refresh_transfers materialize \
   --store "$TRANSFER_PROVENANCE_STORE" \
-  --config "$TRANSFER_REVIEWED_CONFIG" \
+  --config teadata/teadata_sources.yaml \
   --config-sha256 "$TRANSFER_REVIEWED_CONFIG_SHA256" \
   --prepared-input 2024 20b4640c31a135b55c435725f50f75d8798f769ad2790a20b10447d182cfd1da \
   --prepared-input 2025 a79a1f84b46c02b4929f3ec0dc942fa2adce8d6e3ca9f60539bf6ede31549fb5 \
+  --prepared-input 2026 02977bde453c093ff624ff81537cf9c26d163aed6434e7045239273e1a3e0b18 \
   --output "$TRANSFER_NEW_CANDIDATE_DIR"
+```
+
+To read the candidate directly, open its manifest and choose an explicit
+edition and field. The catalog resolves the leaf and includes the raw count,
+status and source row locator alongside the normalized count.
+
+```python
+from teadata.dataset_metadata import EditionKey
+from teadata.release import DataRelease
+
+release = DataRelease("path/to/candidate/release.json", offline=True)
+entry, = (row for row in release.catalog.editions(dataset="district_transfer_reports")
+          if row["edition"] == "2024")
+edition = EditionKey(entry["dataset"], entry["edition"], entry["revision_sha256"],
+                     entry["scope"], entry["table"], entry["grain"])
+selection, = release.catalog.resolve_artifacts([(edition, "student_transfer_count")])
+rows = release.analytical_dataset(selection["artifact"].identity).to_batches(
+    columns=list(selection["columns"]))
 ```
 
 Historical preparations are admitted against their own recorded producer/CLI,
@@ -321,5 +343,6 @@ emitted batch. These are input/buffer checks, not a whole-process RSS or duratio
 guarantee. Native readback must equal the accepted preparation after only the
 declared column projection. The earlier preparations' `field_correctness_qualified`
 value is false; PASS/readback and native materialization do not upgrade it or
-establish all-LEA coverage. Default YAML activation, engine/app consumer cutover,
-field correctness and release qualification remain separate reviewed steps.
+establish all-LEA coverage. The packaged entries expose the source contracts
+without adding district rows to the default engine or app. Engine/app consumer
+cutover, field correctness and release qualification remain separate reviewed steps.

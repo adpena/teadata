@@ -3,17 +3,20 @@
 from copy import deepcopy
 from hashlib import sha256
 import json
+from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 import pytest
 
 from test_transfer_preparation import DISTRICT_HEADER, POLICY, original
 from test_transfer_sources import Response, install_transport, retained_form
-from teadata.column_schema import source_schema_fingerprint
+from teadata.column_schema import crosswalk_dataset, parse_column_schema, source_schema_fingerprint, table_input_sha256s
 from teadata.dataset_metadata import DatasetMetadata, EditionKey, ResolvedDataset
 from teadata.manifest import canonical_json
+from teadata.provenance import ProvenanceStore, validate_record_graph, validate_reference_records
 from teadata.release import DataRelease
 from teadata.scripts.refresh_transfers import main
+from teadata.teadata_config import load_config
 from teadata.transfer_leaves import materialize_district_transfers
 from teadata.transfer_sources import acquire_regional_transfers, prepare_transfer_sources
 from teadata.values import measure
@@ -22,6 +25,33 @@ from teadata.values import measure
 FIELDS = ["school_year", "reporting_region", "reporting_region_name", "reporting_district_number",
     "reporting_charter_status", "report_number", "transfer_direction", "line_group_number",
     "partner_district_number", "student_transfer_count"]
+
+
+@pytest.mark.parametrize("year", [2024, 2025, 2026])
+def test_packaged_district_transfer_discovery_binds_all_regional_originals(year):
+    root = Path(__file__).resolve().parents[1]
+    config = load_config(root / "teadata/teadata_sources.yaml")
+    dataset = "district_transfer_reports"
+    source = config.resolve_dataset(dataset, year, reader_profile="source", exact=True)
+    assert config.is_source_only(dataset, year)
+    assert config.column_schema(dataset, year) is None
+    assert config.column_schema(dataset, year, reader_profile="source") == FIELDS
+    read_record = ProvenanceStore(root / "provenance").read_record
+    roots = [*source.metadata.provenance_ids,
+             *(identifier for ref in source.metadata.references for identifier in ref.provenance_ids)]
+    graph = validate_record_graph(read_record, roots)
+    validate_reference_records(source, graph.__getitem__, verify_all_claimed=True)
+    originals = [graph[identifier] for identifier in source.metadata.provenance_ids]
+    assert [dict(record["parameters"]["form_controls"])["selected_id"] for record in originals] == [
+        f"{region:02}" for region in range(1, 21)
+    ]
+    assert all(record["dataset"] == dataset and record["method"] == "download"
+               and record["requested_year"] == record["resolved_year"] == year
+               for record in originals)
+    contract = config.column_contract(dataset, year, reader_profile="source")
+    assert contract is not None
+    table, = crosswalk_dataset(parse_column_schema(contract["text"].encode()), dataset, str(year))["tables"]
+    table_input_sha256s(table, acquisition_sha256s=[record["artifact"]["sha256"] for record in originals])
 
 
 def prepared_fixture(tmp_path, monkeypatch, years=(2024, 2025), *, complete=True, damage=None):
