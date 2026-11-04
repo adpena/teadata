@@ -145,32 +145,6 @@ def test_tepsac_conversion_uses_selected_paths(monkeypatch, tmp_path, explicit_p
     assert result.loc[0, "district_number"] == "'000456"
 
 
-def test_downloader_uses_explicit_paths_without_loading_snapshot(monkeypatch, tmp_path):
-    from teadata.scripts import download_campus_peims_financials as script
-
-    source = tmp_path / "statewide.csv"
-    output_dir = tmp_path / "reports"
-    pd.DataFrame(
-        {"campus_number": [123, 456], "operating_payroll_gf": [None, 100]}
-    ).to_csv(source, index=False)
-    monkeypatch.setenv("TEADATA_DATA_DIR", str(tmp_path / "unused"))
-    monkeypatch.setattr(script.time, "sleep", lambda _: None)
-    downloads = []
-
-    def download(url, destination, session):
-        downloads.append(url)
-        destination.write_bytes(b"download fixture")
-
-    monkeypatch.setattr(script, "download_file", download)
-    script.cli(["--input", str(source), "--output-dir", str(output_dir)])
-
-    assert (
-        output_dir / "2023-2024 PEIMS_Campus_Data_000000123.xlsx"
-    ).read_bytes() == b"download fixture"
-    assert len(downloads) == 1
-    assert "which_camp=000000123" in downloads[0]
-
-
 def test_geocoder_uses_explicit_paths_with_stubbed_providers(monkeypatch, tmp_path):
     from teadata.scripts import geocode_tepsac_data as script
 

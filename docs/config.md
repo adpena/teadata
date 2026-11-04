@@ -332,9 +332,7 @@ uv run python -m teadata.scripts.rename_tapr_campus_headers \
   --input raw/campus.csv --reference raw/data_elements.xlsx \
   --output output/campus.xlsx
 uv run python -m teadata.scripts.download_campus_peims_financials \
-  --input statewide.csv --output-dir reports/
-uv run python -m teadata.scripts.build_campus_peims_financials_statewide_data \
-  --input-dir reports/ --output output/statewide.csv
+  --year 2025 --store provenance --district 227901 --campus 227901002
 uv run python -m teadata.scripts.geocode_tepsac_data \
   --input raw/schools.xlsx --output output/geocoded.csv
 uv run python -m teadata.scripts.flatten_districts_geojson \
@@ -346,6 +344,18 @@ uv run python -m teadata.scripts.build_tapr_profiles \
   --edition 2025 --family staff_profile --input-dir raw/ \
   --reference-store provenance --output-dir prepared/tapr-2025-staff
 ```
+
+Campus PEIMS financial actuals acquisition supports fiscal years ending in 2024
+and 2025. It retains the publisher's district selector, the campus roster for
+each selected district, and the original individual-campus Excel workbooks in
+the provenance store. Pass `--district` more than once to select multiple
+districts. Omit `--campus` to acquire every campus listed for the selected
+districts. The command returns receipt IDs and distinguishes listed campuses
+from acquired workbooks. Rerun the same selection to resume from verified
+receipts. Use `--refresh` to retain a new observation alongside earlier bytes.
+Uncached acquisitions run serially with a pause between requests.
+This command acquires source material. Field interpretation, masking review,
+and catalog or release activation are separate steps.
 
 The TAPR command prepares every declared publisher column in the selected
 single-table family for both scopes into a **new** directory, validating all
