@@ -12,14 +12,11 @@ from pathlib import Path
 import re
 from typing import Any, Literal, NamedTuple
 
-from teadata.dataset_metadata import DataPeriod
 from teadata.manifest import ContractError
+from teadata.peims_course_sources import CSV_HEADERS, ENCODING, GRADE_LABELS, MEASURES as _MEASURES, course_csv_preamble, open_course_report
 from teadata.provenance import ProvenanceStore
 
 
-_DATASET = "peims_teacher_course_enrollment"
-_BROKER = "https://rptsvr1.tea.texas.gov/cgi/sas/broker"
-_SELECTOR = "https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html"
 _ROWS = {2023: 1386, 2024: 1397, 2025: 1422, 2026: 1453}
 _STANDARD_FOOTER_SHA256 = {
     "csv": "2b84fb6e114e983247ff277f83034d30ee2d4323dae633047e2020a9dafe5953",
@@ -29,17 +26,8 @@ _ENGINEERING_REVISION_FOOTER_SHA256 = {
     "csv": "2d6c1186f89685ab9632e10af8d4f8a15396305c5c8037b159a78925f30dd22c",
     "html": "1ab5594c3c2161a7ac074516a4a15d8ab8e990457eca95ea055478452530bb57",
 }
-_MEASURES = ("TEACHER HEAD COUNT", "TEACHER FTE COUNT", "CONTRACT TEACHER HEAD COUNT",
-             "CONTRACT TEACHER FTE COUNT", "COURSE ENROLLMENT")
-_CSV_HEADER = ("SCOPE", "AGGREGATION LEVEL", "YEAR", "SUBJECT", "COURSE", "COURSE TITLE", "GRADE LEVEL", *_MEASURES)
 _HTML_HEADER = ("Subject", "Course", "Course Title", "Grade Level", "TeacherHead Count", "TeacherFTE Count",
                 "Contract TeacherHead Count", "Contract TeacherFTE Count", "CourseEnrollment")
-_GRADE_LABELS = frozenset({
-    "ALL GRADE LEVELS", "EARLY EDUCATION", "ELEMENTARY (GRADES 1-6)",
-    "GRADE 1", "GRADE 2", "GRADE 3", "GRADE 4", "GRADE 5", "GRADE 6", "GRADE 7", "GRADE 8", "GRADES 9-12",
-    "KINDERGARTEN", "KINDERGARTEN/ELEMENTARY (K-6)", "MIDDLE SCHOOL (GRADES 6 - 8)",
-    "NOT APPLICABLE", "PRE-KINDERGARTEN", "SECONDARY (GRADES 7-12)",
-})
 _COUNT = r"(?:[0-9]+|[0-9]{1,3}(?:,[0-9]{3})+)"
 _FORMAT = Literal["csv", "html"]
 
@@ -52,32 +40,9 @@ class _Course(NamedTuple):
 
 
 def _open_report(store: ProvenanceStore, identifier: str, year: int, fmt: _FORMAT) -> tuple[str, dict[str, Any]]:
-    record = store.read_record(identifier)
-    parameters = record["parameters"]
-    metadata = record["source_metadata"]
+    path, record = open_course_report(store, identifier, year, "state", fmt)
     artifact = record["artifact"]
-    controls = [["_service", "marykay"], ["_program", "adhoc.std_driver1.sas"], ["RptClass", "FteEnroll"],
-                ["_debug", "0"], ["SchoolYr", f"{year % 100:02}"], ["report", "StateState"], ["Campus", ""],
-                ["format", fmt], ["submit", "Next"]]
-    headers = record["response_headers"]
-    content_type = headers.get("content-type", "").split(";", 1)[0]
-    csv_disposition = f"attachment; filename=FteEnrollStateState{year % 100:02}state.csv"
-    if (record["kind"] != "acquisition" or record["method"] != "download" or record["dataset"] != _DATASET
-            or record["section"] != "data_sources" or (record["requested_year"], record["resolved_year"]) != (year, year)
-            or (record["requested_url"], record["resolved_url"], parameters.get("form_url")) != (_BROKER,) * 3
-            or parameters.get("http_method") != "POST" or parameters.get("http_status") != 200
-            or parameters.get("form_content_type") != "application/x-www-form-urlencoded"
-            or parameters.get("form_controls") != controls or metadata.get("version") != str(year)
-            or metadata.get("period") != DataPeriod("school_year", year - 1, year).to_dict()
-            or metadata.get("source_url") != _SELECTOR or metadata.get("publisher") != "Texas Education Agency"
-            or content_type != ("application/csv" if fmt == "csv" else "text/html")
-            or (fmt == "csv" and headers.get("content-disposition") != csv_disposition)
-            or not record["downloaded_at"] or not 0 < artifact["size_bytes"] <= 8 * 1024**2):
-        raise ContractError(f"Receipt {identifier} is not the exact statewide {year} {fmt.upper()} request")
-    path = store.verify_artifact(artifact["sha256"])
-    if path.stat().st_size != artifact["size_bytes"]:
-        raise ContractError(f"Receipt {identifier} artifact size differs")
-    return path.read_text(encoding="cp1252"), {
+    return path.read_text(encoding=ENCODING), {
         "receipt_id": identifier, "sha256": artifact["sha256"], "downloaded_at": record["downloaded_at"],
         "recorded_at": record["recorded_at"],
         "requested_url": record["requested_url"], "resolved_url": record["resolved_url"],
@@ -92,14 +57,12 @@ def _csv_rows(text: str, year: int) -> list[list[str]]:
         if reader.line_num != physical_record:
             raise ContractError("CSV contains a record spanning multiple physical lines")
         rows.append(row)
-    preamble = [["TEXAS EDUCATION AGENCY"], [], ["TOTAL ENROLLMENT AND TEACHER FTE COUNTS BY SUBJECT AND COURSE"],
-                [], [f"PEIMS DATA {period}"], [], ["STATEWIDE"], [], list(_CSV_HEADER)]
-    if rows[:9] != preamble:
+    if rows[:9] != course_csv_preamble(year, "state"):
         raise ContractError("CSV statewide preamble or ninth physical header differs")
     stop = 9 + _ROWS[year]
     body, footer = rows[9:stop], [row for row in rows[stop:] if row]
     _check_footer(footer, year, "csv")
-    if any(len(row) != len(_CSV_HEADER) or row[:3] != ["STATE", "STATE", period] for row in body):
+    if any(len(row) != len(CSV_HEADERS["state"]) or row[:3] != ["STATE", "STATE", period] for row in body):
         raise ContractError("CSV course record width, geography or year differs")
     return [row[3:] for row in body]
 
@@ -141,7 +104,7 @@ def _course_rows(rows: list[list[str]], fmt: _FORMAT) -> dict[str, _Course]:
         subject = subject if fmt == "html" and not subject_label else subject_label
         if not subject or not title or re.fullmatch(r"[A-Z0-9]{8}", code) is None or code in result:
             raise ContractError(f"{fmt.upper()} invalid or duplicate course key: {code!r}")
-        if grade not in _GRADE_LABELS:
+        if grade not in GRADE_LABELS:
             raise ContractError(f"{fmt.upper()} unreviewed intended grade label for {code!r}: {grade!r}")
         measures: list[Decimal | None] = []
         for index, token in enumerate(row[4:]):

@@ -212,6 +212,10 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     assert list(current['data_sources'].pop(staff)) == [2023, 2024, 2025, 2026]
     assert current['schema']['data_sources'].pop(staff) == ['csv']
     assert current['value_policies'].pop('peims_staff_csv')['reference_id'] == 'staff_definition'
+    courses = 'peims_teacher_course_enrollment'
+    assert list(current['data_sources'].pop(courses)) == [2023, 2024, 2025, 2026]
+    assert current['schema']['data_sources'].pop(courses) == ['csv']
+    assert current['value_policies'].pop('peims_course_csv')['reference_id'] == 'course_criteria'
     indicator = 'spp_timely_initial_evaluation'
     assert list(current['data_sources'].pop(indicator)) == [2024, 2025]
     assert current['schema']['data_sources'].pop(indicator) == ['xlsx']

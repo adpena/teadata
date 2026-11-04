@@ -144,9 +144,48 @@ An [individual campus extract](../provenance/records/50bdbb47f990375b35b64c5fa2e
 returned 59 course rows for A+ Academy Elementary (`057829001`) in 2023–24.
 The [selection receipt](../provenance/records/a5d05dd3d90060f054d41962f18d8df08e73ff37ee0f1477469102597256632e.json)
 records how TEA resolved that campus number. This establishes that a historical
-campus report can be retrieved. The [2025–26 statewide district extract](../provenance/records/c54740974d39fdbc3c461120aba68db87b3af07fa3615eb91c868bd2d1c0ae81.json)
-contains 207,751 course rows across 1,203 distinct six-digit district IDs
-and is about 36 MiB. District and campus coverage and value parity still
-require separate validation. The comparison above qualifies source agreement
-at statewide scope only. Native leaves, dataset activation, subgroup measures
-and course completion measures remain outside this comparison.
+campus report can be retrieved. Campus remains outside the native candidate.
+
+### Build and verify a course candidate
+
+The source profile admits separate state and district leaves. It preserves the
+publisher course code, leading-zero district number, raw measure tokens and
+physical source row. Head counts and course membership use integers, and FTE
+uses fixed-precision decimals. The reviewed `-999` course-membership token has
+a null value and `suppressed` status. Recorded zeros remain observed.
+TEA defines the measures in its criteria page. The crosswalk's native storage
+types reflect the reviewed CSV tokens because TEA does not publish formal
+types for this export.
+
+| School year | State course rows | District course rows | District IDs |
+| --- | ---: | ---: | ---: |
+| 2022–23 | 1,386 | — | — |
+| 2023–24 | 1,397 | [201,999](../provenance/records/93c96e9c71b2201e09ba1abde6b0c8f3fb1da2c4befa71d662c1766ff2dda0d2.json) | 1,209 |
+| 2024–25 | 1,422 | [204,303](../provenance/records/7963ec85cdfdce4e02849ec53520caed1df31588fd3c0c2b26161cc061c5773c.json) | 1,207 |
+| 2025–26 | 1,453 | [207,751](../provenance/records/c54740974d39fdbc3c461120aba68db87b3af07fa3615eb91c868bd2d1c0ae81.json) | 1,203 |
+
+`TEADATA_PROVENANCE_DIR` must contain the selected acquisition and reference
+closures. Build into a new directory and pin its manifest before verification.
+
+```sh
+PEIMS_CONFIG=teadata/teadata_sources.yaml
+uv run --locked --offline python -m teadata.scripts.refresh_peims_courses \
+  --store "$TEADATA_PROVENANCE_DIR" \
+  --config "$PEIMS_CONFIG" \
+  --config-sha256 "$(shasum -a 256 "$PEIMS_CONFIG" | cut -d ' ' -f1)" \
+  --edition 2023 state --edition 2024 state --edition 2024 district \
+  --edition 2025 state --edition 2025 district --edition 2026 state --edition 2026 district \
+  --output "$PEIMS_CANDIDATE_DIR"
+
+scripts/check --course-controls --native-release "$PEIMS_CANDIDATE_DIR/release.json" \
+  --native-pin "$PEIMS_MANIFEST_SHA256" --source-store "$TEADATA_PROVENANCE_DIR"
+```
+
+The course check independently decodes the retained CSV and compares all raw
+fields, physical row locators, typed measures and statuses with the candidate.
+It also compares the four state leaves with separately requested TEA HTML
+reports and checks individual district reports for Hays CISD across all three
+district years and A+ Academy in 2025–26. The [publisher witness inventory](../teadata/reference_cases/native_peims_courses.json)
+identifies the exact HTML receipts. District publisher agreement is scoped to
+those selections. These checks support explicit catalog reads from the
+unpublished candidate. Dataset activation and release publication are separate.

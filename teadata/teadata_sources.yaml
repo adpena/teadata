@@ -542,6 +542,12 @@ value_policies:
       '<1,910': *peims_2026_suppression, '<2,000': *peims_2026_suppression,
       '<2,790': *peims_2026_suppression,
     }
+  peims_course_csv:
+    reference_id: course_criteria
+    tokens:
+      '-999':
+        status: suppressed
+        reason: ferpa_primary_or_complementary_mask_no_documented_count_bounds
   peims_staff_csv:
     reference_id: staff_definition
     tokens:
@@ -7677,6 +7683,140 @@ data_sources:
               scope: "district"
               tables:
                 college_readiness_components: "data/tapr/raw/2025-d-GRAD2-offered-original.csv"
+  peims_teacher_course_enrollment:
+    2023:
+      metadata:
+        metrics: &peims_course_facts
+          teacher_head_count:
+            field: teacher_head_count
+            unit: count
+          teacher_fte_count:
+            field: teacher_fte_count
+            unit: fte
+          contract_teacher_head_count:
+            field: contract_teacher_head_count
+            unit: count
+          contract_teacher_fte_count:
+            field: contract_teacher_fte_count
+            unit: fte
+          course_enrollment_count:
+            field: course_enrollment_count
+            unit: count
+        notes: Course enrollment is a reporting-date course membership count. Masked cells remain suppressed.
+          No state sum is derived. The captures postdate the September 2026 regeneration. Publisher finality
+          is unspecified. This edition excludes charter partner teachers from FTE.
+        period:
+          kind: school_year
+          start_year: 2022
+          end_year: 2023
+        publisher: Texas Education Agency
+        references: &peims_course_references
+        - reference_id: course_criteria
+          role: methodology
+          status: available
+          title: TEA teacher FTE and course enrollment criteria and masking notes
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/About_TeacherFTE_Enroll.html
+          reviewed_sha256: 441b25b52cc377b02bd97832834f59814bac453a458de3b91d1f77e90be0a1f6
+          provenance_ids:
+          - 3f0a9a11c39e00dbada1e7017aba382afe7b859bd142a00c0d3b2125752f6b10
+        - reference_id: course_selector
+          role: source_notes
+          status: available
+          title: TEA Teacher FTE and Course Enrollment report selector
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html
+          reviewed_sha256: 97ee5b421b145440663aa58ac65af7ba38785cd5268397c407439ab33306cdd5
+          provenance_ids:
+          - 67a39bd274e492426111703a32278ad84a63cb5db037963779e18d5147da80a1
+        - reference_id: column_crosswalk
+          role: schema
+          status: available
+          title: Reviewed PEIMS course CSV positional crosswalk and physical framing
+          path: schemas/peims--2023-2026--teacher-course-enrollment-crosswalk.json
+          reviewed_sha256: 7f8279470ef2d326024ab17ade6ffd98575e37d3eb3a33018bb23e34f7956ee0
+          provenance_ids: [667367fc03b874c703589c797f93afd546ac74851a229c2dc101d8c4ff94eb82]
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html
+        title: 2022–23 PEIMS Teacher FTE and Course Enrollment
+        value_policy: peims_course_csv
+        version: '2023'
+      path: data/peims/2023/peims_teacher_course_enrollment.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2023-2026--teacher-course-enrollment-crosswalk.json
+            acquisition_ids:
+              state: 4619f15fd40e8a6ae875d9a1c548542a46a7a2f550152f825b5861b22b273164
+    2024:
+      metadata:
+        metrics: *peims_course_facts
+        notes: Course enrollment is a reporting-date course membership count. Masked cells remain suppressed.
+          No state sum is derived. The captures postdate the September 2026 regeneration. Publisher finality
+          is unspecified. This edition includes charter partner teachers in FTE.
+        period:
+          kind: school_year
+          start_year: 2023
+          end_year: 2024
+        publisher: Texas Education Agency
+        references: *peims_course_references
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html
+        title: 2023–24 PEIMS Teacher FTE and Course Enrollment
+        value_policy: peims_course_csv
+        version: '2024'
+      path: data/peims/2024/peims_teacher_course_enrollment.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2023-2026--teacher-course-enrollment-crosswalk.json
+            acquisition_ids:
+              state: 0f4645a4f6919b48ed9653ad6ae8fa07abb500cb74891edc0fe45faa49b0f683
+              district: 93c96e9c71b2201e09ba1abde6b0c8f3fb1da2c4befa71d662c1766ff2dda0d2
+    2025:
+      metadata:
+        metrics: *peims_course_facts
+        notes: Course enrollment is a reporting-date course membership count. Masked cells remain suppressed.
+          No state sum is derived. The captures postdate the September 2026 regeneration. Publisher finality
+          is unspecified. This edition includes charter partner teachers in FTE.
+        period:
+          kind: school_year
+          start_year: 2024
+          end_year: 2025
+        publisher: Texas Education Agency
+        references: *peims_course_references
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html
+        title: 2024–25 PEIMS Teacher FTE and Course Enrollment
+        value_policy: peims_course_csv
+        version: '2025'
+      path: data/peims/2025/peims_teacher_course_enrollment.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2023-2026--teacher-course-enrollment-crosswalk.json
+            acquisition_ids:
+              state: dbe04d144f99c9d54f6f98b01b89a85b2b04f2ac46c9d58b5621d2d9f6ad3a2c
+              district: 7963ec85cdfdce4e02849ec53520caed1df31588fd3c0c2b26161cc061c5773c
+    2026:
+      metadata:
+        metrics: *peims_course_facts
+        notes: Course enrollment is a reporting-date course membership count. Masked cells remain suppressed.
+          No state sum is derived. The captures postdate the September 2026 regeneration. Publisher finality
+          is unspecified. This edition includes charter partner teachers in FTE.
+        period:
+          kind: school_year
+          start_year: 2025
+          end_year: 2026
+        publisher: Texas Education Agency
+        references: *peims_course_references
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html
+        title: 2025–26 PEIMS Teacher FTE and Course Enrollment
+        value_policy: peims_course_csv
+        version: '2026'
+      path: data/peims/2026/peims_teacher_course_enrollment.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2023-2026--teacher-course-enrollment-crosswalk.json
+            acquisition_ids:
+              state: b83eb582021312eaf322d97e0ea081085258d9f89e26e11cbdd9c2efa8b82cc1
+              district: c54740974d39fdbc3c461120aba68db87b3af07fa3615eb91c868bd2d1c0ae81
   peims_staff_fte_and_salary:
     2023:
       metadata:
@@ -9118,6 +9258,8 @@ schema:
     - xlsx
     district_transfer_reports:
     - parquet
+    peims_teacher_course_enrollment:
+    - csv
     peims_staff_fte_and_salary:
     - csv
     peims_special_education_by_primary_disability:

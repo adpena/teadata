@@ -7,6 +7,7 @@ import pytest
 
 from teadata.dataset_metadata import DataPeriod, DatasetMetadata, ResolvedDataset
 from teadata.manifest import ContractError
+from teadata.peims_course_sources import BROKER, SELECTOR
 from teadata.provenance import ProvenanceStore
 from teadata.scripts import verify_peims_courses as check
 
@@ -81,9 +82,9 @@ def test_statewide_course_source_replay(tmp_path, monkeypatch, damage, message):
     for fmt, source, media in (("csv", source_csv, "application/csv"), ("html", source_html, "text/html")):
         request_year = 2025 if fmt == "csv" and damage == "request-year" else 2026
         report = "StateDistrict" if fmt == "csv" and damage == "request-geography" else "StateState"
-        url = "https://example.invalid/other" if fmt == "csv" and damage == "request-url" else check._BROKER
+        url = "https://example.invalid/other" if fmt == "csv" and damage == "request-url" else BROKER
         metadata = DatasetMetadata(title="PEIMS teacher counts and course enrollment", version=str(request_year),
-                                   source_url=check._SELECTOR, publisher="Texas Education Agency",
+                                   source_url=SELECTOR, publisher="Texas Education Agency",
                                    period=DataPeriod("school_year", request_year - 1, request_year))
         dataset = ResolvedDataset("peims_teacher_course_enrollment", "data_sources", request_year, request_year, "", metadata)
         controls = [["_service", "marykay"], ["_program", "adhoc.std_driver1.sas"], ["RptClass", "FteEnroll"],
