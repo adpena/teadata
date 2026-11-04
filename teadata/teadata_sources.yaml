@@ -542,6 +542,12 @@ value_policies:
       '<1,910': *peims_2026_suppression, '<2,000': *peims_2026_suppression,
       '<2,790': *peims_2026_suppression,
     }
+  frc_ppe_published:
+    reference_id: frc_ppe_blank_note
+    tokens:
+      '':
+        status: missing
+        reason: publisher_no_data_available
   peims_course_csv:
     reference_id: course_criteria
     tokens:
@@ -4849,7 +4855,8 @@ data_sources:
           path: schemas/tapr--2025--four-year-longitudinal-rate-crosswalk.json
           title: TEA Data complete source-only header/layout and ordered dictionary-occurrence contract
           status: available
-          provenance_ids: []
+          provenance_ids:
+          - 81dc733a3553dbb705476ebdd3c81b4e597838825569fc51b38ead4fcd29b011
           reviewed_sha256: bcdf49a1156031cdabd3e8c4093c1b8d18c8af072ef5d21d127b6111e2137cb0
         notes: >-
           Complete source-only campus COMP4 download. The 2024–25 TPRS campus
@@ -5086,7 +5093,8 @@ data_sources:
             path: "schemas/tapr--2025--four-year-longitudinal-rate-crosswalk.json"
             title: "TEA Data complete source-only header/layout and ordered dictionary-occurrence contract"
             status: "available"
-            provenance_ids: []
+            provenance_ids:
+              - "89f7285fcc508ca869c91e904880189ff6d43b3faba5d2aaa98c130581e66aa0"
             reviewed_sha256: "bcdf49a1156031cdabd3e8c4093c1b8d18c8af072ef5d21d127b6111e2137cb0"
         notes: >-
           Complete source-only COMP4 download. The same-edition Austin ISD TPRS
@@ -7687,6 +7695,121 @@ data_sources:
               scope: "district"
               tables:
                 college_readiness_components: "data/tapr/raw/2025-d-GRAD2-offered-original.csv"
+  state_tapr_four_year_longitudinal_rate:
+    2025:
+      path: "data/tapr/raw/2025-s-COMP4-csv.csv"
+      metadata:
+        title: "2024–25 TAPR State Four-Year Longitudinal Rate (COMP4)"
+        publisher: "Texas Education Agency"
+        version: "2025"
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        metrics:
+          four_year_federal_graduation_rate_without_exclusions_all_students:
+            field: state_longitudinal_4_year_class_of_2024_graduates_all_students_rate
+            unit: percent
+            period:
+              kind: as_of
+              as_of: "2024-08-31"
+        references:
+          - reference_id: "csv_headers"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+            title: "Published statewide COMP4 CSV selection"
+            status: "available"
+            provenance_ids:
+              - "c880478a39ba6834b507a7c1e9d3e51d61ca4170d415210b6a8924b855929f2d"
+            reviewed_sha256: "42e1c69aa9031f7415abf2867df9c25a998d047c2a0f5e7e65ae62a9e73d8813"
+          - reference_id: "selection"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker"
+            title: "Published statewide COMP4 controls"
+            status: "available"
+            provenance_ids:
+              - "37f1df621aa89ba2f06b3d07ae76949fe70769c34357f6fbd8abf4ce4cdd7ec0"
+            reviewed_sha256: "cdcebf468734d5aa9f5f62c6931fdafa549a8f06e648f96ffe41fbe3044720b7"
+          - reference_id: "dictionary"
+            role: "data_dictionary"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=S&dsname=COMP4&dd=attendgrad&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+            title: "Published statewide COMP4 data dictionary"
+            status: "available"
+            provenance_ids:
+              - "4f0971c3c6af725cac620696bcfa3a3c5b8ee457715f47ea71cd1c91f74336ca"
+            reviewed_sha256: "6f8f2b1682ce34f1e1ff289412dca782ca594d580ba9607e6e39a21eb0a90f1a"
+          - reference_id: "state_attendance_graduation"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=S&lev=S&prgopt=reports%2Ftapr%2Fattendgrad.sas"
+            title: "2024–25 statewide TPRS attendance and graduation report"
+            status: "available"
+            provenance_ids:
+              - "d6af819fbd3b034a5a1c88dc05a323dde1d743409f67829371052aa88740f9de"
+            reviewed_sha256: "1f7e80342fb36cdfa9c2b409afed0c3b8430e438c86cdd5c805658df9ed6b739"
+          - reference_id: "state_longitudinal"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/acctres/completion/2024/state.html"
+            title: "TEA Class of 2024 statewide longitudinal cohort and graduates"
+            status: "available"
+            provenance_ids:
+              - "25a1db03265724eb33dbd38d4a77829e7d7d133abc8d68446dd45529e56897c9"
+            reviewed_sha256: "bacbe8131fddfd23cfac7ba0350ff15a595e8efdf054f359ae44a0d5f05d413c"
+          - reference_id: "federal_garland_school_report_card"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=057909002&lev=C&prgopt=reports%2Fsrc%2Fsrc.sas"
+            title: "Garland High School Report Card federal graduation comparison"
+            status: "available"
+            provenance_ids:
+              - "ff9378d115f00da15d95d7f76072e18275c47ec277dce66bff0b6240ead6035f"
+            reviewed_sha256: "15701b2ebb42e84fb9e3b74b8588c8c7f0ed0dc2f7af7c5073c59c16ff17c2e0"
+          - reference_id: "cohort_methodology"
+            role: "methodology"
+            url: "https://tea.texas.gov/reports-and-data/school-performance/accountability-research/dropcomp-2023-24.pdf"
+            title: "Secondary School Completion and Dropouts, 2023–24, PDF pages 24, 144, and 150 (Table 53)"
+            status: "available"
+            provenance_ids:
+              - "1c829f8a6c46e592006d05470aa18cd058bdf83c99c2394547ddb2edcac2a504"
+            reviewed_sha256: "9e5606b41a72c5539b49cf324da7a7fa14a4959fa2bf1402ebdcb0598659231d"
+          - reference_id: "glossary"
+            role: "glossary"
+            url: "https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf"
+            title: "2024–25 TAPR glossary"
+            status: "available"
+            provenance_ids:
+              - "e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db"
+            reviewed_sha256: "846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416"
+          - reference_id: "masking"
+            role: "masking_methodology"
+            url: "https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html"
+            title: "2024–25 TAPR masking methodology"
+            status: "available"
+            provenance_ids:
+              - "6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554"
+            reviewed_sha256: "7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8"
+          - reference_id: "columns_source"
+            role: "schema"
+            path: "schemas/tapr--2025--state-four-year-longitudinal-rate-crosswalk.json"
+            title: "TEA Data statewide COMP4 crosswalk"
+            status: "available"
+            provenance_ids:
+              - "ce0025e8dd368b36323e7e1615a42b0a57fbca07dc409bcaefb1357c507ab58f"
+            reviewed_sha256: "1bd206bf982d0d4b2b00862cdbe620aa5bc3646e6943d7c22720e20392a99493"
+        notes: >-
+          One statewide publisher observation retaining all 182 offered fields.
+          The Garland High School Report Card names the Class of 2024 federal
+          graduation rate without exclusions and reports Texas at 90.7%.
+          The statewide longitudinal table corroborates the raw cohort count,
+          graduate count, and displayed rate. The dictionary repeats SAGC424R
+          under ordinary and federal headings and the CSV offers no separate
+          SAGC4X24R. TEA retains students subject to state accountability
+          exclusions in its statewide series. The source binds the shared
+          published state rate to the federal comparison only. It has no
+          statewide series using the local state-accountability exclusions.
+      reader:
+        profiles:
+          source:
+            column_schema: "schemas/tapr--2025--state-four-year-longitudinal-rate-crosswalk.json"
+            tapr_source:
+              scope: "state"
+              tables:
+                four_year_longitudinal_rate: "data/tapr/raw/2025-s-COMP4-csv.csv"
   state_tapr_college_career_military_readiness:
     2025:
       path: "data/tapr/raw/2025-s-GRAD1-overall-ccmr.csv"
@@ -7940,6 +8063,62 @@ data_sources:
               scope: "state"
               tables:
                 college_readiness_components: "data/tapr/raw/2025-s-GRAD2-offered-original.csv"
+  frc_per_pupil_expenditure:
+    2025:
+      path: data/frc/2025/per-pupil-expenditure.html
+      metadata:
+        title: 2024–25 Federal Report Card per-pupil expenditures
+        publisher: Texas Education Agency
+        version: '2025'
+        period: {kind: fiscal_year, start_year: 2024, end_year: 2025}
+        source_url: https://rptsvr1.tea.texas.gov/perfreport/frc/frc_srch.html?year=2025
+        value_policy: frc_ppe_published
+        notes: Published actual expenditure rates in dollars per pupil and FRC reported enrollment.
+          State and local and federal source groups retain site and district allocations. A blank dollar
+          cell indicates no data available. Signed amounts and displayed zero tokens are retained.
+          The statewide denominator and rates come from the direct state report. The district and campus
+          summary tables have different enrollment sums. This population and expenditure definition
+          are specific to the Federal Report Card and differ from Actual PWR and TAPR.
+        metrics:
+          reported_enrollment: {field: reported_enrollment, unit: count}
+          all_sources_per_pupil: {field: all_sources_per_pupil, unit: currency_per_pupil}
+          state_local_site_per_pupil: {field: state_local_site_per_pupil, unit: currency_per_pupil}
+          state_local_district_allocation_per_pupil: {field: state_local_district_allocation_per_pupil, unit: currency_per_pupil}
+          state_local_per_pupil: {field: state_local_per_pupil, unit: currency_per_pupil}
+          federal_site_per_pupil: {field: federal_site_per_pupil, unit: currency_per_pupil}
+          federal_district_allocation_per_pupil: {field: federal_district_allocation_per_pupil, unit: currency_per_pupil}
+          federal_per_pupil: {field: federal_per_pupil, unit: currency_per_pupil}
+        references:
+        - reference_id: frc_ppe_definitions
+          role: methodology
+          title: 2024–25 Federal Report Card definitions, Part (x)
+          url: https://tea.texas.gov/texas-schools/accountability/academic-accountability/performance-reporting/2024-25-frc-definitions.pdf
+          reviewed_sha256: 4ea640373382ac0414584ed4ac2d6a62ca8c49f5ac30284f2a3c932bb146c5e4
+          provenance_ids: [ce57bb6cb6ccf4682b6ba63a5430ba7927db1b632dc59f8105ed75888f84ae9d]
+        - reference_id: frc_ppe_blank_note
+          role: source_notes
+          title: Publisher state Federal Report Card Part (x) column groups and blank-cell note
+          url: 'https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&frc=yes&ccyy=2025&lev=S&id=&prgopt=reports%2Ffrc%2Ffrc.sas'
+          reviewed_sha256: 15187d1222ab91bb448b4a18d1c6b5cffbe5682b03aacd4db8be51a5ae902c11
+          provenance_ids: [4e46558c32fa4cf97baef5dc41a1f3c8168ad06c72a65cd734177c5aae572937]
+        - reference_id: frc_ppe_crosswalk
+          role: schema
+          title: Reviewed Federal Report Card PPE totals positional crosswalk
+          path: schemas/frc--2025--per-pupil-expenditure-crosswalk.json
+          reviewed_sha256: 51fbcbbb539d39bacd2069b8728597c63e1198aa7a7857ea7e70975cc331bda5
+          provenance_ids: [36dd469f4fb0e1148e6b7c8132ecdaa9d30cb48028e669833028960b1d15e308]
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/frc--2025--per-pupil-expenditure-crosswalk.json
+            acquisition_ids:
+              state: 4e46558c32fa4cf97baef5dc41a1f3c8168ad06c72a65cd734177c5aae572937
+              district: 29b8ca8721fdb8c512b96261b7ee8aa43f0d4cda3c3a2051fdaf6a036d98160e
+              campus: 3a120c76f02aea19904a9e5ff6bb0c6d835de8b598140afd732e24bd5a7fd9af
+            witness_ids:
+              district: c2d7f80b8337da467f0adafdd4d03f88cb91f027b0b73e9335cde59999fd3cae
+              campus: 08e7c76d93b78de31c3fb2e7b278ee1d70101a01695c1cbba99efb967b74a55b
+
   peims_teacher_course_enrollment:
     2023:
       metadata:
@@ -9529,6 +9708,8 @@ schema:
     - xlsx
     district_transfer_reports:
     - parquet
+    frc_per_pupil_expenditure:
+    - html
     peims_teacher_course_enrollment:
     - csv
     peims_staff_fte_and_salary:
@@ -9546,6 +9727,8 @@ schema:
     campus_tapr_college_readiness_components:
     - csv
     district_tapr_college_readiness_components:
+    - csv
+    state_tapr_four_year_longitudinal_rate:
     - csv
     state_tapr_college_career_military_readiness:
     - csv

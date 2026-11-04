@@ -23,6 +23,7 @@ class MeasurementUnit(StrEnum):
     COUNT = "count"
     PERCENT = "percent"
     CURRENCY = "currency"
+    CURRENCY_PER_PUPIL = "currency_per_pupil"
     TEXT = "text"
     RATIO = "ratio"
     YEARS = "years"
@@ -188,6 +189,8 @@ class Measurement:
             return text + "%"
         if self.unit == "currency":
             return "$" + text
+        if self.unit == MeasurementUnit.CURRENCY_PER_PUPIL:
+            return f"${text} per pupil"
         return text
 
     def to_dict(self) -> dict[str, Any]:
@@ -314,7 +317,7 @@ def measure(
             unit=unit,
         )
     text = str(raw).strip()
-    if unit == "currency":
+    if unit in {MeasurementUnit.CURRENCY, MeasurementUnit.CURRENCY_PER_PUPIL}:
         text = text.removeprefix("$")
         if text.startswith("(") and text.endswith(")"):
             text = "-" + text[1:-1]

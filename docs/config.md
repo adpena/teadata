@@ -594,6 +594,7 @@ The 2025 outcome originals are also explicit `source` opt-ins:
 | --- | --- | --- | ---: | ---: |
 | `four_year_longitudinal_rate` | Campus | COMP4 | 228 | 224 |
 | `four_year_longitudinal_rate` | District | COMP4 | 226 | 224 |
+| `four_year_longitudinal_rate` | State | COMP4 | 182 | 224 |
 | `college_career_military_readiness` | Campus | GRAD1 | 279 | 396 |
 | `college_career_military_readiness` | District | GRAD1 | 277 | 396 |
 | `college_career_military_readiness` | State | GRAD1 overall CCMR selection | 33 | 396 |
@@ -613,7 +614,7 @@ GRAD2 AP/IB criteria and dual-credit readiness describe attainment. Graduate
 course participation measures a separate outcome. Repeated denominator
 dictionary contexts remain discoverable without duplicating physical columns.
 
-Two COMP4 Class of 2024 rates per scope have a reviewed percent unit and an
+Two COMP4 Class of 2024 rates at campus and district scope have a reviewed percent unit and an
 August 31, 2024 diploma cutoff. The Austin ISD attendance and graduation report
 matches the ordinary longitudinal rate (`DAGC4X24R`, 92.3%) and the federal rate
 without exclusions (`DAGC424R`, 90.2%). Garland High School confirms the campus
@@ -622,6 +623,27 @@ show asterisks in the report and `-1` in the CSV. Sam Houston Middle School's
 two campus rates show dashes in the report and blank CSV fields. The reason
 for other blanks remains unknown. The two graduation cohorts follow different
 inclusion rules.
+
+The state COMP4 source retains all 182 offered fields and every dictionary
+occurrence. The statewide selection offers `SAGC424R` but no `SAGC4X24R`.
+The dictionary repeats the available code under both longitudinal and federal
+headings. The [Garland High School Report Card](https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=057909002&lev=C&prgopt=reports%2Fsrc%2Fsrc.sas)
+names the Class of 2024 federal rate without exclusions and gives Texas at
+90.7%. The [state longitudinal table](https://rptsvr1.tea.texas.gov/acctres/completion/2024/state.html)
+corroborates the CSV's 367,549 graduates and 405,019 cohort members.
+`SAGC424R` retains its original longitudinal label. TEA's
+[completion and dropout report](https://tea.texas.gov/reports-and-data/school-performance/accountability-research/dropcomp-2023-24.pdf)
+explains that state accountability exclusions do not apply to statewide rates
+and confirms 367,549 and 90.7% in the Federal Report Card cross-tabulation
+(PDF pages 24, 144 and 150).
+`Query.compare_statewide` supports the exact federal metric across the three
+editions. An ordinary statewide benchmark using the local state-accountability
+exclusions remains unbound.
+Verify the retained publisher witnesses with:
+
+```sh
+uv run python -m teadata.scripts.verify_tapr_state_grad2 --family COMP4 --store provenance
+```
 
 Five district GRAD1 and GRAD2 rates have a reviewed percent unit and
 2023–24 annual-graduate period. The same-edition Austin ISD TPRS report

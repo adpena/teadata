@@ -1,8 +1,9 @@
-"""Replay the reviewed 2024–25 statewide TAPR readiness selections offline."""
+"""Replay reviewed 2024–25 statewide TAPR selections offline."""
 
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable
 import csv
 from decimal import Decimal, ROUND_HALF_UP
 import json
@@ -17,6 +18,7 @@ from teadata.teadata_config import load_config
 
 DATASET = "state_tapr_college_readiness_components"
 GRAD1_DATASET = "state_tapr_college_career_military_readiness"
+COMP4_DATASET = "state_tapr_four_year_longitudinal_rate"
 EDITION = 2025
 GROUPS = {
     "A": "State", "B": "AfricanAmerican", "H": "Hispanic", "W": "White",
@@ -64,7 +66,8 @@ def verify_rates(values: dict[str, str], rows: list[list[str]], *, measures: dic
     return len(measures) * len(GROUPS)
 
 
-def _verify_source(store: ProvenanceStore, dataset: str, measures: dict[str, str]) -> dict[str, int]:
+def _verify_source(store: ProvenanceStore, dataset: str,
+                   verify: Callable[[dict[str, str], Callable[[str], Path]], int]) -> dict[str, int]:
     cfg = load_config()
     metadata = cfg.resolve_dataset(dataset, EDITION, exact=True, reader_profile="source").metadata
     refs = {ref.reference_id: ref for ref in metadata.references if ref.provenance_ids}
@@ -93,29 +96,65 @@ def _verify_source(store: ProvenanceStore, dataset: str, measures: dict[str, str
     occurrences = extract_tapr_dictionary(original("dictionary").read_bytes(), encoding="cp1252")
     if [item.column_record() for item in occurrences] != request.mapping["dictionary_records"]:
         raise ValueError("Statewide TAPR dictionary differs from the reviewed occurrence mapping")
-    rows = _Rows(original("state_ccmr_report").read_text(encoding="cp1252")).rows
     return {
         "raw_cells": len(values),
         "dictionary_occurrences": len(occurrences),
-        "displayed_rates": verify_rates(dict(zip(codes, values, strict=True)), rows, measures=measures),
+        "displayed_rates": verify(dict(zip(codes, values, strict=True)), original),
     }
 
 
+def _verify_ccmr(store: ProvenanceStore, dataset: str, measures: dict[str, str]) -> dict[str, int]:
+    def verify(values: dict[str, str], original: Callable[[str], Path]) -> int:
+        rows = _Rows(original("state_ccmr_report").read_text(encoding="cp1252")).rows
+        return verify_rates(values, rows, measures=measures)
+
+    return _verify_source(store, dataset, verify)
+
+
 def verify_state_grad2(store: ProvenanceStore) -> dict[str, int]:
-    return _verify_source(store, DATASET, MEASURES)
+    return _verify_ccmr(store, DATASET, MEASURES)
 
 
 def verify_state_grad1(store: ProvenanceStore) -> dict[str, int]:
-    return _verify_source(store, GRAD1_DATASET, {"0GP": "College, Career, or Military Ready (Annual Graduates)"})
+    return _verify_ccmr(store, GRAD1_DATASET, {"0GP": "College, Career, or Military Ready (Annual Graduates)"})
+
+
+def verify_state_comp4(store: ProvenanceStore) -> dict[str, int]:
+    def verify(values: dict[str, str], original: Callable[[str], Path]) -> int:
+        original("cohort_methodology")
+        cohort, graduates = int(values["SA0C424D"]), int(values["SAGC424N"])
+        rate = Decimal(values["SAGC424R"])
+        if cohort <= 0 or not 0 <= graduates <= cohort:
+            raise ValueError("Invalid Class of 2024 cohort counts")
+        if (Decimal(graduates) * 100 / cohort).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP) != rate:
+            raise ValueError("Statewide Class of 2024 cohort counts and rate disagree")
+        longitudinal = _Rows(original("state_longitudinal").read_text(encoding="cp1252")).rows
+        state_heading = ["Grade 9 Four-Year Longitudinal Graduation and Dropout Rates, Texas Public Schools, Class of 2024"]
+        if longitudinal.count(state_heading) != 1:
+            raise ValueError("Statewide longitudinal cohort and graduation values disagree")
+        header, data = longitudinal[longitudinal.index(state_heading) + 4:longitudinal.index(state_heading) + 6]
+        if header[:3] != ["Class", "Number", "Rate (%)"] or data[:3] != [f"{cohort:,}", f"{graduates:,}", f"{rate:.1f}"]:
+            raise ValueError("Statewide longitudinal cohort and graduation values disagree")
+        school = _Rows(original("federal_garland_school_report_card").read_text(encoding="cp1252")).rows
+        federal = ["4-Year Federal Graduation Rate Without Exclusions (Gr 9-12)"]
+        if (["2025 School Report Card"] not in school
+                or ["GARLAND H S (057909002) - GARLAND ISD - DALLAS COUNTY"] not in school
+                or school.count(federal) != 1
+                or not any(row[:4] == ["", "State", "District", "Campus"] for row in school[:school.index(federal)])
+                or school[school.index(federal) + 1][:5] != ["Graduation", "Class of 2024", f"{rate:.1f}%", "92.5%", "91.7%"]):
+            raise ValueError("Garland school report card federal graduation values disagree")
+        return 1
+
+    return _verify_source(store, COMP4_DATASET, verify)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--store", required=True, type=Path)
-    parser.add_argument("--family", choices=["GRAD1", "GRAD2"], default="GRAD2")
+    verifiers = {"GRAD1": verify_state_grad1, "GRAD2": verify_state_grad2, "COMP4": verify_state_comp4}
+    parser.add_argument("--family", choices=verifiers, default="GRAD2")
     args = parser.parse_args()
-    verifier = verify_state_grad1 if args.family == "GRAD1" else verify_state_grad2
-    print(json.dumps(verifier(ProvenanceStore(args.store)), sort_keys=True))
+    print(json.dumps(verifiers[args.family](ProvenanceStore(args.store)), sort_keys=True))
 
 
 if __name__ == "__main__":

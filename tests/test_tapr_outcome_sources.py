@@ -303,6 +303,38 @@ def test_literal_class_and_annual_graduate_contexts_do_not_become_other_populati
         assert 'Annual-graduate' in metadata.notes and 'Bonus' in metadata.notes and 'ERC' in metadata.notes
 
 
+def test_state_comp4_binds_only_the_witnessed_federal_rate():
+    cfg = load_config()
+    family = 'four_year_longitudinal_rate'
+    dataset = 'state_tapr_' + family
+    table = source_table(cfg, family, 'state')
+    source = cfg.resolve_dataset(dataset, 2025, exact=True, reader_profile='source')
+    fields = {row['code']: row['field'] for row in table['fields']}
+    assert len(fields) == 182 and len(table['dictionary_records']) == 224
+    assert table['layout']['first_data_record'] == table['layout']['last_data_record'] == 3
+    assert table['metric_period'] == source.metadata.period.to_dict() == {'kind': 'unknown'}
+    assert 'SAGC4X24R' not in fields
+    assert fields['SAGC424R'] == 'state_longitudinal_4_year_class_of_2024_graduates_all_students_rate'
+    assert {row['publisher_context']['heading'] for row in table['dictionary_records']
+            if row['code'] == 'SAGC424R'} == {
+        '4-Year Longitudinal Rate (Gr 9-12)', '4-Year Federal Graduation Rate Without Exclusions (Gr 9-12)',
+    }
+    assert {name: metric.to_dict() for name, metric in source.metadata.metrics.items()} == {
+        'four_year_federal_graduation_rate_without_exclusions_all_students': {
+            'field': fields['SAGC424R'], 'unit': 'percent', 'period': COMP4_RATE_PERIOD,
+        },
+    }
+    store = ProvenanceStore(ROOT / 'provenance')
+    for ref in source.metadata.references:
+        receipt, = ref.provenance_ids
+        raw = store.read_record(receipt)
+        assert raw['artifact']['sha256'] == ref.reviewed_sha256
+        if ref.reference_id == 'csv_headers':
+            assert ref.reviewed_sha256 == table['input_sha256']
+            assert ['dsname', 'COMP4'] in raw['parameters']['form_controls']
+    assert cfg.is_source_only(dataset, 2025)
+
+
 def test_state_overall_ccmr_is_a_separate_successful_publisher_selection():
     cfg = load_config()
     dataset = 'state_tapr_college_career_military_readiness'

@@ -23,11 +23,12 @@ from .values import MeasurementUnit, TokenRule, ValuePolicy, ValueStatus, measur
 if TYPE_CHECKING:
     from .release import DataRelease
 
-_TAPR_READINESS_FAMILIES = {"college_career_military_readiness", "college_readiness_components"}
+_TAPR_RATE_FAMILIES = {"college_career_military_readiness", "college_readiness_components",
+                       "four_year_longitudinal_rate"}
 EDITION = 2025
 _TAPR_RATE_POLICY = ValuePolicy(
-    "tapr_2025_reviewed_readiness_rates",
-    {"-1": TokenRule(ValueStatus.SUPPRESSED, "TEA masked the postsecondary readiness rate")},
+    "tapr_2025_reviewed_rates",
+    {"-1": TokenRule(ValueStatus.SUPPRESSED, "TEA masked the rate")},
     reference_id="masking",
 )
 _NUMERIC_UNITS = frozenset(MeasurementUnit) - {MeasurementUnit.TEXT}
@@ -35,7 +36,7 @@ _VALUE_STATUSES = frozenset(item.value for item in ValueStatus)
 Number = int | float
 
 
-@lru_cache(maxsize=6)
+@lru_cache(maxsize=9)
 def _reviewed_tapr(scope: str, family: str) -> tuple[str, str, DatasetMetadata]:
     config = load_config()
     dataset = f"{scope}_tapr_{family}"
@@ -115,7 +116,7 @@ class _Projection:
         if not self.support:
             raw = row[field]
             if not isinstance(raw, str):
-                raise ContractError("TAPR readiness rate must preserve its publisher token")
+                raise ContractError("TAPR rate must preserve its publisher token")
             value = measure(raw, _TAPR_RATE_POLICY, unit="percent", minimum=0, maximum=100)
             status = "uninterpreted" if value.status == ValueStatus.INVALID else value.status.value
             return raw, status, value.numeric
@@ -206,7 +207,7 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
         expected_dimensions = set(state_keys) - {"school_year"}
         if set(dimensions) != expected_dimensions:
             raise ContractError(f"Expected exact publisher dimensions {sorted(expected_dimensions)}")
-    elif (local.table in _TAPR_READINESS_FAMILIES and local.table == statewide.table
+    elif (local.table in _TAPR_RATE_FAMILIES and local.table == statewide.table
           and local.dataset == f"{local.scope}_tapr_{local.table}"
           and statewide.dataset == f"state_tapr_{local.table}" and local.edition == str(EDITION)):
         if local.grain != f"one row per {key_column}" or statewide.grain != STATEWIDE_SINGLETON_GRAIN or dimensions:
