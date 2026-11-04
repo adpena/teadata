@@ -23,7 +23,7 @@ from typing import Any
 
 from teadata.column_schema import crosswalk_dataset, parse_column_schema, reader_options, table_input_sha256s
 from teadata.analytical import write_leaf_artifact
-from teadata.dataset_metadata import ArtifactRef, DatasetMetadata, EditionKey
+from teadata.dataset_metadata import STATEWIDE_SINGLETON_GRAIN, ArtifactRef, DatasetMetadata, EditionKey
 from teadata.identifiers import canonical_source_identifiers
 from teadata.manifest import BuildRecorder, _validate_methodology, canonical_json, file_identity, processor_identity, verify_reference_receipts
 from teadata.provenance import ProvenanceStore, validate_reference_records
@@ -300,8 +300,8 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
     # All metadata and typed closures validate before any Arrow import/open or staging write.
     for dataset, selected in prepared_inputs.items():
         if (not isinstance(selected, tuple) or len(selected) != 2 or not isinstance(selected[1], tuple)
-                or len(selected[1]) != 1 or not isinstance(selected[1][0], str)):
-            raise ValueError("Prepared input requires a processing ID and an explicit ordered singleton key")
+                or len(selected[1]) > 1 or any(not isinstance(key, str) for key in selected[1])):
+            raise ValueError("Prepared input requires a processing ID and explicit source key selection")
         identifier, keys = selected
         source = cfg.resolve_dataset(dataset, year, reader_profile="source")
         if source.resolved_year != year or source.metadata.version != edition:
@@ -309,8 +309,6 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
         selection = tapr_source_selection(reader_options(source.reader, "source"))
         scope = selection["scope"]
         source_key = TAPR_SOURCE_KEYS[scope]
-        if source_key is None:
-            raise ValueError("State TAPR single observations currently support raw source preparation only")
         family = qualified_tapr_family(source.dataset, source_key)
         resource = cfg.column_contract(dataset, year, reader_profile="source")
         if resource is None:
@@ -326,9 +324,9 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
             raise ValueError("Prepared TAPR leaf requires a single raw input")
         source_rows = reviewed_tapr_data_record_count(table)
         cfg.header_records(dataset, edition=edition, reader_profile="source")
-        validate_tapr_key(table, keys[0])
-        if keys != (source_key,):
+        if keys != (() if source_key is None else (source_key,)):
             raise ValueError("Explicit key differs from the selected TAPR source scope")
+        validate_tapr_key(table, source_key)
         graph = reference_store.verify_record_closure([identifier])
         record = graph[identifier]
         parameters, validation = record.get("parameters", {}), record.get("validation", {})
@@ -350,7 +348,7 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
                        for value in (record.get("code_version"), parameters.get("preparation_code_sha256")))):
             raise ValueError("Prepared leaf requires recorded bounded producer identities and its complete read budget")
         source_budget = TaprReadBudget(**raw_budget)
-        if source_rows * ((9 if scope == "campus" else 6) + 18) > source_budget.key_bytes:
+        if keys and source_rows * ((9 if scope == "campus" else 6) + 18) > source_budget.key_bytes:
             raise ValueError("Prepared source identity index exceeds the admitted key byte budget")
         artifact = record["outputs"]["prepared_source"]
         raw_sha = table_inputs[0]
@@ -404,7 +402,7 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
                            for i in range(native.metadata.num_row_groups))):
                 raise ValueError("Prepared source physical schema, rows or row groups differ from its admitted contract")
         dictionary = table.get("dictionary")
-        request = TaprSourceRequest(reference_store.verify_artifact(raw_sha), table, keys[0], dataset, edition,
+        request = TaprSourceRequest(reference_store.verify_artifact(raw_sha), table, keys[0] if keys else None, dataset, edition,
             reference_store.verify_artifact(dictionary["sha256"]) if dictionary else None)
         if _verify_raw_source(request, prepared, source_budget).rows != rows:
             raise ValueError("Current raw readback differs from the complete admitted source row count")
@@ -431,7 +429,8 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
             for value in [identifier, *dependencies]:
                 store.copy_record_from(reference_store, value)
             prepared = store.verify_artifact(artifact["sha256"])
-            key = EditionKey(dataset, edition, EditionKey.source_revision((raw_sha,)), scope, table_name, "one row per " + keys[0])
+            grain = "one row per " + keys[0] if keys else STATEWIDE_SINGLETON_GRAIN
+            key = EditionKey(dataset, edition, EditionKey.source_revision((raw_sha,)), scope, table_name, grain)
             with pq.ParquetFile(prepared) as native:
                 schema = native.schema_arrow.remove_metadata()
                 if (schema.names != cfg.column_schema(dataset, year, reader_profile="source")
@@ -444,6 +443,9 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
                 leaf = stage / (identity + ".parquet")
 
                 def batches():
+                    if not keys:
+                        yield from _prepared_batches(native, source_budget)
+                        return
                     identities = []
                     key_bytes = 0
                     for batch in _prepared_batches(native, source_budget):
@@ -504,7 +506,7 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--processing-input", action="append", nargs=2, default=[], metavar=("DATASET", "RECORD_ID"),
                         help="Explicit processing dependency for one exact selected dataset/scope; applicability is caller-reviewed")
     parser.add_argument("--prepared-input", action="append", nargs=3, metavar=("DATASET", "PROCESSING_ID", "KEY_COLUMN"),
-                        help="Opt-in raw-wide schema3 selection: exact prepared_source processing output and singleton physical key for each explicitly selected Config dataset")
+                        help="Opt-in raw-wide selection: exact prepared source receipt and physical key; use '-' for a statewide singleton")
     parser.add_argument("--input-dir", type=Path, default=data_path("tapr", "raw"))
     parser.add_argument("--output-dir", required=True, type=Path)
     args = parser.parse_args(argv)
@@ -519,7 +521,7 @@ def main(argv: list[str] | None = None) -> None:
         for dataset, identifier, key in args.prepared_input:
             if dataset in prepared_inputs:
                 parser.error("Duplicate prepared dataset selection")
-            prepared_inputs[dataset] = (identifier, (key,))
+            prepared_inputs[dataset] = (identifier, () if key == "-" else (key,))
     result = prepare_profiles(load_config(args.config), edition=args.edition,
         scopes=args.scope or ["campus", "district"], input_dir=args.input_dir, output_dir=args.output_dir,
         reference_store=ProvenanceStore(args.reference_store) if args.reference_store is not None else None,

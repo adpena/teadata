@@ -232,6 +232,22 @@ class LeafColumnSupport:
         return result
 
 
+STATEWIDE_SINGLETON_GRAIN = "one statewide observation"
+
+
+def validate_leaf_keys(contract: Mapping[str, Any]) -> None:
+    """The statewide singleton is identified by its edition alone."""
+    keys = contract["key_columns"]
+    edition = contract["edition"]
+    singleton = edition["scope"] == "state" and edition["grain"] == STATEWIDE_SINGLETON_GRAIN
+    if singleton:
+        if keys != [] or type(contract["rows"]) is not int or contract["rows"] != 1:
+            raise ValueError("A statewide singleton requires one row and no physical keys")
+    elif (not isinstance(keys, list) or not keys or any(not isinstance(key, str) for key in keys)
+          or len(set(keys)) != len(keys) or not set(keys) <= set(contract["columns"])):
+        raise ValueError("Leaf grain requires explicit ordered native key columns")
+
+
 @dataclass(frozen=True)
 class ArtifactRef:
     """Transport bytes plus an independent, immutable native leaf contract.
@@ -274,10 +290,7 @@ class ArtifactRef:
                 or any(not isinstance(v, str) or not v for v in columns) or len(set(columns)) != len(columns)):
             raise ValueError("Leaf contract requires ordered native columns")
         LeafColumnSupport.from_contract(contract)
-        keys = contract["key_columns"]
-        if (not isinstance(keys, list) or not keys or any(not isinstance(k, str) for k in keys)
-                or len(set(keys)) != len(keys) or not set(keys) <= set(columns)):
-            raise ValueError("Leaf grain requires explicit ordered native key columns")
+        validate_leaf_keys(contract)
         if type(contract["rows"]) is not int or contract["rows"] < 0:
             raise ValueError("Leaf row count must be a nonnegative integer")
         inputs = contract["inputs"]

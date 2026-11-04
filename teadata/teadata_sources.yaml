@@ -7532,7 +7532,8 @@ data_sources:
           path: schemas/tapr--2025--college-readiness-components-crosswalk.json
           title: TEA Data complete source-only header/layout and ordered dictionary-occurrence contract
           status: available
-          provenance_ids: []
+          provenance_ids:
+          - "cf4b8f4e1c3e179ed49e8daac2b7d88787a76a2f60681f73d4763132b96a3049"
           reviewed_sha256: f32fecb68e12e1d55e7be5d08f2800ed70765a59f7c194c1ee5add5fb7427c42
         notes: >-
           Complete source-only campus download. The listed percentage rates
@@ -7657,7 +7658,8 @@ data_sources:
             path: "schemas/tapr--2025--college-readiness-components-crosswalk.json"
             title: "TEA Data complete source-only header/layout and ordered dictionary-occurrence contract"
             status: "available"
-            provenance_ids: []
+            provenance_ids:
+              - "d725fced4ff10c3d9e125423a986b07b9a3781860706b38b098299c2c522b779"
             reviewed_sha256: "f32fecb68e12e1d55e7be5d08f2800ed70765a59f7c194c1ee5add5fb7427c42"
         notes: >-
           Annual-graduate college-readiness components from the complete offered
@@ -7829,7 +7831,8 @@ data_sources:
             path: "schemas/tapr--2025--state-college-readiness-components-crosswalk.json"
             title: "Complete source-only header and dictionary-occurrence contract"
             status: "available"
-            provenance_ids: []
+            provenance_ids:
+              - "f696ea6503b6e92ddc800a456dca6f0b979fea43ca54ba043750e5f1df74ac25"
             reviewed_sha256: "4f007bb974d8cc43fd3e042272d3944322d00f13b5fe89d5a5503eb8a19a72b2"
         notes: >-
           One independent statewide publisher observation for 2023–24 annual

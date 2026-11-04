@@ -5,7 +5,9 @@ from __future__ import annotations
 from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
+    from .dataset_metadata import EditionKey
     from .engine import DataEngine
+    from .release import DataRelease
 
 from .entities import (
     Campus,
@@ -392,6 +394,19 @@ class Query:
         return handler(self, op)
 
     # ---------------------- individual handlers ----------------------
+    def compare_statewide(self, *, release: DataRelease, local: EditionKey,
+                          statewide: EditionKey, metric: str) -> Query:
+        """Project local and publisher statewide values with percentage-point gaps."""
+        from .statewide import compare_statewide
+
+        return Query(compare_statewide(self._items, release=release, local=local,
+                                       statewide=statewide, metric=metric), self._repo)
+
+    def _op_compare_statewide(self, op: tuple):
+        if len(op) != 5:
+            raise ValueError("compare_statewide requires a release, local edition, statewide edition and metric")
+        return self.compare_statewide(release=op[1], local=op[2], statewide=op[3], metric=op[4])
+
     def _op_filter_callable(self, predicate: Callable[[Any], bool]):
         self._items = [o for o in self._items if predicate(o)]
         return self
@@ -684,6 +699,7 @@ _register("filter", Query._op_filter)
 _register("take", Query._op_take)
 _register("sort", Query._op_sort)
 _register("map", Query._op_map)
+_register("compare_statewide", Query._op_compare_statewide)
 _register("distinct", Query._op_distinct)
 _register("grade_overlap", Query._op_grade_overlap)
 _register("campuses_in", Query._op_campuses_in)

@@ -659,15 +659,44 @@ displayed rates across five measures and 11 groups. The CSV supplies the
 numerators and denominators. The catalog binds the all-students and
 economically disadvantaged counts and rates with their units and period.
 Dual-credit and OnRamps criteria can overlap. Use the published combined
-criterion for the union. The statewide source supports raw preparation
-and explicit eager reading. Prepared release leaves and the default engine
-remain outside its scope.
+criterion for the union. The statewide source supports raw preparation,
+explicit eager reading, and a native singleton leaf. Use `-` as the key
+argument in `--prepared-input` for the state source. The singleton is
+identified by its exact edition and has no physical geographic key.
 
 Replay the statewide evidence from a populated provenance store:
 
 ```sh
 uv run python -m teadata.scripts.verify_tapr_state_grad2 --store provenance
 ```
+
+Compare a district or campus query against the state with a pinned native
+release containing the two exact GRAD2 editions:
+
+```python
+from teadata.dataset_metadata import EditionKey
+
+def select_grad2(scope):
+    dataset = f"{scope}_tapr_college_readiness_components"
+    row, = (row for row in release.catalog.editions(dataset=dataset, include_metadata=False)
+            if row["edition"] == "2025")
+    return EditionKey.from_dict({name: value for name, value in row.items() if name != "edition_id"})
+
+comparison = (engine >> ("district", "Austin ISD")) >> (
+    "compare_statewide", release, select_grad2("district"), select_grad2("state"),
+    "ccmr_annual_graduates_dual_credit_economically_disadvantaged_rate",
+)
+print(comparison.first().difference_pp)
+```
+
+The comparison is available for the reviewed AP/IB and dual-credit criteria
+rates for all graduates and economically disadvantaged graduates. It uses
+2023–24 annual graduates in each geography and reports local minus state
+in percentage points. Results retain the exact editions and raw tokens.
+The reviewed TEA rate policy preserves `-1` as suppressed. Blank tokens,
+absent local rows, and uninterpreted tokens carry separate statuses and
+yield no gap. TAPR is not applicable to private campuses. Resolve ambiguous
+source revisions explicitly before comparing. These native leaves are opt-in.
 
 Prepare each family separately with the existing bounded native producer:
 

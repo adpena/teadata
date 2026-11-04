@@ -16,7 +16,7 @@ from typing import Any, TYPE_CHECKING
 
 from .manifest import ContractError, DatasetCatalog, canonical_json, file_identity
 from .values import Measurement, ValueStatus, presentation_value
-from .dataset_metadata import ArtifactRef, LeafColumnSupport
+from .dataset_metadata import ArtifactRef, LeafColumnSupport, validate_leaf_keys
 
 if TYPE_CHECKING:
     import pyarrow as pa
@@ -391,10 +391,12 @@ def _leaf_schema(contract):
     import pyarrow as pa
 
     schema = pa.ipc.read_schema(pa.BufferReader(base64.b64decode(contract["schema"], validate=True)))
-    if (schema.metadata is not None or schema.names != contract["columns"]
-            or not contract["key_columns"] or len(set(contract["key_columns"])) != len(contract["key_columns"])
-            or not set(contract["key_columns"]) <= set(schema.names)):
-        raise ContractError("Leaf contract requires metadata-free native schema and explicit keys")
+    if schema.metadata is not None or schema.names != contract["columns"]:
+        raise ContractError("Leaf contract requires a metadata-free native schema")
+    try:
+        validate_leaf_keys(contract)
+    except ValueError as error:
+        raise ContractError(str(error)) from error
     try:
         support = LeafColumnSupport.from_contract(contract)
         if support is not None:
