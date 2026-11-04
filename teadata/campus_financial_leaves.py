@@ -169,13 +169,11 @@ def _admit_intake(store: ProvenanceStore, data: bytes) -> list[_Workbook]:
     index = graph[index_id]
     _check_receipt(index, _INDEX, "district_index")
 
-    def selector_path(record: Mapping[str, Any]) -> Path:
+    def selector_bytes(record: Mapping[str, Any]) -> bytes:
         artifact = record["artifact"]
-        path = store.root / "objects" / artifact["sha256"]
-        _read_bounded(path, artifact["sha256"], artifact["size_bytes"])
-        return path
+        return _read_bounded(store.root / "objects" / artifact["sha256"], artifact["sha256"], artifact["size_bytes"])
 
-    all_districts = _parse_selector(selector_path(index), field="who_list",
+    all_districts = _parse_selector(selector_bytes(index), field="who_list",
         program=_ROSTER_PROGRAM, heading=f"Select District for Financial Actual Campus {_FISCAL_YEAR} Report:")
     if manifest["publisher_district_count"] != len(all_districts) or not manifest["districts"].keys() <= set(all_districts):
         raise ValueError("Financial intake district coverage differs from the publisher's index")
@@ -184,7 +182,7 @@ def _admit_intake(store: ProvenanceStore, data: bytes) -> list[_Workbook]:
         roster_id = scope["roster_receipt"]
         roster = graph[roster_id]
         _check_receipt(roster, _broker_url(_ROSTER_PROGRAM, who_list=district), "campus_index", parent=index_id, district=district)
-        listed = _parse_selector(selector_path(roster), field="which_camp",
+        listed = _parse_selector(selector_bytes(roster), field="which_camp",
             program=_WORKBOOK_PROGRAM, heading="Select a Campus:", district=district)
         if tuple(scope["listed_campuses"]) != listed:
             raise ValueError("Financial intake campus coverage differs from the publisher's roster")

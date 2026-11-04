@@ -74,9 +74,9 @@ def _broker_url(program: str, **params: str) -> str:
     return f"{BROKER}?" + urlencode({"_service": "marykay", "_debug": "0", **params, "_program": program})
 
 
-def _parse_selector(path: Path, *, field: str, program: str, heading: str, district: str = "") -> tuple[str, ...]:
+def _parse_selector(data: bytes, *, field: str, program: str, heading: str, district: str = "") -> tuple[str, ...]:
     parser = _Selector(field)
-    parser.feed(path.read_text(encoding="utf-8-sig"))
+    parser.feed(data.decode("utf-8-sig"))
     parser.close()
     pattern = rf"{district}[0-9]{{{3 if district else 6}}}"
     if (parser.matches != 1 or parser.inside or parser.programs != [program]
@@ -196,7 +196,7 @@ def acquire_campus_financials(
     def validate_index(path: Path) -> None:
         nonlocal publisher_districts
         publisher_districts = _parse_selector(
-            path, field="who_list", program=campus_selector_program,
+            path.read_bytes(), field="who_list", program=campus_selector_program,
             heading=f"Select District for Financial Actual Campus {fiscal_year} Report:",
         )
 
@@ -219,7 +219,7 @@ def acquire_campus_financials(
         def validate_roster(path: Path, district_id: str = district) -> None:
             nonlocal publisher_campuses
             publisher_campuses = _parse_selector(
-                path, field="which_camp", program=workbook_program, heading="Select a Campus:", district=district_id,
+                path.read_bytes(), field="which_camp", program=workbook_program, heading="Select a Campus:", district=district_id,
             )
 
         url = _broker_url(campus_selector_program, who_list=district)

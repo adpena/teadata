@@ -196,6 +196,24 @@ def test_pinned_receipt_archive_requires_complete_publisher_roster(tmp_path, mon
     assert not output.exists()
 
 
+def test_roster_parser_uses_verified_bytes_without_reopening_archive_path(tmp_path, monkeypatch):
+    store, manifest = _intake(tmp_path, monkeypatch)
+    receipt = manifest["districts"]["084908"]["roster_receipt"]
+    archive = store.verify_artifact(store.read_record(receipt)["artifact"]["sha256"])
+    original_read = finance._read_bounded
+
+    def read_then_replace(path, digest, size=None):
+        data = original_read(path, digest, size)
+        if path == archive:
+            archive.write_bytes(b"<html>Changed after the verified read</html>")
+        return data
+
+    monkeypatch.setattr(finance, "_read_bounded", read_then_replace)
+    workbooks = finance._admit_intake(store, json.dumps(manifest).encode())
+    assert [workbook.campus for workbook in workbooks] == ["084908104", "084908106"]
+    assert b"Changed" in archive.read_bytes()
+
+
 def test_pinned_intake_and_archived_payload_are_verified(tmp_path, monkeypatch):
     store, manifest = _intake(tmp_path, monkeypatch)
     intake, pin = _write_intake(tmp_path, manifest)
