@@ -1146,6 +1146,39 @@ _DEFAULT_CAMPUS_ALIASES: List[str] = [
 _CAMPUS_RE = _DISTRICT_RE
 
 
+def normalize_enrichment_identifiers(df, *, key: Literal["district_number", "campus_number"],
+                                     dataset: str, year: int | None, column: str | None = None):
+    """Normalize original publisher join tokens and reject disagreeing aliases."""
+    from .identifiers import EntityIdentityError, canonical_source_identifier
+
+    width, aliases = (6, _DEFAULT_DISTRICT_ALIASES) if key == "district_number" else (9, _DEFAULT_CAMPUS_ALIASES)
+    candidates = {alias.casefold() for alias in aliases}
+    columns = [name for name in df.columns if str(name).casefold() in candidates] if column is None else [column]
+    context = f"{dataset} ({year}): {key}"
+    if not columns or any(name not in df.columns for name in columns):
+        raise KeyError(f"{dataset} ({year}): enrichment missing required join column: {key}")
+    if not df.columns.is_unique:
+        raise EntityIdentityError(f"{context}: source has duplicate column names")
+
+    def normalize(values, name):
+        def normalize_value(value):
+            try:
+                return canonical_source_identifier(value, width=width)
+            except ValueError as error:
+                raise EntityIdentityError(f"{context}: invalid identifier {value!r} in {name!r}") from error
+        return values.map(normalize_value)
+
+    canonical = normalize(df[columns[0]], columns[0])
+    for name in columns[1:]:
+        alternate = normalize(df[name], name)
+        conflicts = canonical.notna() & alternate.notna() & canonical.ne(alternate)
+        if conflicts.any():
+            position = int(conflicts.to_numpy().nonzero()[0][0])
+            raise EntityIdentityError(f"{context}: conflicting identifier columns at source row {position + 1}: {canonical.iloc[position]!r} and {alternate.iloc[position]!r} in {name!r}")
+        canonical = canonical.fillna(alternate)
+    return df.assign(**{key: canonical}).loc[canonical.notna()].copy()
+
+
 def normalize_campus_number_value(x: Any) -> Optional[str]:
     """
     Normalize any representation of a campus number into a 9-digit zero-padded string (e.g., '011901001').

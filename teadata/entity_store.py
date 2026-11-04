@@ -13,8 +13,13 @@ from typing import Any, Iterable, Optional
 from ._sqlite import readonly_connection
 from .manifest import ContractError, read_sqlite_catalog, read_sqlite_catalog_connection
 from .release import current_release
-from .teadata_config import canonical_district_number
-from .identifiers import campus_lookup_key, normalize_campus_lookup_key
+from .identifiers import (
+    EntityIdentityError,
+    campus_lookup_key,
+    canonical_source_identifier,
+    normalize_campus_lookup_key,
+    validate_stored_district_numbers,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +50,15 @@ def _district_select(*, include_meta: bool, lookup: bool = False) -> str:
         ) counts ON counts.district_id = d.id
     """
     if lookup:
-        query += " WHERE d.district_number_canon = ? OR d.district_number = ?"
+        query += " WHERE d.district_number_canon IN (?, ?) OR d.district_number IN (?, ?)"
     return query
+
+
+def _unique_row(cursor: sqlite3.Cursor, kind: str, key: str) -> tuple | None:
+    rows = cursor.fetchmany(2)
+    if len(rows) > 1:
+        raise ContractError(f"Entity store contains duplicate {kind} {key!r}")
+    return rows[0] if rows else None
 
 
 def _campus_record(row, *, include_meta: bool, build_id: str) -> dict[str, Any]:
@@ -178,40 +190,13 @@ def load_district(
     include_meta: bool = True,
 ) -> Optional[dict[str, Any]]:
     path = discover_entity_store(store_path)
-    if not path:
-        return None
-
-    query = _district_select(include_meta=include_meta, lookup=True)
-
+    if not path.is_file():
+        raise RuntimeError(f"Failed querying district from entity store '{path}': file is unavailable")
     try:
-        with closing(readonly_connection(path, immutable=store_path is None)) as conn:
-            for key in _district_lookup_keys(district_number):
-                row = conn.execute(query, (key, key)).fetchone()
-                if not row:
-                    continue
-                has_charter = bool(row[9])
-                meta = _decode_json(row[7]) if include_meta else {}
-                return {
-                    "name": row[0] or "",
-                    "district_number": _strip_leading_apostrophe(row[1] or row[2]),
-                    "district_number_canon": row[2] or "",
-                    "enrollment": row[3],
-                    "rating": row[4],
-                    "aea": _nullable_bool(row[5]),
-                    "aea_raw": row[6],
-                    "meta": meta,
-                    "campus_count": row[8] or 0,
-                    "is_charter": has_charter,
-                    "district_type": _district_type_from_flag(has_charter),
-                }
-    except ContractError:
-        raise
-    except Exception as exc:
-        raise RuntimeError(
-            f"Failed querying district from entity store '{path}': {exc}"
-        ) from exc
-
-    return None
+        with EntityStore(path, immutable=store_path is None) as store:
+            return store.get_district(district_number, include_meta=include_meta)
+    except sqlite3.Error as error:
+        raise RuntimeError(f"Failed querying district from entity store '{path}': {error}") from error
 
 
 def list_meta_keys(
@@ -370,7 +355,10 @@ class EntityStore:
         self._ensure_open()
         if not district_number:
             return None
-        key = canonical_district_number(district_number) or str(district_number).strip()
+        try:
+            key = canonical_source_identifier(district_number, width=6)
+        except ValueError:
+            return None
         if not key:
             return None
         cached = self._district_cache.get(key) if cache else None
@@ -393,8 +381,14 @@ class EntityStore:
         if conn is None:
             return
         try:
+            keys: set[str] = set()
             for row in conn.execute(_campus_select(include_meta=include_meta)):
-                yield _campus_record(row, include_meta=include_meta, build_id=self.catalog.build_id)
+                record = _campus_record(row, include_meta=include_meta, build_id=self.catalog.build_id)
+                key = record["lookup_key"]
+                if key in keys:
+                    raise ContractError(f"Entity store contains duplicate campus lookup key {key!r}")
+                keys.add(key)
+                yield record
         except sqlite3.OperationalError as error:
             raise ContractError("Entity store requires the source-qualified campus identity schema; rebuild it") from error
 
@@ -403,10 +397,8 @@ class EntityStore:
         if conn is None:
             return []
         query = _district_select(include_meta=include_meta)
-        try:
-            rows = conn.execute(query)
-        except Exception:
-            return []
+        rows = conn.execute(query)
+        _ = self._validated_district_numbers
         for row in rows:
             has_charter = bool(row[9])
             meta = _decode_json(row[7]) if include_meta else {}
@@ -454,7 +446,8 @@ class EntityStore:
         if conn is None:
             return None
         try:
-            row = conn.execute(_campus_select(include_meta=include_meta) + " WHERE c.lookup_key = ?", (key,)).fetchone()
+            cursor = conn.execute(_campus_select(include_meta=include_meta) + " WHERE c.lookup_key = ?", (key,))
+            row = _unique_row(cursor, "campus lookup key", key)
         except sqlite3.OperationalError as error:
             raise ContractError("Entity store requires the source-qualified campus identity schema; rebuild it") from error
         return _campus_record(row, include_meta=include_meta, build_id=self.catalog.build_id) if row else None
@@ -465,11 +458,10 @@ class EntityStore:
         conn = self._connect()
         if conn is None:
             return None
+        _ = self._validated_district_numbers
         query = _district_select(include_meta=include_meta, lookup=True)
-        try:
-            row = conn.execute(query, (key, key)).fetchone()
-        except Exception:
-            row = None
+        keys = (key, key[1:])
+        row = _unique_row(conn.execute(query, (*keys, *keys)), "district number", key)
         if not row:
             return None
         has_charter = bool(row[9])
@@ -488,23 +480,12 @@ class EntityStore:
             "district_type": _district_type_from_flag(has_charter),
         }
 
-
-def _district_lookup_keys(district_number: Optional[str]) -> Iterable[str]:
-    if not district_number:
-        return ()
-    keys = []
-    canonical = canonical_district_number(district_number)
-    if canonical:
-        keys.append(canonical)
-    raw = str(district_number).strip()
-    if raw and raw not in keys:
-        keys.append(raw)
-    if raw.startswith("'") and len(raw) > 1:
-        digits = raw[1:]
-        if digits not in keys:
-            keys.append(digits)
-        if digits.isdigit():
-            normalized = str(int(digits))
-            if normalized not in keys:
-                keys.append(normalized)
-    return keys
+    @cached_property
+    def _validated_district_numbers(self) -> None:
+        """Check stored spelling and uniqueness before the first district read."""
+        try:
+            validate_stored_district_numbers(self.connection.execute(
+                "SELECT district_number, district_number_canon FROM districts"
+            ))
+        except EntityIdentityError as error:
+            raise ContractError(f"Invalid entity store: {error}") from error

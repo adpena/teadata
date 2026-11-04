@@ -91,7 +91,11 @@ from ..classes import (
     _coerce_grade_spans,
     _spans_to_bounds,
 )
-from ..teadata_config import canonical_campus_number, canonical_district_number
+from ..identifiers import (
+    canonical_source_identifier,
+    stored_district_number,
+    validate_stored_district_numbers,
+)
 from ..manifest import (
     CATALOG_TABLE,
     CATALOG_TABLE_DDL,
@@ -144,7 +148,7 @@ class DistrictRecord(Base):
     name: Mapped[str] = mapped_column(String(255), nullable=False)
     enrollment: Mapped[int | None] = mapped_column(Integer)
     district_number: Mapped[str | None] = mapped_column(String(16), index=True)
-    district_number_canon: Mapped[str | None] = mapped_column(String(16), index=True)
+    district_number_canon: Mapped[str | None] = mapped_column(String(16), unique=True, index=True)
     aea: Mapped[bool | None] = mapped_column(Boolean)
     aea_raw: Mapped[str | None] = mapped_column(String(8))
     rating: Mapped[str | None] = mapped_column(Text)
@@ -537,8 +541,14 @@ class LazyMetaDict(UserDict[str, Any]):
         return self.data.setdefault(key, default)
 
     def __copy__(self):
-        # UserDict's default implementation assumes data is an instance slot.
+        # A public whole-mapping copy has the same authoritative view as dict().
         return type(self)(self.data.copy())
+
+    def _copy_deferred(self):
+        """Give an engine union independent metadata without preloading rows."""
+        if self._loader is None:
+            return type(self)(self._payload)
+        return type(self)(self._loader, seed=self._payload)
 
     def __reduce__(self):
         # A persisted graph must contain values, never Session/loader closures.
@@ -967,8 +977,7 @@ def _district_payload(district: District, *, include_geometry: bool) -> dict[str
         "name": district.name,
         "enrollment": district.enrollment,
         "district_number": district.district_number or None,
-        "district_number_canon": getattr(district, "district_number_canon", None)
-        or canonical_district_number(district.district_number),
+        "district_number_canon": district.district_number_canon or None,
         "aea_raw": aea_raw,
         "aea": _coerce_nullable_bool(aea_raw if aea_raw is not None else district.aea),
         "rating": district.rating,
@@ -1008,11 +1017,9 @@ def _campus_payload(campus: Campus, *, include_geometry: bool) -> dict[str, Any]
         "school_status_date": campus.school_status_date,
         "update_date": campus.update_date,
         "district_number": campus.district_number,
-        "district_number_canon": getattr(campus, "district_number_canon", None)
-        or canonical_district_number(campus.district_number),
+        "district_number_canon": canonical_source_identifier(campus.district_number, width=6),
         "campus_number": campus.campus_number,
-        "campus_number_canon": getattr(campus, "campus_number_canon", None)
-        or canonical_campus_number(campus.campus_number),
+        "campus_number_canon": None if campus.is_private else "'" + lookup_key,
         "point_wkb": wkb if include_geometry else None,
         "point_geojson": geojson if include_geometry else None,
         "lon": lon,
@@ -1127,6 +1134,13 @@ def export_dataengine(
         include_meta_entries=include_meta_entries,
         batch_size=batch_size,
     )
+    if not replace:
+        # The catalog lock serializes supported writers, including when an
+        # older destination lacks the unique index or stores quoted numbers.
+        with session.connection().execute(
+            select(DistrictRecord.district_number, DistrictRecord.district_number_canon)
+        ) as rows:
+            validate_stored_district_numbers((raw, canonical) for raw, canonical in rows)
     _write_entities(
         session,
         CampusRecord,
@@ -1261,7 +1275,7 @@ def import_dataengine(
                         id=d["id"],
                         name=d["name"],
                         enrollment=d["enrollment"],
-                        district_number=d["district_number"] or "",
+                        district_number=stored_district_number(d["district_number"], d["district_number_canon"]) or "",
                         aea=d["aea"],
                         aea_raw=d["aea_raw"],
                         rating=d["rating"],

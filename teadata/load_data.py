@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 import gzip
 import json
+import logging
 import pandas as pd
 import os
 import sqlite3
@@ -67,6 +68,8 @@ CFG = str(
     .expanduser()
     .resolve()
 )
+
+logger = logging.getLogger(__name__)
 YEAR = (
     int(os.environ["TEADATA_BUILD_YEAR"])
     if os.environ.get("TEADATA_BUILD_YEAR")
@@ -355,6 +358,8 @@ def run_enrichments(repo: DataEngine) -> None:
             ))
             outcome.update(required=True, status="failed", error_type=type(error).__name__,
                            error=str(error)[:4096], error_truncated=len(str(error)) > 4096)
+            logger.error("Required enrichment failed for %s scope=%s year=%s: %s", dataset, scope, YEAR, outcome["error"],
+                         extra={"enrichment_outcome": outcome})
             try:
                 receipt = _retain_failed_enrichment(repo)
                 if receipt is not None:
@@ -2108,7 +2113,7 @@ def _save_map_store(
 ) -> Optional[Path]:
     if not BUILD_MAP_STORE:
         return None
-    print(f"[maps] district classification {_district_classification_counts(repo)}")
+    logger.info("Map district classification: %s", _district_classification_counts(repo))
     path = _map_store_path(districts_fp, campuses_fp)
     tmp_path = path.with_suffix(".sqlite.tmp")
     try:
@@ -2489,7 +2494,7 @@ def _load_private_entities(repo: DataEngine, cfg: _cfg_mod.Config) -> int:
     source = cfg.resolve_dataset(dataset, None)
     _, frame = cfg.load_df(dataset, None)
     count = _add_tefa_entities(repo, frame, version=source.metadata.version)
-    print(f"[private] loaded {count} private listings from {source.metadata.version} (dataset={dataset})")
+    logger.info("Loaded %s private listings for edition %s from %s", count, source.metadata.version, dataset)
     return count
 
 
@@ -2581,7 +2586,7 @@ def _build_repo(districts_fp: str, campuses_fp: str, *, cfg_obj: _cfg_mod.Config
                         if key:
                             refreshed[key] = d.id
                 dn_to_id = refreshed
-                print(f"[charters] added {charter_networks} statewide districts")
+                logger.info("Added %s statewide charter districts", charter_networks)
         except Exception as e:
             raise ContractError(f"[charters] add failed: {e}") from e
 
@@ -2636,9 +2641,7 @@ def _build_repo(districts_fp: str, campuses_fp: str, *, cfg_obj: _cfg_mod.Config
                 added_ref += 1
 
             if added_ref:
-                print(
-                    f"[districts_ref] added {added_ref} statewide districts from reference {ref_year}"
-                )
+                logger.info("Added %s statewide districts from reference %s", added_ref, ref_year)
         except Exception as e:
             raise ContractError(f"[districts_ref] add failed: {e}") from e
 
@@ -2682,9 +2685,7 @@ def _build_repo(districts_fp: str, campuses_fp: str, *, cfg_obj: _cfg_mod.Config
                 added_ref2 += 1
 
             if added_ref2:
-                print(
-                    f"[districts_ref2] added {added_ref2} statewide districts from reference {ref2_year}"
-                )
+                logger.info("Added %s statewide districts from second reference %s", added_ref2, ref2_year)
         except Exception as e:
             raise ContractError(f"[districts_ref2] add failed: {e}") from e
 
@@ -2868,6 +2869,7 @@ if __name__ == "__main__":
             [sys.executable, "-s", "-P", "-m", "teadata.load_data"],
             {**environment, "PYTHONHASHSEED": "0"},
         )
+    logging.basicConfig(level=logging.INFO)
     cfg = load_config(CFG)
     repo = load_repo(
         cfg.resolve_dataset("districts", section="spatial", **cfg.spatial_selection("districts", YEAR)).path,

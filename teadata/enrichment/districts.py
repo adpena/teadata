@@ -1,22 +1,17 @@
-import pandas as pd
+from collections.abc import Mapping
+import logging
 from typing import Dict, Any, Optional
 
-import teadata.classes as classes_mod
+from teadata.entities import District
 
 from . import enricher, _record_matches
-from .base import Enricher, clean_value_columns
+from .base import Enricher, apply_entity_attributes, clean_value_columns, require_unique_entity_rows
 
 from teadata.teadata_config import load_config
 from teadata.teadata_config import canonical_district_number
-from teadata.teadata_config import normalize_district_number_column
+from teadata.teadata_config import normalize_enrichment_identifiers
 
-def _profile_enabled() -> bool:
-    return bool(getattr(classes_mod, "ENABLE_PROFILING", False))
-
-
-def _debug(msg: str) -> None:
-    if _profile_enabled():
-        print(msg)
+logger = logging.getLogger(__name__)
 
 
 # -----------------------------
@@ -66,9 +61,14 @@ def _apply_district_enrichment_table(
         dataset, year, section="data_sources", **(reader_kwargs or {})
     )
     source_rows = len(df)
+    ratings = dataset == "accountability" and (reader_kwargs or {}).get("reader_profile") == "ratings"
+    if ratings:
+        # TEA's historical summary interleaves district and campus rows. A
+        # district rating is a district row, regardless of publisher row order.
+        df = df.loc[df["Campus Number"].isna()].copy()
 
-    if _profile_enabled():
-        _debug(
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
             f"[enrich:{dataset}] resolved_year={resolved_year} (requested={year}) rows={len(df)}"
         )
 
@@ -76,32 +76,24 @@ def _apply_district_enrichment_table(
     if rename:
         df = df.rename(columns=rename)
 
-    # Ensure we have a clean, machine-joinable district_number column
-    df, found = normalize_district_number_column(df, new_col="district_number")
+    df = normalize_enrichment_identifiers(
+        df, key="district_number", dataset=dataset, year=resolved_year,
+        column="District Number" if ratings else None,
+    )
+    require_unique_entity_rows(df, "district_number", dataset, resolved_year)
 
-    if found is None:
-        if _profile_enabled():
-            _debug(
-                f"[enrich:{dataset}] abort: district_number column missing after normalization (found={found})"
-            )
-        raise KeyError("district enrichment missing required join column: district_number")
-
-    # Canonicalize to leading-apostrophe format used across the repo
-    df["district_number"] = df["district_number"].map(_canon_district_number)
-    df = df[df["district_number"].notna()]
-
-    if _profile_enabled():
+    if logger.isEnabledFor(logging.DEBUG):
         valid_rows = len(df)
         unique_keys = df["district_number"].nunique(dropna=True)
-        _debug(
+        logger.debug(
             f"[enrich:{dataset}] canonical district numbers -> valid_rows={valid_rows} unique_keys={unique_keys}"
         )
 
     if select is None:
         use_cols = [c for c in df.columns if c != "district_number"]
         if not use_cols:
-            if _profile_enabled():
-                _debug(
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
                     f"[enrich:{dataset}] abort: no columns available after excluding district_number"
                 )
             return resolved_year, 0
@@ -109,8 +101,8 @@ def _apply_district_enrichment_table(
         use_cols = [c for c in select if c != "district_number"]
         missing = [c for c in use_cols if c not in df.columns]
         if missing:
-            if _profile_enabled():
-                _debug(
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
                     f"[enrich:{dataset}] missing columns after rename: {', '.join(sorted(missing))}"
                 )
             raise KeyError(
@@ -126,23 +118,15 @@ def _apply_district_enrichment_table(
     clean_value_columns(df, use_cols)
 
     # Build mapping keyed by canonical district_number → {attr: value}
-    sub = df[["district_number"] + use_cols].drop_duplicates("district_number")
-    sub = sub.where(pd.notnull(sub), None)
-    mapping = {
-        key: attrs
-        for key, attrs in sub.set_index("district_number", drop=True)[use_cols]
-        .to_dict(orient="index")
-        .items()
-        if key
-    }
+    mapping = df.set_index("district_number")[use_cols].to_dict(orient="index")
 
-    if _profile_enabled():
-        _debug(
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
             f"[enrich:{dataset}] prepared mapping for {len(mapping)} district numbers (select={use_cols})"
         )
 
     # Apply to repo districts
-    updated = 0
+    matches: list[tuple[District, Mapping[str, Any]]] = []
     missing_no_number = 0
     missing_no_match = 0
     sample_missing: list[str] = []
@@ -161,49 +145,22 @@ def _apply_district_enrichment_table(
         attrs = mapping.get(dn)
         if not attrs:
             missing_no_match += 1
-            if _profile_enabled() and len(sample_missing) < 10:
+            if logger.isEnabledFor(logging.DEBUG) and len(sample_missing) < 10:
                 sample_missing.append(str(getattr(d, "district_number", None)))
             continue
-        # ensure meta exists for dynamic attribute overlay
-        if getattr(d, "meta", None) is None:
-            try:
-                d.meta = {}
-            except Exception:
-                pass
-        for k, v in attrs.items():
-            # Source attribute lives in meta → readable via d.__getattr__ fallback
-            if d.meta is not None:
-                d.meta[k] = v
-            # Optional alias to a canonical field (e.g., overall_rating_2025 → rating)
-            if aliases and k in aliases:
-                try:
-                    setattr(d, aliases[k], v)
-                except Exception:
-                    # some District implementations may freeze fields; meta still holds value
-                    pass
-        updated += 1
+        matches.append((d, attrs))
 
-    if _profile_enabled():
-        _debug(
+    apply_entity_attributes(matches, dataset=dataset, year=resolved_year, aliases=aliases)
+    updated = len(matches)
+
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
             f"[enrich:{dataset}] updated={updated} missing_no_number={missing_no_number} missing_no_match={missing_no_match}"
         )
         if sample_missing:
-            _debug(
+            logger.debug(
                 f"[enrich:{dataset}] sample unmatched district_numbers: {sample_missing}"
             )
-
-    total_repo_districts = updated + missing_no_number + missing_no_match
-    summary_year = resolved_year if resolved_year is not None else year
-    summary_msg = (
-        f"District enrichment '{dataset}' ({summary_year}) updated {updated}"
-        f" of {total_repo_districts} district object(s)."
-    )
-    if missing_no_number or missing_no_match:
-        summary_msg += (
-            " Missing district_number: "
-            f"{missing_no_number}; no matching TAPR row: {missing_no_match}."
-        )
-    print(summary_msg)
 
     _record_matches(repo, dataset, year, resolved_year, "district",
                     matched=updated, unmatched=missing_no_match,

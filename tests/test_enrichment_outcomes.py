@@ -7,10 +7,11 @@ import pandas as pd
 import pytest
 import yaml
 
-from teadata import DataEngine
+from teadata import DataEngine, District
 from teadata import enrichment, load_data
 from teadata.enrichment import campuses, districts
 from teadata.manifest import BuildRecorder, ContractError
+from teadata.identifiers import EntityIdentityError
 from teadata.provenance import ProvenanceStore
 from teadata.teadata_config import load_config
 
@@ -48,6 +49,101 @@ def test_interrupts_are_not_reported_as_ordinary_optional_failures(monkeypatch):
     monkeypatch.setattr(enrichment, "_registry", {"stop": SimpleNamespace(apply=interrupted)})
     with pytest.raises(KeyboardInterrupt):
         enrichment.run_enrichment(DataEngine(), "unused", 2025)
+
+
+@pytest.mark.parametrize("scope,module,dataset,rows", [
+    ("district", districts, "sample", "011901,1\n11901,2\n"),
+    ("campus", campuses, "sample", "011901001,1\n11901001,2\n"),
+    ("campus", campuses, "campus_peims_financials", "011901001,1\n11901001,2\n"),
+])
+def test_enrichment_rejects_canonical_duplicate_source_rows(tmp_path, scope, module, dataset, rows):
+    path = tmp_path / "values.csv"
+    path.write_text(f"{scope}_number,value\n{rows}")
+    cfg = tmp_path / "sources.yaml"
+    cfg.write_text(yaml.safe_dump({"data_sources": {dataset: {2025: str(path)}}}))
+    plural = {"campus": "campuses", "district": "districts"}[scope]
+    apply = getattr(module, f"enrich_{plural}_from_config")
+    with pytest.raises(EntityIdentityError, match=f"{dataset} .*2 rows share duplicate {scope}_number"):
+        apply(DataEngine(), str(cfg), dataset, 2025, select=["value"])
+
+
+def test_enrichment_conflicts_leave_all_entities_unchanged(tmp_path):
+    from uuid import uuid4
+
+    path = tmp_path / "values.csv"
+    path.write_text("district_number,value\n011901,1\n011902,2\n")
+    cfg = tmp_path / "sources.yaml"
+    cfg.write_text(yaml.safe_dump({"data_sources": {"sample": {2025: str(path)}}}))
+    repo = DataEngine()
+    first = District(uuid4(), "first", district_number="011901")
+    second = District(uuid4(), "second", district_number="011902", meta={"value": 3})
+    repo.add_district(first)
+    repo.add_district(second)
+    with pytest.raises(ValueError, match="sample .*conflicting existing field 'value'"):
+        districts.enrich_districts_from_config(repo, str(cfg), "sample", 2025)
+    assert first.meta == {} and second.meta == {"value": 3}
+
+
+@pytest.mark.parametrize(("data", "message"), [
+    ("district_number,value\n-011901,1\n", "invalid identifier"),
+    ("district_number,value\n11901.5,1\n", "invalid identifier"),
+    ("DISTRICT,district_number,value\n011901,011902,1\n", "conflicting identifier columns"),
+])
+def test_enrichment_rejects_malformed_or_conflicting_original_identifiers(tmp_path, data, message):
+    from uuid import uuid4
+
+    path = tmp_path / "values.csv"
+    path.write_text(data)
+    cfg = tmp_path / "sources.yaml"
+    cfg.write_text(yaml.safe_dump({"data_sources": {"sample": {2025: str(path)}}}))
+    repo = DataEngine()
+    district = District(uuid4(), "first", district_number="011901")
+    repo.add_district(district)
+    with pytest.raises(EntityIdentityError, match=message):
+        districts.enrich_districts_from_config(repo, str(cfg), "sample", 2025)
+    assert district.meta == {}
+
+
+@pytest.mark.parametrize(("alias", "error"), [
+    ("district_number_canon", AttributeError),
+    ("_district_number_canon", EntityIdentityError),
+])
+def test_enrichment_rejects_identity_and_read_only_aliases_before_writes(alias, error):
+    from uuid import uuid4
+    from teadata.enrichment.base import apply_entity_attributes
+
+    district = District(uuid4(), "test", district_number="011901")
+    with pytest.raises(error, match=alias):
+        apply_entity_attributes([(district, {"value": 1})], dataset="sample", year=2025, aliases={"value": alias})
+    assert district.meta == {}
+
+
+def test_enrichment_checks_authoritative_metadata_instead_of_lazy_seed():
+    from uuid import uuid4
+    from teadata.enrichment.base import EnrichmentConflictError, apply_entity_attributes
+    from teadata.persistence.sqlalchemy_store import LazyMetaDict
+
+    district = District(uuid4(), "test", meta=LazyMetaDict(lambda: {"value": "B"}, seed={"value": "A"}))
+    with pytest.raises(EnrichmentConflictError, match="conflicting existing field 'value'"):
+        apply_entity_attributes([(district, {"value": "A"})], dataset="sample", year=2025, aliases={"value": "rating"})
+    assert district.meta["value"] == "B" and district.rating is None
+
+
+def test_accountability_selects_reporting_grain_before_district_join(monkeypatch):
+    from uuid import uuid4
+
+    frame = pd.DataFrame({"District Number": [11901, 11901], "Campus Number": [11901001, None],
+                          "District": ["Test ISD", "Test ISD"], "overall_rating": ["C", "A"]})
+    config = SimpleNamespace(load_df=lambda *args, **kwargs: (2025, frame))
+    monkeypatch.setattr(districts, "load_config", lambda _: config)
+    repo = DataEngine()
+    district = District(uuid4(), "test", district_number="011901")
+    repo.add_district(district)
+    assert districts.enrich_districts_from_config(
+        repo, "unused", "accountability", 2025, select=["overall_rating"],
+        aliases={"overall_rating": "rating"}, reader_kwargs={"reader_profile": "ratings"},
+    ) == (2025, 1)
+    assert district.meta == {"overall_rating": "A"} and district.rating == "A"
 
 
 @pytest.mark.parametrize("scope,module,dataset", [

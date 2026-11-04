@@ -1,8 +1,10 @@
 from dataclasses import asdict, dataclass
+import logging
 from typing import Any, Dict, Literal
 from .base import Enricher
 
 _registry: Dict[str, Enricher] = {}
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -36,6 +38,13 @@ def _record_outcome(repo, outcome: EnrichmentOutcome) -> dict[str, Any]:
         repo._enrichment_outcomes = []
     document = outcome.to_dict()
     repo._enrichment_outcomes.append(document)
+    level = logging.WARNING if outcome.status in {"partial", "unmatched", "unsupported", "failed"} else logging.INFO
+    logger.log(
+        level, "Enrichment %s for %s scope=%s requested_year=%s resolved_year=%s matched=%s unmatched=%s missing_identifier=%s source_rows=%s error=%s",
+        outcome.status, outcome.dataset, outcome.scope, outcome.requested_year, outcome.resolved_year,
+        outcome.matched, outcome.unmatched, outcome.missing_identifier, outcome.source_rows, outcome.error,
+        extra={"enrichment_outcome": document},
+    )
     return document
 
 
@@ -95,5 +104,4 @@ def run_enrichment(
                 error_truncated=len(str(e)) > 4096,
                 source_status="missing" if isinstance(e, FileNotFoundError) else "unknown",
             ))}
-            print(f"[enrich] {name} failed: {e}")
     return stats

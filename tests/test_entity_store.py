@@ -69,6 +69,24 @@ def test_entity_store_round_trip(tmp_path, catalog):
     assert "campus_2025_demo" in keys
 
 
+@pytest.mark.parametrize(("alternative", "message"), [
+    ("'123456", "Duplicate district number"),
+    ("123456.0", "Inconsistent district number"),
+])
+def test_district_store_rejects_competing_spellings_before_returning_a_result(tmp_path, catalog, alternative, message):
+    path = _build_entity_store(tmp_path, catalog)
+    with closing(sqlite3.connect(path)) as connection, connection:
+        connection.execute("INSERT INTO districts (id, name, district_number_canon) VALUES (?, ?, ?)",
+                           (uuid.uuid4().hex, "competing", alternative))
+    with entity_store.EntityStore(path) as store:
+        with pytest.raises(RuntimeError, match=message):
+            store.get_district("123456")
+        with pytest.raises(RuntimeError, match=message):
+            next(iter(store.iter_districts()))
+    with pytest.raises(RuntimeError, match=message):
+        entity_store.load_district("123456", store_path=path)
+
+
 @pytest.mark.parametrize("method, argument", [("load_district", "123456"), ("list_meta_keys", "campus")])
 def test_one_shot_snapshot_readers_reject_writes(tmp_path, catalog, monkeypatch, method, argument):
     original = _build_entity_store(tmp_path, catalog)

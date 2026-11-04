@@ -1,16 +1,17 @@
-from collections.abc import MutableMapping
+from collections.abc import Mapping, MutableMapping
+import logging
 from typing import Dict, Any, Callable
 
-import teadata.classes as classes_mod
+from teadata.entities import Campus
 import pandas as pd
 from . import enricher, _record_matches
-from .base import Enricher, clean_value_columns
+from .base import Enricher, apply_entity_attributes, clean_value_columns, require_unique_entity_rows
 
 from teadata.teadata_config import load_config
 
 from teadata.teadata_config import (
     canonical_campus_number,
-    normalize_campus_number_column,
+    normalize_enrichment_identifiers,
 )
 
 DEFAULT_PEIMS_FINANCIAL_COLUMNS: list[str] = [
@@ -27,65 +28,7 @@ DEFAULT_PEIMS_FINANCIAL_COLUMNS: list[str] = [
 ]
 
 
-def _profile_enabled() -> bool:
-    return bool(getattr(classes_mod, "ENABLE_PROFILING", False))
-
-
-def _debug(msg: str) -> None:
-    if _profile_enabled():
-        print(msg)
-
-
-def _canon_campus_number(x) -> str | None:
-    return canonical_campus_number(x)
-
-
-def _canon_series(series: pd.Series) -> pd.Series:
-    """Vectorized canonicalization for a pandas Series of campus numbers."""
-    return series.map(canonical_campus_number)
-
-
-def _build_mapping(sub: pd.DataFrame, use_cols: list[str]) -> dict[str, dict[str, Any]]:
-    sub = sub.where(pd.notnull(sub), None)
-    base_mapping = sub.set_index("campus_number", drop=True)[use_cols].to_dict(
-        orient="index"
-    )
-
-    mapping: dict[str, dict[str, Any]] = {}
-    for key, record in base_mapping.items():
-        if not key:
-            continue
-        mapping[key] = record
-        digits = key[1:] if isinstance(key, str) and key.startswith("'") else key
-        mapping.setdefault(digits, record)
-        if isinstance(digits, str) and digits.isdigit():
-            mapping.setdefault(str(int(digits)), record)
-    return mapping
-
-
-def _build_campus_multi_index(repo) -> dict[str, Any]:
-    """Return a dict mapping multiple key shapes to Campus.id for robust matching.
-    Keys created per campus_number:
-      - canonical with apostrophe: '#########
-      - without apostrophe: #########
-      - int form (no leading zeros): e.g., 123456789 as string
-    """
-    idx: dict[str, Any] = {}
-    for c in repo._campuses.values():
-        cn = getattr(c, "campus_number", None)
-        if not cn:
-            continue
-        key_can = _canon_campus_number(cn)
-        if not key_can:
-            continue
-        idx[key_can] = c.id
-        # Without apostrophe
-        no_tick = key_can[1:]
-        idx[no_tick] = c.id
-        # Int-like
-        if no_tick.isdigit():
-            idx[str(int(no_tick))] = c.id
-    return idx
+logger = logging.getLogger(__name__)
 
 
 # Shared helper for campus enrichment tables
@@ -110,8 +53,8 @@ def _apply_campus_enrichment_table(
     )
     source_rows = len(df)
 
-    if _profile_enabled():
-        _debug(
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
             f"[enrich:{dataset}] resolved_year={resolved_year} (requested={year}) rows={len(df)}"
         )
 
@@ -119,18 +62,11 @@ def _apply_campus_enrichment_table(
     if rename:
         df = df.rename(columns=rename)
 
-    # The normalizer creates a null placeholder when no source alias is found.
-    df, found = normalize_campus_number_column(df, new_col="campus_number")
-    if found is None:
-        if _profile_enabled():
-            _debug(
-                f"[enrich:{dataset}] abort: campus_number column missing after normalization (found={found})"
-            )
-        raise KeyError("campus enrichment missing required join column: campus_number")
-
-    # Canonicalize to leading-apostrophe format used across the repo
-    df["campus_number"] = _canon_series(df["campus_number"])
-    df = df[df["campus_number"].notna()]
+    source_column = "Campus Number" if dataset == "accountability" and (reader_kwargs or {}).get("reader_profile") == "ratings" else None
+    df = normalize_enrichment_identifiers(
+        df, key="campus_number", dataset=dataset, year=resolved_year, column=source_column,
+    )
+    require_unique_entity_rows(df, "campus_number", dataset, resolved_year)
 
     if transform_df:
         df = transform_df(df)
@@ -138,11 +74,15 @@ def _apply_campus_enrichment_table(
             raise KeyError(
                 "campus enrichment transform_df removed the required 'campus_number' column"
             )
+        df = normalize_enrichment_identifiers(
+            df, key="campus_number", dataset=dataset, year=resolved_year, column="campus_number",
+        )
+        require_unique_entity_rows(df, "campus_number", dataset, resolved_year)
 
-    if _profile_enabled():
+    if logger.isEnabledFor(logging.DEBUG):
         valid_rows = len(df)
         unique_keys = df["campus_number"].nunique(dropna=True)
-        _debug(
+        logger.debug(
             f"[enrich:{dataset}] canonical campus numbers -> valid_rows={valid_rows} unique_keys={unique_keys}"
         )
 
@@ -160,8 +100,8 @@ def _apply_campus_enrichment_table(
             if col not in use_cols:
                 use_cols.append(col)
         if missing:
-            if _profile_enabled():
-                _debug(
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
                     f"[enrich:{dataset}] missing columns after rename: {', '.join(sorted(missing))}"
                 )
             raise KeyError(
@@ -176,16 +116,14 @@ def _apply_campus_enrichment_table(
     clean_value_columns(df, use_cols)
 
     # Build mapping from canonical campus_number -> selected attrs
-    sub = df[["campus_number"] + use_cols].drop_duplicates("campus_number")
-    mapping = _build_mapping(sub, use_cols)
+    mapping = df.set_index("campus_number")[use_cols].to_dict(orient="index")
 
-    if _profile_enabled():
-        _debug(
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
             f"[enrich:{dataset}] prepared mapping for {len(mapping)} campus numbers (select={use_cols})"
         )
 
-    # Multi-key index for robust matching
-    updated = 0
+    matches: list[tuple[Campus, Mapping[str, Any]]] = []
     missing_no_number = 0
     missing_no_match = 0
     not_applicable = 0
@@ -198,44 +136,33 @@ def _apply_campus_enrichment_table(
         if not cn:
             missing_no_number += 1
             continue
-        can = _canon_campus_number(cn)
+        can = canonical_campus_number(cn)
         if not can:
             missing_no_number += 1
 
             continue
-        digits = can[1:]
-        attrs = mapping.get(can) or mapping.get(digits)
-        if attrs is None and digits.isdigit():
-            attrs = mapping.get(str(int(digits)))
+        attrs = mapping.get(can)
         if not attrs:
             missing_no_match += 1
-            if _profile_enabled() and len(sample_missing) < 10:
+            if logger.isEnabledFor(logging.DEBUG) and len(sample_missing) < 10:
                 sample_missing.append(str(cn))
             continue
-        if not isinstance(cobj.meta, MutableMapping):
-            cobj.meta = dict(cobj.meta) if cobj.meta is not None else {}
-
         attrs_for_meta = attrs
         if record_hook:
             maybe_new_attrs = record_hook(cobj, dict(attrs), resolved_year)
             if isinstance(maybe_new_attrs, dict):
                 attrs_for_meta = maybe_new_attrs
+        matches.append((cobj, attrs_for_meta))
 
-        for k, v in attrs_for_meta.items():
-            cobj.meta[k] = v
-            if aliases and k in aliases:
-                try:
-                    setattr(cobj, aliases[k], v)
-                except Exception:
-                    pass
-        updated += 1
+    apply_entity_attributes(matches, dataset=dataset, year=resolved_year, aliases=aliases)
+    updated = len(matches)
 
-    if _profile_enabled():
-        _debug(
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
             f"[enrich:{dataset}] updated={updated} missing_no_number={missing_no_number} missing_no_match={missing_no_match}"
         )
         if sample_missing:
-            _debug(
+            logger.debug(
                 f"[enrich:{dataset}] sample unmatched campus_numbers: {sample_missing}"
             )
 
@@ -266,113 +193,14 @@ def _apply_campus_peims_financials(
     so joins stay resilient across spreadsheets.
     """
 
-    cfg = load_config(cfg_path)
-    resolved_year, df = cfg.load_df(
-        dataset, year, section="data_sources", **(reader_kwargs or {})
-    )
-    source_rows = len(df)
-
-    if _profile_enabled():
-        _debug(
-            f"[enrich:{dataset}] resolved_year={resolved_year} (requested={year}) rows={len(df)}"
-        )
-
-    if rename:
-        df = df.rename(columns=rename)
-
-    df, found = normalize_campus_number_column(df, new_col="campus_number")
-    if found is None:
-        if _profile_enabled():
-            _debug(
-                f"[enrich:{dataset}] abort: campus_number column missing after normalization (found={found})"
-            )
-        raise KeyError("campus PEIMS financial enrichment missing required join column: campus_number")
-
-    df["campus_number"] = _canon_series(df["campus_number"])
-    df = df[df["campus_number"].notna()]
-
-    if _profile_enabled():
-        valid_rows = len(df)
-        unique_keys = df["campus_number"].nunique(dropna=True)
-        _debug(
-            f"[enrich:{dataset}] canonical campus numbers -> valid_rows={valid_rows} unique_keys={unique_keys}"
-        )
-
     if not select:
         raise ValueError(
             "campus PEIMS financial enrichment requires an explicit `select` collection of column names"
         )
-
-    use_cols = list(select)
-    missing = [c for c in use_cols if c not in df.columns]
-    if missing:
-        if _profile_enabled():
-            _debug(
-                f"[enrich:{dataset}] missing columns after rename: {', '.join(sorted(missing))}"
-            )
-        raise KeyError(
-            "campus PEIMS financial enrichment missing expected columns after rename: "
-            + ", ".join(sorted(missing))
-        )
-
-    clean_value_columns(df, use_cols)
-    sub = df[["campus_number"] + use_cols].drop_duplicates("campus_number")
-    mapping = _build_mapping(sub, use_cols)
-
-    if _profile_enabled():
-        _debug(
-            f"[enrich:{dataset}] prepared mapping for {len(mapping)} campus numbers (select={use_cols})"
-        )
-
-    updated = 0
-    missing_no_number = 0
-    missing_no_match = 0
-    not_applicable = 0
-    sample_missing: list[str] = []
-    for campus in repo._campuses.values():
-        if getattr(campus, "is_private", False):
-            not_applicable += 1
-            continue
-        cn = getattr(campus, "campus_number", None)
-        if not cn:
-            missing_no_number += 1
-            continue
-        can = _canon_campus_number(cn)
-        if not can:
-            missing_no_number += 1
-            continue
-        digits = can[1:]
-        attrs = mapping.get(can) or mapping.get(digits)
-        if attrs is None and digits.isdigit():
-            attrs = mapping.get(str(int(digits)))
-        if not attrs:
-            missing_no_match += 1
-            if _profile_enabled() and len(sample_missing) < 10:
-                sample_missing.append(str(cn))
-            continue
-        if getattr(campus, "meta", None) is None:
-            campus.meta = {}
-        wrote = False
-        for k, v in attrs.items():
-            campus.meta[k] = v
-            wrote = True
-        if wrote:
-            updated += 1
-
-    if _profile_enabled():
-        _debug(
-            f"[enrich:{dataset}] updated={updated} missing_no_number={missing_no_number} missing_no_match={missing_no_match}"
-        )
-        if sample_missing:
-            _debug(
-                f"[enrich:{dataset}] sample unmatched campus_numbers: {sample_missing}"
-            )
-
-    _record_matches(repo, dataset, year, resolved_year, "campus",
-                    matched=updated, unmatched=missing_no_match,
-                    missing_identifier=missing_no_number, source_rows=source_rows,
-                    not_applicable=not_applicable)
-    return resolved_year, updated
+    return _apply_campus_enrichment_table(
+        repo, cfg_path, dataset, year, select=select, rename=rename,
+        reader_kwargs=reader_kwargs,
+    )
 
 
 def _apply_campus_planned_closures(
@@ -383,29 +211,18 @@ def _apply_campus_planned_closures(
     *,
     reader_kwargs=None,
 ):
-    # Ensure the standard planned-closure columns are always exposed so attribute
-    # access like ``campus.facing_closure`` works even for campuses that are not
-    # present in the dataset.  Other enrichments that cover every campus (such as
-    # TAPR historical enrollment) implicitly provide this behaviour; for this
-    # sparse dataset we seed the meta dicts with ``None`` first and then let the
-    # shared helper overwrite matches with real values.
-    default_columns = ("facing_closure", "closure_date")
+    result = _apply_campus_enrichment_table(
+        repo, cfg_path, dataset, year,
+        select=["campus_number", "facing_closure", "closure_date"],
+        reader_kwargs=reader_kwargs,
+    )
+    # Expose nullable closure fields even for campuses outside this sparse source.
     for campus in repo._campuses.values():
         if not isinstance(campus.meta, MutableMapping):
             campus.meta = dict(campus.meta) if campus.meta is not None else {}
-        for col in default_columns:
+        for col in ("facing_closure", "closure_date"):
             campus.meta.setdefault(col, None)
-
-    return _apply_campus_enrichment_table(
-        repo,
-        cfg_path,
-        dataset,
-        year,
-        select=["campus_number", "facing_closure", "closure_date"],
-        rename=None,
-        aliases=None,
-        reader_kwargs=reader_kwargs,
-    )
+    return result
 
 
 def enrich_campuses_from_config(

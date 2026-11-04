@@ -26,7 +26,7 @@ from .geometry import (
     polygon_area,
 )
 from .grades import coerce_grade_spans, spans_to_bounds
-from .identifiers import campus_lookup_key
+from .identifiers import EntityIdentityError, campus_lookup_key, canonical_source_identifier
 
 __all__ = [
     "District",
@@ -42,6 +42,16 @@ __all__ = [
 def _intern_key(k: Any) -> Any:
     """Intern string keys to reduce memory overhead in large entity maps."""
     return sys.intern(k) if isinstance(k, str) else k
+
+
+def _check_identity_assignment(entity: District | Campus, name: str, value: Any) -> None:
+    try:
+        repo = object.__getattribute__(entity, "_repo")
+        current = object.__getattribute__(entity, name)
+    except AttributeError:
+        return
+    if repo is not None and current != value:
+        raise EntityIdentityError(f"Cannot change registered {type(entity).__name__}.{name} for {entity.id}")
 
 
 def validate_non_empty_str(name: str):
@@ -108,21 +118,24 @@ class District:
     meta: MutableMapping[str, Any] = field(default_factory=dict, repr=False, compare=False)
     _repo: Any = field(default=None, repr=False, compare=False)
 
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name == "district_number":
+            try:
+                value = canonical_source_identifier(value, width=6) or ""
+            except ValueError as error:
+                raise EntityIdentityError(f"Invalid district number {value!r}") from error
+            _check_identity_assignment(self, name, value)
+            object.__setattr__(self, name, value)
+            object.__setattr__(self, "_district_number_canon", value[1:])
+            return
+        if name in {"id", "_district_number_canon"}:
+            _check_identity_assignment(self, name, value)
+        object.__setattr__(self, name, value)
+
     def __post_init__(self):
         self.name = self.name.upper()
         if self.boundary is not None:
             self.polygon = self.boundary
-
-        raw_dn = self.district_number
-        cdn = normalize_district_number_value(raw_dn)
-        if not cdn:
-            cdn = ""
-        self._district_number_canon = cdn
-        if cdn:
-            can = canonical_district_number(raw_dn)
-            self.district_number = can or ""
-        else:
-            self.district_number = ""
 
     def __contains__(self, campus: "Campus") -> bool:
         if self.polygon is None or campus.point is None:
@@ -169,7 +182,7 @@ class District:
 
     @property
     def district_number_canon(self) -> str:
-        return self._district_number_canon
+        return self.district_number[1:]
 
     @cached_property
     def area(self) -> float:
@@ -296,6 +309,8 @@ class Campus:
     meta: MutableMapping[str, Any] = field(default_factory=dict, repr=False, compare=False)
 
     def __setattr__(self, name: str, value: Any) -> None:
+        if name in {"id", "campus_number", "source_namespace", "source_id", "is_private", "district_id", "district_number", "_campus_number_canon", "_district_number_canon"}:
+            _check_identity_assignment(self, name, value)
         if name == "grade_range":
             object.__setattr__(self, name, value)
             spans = tuple(coerce_grade_spans(value))

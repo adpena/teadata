@@ -13,6 +13,7 @@ from sqlalchemy import Text, event, func, inspect, select, text
 from sqlalchemy.engine import make_url
 
 from teadata.classes import Campus, DataEngine, District
+from teadata.identifiers import EntityIdentityError
 from teadata.manifest import (
     CATALOG_TABLE,
     ContractError,
@@ -87,6 +88,41 @@ def changed_catalog(catalog):
     document["processor_sha256"] = "3" * 64
     document["build_id"] = sha256(canonical_json(document).encode()).hexdigest()
     return DatasetCatalog(document)
+
+
+def test_partial_export_rejects_duplicate_identity_in_legacy_database(database, catalog):
+    engine, factory = database
+    with engine.begin() as connection:
+        connection.exec_driver_sql("DROP INDEX ix_districts_district_number_canon")
+        connection.exec_driver_sql("CREATE INDEX ix_districts_district_number_canon ON districts(district_number_canon)")
+    with factory.begin() as session:
+        export_dataengine(graph(catalog, 1), session)
+        session.execute(text("UPDATE districts SET district_number_canon = district_number"))
+
+    collision = DataEngine()
+    collision.catalog = catalog
+    collision.add_district(District(uuid.uuid4(), "Collision", district_number="000001"))
+    with pytest.raises(EntityIdentityError, match="Duplicate district number '000001'"):
+        with factory.begin() as session:
+            export_dataengine(collision, session)
+
+    with factory() as session:
+        restored = import_dataengine(session)
+        assert [row.name for row in restored.districts.values()] == ["DISTRICT 1"]
+
+
+def test_campus_export_keeps_identity_columns_independent_of_dynamic_metadata(database, catalog):
+    _, factory = database
+    repo = graph(catalog, 1)
+    campus = next(iter(repo.campuses.values()))
+    campus.meta.update(campus_number_canon="999999999", district_number_canon="999999")
+    with factory.begin() as session:
+        export_dataengine(repo, session)
+        row = session.get(CampusRecord, campus.id)
+        assert row is not None
+        assert row.campus_number_canon == "'000000001"
+        assert row.district_number_canon is None
+        assert row.meta["campus_number_canon"] == "999999999"
 
 
 @pytest.mark.parametrize("lazy", [False, True])

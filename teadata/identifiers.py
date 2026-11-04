@@ -5,11 +5,37 @@ from __future__ import annotations
 import math
 import numbers
 import re
+from collections.abc import Iterable
 from typing import Any
 from urllib.parse import quote, unquote_to_bytes
 
 
 MAX_CAMPUS_LOOKUP_KEY_BYTES = 1024
+
+
+class EntityIdentityError(ValueError):
+    """An entity or its source rows have an ambiguous or inconsistent identity."""
+
+
+def stored_district_number(raw: str | None, canonical: str | None) -> str | None:
+    """Read a padded district ID from the two historical SQL spellings."""
+    codes = [value.removeprefix("'") for value in (raw, canonical) if value]
+    if not codes:
+        return None
+    key = codes[0]
+    if key == "000000" or re.fullmatch(r"[0-9]{6}", key) is None or any(code != key for code in codes):
+        raise EntityIdentityError(f"Inconsistent district number {raw!r}, {canonical!r}")
+    return key
+
+
+def validate_stored_district_numbers(rows: Iterable[tuple[str | None, str | None]]) -> None:
+    numbers: set[str] = set()
+    for raw, canonical in rows:
+        key = stored_district_number(raw, canonical)
+        if key is not None:
+            if key in numbers:
+                raise EntityIdentityError(f"Duplicate district number {key!r}")
+            numbers.add(key)
 
 
 def normalize_campus_lookup_key(value: str | None) -> str | None:

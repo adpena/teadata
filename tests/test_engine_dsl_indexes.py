@@ -34,17 +34,17 @@ def _campus(
     )
 
 
-def test_district_lookup_by_number_and_name_returns_all_matches():
+def test_district_number_is_unique_and_name_returns_all_matches():
     repo = DataEngine()
     d1 = _district("Alpha ISD", "123")
-    d2 = _district("Alpha ISD", "'000123")
+    d2 = _district("Alpha ISD", "'000124")
     d3 = _district("Beta ISD", "456")
     repo.add_district(d1)
     repo.add_district(d2)
     repo.add_district(d3)
 
     number_hits = repo >> ("district", 123)
-    assert [d.id for d in number_hits] == [d1.id, d2.id]
+    assert [d.id for d in number_hits] == [d1.id]
 
     exact_hits = repo >> ("district", "ALPHA ISD")
     assert [d.id for d in exact_hits] == [d1.id, d2.id]

@@ -1,7 +1,19 @@
 from abc import ABC, abstractmethod
+from collections.abc import Mapping, MutableMapping
+import logging
+from types import MemberDescriptorType
 from typing import Any, Dict
 
 import pandas as pd
+
+from teadata.entities import Campus, District
+from teadata.identifiers import EntityIdentityError
+
+logger = logging.getLogger(__name__)
+
+
+class EnrichmentConflictError(ValueError):
+    """A source would overwrite a different fact on an existing entity."""
 
 try:  # optional performance dependency
     import polars as pl
@@ -52,6 +64,60 @@ def clean_value_columns(df: pd.DataFrame, columns: list[str]) -> None:
     for col in columns:
         if col in df.columns:
             df[col] = df[col].where(pd.notna(df[col]), None)
+
+
+def require_unique_entity_rows(df: pd.DataFrame, key: str, dataset: str, year: int | None) -> None:
+    """Reject ambiguous joins before an enricher writes to any entity."""
+    duplicates = df.loc[df[key].duplicated(keep=False), key]
+    if not duplicates.empty:
+        sample = sorted(map(str, duplicates.unique()))[:8]
+        raise EntityIdentityError(
+            f"{dataset} ({year}): {len(duplicates)} rows share duplicate {key} values, including {', '.join(sample)}"
+        )
+
+
+def apply_entity_attributes(
+    matches: list[tuple[District | Campus, Mapping[str, Any]]], *,
+    dataset: str, year: int | None, aliases: Mapping[str, str] | None = None,
+) -> None:
+    """Add facts to existing entities, checking the full batch for collisions first."""
+    aliases = aliases or {}
+    if len(set(aliases.values())) != len(aliases):
+        raise EnrichmentConflictError(f"{dataset} ({year}): multiple fields target the same enrichment alias")
+    for entity, attrs in matches:
+        meta = entity.meta
+        if meta is not None and not isinstance(meta, dict):
+            # A lazy store can answer individual reads from a prefetched seed.
+            # Validate the same full payload that the mutation will use.
+            len(meta)
+        for field, value in attrs.items():
+            if meta is None or field not in meta or meta[field] is value:
+                continue
+            old = meta[field]
+            if pd.api.types.is_scalar(old) and pd.api.types.is_scalar(value):
+                old_missing, new_missing = bool(pd.isna(old)), bool(pd.isna(value))
+                if (old_missing and new_missing) or (not old_missing and not new_missing and old == value):
+                    continue
+            raise EnrichmentConflictError(f"{dataset} ({year}): conflicting existing field {field!r} for {entity.id}")
+        for field in attrs.keys() & aliases.keys():
+            alias = aliases[field]
+            if alias.startswith("_") or alias in {"id", "district_id", "district_number", "campus_number", "is_private", "source_namespace", "source_id", "meta"}:
+                raise EntityIdentityError(f"{dataset} ({year}): enrichment cannot write identity field {alias!r}")
+            if isinstance(entity, (District, Campus)):
+                writable = isinstance(getattr(type(entity), alias, None), MemberDescriptorType)
+            else:
+                writable = alias in vars(entity)
+            if not writable:
+                raise AttributeError(f"{dataset} ({year}): enrichment alias {alias!r} is not a writable {type(entity).__name__} field")
+    for entity, attrs in matches:
+        if not isinstance(entity.meta, MutableMapping):
+            entity.meta = dict(entity.meta) if entity.meta is not None else {}
+        for field, value in attrs.items():
+            entity.meta.setdefault(field, value)
+            if field in aliases:
+                alias = aliases[field]
+                setattr(entity, alias, value)
+                logger.debug("Applied declared enrichment alias %s for %s (%s), entity %s", alias, dataset, year, getattr(entity, "id", None))
 
 
 class Enricher(ABC):

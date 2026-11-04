@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from contextlib import contextmanager
+from copy import copy
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
@@ -18,7 +19,7 @@ import time
 import uuid
 
 from .manifest import ContractError, DatasetCatalog, read_sqlite_catalog
-from .identifiers import canonical_source_identifier
+from .identifiers import EntityIdentityError, canonical_source_identifier
 from .release import current_release, snapshot_build_id
 from .boundary_store import BoundaryStore
 from teadata.identifiers import normalize_campus_lookup_key
@@ -263,17 +264,6 @@ class _CharterCache:
 class DataEngine:
     catalog: DatasetCatalog
 
-    @staticmethod
-    def _match_district_number(d: "District", key) -> bool:
-        canon = normalize_district_number_value(key)
-        if canon is None:
-            return False
-        stored = getattr(d, "district_number", "") or ""
-        # Compare also unsuffixed variants for safety
-        stored_uns = stored[1:] if stored.startswith("'") else stored
-        canon_uns = canon[1:] if canon.startswith("'") else canon
-        return stored == canon or stored_uns == canon_uns
-
     @classmethod
     def from_snapshot(
         cls,
@@ -316,8 +306,11 @@ class DataEngine:
         obj._set_indexes_enabled(
             DEFAULT_INDEXES_ENABLED if indexes_enabled is None else indexes_enabled
         )
+        try:
+            obj._rebuild_indexes()
+        except EntityIdentityError as error:
+            raise ContractError(f"Snapshot contains an invalid entity registry: {error}") from error
         obj._rehydrate_geometries()
-        obj._rebuild_indexes()
         if eager_indexes:
             obj.warm_indexes()
         if release:
@@ -405,7 +398,8 @@ class DataEngine:
         # Fast name lookups (lowercase exact match)
         self._district_by_name_lower: Dict[str, uuid.UUID] = {}
         self._campus_by_name_lower: Dict[str, uuid.UUID] = {}
-        self._districts_by_number_norm: Dict[str, List[uuid.UUID]] = {}
+        self._districts_by_number_norm: dict[str, uuid.UUID] = {}
+        self._campus_by_key: dict[str, uuid.UUID] = {}
         self._districts_by_name_lower_multi: Dict[str, List[uuid.UUID]] = {}
         self._campuses_by_name_lower_multi: Dict[str, List[uuid.UUID]] = {}
         self._district_name_upper_index: List[Tuple[str, uuid.UUID]] = []
@@ -481,11 +475,9 @@ class DataEngine:
         self._xy_to_index = None
         self._charter_cache = None
 
-        # Name lookups are small but we clear them for completeness; they rebuild via _rebuild_indexes()
-        self._campus_by_key = {}
+        # Keep identity indexes available to validate inserts even with caches cleared.
         self._campus_by_name_lower = {}
         self._district_by_name_lower = {}
-        self._districts_by_number_norm = {}
         self._districts_by_name_lower_multi = {}
         self._campuses_by_name_lower_multi = {}
         self._district_name_upper_index = []
@@ -564,8 +556,6 @@ class DataEngine:
         key = normalize_campus_lookup_key(lookup_key)
         if key is None:
             return None
-        if not getattr(self, "_campus_by_key", None):
-            self._rebuild_indexes()
         return self._campuses.get(self._campus_by_key.get(key))
 
     def campus_by_number(self, campus_number: Any) -> Optional["Campus"]:
@@ -616,12 +606,19 @@ class DataEngine:
                 continue
 
     def __or__(self, other: "DataEngine") -> "DataEngine":
-        """Repo union: r3 = r1 | r2 (non-destructive merge)."""
+        """Build a separate engine from disjoint entity identities."""
         r = DataEngine()
-        for d in (*self._districts.values(), *other._districts.values()):
-            r.add_district(d)
-        for c in (*self._campuses.values(), *other._campuses.values()):
-            r.add_campus(c)
+        with r.bulk():
+            for repo in (self, other):
+                for entity in repo:
+                    detached = copy(entity)
+                    detached._repo = None
+                    copy_deferred = getattr(entity.meta, "_copy_deferred", None)
+                    detached.meta = copy_deferred() if callable(copy_deferred) else copy(entity.meta)
+                    if isinstance(detached, District):
+                        r.add_district(detached)
+                    else:
+                        r.add_campus(detached)
         return r
 
     def __rshift__(self, query):
@@ -668,20 +665,8 @@ class DataEngine:
                 ):
                     hits: List[District] = []
                     norm = normalize_district_number_value(raw)
-                    index = getattr(self, "_districts_by_number_norm", None)
-                    if norm and index:
-                        ids = index.get(norm, [])
-                        hits = [
-                            self._districts[did]
-                            for did in ids
-                            if did in self._districts
-                        ]
-                    elif norm:
-                        hits = [
-                            d
-                            for d in self._districts.values()
-                            if self._match_district_number(d, raw)
-                        ]
+                    if norm and (did := self._districts_by_number_norm.get(norm)) is not None:
+                        hits = [self._districts[did]]
                     return Query(hits, self)
 
                 # 2) Name lookup (supports wildcards); case-insensitive
@@ -1117,7 +1102,21 @@ class DataEngine:
         )
         return cache
 
-    def _rebuild_indexes(self):
+    def _rebuild_indexes(self) -> None:
+        district_numbers: dict[str, uuid.UUID] = {}
+        campus_keys: dict[str, uuid.UUID] = {}
+        overlap = self._districts.keys() & self._campuses.keys()
+        if overlap:
+            raise EntityIdentityError(f"Campus and district share entity ID {min(overlap, key=str)}")
+        for entities, identity_index, kind in ((self._districts, district_numbers, District), (self._campuses, campus_keys, Campus)):
+            for uid, entity in entities.items():
+                if not isinstance(entity, kind) or uid != entity.id:
+                    raise EntityIdentityError(f"Invalid {kind.__name__} registry entry for ID {uid}")
+                if entity._repo is not self:
+                    raise EntityIdentityError(f"{kind.__name__} {uid} has a different registry owner")
+                self._register_identity(identity_index, entity, self._entity_key(entity))
+        self._districts_by_number_norm = district_numbers
+        self._campus_by_key = campus_keys
         self._district_cover_index = None
         self._campuses_by_district.clear()
         for c in self._campuses.values():
@@ -1145,12 +1144,10 @@ class DataEngine:
         self._all_campuses_np = None
         self._xy_to_index = None
 
-        # Rebuild campus-number index (supports enrichment joins by campus_number)
+        # Rebuild name indexes separately from the entity identity constraint.
         try:
-            self._campus_by_key = {}
             self._campus_by_name_lower = {}
             self._district_by_name_lower = {}
-            self._districts_by_number_norm = {}
             self._districts_by_name_lower_multi = {}
             self._campuses_by_name_lower_multi = {}
             self._district_name_upper_index = []
@@ -1167,13 +1164,6 @@ class DataEngine:
                         self._district_by_name_lower[ikey] = did
                     self._districts_by_name_lower_multi.setdefault(ikey, []).append(did)
                     self._district_name_upper_index.append((dname.upper(), did))
-                norm_dn = normalize_district_number_value(
-                    getattr(d, "district_number", None)
-                    or getattr(d, "_district_number_canon", None)
-                )
-                if norm_dn:
-                    inorm_dn = sys.intern(norm_dn)
-                    self._districts_by_number_norm.setdefault(inorm_dn, []).append(did)
             for cid, c in self._campuses.items():
                 cname = c.name or ""
                 name_key = cname.lower()
@@ -1185,18 +1175,12 @@ class DataEngine:
                         cid
                     )
                     self._campus_name_upper_index.append((cname.upper(), cid))
-                key = c.lookup_key
-                if key is not None:
-                    if key in self._campus_by_key and self._campus_by_key[key] != cid:
-                        raise ValueError("Duplicate canonical campus lookup key")
-                    self._campus_by_key[sys.intern(key)] = cid
         except (ValueError, TypeError, AttributeError):
             raise
         except Exception:
-            self._campus_by_key = {}
+            logger.exception("Unable to rebuild entity name indexes")
             self._campus_by_name_lower = {}
             self._district_by_name_lower = {}
-            self._districts_by_number_norm = {}
             self._districts_by_name_lower_multi = {}
             self._campuses_by_name_lower_multi = {}
             self._district_name_upper_index = []
@@ -1939,10 +1923,44 @@ class DataEngine:
         return results
 
     # --- CRUD ---
-    def add_district(self, d: District):
+    @staticmethod
+    def _entity_key(entity: District | Campus) -> str | None:
+        if isinstance(entity, Campus):
+            return entity.lookup_key
+        return entity.district_number_canon or None
+
+    @staticmethod
+    def _register_identity(index: dict[str, uuid.UUID], entity: District | Campus, key: str | None) -> None:
+        if key is None:
+            return
+        existing_id = index.get(key)
+        if existing_id is not None and existing_id != entity.id:
+            kind = "campus lookup key" if isinstance(entity, Campus) else "district number"
+            raise EntityIdentityError(f"Duplicate canonical {kind} {key!r}: {existing_id} and {entity.id}")
+        index[sys.intern(key)] = entity.id
+
+    def _add_entity(self, entity: District | Campus, entities: EntityMap, index: dict[str, uuid.UUID]) -> bool:
+        other_entities = self._campuses if entities is self._districts else self._districts
+        if entity.id in other_entities:
+            raise EntityIdentityError(f"Campus and district share entity ID {entity.id}")
+        existing = entities.get(entity.id)
+        if existing is entity:
+            return False
+        if existing is not None:
+            raise EntityIdentityError(f"Duplicate {type(entity).__name__} ID {entity.id}")
+        if entity._repo is not None and entity._repo is not self:
+            raise EntityIdentityError(f"{type(entity).__name__} {entity.id} already belongs to another engine")
+        self._register_identity(index, entity, self._entity_key(entity))
+        entities[entity.id] = entity
+        entity._repo = self
+        return True
+
+    def add_district(self, d: District) -> None:
+        if not isinstance(d, District):
+            raise TypeError("add_district requires a District")
+        if not self._add_entity(d, self._districts, self._districts_by_number_norm):
+            return
         self._district_cover_index = None
-        d._repo = self
-        self._districts[d.id] = d
         if not self._in_bulk:
             if not hasattr(self, "_district_by_name_lower"):
                 self._district_by_name_lower = {}
@@ -1950,8 +1968,6 @@ class DataEngine:
                 self._districts_by_name_lower_multi = {}
             if not hasattr(self, "_district_name_upper_index"):
                 self._district_name_upper_index = []
-            if not hasattr(self, "_districts_by_number_norm"):
-                self._districts_by_number_norm = {}
             if not hasattr(self, "_district_wildcard_cache"):
                 self._district_wildcard_cache = {}
             if not hasattr(self, "_name_lookup_version"):
@@ -1962,22 +1978,14 @@ class DataEngine:
             if key:
                 self._districts_by_name_lower_multi.setdefault(key, []).append(d.id)
                 self._district_name_upper_index.append(((d.name or "").upper(), d.id))
-            norm_dn = normalize_district_number_value(
-                getattr(d, "district_number", None)
-                or getattr(d, "_district_number_canon", None)
-            )
-            if norm_dn:
-                self._districts_by_number_norm.setdefault(norm_dn, []).append(d.id)
             self._district_wildcard_cache = {}
             self._name_lookup_version += 1
 
-    def add_campus(self, c: Campus):
-        lookup_key = c.lookup_key
-        existing = getattr(self, "_campus_by_key", {}).get(lookup_key)
-        if lookup_key is not None and existing is not None and existing != c.id:
-            raise ValueError("Duplicate canonical campus lookup key")
-        c._repo = self  # attach back-reference
-        self._campuses[c.id] = c
+    def add_campus(self, c: Campus) -> None:
+        if not isinstance(c, Campus):
+            raise TypeError("add_campus requires a Campus")
+        if not self._add_entity(c, self._campuses, self._campus_by_key):
+            return
         # Only append to _campuses_by_district if the district exists
         if not self._in_bulk:
             if c.district_id in self._districts:
@@ -1990,8 +1998,6 @@ class DataEngine:
                 self._campus_name_upper_index = []
             if not hasattr(self, "_campus_wildcard_cache"):
                 self._campus_wildcard_cache = {}
-            if not hasattr(self, "_campus_by_key"):
-                self._campus_by_key = {}
             if not hasattr(self, "_name_lookup_version"):
                 self._name_lookup_version = 0
             key = (c.name or "").lower()
@@ -2000,8 +2006,6 @@ class DataEngine:
             if key:
                 self._campuses_by_name_lower_multi.setdefault(key, []).append(c.id)
                 self._campus_name_upper_index.append(((c.name or "").upper(), c.id))
-            if lookup_key is not None:
-                self._campus_by_key[lookup_key] = c.id
             self._campus_wildcard_cache = {}
             self._name_lookup_version += 1
             self._clear_charter_cache()
