@@ -1,4 +1,6 @@
+import csv
 from decimal import Decimal
+from io import StringIO
 import sys
 from types import SimpleNamespace
 from unittest.mock import Mock
@@ -8,8 +10,10 @@ import pytest
 
 from teadata.dataset_metadata import EditionKey
 from teadata.manifest import ContractError
-from teadata.native_courses import HOLD_CAMPUS_GEOGRAPHY, PASS_COURSE_CONTROLS, _campus_blocks, _compare_batch, _replay
-from teadata.peims_course_sources import DATASET
+from teadata.native_courses import (
+    HOLD_CAMPUS_GEOGRAPHY, PASS_COURSE_CONTROLS, _campus_blocks, _compare_batch, _district_campus_witness, _replay,
+)
+from teadata.peims_course_sources import CSV_HEADERS, DATASET, course_csv_preamble
 from teadata.scripts.verify_peims_courses import _HTML_HEADER
 from teadata.verification import main
 
@@ -102,6 +106,43 @@ def test_campus_blocks_match_values_without_reassigning_conflicting_headings(mon
     shown[3][-1] = "0"
     with pytest.raises(ContractError, match="unique bulk district block"):
         _campus_blocks(shown, 2026, label, rows)
+
+
+@pytest.mark.parametrize("drift", [None, "district", "scope", "mask", "omission", "duplicate"])
+def test_district_campus_csv_matches_complete_literal_slice(monkeypatch, drift):
+    raw = ["STATE", "COUNTYREGIONDISTRICTCAMPUS", "2025-2026", "019905", "NEW BOSTON ISD", "019901102",
+           "DEKALB EL", "TRADITIONAL ISD/CSD", "08", "OTHER", "SE000001", "SPECIAL EDUCATION, GENERIC",
+           "ALL GRADE LEVELS", "1", "0.26", "0", "0", "-999"]
+    extra = [*raw[:10], "SE000005", *raw[11:]]
+    raw_rows = [raw, extra]
+    prefix = course_csv_preamble(2026, "campus")
+    prefix[6] = ["019905 NEW BOSTON ISD BY CAMPUS"]
+    prefix[8] = [*CSV_HEADERS["campus"][:3], *CSV_HEADERS["campus"][5:]]
+    selected = [["DISTRICT", *row[1:3], *row[5:]] for row in reversed(raw_rows)]
+    if drift == "district":
+        prefix[6] = ["019901 DEKALB ISD BY CAMPUS"]
+    if drift == "scope":
+        selected[0][0] = "STATE"
+    if drift == "mask":
+        selected[0][-1] = "0"
+    if drift == "omission":
+        selected.pop()
+    if drift == "duplicate":
+        selected[0] = selected[1]
+    text = StringIO(newline="")
+    csv.writer(text).writerows([*prefix, *selected])
+    opened = Mock(return_value=(text.getvalue(), {"receipt_id": "witness"}))
+    monkeypatch.setattr("teadata.native_courses._open_district_witness", opened)
+    monkeypatch.setattr("teadata.native_courses._check_footer", lambda *args: None)
+    store = Mock()
+    if drift is None:
+        assert _district_campus_witness(store, "witness", 2026, "019905", raw_rows) == {
+            "receipt_id": "witness", "source_district_number": "019905", "rows": 2, "compared_cells": 26,
+        }
+        opened.assert_called_once_with(store, "witness", 2026, "019905", "NEW BOSTON ISD", campus_csv=True)
+    else:
+        with pytest.raises(ContractError, match="Course"):
+            _district_campus_witness(store, "witness", 2026, "019905", raw_rows)
 
 
 @pytest.mark.parametrize("status", [PASS_COURSE_CONTROLS, HOLD_CAMPUS_GEOGRAPHY])

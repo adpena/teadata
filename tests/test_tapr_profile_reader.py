@@ -55,6 +55,25 @@ def test_native_reader_preserves_exact_source_tokens_without_masking_or_whitespa
     assert path.read_bytes() == before
 
 
+def test_state_source_has_one_exact_row_and_no_synthetic_identity(tmp_path):
+    labels, codes, fields = ["State Example"], ["SAVAL"], ["state_example"]
+    layout = {"label_record": 1, "code_record": 2, "first_data_record": 3,
+              "last_data_record": 3, "annotations": []}
+    dataset = "state_tapr_college_readiness_components"
+    path = write_source(tmp_path, [labels, codes, ["003.0"]])
+    mapping = mapping_for(path, labels=labels, codes=codes, fields=fields, layout=layout)
+    source = read_source(path, mapping=mapping, key_field=None, dataset=dataset)
+    assert merge_tapr_tables([source], key_field=None).to_pylist() == [{"state_example": "003.0"}]
+    with pytest.raises(ValueError, match="one independent publisher table"):
+        merge_tapr_tables([source, source], key_field=None)
+    with pytest.raises(ValueError, match="one reviewed data row"):
+        read_source(path, mapping={**mapping, "layout": {**layout, "last_data_record": 4}},
+                    key_field=None, dataset=dataset)
+    mapping["fields"][0]["disposition"] = "identity"
+    with pytest.raises(ValueError, match="without a publisher identity field"):
+        read_source(path, mapping=mapping, key_field=None, dataset=dataset)
+
+
 @pytest.mark.parametrize("override", ["CamelCase", "naïve", "2025_name", "class", ""])
 def test_unsafe_canonical_names_fail_without_sanitizing_at_runtime(tmp_path, override):
     path = write_source(tmp_path, [LABELS, CODES, ["001902001", "42"]])

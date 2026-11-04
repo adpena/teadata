@@ -598,8 +598,9 @@ The 2025 outcome originals are also explicit `source` opt-ins:
 | `college_career_military_readiness` | District | GRAD1 | 277 | 396 |
 | `college_readiness_components` | Campus | GRAD2 | 125 | 165 |
 | `college_readiness_components` | District | GRAD2 | 123 | 165 |
+| `college_readiness_components` | State | GRAD2 | 121 | 165 |
 
-Prefix each dataset with `campus_tapr_` or `district_tapr_` by scope. The sources
+Prefix each dataset with `campus_tapr_`, `district_tapr_`, or `state_tapr_` by scope. The sources
 retain the exact CSV labels, codes, 9,084 campus rows and 1,208 district rows
 per family, and every dictionary occurrence. COMP4
 labels identify Class of 2024; the applicable glossary describes entry into
@@ -649,6 +650,24 @@ counts. Family periods and remaining field periods and units stay unknown. The
 source reader preserves blanks and `-1` and applies no value policy or estimation.
 The district rows carry no State or regional aggregate. The reviewed rates are
 available through the explicit source profile and do not enter the default release.
+
+The `state_tapr_college_readiness_components` source preserves one statewide
+publisher row without a geographic key. It covers 2023–24 annual graduates
+in the 2024–25 edition. The 121 CSV tokens and all 165 ordered dictionary
+occurrences are retained. The public statewide CCMR report corroborates 55
+displayed rates across five measures and 11 groups. The CSV supplies the
+numerators and denominators. The catalog binds the all-students and
+economically disadvantaged counts and rates with their units and period.
+Dual-credit and OnRamps criteria can overlap. Use the published combined
+criterion for the union. The statewide source supports raw preparation
+and explicit eager reading. Prepared release leaves and the default engine
+remain outside its scope.
+
+Replay the statewide evidence from a populated provenance store:
+
+```sh
+uv run python -m teadata.scripts.verify_tapr_state_grad2 --store provenance
+```
 
 Prepare each family separately with the existing bounded native producer:
 

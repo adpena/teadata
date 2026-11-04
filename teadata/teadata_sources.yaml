@@ -7683,6 +7683,168 @@ data_sources:
               scope: "district"
               tables:
                 college_readiness_components: "data/tapr/raw/2025-d-GRAD2-offered-original.csv"
+  state_tapr_college_readiness_components:
+    2025:
+      path: "data/tapr/raw/2025-s-GRAD2-offered-original.csv"
+      metadata:
+        title: "2024–25 TAPR State College Readiness Components for 2023–24 annual graduates (GRAD2)"
+        publisher: "Texas Education Agency"
+        version: "2025"
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        download_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        period:
+          kind: school_year
+          start_year: 2023
+          end_year: 2024
+        identifiers: []
+        metrics:
+          ccmr_annual_graduates_all_students_denominator:
+            field: state_2024_college_career_and_military_ready_graduates_all_students_denominator
+            unit: count
+          ccmr_annual_graduates_ap_ib_all_students_numerator:
+            field: state_2024_ap_ib_met_criteria_in_any_subject_graduates_all_students_numerator
+            unit: count
+          ccmr_annual_graduates_ap_ib_all_students_rate:
+            field: state_2024_ap_ib_met_criteria_in_any_subject_graduates_all_students_rate
+            unit: percent
+          ccmr_annual_graduates_associate_degree_all_students_numerator:
+            field: state_2024_associate_degree_graduates_all_students_numerator
+            unit: count
+          ccmr_annual_graduates_associate_degree_all_students_rate:
+            field: state_2024_associate_degree_graduates_all_students_rate
+            unit: percent
+          ccmr_annual_graduates_dual_credit_all_students_numerator:
+            field: state_2024_dual_credit_graduates_3_hrs_ela_or_math_or_9_hrs_any_subject_all_students_numerator
+            unit: count
+          ccmr_annual_graduates_dual_credit_all_students_rate:
+            field: state_2024_dual_credit_graduates_3_hrs_ela_or_math_or_9_hrs_any_subject_all_students_rate
+            unit: percent
+          ccmr_annual_graduates_onramps_all_students_numerator:
+            field: state_2024_completion_of_onramps_course_graduates_all_students_numerator
+            unit: count
+          ccmr_annual_graduates_onramps_all_students_rate:
+            field: state_2024_completion_of_onramps_course_graduates_all_students_rate
+            unit: percent
+          ccmr_annual_graduates_dual_credit_or_onramps_all_students_numerator:
+            field: state_2024_associated_ccmr_dual_course_credits_or_onramps_course_credits_all_students_numerator
+            unit: count
+          ccmr_annual_graduates_dual_credit_or_onramps_all_students_rate:
+            field: state_2024_associated_ccmr_dual_course_credits_or_onramps_course_credits_all_students_rate
+            unit: percent
+          ccmr_annual_graduates_economically_disadvantaged_denominator:
+            field: state_2024_college_career_and_military_ready_graduates_econ_disadv_denominator
+            unit: count
+          ccmr_annual_graduates_ap_ib_economically_disadvantaged_numerator:
+            field: state_2024_ap_ib_met_criteria_in_any_subject_graduates_econ_disadv_numerator
+            unit: count
+          ccmr_annual_graduates_ap_ib_economically_disadvantaged_rate:
+            field: state_2024_ap_ib_met_criteria_in_any_subject_graduates_econ_disadv_rate
+            unit: percent
+          ccmr_annual_graduates_associate_degree_economically_disadvantaged_numerator:
+            field: state_2024_associate_degree_graduates_econ_disadv_numerator
+            unit: count
+          ccmr_annual_graduates_associate_degree_economically_disadvantaged_rate:
+            field: state_2024_associate_degree_graduates_econ_disadv_rate
+            unit: percent
+          ccmr_annual_graduates_dual_credit_economically_disadvantaged_numerator:
+            field: state_2024_dual_credit_graduates_3_hrs_ela_or_math_or_9_hrs_any_subject_econ_disadv_numerator
+            unit: count
+          ccmr_annual_graduates_dual_credit_economically_disadvantaged_rate:
+            field: state_2024_dual_credit_graduates_3_hrs_ela_or_math_or_9_hrs_any_subject_econ_disadv_rate
+            unit: percent
+          ccmr_annual_graduates_onramps_economically_disadvantaged_numerator:
+            field: state_2024_completion_of_onramps_course_graduates_econ_disadv_numerator
+            unit: count
+          ccmr_annual_graduates_onramps_economically_disadvantaged_rate:
+            field: state_2024_completion_of_onramps_course_graduates_econ_disadv_rate
+            unit: percent
+          ccmr_annual_graduates_dual_credit_or_onramps_economically_disadvantaged_numerator:
+            field: state_2024_associated_ccmr_dual_course_credits_or_onramps_course_credits_econ_disadv_numerator
+            unit: count
+          ccmr_annual_graduates_dual_credit_or_onramps_economically_disadvantaged_rate:
+            field: state_2024_associated_ccmr_dual_course_credits_or_onramps_course_credits_econ_disadv_rate
+            unit: percent
+        value_policy: null
+        estimation: null
+        provenance_ids: []
+        references:
+          - reference_id: "csv_headers"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+            title: "Complete offered 2025 statewide GRAD2 CSV"
+            status: "available"
+            provenance_ids:
+              - "b0136e7d8abba92c492348a11be143fddd46cbfd9887c7325eee378652735ebe"
+            reviewed_sha256: "37525bb27605ac262697a8c731a725e5bfb9a2e8e54495e843ea4ec779979995"
+          - reference_id: "menu"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&tapr=all_s&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr.sas"
+            title: "2025 statewide TAPR download family menu"
+            status: "available"
+            provenance_ids:
+              - "e17c80d32ffed19243e2aec45d03eabb2e342f36205debf60163cc9b0042fe05"
+            reviewed_sha256: "683691a3e4ef2cd21cf0b290b630f3c8f2a3348e0ce54ba5642a4a028e62aec4"
+          - reference_id: "selection"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker"
+            title: "2025 statewide GRAD2 form selector"
+            status: "available"
+            provenance_ids:
+              - "b515df72be78e625af67d773b5d5549cbf9f68f9aa60f0282a0c13bbcebdd659"
+            reviewed_sha256: "36703ba77892b1ef039cce6b8fea41e6bc66231c792502e7aa34dda60432e665"
+          - reference_id: "dictionary"
+            role: "data_dictionary"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=S&dsname=GRAD2&dd=ccmr&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+            title: "2025 statewide GRAD2 data dictionary"
+            status: "available"
+            provenance_ids:
+              - "e0228566a20640a2bb37981bdd0ed74c1fa0aa4e55de251a0ed014f75f391e72"
+            reviewed_sha256: "b63b22d30c91d86c9921157e26021240488874ec8d2f0b1ee166c09ef53cd88c"
+          - reference_id: "glossary"
+            role: "glossary"
+            url: "https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf"
+            title: "2024–25 TAPR glossary"
+            status: "available"
+            provenance_ids:
+              - "e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db"
+            reviewed_sha256: "846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416"
+          - reference_id: "masking"
+            role: "masking_methodology"
+            url: "https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html"
+            title: "2024–25 TAPR masking methodology"
+            status: "available"
+            provenance_ids:
+              - "6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554"
+            reviewed_sha256: "7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8"
+          - reference_id: "state_ccmr_report"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=S&lev=S&prgopt=reports%2Ftapr%2Fccmr.sas"
+            title: "2024–25 statewide TPRS CCMR report for 2023–24 annual graduates"
+            status: "available"
+            provenance_ids:
+              - "51918d0c8bb933464e7d7447c339bc6d6c33a85b1931387ff3bab6885a7005dc"
+            reviewed_sha256: "38e1b11b025162ed68d14af6eaaaaf16f8308859caf2a1007e06d8dc77cefb79"
+          - reference_id: "columns_source"
+            role: "schema"
+            path: "schemas/tapr--2025--state-college-readiness-components-crosswalk.json"
+            title: "Complete source-only header and dictionary-occurrence contract"
+            status: "available"
+            provenance_ids: []
+            reviewed_sha256: "4f007bb974d8cc43fd3e042272d3944322d00f13b5fe89d5a5503eb8a19a72b2"
+        notes: >-
+          One independent statewide publisher observation for 2023–24 annual
+          graduates. The same-edition public report corroborates displayed rates.
+          Counts come from the full CSV and are preserved exactly. Criteria can
+          overlap and are separate from course participation and Outcomes Bonus.
+          The source profile activates no default reader or entity enrichment.
+      reader:
+        profiles:
+          source:
+            column_schema: "schemas/tapr--2025--state-college-readiness-components-crosswalk.json"
+            tapr_source:
+              scope: "state"
+              tables:
+                college_readiness_components: "data/tapr/raw/2025-s-GRAD2-offered-original.csv"
   peims_teacher_course_enrollment:
     2023:
       metadata:
@@ -9285,6 +9447,8 @@ schema:
     campus_tapr_college_readiness_components:
     - csv
     district_tapr_college_readiness_components:
+    - csv
+    state_tapr_college_readiness_components:
     - csv
     accountability:
     - parquet

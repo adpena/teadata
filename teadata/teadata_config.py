@@ -915,7 +915,7 @@ class Config:
         """
         from .column_schema import crosswalk_dataset, parse_column_schema, reader_options
         from .manifest import ACTIVE_BUILD, ContractError
-        from .tapr import TaprSourceRequest, tapr_source_selection
+        from .tapr import TAPR_SOURCE_KEYS, TaprSourceRequest, tapr_source_selection
 
         if ACTIVE_BUILD.get() is not None:
             raise ContractError("Prepare full TAPR sources explicitly before a retained-format release build")
@@ -946,7 +946,7 @@ class Config:
                 path = Path(input_dir) / path.name
             else:
                 path = Path(_resolve_source_path(str(path), self.base_dir or Path.cwd()))
-            result.append(TaprSourceRequest(path, table, selection["scope"] + "_number",
+            result.append(TaprSourceRequest(path, table, TAPR_SOURCE_KEYS[selection["scope"]],
                                              dataset, source.metadata.version))
         return result
 
@@ -999,7 +999,7 @@ class Config:
             options.pop("metadata", None)
         raw_tapr = options.pop("tapr_source", None)
         if raw_tapr is not None:
-            from .tapr import merge_tapr_tables
+            from .tapr import TAPR_SOURCE_KEYS, merge_tapr_tables
 
             if reader_profile != "source" or reader_kwargs:
                 raise ContractError("Full TAPR preparation uses its exact source profile without reader overrides")
@@ -1007,7 +1007,7 @@ class Config:
             if selected_year is None:
                 raise ContractError("Full TAPR source preparation requires an exact declared edition")
             tables = self.read_tapr_sources(dataset, selected_year)
-            frame = merge_tapr_tables(tables, key_field=raw_tapr["scope"] + "_number").to_pandas()
+            frame = merge_tapr_tables(tables, key_field=TAPR_SOURCE_KEYS[raw_tapr["scope"]]).to_pandas()
             if list(frame.columns) != expected_schema:
                 raise ContractError("Full TAPR source preparation differs from its complete crosswalk")
             return source.resolved_year, frame

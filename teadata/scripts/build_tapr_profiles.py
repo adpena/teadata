@@ -30,7 +30,7 @@ from teadata.provenance import ProvenanceStore, validate_reference_records
 from teadata.release import publish_release
 from teadata.scripts.paths import data_path
 from teadata.tapr import (
-    TAPR_PROFILE_FAMILIES, TaprReadBudget, TaprSourceRequest, TaprSourceSummary, qualified_tapr_family,
+    TAPR_PROFILE_FAMILIES, TAPR_SOURCE_KEYS, TaprReadBudget, TaprSourceRequest, TaprSourceSummary, qualified_tapr_family,
     reviewed_tapr_data_record_count, tapr_source_selection, validate_tapr_key,
 )
 from teadata.teadata_config import load_config
@@ -102,8 +102,8 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
     if not isinstance(edition, str) or edition != str(year) or year < 1:
         raise ValueError("Select a canonical annual integer edition")
     if prepared_inputs is None and (not scopes or len(scopes) != len(set(scopes))
-            or set(scopes) - {"campus", "district"} or family not in TAPR_PROFILE_FAMILIES):
-        raise ValueError("Select a declared family and distinct campus/district scopes")
+            or set(scopes) - TAPR_SOURCE_KEYS.keys() or family not in TAPR_PROFILE_FAMILIES):
+        raise ValueError("Select a declared family and distinct TAPR source scopes")
     output_dir = Path(output_dir)
     if output_dir.exists() or output_dir.is_symlink():
         raise FileExistsError(f"Preparation output already exists: {output_dir}")
@@ -308,7 +308,10 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
             raise ValueError("Prepared input requires an exact registered edition")
         selection = tapr_source_selection(reader_options(source.reader, "source"))
         scope = selection["scope"]
-        family = qualified_tapr_family(source.dataset, scope + "_number")
+        source_key = TAPR_SOURCE_KEYS[scope]
+        if source_key is None:
+            raise ValueError("State TAPR single observations currently support raw source preparation only")
+        family = qualified_tapr_family(source.dataset, source_key)
         resource = cfg.column_contract(dataset, year, reader_profile="source")
         if resource is None:
             raise ValueError("Prepared input requires a reviewed source contract")
@@ -324,7 +327,7 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
         source_rows = reviewed_tapr_data_record_count(table)
         cfg.header_records(dataset, edition=edition, reader_profile="source")
         validate_tapr_key(table, keys[0])
-        if keys != (scope + "_number",):
+        if keys != (source_key,):
             raise ValueError("Explicit key differs from the selected TAPR source scope")
         graph = reference_store.verify_record_closure([identifier])
         record = graph[identifier]
@@ -494,7 +497,7 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--edition", required=True, help="Canonical annual integer edition, exactly declared by Config")
     parser.add_argument("--family", choices=TAPR_PROFILE_FAMILIES)
-    parser.add_argument("--scope", action="append", choices=("campus", "district"))
+    parser.add_argument("--scope", action="append", choices=tuple(TAPR_SOURCE_KEYS))
     parser.add_argument("--config", type=Path)
     parser.add_argument("--reference-store", type=Path,
                         help="Canonical store containing the exact claimed reference receipts and bytes")

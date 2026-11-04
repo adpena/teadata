@@ -30,14 +30,16 @@ TAPR_PROFILE_FAMILIES = ("student_staff_profile", "graduation_profile", "student
                          "longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla",
                          "5_year_extended_longitudinal_rate", "6_year_extended_longitudinal_rate",
                          "college_career_military_readiness", "college_readiness_components")
+TAPR_SOURCE_KEYS = {"campus": "campus_number", "district": "district_number", "state": None}
 
 
-def qualified_tapr_family(dataset: str, key_field: str) -> str:
+def qualified_tapr_family(dataset: str, key_field: str | None) -> str:
     """Resolve only the reader's existing exact scope-qualified family names."""
-    if key_field in {"campus_number", "district_number"}:
-        for family in TAPR_PROFILE_FAMILIES:
-            if dataset == key_field.removesuffix("_number") + "_tapr_" + family:
-                return family
+    for scope, source_key in TAPR_SOURCE_KEYS.items():
+        if source_key == key_field:
+            for family in TAPR_PROFILE_FAMILIES:
+                if dataset == f"{scope}_tapr_{family}":
+                    return family
     raise ValueError("TAPR preparation requires an explicit qualified dataset and source edition")
 
 
@@ -45,7 +47,7 @@ def tapr_source_selection(options: Mapping[str, Any]) -> dict[str, Any]:
     """Validate the canonical reader_options result before source or leaf I/O."""
     selection = options.get("tapr_source")
     if (not isinstance(selection, dict) or set(selection) != {"scope", "tables"}
-            or selection["scope"] not in {"campus", "district"}
+            or selection["scope"] not in TAPR_SOURCE_KEYS
             or not isinstance(selection["tables"], dict) or not selection["tables"]
             or any(not isinstance(value, str) or not value or "://" in value
                    for value in selection["tables"].values())):
@@ -204,7 +206,7 @@ class TaprSourceRequest:
 
     path: Path
     mapping: Mapping[str, Any]
-    key_field: str
+    key_field: str | None
     dataset: str
     edition: str
     dictionary_path: Path | None = None
@@ -315,6 +317,8 @@ class TaprSourceReader(Iterator[Any]):
                     null_values=[], strings_can_be_null=False, quoted_strings_can_be_null=False)).rename_columns(names)
             if table.nbytes > budget.batch_bytes or table.num_rows != len(numbers):
                 raise ValueError(f"{path}: native CSV batch exceeds admitted byte/row budget")
+            if request.key_field is None:
+                return table.combine_chunks().to_batches()[0]
             try:
                 identity = canonical_source_identifiers(table[request.key_field], width=key_width)
                 if pc.any(pc.is_null(identity)).as_py():
@@ -374,7 +378,7 @@ class TaprSourceReader(Iterator[Any]):
                             raise ValueError(f"{path}: record {count} has {len(row)} fields; expected {width}")
                         # Fixed-width normalized keys, offsets and record numbers;
                         # reserve before conversion/retention, never per fact cell.
-                        if (rows + 1) * (key_width + 18) > budget.key_bytes:
+                        if request.key_field is not None and (rows + 1) * (key_width + 18) > budget.key_bytes:
                             raise ValueError(f"{path}: global identity index byte budget exceeded")
                         data = bytes(segment)
                         if count == 1:
@@ -415,14 +419,15 @@ class TaprSourceReader(Iterator[Any]):
             raise ValueError(f"{path}: no TAPR data records")
         if layout is not None and rows != reviewed_tapr_data_record_count(mapping):
             raise ValueError(f"{path}: extracted data count differs from reviewed record layout")
-        identity = pa.chunked_array(keys)
-        if pc.count_distinct(identity).as_py() != rows:
-            counts = pc.value_counts(identity)
-            duplicate = pc.filter(counts.field("values"), pc.greater(counts.field("counts"), 1))[0]
-            records = pc.filter(pa.chunked_array(positions), pc.equal(identity, duplicate))
-            example = records.slice(0, 20).to_pylist()
-            suffix = " (first20)" if len(records) > 20 else ""
-            raise ValueError(f"{path}: invalid {request.key_field}: duplicate {request.key_field} at records {example}{suffix}")
+        if request.key_field is not None:
+            identity = pa.chunked_array(keys)
+            if pc.count_distinct(identity).as_py() != rows:
+                counts = pc.value_counts(identity)
+                duplicate = pc.filter(counts.field("values"), pc.greater(counts.field("counts"), 1))[0]
+                records = pc.filter(pa.chunked_array(positions), pc.equal(identity, duplicate))
+                example = records.slice(0, 20).to_pylist()
+                suffix = " (first20)" if len(records) > 20 else ""
+                raise ValueError(f"{path}: invalid {request.key_field}: duplicate {request.key_field} at records {example}{suffix}")
         self._summary = TaprSourceSummary(path, self.input_sha256, request.dataset,
             request.edition, tuple(observed), mapping, rows, before)
 
@@ -451,9 +456,14 @@ def _verify_dictionary(path: Path, mapping: Mapping[str, Any], *, max_bytes: int
         raise ValueError(f"{path}: publisher dictionary does not match the complete reviewed crosswalk")
 
 
-def validate_tapr_key(mapping: Mapping[str, Any], key_field: str) -> None:
+def validate_tapr_key(mapping: Mapping[str, Any], key_field: str | None) -> None:
     """Share the existing reviewed publisher-code/physical-key binding."""
     table_header_identity(mapping, expected="code")
+    if key_field is None:
+        if (reviewed_tapr_data_record_count(mapping) != 1
+                or any(field.get("disposition") == "identity" for field in mapping["fields"])):
+            raise ValueError("A state TAPR source requires one reviewed data row without a publisher identity field")
+        return
     headers = [field["field"] for field in mapping["fields"]]
     if key_field not in {"campus_number", "district_number"} or key_field not in headers:
         raise ValueError(f"missing or unsupported source key {key_field!r}")
@@ -480,7 +490,7 @@ def reviewed_tapr_data_record_count(mapping: Mapping[str, Any]) -> int:
     return rows
 
 
-def read_tapr_table(path: str | Path, *, mapping: Mapping[str, Any], key_field: str,
+def read_tapr_table(path: str | Path, *, mapping: Mapping[str, Any], key_field: str | None,
                     dataset: str, edition: str,
                     dictionary_path: str | Path | None = None,
                     budget: TaprReadBudget | None = None) -> TaprSourceTable:
@@ -496,7 +506,7 @@ def read_tapr_table(path: str | Path, *, mapping: Mapping[str, Any], key_field: 
                            summary.annotations, summary.mapping)
 
 
-def merge_tapr_tables(sources: list[TaprSourceTable], *, key_field: str):
+def merge_tapr_tables(sources: list[TaprSourceTable], *, key_field: str | None):
     """Outer-merge this edition's native tables, retaining historical entities.
 
     Shared identity/header definitions must agree. This is deliberately not a
@@ -509,6 +519,19 @@ def merge_tapr_tables(sources: list[TaprSourceTable], *, key_field: str):
 
     if not sources:
         raise ValueError("At least one source table is required")
+    if key_field is None:
+        if len(sources) != 1:
+            raise ValueError("A state TAPR source requires one independent publisher table")
+        (source,) = sources
+        qualified_tapr_family(source.dataset, key_field)
+        validate_header_table(source.mapping, expected_identity="code")
+        validate_tapr_key(source.mapping, key_field)
+        if (source.table.num_rows != 1
+                or source.table.column_names != [field["field"] for field in source.mapping["fields"]]
+                or any(not pa.types.is_string(column.type) or column.null_count
+                       for column in source.table.columns)):
+            raise ValueError("State TAPR table differs from its complete reviewed observation")
+        return source.table
     if key_field not in {"campus_number", "district_number"}:
         raise ValueError("Unsupported TAPR merge identity")
     width = 9 if key_field == "campus_number" else 6

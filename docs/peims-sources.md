@@ -218,3 +218,14 @@ parity. Use these opt-in leaves as source observations. Campus totals,
 canonical affiliations and dataset activation remain outside the verified
 contract. Preserve earlier manifest bytes and use the corresponding
 checkout when replaying a candidate tied to an earlier crosswalk revision.
+
+The [publisher witness inventory](../teadata/reference_cases/native_peims_courses.json)
+also pins eight separately requested Selected Districtwide Campus Totals
+CSVs. Across the three school years, these reports reproduced 1,792 rows
+and 23,296 shared cells from their complete statewide district slices,
+including off-prefix campus IDs. The report's request, attachment name and
+preamble independently identify the selected district. The verifier reports
+these CSV comparisons separately from the HTML measure comparisons.
+This establishes the district selection used by TEA for the checked slices.
+The submitting organization, campus affiliation and valid aggregation rules
+still require separate evidence.

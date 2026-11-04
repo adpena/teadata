@@ -303,6 +303,46 @@ def test_literal_class_and_annual_graduate_contexts_do_not_become_other_populati
         assert 'Annual-graduate' in metadata.notes and 'Bonus' in metadata.notes and 'ERC' in metadata.notes
 
 
+def test_state_graduate_components_are_one_independent_source_observation():
+    cfg = load_config()
+    family = 'college_readiness_components'
+    dataset = 'state_tapr_' + family
+    table = source_table(cfg, family, 'state')
+    source = cfg.resolve_dataset(dataset, 2025, exact=True, reader_profile='source')
+    metadata = source.metadata
+    fields = {row['code']: row for row in table['fields']}
+    assert len(fields) == 121 and len(table['dictionary_records']) == 165
+    assert table['layout']['first_data_record'] == table['layout']['last_data_record'] == 3
+    assert all(row['disposition'] == 'fact' and row['field'] == sanitize_header(row['label'])
+               for row in fields.values())
+    assert metadata.period.to_dict() == table['metric_period'] == CCMR_RATE_PERIOD
+    assert metadata.value_policy is None and metadata.estimation is None
+    assert len(metadata.metrics) == 22
+    for name, code, unit in (
+        ('economically_disadvantaged_denominator', 'SE0GP24D', 'count'),
+        ('dual_credit_economically_disadvantaged_numerator', 'SE0GUA24N', 'count'),
+        ('onramps_economically_disadvantaged_rate', 'SE0GZ24R', 'percent'),
+        ('dual_credit_or_onramps_all_students_rate', 'SADGG24R', 'percent'),
+    ):
+        metric = metadata.metrics['ccmr_annual_graduates_' + name]
+        assert metric.field == fields[code]['field'] and metric.unit == unit
+    request, = cfg.tapr_source_requests(dataset, 2025)
+    assert request.key_field is None
+    store = ProvenanceStore(ROOT / 'provenance')
+    references = {ref.reference_id: ref for ref in metadata.references}
+    graph = validate_record_graph(store.read_record, [
+        identifier for ref in references.values() for identifier in ref.provenance_ids
+    ])
+    original, = (graph[identifier] for identifier in references['csv_headers'].provenance_ids)
+    assert original['artifact']['sha256'] == table['input_sha256']
+    assert ['sumlev', 'S'] in original['parameters']['form_controls']
+    assert ['dsname', 'GRAD2'] in original['parameters']['form_controls']
+    assert 'ccyy=2025&id=S&lev=S' in (references['state_ccmr_report'].url or '')
+    assert cfg.is_source_only(dataset, 2025) and dataset not in _registry
+    with pytest.raises(ContractError, match='Reader profile is required'):
+        cfg.load_df(dataset, 2025)
+
+
 @pytest.mark.parametrize('family,width,occurrences,raw_sha,receipt', SOURCES)
 def test_ordinary_native_preparation_preserves_every_raw_field_and_original_receipt(tmp_path, family, width, occurrences, raw_sha, receipt):
     dataset = 'district_tapr_' + family
