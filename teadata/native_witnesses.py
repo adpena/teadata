@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode
 
 from .manifest import ContractError
+from .peims_leaves import PRIMARY_DISABILITY
 from .transfer_sources import _FOOTNOTES
 
 if TYPE_CHECKING:
@@ -105,7 +106,7 @@ def _open_witness(store: ProvenanceStore, receipt: str, ref: ArtifactRef, entity
     controls = parameters.get("form_controls", [])
     fields = dict(controls)
     artifact = record["artifact"]
-    expected_method = "POST" if key.dataset == _PROGRAM and key.scope != "campus" else "GET"
+    expected_method = "POST" if key.dataset in (_PROGRAM, PRIMARY_DISABILITY) and key.scope != "campus" else "GET"
     expected_url = _BROKER if expected_method == "POST" else f"{_BROKER}?{urlencode(fields)}"
     expected_media = "text/csv" if key.dataset == _TRANSFER else "text/html"
     if (record["kind"] != "acquisition" or record["method"] != "download"
@@ -123,12 +124,15 @@ def _open_witness(store: ProvenanceStore, receipt: str, ref: ArtifactRef, entity
                  and fields.get("_program") == "adhoc.download_transfer_report.sas"
                  and fields.get("school_year") == key.edition and fields.get("scope") == "District"
                  and fields.get("agg_level") == "district" and fields.get("district") == entity)
-    elif key.dataset == _PROGRAM:
-        valid = (record["dataset"] == "reference:peims_individual_witness"
+    elif key.dataset in (_PROGRAM, PRIMARY_DISABILITY):
+        disability = key.dataset == PRIMARY_DISABILITY
+        valid = (record["dataset"] == ("reference:peims_primary_disability_witness" if disability
+                                        else "reference:peims_individual_witness")
                  and fields.get("_program") == f"adhoc.std_driver{1 if key.scope == 'state' else 2}.sas"
-                 and fields.get("RptClass") == "StudPgm"
+                 and fields.get("RptClass") == ("SpecEd" if disability else "StudPgm")
                  and fields.get("SchoolYr") == key.edition[-2:]
                  and fields.get("report") == key.scope.title() * 2
+                 and (not disability or (key.scope in ("state", "district") and fields.get("format") == "html"))
                  and (key.scope == "state" or fields.get(key.scope, "").startswith(f"{entity} ")))
     else:
         valid = (record["dataset"] == "reference:peims_individual_witness"
@@ -159,6 +163,32 @@ def _program(rows: list[list[str]], native: list[dict[str, Any]], entity: str) -
     if type(total) is not int:
         raise ContractError("Program publisher witness requires an observed enrollment total")
     return len(facts), total
+
+
+def _primary_disability(rows: list[list[str]], native: list[dict[str, Any]], key: EditionKey, entity: str,
+                        columns: dict[str, str], expected_unreported: list[str]) -> tuple[int, list[str]]:
+    group, = (index for index, row in enumerate(rows) if "Primary Disability" in row)
+    title = "Students Receiving Special Education Services By Primary Disability"
+    period = f"PEIMS Data {int(key.edition) - 1}-{key.edition}"
+    if not any(title in cell and period in cell for row in rows[:group] for cell in row):
+        raise ContractError("Primary disability publisher title or period differs")
+    codes, published = rows[group + 1:group + 3]
+    omitted = sorted(set(columns) - set(codes))
+    if (len(codes) != len(set(codes)) or not set(codes) <= set(columns)
+            or not isinstance(expected_unreported, list) or omitted != expected_unreported):
+        raise ContractError("Primary disability publisher report columns differ")
+    if key.scope == "district":
+        if (not published or not re.search(rf"\({re.escape(entity)}\s*\)$", published[0])
+                or not any("Districtwide for " in cell and published[0] in cell
+                           for row in rows[:group] for cell in row)):
+            raise ContractError("Primary disability publisher district differs")
+        published = published[3:]
+    elif not any(row == ["Statewide"] for row in rows[:group]):
+        raise ContractError("Primary disability publisher state scope differs")
+    record, = native
+    for code, token in zip(codes, published, strict=True):
+        _compare_count(record, columns[code], token)
+    return len(codes), omitted
 
 
 def _ethnicity(rows: list[list[str]], native: list[dict[str, Any]], key: EditionKey, entity: str, total: int) -> int:
@@ -213,9 +243,14 @@ def validate_native_witnesses(release: DataRelease, store: ProvenanceStore, refe
     for ref, case in sorted(refs, key=lambda item: item[0].edition.dataset != _PROGRAM):
         key = ref.edition
         table = release.analytical_dataset(ref.identity)
+        columns = ({entry["code"]: entry["field"] for entry in release.catalog.variables(edition=key)
+                    if entry["unit"] == "count"} if key.dataset == PRIMARY_DISABILITY else {})
         for witness in case["reports"]:
             entity, receipt = witness["entity"], witness["receipt"]
+            omitted: list[str] = []
             try:
+                if "unreported_codes" in witness and key.dataset != PRIMARY_DISABILITY:
+                    raise ContractError("Unreported codes require a primary disability witness")
                 path = _open_witness(store, receipt, ref, entity)
                 if key.dataset == _TRANSFER:
                     count = _transfer(path, ref, entity, table)
@@ -229,11 +264,15 @@ def validate_native_witnesses(release: DataRelease, store: ProvenanceStore, refe
                     native = table.to_table(filter=selection).to_pylist()
                     if key.dataset == _PROGRAM:
                         count, totals[(key.scope, entity)] = _program(rows, native, entity)
+                    elif key.dataset == PRIMARY_DISABILITY:
+                        count, omitted = _primary_disability(rows, native, key, entity, columns,
+                                                            witness.get("unreported_codes", []))
                     else:
                         count = _ethnicity(rows, native, key, entity, totals[(key.scope, entity)])
                     peims_values += count
             except (ValueError, KeyError, TypeError, IndexError, OSError, csv.Error, ContractError) as error:
                 raise ContractError(f"Publisher witness {receipt} failed for {key.dataset} {entity}: {error}") from error
             cases.append({"edition_id": key.identity, "entity": entity, "receipt": receipt,
-                          "rows" if key.dataset == _TRANSFER else "values": count})
+                          "rows" if key.dataset == _TRANSFER else "values": count,
+                          **({"unreported_codes": omitted} if omitted else {})})
     return {"reports": cases, "peims_values": peims_values, "transfer_rows": transfer_rows}

@@ -27,8 +27,14 @@ if TYPE_CHECKING:
 
 ENROLLMENT = "peims_student_enrollment_by_ethnicity"
 PROGRAMS = "peims_student_programs_and_special_populations"
-DATASETS = (ENROLLMENT, PROGRAMS)
-SCOPES = {"state", "district", "campus"}
+PRIMARY_DISABILITY = "peims_special_education_by_primary_disability"
+_STUDENT_SCOPES = frozenset({"state", "district", "campus"})
+SCOPES_BY_DATASET = {
+    ENROLLMENT: _STUDENT_SCOPES,
+    PROGRAMS: _STUDENT_SCOPES,
+    PRIMARY_DISABILITY: frozenset({"state", "district"}),
+}
+DATASETS = tuple(SCOPES_BY_DATASET)
 SOURCE_BYTES = 8 * 1024**2
 BATCH_BYTES = 8 * 1024**2
 BATCH_ROWS = 4096
@@ -54,11 +60,12 @@ def _admit_source(config: Config, dataset: str, year: int, store: ProvenanceStor
         raise ValueError("PEIMS requires its reviewed positional crosswalk")
     tables = crosswalk_dataset(parse_column_schema(resource["text"].encode()), dataset, str(year))["tables"]
     identifiers = reader_options(source.reader, "source").get("acquisition_ids")
-    if (len(tables) != len(SCOPES) or {table["table"] for table in tables} != SCOPES
-            or not isinstance(identifiers, dict) or set(identifiers) != SCOPES
+    scopes = SCOPES_BY_DATASET[dataset]
+    if (len(tables) != len(scopes) or {table["table"] for table in tables} != scopes
+            or not isinstance(identifiers, dict) or set(identifiers) != scopes
             or any(not isinstance(identifier, str) for identifier in identifiers.values())
-            or len(set(identifiers.values())) != len(SCOPES)):
-        raise ValueError("PEIMS requires one distinct acquisition per state, district and campus table")
+            or len(set(identifiers.values())) != len(scopes)):
+        raise ValueError("PEIMS requires one distinct acquisition per supported publisher table")
     references = [identifier for ref in source.metadata.references for identifier in ref.provenance_ids]
     records = store.verify_record_closure([*identifiers.values(), *references])
     validate_reference_records(source, records.__getitem__, verify_all_claimed=True)
@@ -170,10 +177,13 @@ def _project(path: Path, table: dict[str, Any], source: ResolvedDataset, policy:
     if scope == "campus" and ("district_number" not in names or not _all_valid(pc.equal(
             pc.utf8_slice_codeunits(literals["campus_number"], 0, 6), literals["district_number"]))):
         raise ValueError("PEIMS campus and district identities disagree")
-    if source.dataset == PROGRAMS and (not {"source_scope", "aggregation_level"} <= set(names)
-            or not _all_valid(pc.equal(literals["source_scope"], "STATE"))
-            or not _all_valid(pc.equal(literals["aggregation_level"], scope.upper()))):
-        raise ValueError("PEIMS program report differs from its selected scope")
+    if source.dataset in (PROGRAMS, PRIMARY_DISABILITY):
+        aggregation = ("COUNTYREGIONDISTRICT" if source.dataset == PRIMARY_DISABILITY and scope == "district"
+                       else scope.upper())
+        if (not {"source_scope", "aggregation_level"} <= set(names)
+                or not _all_valid(pc.equal(literals["source_scope"], "STATE"))
+                or not _all_valid(pc.equal(literals["aggregation_level"], aggregation))):
+            raise ValueError("PEIMS report differs from its selected scope")
     if (not all(_all_valid(pc.not_equal(literals[name], "")) for name in key_columns)
             or literals.select(key_columns).group_by(key_columns).aggregate([]).num_rows != literals.num_rows):
         raise ValueError("PEIMS contains a blank or duplicate table key")

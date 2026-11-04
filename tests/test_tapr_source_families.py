@@ -201,6 +201,10 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
         assert list(current['data_sources'].pop(dataset)) == [2026]
         assert current['schema']['data_sources'].pop(dataset) == ['csv']
         assert current['value_policies'].pop(dataset + '_2026')['reference_id'] == 'peims_masking'
+    primary_disability = 'peims_special_education_by_primary_disability'
+    assert list(current['data_sources'].pop(primary_disability)) == [2023, 2024, 2025, 2026]
+    assert current['schema']['data_sources'].pop(primary_disability) == ['csv']
+    assert current['value_policies'].pop('peims_primary_disability_csv')['reference_id'] == 'peims_disability_masking'
     # Remove only the explicitly added 2025 outcome opt-ins before reconstructing history.
     for scope in ('campus', 'district'):
         for family in ('college_career_military_readiness', 'college_readiness_components'):

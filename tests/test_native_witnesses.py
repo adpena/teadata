@@ -7,7 +7,7 @@ from unittest.mock import Mock
 import pytest
 
 from teadata import native_witnesses, release, source_parity, verification
-from teadata.dataset_metadata import ArtifactRef
+from teadata.dataset_metadata import ArtifactRef, EditionKey
 from teadata.manifest import ContractError
 from teadata.provenance import ProvenanceStore
 
@@ -43,6 +43,26 @@ def test_witness_requires_its_actual_tea_request_url():
     with pytest.raises(ContractError, match="Invalid independent publisher acquisition"):
         native_witnesses._open_witness(cast(ProvenanceStore, store), "receipt", cast(ArtifactRef, ref), "state")
     store.verify_artifact.assert_not_called()
+
+
+def test_primary_disability_witness_keeps_omitted_category_and_suppression_distinct():
+    key = EditionKey(native_witnesses.PRIMARY_DISABILITY, "2023", "0" * 64, "district", "district", "district")
+    rows = [
+        ["Students Receiving Special Education Services By Primary Disability PEIMS Data 2022-2023"],
+        ["Districtwide for AUSTIN ISD (227901 )"],
+        ["District Name (District Number)/Charter Status/Region", "Primary Disability"],
+        ["LD", "DB"],
+        ["AUSTIN ISD (227901 )", "TRADITIONAL ISD/CSD", "13", "4,129", "N/A"],
+    ]
+    native = [{"learning": 4129, "peims_status_learning": "observed", "deafblind": None,
+               "peims_status_deafblind": "suppressed", "delay": 0, "peims_status_delay": "observed"}]
+    columns = {"LD": "learning", "DB": "deafblind", "DD": "delay"}
+    assert native_witnesses._primary_disability(rows, native, key, "227901", columns, ["DD"]) == (2, ["DD"])
+    with pytest.raises(ContractError, match="columns differ"):
+        native_witnesses._primary_disability(rows, native, key, "227901", columns, [])
+    rows[-1][-1] = "0"
+    with pytest.raises(ContractError, match="count or status differs"):
+        native_witnesses._primary_disability(rows, native, key, "227901", columns, ["DD"])
 
 
 def test_transfer_witness_rejects_a_truncated_data_row_as_a_footer(tmp_path):

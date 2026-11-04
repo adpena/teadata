@@ -18,7 +18,7 @@ from .column_schema import crosswalk_dataset, parse_column_schema, table_input_s
 from .dataset_metadata import COLUMN_SCHEMA_MAX_BYTES, DataPeriod
 from .manifest import canonical_json
 from .peims_leaves import DATASETS as PEIMS_DATASETS
-from .peims_leaves import ENCODING, ENROLLMENT, SCOPES, _count_columns
+from .peims_leaves import ENCODING, ENROLLMENT, SCOPES_BY_DATASET, _count_columns
 from .provenance import validate_record_graph
 from .source_csv import SourceLines
 from .source_parity import _FieldReport, _Uncovered
@@ -141,7 +141,8 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
     prepared = None
     projection = {}
     if peims:
-        if (key.scope not in SCOPES or key.table != key.scope or len(ids) != 1 or recipe.get("encoding") != ENCODING
+        if (key.scope not in SCOPES_BY_DATASET[key.dataset] or key.table != key.scope or len(ids) != 1
+                or recipe.get("encoding") != ENCODING
                 or mapping.get("header_identity") != "position" or not mapping.get("layout")
                 or mapping["layout"]["label_record"] is not None):
             raise _Uncovered("No supported recorded PEIMS positional source layout")

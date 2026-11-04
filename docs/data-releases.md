@@ -60,7 +60,7 @@ and methodology references.
 ### Exact retained-source parity
 
 An offline check compares every raw cell in explicitly selected complete TAPR,
-PEIMS student Enrollment and program, and district-transfer native leaves
+PEIMS student Enrollment, program and primary-disability, and district-transfer native leaves
 against retained publisher CSV. It also compares the retained TAPR and transfer
 preparations and checks typed values, statuses and source row locations for the
 admitted PEIMS and district-transfer recipes. Select the existing release, its
@@ -113,6 +113,45 @@ Repairing ETL to match the publisher needs no exception. A future intentional
 difference would require specific user approval of the identified anomaly,
 evidence and repair; general authorization to fix data is insufficient. E3's
 printed-versus-TEA research comparisons are not ETL waivers.
+
+### PEIMS primary-disability counts
+
+`peims_special_education_by_primary_disability` is discoverable as a source-only
+dataset for school years 2022–23 through 2025–26. Select an exact edition by its
+ending year. The reviewed native scopes are Texas and district. TEA also offers
+regional and county reports. Campus results are unavailable through this source.
+Counts are from the October PEIMS snapshot for public schools, including charter
+schools. Preserve each category's raw CSV token and status. `-999` is suppressed
+and `0` is an observed zero. The figures and the program Enrollment and TAPR/TPRS
+Membership measures have separate source lineages. Even published category sums
+can differ from the program count. [TEA report selector](https://rptsvr1.tea.texas.gov/adhocrpt/adser.html)
+and [report criteria](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/abtspeced.html).
+
+TEA permitted developmental delay classification beginning in 2024–25 and
+ended new use of noncategorical early childhood beginning in 2025–26, with an
+exception for previously identified students before age-six reevaluation.
+The statewide publisher files show 14 and 12 Developmental Delay records in
+2022–23 and 2023–24. Their lineage remains unresolved, and interpretation of
+those counts is on hold. Interpret trends in light of the transition. Specific
+learning disability is a broader category than dyslexia. [TEA eligibility definitions](https://spedsupport.tea.texas.gov/resource-library/disability-condition-eligibility-definitions).
+
+Build an unpublished candidate with the exact source configuration and the
+retained public provenance store.
+
+```sh
+uv run --locked python -m teadata.scripts.refresh_peims \
+  --store /path/to/retained/provenance --config teadata/teadata_sources.yaml \
+  --config-sha256 CONFIG_SHA256 \
+  --source peims_special_education_by_primary_disability 2023 \
+  --source peims_special_education_by_primary_disability 2024 \
+  --source peims_special_education_by_primary_disability 2025 \
+  --source peims_special_education_by_primary_disability 2026 \
+  --output /path/to/new/primary-disability-candidate
+```
+
+Use the candidate's `provenance` subdirectory for exact source parity. Separate
+publisher HTML selections can independently verify fields and statuses; a
+category omitted in an HTML view remains outside that witness's coverage.
 
 ### Native fields with retained technical support
 

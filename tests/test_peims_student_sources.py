@@ -6,6 +6,7 @@ import pytest
 
 from teadata.column_schema import crosswalk_dataset, parse_column_schema, reader_options, table_input_sha256s
 from teadata.manifest import ContractError
+from teadata.peims_leaves import PRIMARY_DISABILITY
 from teadata.provenance import ProvenanceStore, validate_record_graph, validate_reference_records
 from teadata.teadata_config import load_config
 from teadata.values import ValueStatus, measure
@@ -100,6 +101,36 @@ def test_mixed_editions_never_hide_required_retained_sources():
         cfg.is_source_only(ENROLLMENT, 2024)
 
 
+@pytest.mark.parametrize(("year", "district_rows"), [(2023, 1209), (2024, 1206), (2025, 1206), (2026, 1201)])
+def test_primary_disability_discovers_exact_source_only_years(year, district_rows):
+    cfg = load_config()
+    selected = cfg.resolve_dataset(PRIMARY_DISABILITY, year, exact=True, reader_profile="source")
+    assert cfg.is_source_only(PRIMARY_DISABILITY, year)
+    assert selected.metadata.published_at == ("2026-04-09" if year == 2026 else None)
+    assert selected.metadata.period.label == f"{year - 1}-{year}"
+    assert len(selected.metadata.metrics) == 13
+    assert "special_education_program_count" not in selected.metadata.metrics
+    assert {reference.role for reference in selected.metadata.references} == {
+        "data_dictionary", "masking_methodology", "schema", "source_notes"}
+    acquisitions = reader_options(selected.reader, "source")["acquisition_ids"]
+    assert set(acquisitions) == {"state", "district"}
+    provenance = ProvenanceStore(Path(__file__).resolve().parents[1] / "provenance")
+    roots = list(acquisitions.values())
+    roots.extend(identifier for reference in selected.metadata.references for identifier in reference.provenance_ids)
+    graph = validate_record_graph(provenance.read_record, roots)
+    validate_reference_records(selected, graph.__getitem__, verify_all_claimed=True)
+    contract = cfg.column_contract(PRIMARY_DISABILITY, year, reader_profile="source")
+    assert contract is not None
+    tables = crosswalk_dataset(parse_column_schema(contract["text"].encode()), PRIMARY_DISABILITY, str(year))["tables"]
+    for table, rows in zip(tables, (1, district_rows), strict=True):
+        layout = table["layout"]
+        assert layout["last_data_record"] - layout["first_data_record"] + 1 == rows
+        receipt = graph[acquisitions[table["table"]]]
+        assert receipt["resolved_year"] == year
+        assert table_input_sha256s(table) == (receipt["artifact"]["sha256"],)
+        assert len([field for field in table["fields"] if field["dictionary_status"] == "documented"]) == 13
+
+
 @pytest.mark.parametrize(
     ("dataset", "raw", "status", "expected"),
     [
@@ -110,6 +141,10 @@ def test_mixed_editions_never_hide_required_retained_sources():
         (PROGRAMS, "-1", ValueStatus.INVALID, None),
         (PROGRAMS, "0", ValueStatus.OBSERVED, 0),
         (PROGRAMS, "", ValueStatus.MISSING, None),
+        (PRIMARY_DISABILITY, "-999", ValueStatus.SUPPRESSED, None),
+        (PRIMARY_DISABILITY, "0", ValueStatus.OBSERVED, 0),
+        (PRIMARY_DISABILITY, "-1", ValueStatus.INVALID, None),
+        (PRIMARY_DISABILITY, "<10", ValueStatus.INVALID, None),
     ],
 )
 def test_peims_masking_is_report_specific(dataset, raw, status, expected):
