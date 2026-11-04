@@ -357,6 +357,34 @@ Uncached acquisitions run serially with a pause between requests.
 This command acquires source material. Field interpretation, masking review,
 and catalog or release activation are separate steps.
 
+To materialize a complete FY2025 campus intake offline, save the acquisition
+command's JSON and compute its SHA-256. Pass that pin to the existing financial
+refresh command with a new output directory.
+
+```bash
+uv run python -m teadata.scripts.refresh_financials \
+  --store provenance --campus-intake fy2025-campus-intake.json \
+  --campus-intake-sha256 "$INTAKE_SHA256" --output prepared/fy2025-campus-actuals
+```
+
+The campus mode verifies the receipt graph, exact year, financial basis,
+and complete campus roster for every selected district. It accepts the
+reviewed FY2025 campus workbook format. `campus_reports.parquet` retains
+the original A3 membership text and reported count separately from
+`campus_financial_facts.parquet`, which retains each amount, share, or
+per-student cell's raw lexeme, section, literal line label and occurrence,
+column role, worksheet coordinates, and original receipt. `MATERIALIZATION.json`
+identifies the verified readback and the separate processing receipt in the
+selected provenance store. The processing receipt lists the campus report
+notes, raw account dictionary, and related definitions as publisher reference
+links. Their semantic review is separate from this raw projection.
+
+The candidate retains source zeros and negatives as published. It records a
+hold reason for normalization, including a distinct hold for per-student
+cells when reported membership is zero. The output does not change the active
+catalog or the historical FY2024 CSV workflow. Campus intake and the financial
+command's district workbook `--config` mode run separately.
+
 The TAPR command prepares every declared publisher column in the selected
 single-table family for both scopes into a **new** directory, validating all
 inputs before staging any output. Its
