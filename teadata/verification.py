@@ -741,26 +741,39 @@ def _retained_store(path: Path):
 
 
 def _validate_native_release(path: Path, pin: str, source_store: Path) -> dict[str, Any]:
-    from teadata.manifest import ContractError
-    from teadata.native_witnesses import reviewed_native_references, validate_native_witnesses
+    from teadata.dataset_metadata import EditionKey
+    from teadata.manifest import ContractError, canonical_json
+    from teadata.native_witnesses import (
+        reviewed_native_references,
+        reviewed_primary_disability_references,
+        validate_native_witnesses,
+    )
     from teadata.release import DataRelease
     from teadata.source_parity import validate_source_parity
 
     try:
         release = DataRelease(path, expected_sha256=pin, offline=True)
-        references = reviewed_native_references()
+        primary_disability = reviewed_primary_disability_references(release.manifest_sha256)
+        references = reviewed_native_references() if primary_disability is None else primary_disability
+        inline_catalog = primary_disability is not None
         index = release.catalog.to_dict()
-        if (index["schema_version"] != 4 or index["editions"].keys() != references.keys()
-                or index["artifacts"] != {entry["artifact"]: edition for edition, entry in references.items()}):
-            raise ReceiptError("Native release does not contain exactly the reviewed profile editions and leaves")
+        if index["schema_version"] != (3 if inline_catalog else 4) or index["editions"].keys() != references.keys():
+            raise ReceiptError("Native release does not contain exactly the reviewed editions and leaves")
+        routes = ({identifier: EditionKey.from_dict(value["edition"]).identity
+                   for identifier, value in index["artifacts"].items()} if inline_catalog else index["artifacts"])
+        if routes != {entry["artifact"]: edition for edition, entry in references.items()}:
+            raise ReceiptError("Native release does not contain exactly the reviewed editions and leaves")
         for edition, entry in references.items():
             artifact = release.catalog.artifact_ref(entry["artifact"])
+            metadata = index["editions"][edition]["metadata"]
+            metadata_sha256 = sha256(canonical_json(metadata).encode()).hexdigest() if inline_catalog else metadata["sha256"]
             if (artifact.sha256 != entry["sha256"] or artifact.processing_id != entry["processing_id"]
-                    or index["editions"][edition]["metadata"]["sha256"] != entry["metadata_sha256"]):
+                    or metadata_sha256 != entry["metadata_sha256"]):
                 raise ReceiptError("Native leaf, metadata or processing receipt differs from the reviewed identity")
         release.verify()
         store = _retained_store(source_store)
-        parity = validate_source_parity(release, store, edition_ids=sorted(references))
+        parity_store = _retained_store(release.path.parent / "provenance") if inline_catalog else store
+        parity = validate_source_parity(release, parity_store, edition_ids=sorted(references))
         if parity["status"] != "PASS_RAW_PARITY":
             return {"status": "HOLD", "build_id": release.build_id, "manifest_sha256": release.manifest_sha256,
                     "structural_integrity": True, "parity": parity, "publisher_witnesses": None}
@@ -783,7 +796,7 @@ def main() -> None:
     parser.add_argument("--timeout", type=float, default=900, help="Maximum seconds for each check")
     parser.add_argument("--validate-release", help=argparse.SUPPRESS)
     parser.add_argument("--source-parity", type=Path, help="Offline raw fidelity check for selected supported native release editions")
-    parser.add_argument("--native-release", type=Path, help="Qualify the exact reviewed native profile supplement offline")
+    parser.add_argument("--native-release", type=Path, help="Qualify an exact reviewed native bundle offline")
     parser.add_argument("--native-pin", help="Trusted manifest SHA-256 for --native-release")
     parser.add_argument("--source-store", type=Path, help="Existing retained ProvenanceStore for source or native checks")
     parser.add_argument("--source-edition", action="append", default=[], help="Exact edition ID for --source-parity; repeat explicitly")

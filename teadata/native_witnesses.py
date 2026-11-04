@@ -80,6 +80,11 @@ def reviewed_native_references() -> dict[str, Any]:
     return json.loads(files("teadata").joinpath("reference_cases/native_peims_transfers.json").read_text())
 
 
+def reviewed_primary_disability_references(manifest_sha256: str) -> dict[str, Any] | None:
+    review = json.loads(files("teadata").joinpath("reference_cases/native_primary_disability.json").read_text())
+    return review["editions"] if review["manifest_sha256"] == manifest_sha256 else None
+
+
 def _label(value: str) -> str:
     return "".join(value.casefold().split())
 
@@ -242,6 +247,8 @@ def validate_native_witnesses(release: DataRelease, store: ProvenanceStore, refe
     refs = [(release.catalog.artifact_ref(case["artifact"]), case) for case in references.values()]
     for ref, case in sorted(refs, key=lambda item: item[0].edition.dataset != _PROGRAM):
         key = ref.edition
+        if not case["reports"]:
+            raise ContractError("Each reviewed native edition requires independent publisher witnesses")
         table = release.analytical_dataset(ref.identity)
         columns = ({entry["code"]: entry["field"] for entry in release.catalog.variables(edition=key)
                     if entry["unit"] == "count"} if key.dataset == PRIMARY_DISABILITY else {})

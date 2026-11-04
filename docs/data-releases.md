@@ -258,25 +258,34 @@ established. The family does not accept SOF run or PEIMS financial-basis fields.
 An absent class year remains omitted, including on existing qualifier families;
 their serialized metadata and leaf semantic hashes remain unchanged.
 
-### Qualifying the native profile supplement
+### Qualifying reviewed native bundles
 
-The offline profile supplement gate admits the six reviewed 2025–26 PEIMS
-Enrollment leaves and the three reviewed district transfer editions. Supply a
-trusted manifest SHA-256 and the retained provenance store.
+The offline gate admits the reviewed native profile supplement and the separate
+four-year PEIMS primary-disability candidate. Supply the trusted manifest
+SHA-256 for the exact bundle and its retained source store.
 
 ```sh
 scripts/check --native-release "$NATIVE_RELEASE" --native-pin "$NATIVE_SHA256" \
   --source-store "$TEADATA_PROVENANCE_DIR"
 ```
 
-The gate checks the complete schema-4 bundle and exact reviewed metadata, leaf
-bytes and processing receipts. It then requires raw and typed parity and
-replays the separately acquired TEA reports listed in
-`teadata/reference_cases/native_peims_transfers.json`. The reports cover each
-PEIMS scope and each transfer year. The result records the pinned manifest,
-whole-source parity, and observed publisher comparisons separately. Missing
-source evidence or mismatches prevent qualification. This command checks an
-unpublished or retained bundle offline. Deployment and profile activation
+The existing schema-4 profile supplement retains its six 2025–26 PEIMS
+Enrollment and program leaves and three district-transfer editions. It checks
+raw parity and independent publisher reports from the supplied store using
+`teadata/reference_cases/native_peims_transfers.json`.
+
+The schema-3 primary-disability candidate qualifies only with the exact
+manifest digest in `teadata/reference_cases/native_primary_disability.json`.
+It checks the eight state and district leaves using the candidate's bundled
+`provenance` directory and reads independent Austin and Texas HTML reports
+from the supplied store. The 2022–23 and 2023–24 Austin HTML views omit
+Developmental Delay. The gate reports those cells as outside HTML witness
+coverage and compares their actual CSV tokens during raw parity.
+
+Both modes verify the complete reviewed scope, manifest, metadata, leaf bytes
+and processing receipts, then require raw and typed parity and independently
+acquired TEA comparisons. Missing evidence or mismatches prevent qualification.
+The result records each check separately. Publication and profile activation
 remain separate operations.
 
 ## File organization and names

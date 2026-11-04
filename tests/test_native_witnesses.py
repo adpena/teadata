@@ -1,4 +1,5 @@
 import csv
+from hashlib import sha256
 from pathlib import Path
 from types import SimpleNamespace
 from typing import cast
@@ -8,7 +9,7 @@ import pytest
 
 from teadata import native_witnesses, release, source_parity, verification
 from teadata.dataset_metadata import ArtifactRef, EditionKey
-from teadata.manifest import ContractError
+from teadata.manifest import ContractError, canonical_json
 from teadata.provenance import ProvenanceStore
 
 
@@ -122,3 +123,72 @@ def test_native_gate_requires_reviewed_identity_parity_and_independent_witnesses
         assert result["status"] == "PASS_REVIEWED_NATIVE"
         assert result["publisher_witnesses"] == {"peims_values": 1}
         witnesses.assert_called_once()
+
+
+def test_primary_disability_review_has_exact_independent_witness_inventory():
+    pin = "6f2cc32a7b9cc1b43d8b0ed84f2870d3dd75ddcfef58e9e8508e37f34c41cd37"
+    editions = native_witnesses.reviewed_primary_disability_references(pin)
+    assert editions is not None and len(editions) == 8
+    assert native_witnesses.reviewed_primary_disability_references("0" * 64) is None
+    witnesses = [witness for case in editions.values() for witness in case["reports"]]
+    assert len(witnesses) == len({witness["receipt"] for witness in witnesses}) == 8
+    for entity in ("state", "227901"):
+        assert sum(witness["entity"] == entity for witness in witnesses) == 4
+    assert [(witness["entity"], witness["unreported_codes"]) for witness in witnesses if "unreported_codes" in witness] == [
+        ("227901", ["DD"]), ("227901", ["DD"])]
+
+
+@pytest.mark.parametrize("damage", [None, "unknown-pin", "wrong-schema", "route", "metadata", "leaf", "receipt", "missing-custody"])
+def test_primary_disability_gate_requires_exact_inline_edition_and_bundled_parity(monkeypatch, damage):
+    key = EditionKey(native_witnesses.PRIMARY_DISABILITY, "2026", "1" * 64, "state", "state", "school_year")
+    other = EditionKey(native_witnesses.PRIMARY_DISABILITY, "2025", "2" * 64, "state", "state", "school_year")
+    pin = "known" if damage != "unknown-pin" else "unknown"
+    path = Path("frozen/release.json")
+    witnesses_path = Path("retained-witnesses")
+    metadata = {"title": "Reviewed primary-disability edition"}
+    case = {"artifact": "leaf", "sha256": "bytes", "processing_id": "receipt",
+            "metadata_sha256": sha256(canonical_json(metadata).encode()).hexdigest()}
+    references = {key.identity: case}
+    document = {"schema_version": 4 if damage == "wrong-schema" else 3,
+                "editions": {key.identity: {"metadata": {"title": "tampered"} if damage == "metadata" else metadata}},
+                "artifacts": {"leaf": {"edition": (other if damage == "route" else key).to_dict()}}}
+    ref = SimpleNamespace(sha256="changed" if damage == "leaf" else "bytes",
+                          processing_id="changed" if damage == "receipt" else "receipt")
+    catalog = SimpleNamespace(to_dict=lambda: document, artifact_ref=lambda _: ref)
+    selected = SimpleNamespace(catalog=catalog, verify=Mock(), build_id="build", manifest_sha256=pin, path=path)
+    load = Mock(return_value=selected)
+    parity = Mock(return_value={"status": "PASS_RAW_PARITY"})
+    witnesses = Mock(return_value={"peims_values": 13})
+    monkeypatch.setattr(release, "DataRelease", load)
+    monkeypatch.setattr(native_witnesses, "reviewed_primary_disability_references",
+                        lambda digest: references if digest == "known" else None)
+    monkeypatch.setattr(native_witnesses, "reviewed_native_references", lambda: {"legacy": case})
+    monkeypatch.setattr(native_witnesses, "validate_native_witnesses", witnesses)
+    monkeypatch.setattr(source_parity, "validate_source_parity", parity)
+
+    def store(location):
+        if damage == "missing-custody" and location == path.parent / "provenance":
+            raise verification.ReceiptError("Missing original receipts")
+        return location
+
+    monkeypatch.setattr(verification, "_retained_store", store)
+    if damage is not None:
+        with pytest.raises(verification.ReceiptError):
+            verification._validate_native_release(path, pin, witnesses_path)
+        parity.assert_not_called()
+        witnesses.assert_not_called()
+    else:
+        assert verification._validate_native_release(path, pin, witnesses_path)["status"] == "PASS_REVIEWED_NATIVE"
+        selected.verify.assert_called_once()
+        parity.assert_called_once_with(selected, path.parent / "provenance", edition_ids=[key.identity])
+        witnesses.assert_called_once_with(selected, witnesses_path, references)
+    load.assert_called_once_with(path, expected_sha256=pin, offline=True)
+
+
+def test_native_witness_replay_rejects_an_edition_with_no_reports():
+    artifact = SimpleNamespace(edition=SimpleNamespace(dataset=native_witnesses.PRIMARY_DISABILITY))
+    selected = SimpleNamespace(catalog=SimpleNamespace(artifact_ref=Mock(return_value=artifact)), analytical_dataset=Mock())
+    with pytest.raises(ContractError, match="requires independent publisher witnesses"):
+        native_witnesses.validate_native_witnesses(cast(release.DataRelease, selected), Mock(),
+                                                   {"edition": {"artifact": "id", "reports": []}})
+    selected.analytical_dataset.assert_not_called()
