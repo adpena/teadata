@@ -39,6 +39,84 @@ value_policies:
       .:
         status: missing
         reason: report_separator_or_missing_count
+  # These tokens were observed in the selected files. The publisher uses
+  # complementary masking, so no individual count or bound is inferred.
+  peims_student_enrollment_by_ethnicity_2026:
+    reference_id: peims_masking
+    tokens: {
+      '<10': &peims_2026_suppression {status: suppressed, reason: publisher_ferpa_suppression},
+      '<20': *peims_2026_suppression, '<30': *peims_2026_suppression,
+      '<40': *peims_2026_suppression, '<50': *peims_2026_suppression,
+      '<60': *peims_2026_suppression, '<70': *peims_2026_suppression,
+      '<80': *peims_2026_suppression, '<90': *peims_2026_suppression,
+      '<100': *peims_2026_suppression, '<110': *peims_2026_suppression,
+      '<120': *peims_2026_suppression, '<130': *peims_2026_suppression,
+      '<140': *peims_2026_suppression, '<150': *peims_2026_suppression,
+      '<160': *peims_2026_suppression, '<170': *peims_2026_suppression,
+      '<180': *peims_2026_suppression, '<190': *peims_2026_suppression,
+      '<200': *peims_2026_suppression, '<210': *peims_2026_suppression,
+      '<220': *peims_2026_suppression, '<230': *peims_2026_suppression,
+      '<240': *peims_2026_suppression, '<250': *peims_2026_suppression,
+      '<260': *peims_2026_suppression, '<270': *peims_2026_suppression,
+      '<280': *peims_2026_suppression, '<290': *peims_2026_suppression,
+      '<300': *peims_2026_suppression, '<310': *peims_2026_suppression,
+      '<320': *peims_2026_suppression, '<330': *peims_2026_suppression,
+      '<340': *peims_2026_suppression, '<350': *peims_2026_suppression,
+      '<360': *peims_2026_suppression, '<370': *peims_2026_suppression,
+      '<380': *peims_2026_suppression, '<390': *peims_2026_suppression,
+      '<400': *peims_2026_suppression, '<410': *peims_2026_suppression,
+      '<420': *peims_2026_suppression, '<430': *peims_2026_suppression,
+      '<440': *peims_2026_suppression, '<450': *peims_2026_suppression,
+      '<460': *peims_2026_suppression, '<470': *peims_2026_suppression,
+      '<480': *peims_2026_suppression, '<490': *peims_2026_suppression,
+      '<500': *peims_2026_suppression, '<510': *peims_2026_suppression,
+      '<520': *peims_2026_suppression, '<530': *peims_2026_suppression,
+      '<540': *peims_2026_suppression, '<550': *peims_2026_suppression,
+      '<560': *peims_2026_suppression, '<570': *peims_2026_suppression,
+      '<580': *peims_2026_suppression, '<590': *peims_2026_suppression,
+      '<600': *peims_2026_suppression, '<610': *peims_2026_suppression,
+      '<630': *peims_2026_suppression, '<640': *peims_2026_suppression,
+      '<650': *peims_2026_suppression, '<660': *peims_2026_suppression,
+      '<680': *peims_2026_suppression, '<690': *peims_2026_suppression,
+      '<700': *peims_2026_suppression, '<720': *peims_2026_suppression,
+      '<730': *peims_2026_suppression, '<760': *peims_2026_suppression,
+      '<780': *peims_2026_suppression, '<820': *peims_2026_suppression,
+      '<870': *peims_2026_suppression, '<910': *peims_2026_suppression,
+      '<920': *peims_2026_suppression, '<1,090': *peims_2026_suppression,
+      '<1,200': *peims_2026_suppression, '<1,260': *peims_2026_suppression,
+      '<1,910': *peims_2026_suppression, '<2,000': *peims_2026_suppression,
+      '<2,790': *peims_2026_suppression,
+    }
+  peims_student_programs_and_special_populations_2026:
+    reference_id: peims_masking
+    tokens: {
+      '-999': *peims_2026_suppression, '<10': *peims_2026_suppression,
+      '<20': *peims_2026_suppression, '<30': *peims_2026_suppression,
+      '<40': *peims_2026_suppression, '<50': *peims_2026_suppression,
+      '<60': *peims_2026_suppression, '<70': *peims_2026_suppression,
+      '<80': *peims_2026_suppression, '<90': *peims_2026_suppression,
+      '<100': *peims_2026_suppression, '<110': *peims_2026_suppression,
+      '<120': *peims_2026_suppression, '<130': *peims_2026_suppression,
+      '<140': *peims_2026_suppression, '<150': *peims_2026_suppression,
+      '<160': *peims_2026_suppression, '<170': *peims_2026_suppression,
+      '<180': *peims_2026_suppression, '<190': *peims_2026_suppression,
+      '<200': *peims_2026_suppression, '<210': *peims_2026_suppression,
+      '<220': *peims_2026_suppression, '<230': *peims_2026_suppression,
+      '<240': *peims_2026_suppression, '<250': *peims_2026_suppression,
+      '<260': *peims_2026_suppression, '<270': *peims_2026_suppression,
+      '<280': *peims_2026_suppression, '<290': *peims_2026_suppression,
+      '<300': *peims_2026_suppression, '<310': *peims_2026_suppression,
+      '<320': *peims_2026_suppression, '<330': *peims_2026_suppression,
+      '<340': *peims_2026_suppression, '<360': *peims_2026_suppression,
+      '<370': *peims_2026_suppression, '<380': *peims_2026_suppression,
+      '<390': *peims_2026_suppression, '<400': *peims_2026_suppression,
+      '<410': *peims_2026_suppression, '<420': *peims_2026_suppression,
+      '<440': *peims_2026_suppression, '<450': *peims_2026_suppression,
+      '<460': *peims_2026_suppression, '<480': *peims_2026_suppression,
+      '<490': *peims_2026_suppression, '<500': *peims_2026_suppression,
+      '<550': *peims_2026_suppression, '<570': *peims_2026_suppression,
+      '<700': *peims_2026_suppression, '<820': *peims_2026_suppression,
+    }
 data_sources:
   accountability:
     2025:
@@ -6893,6 +6971,236 @@ data_sources:
               scope: "district"
               tables:
                 college_readiness_components: "data/tapr/raw/2025-d-GRAD2-offered-original.csv"
+  peims_student_enrollment_by_ethnicity:
+    2026:
+      metadata:
+        metrics:
+          enrollment_by_ethnicity_count:
+            field: enrollment_by_ethnicity_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+        notes: Public statewide scope files from the October PEIMS Enrollment snapshot. Publisher
+          finality is unspecified. This series is distinct from TPRS Membership. Metadata and
+          header discovery only. Scope table hashes bind the original public acquisitions. Those
+          acquisitions predate versioned catalog registration and retain their original names
+          and metadata. The district path is the source contract location; campus and statewide
+          selections remain separate receipt-bound tables. Native catalog leaves and row access
+          are pending.
+        period:
+          end_year: 2026
+          kind: school_year
+          start_year: 2025
+        provenance_ids:
+        - 1ba7432a432dde2efe79b363781b98087bf65b38edfb169d23c6ee9f32008faa
+        - 2dbe85c9bdcd60537eea5563f8292e05a107b489914e5926033450609730ad9c
+        - 2185f07c3a7b3544c83f9cc4e14b76b0612445c5bea9e32f11825547ae1f1fc4
+        published_at: '2026-03-06'
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - bcba31de7281b8453e2247a5c9608410127063a6e5068c7e5b0d5f5ea041afd0
+          reference_id: about
+          reviewed_sha256: 68219148b9b394360c00ce9ff70a64c2ba550e42353255d06a0f30f19e050370
+          role: source_notes
+          status: available
+          title: PEIMS Student Enrollment by Ethnicity definitions and population
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.std_download_selected_report.sas&rpt_subject=about&fname=abtenrl26&ftype=html
+        - provenance_ids:
+          - cacfd931455c3a0ffdde01e794cf9aa8815f7a8b8300618912d0b713b215e885
+          reference_id: peims_masking
+          reviewed_sha256: c940234fd44417fe1e1152cca18d0ee893addd70ed3fc4f7e687492d13ae4954
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS reporting masking rules
+          url: https://tea.texas.gov/data-reports/student-data/discipline-data-products/peims-reporting-masking-web-updated-020125.docx
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: Publisher PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adste.html
+        title: 2025–26 PEIMS Student Enrollment by Ethnicity
+        value_policy: peims_student_enrollment_by_ethnicity_2026
+        version: '2026'
+      path: data/peims/2026/peims_student_enrollment_by_ethnicity--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2026--student-enrollment-by-ethnicity-crosswalk.json
+            references:
+            - path: schemas/peims--2026--student-enrollment-by-ethnicity-crosswalk.json
+              reference_id: column_crosswalk
+              reviewed_sha256: 475022f808536e16f3678600ee5377e6b2c677236981d7e26e628bb953e4636d
+              role: schema
+              status: available
+              title: PEIMS Student Enrollment by Ethnicity literal headers and physical framing
+  peims_student_programs_and_special_populations:
+    2026:
+      metadata:
+        metrics:
+          at_risk_count:
+            field: at_risk_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          bilingual_program_count:
+            field: bilingual_program_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          dyslexia_identification_count:
+            field: dyslexia_identification_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          economically_disadvantaged_count:
+            field: economically_disadvantaged_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          emergent_bilingual_count:
+            field: emergent_bilingual_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          english_as_a_second_language_program_count:
+            field: english_as_a_second_language_program_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          foster_care_count:
+            field: foster_care_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          gifted_and_talented_program_count:
+            field: gifted_and_talented_program_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          homeless_count:
+            field: homeless_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          military_connected_count:
+            field: military_connected_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          section_504_count:
+            field: section_504_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          special_education_program_count:
+            field: special_education_program_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          title_i_program_count:
+            field: title_i_program_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          total_enrollment_count:
+            field: total_enrollment_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+        notes: Public statewide scope files from the October PEIMS Enrollment snapshot. Publisher
+          finality is unspecified. This series is distinct from TPRS Membership. Metadata and
+          header discovery only. Scope table hashes bind the original public acquisitions. Those
+          acquisitions predate versioned catalog registration and retain their original names
+          and metadata. The district path is the source contract location; campus and statewide
+          selections remain separate receipt-bound tables. Native catalog leaves and row access
+          are pending.
+        period:
+          end_year: 2026
+          kind: school_year
+          start_year: 2025
+        provenance_ids:
+        - 1a2fd407882a73582ad129b4081bc274ac2ba319cc36c80c0ee7011b5f364180
+        - 5a2287646ec05dabdbcc8ed8a427811cf61dbbdc052d62e067fe7c81bf326b1e
+        - 0dd20866dae38973252b86e62c6cf6a23177ee1b56b3680105b021c51478b15e
+        published_at: '2026-03-13'
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - 694ada659e1b4b0d9da4ac5df6de02d0a9f493834d784e37f68f1fff9ec50dc2
+          reference_id: about
+          reviewed_sha256: c3ed8f60f083cd143992d1a86e59da73ea4492b629812292e64ca3d880cee17a
+          role: source_notes
+          status: available
+          title: PEIMS Student Program and Special Populations definitions and population
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/About_StudentProgram.html
+        - provenance_ids:
+          - cacfd931455c3a0ffdde01e794cf9aa8815f7a8b8300618912d0b713b215e885
+          reference_id: peims_masking
+          reviewed_sha256: c940234fd44417fe1e1152cca18d0ee893addd70ed3fc4f7e687492d13ae4954
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS reporting masking rules
+          url: https://tea.texas.gov/data-reports/student-data/discipline-data-products/peims-reporting-masking-web-updated-020125.docx
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: Publisher PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adspr.html
+        title: 2025–26 PEIMS Student Program and Special Populations
+        value_policy: peims_student_programs_and_special_populations_2026
+        version: '2026'
+      path: data/peims/2026/peims_student_programs_and_special_populations--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2026--student-programs-and-special-populations-crosswalk.json
+            references:
+            - path: schemas/peims--2026--student-programs-and-special-populations-crosswalk.json
+              reference_id: column_crosswalk
+              reviewed_sha256: f6033ac955fde88a30f0ea2ecd53ef4dd05a615d6a883b5163343c0ef9469822
+              role: schema
+              status: available
+              title: PEIMS Student Program and Special Populations literal headers and physical
+                framing
 spatial:
   districts:
     2025:
@@ -7087,6 +7395,10 @@ spatial:
         column_schema: schemas/spatial--campuses--2025--4826bcd2--default.json
 schema:
   data_sources:
+    peims_student_enrollment_by_ethnicity:
+    - csv
+    peims_student_programs_and_special_populations:
+    - csv
     campus_tapr_college_career_military_readiness:
     - csv
     district_tapr_college_career_military_readiness:

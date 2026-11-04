@@ -528,6 +528,6 @@ def test_existing_repository_configuration_does_not_claim_download_dates():
     cfg = load_config(
         Path(__file__).resolve().parents[1] / "teadata" / "teadata_sources.yaml"
     )
-    for name in cfg.data_sources:
-        source = cfg.resolve_dataset(name, 2025)
-        assert "downloaded_at" not in source.metadata.to_dict()
+    for editions in cfg.data_sources.values():
+        for definition in editions.entries.values():
+            assert "downloaded_at" not in definition.metadata.to_dict()

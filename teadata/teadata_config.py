@@ -864,21 +864,33 @@ class Config:
 
         A named retained reader (such as accountability ratings) still belongs
         in release coverage. Only the explicit source-only crosswalk opts out.
+        Source-only datasets can be excluded from release coverage even when
+        their first edition is newer than the requested build year.
         """
         from .column_schema import crosswalk_dataset, has_default_reader, parse_column_schema
 
-        source = self.resolve_dataset(dataset, year, section=section)
-        if has_default_reader(source.reader) or "source" not in source.reader.get("profiles", {}):
-            return False
-        contract = self.column_contract(dataset, year, section=section, reader_profile="source")
-        if contract is None:
-            return False
-        document = parse_column_schema(contract["text"].encode())
-        if document["schema_version"] != 2:
-            return False
-        if source.metadata.version is None:
-            raise ValueError("Source-only readers require an explicit source edition")
-        return crosswalk_dataset(document, dataset, source.metadata.version).get("source_only", False)
+        def source_only(edition_year: int | None) -> bool:
+            source = self.resolve_dataset(dataset, edition_year, section=section)
+            if has_default_reader(source.reader) or "source" not in source.reader.get("profiles", {}):
+                return False
+            contract = self.column_contract(dataset, edition_year, section=section, reader_profile="source")
+            if contract is None:
+                return False
+            document = parse_column_schema(contract["text"].encode())
+            if document["schema_version"] != 2:
+                return False
+            if source.metadata.version is None:
+                raise ValueError("Source-only readers require an explicit source edition")
+            return crosswalk_dataset(document, dataset, source.metadata.version).get("source_only", False)
+
+        catalog = self.data_sources if section == "data_sources" else self.spatial
+        editions = catalog.get(dataset)
+        if editions is not None and year is not None and year >= editions.year_min and editions.resolve(year) is None:
+            # Keep missing required editions visible for mixed or active families.
+            dated_years = editions.available_years()
+            if dated_years and all(source_only(edition) for edition in dated_years):
+                return True
+        return source_only(year)
 
     def header_mapping(self, dataset: str, *, edition: str, table: str,
                        from_: str = "code", to: str = "field",
@@ -999,6 +1011,10 @@ class Config:
             if list(frame.columns) != expected_schema:
                 raise ContractError("Full TAPR source preparation differs from its complete crosswalk")
             return source.resolved_year, frame
+        if reader_profile == "source" and self.is_source_only(dataset, year, section=section):
+            raise ContractError(
+                f"Source-only discovery for {dataset} requires a dedicated preparation workflow to load rows"
+            )
         columns = options.pop("columns", {})
         required = options.pop("required_columns", [])
         options.update(reader_kwargs)
