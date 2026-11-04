@@ -31,6 +31,32 @@ Catalog schema 2 stores `metric_bindings` with the release: canonical names and 
 
 Canonical public enrollment uses the TAPR student enrollment field for both campuses and districts. The accountability report's Number of Students is a separate `accountability.student_count` population and must not replace enrollment. Public-source metrics are not applicable to private schools. A metric without its own period inherits the dataset period; an explicitly unknown period stays unknown.
 
+### Citing TEA Data
+
+Copy this plain-text citation when referring to the software project as a whole.
+
+```text
+Alejandro Peña. TEA Data [Computer software].
+https://github.com/adpena/teadata
+```
+
+For a reproducible analysis, cite the software version and the exact data build
+as separate entries. Pass the same release used for the analysis to `citation`.
+
+```python
+from teadata import citation, current_release
+
+reference = citation(current_release())
+print(reference.text)
+print(reference.bibtex)
+```
+
+`citation()` by itself uses the installed software metadata and opens no data.
+A selected release adds its catalog build ID and includes the manifest URL when
+it comes from a versioned GitHub release of this project. Keep that build ID with
+the analysis and cite the original publisher datasets using the catalog's source
+and methodology references.
+
 ### Exact retained-source parity
 
 An optional offline check compares every raw cell in explicitly selected,

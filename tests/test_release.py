@@ -12,7 +12,7 @@ from uuid import UUID
 import pytest
 from shapely.geometry import Point
 
-from teadata import DataEngine, ProvenanceStore
+from teadata import DataEngine, ProvenanceStore, citation
 from teadata import boundary_store, entity_store, map_store
 from teadata.entities import Campus, District
 import teadata.release as release_module
@@ -131,6 +131,30 @@ def test_release_binds_all_artifacts(release, catalog):
     assert engine.catalog.build_id == selected.build_id
     with pytest.raises(ContractError, match="no analytical read model"):
         selected.analytical_dataset("campus")
+
+
+def test_citation_pins_release_without_emitting_private_locations(release, tmp_path, monkeypatch):
+    monkeypatch.setattr(release_module, "user_cache_path", lambda _: tmp_path / "cache")
+
+    def copy_manifest(_url, target, **_options):
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_bytes(release.read_bytes())
+
+    monkeypatch.setattr(release_module, "_download", copy_manifest)
+    local = DataRelease(release)
+    official_url = f"{citation().repository_url}/releases/download/v0.0.127/release.json"
+    official = DataRelease(official_url)
+    signed = DataRelease(f"{official_url}?token=private")
+    monkeypatch.setattr(DataRelease, "artifact", Mock(side_effect=AssertionError("implicit artifact access")))
+
+    for selected in (local, signed, official):
+        cite = citation(selected)
+        assert cite.build_id == local.build_id
+        assert f"Build ID: {local.build_id}" in cite.text and local.build_id in cite.bibtex
+        assert str(release) not in cite.text + cite.bibtex
+        assert "token=private" not in cite.text + cite.bibtex
+        assert cite.manifest_url == (official_url if selected is official else None)
+    assert official_url in citation(official).text and official_url in citation(official).bibtex
 
 
 def test_tampered_artifact_is_rejected_even_after_a_successful_read(release):

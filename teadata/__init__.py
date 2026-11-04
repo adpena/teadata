@@ -68,6 +68,7 @@ except PackageNotFoundError:
     __version__ = "0.0.0"
 
 if TYPE_CHECKING:
+    from .citations import Citation, citation
     from .classes import DataEngine, District, Campus
     from .dataset_metadata import DataPeriod, DatasetMetadata, ResolvedDataset
     from .provenance import ProvenanceStore
@@ -78,6 +79,7 @@ if TYPE_CHECKING:
 
 
 _EXPORT_MODULES = {
+    **dict.fromkeys(("Citation", "citation"), ".citations"),
     **dict.fromkeys(("DataEngine", "District", "Campus"), ".classes"),
     **dict.fromkeys(("DataPeriod", "DatasetMetadata", "ResolvedDataset"), ".dataset_metadata"),
     "ProvenanceStore": ".provenance",
@@ -106,6 +108,8 @@ def __dir__() -> list[str]:
     return sorted(set(globals()) | _EXPORT_MODULES.keys())
 
 __all__ = [
+    "Citation",
+    "citation",
     "DataEngine",
     "District",
     "Campus",

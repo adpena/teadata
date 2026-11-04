@@ -1,0 +1,8 @@
+cff-version: 1.2.0
+message: Cite TEA Data and record the data build identifier when using a release bundle.
+type: software
+title: TEA Data
+authors:
+  - given-names: Alejandro
+    family-names: Peña
+url: https://github.com/adpena/teadata

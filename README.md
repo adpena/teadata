@@ -173,6 +173,9 @@ Artifacts typically used at runtime:
 
 The authoritative `release.json` binds the snapshot and sidecars to one catalog and verified hashes. Hydrate tracked assets with Git LFS, or configure an immutable remote release URL. Metadata, provenance, masking, estimates, and rebuild instructions are documented in [Dataset contracts and data releases](docs/data-releases.md).
 
+For academic use, [cite the software and the data build](docs/data-releases.md#citing-tea-data)
+in plain text or BibTeX with `teadata.citation()`.
+
 ### Environment Variables
 
 - `TEADATA_RELEASE`: local release manifest.
