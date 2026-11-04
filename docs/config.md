@@ -689,10 +689,28 @@ comparison = (engine >> ("district", "Austin ISD")) >> (
 print(comparison.first().difference_pp)
 ```
 
-The comparison is available for the reviewed AP/IB and dual-credit criteria
-rates for all graduates and economically disadvantaged graduates. It uses
-2023–24 annual graduates in each geography and reports local minus state
-in percentage points. Results retain the exact editions and raw tokens.
+Omit the metric or pass `"*"` to compare every common reviewed statistic in
+the selected editions. The same operator accepts exact editions of the
+following families when the release contains both scopes.
+
+| Publisher family | Local scopes | Required dimensions |
+| --- | --- | --- |
+| TAPR 2025 GRAD2 | District, campus | None |
+| PEIMS Student Program and Special Populations | District, campus | None |
+| PEIMS Student Enrollment by Ethnicity | District, campus | `ethnicity`, such as `"Hispanic/Latino"` |
+| PEIMS Primary Disability | District | None |
+| PEIMS Staff FTE and Salary | District | `staff_category` and `staff_role`, as published |
+
+Pass dimensions as a sixth tuple element or the `dimensions` keyword.
+The result includes local and statewide values, their raw tokens and statuses,
+their unit and period, and local minus statewide. Percent comparisons also
+expose `difference_pp`. Counts, currency and FTE retain their own units.
+The 2023 and 2024 Developmental Delay interpretation hold excludes those
+observations from comparison.
+
+GRAD2 exposes the reviewed AP/IB and dual-credit criteria rates for all
+graduates and economically disadvantaged graduates. Each uses 2023–24
+annual graduates in the selected geography.
 The reviewed TEA rate policy preserves `-1` as suppressed. Blank tokens,
 absent local rows, and uninterpreted tokens carry separate statuses and
 yield no gap. TAPR is not applicable to private campuses. Resolve ambiguous

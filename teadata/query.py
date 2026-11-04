@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional, Sequence, Tuple, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Mapping, Optional, Sequence, Tuple, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from .dataset_metadata import EditionKey
@@ -395,17 +395,20 @@ class Query:
 
     # ---------------------- individual handlers ----------------------
     def compare_statewide(self, *, release: DataRelease, local: EditionKey,
-                          statewide: EditionKey, metric: str) -> Query:
-        """Project local and publisher statewide values with percentage-point gaps."""
+                          statewide: EditionKey, metric: str = "*",
+                          dimensions: Mapping[str, str] | None = None) -> Query:
+        """Project one or all reviewed statistics against publisher statewide values."""
         from .statewide import compare_statewide
 
         return Query(compare_statewide(self._items, release=release, local=local,
-                                       statewide=statewide, metric=metric), self._repo)
+                                       statewide=statewide, metric=metric, dimensions=dimensions), self._repo)
 
     def _op_compare_statewide(self, op: tuple):
-        if len(op) != 5:
-            raise ValueError("compare_statewide requires a release, local edition, statewide edition and metric")
-        return self.compare_statewide(release=op[1], local=op[2], statewide=op[3], metric=op[4])
+        if not 4 <= len(op) <= 6:
+            raise ValueError("compare_statewide requires a release and two editions, with optional metric and dimensions")
+        return self.compare_statewide(release=op[1], local=op[2], statewide=op[3],
+                                      metric=op[4] if len(op) >= 5 else "*",
+                                      dimensions=op[5] if len(op) == 6 else None)
 
     def _op_filter_callable(self, predicate: Callable[[Any], bool]):
         self._items = [o for o in self._items if predicate(o)]

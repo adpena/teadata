@@ -11,11 +11,11 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, NotRequired, Sequence, TypedDict
 
 from .column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
-from .dataset_metadata import COLUMN_SCHEMA_MAX_BYTES, EditionKey
+from .dataset_metadata import COLUMN_SCHEMA_MAX_BYTES, STATEWIDE_SINGLETON_GRAIN, EditionKey
 from .manifest import ContractError, canonical_json
 from .peims_leaves import DATASETS as PEIMS_DATASETS
 from .provenance import validate_record_graph
-from .tapr import TaprReadBudget, TaprSourceRequest, qualified_tapr_family
+from .tapr import TAPR_SOURCE_KEYS, TaprReadBudget, TaprSourceRequest, qualified_tapr_family
 
 if TYPE_CHECKING:
     from .provenance import ProvenanceStore
@@ -40,7 +40,7 @@ class _Selection:
     raw: Path
     prepared: Path
     leaf: Path
-    key_field: str
+    key_field: str | None
     budget: TaprReadBudget
     dictionary: Path | None
     lineage: dict[str, Any]
@@ -104,12 +104,14 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey) ->
     if sha256(canonical_json(mapping).encode()).hexdigest() != contract['mapping_sha256']:
         raise ValueError('Prepared crosswalk and final leaf mapping differ')
     hashes = table_input_sha256s(mapping)
-    if len(hashes) != 1 or key.scope not in {'campus', 'district'}:
-        raise _Uncovered('Only single-original campus/district TAPR tables are covered')
-    key_field = key.scope + '_number'
+    if len(hashes) != 1 or key.scope not in TAPR_SOURCE_KEYS:
+        raise _Uncovered('Only single-original TAPR tables are covered')
+    key_field = TAPR_SOURCE_KEYS[key.scope]
+    if key_field is None and key.grain != STATEWIDE_SINGLETON_GRAIN:
+        raise _Uncovered('Statewide TAPR parity requires the reviewed singleton grain')
     qualified_tapr_family(key.dataset, key_field)
     names = [item['field'] for item in mapping['fields']]
-    if (list(contract['columns']) != names or list(contract['key_columns']) != [key_field]
+    if (list(contract['columns']) != names or list(contract['key_columns']) != ([key_field] if key_field else [])
             or {row['field'] for row in variables} != set(names)
             or validation.get('fields') != len(names) or validation.get('source_columns_accounted') != len(names)
             or validation.get('rows') != contract['rows']):
@@ -168,13 +170,17 @@ def _compare(selection: _Selection, *, max_examples: int, working_bytes: int) ->
     raw = pa.Table.from_batches(batches)
     del batches, batch
     width = 9 if selection.key.scope == 'campus' else 6
-    raw_index_bound = (width + 10) * (raw.num_rows + 1)
-    if 2 * raw_index_bound > slot:
-        raise _Uncovered('Raw alignment buffers exceed their explicit working-byte slot')
-    raw_keys = canonical_source_identifiers(raw[selection.key_field], width=width)
-    if raw_keys.nbytes > selection.budget.key_bytes:
-        raise _Uncovered('Raw identity index exceeds its recorded byte budget')
-    raw_set = raw_keys.combine_chunks()
+    key_field = selection.key_field
+    raw_index_bound = 0
+    raw_keys = raw_set = None
+    if key_field is not None:
+        raw_index_bound = (width + 10) * (raw.num_rows + 1)
+        if 2 * raw_index_bound > slot:
+            raise _Uncovered('Raw alignment buffers exceed their explicit working-byte slot')
+        raw_keys = canonical_source_identifiers(raw[key_field], width=width)
+        if raw_keys.nbytes > selection.budget.key_bytes:
+            raise _Uncovered('Raw identity index exceeds its recorded byte budget')
+        raw_set = raw_keys.combine_chunks()
     examples_used = 0
 
     def compare_stage(stage, path):
@@ -193,34 +199,42 @@ def _compare(selection: _Selection, *, max_examples: int, working_bytes: int) ->
                 batches.append(batch)
         actual = pa.Table.from_batches(batches, schema=schema)
         del batches
-        scratch_base = 2 * raw_index_bound + 2 * (width + 10) * (actual.num_rows + 1) + 8 * raw.num_rows
-        if scratch_base > slot:
-            raise _Uncovered(stage + ' alignment exceeds its explicit working-byte slot')
-        keys = canonical_source_identifiers(actual[selection.key_field], width=width)
-        if pc.any(pc.is_null(keys)).as_py():
-            raise ValueError(stage + ' has malformed source identities')
-        if keys.nbytes > selection.budget.key_bytes:
-            raise _Uncovered(stage + ' identity index exceeds its recorded byte budget')
-        if pc.count_distinct(keys).as_py() != len(keys):
-            raise ValueError(stage + ' has duplicate source identities')
-        # One native index for the stage; no per-batch predicate rescans.
-        alignment = pc.index_in(raw_keys, value_set=keys.combine_chunks())
-        keyset = {'raw_only': alignment.null_count,
-                  'target_only': pc.sum(pc.cast(pc.invert(pc.is_in(keys, value_set=raw_set)), pa.int64())).as_py() or 0}
+        scratch_base = 0
+        alignment = None
+        keyset = {'raw_only': 0, 'target_only': 0}
+        if key_field is None:
+            if raw.num_rows != 1 or actual.num_rows != 1:
+                raise ValueError(stage + ' differs from the one-row statewide grain')
+        else:
+            scratch_base = 2 * raw_index_bound + 2 * (width + 10) * (actual.num_rows + 1) + 8 * raw.num_rows
+            if scratch_base > slot:
+                raise _Uncovered(stage + ' alignment exceeds its explicit working-byte slot')
+            keys = canonical_source_identifiers(actual[key_field], width=width)
+            if pc.any(pc.is_null(keys)).as_py():
+                raise ValueError(stage + ' has malformed source identities')
+            if keys.nbytes > selection.budget.key_bytes:
+                raise _Uncovered(stage + ' identity index exceeds its recorded byte budget')
+            if pc.count_distinct(keys).as_py() != len(keys):
+                raise ValueError(stage + ' has duplicate source identities')
+            # One native index for the stage; no per-batch predicate rescans.
+            alignment = pc.index_in(raw_keys, value_set=keys.combine_chunks())
+            keyset = {'raw_only': alignment.null_count,
+                      'target_only': pc.sum(pc.cast(pc.invert(pc.is_in(keys, value_set=raw_set)), pa.int64())).as_py() or 0}
         fields: dict[str, _FieldReport] = {}
         for name in names:
             # Conservative retained gather/mask/example buffer admission. This is
             # not an allocator/RSS promise; the tables themselves occupy two slots.
             if scratch_base + 2 * raw[name].nbytes + 3 * actual[name].nbytes + 32 * (raw.num_rows + 1) > slot:
                 raise _Uncovered(stage + ' column comparison exceeds its explicit working-byte slot')
-            values = pc.take(actual[name], alignment)
+            values = actual[name] if alignment is None else pc.take(actual[name], alignment)
             mask = pc.fill_null(pc.not_equal(raw[name], values), True)
             count = pc.sum(pc.cast(mask, pa.int64())).as_py() or 0
             item: _FieldReport = {'checked': raw.num_rows, 'mismatches': count, 'examples': []}
             remaining = max_examples - examples_used
             if count and remaining > 0:
                 indices = pc.indices_nonzero(mask).slice(0, remaining)
-                examples = pa.table({'source_key': raw_keys, 'raw': raw[name], 'actual': values}).take(indices)
+                identity = {'source_key': raw_keys} if raw_keys is not None else {'row_number': [1]}
+                examples = pa.table({**identity, 'raw': raw[name], 'actual': values}).take(indices)
                 for example in examples.to_pylist():
                     for column in ('raw', 'actual'):
                         value = example[column]

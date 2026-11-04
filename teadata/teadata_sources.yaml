@@ -7870,6 +7870,8 @@ data_sources:
         notes: Course enrollment is a reporting-date course membership count. Masked cells remain suppressed.
           No state sum is derived. The captures postdate the September 2026 regeneration. Publisher finality
           is unspecified. This edition excludes charter partner teachers from FTE.
+          Campus DISTRICT and CAMPUS are literal source fields. The administrative relationship and attribution
+          represented by DISTRICT are unconfirmed. No campus affiliation or total is inferred.
         period:
           kind: school_year
           start_year: 2022
@@ -7897,8 +7899,8 @@ data_sources:
           status: available
           title: Reviewed PEIMS course CSV positional crosswalk and physical framing
           path: schemas/peims--2023-2026--teacher-course-enrollment-crosswalk.json
-          reviewed_sha256: 352eb7795136cf41c91087ca897069d87447233de0c6c525b5076d251ebbec3a
-          provenance_ids: [6bd1dd36b4fc4a65e6aac048a493c755aa5ecf5374a4218c1764ca1dc019f99c]
+          reviewed_sha256: 7aaca2fdbae5cd7a31e0b2f245c5fbef51c2cb386ed3467c0ca78167763af40e
+          provenance_ids: [00f8ba1c43b9a4b968c506e2c287b5bf119d6fdbb54cd35c5b52383f13dc5237]
         source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html
         title: 2022–23 PEIMS Teacher FTE and Course Enrollment
         value_policy: peims_course_csv
@@ -7910,6 +7912,8 @@ data_sources:
             column_schema: schemas/peims--2023-2026--teacher-course-enrollment-crosswalk.json
             acquisition_ids:
               state: 4619f15fd40e8a6ae875d9a1c548542a46a7a2f550152f825b5861b22b273164
+              district: ee41014dd9408af8f32371848f14138583af7ced5c8bf48ee7e896e1c5e0f1ff
+              campus: c07f85fa1df8bd2ef952d76e288f00a143f40325685f4cc41e6a06cf6582ab1e
     2024:
       metadata:
         metrics: *peims_course_facts

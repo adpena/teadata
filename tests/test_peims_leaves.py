@@ -3,16 +3,21 @@
 from datetime import UTC, datetime
 from hashlib import sha256
 import json
+from uuid import uuid4
 
 import pytest
 
 from teadata.column_schema import source_schema_fingerprint
 from teadata.dataset_metadata import DataPeriod, DatasetMetadata, EditionKey, ResolvedDataset
-from teadata.manifest import canonical_json
+from teadata.entities import Campus, District
+from teadata.manifest import ContractError, canonical_json
 from teadata.peims_leaves import PRIMARY_DISABILITY, PROGRAMS, materialize_peims_students
 from teadata.provenance import ProvenanceStore
+from teadata.query import Query
 from teadata.release import DataRelease
 from teadata.scripts.refresh_peims import main
+from teadata.statewide import _Projection, _reviewed_peims
+from teadata.teadata_config import load_config
 
 
 YEAR = 2026
@@ -37,6 +42,8 @@ def fixture_config(tmp_path, *, damage=None, dataset=PROGRAMS):
     if disability and damage != "extra-campus":
         scope_rows = scope_rows[:2]
     for scope, geography, cells in scope_rows:
+        if scope == "state" and damage == "masked-state":
+            cells[-1] = "-999"
         if scope == "campus" and damage == "campus-prefix":
             cells[1] = "002901001"
         if scope == "campus" and damage == "bad-mask":
@@ -121,6 +128,39 @@ def test_program_cli_materializes_exact_scope_leaves_and_retains_suppression(tmp
             assert (row[FIELD], row[f"peims_raw_{FIELD}"], row[f"peims_status_{FIELD}"]) == (None, "-999", "suppressed")
         else:
             assert (row[FIELD], row[f"peims_raw_{FIELD}"], row[f"peims_status_{FIELD}"]) == (0, "0", "observed")
+
+
+@pytest.mark.parametrize("damage", [None, "masked-state"])
+def test_statewide_peims_comparison_preserves_counts_and_both_statuses(tmp_path, monkeypatch, damage):
+    store, config, digest, _ = fixture_config(tmp_path, damage=damage)
+    output = tmp_path / "candidate"
+    materialize_peims_students(store, config=config, config_sha256=digest,
+                               selections=[(PROGRAMS, YEAR)], output=output)
+    release = DataRelease(output / "release.json", offline=True)
+    editions = {row["scope"]: EditionKey.from_dict({name: row[name] for name in EditionKey.__dataclass_fields__})
+                for row in release.catalog.editions(include_metadata=False)}
+    cfg = load_config(config)
+    monkeypatch.setattr("teadata.statewide.load_config", lambda: cfg)
+    _reviewed_peims.cache_clear()
+    try:
+        district = Query([District(uuid4(), "Test ISD", district_number="001901")], repo=None)
+        row, = district >> ("compare_statewide", release, editions["district"], editions["state"])
+        assert (row.metric, row.unit, row.local_value, row.difference_pp) == (FIELD, "count", 0, None)
+        expected = ("-999", "suppressed", None, None) if damage else ("0", "observed", 0, 0)
+        assert (row.statewide_raw, row.statewide_status, row.statewide_value, row.difference) == expected
+        campus = Campus(uuid4(), None, "School", "", False, campus_number="001901001")
+        result, = Query([campus], repo=None).compare_statewide(
+            release=release, local=editions["campus"], statewide=editions["state"])
+        assert (result.local_raw, result.local_status, result.difference) == ("-999", "suppressed", None)
+    finally:
+        _reviewed_peims.cache_clear()
+
+
+@pytest.mark.parametrize("invalid_value", [0, False, "0"])
+def test_statewide_comparison_rejects_a_value_on_a_suppressed_cell(invalid_value):
+    projection = _Projection(None, (), {FIELD: ("raw", "status")})
+    with pytest.raises(ContractError, match="raw/status"):
+        projection.value({FIELD: invalid_value, "raw": "-999", "status": "suppressed"}, FIELD)
 
 
 @pytest.mark.parametrize(("damage", "message"), [

@@ -80,8 +80,9 @@ Original IDs, whitespace, zeros, masks and source row locations are compared
 where the recipe records them. Reports name the bound source receipts and show
 row and cell coverage, per-column differences and bounded examples.
 
-TAPR uses one native key-to-row index and compares raw rows independently of
-their storage order. The typed check decodes CSV independently of the
+Keyed TAPR editions use one native key-to-row index and compare raw rows
+independently of their storage order. Statewide TAPR singleton editions compare
+the one observation directly, with its edition as identity. The typed check decodes CSV independently of the
 producer's Arrow CSV reader, applies the same reviewed normalization rules
 and compares ordered batches with the native outputs. It also rechecks the
 district-transfer preparation's exact regional inputs and retained

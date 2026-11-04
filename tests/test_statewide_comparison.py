@@ -13,6 +13,7 @@ from teadata.provenance import ProvenanceStore
 from teadata.query import Query
 from teadata.release import DataRelease
 from teadata.scripts.build_tapr_profiles import prepare_profiles
+from teadata.source_parity import validate_source_parity
 from teadata.statewide import _reviewed_grad2
 from teadata.teadata_config import Config
 
@@ -122,7 +123,7 @@ def test_statewide_operator_keeps_exact_values_and_distinguishes_unavailable(com
         Query([campus], repo=None) >> ("compare_statewide", release, editions["district"], editions["state"], METRIC)
     with pytest.raises(ContractError, match="matched"):
         query >> ("compare_statewide", release, editions["district"], replace(editions["state"], edition="2026"), METRIC)
-    with pytest.raises(ContractError, match="reviewed percentage"):
+    with pytest.raises(ContractError, match="reviewed numeric"):
         query >> ("compare_statewide", release, editions["district"], editions["state"], "an_unreviewed_rate")
 
 
@@ -139,5 +140,13 @@ def test_statewide_operator_rejects_a_rebound_metric_before_leaf_reads(compariso
     monkeypatch.setattr(release.catalog, "metadata", rebound)
     monkeypatch.setattr(release, "analytical_dataset", lambda *a: pytest.fail("Unreviewed rate opened a leaf"))
     query = Query([District(uuid4(), "Austin", district_number="227901")], repo=None)
-    with pytest.raises(ContractError, match="reviewed percentage"):
+    with pytest.raises(ContractError, match="reviewed numeric"):
         query >> ("compare_statewide", release, editions["district"], editions["state"], METRIC)
+
+
+def test_raw_parity_replays_the_statewide_row_without_a_geographic_key(comparison_release):
+    release, editions = comparison_release
+    result = validate_source_parity(release, ProvenanceStore(release.path.parent / "provenance"),
+                                   edition_ids=[editions["state"].identity])
+    assert result["status"] == "PASS_RAW_PARITY"
+    assert (result["coverage"]["raw_cells"], result["coverage"]["compared_cells"]) == (1, 2)

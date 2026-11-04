@@ -158,7 +158,7 @@ types for this export.
 
 | School year | State course rows | District course rows | District IDs | Campus course rows |
 | --- | ---: | ---: | ---: | ---: |
-| 2022–23 | 1,386 | — | — | — |
+| 2022–23 | 1,386 | [200,743](../provenance/records/ee41014dd9408af8f32371848f14138583af7ced5c8bf48ee7e896e1c5e0f1ff.json) | 1,211 | [504,825](../provenance/records/c07f85fa1df8bd2ef952d76e288f00a143f40325685f4cc41e6a06cf6582ab1e.json) |
 | 2023–24 | 1,397 | [201,999](../provenance/records/93c96e9c71b2201e09ba1abde6b0c8f3fb1da2c4befa71d662c1766ff2dda0d2.json) | 1,209 | [511,268](../provenance/records/ae2d4079fcd7647b1645c63848c87cb9a4278877ee896ebfb8e43795c5fbf086.json) |
 | 2024–25 | 1,422 | [204,303](../provenance/records/7963ec85cdfdce4e02849ec53520caed1df31588fd3c0c2b26161cc061c5773c.json) | 1,207 | [519,697](../provenance/records/0ca396d94c1bf6bb871a6bea4c31e73da726af62246ffd2b8acb9c68702b59af.json) |
 | 2025–26 | 1,453 | [207,751](../provenance/records/c54740974d39fdbc3c461120aba68db87b3af07fa3615eb91c868bd2d1c0ae81.json) | 1,203 | [533,161](../provenance/records/b167d12d5376336b863e7553b604247e184f6df389d85f24f64114089e418293.json) |
@@ -172,7 +172,7 @@ uv run --locked --offline python -m teadata.scripts.refresh_peims_courses \
   --store "$TEADATA_PROVENANCE_DIR" \
   --config "$PEIMS_CONFIG" \
   --config-sha256 "$(shasum -a 256 "$PEIMS_CONFIG" | cut -d ' ' -f1)" \
-  --edition 2023 state --edition 2024 state --edition 2024 district \
+  --edition 2023 state --edition 2023 district --edition 2024 state --edition 2024 district \
   --edition 2025 state --edition 2025 district --edition 2026 state --edition 2026 district \
   --output "$PEIMS_CANDIDATE_DIR"
 
@@ -183,7 +183,7 @@ scripts/check --course-controls --native-release "$PEIMS_CANDIDATE_DIR/release.j
 The course check independently decodes the retained CSV and compares all raw
 fields, physical row locators, typed measures and statuses with the candidate.
 It also compares the four state leaves with separately requested TEA HTML
-reports and checks individual district reports for Hays CISD across all three
+reports and checks individual district reports for Hays CISD across all four
 district years and A+ Academy in 2025–26. The [publisher witness inventory](../teadata/reference_cases/native_peims_courses.json)
 identifies the exact HTML receipts. District publisher agreement is scoped to
 those selections. These checks support explicit catalog reads from the
@@ -191,17 +191,25 @@ unpublished candidate. Dataset activation and release publication are separate.
 
 ### Campus source rows and geography hold
 
-To include the campus source rows, add `--edition 2024 campus`,
-`--edition 2025 campus` and `--edition 2026 campus` to the build.
+To include the campus source rows, add `--edition 2023 campus`,
+`--edition 2024 campus`, `--edition 2025 campus` and `--edition 2026 campus`
+to the build.
 The campus grain is school year, `source_district_number`,
 `campus_number` and `course_code`. The district field preserves the value
 printed in TEA's bulk CSV. Campus ownership and the administrative meaning
 of that field require separate evidence. A campus may appear under more
 than one source district. Keep those facts separate when analyzing them.
+The district scope can include education service centers. The campus CSV
+can include units labelled district administration or shared service
+arrangement. Preserve those rows as source observations when joining to
+instructional campus entities.
 
-Four separately selected TEA HTML reports reproduce the course values of
+Five separately selected TEA HTML reports reproduce the course values of
 two distinct bulk district groups while printing the same district heading
-over both. For example, DeKalb Elementary's 2025–26 bulk CSV contains two
+over both. In 2022–23, TEA's [Kyle Elementary HTML](../provenance/records/ed32e23d00ddf4737b5b48bb62f4f7ace2ce7752a75dc3693adb4f71a84fa4ed.json)
+shows McAllen ISD over both the 42-row Hays CISD group and the one-row
+McAllen ISD group. The [campus selector receipt](../provenance/records/2010d278de7ae385d1d8566f197ca1df51b5ae6344c35613d458c9cb77616277.json)
+binds that report to Kyle Elementary. DeKalb Elementary's 2025–26 bulk CSV contains two
 `SE000001` records. One has suppressed enrollment and the other has an
 observed zero. TEA's [monitoring report](../provenance/records/03192c1d0591443eeace54456d8162f0f589f1562630cb533a0743d197f3d4e3.json)
 identifies a fiscal agent for 2023–24, and its [staff assignment rules](../provenance/records/0cd44065979f6b8dd860402840ce9ca545d3170a8aecf508edd0c1940a559d84.json)
@@ -220,9 +228,9 @@ contract. Preserve earlier manifest bytes and use the corresponding
 checkout when replaying a candidate tied to an earlier crosswalk revision.
 
 The [publisher witness inventory](../teadata/reference_cases/native_peims_courses.json)
-also pins eight separately requested Selected Districtwide Campus Totals
-CSVs. Across the three school years, these reports reproduced 1,792 rows
-and 23,296 shared cells from their complete statewide district slices,
+also pins nine separately requested Selected Districtwide Campus Totals
+CSVs. Across the four school years, these reports reproduced 3,602 rows
+and 46,826 shared cells from their complete statewide district slices,
 including off-prefix campus IDs. The report's request, attachment name and
 preamble independently identify the selected district. The verifier reports
 these CSV comparisons separately from the HTML measure comparisons.

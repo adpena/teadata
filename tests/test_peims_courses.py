@@ -14,7 +14,7 @@ from teadata.teadata_config import load_config
 
 
 @pytest.mark.parametrize(("year", "state_rows", "district_rows", "campus_rows"), [
-    (2023, 1386, None, None), (2024, 1397, 201999, 511268),
+    (2023, 1386, 200743, 504825), (2024, 1397, 201999, 511268),
     (2025, 1422, 204303, 519697), (2026, 1453, 207751, 533161),
 ])
 def test_packaged_course_sources_are_exact_and_opt_in(year, state_rows, district_rows, campus_rows):
@@ -24,23 +24,17 @@ def test_packaged_course_sources_are_exact_and_opt_in(year, state_rows, district
     state = courses._table(config, year, "state")
     assert state["layout"]["last_data_record"] - 9 == state_rows
     district = courses._table(config, year, "district")
-    if district_rows is None:
-        assert district == {}
-    else:
-        assert district["layout"]["last_data_record"] - 9 == district_rows
-        assert district["input_sha256"] != state["input_sha256"]
+    assert district["layout"]["last_data_record"] - 9 == district_rows
+    assert district["input_sha256"] != state["input_sha256"]
     campus = courses._table(config, year, "campus")
-    if campus_rows is None:
-        assert campus == {}
-    else:
-        assert campus["layout"]["last_data_record"] - 9 == campus_rows
-        assert campus["input_sha256"] not in (state["input_sha256"], district["input_sha256"])
-        assert [(row["code"], row["field"]) for row in campus["fields"][3:7]] == [
-            ("DISTRICT", "source_district_number"), ("DISTRICT NAME", "source_district_name"),
-            ("CAMPUS", "campus_number"), ("CAMPUS NAME", "campus_name"),
-        ]
-        metadata = config.resolve_dataset(DATASET, year, reader_profile="source", exact=True).metadata
-        assert "represented by DISTRICT are unconfirmed" in (metadata.notes or "")
+    assert campus["layout"]["last_data_record"] - 9 == campus_rows
+    assert campus["input_sha256"] not in (state["input_sha256"], district["input_sha256"])
+    assert [(row["code"], row["field"]) for row in campus["fields"][3:7]] == [
+        ("DISTRICT", "source_district_number"), ("DISTRICT NAME", "source_district_name"),
+        ("CAMPUS", "campus_number"), ("CAMPUS NAME", "campus_name"),
+    ]
+    metadata = config.resolve_dataset(DATASET, year, reader_profile="source", exact=True).metadata
+    assert "represented by DISTRICT are unconfirmed" in (metadata.notes or "")
 
 
 def _raw_source(tmp_path, scope, records):

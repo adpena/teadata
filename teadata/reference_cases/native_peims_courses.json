@@ -6,6 +6,7 @@
     "2026": {"html": "cea5fd8baa3c740914856de275dc29a33508b3dafbcf51d9bf4b7370b84cc99c"}
   },
   "district": {
+    "2023": {"105906": "b1573ccc59b2dd673cfa2c2ad28cabe07589de40fcdb13e87106925e1ecb7b8b"},
     "2024": {"105906": "4a87d91628087323ffa01612b4cc445722f18fd45ddfb2bc14767e5a8c3f102d"},
     "2025": {"105906": "1406ab1cb048b7725dbacb4130d858d0ecd93612bfcc56a463c9174af9901ad2"},
     "2026": {
@@ -14,6 +15,10 @@
     }
   },
   "campus": {
+    "2023": {
+      "html": {"105906101": "ed32e23d00ddf4737b5b48bb62f4f7ace2ce7752a75dc3693adb4f71a84fa4ed"},
+      "district_csv": {"105906": "7d040c5e03efaafffb50c3f077b1e0cec8f06662bdb7faef17b46b60231945ca"}
+    },
     "2024": {
       "html": {"061907001": "f3520d26b99aa8a67c20259d2b3b888584d5f9cef264decd663a7c63ff1f121a"},
       "district_csv": {
