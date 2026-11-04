@@ -82,6 +82,24 @@ def test_excel_example_help_does_not_require_excel(tmp_path):
     assert not list(tmp_path.iterdir())
 
 
+def test_geocoder_help_does_not_import_processing_dependencies(tmp_path):
+    probe = """
+import sys
+
+class RejectProcessingImports:
+    def find_spec(self, fullname, *_):
+        if fullname.split(".")[0] in {"aiohttp", "geopy", "pandas", "requests", "tqdm"}:
+            raise AssertionError(f"Geocoder help imported {fullname}")
+
+sys.meta_path.insert(0, RejectProcessingImports())
+from teadata.scripts.geocode_tepsac_data import main
+main(["--help"])
+"""
+    result = subprocess.run([sys.executable, "-c", probe], cwd=tmp_path, capture_output=True, text=True, timeout=20)
+    assert result.returncode == 0, result.stderr
+    assert "--output" in result.stdout
+
+
 @pytest.mark.parametrize(
     "module",
     [

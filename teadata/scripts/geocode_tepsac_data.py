@@ -1,27 +1,19 @@
 # ty: ignore
 
+from __future__ import annotations
+
 import argparse
-from pathlib import Path
-
-import pandas as pd
-import time
-import requests
-from typing import Optional, Tuple, Dict, Any
-from geopy.geocoders import ArcGIS, Nominatim
-from geopy.exc import GeocoderTimedOut, GeocoderServiceError
-
 import asyncio
+from functools import cache
+from pathlib import Path
+import time
+from typing import TYPE_CHECKING, Optional, Tuple, Dict, Any
 
 from teadata.scripts.paths import data_path
 
-try:
-    import aiohttp  # async HTTP client for Census
-except ImportError:
-    aiohttp = None
-try:
-    from tqdm.auto import tqdm  # progress bar
-except ImportError:
-    tqdm = None
+if TYPE_CHECKING:
+    import aiohttp
+    import requests
 
 # ----------------------------
 # Geocoding helpers (Census, ArcGIS, Nominatim/OSM)
@@ -56,7 +48,10 @@ def geocode_census(
             "match_score": None,
             "raw": None,
         }
-    sess = session or requests.Session()
+    if session is None:
+        from requests import Session
+
+        session = Session()
     url = "https://geocoding.geo.census.gov/geocoder/locations/onelineaddress"
     params = {
         "address": addr,
@@ -66,7 +61,7 @@ def geocode_census(
     last_exc = None
     for _ in range(retries + 1):
         try:
-            r = sess.get(url, params=params, timeout=15)
+            r = session.get(url, params=params, timeout=15)
             if r.status_code == 200:
                 data = r.json()
                 matches = _safe_get(data, ("result", "addressMatches"), []) or []
@@ -107,13 +102,18 @@ def geocode_census(
     }
 
 
-# Initialize geocoders (free tiers; respect rate limits)
-_arcgis = ArcGIS(
-    timeout=15
-)  # ArcGIS World Geocoding Service (no key needed for light use)
-_nominatim = Nominatim(
-    user_agent="teadata_geocoder", timeout=15
-)  # OpenStreetMap / Nominatim
+@cache
+def _arcgis_client():
+    from geopy.geocoders import ArcGIS
+
+    return ArcGIS(timeout=15)
+
+
+@cache
+def _nominatim_client():
+    from geopy.geocoders import Nominatim
+
+    return Nominatim(user_agent="teadata_geocoder", timeout=15)
 
 
 def geocode_arcgis(addr: str, retries: int = 2, pause: float = 0.2) -> Dict[str, Any]:
@@ -122,10 +122,11 @@ def geocode_arcgis(addr: str, retries: int = 2, pause: float = 0.2) -> Dict[str,
     """
     if not addr:
         return {"lat": None, "lng": None, "score": None, "raw": None}
+    client = _arcgis_client()
     last_exc = None
     for _ in range(retries + 1):
         try:
-            res = _arcgis.geocode(addr, exactly_one=True)
+            res = client.geocode(addr, exactly_one=True)
             if res:
                 lat, lng = res.latitude, res.longitude
                 score = None
@@ -140,7 +141,7 @@ def geocode_arcgis(addr: str, retries: int = 2, pause: float = 0.2) -> Dict[str,
                     "raw": getattr(res, "raw", None),
                 }
             return {"lat": None, "lng": None, "score": None, "raw": None}
-        except (GeocoderTimedOut, GeocoderServiceError, Exception) as e:
+        except Exception as e:
             last_exc = e
             time.sleep(pause)
     return {"lat": None, "lng": None, "score": None, "raw": {"error": str(last_exc)}}
@@ -162,10 +163,11 @@ def geocode_nominatim(
             "typ": None,
             "raw": None,
         }
+    client = _nominatim_client()
     last_exc = None
     for _ in range(retries + 1):
         try:
-            res = _nominatim.geocode(addr, exactly_one=True)
+            res = client.geocode(addr, exactly_one=True)
             if res:
                 lat, lng = res.latitude, res.longitude
                 raw = getattr(res, "raw", {}) or {}
@@ -185,7 +187,7 @@ def geocode_nominatim(
                 "typ": None,
                 "raw": None,
             }
-        except (GeocoderTimedOut, GeocoderServiceError, Exception) as e:
+        except Exception as e:
             last_exc = e
         # Nominatim rate-limit
         time.sleep(pause)
@@ -384,6 +386,15 @@ async def _geocode_with_addr(
 
 
 async def build_results_map_with_progress(addresses):
+    try:
+        import aiohttp
+    except ImportError:
+        aiohttp = None
+    try:
+        from tqdm.auto import tqdm
+    except ImportError:
+        tqdm = None
+
     results_map: Dict[str, Dict[str, Dict[str, Any]]] = {}
     sem_arc = asyncio.Semaphore(5)
     sem_osm = asyncio.Semaphore(1)
@@ -423,6 +434,8 @@ def main(argv: list[str] | None = None) -> None:
         "--output", type=Path, default=data_path("tepsac", "tepsac_geocoded.csv")
     )
     args = parser.parse_args(argv)
+    import pandas as pd
+
     tepsac_df = pd.read_excel(args.input)
 
     tepsac_df = tepsac_df[~tepsac_df["Closed"]]
