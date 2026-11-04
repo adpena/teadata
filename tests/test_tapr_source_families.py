@@ -216,6 +216,9 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     actuals = 'peims_financial_single_file_actuals'
     assert list(current['data_sources'].pop(actuals)) == [2023, 2024, 2025]
     assert current['schema']['data_sources'].pop(actuals) == ['zip']
+    budgets = 'peims_financial_single_file_budgets'
+    assert list(current['data_sources'].pop(budgets)) == [2026]
+    assert current['schema']['data_sources'].pop(budgets) == ['zip']
     # Remove only the explicitly added 2025 outcome opt-ins before reconstructing history.
     for scope in ('campus', 'district'):
         for family in ('college_career_military_readiness', 'college_readiness_components'):

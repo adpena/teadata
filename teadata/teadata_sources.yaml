@@ -8092,6 +8092,91 @@ data_sources:
                 requested_url: https://tea.texas.gov/media/423231
                 resolved_url: https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/charact25.zip
 
+  peims_financial_single_file_budgets:
+    2026:
+      path: data/peims/2026/budget2026.zip
+      metadata:
+        title: FY2026 PEIMS Single File Financial Budgets
+        publisher: Texas Education Agency
+        version: '2026'
+        period:
+          kind: fiscal_year
+          start_year: 2025
+          end_year: 2026
+        source_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads
+        identifiers:
+        - district_number
+        source_qualifiers:
+          family: peims_financial
+          reference_id: release_listing
+          financial_basis: budget
+        notes: Separate district and charter budget account files. Signed nominal whole-dollar budget
+          amounts include explicit zeros. The archive fiscal edition is distinct from the row fund year
+          and update date. The linked FY2026 budget report notes use actuals wording and cite October
+          2022 membership. No per-student measures, publication date, or finality are assigned.
+        metrics:
+          budget_amount:
+            field: budget_amount
+            unit: currency
+        references:
+        - reference_id: release_listing
+          role: source_notes
+          status: available
+          title: PEIMS Single File Financial Data Downloads
+          url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads
+          reviewed_sha256: 7aea28359129b93999bc2c024077719b762742a56e7a49ac1472a71c01a024cd
+          provenance_ids:
+          - 2c2712324e1f370ae5d8dcfaf82b67ab1bb689b9684d78b6d4f34dea77bd2b15
+        - reference_id: budget_amount_definition
+          role: data_dictionary
+          status: available
+          title: 2025–26 TEDS E0321 BudgetAmount
+          url: https://tealprod.tea.state.tx.us/TWEDSAPI/31/0/0/DataComponents/DataElements/List/11557
+          reviewed_sha256: 0e3ca8b823c308e417e8b4c53ed646e0bac7ef4de060bce102a9b1a48f50fcf6
+          provenance_ids:
+          - c2289dc8bc08080010e0d729e5bb6d5d923f0dbd58b57829ff4fa13fbf9a4005
+        - reference_id: budget_report_notes
+          role: methodology
+          status: available
+          title: TEA FY2026 PEIMS Budget Financial Data Reports notes
+          url: https://rptsvr1.tea.texas.gov/school.finance/forecasting/financial_reports/AbtBud26.docx
+          reviewed_sha256: a88e0a6f1107eb4050a40bdc9a8afe554ca2cc1ea1b1b4942183af1f6016528e
+          provenance_ids:
+          - f4eab519dd0e019241e5f2e059d3a7f83d6fb1f396a2412348a9af3ee0ec6f2b
+        - reference_id: budget_pwr
+          role: source_notes
+          status: available
+          title: TEA FY2026 PEIMS Web Report Budget workbook
+          url: https://tea.texas.gov/media/423716
+          reviewed_sha256: 646d2a6776452fb3bf4fa4cd89638b28e8f613b9c1c4dd08098d82f26aa90276
+          provenance_ids:
+          - b539fa824d45e84988b911ce55bea1e25ceaa1cb89ac9bfc12f97cbe32a5430e
+        - reference_id: column_crosswalk
+          role: schema
+          status: available
+          path: schemas/peims--2026--single-file-financial-budgets-crosswalk.json
+          provenance_ids:
+          - 53b7d98d129eb58c9b17d815fae859913ecd8d6f30d38458c69fc96efcec9db4
+          title: Exact literal district and charter PEIMS single-file budgets mappings
+          reviewed_sha256: 490117356b7ce16607b2ae2494532a79c875d7c75fbe66d76e53744fc6bb528d
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2026--single-file-financial-budgets-crosswalk.json
+            archives:
+              district:
+                receipt_id: 0a9aa9a13e55dd2218d2394f4258c4ba463eb3cfd88a355d2f552891172b7f9b
+                member: budget2026.csv
+                rows: 1337887
+                requested_url: https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/budget2026.zip
+                resolved_url: https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/budget2026.zip
+              charter:
+                receipt_id: 0dab3e2beff132d059bf747f218f79753cfa0159938a839f5bda6efb87fc1f80
+                member: charbud26.csv
+                rows: 88400
+                requested_url: https://tea.texas.gov/about-tea/state-funding/charbud26.zip
+                resolved_url: https://tea.texas.gov/about-tea/state-funding/charbud26.zip
+
 spatial:
   districts:
     2025:
@@ -8287,6 +8372,8 @@ spatial:
 schema:
   data_sources:
     peims_financial_single_file_actuals:
+    - zip
+    peims_financial_single_file_budgets:
     - zip
     spp_timely_initial_evaluation:
     - xlsx

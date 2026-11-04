@@ -277,6 +277,13 @@ reports and signed district audits is a separate qualification step. TEA's
 listing schedules FY2026 actuals for spring 2027 and currently offers FY2026
 budgets. [TEA download listing](https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads)
 
+For an August 31 to June 30 fiscal year-end change, TEA requires a ten-month
+signed audit and a twelve-month PEIMS submission in the transition year.
+Establish each district's reporting window before comparing financial totals.
+The signed audit's Instruction line is an all-program control. It cannot
+reconcile a particular program intent code without separately aligned evidence.
+[TEA fiscal year guidance](https://tea.texas.gov/data-reports/financial-compliance/fiscal-year-start-date)
+
 Build an opt-in candidate from the exact retained archives and reference
 receipts. The writer streams each CSV into Parquet and compares every row on
 readback. Select the exact edition and project account and measure columns with
@@ -287,6 +294,30 @@ uv run --locked python -m teadata.scripts.refresh_peims_actuals \
   --store "$TEADATA_PROVENANCE_DIR" \
   --config teadata/teadata_sources.yaml --config-sha256 "$CONFIG_SHA256" \
   --year 2023 --year 2024 --year 2025 --output "$ACTUALS_CANDIDATE"
+```
+
+### PEIMS Single File Financial Budgets
+
+`peims_financial_single_file_budgets` provides opt-in FY2026 district and
+charter account tables. The producer shares the account reader with actuals
+and requires the publisher's literal `BUDGAMT` column, explicit budget basis,
+and the budget edition's own source receipts. `budget_amount` is a signed,
+whole-dollar budget value. Raw amount, status, physical record number and
+seven account codes are retained as in the actuals tables.
+
+The FY2026 budget report notes use actuals wording and cite October 2022
+membership. The archive listing and year-specific BudgetAmount definition
+establish the budget basis and dollars. Per-student amounts, publication date,
+and finality remain unassigned. The separate FY2026 Budget PWR provides
+an independent Instruction control using functions 11 and 95 and objects
+6100–6499. This control covers budgeted dollars and leaves reconciliation to
+signed audits outside its scope. [TEA financial reports](https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-financial-standard-reports)
+
+```sh
+uv run --locked python -m teadata.scripts.refresh_peims_budgets \
+  --store "$TEADATA_PROVENANCE_DIR" \
+  --config teadata/teadata_sources.yaml --config-sha256 "$CONFIG_SHA256" \
+  --year 2026 --output "$BUDGET_CANDIDATE"
 ```
 
 ### Qualifying reviewed native bundles
@@ -320,6 +351,30 @@ content-addressed store containing the complete original source receipts and
 bytes for both constituents and their independent TEA reports. The gate
 checks the original leaf and processing identities and verifies that the
 externalized disability metadata matches the reviewed inline metadata.
+
+The same command admits the exact standalone PEIMS staffing and SPP Indicator
+11 candidates listed in `teadata/reference_cases/native_staff_spp.json`. Keep
+each candidate's bundled `provenance` directory beside its manifest and pass
+the separate store containing its TEA HTML witnesses with `--source-store`.
+Staffing compares every retained CSV cell using the typed source verifier,
+then checks the native values against eight independently selected Texas and
+Austin staffing reports. Indicator 11 replays the native projection from
+all 40 original regional workbooks, including raw tokens, typed values,
+statuses and physical source locations. Seven separate TEA district reports
+check the published rates and target flags. The Austin 2024–25 witness
+retains both displayed rates, 99.6% in the workbook and 99.62% in the
+individual report. Its exact receipt allows that documented difference in
+display precision. No general tolerance is applied.
+
+The two exact FY2026 budget manifests in
+`teadata/reference_cases/native_budgets.json` use the same custody arrangement.
+The gate streams both retained ZIPs and compares every account cell, signed
+amount, status and record location with the native leaves. It also checks
+General Fund and All Funds Instruction against the separately acquired TEA
+Budget PWR workbook for every district and charter LEA in those archives.
+That independent comparison covers Functions 11 and 95 and objects
+6100–6499. Reconciliation to signed audits or other actuals products requires
+separate evidence.
 
 All modes verify the complete reviewed scope, manifest, metadata, leaf bytes
 and processing receipts, then require raw and typed parity and independently

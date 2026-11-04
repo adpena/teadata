@@ -9,26 +9,31 @@ import pytest
 from teadata.column_schema import parse_column_schema
 from teadata.dataset_metadata import DataPeriod, DatasetMetadata, ResolvedDataset
 from teadata.manifest import canonical_json
-from teadata.peims_actuals import DATASET, materialize_peims_actuals
+from teadata.peims_actuals import BUDGET_DATASET, DATASET, materialize_peims_actuals, materialize_peims_budgets
 from teadata.provenance import ProvenanceStore
 from teadata.release import DataRelease
 from teadata.teadata_config import load_config
 
 ROOT = Path(__file__).resolve().parents[1]
-SCHEMA = ROOT / "teadata/schemas/peims--2023-2025--single-file-financial-actuals-crosswalk.json"
+SCHEMAS = ROOT / "teadata/schemas"
+ACTUALS_SCHEMA = SCHEMAS / "peims--2023-2025--single-file-financial-actuals-crosswalk.json"
+BUDGET_SCHEMA = SCHEMAS / "peims--2026--single-file-financial-budgets-crosswalk.json"
 YEAR = 2025
 NOW = datetime(2026, 11, 4, tzinfo=UTC)
-LISTING = "https://example.test/actuals"
+LISTING = "https://example.test/financial"
 ROW = "001902,199,2026,11,6100,101,23,-125,18FEB2026\n"
 ZERO = "001902,199,2026,11,6100,101,33,0,18FEB2026\n"
 
 
-def _case(tmp_path, damage=None):
+def _case(tmp_path, damage=None, *, budget=False):
     store = ProvenanceStore(tmp_path / "provenance")
-    edition = parse_column_schema(SCHEMA.read_bytes())["datasets"][-1]
-    metadata = DatasetMetadata(version=str(YEAR), period=DataPeriod("fiscal_year", 2024, YEAR),
+    schema = BUDGET_SCHEMA if budget else ACTUALS_SCHEMA
+    basis = "budget" if budget else "actual"
+    edition = parse_column_schema(schema.read_bytes())["datasets"][-1]
+    dataset, year = edition["dataset"], int(edition["edition"])
+    metadata = DatasetMetadata(version=str(year), period=DataPeriod("fiscal_year", year - 1, year),
                                source_url=LISTING)
-    original = ResolvedDataset(DATASET, "data_sources", YEAR, YEAR, "", metadata)
+    original = ResolvedDataset(dataset, "data_sources", year, year, "", metadata)
     archives = {}
     for table in edition["tables"]:
         kind = table["table"]
@@ -42,6 +47,11 @@ def _case(tmp_path, damage=None):
                 body = ROW + ROW
             elif damage == "header":
                 fields = fields.replace("PROGRAM_INTENT", "PROGRAM_CODE")
+            elif damage == "actual-amount":
+                fields = fields.replace("BUDGAMT", "ACTAMT")
+            elif damage == "swapped-aliases":
+                function, program = table["fields"][3], table["fields"][6]
+                function["field"], program["field"] = program["field"], function["field"]
             elif damage == "token":
                 body = body.replace("-125", ".")
         with ZipFile(path, "w") as package:
@@ -67,35 +77,67 @@ def _case(tmp_path, damage=None):
                            "path": path.name, "reviewed_sha256": sha256(path.read_bytes()).hexdigest(),
                            "provenance_ids": [receipt]})
     config = tmp_path / "sources.json"
-    config.write_text(canonical_json({"data_sources": {DATASET: {str(YEAR): {
+    amount = f"{basis}_amount"
+    config.write_text(canonical_json({"data_sources": {dataset: {str(year): {
         "path": "unused.zip", "metadata": {**metadata.to_dict(), "references": references,
-            "metrics": {"actual_amount": {"field": "actual_amount", "unit": "currency"}},
-            "source_qualifiers": {"family": "peims_financial", "reference_id": "listing", "financial_basis": "actual"}},
+            "metrics": {amount: {"field": amount, "unit": "currency"}},
+            "source_qualifiers": {"family": "peims_financial", "reference_id": "listing",
+                                  "financial_basis": "actual" if damage == "actual-basis" else basis}},
         "reader": {"profiles": {"source": {"column_schema": crosswalk.name, "archives": archives}}},
     }}}}))
     return store, config
 
 
-def test_native_financial_accounts_keep_distinct_scopes_exact_codes_and_signed_amounts(tmp_path):
-    store, config = _case(tmp_path)
+@pytest.mark.parametrize("budget", [False, True], ids=["actuals", "budgets"])
+def test_native_financial_accounts_keep_distinct_scopes_exact_codes_and_signed_amounts(tmp_path, budget):
+    store, config = _case(tmp_path, budget=budget)
+    basis = "budget" if budget else "actual"
+    amount = f"{basis}_amount"
+    raw, status = f"raw_{amount}", f"{amount}_status"
     output = tmp_path / "candidate"
-    result = materialize_peims_actuals(store, config=config, config_sha256=sha256(config.read_bytes()).hexdigest(),
-                                      years=[YEAR], output=output)
+    materialize = materialize_peims_budgets if budget else materialize_peims_actuals
+    result = materialize(store, config=config, config_sha256=sha256(config.read_bytes()).hexdigest(),
+                         years=[2026 if budget else YEAR], output=output)
     assert not result["cross_report_reconciliation_qualified"] and not result["release_activation"]
     path = output / "release.json"
     release = DataRelease(path, expected_sha256=sha256(path.read_bytes()).hexdigest(), offline=True)
     assert len(release.verify()) == 2
-    assert {row["table"] for row in release.catalog.editions()} == {"district", "charter"}
+    editions = list(release.catalog.editions())
+    assert {row["table"] for row in editions} == {"district", "charter"}
+    assert {row["dataset"] for row in editions} == {BUDGET_DATASET if budget else DATASET}
     for entry in result["editions"]:
         leaf = release.analytical_dataset(entry["artifact_id"])
         fields = leaf.schema.names
         assert ("fund_year" in fields) == (entry["key"]["table"] == "district")
         assert ("fiscal_year_code" in fields) == (entry["key"]["table"] == "charter")
         assert leaf.to_table(filter=ds.field("district_number") == "001902",
-            columns=["actual_amount", "raw_actual_amount", "actual_amount_status", "source_record"]).to_pylist() == [
-            {"actual_amount": -125, "raw_actual_amount": "-125", "actual_amount_status": "observed", "source_record": 2},
-            {"actual_amount": 0, "raw_actual_amount": "0", "actual_amount_status": "observed", "source_record": 3},
+            columns=[amount, raw, status, "source_record"]).to_pylist() == [
+            {amount: -125, raw: "-125", status: "observed", "source_record": 2},
+            {amount: 0, raw: "0", status: "observed", "source_record": 3},
         ]
+
+
+@pytest.mark.parametrize(("damage", "message"), [
+    ("actual-amount", "CSV header changed"), ("actual-basis", "require explicit budget basis"),
+])
+def test_budget_candidate_refuses_actuals_amount_or_basis(tmp_path, damage, message):
+    store, config = _case(tmp_path, damage, budget=True)
+    output = tmp_path / "candidate"
+    with pytest.raises(ValueError, match=message):
+        materialize_peims_budgets(store, config=config, config_sha256=sha256(config.read_bytes()).hexdigest(),
+                                  years=[2026], output=output)
+    assert not output.exists()
+
+
+@pytest.mark.parametrize("budget", [False, True], ids=["actuals", "budgets"])
+def test_financial_accounts_refuse_swapped_same_width_field_aliases(tmp_path, budget):
+    store, config = _case(tmp_path, "swapped-aliases", budget=budget)
+    output = tmp_path / "candidate"
+    materialize = materialize_peims_budgets if budget else materialize_peims_actuals
+    with pytest.raises(ValueError, match="columns differ from the packaged source crosswalk"):
+        materialize(store, config=config, config_sha256=sha256(config.read_bytes()).hexdigest(),
+                     years=[2026 if budget else YEAR], output=output)
+    assert not output.exists()
 
 
 @pytest.mark.parametrize(("damage", "message"), [
@@ -112,18 +154,24 @@ def test_financial_archive_drift_and_cross_batch_duplicate_never_publish(tmp_pat
     assert not output.exists()
 
 
-def test_annual_actuals_config_has_reviewed_separate_publisher_bindings():
+@pytest.mark.parametrize(("dataset", "years", "basis"), [
+    (DATASET, (2023, 2024, 2025), "actual"), (BUDGET_DATASET, (2026,), "budget"),
+])
+def test_annual_financial_config_has_reviewed_separate_publisher_bindings(dataset, years, basis):
     cfg = load_config()
-    assert set(cfg.data_sources[DATASET].entries) == {2023, 2024, 2025}
+    assert set(cfg.data_sources[dataset].entries) == set(years)
     store = ProvenanceStore(ROOT / "provenance")
     # Admission reads archived bytes; this static check uses only checked-in receipt headers.
-    for year in (2023, 2024, 2025):
-        source = cfg.resolve_dataset(DATASET, year, reader_profile="source", exact=True)
-        assert cfg.is_source_only(DATASET, year)
+    for year in years:
+        source = cfg.resolve_dataset(dataset, year, reader_profile="source", exact=True)
+        assert cfg.is_source_only(dataset, year)
         assert source.metadata.period == DataPeriod("fiscal_year", year - 1, year)
+        assert source.metadata.source_qualifiers is not None
+        assert source.metadata.source_qualifiers.financial_basis == basis
         archives = source.reader["profiles"]["source"]["archives"]
         assert set(archives) == {"district", "charter"}
         for population, archive in archives.items():
             record = store.read_record(archive["receipt_id"])
+            assert record["dataset"] == dataset
             assert record["parameters"]["population"] == population
             assert record["resolved_url"] == archive["resolved_url"]

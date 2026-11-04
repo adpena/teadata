@@ -1,0 +1,101 @@
+{
+  "peims_staff_fte_and_salary": {
+    "editions": {
+      "1ce988cd6ec239bc5a9f22f7dec3a03cd9702cba2166254ecff470ea598ffe3c": [
+        {
+          "entity": "227901",
+          "receipt": "ace185e0e903b4bda704331cfb1e45fe3f92f70e97df8ac84c5e2694fe2ee7d4"
+        }
+      ],
+      "21ad98867072e82941dc4a9508c33763962e14db8e0875921cc63a3901e4b433": [
+        {
+          "entity": "state",
+          "receipt": "8d579102e9aec668b29d97906aca872a67650960a968f06794fdbe55dcd9c187"
+        }
+      ],
+      "36538cff107e754743093fc022482e7e33405352212d37202a8aff2b50b7b6c8": [
+        {
+          "entity": "227901",
+          "receipt": "b2616fd48966ed96d823643044f66dae60f481d68699d874c5c739da71abce60"
+        }
+      ],
+      "377e4fe5bf3f049713df3084e1c74b36643f5828c95b06a100e2679a1677c6a1": [
+        {
+          "entity": "227901",
+          "receipt": "e6898ffcfe133f862b4bc75d14e3305e7730c650be89b1a40e6ecea1ee847bac"
+        }
+      ],
+      "5d2a87e7278d80815365d53329a36674a5b554df8242637a491c6748f55dc220": [
+        {
+          "entity": "state",
+          "receipt": "87b8deefeb630fc6dda50c5105b13ea0e878d170f9209c13d6dd9f1f5c262e0d"
+        }
+      ],
+      "779360519f69bc9ddaaf1dc8f8958e063573c8ecf8c2f7d7274d8bd633193d5e": [
+        {
+          "entity": "227901",
+          "receipt": "e89e73e76384204271faa86d9eadf947b55f9b708548f2413bd5303f6dabedb4"
+        }
+      ],
+      "b1d0bde36a39826774897c69a93d461b5fd4c4a132a540bace1b4f88eaaf849e": [
+        {
+          "entity": "state",
+          "receipt": "d78f12c607c668e51f9f9f46aeea5e0e82dd58c06c2ada1fe52dfea1d4e7888e"
+        }
+      ],
+      "d511efe3d822e65c0b1e88092a48de1a39f4c7f2cbbcebd3179bb3d11fcda89d": [
+        {
+          "entity": "state",
+          "receipt": "cc1a1774f2574d18a10b54ca966e144bdd6cddac8e4a08c728a5cf935ee688cb"
+        }
+      ]
+    },
+    "manifests": {
+      "8cd071e5cfaac027a43895aa2335206d87eb5bf19a9001b2cc42797c5b0c9325": 3
+    }
+  },
+  "spp_timely_initial_evaluation": {
+    "editions": {
+      "2d0ca008b2abd901d5a20c155b5e3eb520b5d3c8008ee2ab34be98d856f81c4b": [
+        {
+          "entity": "246913",
+          "receipt": "52d96d3acfcf8ad5c91af8bbfef3cd75d37cc938bb68bab95c711d67c65267f8"
+        },
+        {
+          "entity": "101912",
+          "receipt": "eb00e651c264dbd5aa697c7a01ae686cb3fbdc222423418452bcfc429cacf538"
+        },
+        {
+          "entity": "214902",
+          "receipt": "989269c8fe3e6c5bb8efd4c6d49d4f65e654d1c636d00c5982e05eb7f1811e53"
+        },
+        {
+          "entity": "028903",
+          "receipt": "fb172c8441423617bbee9d3f7e061fbb4d3f5d166426f61d115db162b978da15"
+        },
+        {
+          "entity": "108804",
+          "receipt": "bcad6298f2a47279fdcd9942ab482ba6610be505e5703c5a31b45fff6c7cc1cc"
+        }
+      ],
+      "cd19ec605b80459c39cb150b4d454060db3bcafbc9ee4196e2b3f3a7d9f8ee36": [
+        {
+          "entity": "101912",
+          "receipt": "add67ba96143ac78062bcfa2ac84446ea31175695984728f81f78d1f3a727cc2"
+        },
+        {
+          "entity": "227901",
+          "publisher_rate_precision": {
+            "html": 2,
+            "workbook": 1
+          },
+          "receipt": "7b4d3a97767307986e07a77de50574f394890c77333cab690baed0b738b0d3f7"
+        }
+      ]
+    },
+    "manifests": {
+      "c7a02280b6228040552cb895da02a6fb9f9773887fc96e7121a257dc40adf95b": 4,
+      "d2f1f6c94eef232c197a464a847a21a1ed1b309cef3dbe63bf64bc1eddfa75aa": 4
+    }
+  }
+}

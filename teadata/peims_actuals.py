@@ -1,4 +1,4 @@
-"""Build explicit PEIMS Single File district and charter financial actuals leaves."""
+"""Build explicit PEIMS Single File district and charter financial account leaves."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import platform
 import re
 import sys
 from tempfile import TemporaryDirectory
-from typing import Any
+from typing import Any, Literal
 from zipfile import ZipFile
 
 import pyarrow as pa
@@ -25,16 +25,12 @@ from .dataset_metadata import ArtifactRef, DataPeriod, DatasetMetadata, EditionK
 from .manifest import BuildRecorder, canonical_json, file_identity
 from .provenance import ProvenanceStore, validate_reference_records
 from .release import _install_candidate, publish_release
-from .teadata_config import Config, load_config_bytes
+from .teadata_config import Config, load_config, load_config_bytes
 from .values import ValueStatus
 
 DATASET = "peims_financial_single_file_actuals"
-_TABLES = {"district", "charter"}
-_AMT = "actual_amount"
-_RAW = "raw_actual_amount"
-_STATUS = "actual_amount_status"
+BUDGET_DATASET = "peims_financial_single_file_budgets"
 _RECORD = "source_record"
-_SUPPORT = {"fields": {_AMT: {"raw": _RAW, "status": _STATUS}}, "context": [_RECORD]}
 _WIDTHS = (6, 3, 4, 2, 4, 3, 2)
 _BLOCK_BYTES = 2 * 1024**2
 _MAX_ARCHIVE_BYTES = 40 * 1024**2
@@ -43,7 +39,31 @@ pc: Any = arrow_compute
 
 
 @dataclass(frozen=True)
+class _FinancialBasis:
+    name: Literal["actual", "budget"]
+    dataset: str
+    amount_code: str
+
+    @property
+    def amount(self) -> str:
+        return f"{self.name}_amount"
+
+    @property
+    def raw(self) -> str:
+        return f"raw_{self.amount}"
+
+    @property
+    def status(self) -> str:
+        return f"{self.amount}_status"
+
+
+_ACTUALS = _FinancialBasis("actual", DATASET, "ACTAMT")
+_BUDGETS = _FinancialBasis("budget", BUDGET_DATASET, "BUDGAMT")
+
+
+@dataclass(frozen=True)
 class _Archive:
+    basis: _FinancialBasis
     source: ResolvedDataset
     table: str
     member: str
@@ -57,8 +77,8 @@ class _Archive:
     @property
     def schema(self) -> pa.Schema:
         return pa.schema(
-            [(name, pa.int64() if name == _AMT else pa.string()) for name in self.names]
-            + [(_RAW, pa.string()), (_STATUS, pa.string()), (_RECORD, pa.int64())]
+            [(name, pa.int64() if name == self.basis.amount else pa.string()) for name in self.names]
+            + [(self.basis.raw, pa.string()), (self.basis.status, pa.string()), (_RECORD, pa.int64())]
         )
 
     @property
@@ -66,34 +86,43 @@ class _Archive:
         return self.names[:len(_WIDTHS)]
 
 
-def _admit(config: Config, store: ProvenanceStore, year: int) -> Iterator[_Archive]:
-    source = config.resolve_dataset(DATASET, year, reader_profile="source", exact=True)
+def _tables(config: Config, year: int, basis: _FinancialBasis) -> dict[str, dict[str, Any]]:
+    resource = config.column_contract(basis.dataset, year, reader_profile="source")
+    if resource is None:
+        raise ValueError("PEIMS financial accounts require the reviewed positional crosswalk")
+    document = parse_column_schema(resource["text"].encode())
+    return {table["table"]: table for table in crosswalk_dataset(document, basis.dataset, str(year))["tables"]}
+
+
+def _admit(config: Config, canonical: Config, store: ProvenanceStore, year: int,
+           basis: _FinancialBasis) -> Iterator[_Archive]:
+    source = config.resolve_dataset(basis.dataset, year, reader_profile="source", exact=True)
     if (source.metadata.period != DataPeriod("fiscal_year", year - 1, year)
             or source.metadata.version != str(year)
-            or not config.is_source_only(DATASET, year)):
-        raise ValueError("PEIMS financial actuals require an exact source-only fiscal edition")
+            or not config.is_source_only(basis.dataset, year)):
+        raise ValueError(f"PEIMS financial {basis.name}s require an exact source-only fiscal edition")
     qualifiers = source.metadata.source_qualifiers
-    if qualifiers is None or qualifiers.family != "peims_financial" or qualifiers.financial_basis != "actual":
-        raise ValueError("PEIMS financial actuals require explicit actual basis")
+    if qualifiers is None or qualifiers.family != "peims_financial" or qualifiers.financial_basis != basis.name:
+        raise ValueError(f"PEIMS financial {basis.name}s require explicit {basis.name} basis")
     metrics = source.metadata.metrics
-    if (source.metadata.value_policy is not None or set(metrics) != {_AMT}
-            or metrics[_AMT].field != _AMT or metrics[_AMT].unit != "currency"
-            or metrics[_AMT].period not in (None, source.metadata.period)):
-        raise ValueError("PEIMS financial actuals require observed signed currency and the exact fiscal edition")
-    resource = config.column_contract(DATASET, year, reader_profile="source")
-    if resource is None:
-        raise ValueError("PEIMS financial actuals require the reviewed positional crosswalk")
-    tables = crosswalk_dataset(parse_column_schema(resource["text"].encode()), DATASET, str(year))["tables"]
+    amount = basis.amount
+    if (source.metadata.value_policy is not None or set(metrics) != {amount}
+            or metrics[amount].field != amount or metrics[amount].unit != "currency"
+            or metrics[amount].period not in (None, source.metadata.period)):
+        raise ValueError("PEIMS financial accounts require observed signed currency and the exact fiscal edition")
+    tables = _tables(config, year, basis)
+    reviewed = _tables(canonical, year, basis)
     archives = reader_options(source.reader, "source").get("archives")
-    if not isinstance(archives, dict) or set(archives) != _TABLES or {table["table"] for table in tables} != _TABLES:
-        raise ValueError("PEIMS financial actuals require separate district and charter sources")
+    if not isinstance(archives, dict) or archives.keys() != tables.keys() or tables.keys() != reviewed.keys():
+        raise ValueError("PEIMS financial accounts require separate district and charter sources")
     references = tuple(dict.fromkeys(
         identifier for ref in source.metadata.references for identifier in ref.provenance_ids
     ))
     records = store.verify_record_closure(references)
     validate_reference_records(source, records.__getitem__, verify_all_claimed=True)
-    for table in tables:
-        population = table["table"]
+    for population, table in tables.items():
+        if table["fields"] != reviewed[population]["fields"]:
+            raise ValueError(f"PEIMS financial {basis.name}s {population} columns differ from the packaged source crosswalk")
         selection = archives[population]
         if (not isinstance(selection, dict)
                 or set(selection) != {"receipt_id", "member", "rows", "requested_url", "resolved_url"}
@@ -106,7 +135,7 @@ def _admit(config: Config, store: ProvenanceStore, year: int) -> Iterator[_Archi
         digest, = table_input_sha256s(table)
         artifact = record["artifact"]
         if (record["kind"] != "acquisition" or record["method"] != "download"
-                or record["dataset"] != DATASET or record["section"] != source.section
+                or record["dataset"] != basis.dataset or record["section"] != source.section
                 or (record["requested_year"], record["resolved_year"]) != (year, year)
                 or record["source_metadata"]["version"] != str(year)
                 or record["source_metadata"]["period"] != source.metadata.period.to_dict()
@@ -117,17 +146,17 @@ def _admit(config: Config, store: ProvenanceStore, year: int) -> Iterator[_Archi
                 or record["parameters"].get("http_status") != 200
                 or record["parameters"].get("population") != population
                 or artifact["sha256"] != digest or not 0 < artifact["size_bytes"] <= _MAX_ARCHIVE_BYTES):
-            raise ValueError(f"PEIMS financial actuals {population} acquisition differs from its reviewed contract")
+            raise ValueError(f"PEIMS financial {basis.name}s {population} acquisition differs from its reviewed contract")
         fields = table["fields"]
         codes = tuple(field["code"] for field in fields)
         names = tuple(field["field"] for field in fields)
         if (table.get("header_identity") != "position" or table.get("metric_period") != source.metadata.period.to_dict()
-                or len(names) != 9 or names[0] != "district_number" or names[7:] != (_AMT, "source_update_date")
-                or codes[0] != "DISTRICT" or codes[7:] != ("ACTAMT", "DTUPDATE")
-                or set(names) & {_RAW, _STATUS, _RECORD}
-                or [field["field"] for field in fields if field["disposition"] == "fact"] != [_AMT]):
-            raise ValueError(f"PEIMS financial actuals {population} crosswalk is not the reviewed account layout")
-        yield _Archive(source, population, selection["member"], selection["rows"], identifier, digest,
+                or len(names) != 9 or names[0] != "district_number" or names[7:] != (amount, "source_update_date")
+                or codes[0] != "DISTRICT" or codes[7:] != (basis.amount_code, "DTUPDATE")
+                or set(names) & {basis.raw, basis.status, _RECORD}
+                or [field["field"] for field in fields if field["disposition"] == "fact"] != [amount]):
+            raise ValueError(f"PEIMS financial {basis.name}s {population} crosswalk is not the reviewed account layout")
+        yield _Archive(basis, source, population, selection["member"], selection["rows"], identifier, digest,
                        codes, names, references)
 
 
@@ -194,24 +223,36 @@ def _verify_leaf(leaf: Path, source: Path, archive: _Archive) -> None:
 
 def materialize_peims_actuals(store: ProvenanceStore, *, config: Path, config_sha256: str,
                              years: Sequence[int], output: Path) -> dict[str, Any]:
-    """Project pinned archives in bounded batches to an unpublished analytical bundle."""
+    """Project pinned actuals archives to an unpublished analytical bundle."""
+    return _materialize(store, config=config, config_sha256=config_sha256, years=years, output=output, basis=_ACTUALS)
+
+
+def materialize_peims_budgets(store: ProvenanceStore, *, config: Path, config_sha256: str,
+                             years: Sequence[int], output: Path) -> dict[str, Any]:
+    """Project pinned budget archives to an unpublished analytical bundle."""
+    return _materialize(store, config=config, config_sha256=config_sha256, years=years, output=output, basis=_BUDGETS)
+
+
+def _materialize(store: ProvenanceStore, *, config: Path, config_sha256: str,
+                 years: Sequence[int], output: Path, basis: _FinancialBasis) -> dict[str, Any]:
     if not years or len(set(years)) != len(years) or any(type(year) is not int or not 2 <= year <= 9999 for year in years):
-        raise ValueError("Select distinct exact PEIMS financial actuals editions")
+        raise ValueError(f"Select distinct exact PEIMS financial {basis.name}s editions")
     if output.exists() or output.is_symlink():
-        raise FileExistsError("PEIMS financial actuals require a new candidate directory")
+        raise FileExistsError(f"PEIMS financial {basis.name}s require a new candidate directory")
     with config.open("rb") as stream:
         config_bytes = stream.read(2 * 1024**2 + 1)
     if not 0 < len(config_bytes) <= 2 * 1024**2 or sha256(config_bytes).hexdigest() != config_sha256:
-        raise ValueError("PEIMS financial actuals Config differs from its pin or exceeds 2 MiB")
+        raise ValueError(f"PEIMS financial {basis.name}s Config differs from its pin or exceeds 2 MiB")
     cfg = load_config_bytes(config_bytes, path=config)
-    selections = [archive for year in sorted(years) for archive in _admit(cfg, store, year)]
+    canonical = load_config()
+    selections = [archive for year in sorted(years) for archive in _admit(cfg, canonical, store, year, basis)]
     toolchain = {"python": sys.version, "pyarrow": version("pyarrow"),
                  "platform": platform.platform(), "architecture": platform.machine()}
     lock = Path(__file__).parents[1] / "uv.lock"
     if lock.is_file():
         toolchain["lock_sha256"] = file_identity(lock)["sha256"]
     output.parent.mkdir(parents=True, exist_ok=True)
-    with TemporaryDirectory(prefix=".peims-actuals-", dir=output.parent) as temporary:
+    with TemporaryDirectory(prefix=f".peims-{basis.name}s-", dir=output.parent) as temporary:
         stage = Path(temporary) / "bundle"
         stage.mkdir(mode=0o700)
         target = ProvenanceStore(stage / "provenance")
@@ -219,8 +260,8 @@ def materialize_peims_actuals(store: ProvenanceStore, *, config: Path, config_sh
         captured = Path(temporary) / "source-config.input"
         captured.write_bytes(config_bytes)
         config_id = target.record_acquisition(captured, ResolvedDataset(
-            "reference:peims_financial_actuals_config", "reference", None, None, "",
-            DatasetMetadata(title="Exact reviewed PEIMS Single File Financial Actuals Config")))
+            f"reference:peims_financial_{basis.name}s_config", "reference", None, None, "",
+            DatasetMetadata(title=f"Exact reviewed PEIMS Single File Financial {basis.name.title()}s Config")))
         roots = dict.fromkeys(identifier for archive in selections for identifier in (archive.receipt_id, *archive.references))
         for identifier in roots:
             target.copy_record_from(store, identifier)
@@ -228,19 +269,20 @@ def materialize_peims_actuals(store: ProvenanceStore, *, config: Path, config_sh
         for archive in selections:
             source = archive.source
             raw = target.verify_artifact(archive.digest)
-            key = EditionKey(DATASET, str(source.resolved_year), EditionKey.source_revision((archive.digest,)),
+            key = EditionKey(basis.dataset, str(source.resolved_year), EditionKey.source_revision((archive.digest,)),
                              "district", archive.table, "one publisher row per complete account code tuple")
-            recipe = {"operation": "peims_single_file_actuals_projection", "archive_member": archive.member,
+            recipe = {"operation": f"peims_single_file_{basis.name}s_projection", "archive_member": archive.member,
                       "config_sha256": config_sha256, "input_block_bytes": _BLOCK_BYTES}
             schema = archive.schema
             contract = recorder.leaf_contract(key, source, native_schema=schema.serialize().to_pybytes(),
                 columns=schema.names, key_columns=archive.key_columns, rows=archive.rows, inputs=[archive.digest],
-                recipe=recipe, toolchain=toolchain, column_support=_SUPPORT)
+                recipe=recipe, toolchain=toolchain,
+                column_support={"fields": {basis.amount: {"raw": basis.raw, "status": basis.status}}, "context": [_RECORD]})
             identity = sha256(canonical_json(contract).encode()).hexdigest()
             leaf = stage / f"{identity}.parquet"
             physical = write_leaf_artifact(leaf, _batches(raw, archive), contract=contract, batch_bytes=16 * 1024**2)
             _verify_leaf(leaf, raw, archive)
-            processing = target.record_processing(dataset=DATASET, inputs=[archive.receipt_id, *archive.references, config_id],
+            processing = target.record_processing(dataset=basis.dataset, inputs=[archive.receipt_id, *archive.references, config_id],
                 outputs={"leaf": leaf}, processor="teadata.peims_actuals", code_version=recorder.processor_sha256,
                 parameters={"leaf_contract_sha256": identity, "recipe": recipe, "toolchain": toolchain},
                 validation={"native_projection_readback_equal": True, "rows": archive.rows,
@@ -252,7 +294,7 @@ def materialize_peims_actuals(store: ProvenanceStore, *, config: Path, config_sh
                             "acquisition_id": archive.receipt_id, "processing_record_id": processing})
         catalog = recorder.catalog(schema_version=4)
         publish_release(stage, catalog, schema_version=4)
-        result = {"status": "unpublished_native_peims_actuals_candidate", "build_id": catalog.build_id,
+        result = {"status": f"unpublished_native_peims_{basis.name}s_candidate", "build_id": catalog.build_id,
                   "cross_report_reconciliation_qualified": False, "release_activation": False, "editions": results}
         (stage / "MATERIALIZATION.json").write_text(canonical_json(result) + "\n", encoding="utf-8")
         _install_candidate(stage, output)

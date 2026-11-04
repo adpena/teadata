@@ -743,6 +743,8 @@ def _retained_store(path: Path):
 def _validate_native_release(path: Path, pin: str, source_store: Path) -> dict[str, Any]:
     from teadata.dataset_metadata import EditionKey
     from teadata.manifest import ContractError, canonical_json
+    from teadata.native_financial_accounts import is_reviewed_budget, qualify_budget
+    from teadata.native_staff_spp import qualify_staff_spp, reviewed_staff_spp
     from teadata.native_witnesses import (
         reviewed_composed_disability_references,
         reviewed_native_references,
@@ -754,6 +756,13 @@ def _validate_native_release(path: Path, pin: str, source_store: Path) -> dict[s
 
     try:
         release = DataRelease(path, expected_sha256=pin, offline=True)
+        if is_reviewed_budget(release.manifest_sha256):
+            return qualify_budget(release, _retained_store(release.path.parent / "provenance"),
+                                  _retained_store(source_store))
+        staffing_or_evaluation = reviewed_staff_spp(release.manifest_sha256)
+        if staffing_or_evaluation is not None:
+            return qualify_staff_spp(release, _retained_store(release.path.parent / "provenance"),
+                                     _retained_store(source_store), staffing_or_evaluation)
         primary_disability = reviewed_primary_disability_references(release.manifest_sha256)
         references = reviewed_native_references() if primary_disability is None else primary_disability
         inline_catalog = primary_disability is not None
