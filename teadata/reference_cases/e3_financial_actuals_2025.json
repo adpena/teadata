@@ -1,0 +1,69 @@
+{
+  "about_actual_receipt": "5421591f871fda8894b5811f860b2dcbd93ed5c67ebb0bf34834a6a02908f106",
+  "accounting_guide_receipt": "e219f0ff5233805df9a92d5737d154f2a264e3a209f894e984b5673d6c567288",
+  "campus_preparation_receipt": "f6cc11e99fcb9669d0c3aa90c629005ddf15c7e77d56cfedc182e9a47f49209d",
+  "cohort_intake_sha256": "634b7cac9da2138447450f0afa8c57b1d54cb8bd88e2713f635a6f2dd2351342",
+  "district_pwr_receipt": "dbd9685ab46d86dd68fea35997138e6818917577e70f9ca157490aed1214e443",
+  "district_selector_receipt": "2d489429fe258f405ce29a9208ffb6b83b2e08641244c5f44dd7613bbc1c9582",
+  "districts": {
+    "011901": {
+      "campus_pdf": "c682de3b197e1b27a1fa2b8e631175b87028332051ccac6101f6d57a87cb9fb2",
+      "district_html": "10e6cf5763f9e6f8237be2c88cd2247d1d9423cefb2e6b80543e2eabecf4cb74"
+    },
+    "011902": {
+      "campus_pdf": "a01961d699c91eb0e6ad5e6196d94979afefe78e484bbe6976a6322d6e0ffda3",
+      "district_html": "77884bca81a8431601a8b4e57d03b4efb75b1399fa239ddabd0a8b9a9f0f1661"
+    },
+    "028902": {
+      "campus_pdf": "27da5782bb8e2d451e57725e3a0692fba88399f04fedc10903e8ca2dd6a88289",
+      "district_html": "2a9eebed14456163585e556976ed46faaa77b662cdb7c2f946256b98b3699767"
+    },
+    "105906": {
+      "campus_pdf": "385d623c3c9d098affcd1564e8401751cce34fd8a63a400d28c67216481757ed",
+      "district_html": "e13b9ed268906ed0fc86a55b363e0c671e346716ded058235aadc08669e2bd27"
+    },
+    "227901": {
+      "campus_pdf": "c27e6d2488e84bff33fcefdedbaff603452b8982f0257204966e85bc825791a3",
+      "district_html": "563aca4367632149ca4b643530b9d11992c8abc97ba3263a7bc28d64ff430287"
+    },
+    "227904": {
+      "campus_pdf": "e7e1153dfb5e3a79f9a0bfd442f2b77dd5b041fd8b4fb0a0a258d3e43b31d53b",
+      "district_html": "6b41367d66ce850241dc97cb560d18e397fcbdc56c09ec6ca795d47bed9725e2"
+    },
+    "227907": {
+      "campus_pdf": "b3f3ba51703e6a100d1c0c6710d16f3b7eba1b0f634ff3a295ca69c013e4219f",
+      "district_html": "f41938d5efb9073a3839d2c00df3d124f7123b378389f2c981fc9ae0cd3ab1d5"
+    },
+    "227909": {
+      "campus_pdf": "ea92a29fbe218fb461b3a7c9cab217b0c782e20d2edcb734438f07b9f9816add",
+      "district_html": "e5d39a34b9794fe054f9a38ac95652a89801d791530329a3eab89124517cee5d"
+    },
+    "227910": {
+      "campus_pdf": "8228cb1a3204bce6150440be407afb8125d02908f4e294f89ac901dda77db45e",
+      "district_html": "8818ce4c8f87cbc2b8b43ecf1b105cacb0a55457bc7c70dabf6ab5c90bacc507"
+    },
+    "227913": {
+      "campus_pdf": "f3693c4744f96feb2ec07fb764208eec6a5baa891dfcb6ed77ae590e8d809fb5",
+      "district_html": "44a944166dbd1e007bb436734b8fa979ea80893116602be0a931f88beb794a4d"
+    },
+    "246906": {
+      "campus_pdf": "4f05e288ba16e7c6dbf824afa353154d321a8aedb089f8b2dcf1ca339b45ce19",
+      "district_html": "374200419cb683958d185265656b541a9db84937c4d243ffd61b33a2cf0de99e"
+    },
+    "246909": {
+      "campus_pdf": "134070185a3f8ebf002c8b1955ea52dd95d58cb237cf7feaf026c8b839d8edb7",
+      "district_html": "6f634aaeeffb9f932ef85c30be03cd28ee31d31d67bf5033aade736a56fff5be"
+    },
+    "246911": {
+      "campus_pdf": "1afc25be303457878e36d673ba3bb42e473b30d9cc1e1141beecaa0fdb8748e8",
+      "district_html": "91a48644560b979aa2b336f28009ad194203709e47ede7f13bb659132c6368e7"
+    },
+    "246913": {
+      "campus_pdf": "fc52f734336f27bd7ce802fb5633c515af8a1efbc4cd2d5a312a1195339c9b5c",
+      "district_html": "ab40284776216e51af074705f8616b9b2acb9fbf4cd60fb7bfe5ded82ceaf840"
+    }
+  },
+  "fiscal_end_year": 2025,
+  "raw_dictionary_receipt": "12d4ffa982775ab2ed61623326018873c9d1976803e95e6ef293b93a869151c5",
+  "schema_version": 1
+}

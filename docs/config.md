@@ -385,6 +385,30 @@ cells when reported membership is zero. The output does not change the active
 catalog or the historical FY2024 CSV workflow. Campus intake and the financial
 command's district workbook `--config` mode run separately.
 
+The reviewed FY2025 E3 financial fields have their own offline qualification
+mode. Run it with the retained provenance store and Poppler `pdftotext`.
+
+```bash
+uv run python -m teadata.scripts.refresh_financials \
+  --qualify-e3-fy2025 --store provenance --output prepared/e3-fy2025-finance
+```
+
+It replays the original workbook cells and separate publisher reports for the
+14 E3 districts. The resulting schema-4 release contains two signed integer
+dollar fields. Campus `all_funds_total_expenditures` uses the object-section
+All Funds amount at E7. District `af_college_career_and_military_readiness_ccmr_pic_38`
+uses the All Funds PIC 38 column at BN in the statewide PWR workbook, checked
+against the individual district's published amount. The catalog retains each
+original cell and receipt, the separate publisher report locator and receipt,
+the fiscal period, and the official source notes and accounting references.
+
+The qualification command verifies its pinned release and reads both editions
+back through the catalog. Each edition admits one amount and its identity.
+Per-student, share, fund-balance, and readiness measures remain outside this
+supplement. The active snapshot is independent. The profile supplement's
+`--native-release` gate and general source-parity check have their own supported
+recipes. Use the scoped command above to replay this finance qualification.
+
 The TAPR command prepares every declared publisher column in the selected
 single-table family for both scopes into a **new** directory, validating all
 inputs before staging any output. Its

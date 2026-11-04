@@ -13,6 +13,7 @@ def main(argv: list[str] | None = None) -> int:
     source = parser.add_mutually_exclusive_group(required=True)
     source.add_argument("--config", type=Path, help="Explicit reviewed Config; never edits default sources")
     source.add_argument("--campus-intake", type=Path, help="Exact FY2025 campus actual acquisition manifest")
+    source.add_argument("--qualify-e3-fy2025", action="store_true", help="Replay the reviewed FY2025 E3 campus and district dollar fields")
     parser.add_argument("--config-sha256")
     parser.add_argument("--campus-intake-sha256")
     parser.add_argument("--source", nargs=2, action="append", metavar=("DATASET", "CATALOG_YEAR"))
@@ -20,6 +21,14 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     from teadata.provenance import ProvenanceStore
 
+    if args.qualify_e3_fy2025:
+        if args.campus_intake_sha256 is not None or args.config_sha256 is not None or args.source is not None:
+            parser.error("FY2025 E3 qualification uses its own reviewed receipt selection")
+        from teadata.finance_qualification import qualify_e3_financial_actuals
+
+        result = qualify_e3_financial_actuals(ProvenanceStore(args.store), output=args.output)
+        print(json.dumps(result, sort_keys=True))
+        return 0
     if args.campus_intake is not None:
         if not args.campus_intake_sha256 or args.config_sha256 is not None or args.source is not None:
             parser.error("Campus intake requires --campus-intake-sha256 and runs separately from Config workbooks")
