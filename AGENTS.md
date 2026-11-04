@@ -68,6 +68,13 @@ Python 3.14 and 3.15 are required compatibility targets alongside supported earl
 
 Adversarial review of the final diff is required before landing. Resolve findings and run the applicable checks against the exact revision to be landed. Draft review branches are permitted; a prior review of an earlier revision does not satisfy this gate.
 
+## Publisher Authority and Source Correctness
+
+- TEA's original data and year-specific documents are the authority. Retain publisher bytes and their acquisition records; check headings, definitions, periods, populations, units and masking rules for each new dataset or edition. Download success, matching hashes and structural validation alone do not establish value correctness.
+- Compare retained raw values through preparation, stores and exports, and keep independent publisher-report goldens for semantic bindings. Preserve raw tokens alongside normalized values and statuses. Documented transformations must follow the exact source contract; do not infer masking, units or comparability from field names or another year's rules.
+- Every unexplained discrepancy blocks qualification. An intentional deviation for a publisher anomaly requires a narrowly scoped, evidence-backed record of the identified problem, understood repair and the user's explicit approval. General repair authorization is not a discrepancy waiver. Never auto-record expected values, add broad tolerances or silently accept known differences.
+- Report checked coverage and unresolved lineage explicitly. Unsupported readers, unreviewed definitions and missing source evidence remain uncovered/HOLD; they cannot be counted as passing source qualification. Keep integrity, raw-value parity, semantic goldens and researcher reproducibility as distinct claims.
+
 ## Local Verification
 
 `scripts/check` is the primary verification entry point; it runs locked isolated local Ruff, ty, deptry, and pytest checks and records receipts/logs in ignored `.local/checks/`. Use `scripts/check --verify-latest` to verify evidence for the current exact revision. After serialized-code or data changes, rebuild the bundle and run `scripts/check --release teadata/.cache/release.json`. Code-only receipts do not certify raw data or artifacts, and all receipts remain separate from adversarial review. `TEADATA_CHECK_PYTHON` selects another supported Python version for compatibility checks. Hosted workflows are manual only; do not restore automatic hosted triggers without a user request. Optional hook installation must preserve Git LFS and refuse custom hooks/configuration.

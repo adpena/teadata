@@ -741,6 +741,9 @@ def main() -> None:
     parser.add_argument("--install-hook", action="store_true", help="Install an optional pre-push code-check hook, preserving Git LFS")
     parser.add_argument("--timeout", type=float, default=900, help="Maximum seconds for each check")
     parser.add_argument("--validate-release", help=argparse.SUPPRESS)
+    parser.add_argument("--source-parity", type=Path, help="Offline raw fidelity check for selected supported native release editions")
+    parser.add_argument("--source-store", type=Path, help="Existing retained ProvenanceStore for --source-parity")
+    parser.add_argument("--source-edition", action="append", default=[], help="Exact edition ID for --source-parity; repeat explicitly")
     args = parser.parse_args()
     if args.timeout <= 0:
         parser.error("--timeout must be positive")
@@ -750,7 +753,27 @@ def main() -> None:
         parser.error("Choose --verify or --verify-latest")
     if args.install_hook and (args.verify or args.verify_latest or args.release):
         parser.error("Install the hook separately from verification or release checks")
+    if args.source_parity:
+        if (args.source_store is None or not args.source_edition or args.validate_release or args.release
+                or args.verify or args.verify_latest or args.install_hook or args.paired_library):
+            parser.error("Source parity requires --source-store and explicit --source-edition; run separately from other modes")
+    elif args.source_store is not None or args.source_edition:
+        parser.error("Source-store and source-edition options require --source-parity")
     try:
+        if args.source_parity:
+            from teadata.provenance import ProvenanceStore
+            from teadata.release import DataRelease
+            from teadata.source_parity import validate_source_parity
+
+            if (not args.source_store.is_dir() or not (args.source_store / "records").is_dir()
+                    or not (args.source_store / "objects").is_dir()):
+                raise ReceiptError("Source parity requires an existing retained provenance store")
+            report = validate_source_parity(DataRelease(args.source_parity, offline=True),
+                ProvenanceStore(args.source_store), edition_ids=args.source_edition)
+            print(json.dumps(report, sort_keys=True, ensure_ascii=False, allow_nan=False))
+            if report["status"] != "PASS_RAW_PARITY":
+                raise SystemExit(2)
+            return
         if args.validate_release:
             _validate_release(args.validate_release, args.kind)
             return

@@ -31,6 +31,61 @@ Catalog schema 2 stores `metric_bindings` with the release: canonical names and 
 
 Canonical public enrollment uses the TAPR student enrollment field for both campuses and districts. The accountability report's Number of Students is a separate `accountability.student_count` population and must not replace enrollment. Public-source metrics are not applicable to private schools. A metric without its own period inherits the dataset period; an explicitly unknown period stays unknown.
 
+### Exact retained-source parity
+
+An optional offline check compares every raw cell in explicitly selected,
+complete TAPR raw-string native leaves against their exact retained original
+CSV and prepared Parquet. Select the existing release, provenance store and
+exact edition IDs; repeat `--source-edition` to check a finite set:
+
+```sh
+uv run --locked python -m teadata.verification --kind library \
+  --source-parity /path/to/release.json --source-store /path/to/provenance \
+  --source-edition EXACT_EDITION_ID
+```
+
+The catalog, reviewed crosswalk and historical processing recipes select the
+source bytes, fields, layout, keys and reader budgets. Native joins compare
+all rows and fields without assuming row order; original IDs, whitespace,
+zeros and masking tokens remain exact. Reports name source receipts/URLs,
+field/row/cell coverage, key differences and bounded, explicitly marked
+examples. No current-code hash is substituted for a recorded historical
+producer identity. Selected artifact integrity remains checked by the existing
+release reader.
+
+The checker reads the original once and each target stage once, then uses one
+native key-to-row index and per-column comparisons. Its default 128 MiB
+`working_bytes` budget is split between retained original, one target at a time,
+and alignment/comparison buffers. Larger inputs remain uncovered/HOLD; increasing
+this explicit core-API budget does not change the comparison rules. Source
+decoding retains its recorded batch/key limits. These are Arrow-buffer admission
+limits, not a process RSS guarantee.
+
+Prepared TAPR inputs may retain a different historical global or script digest.
+Those identities remain provenance; matching today's script alone would not
+prove unchanged transitive dependencies. Before any native leaf staging/writer,
+the canonical producer replays each exact original and bound dictionary through
+the current bounded reader and compares every column, row group and completed
+layout/EOF with the retained preparation. It writes no replacement preparation.
+Receipt, input, crosswalk, row/key and reference gates remain strict. The new
+leaf records current raw revalidation separately while retaining the actual
+historical preparation identities. Any disagreement blocks; this raw readback
+does not confer scientific qualification or a user-approved exception.
+
+`PASS_RAW_PARITY` establishes only the named raw fidelity scope. Typed or
+normalized leaves, unsupported readers and missing lineage are uncovered/HOLD;
+they are never counted as checked. Scientific mappings, periods, units, policy
+applicability, source authenticity and publisher correctness remain separate
+qualifications. Existing independent publisher goldens and ordinary release
+checks remain unchanged.
+
+Every unexplained raw, key or contract mismatch blocks qualification. This
+checker supports no exceptions, tolerances or automatic golden updates.
+Repairing ETL to match the publisher needs no exception. A future intentional
+difference would require specific user approval of the identified anomaly,
+evidence and repair; general authorization to fix data is insufficient. E3's
+printed-versus-TEA research comparisons are not ETL waivers.
+
 ### Native fields with retained technical support
 
 An optional `column_support` in a native leaf contract separates real reviewed

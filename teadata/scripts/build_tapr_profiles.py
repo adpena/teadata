@@ -15,6 +15,7 @@ from itertools import zip_longest
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import sys
 import tempfile
@@ -38,7 +39,6 @@ from teadata.teadata_config import load_config
 def _write_raw_source(request: TaprSourceRequest, expected: TaprSourceSummary,
                       path: Path, budget: TaprReadBudget) -> None:
     """One admitted batch per row group, then exact bounded source readback."""
-    import pyarrow as pa
     import pyarrow.parquet as pq
 
     with request.open(budget=budget) as reader:
@@ -54,6 +54,17 @@ def _write_raw_source(request: TaprSourceRequest, expected: TaprSourceSummary,
         if reader.summary != expected:
             raise ValueError("TAPR source changed between validation and writing")
         del batch, writer
+    _verify_raw_source(request, path, budget, expected=expected)
+
+
+def _verify_raw_source(request: TaprSourceRequest, path: Path, budget: TaprReadBudget,
+                       *, expected: TaprSourceSummary | None = None) -> TaprSourceSummary:
+    """Read only: current canonical source batches must equal every retained group."""
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    before = path.stat()
+    signature = tuple(getattr(before, name) for name in ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_ctime_ns'))
     with pq.ParquetFile(path) as reopened, request.open(budget=budget) as reader:
         groups = 0
         for groups, batch in enumerate(reader, 1):
@@ -64,8 +75,13 @@ def _write_raw_source(request: TaprSourceRequest, expected: TaprSourceSummary,
             actual = reopened.read_row_group(groups - 1, use_threads=False)
             if actual.nbytes > budget.batch_bytes or not actual.equals(pa.Table.from_batches([batch]), check_metadata=True):
                 raise ValueError("TAPR prepared source artifact differs from validated raw strings")
-        if groups != reopened.metadata.num_row_groups or reader.summary != expected:
+        summary = reader.summary
+        if groups != reopened.metadata.num_row_groups or (expected is not None and summary != expected):
             raise ValueError("TAPR source/readback changed or has additional row groups")
+    after = path.stat()
+    if signature != tuple(getattr(after, name) for name in ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_ctime_ns')):
+        raise ValueError("Prepared source changed during current raw readback")
+    return summary
 
 
 def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | None,
@@ -327,9 +343,9 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
             raise ValueError("Processing receipt is not the selected complete source preparation")
         raw_budget = parameters.get("source_read_budget")
         if (not isinstance(raw_budget, dict) or set(raw_budget) != set(TaprReadBudget.__dataclass_fields__)
-                or record.get("code_version") != processor_identity()
-                or parameters.get("preparation_code_sha256") != sha256(Path(__file__).read_bytes()).hexdigest()):
-            raise ValueError("Prepared leaf requires this accepted bounded source producer and its complete read budget")
+                or any(not isinstance(value, str) or re.fullmatch(r"[0-9a-f]{64}", value) is None
+                       for value in (record.get("code_version"), parameters.get("preparation_code_sha256")))):
+            raise ValueError("Prepared leaf requires recorded bounded producer identities and its complete read budget")
         source_budget = TaprReadBudget(**raw_budget)
         if source_rows * ((9 if scope == "campus" else 6) + 18) > source_budget.key_bytes:
             raise ValueError("Prepared source identity index exceeds the admitted key byte budget")
@@ -343,6 +359,10 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
                 or graph[value]["artifact"]["sha256"] != raw_sha
                 or graph[value].get("source_metadata", {}).get("version") != edition for value in acquisitions):
             raise ValueError("Selected prepared source does not close its exact upstream raw revision")
+        dictionary = table.get("dictionary")
+        if dictionary and not any(item["kind"] == "acquisition" and item["artifact"]["sha256"] == dictionary["sha256"]
+                                  for item in graph.values()):
+            raise ValueError("Prepared source does not close its bound publisher dictionary")
         validate_reference_records(source, graph.__getitem__, verify_all_claimed=True)
         _validate_methodology(source.metadata, cfg.value_policies.get(source.metadata.value_policy))
         declared = parameters.get("selected_processing_inputs", [])
@@ -359,7 +379,8 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
                 raise ValueError("Additional dependency is not a processing receipt")
             reference_store.verify_record_closure([value])
         validated.append((dataset, scope, family, table["table"], source, identifier, keys, acquisitions,
-                          artifact, raw_sha, validation["rows"], dependencies, declared, source_budget))
+                          artifact, raw_sha, validation["rows"], dependencies, declared, source_budget,
+                          {"processor_sha256": record["code_version"], "preparation_code_sha256": parameters["preparation_code_sha256"]}, table))
 
     import pyarrow as pa
     import pyarrow.compute as arrow_compute
@@ -368,7 +389,7 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
     pc: Any = arrow_compute  # Arrow registers compute kernels dynamically.
 
     # All selected physical headers and admitted row boundaries precede the first writer.
-    for dataset, _, _, _, _, _, _, _, artifact, _, rows, _, _, source_budget in validated:
+    for dataset, _, _, _, _, _, keys, _, artifact, raw_sha, rows, _, _, source_budget, _, table in validated:
         prepared = reference_store.verify_artifact(artifact["sha256"])
         with pq.ParquetFile(prepared) as native:
             schema = native.schema_arrow.remove_metadata()
@@ -379,6 +400,11 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
                     or any(not 0 < native.metadata.row_group(i).num_rows <= source_budget.batch_rows
                            for i in range(native.metadata.num_row_groups))):
                 raise ValueError("Prepared source physical schema, rows or row groups differ from its admitted contract")
+        dictionary = table.get("dictionary")
+        request = TaprSourceRequest(reference_store.verify_artifact(raw_sha), table, keys[0], dataset, edition,
+            reference_store.verify_artifact(dictionary["sha256"]) if dictionary else None)
+        if _verify_raw_source(request, prepared, source_budget).rows != rows:
+            raise ValueError("Current raw readback differs from the complete admitted source row count")
 
     output_dir.parent.mkdir(parents=True, exist_ok=True)
     stage = Path(tempfile.mkdtemp(prefix=".tapr-edition-", dir=output_dir.parent))
@@ -393,9 +419,12 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
         if lock.is_file():
             toolchain["lock_sha256"] = sha256(lock.read_bytes()).hexdigest()
         base_recipe = {"operation": "lossless_admitted_source_row_groups", "compression": "zstd",
-                  "preparation_code_sha256": sha256(Path(__file__).read_bytes()).hexdigest(), "values_interpreted": False}
-        for dataset, scope, family, table_name, source, identifier, keys, acquisitions, artifact, raw_sha, rows, dependencies, declared, source_budget in validated:
-            recipe = {**base_recipe, "source_read_budget": vars(source_budget)}
+                  "revalidation_code_sha256": sha256(Path(__file__).read_bytes()).hexdigest(),
+                  "raw_source_revalidated": True, "values_interpreted": False}
+        for dataset, scope, family, table_name, source, identifier, keys, acquisitions, artifact, raw_sha, rows, dependencies, declared, source_budget, historical, _ in validated:
+            recipe = {**base_recipe, "source_read_budget": vars(source_budget),
+                      "preparation_code_sha256": historical["preparation_code_sha256"],
+                      "historical_processor_sha256": historical["processor_sha256"]}
             for value in [identifier, *dependencies]:
                 store.copy_record_from(reference_store, value)
             prepared = store.verify_artifact(artifact["sha256"])
@@ -440,7 +469,8 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
                 processor="teadata.scripts.build_tapr_profiles", code_version=recorder.processor_sha256,
                 parameters={"edition": edition, "family": family, "leaf_contract_sha256": identity,
                     "recipe": recipe, "toolchain": toolchain, "key_columns": list(keys), "selected_processing_inputs": dependencies},
-                validation={"rows": rows, "fields": len(schema), "raw_string_readback_equal": True, "values_interpreted": False})
+                validation={"rows": rows, "fields": len(schema), "raw_string_readback_equal": True,
+                            "raw_source_revalidated": True, "values_interpreted": False})
             ref = ArtifactRef(key, physical["sha256"], physical["size_bytes"], leaf.name, canonical_json(contract), processing, "leaf")
             recorder.record_edition(key, source, artifacts=[ref], acquisition_ids=acquisitions)
             result["datasets"][dataset] = {"rows": rows, "fields": len(schema), "key": key.to_dict(), "key_columns": list(keys),

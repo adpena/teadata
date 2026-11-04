@@ -692,9 +692,9 @@ def test_prepared_budget_and_code_admission_precede_every_writer(tmp_path, monke
     elif damage == "boolean_budget":
         params["source_read_budget"]["batch_bytes"] = True
     elif damage == "code":
-        code = "f" * 64
+        code = "not-a-historical-digest"
     elif damage == "script":
-        params["preparation_code_sha256"] = "f" * 64
+        params["preparation_code_sha256"] = "not-a-historical-digest"
     else:
         params["source_read_budget"]["key_bytes"] = 1
     changed = store.record_processing(dataset=dataset, inputs=record["inputs"],
@@ -706,6 +706,78 @@ def test_prepared_budget_and_code_admission_precede_every_writer(tmp_path, monke
     with pytest.raises(ValueError, match="bounded|budget"):
         prepare_profiles(cfg, edition="2025", scopes=[], input_dir=None, output_dir=output,
             reference_store=store, prepared_inputs=selected)
+    assert not output.parent.exists()
+
+
+def test_historical_preparation_reuses_exact_bytes_after_current_raw_readback(tmp_path, monkeypatch, accepted_prepared_sources):
+    import pyarrow.parquet as pq
+    import teadata.scripts.build_tapr_profiles as producer
+    from teadata.provenance import ProvenanceStore
+
+    cfg, store, selected, result, _ = accepted_prepared_sources
+    dataset = result["scopes"]["district"]["dataset"]
+    record = store.read_record(selected[dataset][0])
+    record["parameters"]["preparation_code_sha256"] = "e" * 64
+    historical = store.record_processing(dataset=dataset, inputs=record["inputs"],
+        outputs={name: store.verify_artifact(value["sha256"]) for name, value in record["outputs"].items()},
+        processor=record["processor"], code_version="f" * 64, parameters=record["parameters"], validation=record["validation"])
+    selected[dataset] = historical, selected[dataset][1]
+    before = store.verify_artifact(record["outputs"]["prepared_source"]["sha256"]).read_bytes()
+    monkeypatch.setattr(producer, "_write_raw_source", lambda *a, **k: pytest.fail("Historical reuse must not write a new preparation"))
+    output = tmp_path / "leaves"
+    built = prepare_profiles(cfg, edition="2025", scopes=[], input_dir=None, output_dir=output,
+                             reference_store=store, prepared_inputs=selected)
+    archived = ProvenanceStore(output / "provenance")
+    leaf = archived.read_record(built["datasets"][dataset]["processing_record_id"])
+    recipe = leaf["parameters"]["recipe"]
+    assert historical in leaf["inputs"]
+    assert recipe["historical_processor_sha256"] == "f" * 64
+    assert recipe["preparation_code_sha256"] == "e" * 64
+    assert recipe["revalidation_code_sha256"] == sha256(Path(producer.__file__).read_bytes()).hexdigest()
+    assert recipe["raw_source_revalidated"] is True and leaf["validation"]["raw_source_revalidated"] is True
+    prepared = store.verify_artifact(record["outputs"]["prepared_source"]["sha256"])
+    assert prepared.read_bytes() == before
+    with pq.ParquetFile(prepared) as native:
+        assert native.metadata.num_rows == 5
+
+
+@pytest.mark.parametrize("problem", ["current_reader", "raw", "prepared"])
+def test_reused_preparation_disagreement_blocks_every_writer(tmp_path, monkeypatch, accepted_prepared_sources, problem):
+    import pyarrow.parquet as pq
+    import teadata.scripts.build_tapr_profiles as producer
+    from teadata.tapr import TaprSourceReader
+
+    cfg, store, selected, result, _ = accepted_prepared_sources
+    dataset = result["scopes"]["campus"]["dataset"]
+    record = store.read_record(selected[dataset][0])
+    if problem == "current_reader":
+        original_next = TaprSourceReader.__next__
+        def changed_reader(self):
+            batch = original_next(self)
+            return batch.set_column(1, batch.schema.field(1), pa.array(["changed dependency behavior"] * batch.num_rows))
+        monkeypatch.setattr(TaprSourceReader, "__next__", changed_reader)
+    elif problem == "raw":
+        raw_sha = next(item["source_revision_sha256"] for item in result["scopes"]["campus"]["source_tables"])
+        store.verify_artifact(raw_sha).write_bytes(b"changed original bytes")
+    else:
+        path = tmp_path / "different-preparation.parquet"
+        source = store.verify_artifact(record["outputs"]["prepared_source"]["sha256"])
+        with pq.ParquetFile(source) as original, pq.ParquetWriter(path, original.schema_arrow) as writer:
+            for index in range(original.metadata.num_row_groups):
+                table = original.read_row_group(index)
+                if index == 0:
+                    table = table.set_column(1, table.schema.field(1), pa.array(["wrong retained value"] * table.num_rows))
+                writer.write_table(table, row_group_size=table.num_rows)
+        changed = store.record_processing(dataset=dataset, inputs=record["inputs"],
+            outputs={name: path if name == "prepared_source" else store.verify_artifact(value["sha256"])
+                     for name, value in record["outputs"].items()}, processor=record["processor"],
+            code_version=record["code_version"], parameters=record["parameters"], validation=record["validation"])
+        selected[dataset] = changed, selected[dataset][1]
+    monkeypatch.setattr(producer, "write_leaf_artifact", lambda *a, **k: pytest.fail("Writer before complete current raw readback"))
+    output = tmp_path / "new" / "leaves"
+    with pytest.raises(ValueError, match="checksum mismatch|differs from validated raw strings"):
+        prepare_profiles(cfg, edition="2025", scopes=[], input_dir=None, output_dir=output,
+                         reference_store=store, prepared_inputs=selected)
     assert not output.parent.exists()
 
 
