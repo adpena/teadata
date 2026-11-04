@@ -1,10 +1,9 @@
 # Geographic source-quality observations, November 2026
 
-**Status: SOURCE IN PROGRESS — not deployed.** These observations concern the
-retained TEA responses acquired on 2026-11-03 UTC and the prospective 0.0.128
-source refresh. They do not change published 0.0.127 or establish release
-qualification. Publisher edition, school year and HTTP download time remain
-separate facts.
+**Status: source review in progress.** These observations cover TEA responses
+acquired November 3–4, 2026 UTC for the prospective 0.0.128 source refresh.
+Published 0.0.127 is the comparison release. Publisher edition, school year
+and HTTP download time remain separate facts.
 
 ## Sources and scope
 
@@ -20,6 +19,12 @@ campus metadata identifies an AskTED export. Those statements do not establish
 the original HTTP lineage of older local files, a legal boundary determination,
 or independently verified campus coordinates.
 
+On November 4, 2026 the official locator still used the 2025–26 district
+polygons and 2024–25 campus points shown above. The public service and item
+indexes checked that day exposed those as the latest dedicated statewide
+locator layers. [TEA Geographic Data](https://tea.texas.gov/families-and-students/school-district-locator/geographic-data) ·
+[Locator map configuration](https://www.arcgis.com/sharing/rest/content/items/15ce858b4ad5408480950db704fd455a/data?f=json)
+
 ## Snyder ISD boundary
 
 The raw district properties identify `208902` as **Snyder ISD** (`NAME`), with
@@ -30,11 +35,13 @@ diagnostic in both the historical and newly acquired representations:
 Ring Self-intersection[-100.815812515043 32.7617015573616]
 ```
 
-This identifies a geometric validity issue in the compared representations. It
-does not establish that the legal boundary is wrong or determine whether the
-issue originates upstream or during export/conversion. Comparing the native
-ArcGIS geometry with the upstream representation is a reasonable technical
-review step. No repair, simplification or replacement has been applied.
+A fresh native-projection Esri JSON query on November 4 returned a
+self-intersection in the 1,682-vertex outer ring at easting `923691.1325` and
+northing `1176792.9503`. The separate WGS84 GeoJSON query reproduced the
+diagnostic above. The defect is present in the publisher's served geometry.
+Its effect on the legal boundary is unknown. Hold the polygon from map
+rendering pending review and preserve the source geometry.
+[Native Snyder query](https://services2.arcgis.com/5MVN2jsqIrNZD4tP/arcgis/rest/services/School_Districts__2026/FeatureServer/0/query?where=DISTRICT_C%3D%27208902%27&outFields=DISTRICT_C%2CNAME&returnGeometry=true&f=json)
 
 ## Campus rows without source geometry
 
@@ -82,6 +89,71 @@ Randolph's building-style base address illustrates a plausible addressing
 complication, not a demonstrated cause of its unmatched result. None of these
 examples justifies guessing a coordinate, using a city centroid or plotting a
 missing point at zero.
+
+## 2026 accountability and the October map layers
+
+Joining the 2026 preliminary accountability roster to the dedicated layers by
+district and campus code yielded 1,016 usable district polygons across 1,202
+reporting districts. Another 185 lacked a polygon, including 181 with charter
+district evidence in the locator, and Snyder was invalid. Of 9,105 reporting
+campuses, 8,756 had a usable locator point, 272 had a locator row with null
+geometry and `Status=U`, `Score=0`, and 77 were absent from the 2024–25 locator
+layer. The 286 null points in the preceding section use the entire locator
+layer as their denominator. [2026 Accountability Rating System](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2026-accountability-rating-system)
+
+TEA Performance Reporting's separate October 2026 map layers have 1,195
+district points and 8,963 campus points. They provide display points for 346
+of the 349 reporting campuses without a usable dedicated locator point.
+Among reporting campuses with usable points in both layers, 3,180 pairs differ
+by more than 100 metres and 608 differ by more than one kilometre. The October
+item dates describe publication of the map layers. The underlying coordinate
+vintage and derivation are unresolved. Hold these points as corroboration
+pending review of location lineage and discrepancies, and keep district
+display points separate from district boundaries. [October campus layer](https://www.arcgis.com/home/item.html?id=3ac5b236caca4979bbdf091a5f983058) ·
+[October district layer](https://www.arcgis.com/home/item.html?id=bc436027f8e1424ba52e534cf5fb1d10)
+
+## AskTED campus directory reconciliation
+
+AskTED is TEA's public organizational directory for public schools and
+districts, including charters and state-agency schools. TEA's search distinguishes
+school type, instruction type, magnet status, residential facility status and
+alternative education accountability. The separate Campus Enrollment Type
+taxonomy concerns admissions and attendance, such as zoned, selective or
+special assignment. Keep these attributes separate when binding source fields.
+[AskTED description](https://tea.texas.gov/families-and-students/secure-applications/teal-applications-reference-program-descriptions) ·
+[AskTED search](https://tealprod.tea.state.tx.us/Tea.AskTed.Web/Forms/SearchScreen.aspx) ·
+[Campus Enrollment Type FAQ](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/campus-enrollment-type-faq)
+
+For performance measures, use the TPRS glossary's definitions and reporting
+populations. Use the TPRS guide for its report navigation and release schedule.
+AskTED's archive describes a separate organizational source.
+[TPRS glossary](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/comprehensive-tprs-glossary.pdf) ·
+[TPRS guide](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/tprs-user-guide-2026.pdf)
+
+| 2025–26 AskTED export | Publisher archive label | Acquired November 4, 2026 UTC | Rows | Raw SHA-256 | Acquisition receipt |
+| --- | --- | --- | ---: | --- | --- |
+| Fall | October 31, 2025 | 08:52:05 | 12,442 | `dd3dd5779f45b77894657c3925bc4fbcde513a771686a54ef5c6ca50d9a381c2` | [Fall receipt](https://github.com/adpena/teadata/blob/main/provenance/records/fda9ca2e041f93e875def0d0b4253b36eb496a7c32437c5ca91fcbb49271819f.json) |
+| Spring | March 31, 2026 | 08:55:37 | 12,481 | `f7df51bd645a0801d38bec8e4048a674f16b058b6310dd1fc6a569368b07e2db` | [Spring receipt](https://github.com/adpena/teadata/blob/main/provenance/records/d0c9ec40cc8738a3b7325e7d44ab6701eaad93b8b6561a65769d036c4386e735.json) |
+
+Every row's `Update Date` is later than its archive label. Both files label
+their enrollment columns October 2025 and omit Campus Enrollment Type.
+Treat the archive label, row update time and enrollment reference month as
+distinct observations. [Publisher archive](https://tealprod.tea.state.tx.us/Tea.AskTed.Web/Forms/ArchivedSchoolAndDistrictDataFiles.aspx) ·
+[Acquisition contract](data-releases.md#rebuild-from-retained-inputs)
+
+Each export has 82 repeated canonical campus codes. The same 48 overlap the
+2026 preliminary accountability roster in both exports, with exactly two
+AskTED rows per campus. Each pair already has identical raw identifiers with
+the leading apostrophe and nine campus or six district digits. The duplicate
+rows exist before normalization. The accountability roster has one row per
+campus code.
+
+All 48 pairs differ on NCES school ID, site address, grade range and
+enrollment. Forty differ on school name. The populated NCES row is Active in
+every pair, while its blank-NCES partner is Active in 29 and Under Construction
+in 19. The reviewed public guidance supplies no precedence for these
+conflicting rows. Preserve both and hold conflicting directory attributes
+pending a publisher rule or source-specific resolution.
 
 ## Planned application behavior
 
