@@ -1,4 +1,4 @@
-"""Build unpublished native leaves for reviewed PEIMS student report tables."""
+"""Build unpublished native leaves for reviewed PEIMS report tables."""
 
 from __future__ import annotations
 
@@ -16,6 +16,17 @@ from typing import TYPE_CHECKING, Any
 from .column_schema import crosswalk_dataset, parse_column_schema, reader_options, table_input_sha256s
 from .dataset_metadata import ArtifactRef, DataPeriod, DatasetMetadata, EditionKey, ResolvedDataset
 from .manifest import BuildRecorder, canonical_json, file_identity
+from .peims_staff import (
+    STAFF,
+    STAFF_EMPLOYEE_BASIS,
+    STAFF_EMPLOYEE_COUNT,
+    STAFF_RECIPE,
+    staff_allows_unavailable_average,
+    staff_employee_basis,
+    staff_fact_units,
+    staff_values,
+    validate_staff_request,
+)
 from .provenance import ProvenanceStore, validate_reference_records
 from .values import ValuePolicy, ValueStatus, measure
 
@@ -29,10 +40,12 @@ ENROLLMENT = "peims_student_enrollment_by_ethnicity"
 PROGRAMS = "peims_student_programs_and_special_populations"
 PRIMARY_DISABILITY = "peims_special_education_by_primary_disability"
 _STUDENT_SCOPES = frozenset({"state", "district", "campus"})
+_STATE_DISTRICT = frozenset({"state", "district"})
 SCOPES_BY_DATASET = {
     ENROLLMENT: _STUDENT_SCOPES,
     PROGRAMS: _STUDENT_SCOPES,
-    PRIMARY_DISABILITY: frozenset({"state", "district"}),
+    PRIMARY_DISABILITY: _STATE_DISTRICT,
+    STAFF: _STATE_DISTRICT,
 }
 DATASETS = tuple(SCOPES_BY_DATASET)
 SOURCE_BYTES = 8 * 1024**2
@@ -83,6 +96,8 @@ def _admit_source(config: Config, dataset: str, year: int, store: ProvenanceStor
                 or observed.get("source_url") != source.metadata.source_url or content_type not in {"text/csv", "application/csv"}
                 or record["artifact"]["sha256"] != expected or not 0 < record["artifact"]["size_bytes"] <= SOURCE_BYTES):
             raise ValueError(f"PEIMS {dataset} {table['table']} acquisition differs from its exact source contract")
+        if dataset == STAFF:
+            validate_staff_request(record, year, table["table"])
     return source, policy, tables, identifiers, references
 
 
@@ -144,6 +159,13 @@ def _count_columns(raw: pa.ChunkedArray, policy: ValuePolicy) -> tuple[pa.Chunke
     return values, pc.if_else(observed, ValueStatus.OBSERVED.value, statuses)
 
 
+def _key_columns(dataset: str, scope: str) -> list[str]:
+    geography = [] if scope == "state" else [f"{scope}_number"]
+    if dataset == STAFF:
+        return [*geography, "staff_category", "staff_role"]
+    return ["school_year", *geography, *(["ethnicity"] if dataset == ENROLLMENT else [])]
+
+
 def _project(path: Path, table: dict[str, Any], source: ResolvedDataset, policy: ValuePolicy) -> tuple[
     pa.Table, list[str], dict[str, Any]
 ]:
@@ -161,14 +183,11 @@ def _project(path: Path, table: dict[str, Any], source: ResolvedDataset, policy:
         convert_options=pacsv.ConvertOptions(column_types=dict.fromkeys(names, pa.string()), strings_can_be_null=False,
                                              quoted_strings_can_be_null=False, null_values=[]))
     scope = table["table"]
-    key_columns = ["school_year"]
-    if scope != "state":
-        key_columns.append(f"{scope}_number")
-    if source.dataset == ENROLLMENT:
-        key_columns.append("ethnicity")
+    staff = source.dataset == STAFF
+    key_columns = _key_columns(source.dataset, scope)
     if not set(key_columns) <= set(names) or literals.num_rows != len(records):
         raise ValueError("PEIMS native table differs from its reviewed layout or grain")
-    if not _all_valid(pc.equal(literals["school_year"], source.metadata.period.label)):
+    if not staff and not _all_valid(pc.equal(literals["school_year"], source.metadata.period.label)):
         raise ValueError("PEIMS row period differs from its source edition")
     for name, width in (("district_number", 6), ("campus_number", 9)):
         if name in names and (not _all_valid(pc.match_substring_regex(literals[name], rf"^[0-9]{{{width}}}$"))
@@ -177,6 +196,11 @@ def _project(path: Path, table: dict[str, Any], source: ResolvedDataset, policy:
     if scope == "campus" and ("district_number" not in names or not _all_valid(pc.equal(
             pc.utf8_slice_codeunits(literals["campus_number"], 0, 6), literals["district_number"]))):
         raise ValueError("PEIMS campus and district identities disagree")
+    if staff and scope == "district":
+        geography = ["district_number", "district_name", "region_number", "county_name", "charter_status"]
+        if (not set(geography) <= set(names) or not _all_valid(pc.match_substring_regex(literals["region_number"], r"^[0-9]{2}$"))
+                or literals.select(geography).group_by(geography).aggregate([]).num_rows != len(pc.unique(literals["district_number"]))):
+            raise ValueError("PEIMS staffing has conflicting or malformed district identity rows")
     if source.dataset in (PROGRAMS, PRIMARY_DISABILITY):
         aggregation = ("COUNTYREGIONDISTRICT" if source.dataset == PRIMARY_DISABILITY and scope == "district"
                        else scope.upper())
@@ -187,20 +211,34 @@ def _project(path: Path, table: dict[str, Any], source: ResolvedDataset, policy:
     if (not all(_all_valid(pc.not_equal(literals[name], "")) for name in key_columns)
             or literals.select(key_columns).group_by(key_columns).aggregate([]).num_rows != literals.num_rows):
         raise ValueError("PEIMS contains a blank or duplicate table key")
+    units = {metric.field: metric.unit for metric in source.metadata.metrics.values()}
     counts = {metric.field for metric in source.metadata.metrics.values() if metric.unit == "count"}
+    year = source.resolved_year
+    if staff and (year is None or units != staff_fact_units(year)
+                  or {field["field"] for field in table["fields"] if field["disposition"] == "fact"} != set(units)):
+        raise ValueError("PEIMS staffing requires the exact edition's reviewed fact units")
     columns: dict[str, pa.Array | pa.ChunkedArray] = {}
-    fields = {}
+    fields: dict[str, dict[str, str | list[str]]] = {}
     for field in table["fields"]:
         name = field["field"]
         if field["disposition"] == "identity":
             columns[name] = literals[name]
             continue
-        if field["disposition"] != "fact" or name not in counts:
+        if field["disposition"] != "fact" or (not staff and name not in counts):
             raise ValueError(f"PEIMS field {name!r} lacks a reviewed count definition")
         raw, status = f"peims_raw_{name}", f"peims_status_{name}"
-        columns[name], columns[status] = _count_columns(literals[name], policy)
+        if staff:
+            unit = units[name]
+            assert year is not None and unit is not None
+            columns[name], columns[status] = staff_values(literals[name], policy, unit=unit,
+                allow_dot=staff_allows_unavailable_average(name, year, scope))
+        else:
+            columns[name], columns[status] = _count_columns(literals[name], policy)
         columns[raw] = literals[name]
         fields[name] = {"raw": raw, "status": status}
+    if staff and STAFF_EMPLOYEE_COUNT in fields:
+        columns[STAFF_EMPLOYEE_BASIS] = staff_employee_basis(literals["staff_category"], literals["staff_role"])
+        fields[STAFF_EMPLOYEE_COUNT]["auxiliary"] = [STAFF_EMPLOYEE_BASIS]
     columns["peims_source_record"] = pa.array(records, type=pa.int64())
     return pa.table(columns), key_columns, {"fields": fields, "context": ["peims_source_record"]}
 
@@ -217,7 +255,7 @@ def materialize_peims_students(store: ProvenanceStore, *, config: Path, config_s
 
     if (not selections or len(set(selections)) != len(selections)
             or any(dataset not in DATASETS or type(year) is not int or not 2 <= year <= 9999 for dataset, year in selections)):
-        raise ValueError("Select distinct exact PEIMS student datasets and years")
+        raise ValueError("Select distinct exact PEIMS datasets and years")
     if output.exists() or output.is_symlink():
         raise FileExistsError("PEIMS candidate requires a new exclusive output directory")
     with config.open("rb") as stream:
@@ -254,7 +292,8 @@ def materialize_peims_students(store: ProvenanceStore, *, config: Path, config_s
                 edition = str(source.resolved_year)
                 grain = "one publisher row per " + " and ".join(keys)
                 key = EditionKey(source.dataset, edition, EditionKey.source_revision((source_sha,)), scope, scope, grain)
-                recipe = {"operation": "reviewed_peims_student_csv_projection", "encoding": ENCODING,
+                operation = STAFF_RECIPE if source.dataset == STAFF else "reviewed_peims_student_csv_projection"
+                recipe = {"operation": operation, "encoding": ENCODING,
                           "config_sha256": config_sha256, "cli_sha256": cli_sha, "batch_rows": BATCH_ROWS}
                 contract = recorder.leaf_contract(key, source, native_schema=projected.schema.serialize().to_pybytes(),
                     columns=projected.column_names, key_columns=keys, rows=projected.num_rows, inputs=[source_sha],

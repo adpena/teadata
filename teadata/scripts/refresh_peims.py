@@ -1,4 +1,4 @@
-"""Materialize explicitly selected PEIMS student source editions offline."""
+"""Materialize explicitly selected PEIMS source editions offline."""
 
 from __future__ import annotations
 

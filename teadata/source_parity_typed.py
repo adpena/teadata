@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import ExitStack
 import csv
 from dataclasses import dataclass
+from decimal import Decimal
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -18,12 +19,22 @@ from .column_schema import crosswalk_dataset, parse_column_schema, table_input_s
 from .dataset_metadata import COLUMN_SCHEMA_MAX_BYTES, DataPeriod
 from .manifest import canonical_json
 from .peims_leaves import DATASETS as PEIMS_DATASETS
-from .peims_leaves import ENCODING, ENROLLMENT, SCOPES_BY_DATASET, _count_columns
+from .peims_leaves import ENCODING, SCOPES_BY_DATASET, _count_columns, _key_columns
+from .peims_staff import (
+    STAFF,
+    STAFF_EMPLOYEE_BASIS,
+    STAFF_EMPLOYEE_COUNT,
+    STAFF_RECIPE,
+    staff_allows_unavailable_average,
+    staff_fact_units,
+    validate_staff_request,
+)
 from .provenance import validate_record_graph
 from .source_csv import SourceLines
 from .source_parity import _FieldReport, _Uncovered
 from .transfer_leaves import _district_projection
 from .transfer_sources import _FOOTNOTES, _selected_encoding, _transfer_projection, district_batch_inputs, transfer_columns
+from .values import ValueStatus
 
 if TYPE_CHECKING:
     from .dataset_metadata import EditionKey
@@ -60,6 +71,7 @@ class _Typed:
     policy: ValuePolicy
     rows: int
     lineage: dict[str, Any]
+    staff_scope: str | None = None
 
 
 def _digest(value: Any) -> str:
@@ -87,7 +99,8 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
     parameters = record.get("parameters", {})
     recipe = parameters.get("recipe", {})
     peims = key.dataset in PEIMS_DATASETS
-    pair = ("teadata.scripts.refresh_peims", "reviewed_peims_student_csv_projection") if peims else (
+    staff = key.dataset == STAFF
+    pair = ("teadata.scripts.refresh_peims", STAFF_RECIPE if staff else "reviewed_peims_student_csv_projection") if peims else (
         "teadata.scripts.refresh_transfers.materialize", "accepted_transfer_preparation_projection")
     if (record.get("processor"), recipe.get("operation")) != pair:
         raise _Uncovered("No supported recorded typed replay recipe")
@@ -150,7 +163,8 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
             raise ValueError("PEIMS original receipt or field period differs from the retained projection")
         if any(token.isascii() and token.isdecimal() for token in policy.tokens):
             raise _Uncovered("PEIMS count tokens conflict with the admitted integer projection")
-        names, support = [], {}
+        names = []
+        support: dict[str, dict[str, str | list[str]]] = {}
         for field in fields:
             name = field["field"]
             names.append(name)
@@ -160,9 +174,16 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
                 support[name] = {"raw": raw, "status": status}
             elif field["disposition"] != "identity":
                 raise _Uncovered("PEIMS has an unsupported source field disposition")
+        if staff:
+            assert period.end_year is not None
+            units = {row["field"]: row["unit"] for row in variables if row["field"] in support}
+            if units != staff_fact_units(period.end_year):
+                raise ValueError("PEIMS staffing facts differ from the exact edition's reviewed units")
+            if STAFF_EMPLOYEE_COUNT in support:
+                names.append(STAFF_EMPLOYEE_BASIS)
+                support[STAFF_EMPLOYEE_COUNT]["auxiliary"] = [STAFF_EMPLOYEE_BASIS]
         names.append("peims_source_record")
-        keys = ["school_year", *([f"{key.scope}_number"] if key.scope != "state" else []),
-                *(["ethnicity"] if key.dataset == ENROLLMENT else [])]
+        keys = _key_columns(key.dataset, key.scope)
         expected_support = {"fields": support, "context": ["peims_source_record"]}
         if contract["columns"] != names or contract["key_columns"] != keys or contract.get("column_support") != expected_support:
             raise ValueError("PEIMS leaf does not retain all reviewed fields, raw tokens, statuses and row keys")
@@ -230,12 +251,15 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
                 or receipt["source_metadata"].get("period") != period.to_dict()):
             raise ValueError("Catalog acquisition differs from its exact upstream original receipt")
         digest = claimed["artifact"]["sha256"]
+        if staff:
+            assert period.end_year is not None
+            validate_staff_request(receipt, period.end_year, key.scope)
         originals.append(_Original(store.verify_artifact(digest), digest, encoding, region, rows, annotations))
     return _Typed(names, fields, originals, release.artifact(ref.identity), prepared,
                   mapping.get("layout") if peims else None, projection, period, policy, contract["rows"],
                   {"leaf_processing_id": ref.processing_id, "leaf_sha256": ref.sha256,
                    "prepared_sha256": hashes[-1] if prepared else None, "crosswalk_sha256": schema.reviewed_sha256,
-                   "acquisitions": acquisitions})
+                   "acquisitions": acquisitions}, staff_scope=key.scope if staff else None)
 
 
 def _wire(original: _Original, selection: _Typed, *, limit: int) -> Iterator[tuple[list[str], int, int, int, int]]:
@@ -339,6 +363,30 @@ def _wire(original: _Original, selection: _Typed, *, limit: int) -> Iterator[tup
         raise ValueError("Publisher records do not account for the full retained input")
 
 
+def _staff_replay(literals: pa.Array, name: str, selection: _Typed) -> tuple[pa.Array, pa.Array]:
+    year = selection.period.end_year
+    assert year is not None and selection.staff_scope is not None
+    unit = staff_fact_units(year)[name]
+    allow_dot = staff_allows_unavailable_average(name, year, selection.staff_scope)
+    if allow_dot and ("." not in selection.policy.tokens or selection.policy.tokens["."].status != ValueStatus.MISSING):
+        raise ValueError("PEIMS staffing replay lacks its reviewed unavailable average pay status")
+    values, statuses = [], []
+    for token in literals.to_pylist():
+        if token == "." and allow_dot:
+            values.append(None)
+            statuses.append(ValueStatus.MISSING.value)
+            continue
+        components = token.split(".")
+        exact_digits = all(part.isascii() and part.isdecimal() for part in components)
+        if not exact_digits or (unit == "fte" and (len(components) != 2 or len(components[1]) != 2)) or (
+            unit != "fte" and len(components) != 1
+        ):
+            raise ValueError("PEIMS staffing replay contains an unsupported numeric token")
+        values.append(Decimal(token) if unit == "fte" else int(token))
+        statuses.append(ValueStatus.OBSERVED.value)
+    return pa.array(values, type=pa.decimal128(16, 2) if unit == "fte" else pa.int64()), pa.array(statuses, type=pa.string())
+
+
 def _batch(selection: _Typed, index: int, rows: list[list[str]], positions: list[tuple[int, int, int]]) -> pa.Table:
     fields = selection.fields
     columns = [pa.array(values, type=pa.string()) for values in zip(*rows, strict=True)]
@@ -349,8 +397,14 @@ def _batch(selection: _Typed, index: int, rows: list[list[str]], positions: list
             if field["disposition"] == "identity":
                 arrays[name] = literals
             else:
-                arrays[name], arrays[f"peims_status_{name}"] = _count_columns(pa.chunked_array([literals]), selection.policy)
+                values, statuses = (_staff_replay(literals, name, selection) if selection.staff_scope is not None
+                                    else _count_columns(pa.chunked_array([literals]), selection.policy))
+                arrays[name], arrays[f"peims_status_{name}"] = values, statuses
                 arrays[f"peims_raw_{name}"] = literals
+        if selection.staff_scope is not None and STAFF_EMPLOYEE_COUNT in arrays:
+            arrays[STAFF_EMPLOYEE_BASIS] = pa.array([
+                "distinct_employees" if role.startswith("TOTAL ") else "positions"
+                for role in arrays["staff_role"].to_pylist()], type=pa.string())
         arrays["peims_source_record"] = pa.array([position[0] for position in positions], type=pa.int64())
         return pa.table(arrays)
     context = [pa.array(values, type=pa.int64()) for values in zip(*positions, strict=True)]
@@ -401,6 +455,10 @@ class _Target:
                 if mismatches and examples_left:
                     for mismatch in pc.indices_nonzero(different).slice(0, examples_left).to_pylist():
                         original, value = wanted[mismatch].as_py(), actual[mismatch].as_py()
+                        if isinstance(original, Decimal):
+                            original = str(original)
+                        if isinstance(value, Decimal):
+                            value = str(value)
                         summary["examples"].append({"source_input": source_input, "source_record": records[start + mismatch].as_py(),
                             "raw": original[:1024] if isinstance(original, str) else original,
                             "actual": value[:1024] if isinstance(value, str) else value,

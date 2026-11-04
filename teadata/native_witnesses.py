@@ -80,9 +80,18 @@ def reviewed_native_references() -> dict[str, Any]:
     return json.loads(files("teadata").joinpath("reference_cases/native_peims_transfers.json").read_text())
 
 
+def _primary_disability_review() -> dict[str, Any]:
+    return json.loads(files("teadata").joinpath("reference_cases/native_primary_disability.json").read_text())
+
+
 def reviewed_primary_disability_references(manifest_sha256: str) -> dict[str, Any] | None:
-    review = json.loads(files("teadata").joinpath("reference_cases/native_primary_disability.json").read_text())
+    review = _primary_disability_review()
     return review["editions"] if review["manifest_sha256"] == manifest_sha256 else None
+
+
+def reviewed_composed_disability_references(manifest_sha256: str) -> dict[str, Any]:
+    review = _primary_disability_review()
+    return review["editions"] if review["profile_composition_manifest_sha256"] == manifest_sha256 else {}
 
 
 def _label(value: str) -> str:

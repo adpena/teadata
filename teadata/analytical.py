@@ -402,9 +402,11 @@ def _leaf_schema(contract):
                 if not (pa.types.is_string(schema.field(field.raw).type) or pa.types.is_large_string(schema.field(field.raw).type)):
                     raise ValueError("Raw support must preserve source string tokens")
                 if field.status is not None:
+                    normalized = schema.field(field.field).type
                     if (not (pa.types.is_string(schema.field(field.status).type) or pa.types.is_large_string(schema.field(field.status).type))
-                            or not (pa.types.is_integer(schema.field(field.field).type) or pa.types.is_floating(schema.field(field.field).type))):
-                        raise ValueError("Status support requires a string status and numeric normalized value")
+                            or not (pa.types.is_integer(normalized) or pa.types.is_floating(normalized)
+                                    or pa.types.is_decimal(normalized) or pa.types.is_boolean(normalized))):
+                        raise ValueError("Status support requires a string status and numeric or boolean normalized value")
     except (KeyError, TypeError, ValueError) as error:
         raise ContractError(f"Invalid leaf column support: {error}") from error
     return schema

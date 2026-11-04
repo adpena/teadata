@@ -138,6 +138,81 @@ def test_primary_disability_review_has_exact_independent_witness_inventory():
         ("227901", ["DD"]), ("227901", ["DD"])]
 
 
+def test_composed_profile_reuses_the_exact_disability_review_inventory():
+    inline_pin = "6f2cc32a7b9cc1b43d8b0ed84f2870d3dd75ddcfef58e9e8508e37f34c41cd37"
+    composed_pin = "465e130bcb4bc48a523e4901103d34a41ead89123141a2ca7bb0c6ef3171b4a0"
+    composed = native_witnesses.reviewed_composed_disability_references(composed_pin)
+    assert composed == native_witnesses.reviewed_primary_disability_references(inline_pin)
+    assert native_witnesses.reviewed_composed_disability_references(inline_pin) == {}
+    assert native_witnesses.reviewed_primary_disability_references(composed_pin) is None
+    legacy = native_witnesses.reviewed_native_references()
+    assert legacy.keys().isdisjoint(composed) and len(legacy | composed) == 17
+
+
+@pytest.mark.parametrize("damage", [
+    None, "pin", "missing-edition", "overlap", "legacy-metadata", "disability-metadata", "receipt",
+    "missing-store", "parity",
+])
+def test_composed_gate_requires_both_reviewed_constituents(monkeypatch, damage):
+    key = EditionKey(native_witnesses.PRIMARY_DISABILITY, "2026", "1" * 64, "district", "district", "district")
+    metadata = {"title": "Reviewed primary disability"}
+    primary = {"artifact": "disability-leaf", "sha256": "disability-bytes", "processing_id": "disability-receipt",
+               "metadata_sha256": sha256(canonical_json(metadata).encode()).hexdigest()}
+    legacy = {"artifact": "legacy-leaf", "sha256": "legacy-bytes", "processing_id": "legacy-receipt",
+              "metadata_sha256": "legacy-metadata"}
+    editions = {"legacy": {"metadata": {"sha256": "changed" if damage == "legacy-metadata" else "legacy-metadata"}},
+                key.identity: {"metadata": {"sha256": "externalized-disability-child"}}}
+    routes = {"legacy-leaf": "legacy", "disability-leaf": key.identity}
+    if damage == "missing-edition":
+        del editions["legacy"]
+        del routes["legacy-leaf"]
+    artifacts = {
+        "legacy-leaf": SimpleNamespace(sha256="legacy-bytes", processing_id="legacy-receipt"),
+        "disability-leaf": SimpleNamespace(
+            edition=key, sha256="disability-bytes",
+            processing_id="changed" if damage == "receipt" else "disability-receipt",
+        ),
+    }
+    decode = Mock(return_value=SimpleNamespace(
+        to_dict=lambda: {"title": "Changed"} if damage == "disability-metadata" else metadata))
+    catalog = SimpleNamespace(to_dict=lambda: {"schema_version": 4, "editions": editions, "artifacts": routes},
+                              artifact_ref=artifacts.__getitem__, metadata=decode)
+    selected = SimpleNamespace(catalog=catalog, verify=Mock(), build_id="build",
+                               manifest_sha256="unreviewed" if damage == "pin" else "composition")
+    load = Mock(return_value=selected)
+    parity = Mock(return_value={"status": "HOLD" if damage == "parity" else "PASS_RAW_PARITY"})
+    witnesses = Mock(return_value={"peims_values": 13, "transfer_rows": 1})
+    primary_id = "legacy" if damage == "overlap" else key.identity
+    monkeypatch.setattr(release, "DataRelease", load)
+    monkeypatch.setattr(native_witnesses, "reviewed_native_references", lambda: {"legacy": legacy})
+    monkeypatch.setattr(native_witnesses, "reviewed_composed_disability_references",
+                        lambda digest: {primary_id: primary} if digest == "composition" else {})
+    monkeypatch.setattr(source_parity, "validate_source_parity", parity)
+    monkeypatch.setattr(native_witnesses, "validate_native_witnesses", witnesses)
+    store = Mock(side_effect=verification.ReceiptError("Missing original receipts")
+                 if damage == "missing-store" else None, return_value="retained-union")
+    monkeypatch.setattr(verification, "_retained_store", store)
+
+    if damage not in {None, "parity"}:
+        with pytest.raises(verification.ReceiptError):
+            verification._validate_native_release(Path("release.json"), "trusted", Path("sources"))
+        parity.assert_not_called()
+        witnesses.assert_not_called()
+        return
+    result = verification._validate_native_release(Path("release.json"), "trusted", Path("sources"))
+    load.assert_called_once_with(Path("release.json"), expected_sha256="trusted", offline=True)
+    decode.assert_called_once_with(key.dataset, edition=key)
+    selected.verify.assert_called_once()
+    store.assert_called_once_with(Path("sources"))
+    parity.assert_called_once_with(selected, "retained-union", edition_ids=sorted(editions))
+    if damage == "parity":
+        assert result["status"] == "HOLD" and result["publisher_witnesses"] is None
+        witnesses.assert_not_called()
+    else:
+        assert result["status"] == "PASS_REVIEWED_NATIVE"
+        witnesses.assert_called_once_with(selected, "retained-union", {"legacy": legacy, key.identity: primary})
+
+
 @pytest.mark.parametrize("damage", [None, "unknown-pin", "wrong-schema", "route", "metadata", "leaf", "receipt", "missing-custody"])
 def test_primary_disability_gate_requires_exact_inline_edition_and_bundled_parity(monkeypatch, damage):
     key = EditionKey(native_witnesses.PRIMARY_DISABILITY, "2026", "1" * 64, "state", "state", "school_year")

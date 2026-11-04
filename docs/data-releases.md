@@ -258,11 +258,43 @@ established. The family does not accept SOF run or PEIMS financial-basis fields.
 An absent class year remains omitted, including on existing qualifier families;
 their serialized metadata and leaf semantic hashes remain unchanged.
 
+### PEIMS Single File Financial Actuals
+
+The source-only `peims_financial_single_file_actuals` dataset catalogs the
+district and charter account archives for fiscal years ending 2023, 2024 and
+2025. Each year has two separate tables at district scope. The seven account
+codes form the unique row key within each table and exact source revision.
+`financial_unit_code` can identify an administrative unit, so it cannot serve
+as a campus identifier on its own. The row fund-year code and update date are
+retained separately from the archive's fiscal edition.
+
+`actual_amount` preserves the signed, whole-dollar amount as published, with
+the raw token, observed status and CSV record number. The historical dictionary
+describes `ACTAMT` in budget terms and says zero rows are absent. The current
+publisher listing identifies the six ZIPs as actuals, and their CSVs contain
+explicit zeros. Release finality is unspecified. Reconciliation to derived
+reports and signed district audits is a separate qualification step. TEA's
+listing schedules FY2026 actuals for spring 2027 and currently offers FY2026
+budgets. [TEA download listing](https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads)
+
+Build an opt-in candidate from the exact retained archives and reference
+receipts. The writer streams each CSV into Parquet and compares every row on
+readback. Select the exact edition and project account and measure columns with
+the Arrow dataset API. The account leaves stay outside default entity hydration.
+
+```sh
+uv run --locked python -m teadata.scripts.refresh_peims_actuals \
+  --store "$TEADATA_PROVENANCE_DIR" \
+  --config teadata/teadata_sources.yaml --config-sha256 "$CONFIG_SHA256" \
+  --year 2023 --year 2024 --year 2025 --output "$ACTUALS_CANDIDATE"
+```
+
 ### Qualifying reviewed native bundles
 
-The offline gate admits the reviewed native profile supplement and the separate
-four-year PEIMS primary-disability candidate. Supply the trusted manifest
-SHA-256 for the exact bundle and its retained source store.
+The offline gate admits the reviewed native profile supplement, the separate
+four-year PEIMS primary-disability candidate, and their exact schema-4
+composition. Supply the trusted manifest SHA-256 for the bundle and its retained
+source store.
 
 ```sh
 scripts/check --native-release "$NATIVE_RELEASE" --native-pin "$NATIVE_SHA256" \
@@ -282,7 +314,14 @@ from the supplied store. The 2022–23 and 2023–24 Austin HTML views omit
 Developmental Delay. The gate reports those cells as outside HTML witness
 coverage and compares their actual CSV tokens during raw parity.
 
-Both modes verify the complete reviewed scope, manifest, metadata, leaf bytes
+The composed profile manifest is pinned in the primary-disability registry and
+uses the same reviews for all 17 constituent editions. Supply one
+content-addressed store containing the complete original source receipts and
+bytes for both constituents and their independent TEA reports. The gate
+checks the original leaf and processing identities and verifies that the
+externalized disability metadata matches the reviewed inline metadata.
+
+All modes verify the complete reviewed scope, manifest, metadata, leaf bytes
 and processing receipts, then require raw and typed parity and independently
 acquired TEA comparisons. Missing evidence or mismatches prevent qualification.
 The result records each check separately. Publication and profile activation

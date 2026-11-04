@@ -744,6 +744,7 @@ def _validate_native_release(path: Path, pin: str, source_store: Path) -> dict[s
     from teadata.dataset_metadata import EditionKey
     from teadata.manifest import ContractError, canonical_json
     from teadata.native_witnesses import (
+        reviewed_composed_disability_references,
         reviewed_native_references,
         reviewed_primary_disability_references,
         validate_native_witnesses,
@@ -756,6 +757,10 @@ def _validate_native_release(path: Path, pin: str, source_store: Path) -> dict[s
         primary_disability = reviewed_primary_disability_references(release.manifest_sha256)
         references = reviewed_native_references() if primary_disability is None else primary_disability
         inline_catalog = primary_disability is not None
+        composed_disability = {} if inline_catalog else reviewed_composed_disability_references(release.manifest_sha256)
+        if references.keys() & composed_disability.keys():
+            raise ReceiptError("Reviewed native profile constituents have overlapping editions")
+        references = references | composed_disability
         index = release.catalog.to_dict()
         if index["schema_version"] != (3 if inline_catalog else 4) or index["editions"].keys() != references.keys():
             raise ReceiptError("Native release does not contain exactly the reviewed editions and leaves")
@@ -766,7 +771,12 @@ def _validate_native_release(path: Path, pin: str, source_store: Path) -> dict[s
         for edition, entry in references.items():
             artifact = release.catalog.artifact_ref(entry["artifact"])
             metadata = index["editions"][edition]["metadata"]
-            metadata_sha256 = sha256(canonical_json(metadata).encode()).hexdigest() if inline_catalog else metadata["sha256"]
+            if edition in composed_disability:
+                # Externalization changes the descriptor identity while preserving the reviewed metadata.
+                key = artifact.edition
+                metadata = release.catalog.metadata(key.dataset, edition=key).to_dict()
+            metadata_sha256 = (sha256(canonical_json(metadata).encode()).hexdigest()
+                               if inline_catalog or edition in composed_disability else metadata["sha256"])
             if (artifact.sha256 != entry["sha256"] or artifact.processing_id != entry["processing_id"]
                     or metadata_sha256 != entry["metadata_sha256"]):
                 raise ReceiptError("Native leaf, metadata or processing receipt differs from the reviewed identity")

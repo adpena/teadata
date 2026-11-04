@@ -1,6 +1,15 @@
 contract_version: 1
 year_min: 2009
 value_policies:
+  spp_ind11_workbook:
+    reference_id: spp_masking
+    tokens:
+      '-999':
+        status: suppressed
+        reason: ferpa_small_cell
+      NR:
+        status: missing
+        reason: publisher_no_report_reason_unspecified
   numeric:
     tokens:
       .:
@@ -87,6 +96,12 @@ value_policies:
       '<1,910': *peims_2026_suppression, '<2,000': *peims_2026_suppression,
       '<2,790': *peims_2026_suppression,
     }
+  peims_staff_csv:
+    reference_id: staff_definition
+    tokens:
+      .:
+        status: missing
+        reason: publisher_unavailable_average_base_pay
   peims_primary_disability_csv:
     reference_id: peims_disability_masking
     tokens:
@@ -7216,6 +7231,339 @@ data_sources:
               scope: "district"
               tables:
                 college_readiness_components: "data/tapr/raw/2025-d-GRAD2-offered-original.csv"
+  peims_staff_fte_and_salary:
+    2023:
+      metadata:
+        metrics: &peims_staff_facts
+          staff_fte: {field: staff_fte, unit: fte}
+          staff_total_base_pay: {field: staff_total_base_pay, unit: currency}
+          staff_average_base_pay: {field: staff_average_base_pay, unit: currency}
+        notes: October PEIMS staffing by publisher role. Excludes ESC and contracted staff.
+          State and district scopes use separate publisher reports. Absent roles remain absent.
+          Base pay excludes supplements. Publisher finality is unspecified.
+          This edition excludes charter partner teachers from FTE.
+        period: {kind: school_year, start_year: 2022, end_year: 2023}
+        publisher: Texas Education Agency
+        references:
+        - reference_id: staff_definition
+          role: data_dictionary
+          status: available
+          title: TEA 2022–23 staff FTE and salary criteria and role definitions
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.std_download_selected_report.sas&rpt_subject=about&fname=abtstf23&ftype=html
+          reviewed_sha256: f2db147d704566f44e8e8f28c60388d0189e55d8276d06f333e13950167a11f2
+          provenance_ids: [8221e81b903493ae2c5f9bf8846a949b1715fbf6716205aff9dfe906f38e74a2]
+        - &peims_staff_release_listing
+          reference_id: release_listing
+          role: source_notes
+          status: available
+          title: TEA PEIMS Standard Reports release dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          provenance_ids: [7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356]
+        - &peims_staff_columns
+          reference_id: column_crosswalk
+          role: schema
+          status: available
+          title: TEA Data reviewed staffing source headers and physical framing
+          path: schemas/peims--2023-2026--staff-fte-and-salary-crosswalk.json
+          reviewed_sha256: 7df93578524b7a969336eb93a07c0073df567f70a574ed2fc73306f780abd4e4
+          provenance_ids: [0b8f96434b2015e6ac3974fd541abf46c1f8d4204ac7c94234e1986cf4a6b0fc]
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adpeb.html
+        title: 2022–23 PEIMS Staff FTE Counts and Salary
+        value_policy: peims_staff_csv
+        version: '2023'
+      path: data/peims/2023/peims_staff_fte_and_salary--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2023-2026--staff-fte-and-salary-crosswalk.json
+            acquisition_ids:
+              state: d8579569c9799c63f99258500951560bd1c0116a81876e31c2e2e42346016d71
+              district: 2c7e2ffcf0edf280fe2ffa10f33853acb753821fe23149685fb868b35d9e1a2c
+    2024:
+      metadata:
+        metrics: *peims_staff_facts
+        notes: October PEIMS staffing by publisher role. Excludes ESC and contracted staff.
+          State and district scopes use separate publisher reports. Absent roles remain absent.
+          Base pay excludes supplements. Publisher finality is unspecified.
+          Charter partner teachers enter FTE but are excluded from Average Base Pay.
+        period: {kind: school_year, start_year: 2023, end_year: 2024}
+        publisher: Texas Education Agency
+        references:
+        - reference_id: staff_definition
+          role: data_dictionary
+          status: available
+          title: TEA 2023–24 staff FTE and salary criteria and role definitions
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.std_download_selected_report.sas&rpt_subject=about&fname=abtstf24&ftype=html
+          reviewed_sha256: c97174faae605b2ba4937114a4877f329f17ddc66ffbd54bd803a292a7976d75
+          provenance_ids: [ce5373f916381f822197403cdee7b42286daa56b0f013a81968088ab784cd990]
+        - *peims_staff_release_listing
+        - *peims_staff_columns
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adpeb.html
+        title: 2023–24 PEIMS Staff FTE Counts and Salary
+        value_policy: peims_staff_csv
+        version: '2024'
+      path: data/peims/2024/peims_staff_fte_and_salary--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2023-2026--staff-fte-and-salary-crosswalk.json
+            acquisition_ids:
+              state: 9eb004c75a7bcd5b5e0c0e6702c2af664566d94fc13c2c6248423402bdae380d
+              district: 680b9040fa29fda389a2b4cda1fbb6b2cdfc5f4f69b4f215665832206449d314
+    2025:
+      metadata:
+        metrics: *peims_staff_facts
+        notes: October PEIMS staffing by publisher role. Excludes ESC and contracted staff.
+          State and district scopes use separate publisher reports. Absent roles remain absent.
+          Base pay excludes supplements. Publisher finality is unspecified.
+          Charter partner teachers enter FTE but are excluded from Average Base Pay.
+          A district Average Base Pay dot is unavailable.
+        period: {kind: school_year, start_year: 2024, end_year: 2025}
+        publisher: Texas Education Agency
+        references:
+        - reference_id: staff_definition
+          role: data_dictionary
+          status: available
+          title: TEA 2024–25 staff FTE and salary criteria and role definitions
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.std_download_selected_report.sas&rpt_subject=about&fname=abtstf25&ftype=html
+          reviewed_sha256: 55c17f986217abdc0fafca760d63c942b63171c4f7a99d30f2801b24f7c45050
+          provenance_ids: [ebd5ee61f181912dfb9c3e4eb4bf2e19cc360c1bc13e288edf4dcaea156c4694]
+        - *peims_staff_release_listing
+        - *peims_staff_columns
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adpeb.html
+        title: 2024–25 PEIMS Staff FTE Counts and Salary
+        value_policy: peims_staff_csv
+        version: '2025'
+      path: data/peims/2025/peims_staff_fte_and_salary--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2023-2026--staff-fte-and-salary-crosswalk.json
+            acquisition_ids:
+              state: d6d88ac59a5c8b58042e59aee353531f6915c8f6fb99e8de8d60b942d28d8b08
+              district: 8dc25f8ef3792562f534f1f15a7fe91b2f054617ef529050eec359c60a52b95a
+    2026:
+      metadata:
+        metrics:
+          staff_employee_count: {field: staff_employee_count, unit: count}
+          staff_fte: {field: staff_fte, unit: fte}
+          staff_total_base_pay: {field: staff_total_base_pay, unit: currency}
+          staff_average_base_pay: {field: staff_average_base_pay, unit: currency}
+        notes: October PEIMS staffing by publisher role. Excludes ESC and contracted staff.
+          State and district scopes use separate publisher reports. Absent roles remain absent.
+          Base pay excludes supplements. Publisher finality is unspecified.
+          Charter partner teachers enter FTE but are excluded from Average Base Pay.
+          Employee Count means positions on detail rows and distinct employees on totals.
+          A district Average Base Pay dot is unavailable.
+        period: {kind: school_year, start_year: 2025, end_year: 2026}
+        publisher: Texas Education Agency
+        published_at: '2026-03-19'
+        references:
+        - reference_id: staff_definition
+          role: data_dictionary
+          status: available
+          title: TEA 2025–26 staff FTE and salary criteria and role definitions
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.std_download_selected_report.sas&rpt_subject=about&fname=abtstf26&ftype=html
+          reviewed_sha256: 858a59813de49b64b47b212fc9c65f5e111ca7444abbef6c728fa5f574ae1f43
+          provenance_ids: [d91208e16f673adb20e204d5a6af8b2a5912c0a6cb88ec2e58aafdca7956c2bf]
+        - *peims_staff_release_listing
+        - *peims_staff_columns
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adpeb.html
+        title: 2025–26 PEIMS Staff FTE Counts and Salary
+        value_policy: peims_staff_csv
+        version: '2026'
+      path: data/peims/2026/peims_staff_fte_and_salary--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2023-2026--staff-fte-and-salary-crosswalk.json
+            acquisition_ids:
+              state: 711fa63b6609d4e25c21081379057c64227580a512791a09a5b269118d3292d3
+              district: 74db89ee765156c92671435f3d84144cda46b5ab79797642f8576838fb54ed88
+  spp_timely_initial_evaluation:
+    2024:
+      metadata:
+        title: 2025 TEA State Performance Plan Indicator 11 Timely Initial Evaluation
+        publisher: Texas Education Agency
+        version: '2025'
+        period:
+          kind: school_year
+          start_year: 2023
+          end_year: 2024
+        notes: Public LEA Indicator 11A pre-clarification results from TSDS Child Find. The denominator is children
+          with parental consent to evaluate in the reporting population. District detail across 20 ESC regions is distinct
+          from a publisher state or ESC aggregate. The original rate and target are retained independently.
+        source_url: https://rptsvr1.tea.texas.gov/idea/index.html
+        value_policy: spp_ind11_workbook
+        metrics:
+          initial_evaluation_consent_count:
+            field: initial_evaluation_consent_count
+            unit: count
+          timely_initial_evaluation_count:
+            field: timely_initial_evaluation_count
+            unit: count
+          timely_initial_evaluation_reported_percent:
+            field: timely_initial_evaluation_reported_percent
+            unit: percent
+          timely_initial_evaluation_met_target:
+            field: timely_initial_evaluation_met_target
+        references:
+        - reference_id: spp_masking
+          role: masking_methodology
+          status: available
+          title: TEA SPP public reporting masking and No Report rules
+          url: https://rptsvr1.tea.texas.gov/idea/index.html
+          reviewed_sha256: 393145c07c042dfe57fe1e0a71b7520ad23cc74790e6fd695a400544db745dd7
+          provenance_ids: &spp_ind11_001
+          - 2a350f39205d09db12f0024b7f0e9cd12c1459a908b4fd4bf1f44746d0f8360d
+        - reference_id: spp_reporting
+          role: source_notes
+          status: available
+          title: TEA local educational agency reporting editions and pre-clarification status
+          url: https://tea.texas.gov/special-populations-and-support/special-education/data-and-reports/local-educational-agency-public-reporting
+          reviewed_sha256: 85e1cabb82648bd57a1526a0a5cef6a76917ee4a86b1626ecd9f6c9aa45588c2
+          provenance_ids: &spp_ind11_002
+          - 03b8a08accda4601d6db7e9d1ebd5d8fbb49df8d211639e2d706155e4425e4fd
+        - reference_id: spp_11a_calculation
+          role: methodology
+          status: available
+          title: TEA Indicator 11A calculation and population
+          url: https://tea.texas.gov/special-populations-and-support/review-and-support/sppi-11a-calculation-and-example.pdf
+          reviewed_sha256: 231c899c68636f0f227681ac2e5a93462f930aacb6099e9dcb24db2390df5b0a
+          provenance_ids: &spp_ind11_003
+          - 7acd0093e40c51c5b4a02b7ec8608df622cb70e51dd9231380a2fb27f0a2d928
+        - reference_id: report_2025
+          role: data_dictionary
+          status: available
+          title: About the 2025 LEA State Performance Plan Indicator Report
+          url: https://tea.texas.gov/special-populations-and-support/special-education/about-the-2025-lea-spp-indicator-report-ffy-2023-0.pdf
+          reviewed_sha256: 2ba098ae3689a65e147bf14fccfa98314b6568a2010002dbeb4884f1a2902ae8
+          provenance_ids:
+          - 062ececfcb94ee7718e4cc42352b289581bf53dac43f896c3af70d91a09f92f6
+        - reference_id: column_crosswalk
+          role: schema
+          status: available
+          title: Reviewed SPP Indicator 11 workbook crosswalk
+          path: schemas/spp--2024-2025--timely-initial-evaluation-crosswalk.json
+          reviewed_sha256: 9d959601d122a09f47baf2d3d436d16dd7bb2bd34269d57b5b764f55abb0e0e9
+          provenance_ids: &spp_ind11_004
+          - 97409894e1ceab23a3059957663a03842e886a2aa681acf3b688e7d4f3866270
+      path: data/spp/2024/Region01_masked_2023-24.xlsx
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/spp--2024-2025--timely-initial-evaluation-crosswalk.json
+            acquisition_ids:
+              '01': d768b5851498dec4d6fd98b3ff4c521e1de44e3fbf1dea3aed126cf3aaf7ecdd
+              '02': 239e2be7b815054fdf334924fe96275cf5d3358dc40fd6cbb7a97746d7cc3ce6
+              '03': 9ca25cb22ccaca2a8b7b4ecacb5fe26d2a16255880532a1466684d70d9e2782d
+              '04': c6f02ca8a8340f7866e4594174f731d73e3e64eb828fba9b83897d8cf7c0d0cd
+              '05': 8c0471be331b64c89791ad82c4ccb4f1e0394f7084735ffa1977818ad4a686fd
+              '06': ee8fe38c1dee19acf2d38ea4bf12c3c5b0152e7c335ae675f897c1dade495996
+              '07': 1a237d299cf8f0398de8bb150fa89a19c39cabef1f950b357f2cb627d1d5424d
+              08: a8325dd34fd330d6b3ba02070edf37c2865e377696fc3a46572f9de28517da26
+              09: ec0b5e1a376e7c08b09af694f851b3cd17468e2d00d3f8801d9594fd3c37e965
+              '10': 8560b2712c0af4b1cc3ecef5bde8e070dd00ab427d99b39dafe14977c8b68137
+              '11': efa7a3eb36dd251d9c8dd64ba17585fe2bdbb349d493cfbe7c04db0e0af53ea1
+              '12': e40695cee05af9d96fb8ddbbdbf0e07e74ff6a2b3324c3c2d907aa1e22e0e14b
+              '13': bf8d4ba3ecf4dc4516d324c3370d08796274fac7eb16a94bc380471ce841825c
+              '14': 2f243af1bdc1a8c59ee28472ead4d88f057615a3336d3caddf763cfd92951e87
+              '15': 18db82c52a182e4c117555e41d808a48d2c13274383c3974d3c277f666ea116b
+              '16': a7a284062515d0d6cec45a1209585c7ac00a927e5c728aa1d6fc55e98f402757
+              '17': 29958437f5050b933157e0f1a182e9c9e567c215d5df023b31ca49928294341e
+              '18': dde39bfbb5b74c56f8730cc302a3b0dd380750f541d36861656d78a40ee5125e
+              '19': 0bc6de251b69a1f9c8bd02880023437de68bcdfe68c0434f25c7419de8dad986
+              '20': 1bcbd4c9fcce910f953f2f9055242303ef3d3c60f45fa8026a0dbfaf69094960
+    2025:
+      metadata:
+        title: 2026 TEA State Performance Plan Indicator 11 Timely Initial Evaluation
+        publisher: Texas Education Agency
+        version: '2026'
+        period:
+          kind: school_year
+          start_year: 2024
+          end_year: 2025
+        notes: Public LEA Indicator 11A pre-clarification results from TSDS Child Find. The denominator is children
+          with parental consent to evaluate in the reporting population. District detail across 20 ESC regions is distinct
+          from a publisher state or ESC aggregate. The original rate and target are retained independently.
+        source_url: https://rptsvr1.tea.texas.gov/idea/index.html
+        value_policy: spp_ind11_workbook
+        metrics:
+          initial_evaluation_consent_count:
+            field: initial_evaluation_consent_count
+            unit: count
+          timely_initial_evaluation_count:
+            field: timely_initial_evaluation_count
+            unit: count
+          timely_initial_evaluation_reported_percent:
+            field: timely_initial_evaluation_reported_percent
+            unit: percent
+          timely_initial_evaluation_met_target:
+            field: timely_initial_evaluation_met_target
+        references:
+        - reference_id: spp_masking
+          role: masking_methodology
+          status: available
+          title: TEA SPP public reporting masking and No Report rules
+          url: https://rptsvr1.tea.texas.gov/idea/index.html
+          reviewed_sha256: 393145c07c042dfe57fe1e0a71b7520ad23cc74790e6fd695a400544db745dd7
+          provenance_ids: *spp_ind11_001
+        - reference_id: spp_reporting
+          role: source_notes
+          status: available
+          title: TEA local educational agency reporting editions and pre-clarification status
+          url: https://tea.texas.gov/special-populations-and-support/special-education/data-and-reports/local-educational-agency-public-reporting
+          reviewed_sha256: 85e1cabb82648bd57a1526a0a5cef6a76917ee4a86b1626ecd9f6c9aa45588c2
+          provenance_ids: *spp_ind11_002
+        - reference_id: spp_11a_calculation
+          role: methodology
+          status: available
+          title: TEA Indicator 11A calculation and population
+          url: https://tea.texas.gov/special-populations-and-support/review-and-support/sppi-11a-calculation-and-example.pdf
+          reviewed_sha256: 231c899c68636f0f227681ac2e5a93462f930aacb6099e9dcb24db2390df5b0a
+          provenance_ids: *spp_ind11_003
+        - reference_id: report_2026
+          role: data_dictionary
+          status: available
+          title: About the 2026 LEA State Performance Plan Indicator Report
+          url: https://tea.texas.gov/special-populations-and-support/special-education/about-the-2026-lea-spp-indicator-report.pdf
+          reviewed_sha256: f8c5672941d6d83a4dc8d1949418004bafabeb2b28c32fd0a8b07e3e67639c64
+          provenance_ids:
+          - 95500340f4e73053b1db660f7e4cdcbf9dd5c77525a08f08c3577f3e086d047b
+        - reference_id: column_crosswalk
+          role: schema
+          status: available
+          title: Reviewed SPP Indicator 11 workbook crosswalk
+          path: schemas/spp--2024-2025--timely-initial-evaluation-crosswalk.json
+          reviewed_sha256: 9d959601d122a09f47baf2d3d436d16dd7bb2bd34269d57b5b764f55abb0e0e9
+          provenance_ids: *spp_ind11_004
+      path: data/spp/2025/Region01_masked_2024-25.xlsx
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/spp--2024-2025--timely-initial-evaluation-crosswalk.json
+            acquisition_ids:
+              '01': e2944e4b508912faeade22d90fb411a5b44bccd330b4ee21efb4acbb55008eba
+              '02': 2aa3ddc9a192d3c652eb4e23e2bdb7e714376b3fb6040271a3dde010c5d4e30b
+              '03': 82ae0c3fa324566b9f6ba2c981877b91942fff928ea5c8f79bbeb8c49803675a
+              '04': 5abe39bc6596f41bcb206c33616ece8f4f3a1f1179e034bf088de41b175909cb
+              '05': 2ef10fb8225f3eb7ac193c92d808ed3bfb8fb4343a30a3bb334784451267c51a
+              '06': a8b48b855569a480c74eece8cac737b02a4ad5bdc0c1ecb9ccd2accaeeb092c8
+              '07': 14ade0015ffee108ecc5f126b0df95675b7c747b594546db63da1c97e820c906
+              08: c05457fc557ff893fec5570bc0cfa82bea7cf9de6fd35d4d8e3402139c74159f
+              09: 66dc893a10b4135d93cea30c422fccd9ce0789b5f01b66cb5c53427c70d565ab
+              '10': 48512cdc4d0a9c381523810784f2d2db9d7add37d0afd7da739d71211df6b29f
+              '11': 75c88299b453b254b3d46109afa61fb329722488c616d7c512f0b6a4cf4ee18d
+              '12': 8665f24230fbfe686c0f4ea027a5e056a449c7ae952fb250330112b535b4dfd2
+              '13': 3b34bb6eaeae48d6649acb551b0d39072ada6a824c788eb8a88a6199cca3394c
+              '14': 53e6833d933c375a1322886f851edae28379f51195b79dec5564dc48f8768697
+              '15': d27639e8b5093ee49e0604f5ce2874303a46667d4003c5a2784c816d7fa54519
+              '16': dfac3477e687ee9fe2c5aa4ffcc10bc1f2f779f840a6807dedd31c2f72172b6f
+              '17': 4eed1c8e1e045a4ac9c198c726f8eb0390b1904f9f863860613d7c20af798d69
+              '18': 57d7d996572c691cfe7ce201d8c9e970479d55afdee5b4b424004044de6cdbe4
+              '19': 903db99267db6787bd747350e980890067831d1517f34341cb30e283e348e65c
+              '20': 9c81b824547f8826d00fd48d0ab7b302da17715c63def83969d6661d151a73f0
   peims_special_education_by_primary_disability:
     2023:
       metadata:
@@ -7577,6 +7925,173 @@ data_sources:
               state: cb8abe33c626796eafaa89395129cb9b4df5297adcbd1f18c2cc5bc7e13f4e7d
               district: 9b4ed15e6fab5cbf79fdfc58585147666e9bc1c28080b419109bc05e9e43c46b
               campus: 540c12a72c6373e8a073a7203158a5a5b1c7e872b835a1c6e8490ac5289b07fb
+  peims_financial_single_file_actuals:
+    2023:
+      path: data/peims/2023/actget2023.zip
+      metadata:
+        title: FY2023 PEIMS Single File Financial Actuals
+        publisher: Texas Education Agency
+        version: '2023'
+        period:
+          kind: fiscal_year
+          start_year: 2022
+          end_year: 2023
+        source_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads
+        identifiers:
+        - district_number
+        source_qualifiers:
+          family: peims_financial
+          reference_id: release_listing
+          financial_basis: actual
+        notes: Exact edition of separate district and charter account files. The row
+          year code and publisher update date are separate from the archive fiscal edition.
+          Signed source amounts in nominal dollars. The historical dictionary describes ACTAMT
+          as budget data and claims zero rows are absent. The actuals archives include explicit zeros.
+          Cross-report reconciliation and finality are unasserted.
+        metrics:
+          actual_amount:
+            field: actual_amount
+            unit: currency
+        references: &peims_single_file_actuals_references
+        - reference_id: release_listing
+          role: source_notes
+          status: available
+          title: PEIMS Single File Financial Data Downloads
+          url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads
+          reviewed_sha256: 7aea28359129b93999bc2c024077719b762742a56e7a49ac1472a71c01a024cd
+          provenance_ids:
+          - 2c2712324e1f370ae5d8dcfaf82b67ab1bb689b9684d78b6d4f34dea77bd2b15
+        - reference_id: raw_dictionary
+          role: data_dictionary
+          status: available
+          title: Historical single-file financial data dictionary. Consult the actual
+            headers for columns absent from this edition of the dictionary.
+          url: https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/reports-and-downloadable-data/datadictionary.pdf
+          reviewed_sha256: 7d5a5121f09d3e6b45986ee352bb5ab933dc39b7730b34855ac1f8aaceea8ade
+          provenance_ids:
+          - e1c3fb464a07f3376e875ea5d3710e533aa9975eba147a59dc96c1c995123e15
+        - reference_id: accounting_guide
+          role: methodology
+          status: available
+          title: TEA FASRG FAR version 19 accounting code appendices
+          url: https://tea.texas.gov/data-reports/financial-accountability/fasrg/fasrg19-module1-far-appendices-0.pdf
+          reviewed_sha256: cabc0c2bc12120aceb566619faca33527d0fa6bf174ad14d145578cb47c41148
+          provenance_ids:
+          - bd15c5ce1eada3e1be247d0dca655ea057d50ab4d3013eca814dbfcb450abe80
+        - reference_id: column_crosswalk
+          role: schema
+          status: available
+          path: schemas/peims--2023-2025--single-file-financial-actuals-crosswalk.json
+          provenance_ids:
+          - d289a789b8e6e183a22159fb6439d42cb612ef60cbbd07ae71259e435c715d43
+          title: Exact literal district and charter PEIMS single-file actuals mappings
+          reviewed_sha256: e9c7297b527e3983984895ec0723ad6ed390f0421a466df79c6fedd252a04ed9
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2023-2025--single-file-financial-actuals-crosswalk.json
+            archives:
+              district:
+                receipt_id: 43944b4370ec8abb136aeaa591720c983f6b4994acc3337fe2064dc1961e5a19
+                member: actget2023.csv
+                rows: 5441686
+                requested_url: https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/actget2023.zip
+                resolved_url: https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/actget2023.zip
+              charter:
+                receipt_id: 3c4da0a007f2f8584362453e4364300fe92383ed31d351500e7015e5b52ec3f6
+                member: charact23.csv
+                rows: 347998
+                requested_url: https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/charact23.zip
+                resolved_url: https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/charact23.zip
+    2024:
+      path: data/peims/2024/actget2024.zip
+      metadata:
+        title: FY2024 PEIMS Single File Financial Actuals
+        publisher: Texas Education Agency
+        version: '2024'
+        period:
+          kind: fiscal_year
+          start_year: 2023
+          end_year: 2024
+        source_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads
+        identifiers:
+        - district_number
+        source_qualifiers:
+          family: peims_financial
+          reference_id: release_listing
+          financial_basis: actual
+        notes: Exact edition of separate district and charter account files. The row
+          year code and publisher update date are separate from the archive fiscal edition.
+          Signed source amounts in nominal dollars. The historical dictionary describes ACTAMT
+          as budget data and claims zero rows are absent. The actuals archives include explicit zeros.
+          Cross-report reconciliation and finality are unasserted.
+        metrics:
+          actual_amount:
+            field: actual_amount
+            unit: currency
+        references: *peims_single_file_actuals_references
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2023-2025--single-file-financial-actuals-crosswalk.json
+            archives:
+              district:
+                receipt_id: c9d1d6d487f95baee1b82a8c34b3264d900ed21168cc5cc8ba7d148529dfda0c
+                member: actget2024.csv
+                rows: 5398527
+                requested_url: https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/actget2024.zip
+                resolved_url: https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/actget2024.zip
+              charter:
+                receipt_id: b7adf2befaa054d68a89e5d1c2f0b32d0ccdfbff79dc4886b96a8e1be9be3743
+                member: charact24.csv
+                rows: 362999
+                requested_url: https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/charact24.zip
+                resolved_url: https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/charact24.zip
+    2025:
+      path: data/peims/2025/actget2025.zip
+      metadata:
+        title: FY2025 PEIMS Single File Financial Actuals
+        publisher: Texas Education Agency
+        version: '2025'
+        period:
+          kind: fiscal_year
+          start_year: 2024
+          end_year: 2025
+        source_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads
+        identifiers:
+        - district_number
+        source_qualifiers:
+          family: peims_financial
+          reference_id: release_listing
+          financial_basis: actual
+        notes: Exact edition of separate district and charter account files. The row
+          year code and publisher update date are separate from the archive fiscal edition.
+          Signed source amounts in nominal dollars. The historical dictionary describes ACTAMT
+          as budget data and claims zero rows are absent. The actuals archives include explicit zeros.
+          Cross-report reconciliation and finality are unasserted.
+        metrics:
+          actual_amount:
+            field: actual_amount
+            unit: currency
+        references: *peims_single_file_actuals_references
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2023-2025--single-file-financial-actuals-crosswalk.json
+            archives:
+              district:
+                receipt_id: 67a543265615de14e755f5998e363741d55e3c4bfbb677cae1bdcaf446e74f52
+                member: actget2025.csv
+                rows: 5264565
+                requested_url: https://tea.texas.gov/media/423221
+                resolved_url: https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/actget2025.zip
+              charter:
+                receipt_id: dcfd0249150986552780b429118ba76ecb32592d53b9addb77f10709beee2dd7
+                member: charact25.csv
+                rows: 361456
+                requested_url: https://tea.texas.gov/media/423231
+                resolved_url: https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/charact25.zip
+
 spatial:
   districts:
     2025:
@@ -7771,8 +8286,14 @@ spatial:
         column_schema: schemas/spatial--campuses--2025--4826bcd2--default.json
 schema:
   data_sources:
+    peims_financial_single_file_actuals:
+    - zip
+    spp_timely_initial_evaluation:
+    - xlsx
     district_transfer_reports:
     - parquet
+    peims_staff_fte_and_salary:
+    - csv
     peims_special_education_by_primary_disability:
     - csv
     peims_student_enrollment_by_ethnicity:

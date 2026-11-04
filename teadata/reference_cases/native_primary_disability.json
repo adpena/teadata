@@ -103,5 +103,6 @@
       "sha256": "4bac973bd116ed81aa0f5fd1dd26a1fe1c7278e91b59a35bbe48f3db06ec8123"
     }
   },
-  "manifest_sha256": "6f2cc32a7b9cc1b43d8b0ed84f2870d3dd75ddcfef58e9e8508e37f34c41cd37"
+  "manifest_sha256": "6f2cc32a7b9cc1b43d8b0ed84f2870d3dd75ddcfef58e9e8508e37f34c41cd37",
+  "profile_composition_manifest_sha256": "465e130bcb4bc48a523e4901103d34a41ead89123141a2ca7bb0c6ef3171b4a0"
 }
