@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import pyarrow as pa
 import pytest
 
 from test_transfer_preparation import DISTRICT_HEADER, POLICY, original
@@ -18,6 +19,7 @@ from teadata.release import DataRelease
 from teadata.scripts.refresh_transfers import main
 from teadata.teadata_config import load_config
 from teadata.transfer_leaves import materialize_district_transfers
+from teadata.transfer_rollups import _compare_details
 from teadata.transfer_sources import acquire_regional_transfers, prepare_transfer_sources
 from teadata.values import measure
 
@@ -25,6 +27,48 @@ from teadata.values import measure
 FIELDS = ["school_year", "reporting_region", "reporting_region_name", "reporting_district_number",
     "reporting_charter_status", "report_number", "transfer_direction", "line_group_number",
     "partner_district_number", "student_transfer_count"]
+
+
+def test_campus_district_rollup_checks_only_fully_observed_cross_district_groups():
+    def detail(rows, value):
+        fields = {
+            "transfer_direction": [row[0] for row in rows],
+            "transfer_reporting_district_number": [row[1] for row in rows],
+            "transfer_partner_district_number": [row[2] for row in rows],
+            "transfer_count_status": ["observed" if row[3] is not None else "suppressed" for row in rows],
+            value: pa.array([row[3] for row in rows], type=pa.int64()),
+        }
+        if value == "transfer_count_value":
+            fields["transfer_reporting_number"] = [f"{row[1]}{index:03}" for index, row in enumerate(rows)]
+            fields["transfer_partner_number"] = [f"{row[2]}001" for row in rows]
+        return pa.table(fields)
+
+    campus = detail([("in", "001", "002", 11), ("in", "001", "002", 15), ("out", "002", "001", 26),
+                     ("in", "003", "003", 100), ("in", "003", "004", 12), ("in", "003", "004", None),
+                     ("in", "005", "006", 32)], "transfer_count_value")
+    district = detail([("in", "001", "002", 26), ("out", "002", "001", 26), ("in", "003", "004", 22),
+                       ("in", "005", "006", None), ("out", "006", "005", None)], "student_transfer_count")
+    result = _compare_details(campus, district)
+    assert result["status"] == "PASS_OBSERVED_TRANSFER_ROLLUP"
+    assert result["coverage"] == {"exact": 2, "different": 0, "campus_suppressed": 1, "district_suppressed": 1,
+                                  "campus_only": 0, "district_only_observed": 0, "district_only_suppressed": 1}
+    assert result["campus_within_district_detail_rows_excluded"] == 1
+    assert result["visible_mismatch_examples"] == []
+    changed = district.set_column(district.num_columns - 1, "student_transfer_count", pa.array([27, 26, 22, None, None]))
+    mismatch = _compare_details(campus, changed)
+    assert mismatch["status"] == "HOLD"
+    assert mismatch["coverage"]["different"] == 1
+    assert [row["student_transfer_count"] for row in mismatch["visible_mismatch_examples"]] == [27]
+    assert _compare_details(campus.slice(0, 1), district.slice(0, 2))["coverage"]["district_only_observed"] == 1
+    assert _compare_details(campus, district.slice(0, 1))["coverage"]["campus_only"] == 3
+    with pytest.raises(ValueError, match="Duplicate directional campus"):
+        _compare_details(pa.concat_tables([campus.slice(0, 1), campus]), district)
+    very_large = detail([("in", "001", "002", 2**63 - 1), ("in", "001", "002", 2**63 - 1),
+                         ("in", "001", "002", 3)], "transfer_count_value")
+    overflow = _compare_details(very_large, detail([("in", "001", "002", 1)], "student_transfer_count"))
+    assert overflow["status"] == "HOLD"
+    assert overflow["visible_mismatch_examples"][0]["transfer_count_value_sum"] == 2**64 + 1
+    assert _compare_details(campus.slice(0, 0), district.slice(0, 0))["status"] == "HOLD"
 
 
 @pytest.mark.parametrize("year", [2024, 2025, 2026])

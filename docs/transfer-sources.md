@@ -346,3 +346,36 @@ value is false; PASS/readback and native materialization do not upgrade it or
 establish all-LEA coverage. The packaged entries expose the source contracts
 without adding district rows to the default engine or app. Engine/app consumer
 cutover, field correctness and release qualification remain separate reviewed steps.
+
+## Compare campus observations with district reports
+
+`compare-campus-district` compares cross-district directional details from a
+retained campus preparation and an exact manifest-pinned district release. It
+verifies the campus preparation's original provenance and the selected district
+leaf. The school years must agree.
+
+```sh
+uv run --locked --offline python -m teadata.scripts.refresh_transfers compare-campus-district \
+  --store "$TRANSFER_PROVENANCE_STORE" --year 2026 \
+  --campus-preparation 7d651084d10803842bc7557f16ba604140051423967956c88952675c3e560798 \
+  --district-release "$DISTRICT_RELEASE_MANIFEST" --district-pin "$DISTRICT_MANIFEST_SHA256"
+```
+
+It excludes same-district campus details, publisher totals, and separator rows.
+It sums a directional district pair only when every published campus detail
+and the district count are observed. Coverage categories are mutually
+exclusive. When both levels are suppressed the shared group is counted under
+district suppression. The check does not reconstruct masked counts.
+
+| School year | Exact observed groups | District-only masked groups |
+| --- | ---: | ---: |
+| 2023–24 | 372 | 6 |
+| 2024–25 | 420 | 0 |
+| 2025–26 | 418 | 12 |
+
+`PASS_OBSERVED_TRANSFER_ROLLUP` covers only this visible subset. A disagreement,
+a campus-only cross-district group, a district-only observed group, or no
+comparable groups yields `HOLD`. The 2023–24 campus preparation's canonical
+edge status remains `HOLD` because of the directional masking differences
+described above. The comparison can use its separately accepted source rows
+without upgrading that status.

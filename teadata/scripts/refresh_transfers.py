@@ -47,8 +47,21 @@ def main(argv: list[str] | None = None) -> int:
     materialize.add_argument("--config-sha256", required=True)
     materialize.add_argument("--prepared-input", nargs=2, action="append", required=True, metavar=("YEAR", "PROCESSING_RECORD"))
     materialize.add_argument("--output", type=Path, required=True, help="New exclusive unpublished candidate directory")
+    compare = sub.add_parser("compare-campus-district", help="Check wholly visible cross-district transfer rollups offline")
+    compare.add_argument("--store", type=Path, required=True, help="Retained campus preparation and its original provenance")
+    compare.add_argument("--year", type=int, required=True)
+    compare.add_argument("--campus-preparation", required=True)
+    compare.add_argument("--district-release", type=Path, required=True)
+    compare.add_argument("--district-pin", required=True)
     args = parser.parse_args(argv)
     store = ProvenanceStore(args.store)
+    if args.command == "compare-campus-district":
+        from teadata.transfer_rollups import PASS_OBSERVED_TRANSFER_ROLLUP, compare_transfer_rollup
+
+        result = compare_transfer_rollup(store, year=args.year, campus_preparation=args.campus_preparation,
+                                         district_release=args.district_release, district_pin=args.district_pin)
+        print(json.dumps(result, sort_keys=True))
+        return 0 if result["status"] == PASS_OBSERVED_TRANSFER_ROLLUP else 2
     if args.command == "materialize":
         from teadata.transfer_leaves import materialize_district_transfers
         try:
