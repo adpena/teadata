@@ -1,5 +1,6 @@
 from dataclasses import replace
 from contextlib import closing
+import errno
 import gzip
 from hashlib import sha256
 from io import BytesIO
@@ -132,6 +133,47 @@ def test_release_binds_all_artifacts(release, catalog):
     assert engine.catalog.build_id == selected.build_id
     with pytest.raises(ContractError, match="no analytical read model"):
         selected.analytical_dataset("campus")
+
+
+@pytest.mark.parametrize("unsupported", [False, True])
+def test_file_identity_cache_advice_preserves_complete_hash(tmp_path, monkeypatch, unsupported):
+    window = 16 * 1024 * 1024
+    path = tmp_path / "artifact"
+    with path.open("wb") as stream:
+        stream.seek(window + 19)
+        stream.write(b"x")
+    calls = []
+
+    def advise(fd, offset, length, policy):
+        assert os.fstat(fd).st_size == window + 20
+        calls.append((offset, length, policy))
+        if unsupported:
+            raise OSError(errno.EINVAL, "cache advice unsupported")
+
+    monkeypatch.setattr(os, "posix_fadvise", advise, raising=False)
+    monkeypatch.setattr(os, "POSIX_FADV_DONTNEED", 4, raising=False)
+    expected = file_identity(path)
+    assert calls == []
+    assert file_identity(path, discard_cached_reads=True) == expected
+    assert calls == ([(0, window, 4)] if unsupported else [(0, window, 4), (window, 20, 4)])
+
+
+def test_streaming_release_verification_still_rejects_replaced_bytes(release, monkeypatch):
+    identify = Mock(wraps=file_identity)
+    monkeypatch.setattr(release_module, "file_identity", identify)
+    selected = DataRelease(release)
+    verified = selected.verify(discard_cached_reads=True)
+    assert {call.args[0] for call in identify.call_args_list} == set(verified.values())
+    assert all(call.kwargs == {"discard_cached_reads": True} for call in identify.call_args_list)
+
+    # Same file size, so the checksum and the verified file identity both matter.
+    path = verified["maps"]
+    with path.open("r+b") as stream:
+        original = stream.read(1)
+        stream.seek(0)
+        stream.write(bytes([original[0] ^ 1]))
+    with pytest.raises(ContractError, match="checksum or size"):
+        selected.verify(discard_cached_reads=True)
 
 
 def test_current_release_reuses_a_pinned_build_cache_offline(release, tmp_path, monkeypatch):

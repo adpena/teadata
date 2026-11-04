@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
+from functools import lru_cache, partial
 from contextlib import contextmanager
 from contextvars import ContextVar
 from hashlib import sha256
@@ -266,14 +266,15 @@ class DataRelease:
         else:
             self.__dict__.update(state)
 
-    def artifact(self, role: str) -> Path:
+    def artifact(self, role: str, *, discard_cached_reads: bool = False) -> Path:
+        identify = partial(file_identity, discard_cached_reads=True) if discard_cached_reads else file_identity
         if self._v3:
             descriptor = self.catalog.artifact_ref(role)
             path = self._resource_path(descriptor.location, descriptor.sha256, descriptor.size_bytes)
             state = path.stat()
             signature = (state.st_ino, state.st_size, state.st_mtime_ns, state.st_ctime_ns)
             if self._verified_bytes.get(descriptor.sha256) != (path, signature):
-                observed = file_identity(path)
+                observed = identify(path)
                 if observed["sha256"] != descriptor.sha256 or observed["size_bytes"] != descriptor.size_bytes:
                     raise ContractError("Selected leaf checksum or size mismatch")
                 self._verified_bytes[descriptor.sha256] = path, signature
@@ -302,7 +303,7 @@ class DataRelease:
         signature = (stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
         if self._verified.get(role) == (path, signature):
             return path
-        identity = file_identity(path)
+        identity = identify(path)
         if any(identity[key] != expected[key] for key in ("sha256", "size_bytes")):
             raise ContractError(f"Release artifact checksum or size mismatch: {role}")
         if role in ROLES - {"snapshot"} and read_sqlite_catalog(path, immutable=True).build_id != self.build_id:
@@ -314,11 +315,13 @@ class DataRelease:
         self._verified[role] = (path, signature)
         return path
 
-    def verify(self) -> dict[str, Path]:
+    def verify(self, *, discard_cached_reads: bool = False) -> dict[str, Path]:
+        """Verify the complete bundle, optionally releasing already hashed file pages."""
+        artifact = partial(self.artifact, discard_cached_reads=True) if discard_cached_reads else self.artifact
         if self._v3:
             self.catalog.verify_metadata()
-            return {identifier: self.artifact(identifier) for identifier in self.catalog.to_dict()["artifacts"]}
-        return {role: self.artifact(role) for role in sorted(self._artifacts)}
+            return {identifier: artifact(identifier) for identifier in self.catalog.to_dict()["artifacts"]}
+        return {role: artifact(role) for role in sorted(self._artifacts)}
 
     def analytical_dataset(self, name: str):
         """Return a standard Arrow Dataset for campus, district, attributes or sources.

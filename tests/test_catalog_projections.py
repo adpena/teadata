@@ -1723,6 +1723,23 @@ def test_v4_selected_foreign_dependency_closure_uses_existing_resolver(edition_i
         index_with_child(fixture, student, foreign).artifact_ref(ref.identity)
 
 
+def test_v4_cache_advice_preserves_leaf_verification(edition_index_fixture):
+    from teadata.release import DataRelease
+
+    fixture = edition_index_fixture
+    release = DataRelease(fixture["root"], offline=True)
+    _, ref, _ = fixture["leaves"]["student"]
+    verified = release.verify(discard_cached_reads=True)
+    path = verified[ref.identity]
+    with path.open("r+b") as stream:
+        first = stream.read(1)
+        stream.seek(0)
+        stream.write(bytes([first[0] ^ 1]))
+
+    with pytest.raises(ContractError, match="Selected leaf checksum"):
+        release.verify(discard_cached_reads=True)
+
+
 def test_v4_pickle_drops_child_acceptance_and_rechecks_current_files(edition_index_fixture):
     from teadata.release import DataRelease
     fixture = edition_index_fixture

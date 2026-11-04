@@ -54,12 +54,31 @@ def schema_fingerprint(columns: Any) -> str:
     ).hexdigest()
 
 
-def file_identity(path: str | Path) -> dict[str, Any]:
+def file_identity(path: str | Path, *, discard_cached_reads: bool = False) -> dict[str, Any]:
+    """Hash every byte; optionally release cache pages behind a one-pass scan."""
     path = Path(path)
     digest = sha256()
+    advise = getattr(os, "posix_fadvise", None) if discard_cached_reads else None
+    dontneed = getattr(os, "POSIX_FADV_DONTNEED", None) if advise is not None else None
+    discard_window = 16 * 1024 * 1024
+    offset = position = 0
     with path.open("rb") as stream:
-        for block in iter(lambda: stream.read(1024 * 1024), b""):
-            digest.update(block)
+        while True:
+            block = stream.read(1024 * 1024)
+            if block:
+                digest.update(block)
+            if advise is not None and dontneed is not None:
+                position += len(block)
+                if position - offset >= discard_window or (not block and position > offset):
+                    try:
+                        advise(stream.fileno(), offset, position - offset, dontneed)
+                    except OSError:
+                        # Cache advice is best effort. Filesystem support does
+                        # not change the validity of a complete checksum.
+                        advise = None
+                    offset = position
+            if not block:
+                break
     return {
         "filename": path.name,
         "sha256": digest.hexdigest(),
