@@ -99,3 +99,54 @@ with the [native release gate](data-releases.md#qualifying-reviewed-native-bundl
 The manifest's adjacent `provenance` directory supplies raw parity evidence.
 The separate source store passed with `--source-store` supplies the individual
 publisher reports.
+
+## Teacher FTE and course enrollment source review
+
+TEA's [standard report listing](https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports)
+records March 16, 2026 for the latest edition. The 2025–26 report footer also
+records the July 20 addition of Engineering courses. The September 16
+[report criteria](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/About_TeacherFTE_Enroll.html)
+document a separate September recreation of the 2012–13 through 2025–26
+reports to eliminate duplicate student counts associated with assistant or
+support teachers. Pin the dated acquisition when comparing extracts from
+before and after that revision. TEA does not specify a finality status here.
+
+Each statewide edition has one observation per published course code, with
+the subject and intended grade range attached. The student count measures
+course membership at the PEIMS reporting date. Course membership differs
+from full-year completion and does not measure eligibility or exam taking.
+A student can appear in multiple courses. Teacher FTE includes charter partner
+teachers starting in 2023–24, so comparisons with earlier years need that
+definition change. The publisher uses `-999` in CSV and `N/A` in HTML for
+masked cells, including some larger values masked to prevent imputation.
+
+The November 4, 2026 acquisition retains the
+[selector](../provenance/records/67a39bd274e492426111703a32278ad84a63cb5db037963779e18d5147da80a1.json)
+and [criteria](../provenance/records/3f0a9a11c39e00dbada1e7017aba382afe7b859bd142a00c0d3b2125752f6b10.json)
+with the exact request controls, hashes and retrieval times. The following
+offline comparison requires the archived objects under the provenance store's
+`objects/` directory. To replay from another checkout, use the archive or
+reissue each receipt's recorded form request and verify the returned byte hash
+and size before reusing the receipt. Changed bytes need a new acquisition
+record. The command compares 5,658 statewide rows and 28,290 measure cells,
+including 306 masked cells, across two presentations from TEA. It also checks
+the reviewed masking, grade and revision notes in each edition's footer.
+
+```sh
+uv run --locked --offline python -m teadata.scripts.verify_peims_courses --store provenance \
+  --pair 2023 4619f15fd40e8a6ae875d9a1c548542a46a7a2f550152f825b5861b22b273164 0b982beddda26f2d4515264bca782d4bff3c408ed246c6cfbff8c7fb894c189e \
+  --pair 2024 0f4645a4f6919b48ed9653ad6ae8fa07abb500cb74891edc0fe45faa49b0f683 1ff4dbd6bcd81695d36dbb129b35d83b19571f4f22d7c1952af53633c9f21e1a \
+  --pair 2025 dbe04d144f99c9d54f6f98b01b89a85b2b04f2ac46c9d58b5621d2d9f6ad3a2c 6e3333bc9663abf5d33685838a6ecc77207c1b7159c399b67ca2af60250e3669 \
+  --pair 2026 b83eb582021312eaf322d97e0ea081085258d9f89e26e11cbdd9c2efa8b82cc1 cea5fd8baa3c740914856de275dc29a33508b3dafbcf51d9bf4b7370b84cc99c
+```
+
+An [individual campus extract](../provenance/records/50bdbb47f990375b35b64c5fa2e92c92edff30d4c267a5388b814854a78c97b6.json)
+returned 59 course rows for A+ Academy Elementary (`057829001`) in 2023–24.
+The [selection receipt](../provenance/records/a5d05dd3d90060f054d41962f18d8df08e73ff37ee0f1477469102597256632e.json)
+records how TEA resolved that campus number. This establishes that a historical
+campus report can be retrieved. The [2025–26 statewide district extract](../provenance/records/c54740974d39fdbc3c461120aba68db87b3af07fa3615eb91c868bd2d1c0ae81.json)
+contains 207,751 course rows across 1,203 distinct six-digit district IDs
+and is about 36 MiB. District and campus coverage and value parity still
+require separate validation. The comparison above qualifies source agreement
+at statewide scope only. Native leaves, dataset activation, subgroup measures
+and course completion measures remain outside this comparison.
