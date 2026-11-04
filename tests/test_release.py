@@ -193,6 +193,19 @@ def test_current_release_applies_pin_to_the_selected_local_manifest(release, mon
         release_module.current_release()
 
 
+def test_release_offline_reads_policy_without_selecting_a_manifest(release, tmp_path, monkeypatch):
+    monkeypatch.setenv("TEADATA_RELEASE", str(tmp_path / "missing.json"))
+    monkeypatch.delenv("TEADATA_RELEASE_OFFLINE", raising=False)
+    assert release_module.release_offline() is False
+    monkeypatch.setenv("TEADATA_RELEASE_OFFLINE", "1")
+    assert release_module.release_offline() is True
+    with release_module.using_release(DataRelease(release)):
+        assert release_module.release_offline() is False
+    monkeypatch.setenv("TEADATA_RELEASE_OFFLINE", "true")
+    with pytest.raises(ContractError, match="must be 0 or 1"):
+        release_module.release_offline()
+
+
 def test_citation_pins_release_without_emitting_private_locations(release, tmp_path, monkeypatch):
     monkeypatch.setattr(release_module, "user_cache_path", lambda _: tmp_path / "cache")
 

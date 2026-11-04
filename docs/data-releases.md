@@ -407,6 +407,8 @@ manifest and checks its pin in each new process. Missing or corrupt cached
 files fail when the reader verifies or opens them. The offline setting defaults
 to `0` and accepts only `0` or `1`. The manifest pin also applies when
 `TEADATA_RELEASE` selects a local file. Use `release.manifest_sha256` to pass the
-identity of the loaded manifest to a background job.
+identity of the loaded manifest to a background job. When reopening a saved
+release, `teadata.release.release_offline()` provides the scoped or configured
+offline policy without opening the active manifest.
 
 The application requires the coordinated library version, schema migrations, and release manifest. Publish and pin those together before deployment. Never merge the app against an older library tag. Preserve the previous deployed code and data bundle for rollback. The migration's missing joins, unreviewed documentation, unknown original download dates, and incomplete upstream lineage must remain visible; they prevent claiming this baseline has completed researcher-grade dataset certification.

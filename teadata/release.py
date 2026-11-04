@@ -343,6 +343,17 @@ def _load_release(source: str, stamp: int, expected_sha256: str | None = None, o
     return DataRelease(source, expected_sha256=expected_sha256, offline=offline)
 
 
+def release_offline() -> bool:
+    """Return the scoped or configured offline policy without opening a manifest."""
+    active = _ACTIVE_RELEASE.get()
+    if active is not None:
+        return active.offline
+    value = os.environ.get("TEADATA_RELEASE_OFFLINE", "0")
+    if value not in {"0", "1"}:
+        raise ContractError("TEADATA_RELEASE_OFFLINE must be 0 or 1")
+    return value == "1"
+
+
 def current_release() -> DataRelease:
     active = _ACTIVE_RELEASE.get()
     if active is not None:
@@ -351,11 +362,9 @@ def current_release() -> DataRelease:
     if not source:
         source = str(Path(__file__).with_name(".cache") / "release.json")
     expected_sha256 = os.environ.get("TEADATA_RELEASE_SHA256")
-    offline = os.environ.get("TEADATA_RELEASE_OFFLINE", "0")
-    if offline not in {"0", "1"}:
-        raise ContractError("TEADATA_RELEASE_OFFLINE must be 0 or 1")
+    offline = release_offline()
     stamp = 0 if "://" in source else Path(source).expanduser().stat().st_mtime_ns
-    return _load_release(source, stamp, expected_sha256, offline == "1")
+    return _load_release(source, stamp, expected_sha256, offline)
 
 
 @contextmanager
