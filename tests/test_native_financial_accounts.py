@@ -103,8 +103,11 @@ def test_actual_operating_control_keeps_signed_values_and_fund_scope():
     assert totals == {("001902", "GF"): 80, ("001902", "AF"): 110, ("001902", "excluded_fund_699"): 40}
 
 
-@pytest.mark.parametrize("damage", [None, "amount", "missing-raw", "extra-raw", "retyped", "duplicate", "period"])
-def test_actual_pwr_compares_exact_operating_amounts_and_validates_full_roster(tmp_path, monkeypatch, damage):
+@pytest.mark.parametrize(("year", "damage"), [
+    (2024, None), (2024, "tab-name"), (2024, "wrong-download"), (2025, None), (2025, "amount"),
+    (2025, "missing-raw"), (2025, "extra-raw"), (2025, "retyped"), (2025, "duplicate"), (2025, "period"),
+])
+def test_actual_pwr_compares_exact_operating_amounts_and_validates_full_roster(tmp_path, monkeypatch, year, damage):
     from openpyxl import Workbook
 
     url = "https://tea.texas.gov/example.xlsx"
@@ -113,23 +116,29 @@ def test_actual_pwr_compares_exact_operating_amounts_and_validates_full_roster(t
     assert workbook.active is not None
     workbook.remove(workbook.active)
     for group in ("GF", "AF"):
-        sheet = workbook.create_sheet(f"24_25 {group} Act")
+        tab_name = f"{(year - 1) % 100:02}_{year % 100:02} {group} Act"
+        sheet = workbook.create_sheet("2024 AF Act" if year == 2024 and group == "AF" else tab_name)
         sheet.append(["SOURCE", "TAB NAME", "DISTRICT NUMBER", "DISTRICT NAME", "District Type",
                       f"{group} Students with Disabilities (PICs 23,33,43)"])
-        edition = "2024 Actual PWR" if damage == "period" else "2025 Actual PWR"
+        edition = f"{year - 1 if damage == 'period' else year} Actual PWR"
         for cdn, population, amount in (
             ("001902", "INDEPENDENT", -20 if damage == "amount" else -10),
             ("001903", "COMMON" if damage == "retyped" and group == "AF" else "INDEPENDENT", 0),
             ("001904", "INDEPENDENT" if damage == "retyped" and group == "AF" else "COMMON", 0),
             ("001902" if damage == "duplicate" else "002801", "CHARTER", 999),
         ):
-            sheet.append([edition, sheet.title, cdn, "Fixture", population, amount])
+            sheet.append([edition, sheet.title if damage == "tab-name" else tab_name,
+                          cdn, "Fixture", population, amount])
     workbook.save(path)
     store = Mock(spec=ProvenanceStore)
     store.verify_artifact.return_value = path
     store.read_record.return_value = {
         "kind": "acquisition", "method": "download", "section": "reference", "requested_url": url,
-        "resolved_url": url, "source_metadata": {"source_url": url},
+        "resolved_url": url, "source_metadata": (
+            {"source_url": "https://tea.texas.gov/reports", "download_url": (
+                "https://tea.texas.gov/other.xlsx" if damage == "wrong-download" else url
+            )} if year == 2024 else {"source_url": url}
+        ),
         "downloaded_at": "2026-11-04T19:34:19+00:00",
         "parameters": {"http_method": "GET", "http_status": 200},
         "response_headers": {"content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
@@ -141,16 +150,19 @@ def test_actual_pwr_compares_exact_operating_amounts_and_validates_full_roster(t
     if damage == "extra-raw":
         entities.add("002801")
     totals = Counter({("001902", "GF"): -10, ("001902", "AF"): -10, ("001902", "excluded_fund_699"): 21})
-    monkeypatch.setattr(gate, "_ACTUAL_PWR", {2025: ("1" * 64, 2)})
+    monkeypatch.setattr(gate, "_ACTUAL_PWR", {year: ("1" * 64, 2)})
     if damage is None:
-        report = gate._actual_workbook_control(store, 2025, entities, totals)
+        report = gate._actual_workbook_control(store, year, entities, totals)
         assert report["compared_cells"] == 4
         assert report["fund_groups"]["AF"]["common_unchecked"] == 1
         assert report["fund_groups"]["AF"]["charter_unchecked"] == 1
         assert report["independent_districts_with_nonzero_excluded_fund_699"] == 1
+        if year == 2024:
+            assert report["fund_groups"]["AF"]["sheet"] == "2024 AF Act"
+            assert report["fund_groups"]["AF"]["publisher_tab_name"] == "23_24 AF Act"
     else:
         with pytest.raises(ContractError):
-            gate._actual_workbook_control(store, 2025, entities, totals)
+            gate._actual_workbook_control(store, year, entities, totals)
 
 
 def test_canonical_actual_pwr_dispatch_uses_explicit_separate_status(monkeypatch):

@@ -843,7 +843,7 @@ def main() -> None:
     parser.add_argument("--native-release", type=Path, help="Qualify an exact reviewed native bundle offline")
     parser.add_argument("--native-pin", help="Trusted manifest SHA-256 for --native-release")
     parser.add_argument("--actual-pwr-controls", action="store_true",
-                        help="Check only the reviewed FY2023 and FY2025 district Actual PWR operating-dollar controls")
+                        help="Check only the reviewed FY2023–FY2025 district Actual PWR operating-dollar controls")
     parser.add_argument("--source-store", type=Path, help="Existing retained ProvenanceStore for source or native checks")
     parser.add_argument("--source-edition", action="append", default=[], help="Exact edition ID for --source-parity; repeat explicitly")
     args = parser.parse_args()

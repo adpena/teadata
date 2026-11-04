@@ -298,7 +298,7 @@ uv run --locked python -m teadata.scripts.refresh_peims_actuals \
 
 #### Actual PWR operating-dollar controls
 
-Run the scoped comparison against the [FY2023 Actual PWR workbook](https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/2023-actual-pwr.xlsx) and the [FY2025 Actual PWR workbook](https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/actual2025-info-gen-all.xlsx).
+Run the scoped comparison against the [FY2023 Actual PWR workbook](https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/2023-actual-pwr.xlsx), the [FY2024 Actual PWR workbook](https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/actual2024-info-gen-all-w-fb.xlsx), and the [FY2025 Actual PWR workbook](https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/actual2025-info-gen-all.xlsx).
 
 ```sh
 scripts/check --actual-pwr-controls --native-release "$ACTUALS_CANDIDATE/release.json" \
@@ -313,22 +313,26 @@ directory. Download each record's `requested_url`, verify the exact
 receipt separately if reacquiring a different publisher revision.
 
 - FY2023 `2beb638ee1da5351a69e715b8dc6ac30dedfe8284c44ecdead5895efd8cd4bfa`
+- FY2024 `f62a3201b892c354edcac791126075b1e8be4b27ec5e060d56aedb38e4bc14fe`
 - FY2025 `f8a3128a833512452dfaef9af8030f07854f7f02fe8c2fa69d7f157c5d109b23`
 
 `PASS_REVIEWED_ACTUAL_PWR_CONTROLS` means that raw account fidelity passed for
-the two district leaves and every Independent ISD's published **Students with
+the three district leaves and every Independent ISD's published **Students with
 Disabilities (PICs 23,33,43)** operating-dollar cell matched in both fund
-groups. This is 2,028 comparisons in FY2023 and 2,026 in FY2025. The raw
+groups. This is 2,028 comparisons in FY2023 and 2,026 each in FY2024 and FY2025. The raw
 district roster must match the publisher's Independent and Common rows, and
 the two workbook sheets must agree on classifications. The Common and charter
-rows are outside the dollar comparison. FY2024 is outside this mode.
+rows are outside the dollar comparison. The FY2024 physical All Funds sheet
+`2024 AF Act` carries the publisher's distinct `TAB NAME` value `23_24 AF Act`.
 
 The calculation uses objects 6100–6499 and excludes functions 71, 81, 91, 93,
 97 and 99. General Fund uses funds 100, 101 and 199 and is included in All Funds.
-Excluding capital-project Fund 699 reproduces these two frozen PWR All Funds
+Excluding capital-project Fund 699 reproduces these three frozen PWR All Funds
 presentations. The report counts nonzero excluded Fund 699 contributions
 separately. This empirical scope rule applies to this control only and leaves
-the original account values intact. [TEA Actual report methodology](https://rptsvr1.tea.texas.gov/school.finance/forecasting/financial_reports/AbtAct25.docx)
+the original account values intact. The FY2024 notes explicitly mention Fund
+699 for operating revenue. The expenditure scope was established by the dollar
+comparisons above. [FY2024 Actual report methodology](https://rptsvr1.tea.texas.gov/school.finance/forecasting/financial_reports/AbtAct24.docx) and [FY2025 Actual report methodology](https://rptsvr1.tea.texas.gov/school.finance/forecasting/financial_reports/AbtAct25.docx).
 
 Both presentations use PEIMS. This result leaves full-bundle semantic
 qualification, signed-audit reconciliation, the narrower PIC 23+33 totals,

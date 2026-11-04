@@ -40,6 +40,7 @@ _COVERAGE = {("charter", "AF"): 182, ("charter", "GF"): 182, ("district", "AF"):
 PASS_ACTUAL_PWR_CONTROLS = "PASS_REVIEWED_ACTUAL_PWR_CONTROLS"
 _ACTUAL_PWR = {
     2023: ("2beb638ee1da5351a69e715b8dc6ac30dedfe8284c44ecdead5895efd8cd4bfa", 1014),
+    2024: ("f62a3201b892c354edcac791126075b1e8be4b27ec5e060d56aedb38e4bc14fe", 1013),
     2025: ("f8a3128a833512452dfaef9af8030f07854f7f02fe8c2fa69d7f157c5d109b23", 1013),
 }
 _ACTUAL_PROGRAMS = ["23", "33", "43"]
@@ -242,7 +243,7 @@ def _accumulate_actual_control(table: pa.Table, totals: Counter[tuple[str, str]]
     ))
     _accumulate(selected.filter(pc.is_in(selected["fund_code"], value_set=pa.array(_GENERAL_FUNDS))),
                 _ACTUALS.amount, "GF", totals)
-    # The two frozen All Funds presentations exclude this fund. Preserve its
+    # The reviewed All Funds presentations exclude this fund. Preserve its
     # signed contribution independently; the raw account leaf is never changed.
     capital_projects = pc.equal(selected["fund_code"], _CAPITAL_PROJECTS_FUND)
     _accumulate(selected.filter(pc.invert(capital_projects)), _ACTUALS.amount, "AF", totals)
@@ -257,8 +258,9 @@ def _actual_workbook_control(store: ProvenanceStore, year: int, entities: set[st
     record = store.read_record(identifier)
     artifact = record["artifact"]
     url = record["requested_url"]
+    metadata = record["source_metadata"]
     if (record["kind"] != "acquisition" or record["method"] != "download" or record["section"] != "reference"
-            or record["resolved_url"] != url or record["source_metadata"].get("source_url") != url
+            or record["resolved_url"] != url or metadata.get("download_url", metadata.get("source_url")) != url
             or record["parameters"].get("http_method") != "GET" or record["parameters"].get("http_status") != 200
             or record["response_headers"].get("content-type", "").split(";", 1)[0]
             != "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -273,7 +275,8 @@ def _actual_workbook_control(store: ProvenanceStore, year: int, entities: set[st
         workbook = load_workbook(stream, read_only=True, keep_links=False)
         try:
             for group in ("GF", "AF"):
-                sheet = f"{(year - 1) % 100:02}_{year % 100:02} {group} Act"
+                tab_name = f"{(year - 1) % 100:02}_{year % 100:02} {group} Act"
+                sheet = "2024 AF Act" if year == 2024 and group == "AF" else tab_name
                 records = iter(workbook[sheet].rows)
                 headings = [cell.value for cell in next(records)]
                 title = f"{group} Students with Disabilities (PICs {','.join(_ACTUAL_PROGRAMS)})"
@@ -286,7 +289,7 @@ def _actual_workbook_control(store: ProvenanceStore, year: int, entities: set[st
                 types: Counter[str] = Counter()
                 for row in records:
                     entity, population = row[2].value, row[4].value
-                    if (row[0].value != f"{year} Actual PWR" or row[1].value != sheet
+                    if (row[0].value != f"{year} Actual PWR" or row[1].value != tab_name
                             or not isinstance(entity, str) or re.fullmatch(r"[0-9]{6}", entity) is None
                             or entity == "000000" or entity in roster
                             or population not in {"INDEPENDENT", "COMMON", "CHARTER"}):
@@ -301,7 +304,8 @@ def _actual_workbook_control(store: ProvenanceStore, year: int, entities: set[st
                         or {entity for entity, population in roster.items() if population != "CHARTER"} != entities):
                     raise ContractError("Actual PWR district account population differs from the publisher roster")
                 rosters[group] = roster
-                fund_groups[group] = {"sheet": sheet, "column": title, "compared_cells": types["INDEPENDENT"],
+                fund_groups[group] = {"sheet": sheet, "publisher_tab_name": tab_name, "column": title,
+                                      "compared_cells": types["INDEPENDENT"],
                                       "common_unchecked": types["COMMON"], "charter_unchecked": types["CHARTER"]}
         finally:
             workbook.close()
@@ -340,7 +344,7 @@ def _check_actual_binding(config: Config, release: DataRelease, ref: ArtifactRef
 
 def qualify_actual_pwr(release: DataRelease, parity_store: ProvenanceStore,
                        witness_store: ProvenanceStore) -> dict[str, Any]:
-    """Replay only the reviewed Independent ISD operating controls for FY2023 and FY2025."""
+    """Replay only the reviewed FY2023–FY2025 Independent ISD operating controls."""
     try:
         catalog = release.catalog.to_dict()
         if catalog["schema_version"] != 4:
