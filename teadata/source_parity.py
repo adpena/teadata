@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, NotRequired, Sequence, TypedDict
 from .column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
 from .dataset_metadata import COLUMN_SCHEMA_MAX_BYTES, EditionKey
 from .manifest import ContractError, canonical_json
+from .provenance import validate_record_graph
 from .tapr import TaprReadBudget, TaprSourceRequest, qualified_tapr_family
 
 if TYPE_CHECKING:
@@ -66,12 +67,13 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey) ->
             or not any(item['sha256'] == ref.sha256 and item['size_bytes'] == ref.size_bytes
                        for item in leaf_record['outputs'].values())):
         raise ValueError('Leaf processing does not bind the selected descriptor')
-    candidates = [graph[identifier] for identifier in leaf_record['inputs']
+    candidates = [identifier for identifier in leaf_record['inputs']
                   if graph[identifier]['kind'] == 'processing' and graph[identifier].get('dataset') == key.dataset
                   and 'prepared_source' in graph[identifier].get('outputs', {})]
     if len(candidates) != 1:
         raise _Uncovered('A unique complete upstream preparation is unavailable')
-    prepared, contract = candidates[0], ref.contract
+    preparation_id, = candidates
+    prepared, contract = graph[preparation_id], ref.contract
     validation, prior = prepared.get('validation', {}), prepared.get('parameters', {})
     if not isinstance(validation, dict) or not isinstance(prior, dict):
         raise _Uncovered('Recorded preparation validation/parameters are unavailable')
@@ -117,16 +119,19 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey) ->
     acquisitions = release.catalog.acquisitions(key.dataset, edition=key)
     if not acquisitions:
         raise _Uncovered('Selected original acquisition lineage is unavailable')
+    # Equal bytes can have several acquisition receipts. Only the selected
+    # preparation's upstream graph identifies the receipt actually bound to it.
+    upstream = validate_record_graph(graph.__getitem__, [preparation_id])
     for claimed in acquisitions:
         identifier = claimed['record_id']
-        observed = store.read_record(identifier)
-        if (observed != {name: value for name, value in claimed.items() if name != 'record_id'}
+        observed = upstream.get(identifier)
+        if observed is None:
+            raise ValueError('Catalog acquisition is outside the preparation closure')
+        if (observed['kind'] != 'acquisition'
+                or observed != {name: value for name, value in claimed.items() if name != 'record_id'}
                 or observed['artifact']['sha256'] != hashes[0]
                 or observed['source_metadata'].get('version') != key.edition):
             raise ValueError('Catalog acquisition and exact source receipt differ')
-    if not any(item['kind'] == 'acquisition' and item['artifact']['sha256'] == hashes[0]
-               for item in graph.values()):
-        raise ValueError('Upstream preparation does not close the declared raw source')
     dictionary = mapping.get('dictionary')
     dictionary_path = store.verify_artifact(dictionary['sha256']) if dictionary else None
     return _Selection(key, mapping, store.verify_artifact(hashes[0]),

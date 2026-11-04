@@ -93,12 +93,18 @@ def fixture_release(tmp_path, *, damage=None, schema_version=3):
     leaf_id = sha256(canonical_json(contract).encode()).hexdigest()
     leaf = tmp_path / 'leaf.parquet'
     write_leaf_artifact(leaf, actual.to_batches(max_chunksize=1), contract=contract)
-    processing = store.record_processing(dataset=dataset, inputs=[preparation], outputs={'leaf': leaf},
+    catalog_acquisition = acquisition
+    processing_inputs = [preparation]
+    if damage in {'detached_acquisition', 'sibling_acquisition'}:
+        catalog_acquisition = store.record_acquisition(raw, source, parameters={'observation': 'another source observation'})
+        if damage == 'sibling_acquisition':
+            processing_inputs.append(catalog_acquisition)
+    processing = store.record_processing(dataset=dataset, inputs=processing_inputs, outputs={'leaf': leaf},
         processor='teadata.scripts.build_tapr_profiles', code_version=recorder.processor_sha256,
         parameters={'edition': '2025', 'leaf_contract_sha256': leaf_id, 'recipe': recipe, 'toolchain': toolchain})
     physical = file_identity(leaf)
     ref = ArtifactRef(key, physical['sha256'], physical['size_bytes'], leaf.name, canonical_json(contract), processing, 'leaf')
-    recorder.record_edition(key, source, artifacts=[ref], acquisition_ids=[acquisition])
+    recorder.record_edition(key, source, artifacts=[ref], acquisition_ids=[catalog_acquisition])
     catalog = recorder.catalog(schema_version=schema_version)
     manifest = publish_release(tmp_path, catalog, schema_version=schema_version)
     return DataRelease(manifest), store, key, raw
@@ -144,6 +150,15 @@ def test_unsupported_or_unavailable_lineage_is_uncovered_never_pass(tmp_path, pr
     assert report['status'] == 'HOLD'
     assert report['editions'][0]['status'] == 'HOLD_UNCOVERED'
     assert report['coverage']['checked_editions'] == 0
+
+
+@pytest.mark.parametrize('damage', ['detached_acquisition', 'sibling_acquisition'])
+def test_same_bytes_from_another_acquisition_do_not_establish_preparation_lineage(tmp_path, damage):
+    release, store, key, _ = fixture_release(tmp_path, damage=damage)
+    report = validate_source_parity(release, store, edition_ids=[key.identity])
+    assert report['status'] == 'HOLD'
+    assert report['editions'][0]['status'] == 'FAIL_MISMATCH'
+    assert 'acquisition is outside the preparation closure' in report['editions'][0]['diagnostic']
 
 
 def test_explicit_unique_scope_required(tmp_path):
