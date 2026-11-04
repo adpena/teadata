@@ -505,13 +505,18 @@ not establish the reference window of publisher edition 2024. The retained
 annual [glossary](https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf)
 and [masking page](https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html)
 are linked as available references with their original acquisition receipts.
-Field-specific COMP4 masking applicability remains unreviewed. Shared annual
-documentation does not by itself assign token rules, suppression thresholds,
-cohort windows, scientific units or comparability. Periods and scientific
-metric bindings stay unknown/unassigned, with no applied policy or estimation.
-Identity attributes do not become repeated entity metadata metrics. Original
-acquisition dates stay intact, and the generated schema has its own genuine
-local observation.
+Two all-students Class of 2023 graduate rates per scope have reviewed metadata.
+Both are percentages with an August 31, 2023 diploma cutoff. TEA's ordinary
+longitudinal and federal graduation rates use different cohort inclusion rules.
+The retained reports show 95.2% ordinary and 93.1% federal for Garland High
+School, and 93.1% ordinary and 90.9% federal for Austin ISD. Marathon's campus and
+district report columns both show asterisks in these fields, corresponding to
+`-1` in the raw download under TEA's small-group masking rule. Blank download
+tokens remain unexplained. These checks apply to the two graduate rate fields in
+each scope. All other field periods and units remain unknown. Preparation keeps
+all source values as strings, applies no value policy or estimation, and retains
+identity attributes as source history. Original acquisition dates stay intact,
+and the generated schema has its own local observation.
 
 The 2024 `campus_tapr_staar_school_progress` and
 `district_tapr_staar_school_progress` declarations require the explicit `source`

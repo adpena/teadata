@@ -24,6 +24,7 @@ from teadata.teadata_config import Config, load_config
 ROOT = Path(__file__).resolve().parents[1]
 RESOURCE = ROOT / 'teadata/schemas/tapr--2024--reference-dropout-attendance-crosswalk.json'
 UNKNOWN = {'kind': 'unknown'}
+COMP4_GRADUATION_CUTOFF = {'kind': 'as_of', 'as_of': '2023-08-31'}
 PROGRAM_SOURCES = [
     ('campus', 'annual_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla', 200, 9082, '4b7487ef04e74c8048317a75c784305793519c79c9aaf6df25742ad153a5d51d'),
     ('campus', 'longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla', 158, 9082, 'ab64e994ba04f5930606f8f765e6ab15ae69b45f0e3409c9aad7ae2d7ce9d048'),
@@ -70,7 +71,8 @@ def test_complete_source_only_discovery_and_typed_receipts_need_no_artifact_io(s
     metadata = source.metadata
     assert metadata.version == '2024' and metadata.period.to_dict() == UNKNOWN
     assert metadata.value_policy is None and metadata.estimation is None and metadata.field_year is None
-    assert not metadata.metrics and metadata.provenance_ids == (raw_id,)
+    expected_metrics = 2 if family == 'four_year_longitudinal_rate' else 0
+    assert len(metadata.metrics) == expected_metrics and metadata.provenance_ids == (raw_id,)
     _validate_methodology(metadata, None)
     assert cfg.is_source_only(dataset, 2024) and cfg.column_schema(dataset, 2024) is None
     assert cfg.availability_report()['data_sources'][dataset]['years'] == (
@@ -98,7 +100,8 @@ def test_complete_source_only_discovery_and_typed_receipts_need_no_artifact_io(s
     assert local['artifact']['sha256'] == schema_ref.reviewed_sha256 == sha256((ROOT / 'teadata' / schema_ref.path).read_bytes()).hexdigest()
     records = cfg.header_records(dataset, edition='2024', reader_profile='source')
     assert len(records) == width == len({record['code'] for record in records}) == len({record['field'] for record in records})
-    assert all(record['period'] == UNKNOWN and record['table'] == family for record in records)
+    assert all(record['table'] == family for record in records)
+    assert sum(record['period'] != UNKNOWN for record in records) == expected_metrics
     assert {record['field'] for record in records if record['disposition'] == 'identity'} == (
         {'campus_number', 'campus_name', 'district_number', 'district_name'} if scope == 'campus' else {'district_number', 'district_name'})
     contract = cfg.column_contract(dataset, 2024, reader_profile='source')
@@ -196,6 +199,15 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
         assert list(current['data_sources'].pop(dataset)) == [2025]
         assert current['schema']['data_sources'].pop(dataset) == ['csv']
     current['data_sources']['district_tapr_four_year_longitudinal_rate'].pop(2025)
+    # Exclude the four reviewed COMP4 metric bindings and their report evidence.
+    # Their exact scope and unchanged neighbor fields have dedicated checks.
+    for scope in ('campus', 'district'):
+        metadata = current['data_sources'][scope + '_tapr_four_year_longitudinal_rate'][2024]['metadata']
+        metadata.pop('notes')
+        metadata['metrics'] = {}
+        metadata['references'] = [
+            ref for ref in metadata['references'] if not ref['reference_id'].startswith('comp4_')
+        ]
     for scope, family, *_ in EXTENDED_SOURCES:
         dataset = scope + '_tapr_' + family
         current['data_sources'].pop(dataset)
@@ -238,7 +250,7 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     campus['path'] = 'data/shapes/' + historical['artifact']['filename']
     campus['metadata'] = metadata
     campus['reader']['column_schema'] = schema['path']
-    assert sha256(canonical_json(current).encode()).hexdigest() == '34a7b6d5bf97111d9de442a60a6c446361b8501aab44851429660cb12f91ea8c'
+    assert sha256(canonical_json(current).encode()).hexdigest() == 'bb96a9eab62808caecf37764a6e7096c6b9537420a76fef0ff4bba5d285f6cf8'
 
 
 @pytest.mark.parametrize('scope,dictionary_sha,fields_sha', [
@@ -289,7 +301,7 @@ def test_staar_school_progress_preserves_all_dictionary_occurrences_without_fabr
 
 
 @pytest.mark.parametrize('scope,prefix', [('campus', 'C'), ('district', 'D')])
-def test_comp4_context_names_and_annual_references_do_not_assign_methodology(scope, prefix):
+def test_comp4_binds_only_the_two_publisher_verified_graduation_rates(scope, prefix):
     cfg = load_config()
     dataset = scope + '_tapr_four_year_longitudinal_rate'
     records = cfg.header_records(dataset, edition='2024', reader_profile='source')
@@ -335,9 +347,37 @@ def test_comp4_context_names_and_annual_references_do_not_assign_methodology(sco
     roots = [*source.metadata.provenance_ids, *(identifier for ref in source.metadata.references for identifier in ref.provenance_ids)]
     graph = validate_record_graph(store.read_record, roots)
     validate_reference_records(source, graph.__getitem__, verify_all_claimed=True)
-    assert source.metadata.metrics == {} and source.metadata.period.to_dict() == UNKNOWN
+    expected_metrics = {
+        'four_year_longitudinal_graduation_rate_all_students': (
+            prefix + 'AGC4X23R', scope + '_2023_4_year_longitudinal_graduates_for_all_students_rate', ordinary),
+        'four_year_federal_graduation_rate_without_exclusions_all_students': (
+            prefix + 'AGC423R',
+            scope + '_2023_4_year_federal_graduation_rate_without_exclusions_gr_9_12_graduates_for_all_students_rate',
+            federal),
+    }
+    assert source.metadata.metrics.keys() == expected_metrics.keys()
+    for metric, (code, field, heading) in expected_metrics.items():
+        assert source.metadata.metrics[metric].to_dict() == {
+            'field': field, 'period': COMP4_GRADUATION_CUTOFF, 'unit': 'percent'}
+        assert by_code[code]['field'] == field and by_code[code]['period'] == COMP4_GRADUATION_CUTOFF
+        assert by_code[code]['dictionary_occurrences'][0]['publisher_context']['heading'] == heading
+    reviewed_codes = {code for code, _, _ in expected_metrics.values()}
+    assert all(record['period'] == UNKNOWN for record in records if record['code'] not in reviewed_codes)
+    assert source.metadata.period.to_dict() == UNKNOWN
     assert source.metadata.value_policy is None and source.metadata.estimation is None and source.metadata.field_year is None
-    assert 'field-specific COMP4 masking applicability remains unreviewed' in source.metadata.notes
+    report_id, entity, level = ('comp4_garland_high_report', '057909002', 'C') if scope == 'campus' else (
+        'comp4_austin_isd_report', '227901', 'D')
+    expected_reports = {report_id: (entity, level), 'comp4_marathon_report': ('022902001', 'C')}
+    witnesses = {ref.reference_id: ref for ref in source.metadata.references if ref.reference_id.startswith('comp4_')}
+    assert witnesses.keys() == expected_reports.keys()
+    for name, (entity, level) in expected_reports.items():
+        reference = witnesses[name]
+        identifier, = reference.provenance_ids
+        record = graph[identifier]
+        assert reference.role == 'source_notes' and reference.status == 'available'
+        assert reference.url and f'&ccyy=2024&id={entity}&lev={level}&' in reference.url
+        assert record['method'] == 'download' and record['requested_url'] == reference.url
+        assert record['artifact']['sha256'] == reference.reviewed_sha256
     _validate_methodology(source.metadata, None)
 
 

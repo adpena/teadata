@@ -3840,21 +3840,33 @@ data_sources:
       metadata:
         download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
         identifiers: []
-        metrics: {}
+        metrics:
+          four_year_longitudinal_graduation_rate_all_students:
+            field: campus_2023_4_year_longitudinal_graduates_for_all_students_rate
+            unit: percent
+            period:
+              kind: as_of
+              as_of: '2023-08-31'
+          four_year_federal_graduation_rate_without_exclusions_all_students:
+            field: campus_2023_4_year_federal_graduation_rate_without_exclusions_gr_9_12_graduates_for_all_students_rate
+            unit: percent
+            period:
+              kind: as_of
+              as_of: '2023-08-31'
         notes: Source-only complete COMP4 observation from the literal 4-Year Longitudinal
           Rate menu in publisher edition 2024. All 224 facts and source identity columns
           remain lossless strings; historical names and parent IDs remain identity
           attributes, not entity.meta metrics. Literal 2023 labels and dictionary
           descriptions are preserved independently of edition. The 42 federal fields
           use only their exact publisher heading as a reviewed naming qualifier; the
-          182 ordinary fact names remain unchanged. Publisher context and Type are
-          descriptive metadata, not a scientific period, unit, eligibility/exclusion
-          rule, numeric status, masking policy or comparability claim. The retained
-          annual 2023-24 TAPR glossary and masking page are linked as available references;
-          field-specific COMP4 masking applicability remains unreviewed. No token
-          rule, suppression threshold, cohort window, unit or scientific equivalence
-          is assigned. Original HTTP receipts and dates remain immutable. No default
-          reader, release or app enrichment is activated.
+          182 ordinary fact names remain unchanged. The two reviewed Class of 2023
+          all-students graduate percentage fields use August 31, 2023 as the diploma
+          cutoff and retain their distinct ordinary and federal cohort rules. TEA's
+          Marathon report confirms a download token of -1 corresponds to a masked
+          rate in these fields. Blank strings stay unexplained. No value policy is
+          applied and all other periods and units remain unknown. Original HTTP
+          receipts and dates remain immutable. No default reader, release or app
+          enrichment is activated.
         period:
           kind: unknown
         provenance_ids:
@@ -3908,6 +3920,22 @@ data_sources:
           role: masking_methodology
           status: available
           url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+        - reference_id: comp4_garland_high_report
+          role: source_notes
+          title: Garland High School 2023-24 TAPR attendance and graduation report
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2024&id=057909002&lev=C&prgopt=reports%2Ftapr%2Fattendgrad.sas
+          provenance_ids:
+          - 8ed481df648de4fcaa815a4e2155f21bc16c15552832abf522a937c039376fcf
+          reviewed_sha256: 06d75728d60051afafc8bfe4d94254286e36fe0ce32af01f8a4cc35feb7cbe2a
+        - reference_id: comp4_marathon_report
+          role: source_notes
+          title: Marathon 2023-24 TAPR attendance and graduation report with campus and district rates
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2024&id=022902001&lev=C&prgopt=reports%2Ftapr%2Fattendgrad.sas
+          provenance_ids:
+          - 36c67040b1b2c8de2c498cdfadbd8d623c8fb828976cfb41e92aaa07f604ea06
+          reviewed_sha256: 8e96a4bb9d94eceed4d259290bba05e082251ca11bdfdc1f29dd2bf3dbcbe4d3
         - reference_id: columns_source
           role: schema
           path: schemas/tapr--2024--four-year-longitudinal-rate-crosswalk.json
@@ -3936,21 +3964,33 @@ data_sources:
       metadata:
         download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
         identifiers: []
-        metrics: {}
+        metrics:
+          four_year_longitudinal_graduation_rate_all_students:
+            field: district_2023_4_year_longitudinal_graduates_for_all_students_rate
+            unit: percent
+            period:
+              kind: as_of
+              as_of: '2023-08-31'
+          four_year_federal_graduation_rate_without_exclusions_all_students:
+            field: district_2023_4_year_federal_graduation_rate_without_exclusions_gr_9_12_graduates_for_all_students_rate
+            unit: percent
+            period:
+              kind: as_of
+              as_of: '2023-08-31'
         notes: Source-only complete COMP4 observation from the literal 4-Year Longitudinal
           Rate menu in publisher edition 2024. All 224 facts and source identity columns
           remain lossless strings; historical names and parent IDs remain identity
           attributes, not entity.meta metrics. Literal 2023 labels and dictionary
           descriptions are preserved independently of edition. The 42 federal fields
           use only their exact publisher heading as a reviewed naming qualifier; the
-          182 ordinary fact names remain unchanged. Publisher context and Type are
-          descriptive metadata, not a scientific period, unit, eligibility/exclusion
-          rule, numeric status, masking policy or comparability claim. The retained
-          annual 2023-24 TAPR glossary and masking page are linked as available references;
-          field-specific COMP4 masking applicability remains unreviewed. No token
-          rule, suppression threshold, cohort window, unit or scientific equivalence
-          is assigned. Original HTTP receipts and dates remain immutable. No default
-          reader, release or app enrichment is activated.
+          182 ordinary fact names remain unchanged. The two reviewed Class of 2023
+          all-students graduate percentage fields use August 31, 2023 as the diploma
+          cutoff and retain their distinct ordinary and federal cohort rules. TEA's
+          Marathon report confirms a download token of -1 corresponds to a masked
+          rate in these fields. Blank strings stay unexplained. No value policy is
+          applied and all other periods and units remain unknown. Original HTTP
+          receipts and dates remain immutable. No default reader, release or app
+          enrichment is activated.
         period:
           kind: unknown
         provenance_ids:
@@ -4004,6 +4044,22 @@ data_sources:
           role: masking_methodology
           status: available
           url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+        - reference_id: comp4_austin_isd_report
+          role: source_notes
+          title: Austin ISD 2023-24 TAPR attendance and graduation report
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2024&id=227901&lev=D&prgopt=reports%2Ftapr%2Fattendgrad.sas
+          provenance_ids:
+          - 2d9925dc7077f9fd1991e8465f75853e8971e5b1f726148d2cfc821c430eb318
+          reviewed_sha256: 305cf9db6147d8cd73131253ce505946a2a8f75102da230b5c3edd967b846b6e
+        - reference_id: comp4_marathon_report
+          role: source_notes
+          title: Marathon 2023-24 TAPR attendance and graduation report with campus and district rates
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2024&id=022902001&lev=C&prgopt=reports%2Ftapr%2Fattendgrad.sas
+          provenance_ids:
+          - 36c67040b1b2c8de2c498cdfadbd8d623c8fb828976cfb41e92aaa07f604ea06
+          reviewed_sha256: 8e96a4bb9d94eceed4d259290bba05e082251ca11bdfdc1f29dd2bf3dbcbe4d3
         - reference_id: columns_source
           role: schema
           path: schemas/tapr--2024--four-year-longitudinal-rate-crosswalk.json
