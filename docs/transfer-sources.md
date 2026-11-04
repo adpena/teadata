@@ -141,6 +141,33 @@ not fill a suppressed cell in the other. That immutable preparation remains
 HOLD; the source-only retention behavior below requires a new preparation and
 does not change the original record or activate this edition.
 
+## 2025–26 source preparation
+
+All 20 regional district originals prepared successfully. They contain 44,327
+rows, including 37,736 detail rows and 2,197 publisher totals, across 1,201
+reporting district codes. These are the district reports' own observations.
+The processing receipt is
+`02977bde453c093ff624ff81537cf9c26d163aed6434e7045239273e1a3e0b18`.
+[TEA regional district reports](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/region_district_transfer_report.html)
+
+The 2025–26 statewide campus original uses `TRANSFERS_IN_OUT` where the
+2024–25 original uses `TRANSFERS_IN_OR_OUT`. The preceding 13 headings,
+report titles and masking footnotes agree. The 2026 reader retains the literal
+header and projects its counts through the same masking policy. The original
+acquisition is `f7feea636a5bb61447566389cc135413798918cd70ec2bd3200058460fdf417d`,
+with raw SHA-256
+`40726ad2d508f383cddc09861e3efbbeabf9e40f1fbd0687a46bf59ea1a7a3f0`.
+[TEA statewide campus report](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/campus_transfer_report.html)
+
+The campus preparation retains 321,375 rows across 8,850 reporting campuses.
+Its direction check found 152,781 unique pairs in each view, with 14,864
+observed and 137,917 suppressed pairs agreeing across views. The check covers
+pair identities, report-time districts, count values, statuses and raw count
+tokens. The processing receipt is
+`7d651084d10803842bc7557f16ba604140051423967956c88952675c3e560798`.
+Both preparations passed native readback and remain at the source preparation
+stage. Field-level qualification and release activation are pending.
+
 ## Offline structural preparation
 
 `prepare` consumes either explicitly pinned source acquisition/SHA pairs or one

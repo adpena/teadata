@@ -354,14 +354,24 @@ _FOOTNOTES = (
 )
 
 
-def transfer_columns(grain: str) -> tuple[str, ...]:
+def _campus_wire_schema(year: int | None, layout: str = "original") -> bytes:
+    resource = Path(__file__).with_name("schemas") / "data_sources--campus_transfer_reports--2025--default.json"
+    raw = resource.read_bytes()
+    if year != 2026 or layout != "original":
+        return raw
+    # Derive the one reviewed heading change for the 2026 publisher original.
+    schema = json.loads(raw)
+    if schema["columns"][-1] != "TRANSFERS_IN_OR_OUT":
+        raise ValueError("Campus transfer count heading differs from the reviewed baseline")
+    schema["columns"][-1] = "TRANSFERS_IN_OUT"
+    return (json.dumps(schema, separators=(",", ":")) + "\n").encode()
+
+
+def transfer_columns(grain: str, *, year: int | None = None, layout: str = "original") -> tuple[str, ...]:
     if grain == "district":
         return _DISTRICT_COLUMNS
     if grain == "campus":
-        # Reuse the existing campus wire-schema authority, rather than another
-        # copy of its fourteen names/order in Python.
-        resource = Path(__file__).with_name("schemas") / "data_sources--campus_transfer_reports--2025--default.json"
-        return tuple(json.loads(resource.read_bytes())["columns"])
+        return tuple(json.loads(_campus_wire_schema(year, layout))["columns"])
     raise ValueError("Transfer grain must be campus or district")
 
 
@@ -376,16 +386,17 @@ class TransferSourceTable:
     annotations: tuple[dict[str, Any], ...]
 
 
-def transfer_value_columns(grain: str) -> dict[str, str]:
+def transfer_value_columns(grain: str, *, year: int | None = None, layout: str = "original") -> dict[str, str]:
     """The existing projector's publisher inputs and normalized value outputs."""
-    transfer_columns(grain)
+    count_column = transfer_columns(grain, year=year, layout=layout)[-1]
     return {"REPORT_REGION": "transfer_reporting_region", "REPORT_TYPE": "transfer_direction",
         "REPORT_CAMPUS" if grain == "campus" else "REPORT_DISTNAME_NUMBER": "transfer_reporting_number",
         "CAMPUS_RES_OR_ATTEND" if grain == "campus" else "DISTNAME_NUMBER_RES_ATTEND": "transfer_partner_number",
-        "TRANSFERS_IN_OR_OUT" if grain == "campus" else "TRANSFERS_IN_OUT": "transfer_count_value"}
+        count_column: "transfer_count_value"}
 
 
-def _transfer_projection(table, *, grain: str, period: DataPeriod, policy: ValuePolicy, region: str | None):
+def _transfer_projection(table, *, grain: str, period: DataPeriod, policy: ValuePolicy, region: str | None,
+                         layout: str):
     """Interpret whole Arrow columns; scalar values.py runs only per token."""
     import pyarrow as pa
     import pyarrow.compute as arrow_compute
@@ -450,7 +461,7 @@ def _transfer_projection(table, *, grain: str, period: DataPeriod, policy: Value
         partner = label_ids(table["DISTNAME_NUMBER_RES_ATTEND"], detail)
         reporting_district, partner_district = reporting, partner
 
-    count_column = "TRANSFERS_IN_OR_OUT" if grain == "campus" else "TRANSFERS_IN_OUT"
+    count_column = transfer_columns(grain, year=period.end_year, layout=layout)[-1]
     unique = pc.unique(table[count_column])
     if len(unique) > 4096:
         raise ValueError("Transfer source exceeds bounded distinct-count-token interpretation")
@@ -462,7 +473,7 @@ def _transfer_projection(table, *, grain: str, period: DataPeriod, policy: Value
     values = pc.take(pa.array([value.numeric for value in interpreted], type=pa.int64()), indices)
     require(pc.or_(pc.invert(separator), pc.equal(statuses, ValueStatus.MISSING.value)),
             "Transfer separator carries a nonmissing count")
-    names = transfer_value_columns(grain)
+    names = transfer_value_columns(grain, year=period.end_year, layout=layout)
     columns = {
         names["REPORT_REGION"]: regions,
         "transfer_row_kind": pc.if_else(detail, "detail", pc.if_else(total, "publisher_total", "separator")),
@@ -501,7 +512,7 @@ def read_transfer_table(path: Path, *, grain: str, year: int, policy: ValuePolic
     if not 0 < before.st_size <= max_bytes:
         raise ValueError("Transfer source exceeds its admitted input byte limit")
     period = DataPeriod("school_year", year - 1, year)
-    columns = transfer_columns(grain)
+    columns = transfer_columns(grain, year=year, layout=layout)
     if region is not None and grain != "district":
         raise ValueError("Regional report selection is supported only for district-grain originals")
     report_scope = "Region" if region is not None else grain.title()
@@ -594,7 +605,7 @@ def read_transfer_table(path: Path, *, grain: str, year: int, policy: ValuePolic
     if not batches:
         raise ValueError("Transfer source contains no report rows")
     table = pa.concat_tables(batches)
-    table = _transfer_projection(table, grain=grain, period=period, policy=policy, region=region)
+    table = _transfer_projection(table, grain=grain, period=period, policy=policy, region=region, layout=layout)
     return TransferSourceTable(table, grain, period, expected_sha256, actual_encoding, layout, tuple(annotations))
 
 
@@ -613,6 +624,7 @@ def _campus_pairs(source: TransferSourceTable):
         raise ValueError("Campus pair interpretation does not establish district report totals")
     table = source.table.filter(pc.equal(source.table["transfer_row_kind"], "detail"))
     outgoing = pc.equal(table["transfer_direction"], "out")
+    raw_columns = transfer_columns("campus", year=source.period.end_year, layout=source.layout)
     columns = {
         "YEAR": table["YEAR"], "direction": table["transfer_direction"],
         "source_number": pc.if_else(outgoing, table["transfer_reporting_number"], table["transfer_partner_number"]),
@@ -620,7 +632,7 @@ def _campus_pairs(source: TransferSourceTable):
         "source_district": pc.if_else(outgoing, table["transfer_reporting_district_number"], table["transfer_partner_district_number"]),
         "destination_district": pc.if_else(outgoing, table["transfer_partner_district_number"], table["transfer_reporting_district_number"]),
         "count_status": table["transfer_count_status"], "count_value": table["transfer_count_value"],
-        "raw_count": table["TRANSFERS_IN_OR_OUT"],
+        "raw_count": table[raw_columns[-1]],
         "source_record": table["transfer_source_record"],
         "first_line": table["transfer_first_line"], "last_line": table["transfer_last_line"],
         "normalized_REPORT_REGION": table["transfer_reporting_region"],
@@ -631,7 +643,7 @@ def _campus_pairs(source: TransferSourceTable):
     }
     # Original columns stay available to the old/new comparison. Native joins
     # select direction first and never collapse opposite-direction observations.
-    columns.update({name: table[name] for name in transfer_columns("campus") if name != "YEAR"})
+    columns.update({name: table[name] for name in raw_columns[1:]})
     return pa.table(columns)
 
 
@@ -728,16 +740,16 @@ def compare_campus_sources(old: TransferSourceTable, new: TransferSourceTable, *
     identity_columns = {"REPORT_REGION", "REPORT_CAMPUS", "CAMPUS_RES_OR_ATTEND", "REPORT_DISTRICT", "DISTRICT_RES_OR_ATTEND"}
     lexical, identity_changes, other = {}, {}, {}
     changed_any = pc.or_(changed_status, pc.or_(changed_value, changed_district))
-    for name in transfer_columns("campus"):
-        if name == "YEAR":
-            continue
+    # YEAR is already a join key and the two literal count headers are
+    # compared through raw_count above.
+    for name in transfer_columns("campus", year=old.period.end_year, layout=old.layout)[1:-1]:
         changed = pc.and_(both, pc.not_equal(joined[name + "_old"], joined[name + "_new"]))
         if name in identity_columns:
             normalized_changed = pc.and_(both, pc.not_equal(joined["normalized_" + name + "_old"], joined["normalized_" + name + "_new"]))
             lexical[name] = _number_true(pc.and_(changed, pc.invert(normalized_changed)))
             identity_changes[name] = _number_true(normalized_changed)
             changed_any = pc.or_(changed_any, normalized_changed)
-        elif name != "TRANSFERS_IN_OR_OUT":
+        else:
             other[name] = _number_true(changed)
             changed_any = pc.or_(changed_any, changed)
     return {"status": "compared", "old_sha256": old.input_sha256, "new_sha256": new.input_sha256,
@@ -841,7 +853,12 @@ def prepare_transfer_sources(
     if compare_input is None and compare_encoding is not None:
         raise ValueError("Comparison encoding requires an explicit legacy comparison input")
     config_raw = _captured_input(policy_config, policy_config_sha256)
-    wire_schema = (Path(__file__).parent / "schemas/data_sources--campus_transfer_reports--2025--default.json").read_bytes() if grain == "campus" else None
+    schema_layouts = {"wire_schema": "original"} if grain == "campus" else {}
+    if compare_input is not None:
+        schema_layouts["legacy_wire_schema"] = "legacy_prepared"
+    schemas = {role: _campus_wire_schema(year, layout) for role, layout in schema_layouts.items()}
+    if compare_input is not None and schemas["legacy_wire_schema"] == schemas["wire_schema"]:
+        del schemas["legacy_wire_schema"]
     cfg = load_config_bytes(config_raw, path=policy_config)
     if value_policy not in cfg.value_policies:
         raise ValueError("Selected value policy is not declared by the pinned Config")
@@ -900,13 +917,11 @@ def prepare_transfer_sources(
         for number, (identifier, _) in enumerate(selected)
     ]
     report["inputs"] = attempts
-    if wire_schema is not None:
-        report["wire_schema_sha256"] = sha256(wire_schema).hexdigest()
+    report.update({f"{role}_sha256": sha256(raw).hexdigest() for role, raw in schemas.items()})
     _write_index(output, report, filename="PREPARATION.json")
     local_inputs = []
     controls: list[tuple[str, bytes]] = [("policy_config", config_raw)]
-    if wire_schema is not None:
-        controls.append(("wire_schema", wire_schema))
+    controls.extend(schemas.items())
     if index_raw is not None:
         controls.append(("batch_index", index_raw))
     for role, raw in controls:
@@ -1016,7 +1031,7 @@ def prepare_transfer_sources(
                     raise ValueError("Transfer prepared native readback differs from retained raw strings/projections")
                 offset += batch.num_rows
         if (offset != merged.num_rows or processor_identity() != code
-                or (wire_schema is not None and (Path(__file__).parent / "schemas/data_sources--campus_transfer_reports--2025--default.json").read_bytes() != wire_schema)):
+                or any(_campus_wire_schema(year, schema_layouts[role]) != raw for role, raw in schemas.items())):
             raise ValueError("Transfer preparation source/row coverage changed before retention")
     except Exception as error:
         if artifact_created:

@@ -44,21 +44,22 @@ def pair_rows(out="0", incoming=None):
     ]
 
 
-def original(tmp_path, rows, *, grain="campus", legacy=False, filename="source.csv", report_scope=None):
+def original(tmp_path, rows, *, grain="campus", legacy=False, filename="source.csv", report_scope=None,
+             campus_count_header=CAMPUS_HEADER[-1]):
     path = tmp_path / filename
     with path.open("w", encoding="utf-8", newline="") as stream:
         if not legacy:
             stream.write(f"T E X A S  E D U C A T I O N  A G E N C Y\n\n{report_scope or grain.title()} Level Transfer Report\n\nPEIMS Student Transfer Report\n\n")
         writer = csv.writer(stream)
-        writer.writerow(CAMPUS_HEADER if grain == "campus" else DISTRICT_HEADER)
+        writer.writerow([*CAMPUS_HEADER[:-1], campus_count_header] if grain == "campus" else DISTRICT_HEADER)
         writer.writerows(rows)
         if not legacy:
             stream.write("\n" + "\n\n".join(NOTES) + "\n\n")
     return path, sha256(path.read_bytes()).hexdigest()
 
 
-def read(path, digest, *, grain="campus", layout="original", region=None):
-    return read_transfer_table(path, grain=grain, year=2025, policy=ValuePolicy.from_dict(POLICY),
+def read(path, digest, *, grain="campus", year=2025, layout="original", region=None):
+    return read_transfer_table(path, grain=grain, year=year, policy=ValuePolicy.from_dict(POLICY),
         expected_sha256=digest, encoding="utf-8", layout=layout, region=region)
 
 
@@ -78,6 +79,32 @@ def test_campus_original_preserves_source_strings_notes_coordinates_and_zero(tmp
     assert source.table["transfer_last_line"].to_pylist() == [9, 11, 12]
     assert [note["text"].strip() for note in source.annotations if note["kind"] == "footer"] == [note.strip() for note in NOTES]
     assert validate_campus_directions(source)["matching_observed"] == 1
+
+
+def test_2026_campus_original_requires_its_literal_count_header(tmp_path):
+    rows = [["2025-2026", *row[1:]] for row in pair_rows("-999")]
+    path, digest = original(tmp_path, rows, campus_count_header="TRANSFERS_IN_OUT")
+    source = read(path, digest, year=2026)
+
+    assert source.table["TRANSFERS_IN_OUT"].to_pylist() == ["-999", "-999"]
+    assert "TRANSFERS_IN_OR_OUT" not in source.table.column_names
+    assert source.table["transfer_count_status"].to_pylist() == ["suppressed", "suppressed"]
+    assert source.table["transfer_count_value"].to_pylist() == [None, None]
+    assert validate_campus_directions(source)["matching_suppressed"] == 1
+    assert "TRANSFERS_IN_OUT" in next(note["text"] for note in source.annotations if note["kind"] == "header")
+    with pytest.raises(ValueError, match="preamble/header schema"):
+        read(path, digest)
+
+    old_header, old_digest = original(tmp_path, rows, filename="old-header.csv")
+    with pytest.raises(ValueError, match="preamble/header schema"):
+        read(old_header, old_digest, year=2026)
+
+    legacy_path, legacy_digest = original(tmp_path, rows, legacy=True, filename="legacy.csv")
+    legacy = read(legacy_path, legacy_digest, year=2026, layout="legacy_prepared")
+    assert legacy.table["TRANSFERS_IN_OR_OUT"].to_pylist() == ["-999", "-999"]
+    comparison = compare_campus_sources(legacy, source)
+    assert comparison["raw_count_token_differences"] == 0
+    assert comparison["only_old"] == comparison["only_new"] == 0
 
 
 def test_district_published_total_is_retained_independently_of_masked_detail(tmp_path):
