@@ -194,10 +194,11 @@ def test_current_source_contracts_keep_explicit_edition_csv_opt_ins():
 def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     current = yaml.safe_load((ROOT / 'teadata/teadata_sources.yaml').read_text())
     # Remove only the explicitly added 2025 outcome opt-ins before reconstructing history.
-    for family in ('college_career_military_readiness', 'college_readiness_components'):
-        dataset = 'district_tapr_' + family
-        assert list(current['data_sources'].pop(dataset)) == [2025]
-        assert current['schema']['data_sources'].pop(dataset) == ['csv']
+    for scope in ('campus', 'district'):
+        for family in ('college_career_military_readiness', 'college_readiness_components'):
+            dataset = scope + '_tapr_' + family
+            assert list(current['data_sources'].pop(dataset)) == [2025]
+            assert current['schema']['data_sources'].pop(dataset) == ['csv']
     for scope in ('campus', 'district'):
         versions = current['data_sources'][scope + '_tapr_four_year_longitudinal_rate']
         versions.pop(2025)

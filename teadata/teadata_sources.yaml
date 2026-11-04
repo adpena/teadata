@@ -6381,6 +6381,133 @@ data_sources:
               scope: district
               tables:
                 6_year_extended_longitudinal_rate: data/tapr/raw/2024-district-comp6-raw.csv
+  campus_tapr_college_career_military_readiness:
+    2025:
+      path: data/tapr/raw/2025-c-GRAD1-offered-original.csv
+      metadata:
+        title: 2025 TAPR Campus College, Career, and Military Readiness, 2023–24 annual graduates (GRAD1)
+        publisher: Texas Education Agency
+        version: '2025'
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        period:
+          kind: unknown
+        identifiers: []
+        metrics:
+          ccmr_annual_graduates_all_students_rate:
+            field: campus_2024_college_career_and_military_ready_graduates_all_students_rate
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2023
+              end_year: 2024
+          ccmr_annual_graduates_economically_disadvantaged_rate:
+            field: campus_2024_college_career_and_military_ready_graduates_econ_disadv_rate
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2023
+              end_year: 2024
+        value_policy: null
+        estimation: null
+        provenance_ids: []
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          title: Complete original 2024–25 campus GRAD1 CSV and ordered controls
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          provenance_ids:
+          - 3d5a8dd95e12162523acd5d5353aa51ce3d0fa94e68f604041f8bdcd2fdc181e
+          reviewed_sha256: 50dd45e1d3205babd68c20ca3be16e15f71750331eed1811f32d7a7657ba17ac
+        - reference_id: menu
+          role: source_notes
+          title: 2024–25 all-campus TAPR family menu
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&tapr=all_c&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr.sas
+          provenance_ids:
+          - af730f6caf7c16a3e6fc7b111021f03a9e840ca69ffe129a5d8348dccae8b18b
+          reviewed_sha256: e6135b4c5b86d292a7bec614003c6427705f8bacce568f8e413b34c1f4492f43
+        - reference_id: selection
+          role: source_notes
+          title: 2024–25 campus GRAD1 selector and checked controls
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+          provenance_ids:
+          - 2737db5ef01972924b5290f0c4be4735c9b97feb03a0fc818587a9b069aef155
+          reviewed_sha256: b2a775d3251de9e6f07cc7d86ce26ea6b5a9725c76e00add711aadb9c16c83a1
+        - reference_id: dictionary
+          role: data_dictionary
+          title: 2024–25 campus GRAD1 publisher dictionary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=C&dsname=GRAD1&dd=ccmr&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          provenance_ids:
+          - af379c5555e41d22dada7407d1317a72806399583524529f9d6f3ff3e6c2749c
+          reviewed_sha256: 472d189fb21b2097959b7b91fa8c91aa13bc6a252126a3d82aaae3e58d6e15f6
+        - reference_id: glossary
+          role: glossary
+          url: https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf
+          title: Applicable 2024–25 TAPR glossary; reference only
+          status: available
+          provenance_ids:
+          - e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db
+          reviewed_sha256: 846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416
+        - reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html
+          title: Applicable 2024–25 masking; selected applicability pending
+          status: available
+          provenance_ids:
+          - 6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554
+          reviewed_sha256: 7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8
+        - reference_id: campus_057909002_ccmr_report
+          role: source_notes
+          title: Garland High School 2024–25 TPRS CCMR report
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=057909002&lev=C&prgopt=reports/tapr/ccmr.sas
+          provenance_ids:
+          - f010e2cf109847a8575f2c50f1db3e72787fafbe7d2276b5943039f340ed17fc
+          reviewed_sha256: e339476f5bdafde2711b7b91676bda00470e8ff1a02a4a1140b77cd53a3b00c8
+        - reference_id: campus_105906001_ccmr_report
+          role: source_notes
+          title: Jack C Hays High School 2024–25 TPRS CCMR report
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=105906001&lev=C&prgopt=reports/tapr/ccmr.sas
+          provenance_ids:
+          - fcd8e674a5fffbd52d74cf33c72fa3ce19cf4a261b1c43f1ddec6a38e1572d7c
+          reviewed_sha256: d3ff917af337612dc32b7bbfd660d601a75915c67b76ed91c19229393783100d
+        - reference_id: campus_227904001_ccmr_report
+          role: source_notes
+          title: Pflugerville High School 2024–25 TPRS CCMR report
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=227904001&lev=C&prgopt=reports/tapr/ccmr.sas
+          provenance_ids:
+          - aeeb173fa68d53fb09850a62461fdb55820309da0a9a4cd4ce417f0b1cf5694f
+          reviewed_sha256: 29a373e1f82eacc1ca97d8d7acd1068dfaa5531b46f8321d479b7814dcc6ff80
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2025--college-career-military-readiness-crosswalk.json
+          title: TEA Data complete source-only header/layout and ordered dictionary-occurrence contract
+          status: available
+          provenance_ids: []
+          reviewed_sha256: 41f7550bd5dd18cce1f8c96615992d14bf00420a4c848bef78724958f4a65676
+        notes: >-
+          Complete source-only campus download. The listed percentage rates
+          describe 2023–24 annual graduates and match same-edition campus
+          report witnesses. The reports independently display rates only.
+          The family period and other fields remain unqualified. Raw strings,
+          identity columns, publisher headings and dictionary occurrences are
+          preserved. This source profile applies no value policy or estimate.
+          Annual-graduate criteria remain separate from ERC course-taking,
+          current student Membership and Outcomes Bonus funding.
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2025--college-career-military-readiness-crosswalk.json
+            tapr_source:
+              scope: campus
+              tables:
+                college_career_military_readiness: data/tapr/raw/2025-c-GRAD1-offered-original.csv
   district_tapr_college_career_military_readiness:
     2025:
       path: "data/tapr/raw/2025-d-GRAD1-offered-original.csv"
@@ -6467,7 +6594,7 @@ data_sources:
             title: "TEA Data complete source-only header/layout and ordered dictionary-occurrence contract"
             status: "available"
             provenance_ids: []
-            reviewed_sha256: "5f6e4eb0765e954157b096de63a11a10333883195ca4677dbca03fb8a03a00e8"
+            reviewed_sha256: "41f7550bd5dd18cce1f8c96615992d14bf00420a4c848bef78724958f4a65676"
         notes: >-
           Annual-graduate CCMR, college readiness, and TSI source-only download.
           The all-students reported CCMR rate (DA0GP24R) is a percentage for
@@ -6493,6 +6620,147 @@ data_sources:
               scope: "district"
               tables:
                 college_career_military_readiness: "data/tapr/raw/2025-d-GRAD1-offered-original.csv"
+  campus_tapr_college_readiness_components:
+    2025:
+      path: data/tapr/raw/2025-c-GRAD2-offered-original.csv
+      metadata:
+        title: 2025 TAPR Campus College Readiness Components, 2023–24 annual graduates (GRAD2)
+        publisher: Texas Education Agency
+        version: '2025'
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        period:
+          kind: unknown
+        identifiers: []
+        metrics:
+          ccmr_annual_graduates_ap_ib_all_students_rate:
+            field: campus_2024_ap_ib_met_criteria_in_any_subject_graduates_all_students_rate
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2023
+              end_year: 2024
+          ccmr_annual_graduates_ap_ib_economically_disadvantaged_rate:
+            field: campus_2024_ap_ib_met_criteria_in_any_subject_graduates_econ_disadv_rate
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2023
+              end_year: 2024
+          ccmr_annual_graduates_dual_credit_all_students_rate:
+            field: campus_2024_dual_credit_graduates_3_hrs_ela_or_math_or_9_hrs_any_subject_all_students_rate
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2023
+              end_year: 2024
+          ccmr_annual_graduates_dual_credit_economically_disadvantaged_rate:
+            field: campus_2024_dual_credit_graduates_3_hrs_ela_or_math_or_9_hrs_any_subject_econ_disadv_rate
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2023
+              end_year: 2024
+        value_policy: null
+        estimation: null
+        provenance_ids: []
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          title: Complete original 2024–25 campus GRAD2 CSV and ordered controls
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          provenance_ids:
+          - 974bc49fd2a56647ea7c915063744b11bf3c994666f1cc9507fa5076741bbb88
+          reviewed_sha256: 0b6a9c71e4f0ef390308ecb8286eb05ecead8df88d2fcf8f7fa68bc561fb0306
+        - reference_id: menu
+          role: source_notes
+          title: 2024–25 all-campus TAPR family menu
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&tapr=all_c&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr.sas
+          provenance_ids:
+          - af730f6caf7c16a3e6fc7b111021f03a9e840ca69ffe129a5d8348dccae8b18b
+          reviewed_sha256: e6135b4c5b86d292a7bec614003c6427705f8bacce568f8e413b34c1f4492f43
+        - reference_id: selection
+          role: source_notes
+          title: 2024–25 campus GRAD2 selector and checked controls
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+          provenance_ids:
+          - 1441f73e0e442df7180b8a01778d4dd66f8c186cdcd9cc24573d2f557044c09a
+          reviewed_sha256: e3ba5bdc8724853f335e36d30ce25ef492c13eafd153c5276f468511ad286b6c
+        - reference_id: dictionary
+          role: data_dictionary
+          title: 2024–25 campus GRAD2 publisher dictionary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=C&dsname=GRAD2&dd=ccmr&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          provenance_ids:
+          - 4f55dbf04595d757388155cc9617fef33a20ccdf0248f8a839d8effc4615ade6
+          reviewed_sha256: 5123bc83f3f6bd658941e4a3d4c417662c4a32fb4e33c172f1f550f324f60c40
+        - reference_id: glossary
+          role: glossary
+          url: https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf
+          title: Applicable 2024–25 TAPR glossary; reference only
+          status: available
+          provenance_ids:
+          - e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db
+          reviewed_sha256: 846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416
+        - reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html
+          title: Applicable 2024–25 masking; selected applicability pending
+          status: available
+          provenance_ids:
+          - 6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554
+          reviewed_sha256: 7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8
+        - reference_id: campus_057909002_ccmr_report
+          role: source_notes
+          title: Garland High School 2024–25 TPRS CCMR report
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=057909002&lev=C&prgopt=reports/tapr/ccmr.sas
+          provenance_ids:
+          - f010e2cf109847a8575f2c50f1db3e72787fafbe7d2276b5943039f340ed17fc
+          reviewed_sha256: e339476f5bdafde2711b7b91676bda00470e8ff1a02a4a1140b77cd53a3b00c8
+        - reference_id: campus_105906001_ccmr_report
+          role: source_notes
+          title: Jack C Hays High School 2024–25 TPRS CCMR report
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=105906001&lev=C&prgopt=reports/tapr/ccmr.sas
+          provenance_ids:
+          - fcd8e674a5fffbd52d74cf33c72fa3ce19cf4a261b1c43f1ddec6a38e1572d7c
+          reviewed_sha256: d3ff917af337612dc32b7bbfd660d601a75915c67b76ed91c19229393783100d
+        - reference_id: campus_227904001_ccmr_report
+          role: source_notes
+          title: Pflugerville High School 2024–25 TPRS CCMR report
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=227904001&lev=C&prgopt=reports/tapr/ccmr.sas
+          provenance_ids:
+          - aeeb173fa68d53fb09850a62461fdb55820309da0a9a4cd4ce417f0b1cf5694f
+          reviewed_sha256: 29a373e1f82eacc1ca97d8d7acd1068dfaa5531b46f8321d479b7814dcc6ff80
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2025--college-readiness-components-crosswalk.json
+          title: TEA Data complete source-only header/layout and ordered dictionary-occurrence contract
+          status: available
+          provenance_ids: []
+          reviewed_sha256: f32fecb68e12e1d55e7be5d08f2800ed70765a59f7c194c1ee5add5fb7427c42
+        notes: >-
+          Complete source-only campus download. The listed percentage rates
+          describe 2023–24 annual graduates and match same-edition campus
+          report witnesses. The reports independently display rates only.
+          The family period and other fields remain unqualified. Raw strings,
+          identity columns, publisher headings and dictionary occurrences are
+          preserved. This source profile applies no value policy or estimate.
+          Annual-graduate criteria remain separate from ERC course-taking,
+          current student Membership and Outcomes Bonus funding.
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2025--college-readiness-components-crosswalk.json
+            tapr_source:
+              scope: campus
+              tables:
+                college_readiness_components: data/tapr/raw/2025-c-GRAD2-offered-original.csv
   district_tapr_college_readiness_components:
     2025:
       path: "data/tapr/raw/2025-d-GRAD2-offered-original.csv"
@@ -6600,7 +6868,7 @@ data_sources:
             title: "TEA Data complete source-only header/layout and ordered dictionary-occurrence contract"
             status: "available"
             provenance_ids: []
-            reviewed_sha256: "7fde7d9858ea83b7cbfb06aaac115884cb578c2d6c869cc7564e88b293f0f7a0"
+            reviewed_sha256: "f32fecb68e12e1d55e7be5d08f2800ed70765a59f7c194c1ee5add5fb7427c42"
         notes: >-
           Annual-graduate college-readiness components from the complete offered
           source-only download. The AP/IB criterion and dual-credit criterion
@@ -6819,7 +7087,11 @@ spatial:
         column_schema: schemas/spatial--campuses--2025--4826bcd2--default.json
 schema:
   data_sources:
+    campus_tapr_college_career_military_readiness:
+    - csv
     district_tapr_college_career_military_readiness:
+    - csv
+    campus_tapr_college_readiness_components:
     - csv
     district_tapr_college_readiness_components:
     - csv

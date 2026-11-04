@@ -551,11 +551,13 @@ The 2025 outcome originals are also explicit `source` opt-ins:
 | --- | --- | --- | ---: | ---: |
 | `four_year_longitudinal_rate` | Campus | COMP4 | 228 | 224 |
 | `four_year_longitudinal_rate` | District | COMP4 | 226 | 224 |
+| `college_career_military_readiness` | Campus | GRAD1 | 279 | 396 |
 | `college_career_military_readiness` | District | GRAD1 | 277 | 396 |
+| `college_readiness_components` | Campus | GRAD2 | 125 | 165 |
 | `college_readiness_components` | District | GRAD2 | 123 | 165 |
 
 Prefix each dataset with `campus_tapr_` or `district_tapr_` by scope. The sources
-retain the exact CSV labels, codes, 9,084 campus COMP4 rows, 1,208 district rows
+retain the exact CSV labels, codes, 9,084 campus rows and 1,208 district rows
 per family, and every dictionary occurrence. COMP4
 labels identify Class of 2024; the applicable glossary describes entry into
 ninth grade in 2020–21 and a diploma cutoff of August 31, 2024. Its ordinary
@@ -576,14 +578,26 @@ two campus rates show dashes in the report and blank CSV fields. The reason
 for other blanks remains unknown. The two graduation cohorts follow different
 inclusion rules.
 
-Five GRAD1 and GRAD2 rates have a reviewed percent unit and 2023–24 annual-graduate period.
-The same-edition Austin ISD TPRS report matches the raw downloads for each:
+Five district GRAD1 and GRAD2 rates have a reviewed percent unit and
+2023–24 annual-graduate period. The same-edition Austin ISD TPRS report
+matches the raw downloads for each.
 
 | Family | Rate | All students | Economically disadvantaged |
 | --- | --- | --- | --- |
 | GRAD1 | CCMR | `DA0GP24R` (87.8%) | |
 | GRAD2 | AP/IB exam criterion | `DA0GY24R` (36.4%) | `DE0GY24R` (16.0%) |
 | GRAD2 | Dual-credit criterion | `DA0GUA24R` (35.6%) | `DE0GUA24R` (24.4%) |
+
+Six campus rates have the same reviewed unit and annual-graduate period. Garland
+High School, Jack C Hays High School and Pflugerville High School match the
+original CSV rates in same-edition TPRS. The Garland High School report
+shows these figures.
+
+| Family | Rate | All students | Economically disadvantaged |
+| --- | --- | --- | --- |
+| GRAD1 | CCMR | `CA0GP24R` (92.9%) | `CE0GP24R` (92.7%) |
+| GRAD2 | AP/IB exam criterion | `CA0GY24R` (32.7%) | `CE0GY24R` (26.3%) |
+| GRAD2 | Dual-credit criterion | `CA0GUA24R` (33.8%) | `CE0GUA24R` (36.3%) |
 
 The CCMR report also shows asterisks for Austin ISD's American Indian rates for
 all three measures. Those cells match `-1` in `DI0GP24R`, `DI0GY24R`, and

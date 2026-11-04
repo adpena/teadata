@@ -184,6 +184,87 @@ def test_campus_comp4_preserves_scope_and_qualifies_only_two_rates():
         cfg.load_df(dataset, 2025)
 
 
+@pytest.mark.parametrize('family,selector,width,occurrences,receipt,qualified', [
+    ('college_career_military_readiness', 'GRAD1', 279, 396,
+     '3d5a8dd95e12162523acd5d5353aa51ce3d0fa94e68f604041f8bdcd2fdc181e', {
+         'ccmr_annual_graduates_all_students_rate': 'CA0GP24R',
+         'ccmr_annual_graduates_economically_disadvantaged_rate': 'CE0GP24R',
+     }),
+    ('college_readiness_components', 'GRAD2', 125, 165,
+     '974bc49fd2a56647ea7c915063744b11bf3c994666f1cc9507fa5076741bbb88', {
+         'ccmr_annual_graduates_ap_ib_all_students_rate': 'CA0GY24R',
+         'ccmr_annual_graduates_ap_ib_economically_disadvantaged_rate': 'CE0GY24R',
+         'ccmr_annual_graduates_dual_credit_all_students_rate': 'CA0GUA24R',
+         'ccmr_annual_graduates_dual_credit_economically_disadvantaged_rate': 'CE0GUA24R',
+     }),
+])
+def test_campus_annual_graduate_sources_keep_scope_and_rate_only_bindings(
+        family, selector, width, occurrences, receipt, qualified):
+    cfg = load_config()
+    dataset = 'campus_tapr_' + family
+    table = source_table(cfg, family, 'campus')
+    metadata = cfg.resolve_dataset(dataset, 2025, reader_profile='source').metadata
+    assert metadata.version == '2025' and metadata.period.to_dict() == UNKNOWN
+    assert metadata.value_policy is None and metadata.estimation is None
+    assert metadata.field_year is None and metadata.provenance_ids == ()
+    assert table['metric_period'] == UNKNOWN
+    assert table['layout'] == {'label_record': 1, 'code_record': 2, 'first_data_record': 3,
+                               'last_data_record': 9086, 'annotations': []}
+    assert len(table['fields']) == width and len(table['dictionary_records']) == occurrences
+    assert [row['ordinal'] for row in table['dictionary_records']] == list(range(1, occurrences + 1))
+    assert [(row['code'], row['field']) for row in table['fields'][:4]] == [
+        ('CAMPUS', 'campus_number'), ('CAMPNAME', 'campus_name'),
+        ('DISTRICT', 'district_number'), ('DISTNAME', 'district_name'),
+    ]
+    assert all(row['disposition'] == 'identity' for row in table['fields'][:4])
+    records = cfg.header_records(dataset, edition='2025', reader_profile='source')
+    by_code = {row['code']: row for row in records}
+    assert len(records) == len(by_code) == width
+    assert {row['code']: row['period'] for row in records if row['period'] != UNKNOWN} == {
+        code: CCMR_RATE_PERIOD for code in qualified.values()
+    }
+    assert {name: metric.to_dict() for name, metric in metadata.metrics.items()} == {
+        name: {'field': by_code[code]['field'], 'period': CCMR_RATE_PERIOD, 'unit': 'percent'}
+        for name, code in qualified.items()
+    }
+    assert len(by_code['CA0GP24D']['dictionary_occurrences']) == (12 if selector == 'GRAD1' else 5)
+    district = {row['code']: row for row in source_table(cfg, family)['fields']}
+    for row in table['fields'][4:]:
+        peer = district['D' + row['code'][1:]]
+        assert row['label'] == peer['label'].replace('District ', 'Campus ', 1)
+        assert row['field'] == peer['field'].replace('district_', 'campus_', 1)
+
+    references = {ref.reference_id: ref for ref in metadata.references}
+    original = references['csv_headers']
+    assert original.provenance_ids == (receipt,)
+    store = ProvenanceStore(ROOT / 'provenance')
+    graph = validate_record_graph(store.read_record, [
+        identifier for ref in references.values() for identifier in ref.provenance_ids
+    ])
+    for ref in references.values():
+        for identifier in ref.provenance_ids:
+            record = graph[identifier]
+            assert record['requested_url'] == ref.url
+            assert record['artifact']['sha256'] == ref.reviewed_sha256
+    raw = graph[receipt]
+    assert raw['artifact']['sha256'] == table['input_sha256']
+    assert ('sumlev', 'C') in map(tuple, raw['parameters']['form_controls'])
+    assert ('dsname', selector) in map(tuple, raw['parameters']['form_controls'])
+    dictionary, = references['dictionary'].provenance_ids
+    assert {item['source_sha256'] for item in table['dictionary_records']} == {
+        graph[dictionary]['artifact']['sha256']
+    }
+    for campus in ('057909002', '105906001', '227904001'):
+        report = references[f'campus_{campus}_ccmr_report']
+        assert report.url and f'ccyy=2025&id={campus}&lev=C' in report.url
+        assert report.url.endswith('/ccmr.sas')
+
+    assert cfg.is_source_only(dataset, 2025) and cfg.column_schema(dataset, 2025) is None
+    assert dataset not in _registry
+    with pytest.raises(ContractError, match='Reader profile is required'):
+        cfg.load_df(dataset, 2025)
+
+
 def test_literal_class_and_annual_graduate_contexts_do_not_become_other_populations():
     cfg = load_config()
     comp = cfg.header_records('district_tapr_four_year_longitudinal_rate', edition='2025', reader_profile='source')
