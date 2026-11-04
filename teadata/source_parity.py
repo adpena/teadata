@@ -1,4 +1,4 @@
-"""Offline exact raw parity for explicitly selected lossless TAPR native leaves.
+"""Offline exact raw parity for explicitly selected admitted native leaves.
 
 This checks transport/preparation fidelity, not scientific meanings or publisher
 authenticity. Unsupported transformations and unavailable lineage remain HOLD.
@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING, Any, NotRequired, Sequence, TypedDict
 from .column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
 from .dataset_metadata import COLUMN_SCHEMA_MAX_BYTES, EditionKey
 from .manifest import ContractError, canonical_json
+from .peims_leaves import DATASETS as PEIMS_DATASETS
 from .provenance import validate_record_graph
 from .tapr import TaprReadBudget, TaprSourceRequest, qualified_tapr_family
 
@@ -261,7 +262,7 @@ def validate_source_parity(release: DataRelease, store: ProvenanceStore, *, edit
             or type(max_examples) is not int or not 0 <= max_examples <= 20
             or type(working_bytes) is not int or not 0 < working_bytes <= 1024**3):
         raise ValueError('Explicit unique edition IDs and bounded example/working-byte budgets are required')
-    output: dict[str, Any] = {'scope': 'complete lossless TAPR raw-string leaves only', 'status': 'HOLD', 'editions': [],
+    output: dict[str, Any] = {'scope': 'admitted lossless TAPR, typed PEIMS and typed district transfer leaves', 'status': 'HOLD', 'editions': [],
         'working_bytes': working_bytes,
         'scientific_qualification': False, 'publisher_authenticity_verified': False,
         'exceptions_supported': False, 'semantic_goldens_replaced': False}
@@ -278,7 +279,13 @@ def validate_source_parity(release: DataRelease, store: ProvenanceStore, *, edit
                 raise _Uncovered(unsupported or 'Exact edition is not present in this release')
             key = choices[identifier]
             item['edition'] = key.to_dict()
-            item.update(_compare(_selection(release, store, key), max_examples=max_examples, working_bytes=working_bytes))
+            if key.dataset in (*PEIMS_DATASETS, "district_transfer_reports"):
+                from .source_parity_typed import compare_typed
+
+                result = compare_typed(release, store, key, max_examples=max_examples, working_bytes=working_bytes)
+            else:
+                result = _compare(_selection(release, store, key), max_examples=max_examples, working_bytes=working_bytes)
+            item.update(result)
         except (_Uncovered, FileNotFoundError) as error:
             item.update(status='HOLD_UNCOVERED', diagnostic=str(error))
         except (ContractError, OSError, ValueError, KeyError, TypeError) as error:

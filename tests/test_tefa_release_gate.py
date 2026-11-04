@@ -33,7 +33,7 @@ def private_release(monkeypatch):
               "metadata": metadata, "artifact": deepcopy(expected["artifact"]),
               "reader": {"columns": deepcopy(reference["reader_columns"])},
               "reads": [{"columns": list(reference["reader_columns"])}]}
-    document = {"datasets": {"tefa": source}, "provenance": records}
+    document = {"schema_version": 2, "datasets": {"tefa": source}, "provenance": records}
     build_id = "a" * 64
     stored = {}
     for number, case in enumerate(reference["cases"]):

@@ -59,10 +59,13 @@ and methodology references.
 
 ### Exact retained-source parity
 
-An optional offline check compares every raw cell in explicitly selected,
-complete TAPR raw-string native leaves against their exact retained original
-CSV and prepared Parquet. Select the existing release, provenance store and
-exact edition IDs; repeat `--source-edition` to check a finite set:
+An offline check compares every raw cell in explicitly selected complete TAPR,
+PEIMS student Enrollment and program, and district-transfer native leaves
+against retained publisher CSV. It also compares the retained TAPR and transfer
+preparations and checks typed values, statuses and source row locations for the
+admitted PEIMS and district-transfer recipes. Select the existing release, its
+provenance store and exact edition IDs. Repeat `--source-edition` for each
+edition to check.
 
 ```sh
 uv run --locked python -m teadata.verification --kind library \
@@ -70,22 +73,22 @@ uv run --locked python -m teadata.verification --kind library \
   --source-edition EXACT_EDITION_ID
 ```
 
-The catalog, reviewed crosswalk and historical processing recipes select the
-source bytes, fields, layout, keys and reader budgets. Native joins compare
-all rows and fields without assuming row order; original IDs, whitespace,
-zeros and masking tokens remain exact. Reports name source receipts/URLs,
-field/row/cell coverage, key differences and bounded, explicitly marked
-examples. No current-code hash is substituted for a recorded historical
-producer identity. Selected artifact integrity remains checked by the existing
-release reader.
+The catalog, reviewed crosswalk and historical recipes bind the exact source
+receipts, order, layout, field names and interpretation policy. The checker
+does not substitute a current-code hash for a recorded historical producer.
+Original IDs, whitespace, zeros, masks and source row locations are compared
+where the recipe records them. Reports name the bound source receipts and show
+row and cell coverage, per-column differences and bounded examples.
 
-The checker reads the original once and each target stage once, then uses one
-native key-to-row index and per-column comparisons. Its default 128 MiB
-`working_bytes` budget is split between retained original, one target at a time,
-and alignment/comparison buffers. Larger inputs remain uncovered/HOLD; increasing
-this explicit core-API budget does not change the comparison rules. Source
-decoding retains its recorded batch/key limits. These are Arrow-buffer admission
-limits, not a process RSS guarantee.
+TAPR uses one native key-to-row index and compares raw rows independently of
+their storage order. The typed check decodes CSV independently of the
+producer's Arrow CSV reader, applies the same reviewed normalization rules
+and compares ordered batches with the native outputs. It also rechecks the
+district-transfer preparation's exact regional inputs and retained
+annotations. Each target is streamed once. The default `working_bytes`
+budget is 128 MiB, with separate slots for staged source rows and Arrow
+batches or for TAPR tables and alignment. Inputs exceeding an explicit
+budget remain uncovered. The limits do not bound total process RSS.
 
 Prepared TAPR inputs may retain a different historical global or script digest.
 Those identities remain provenance; matching today's script alone would not
@@ -98,12 +101,11 @@ leaf records current raw revalidation separately while retaining the actual
 historical preparation identities. Any disagreement blocks; this raw readback
 does not confer scientific qualification or a user-approved exception.
 
-`PASS_RAW_PARITY` establishes only the named raw fidelity scope. Typed or
-normalized leaves, unsupported readers and missing lineage are uncovered/HOLD;
-they are never counted as checked. Scientific mappings, periods, units, policy
-applicability, source authenticity and publisher correctness remain separate
-qualifications. Existing independent publisher goldens and ordinary release
-checks remain unchanged.
+`PASS_RAW_PARITY` establishes fidelity to the named retained inputs and the
+recorded projection. Unsupported recipes and missing lineage remain uncovered.
+Scientific mappings, measurement periods, units, policy applicability,
+publisher authenticity and publisher correctness require separate evidence,
+including the independent publisher witnesses used by the native release gate.
 
 Every unexplained raw, key or contract mismatch blocks qualification. This
 checker supports no exceptions, tolerances or automatic golden updates.
@@ -216,6 +218,27 @@ separate, and retain an unknown measurement period when its window is not
 established. The family does not accept SOF run or PEIMS financial-basis fields.
 An absent class year remains omitted, including on existing qualifier families;
 their serialized metadata and leaf semantic hashes remain unchanged.
+
+### Qualifying the native profile supplement
+
+The offline profile supplement gate admits the six reviewed 2025–26 PEIMS
+Enrollment leaves and the three reviewed district transfer editions. Supply a
+trusted manifest SHA-256 and the retained provenance store.
+
+```sh
+scripts/check --native-release "$NATIVE_RELEASE" --native-pin "$NATIVE_SHA256" \
+  --source-store "$TEADATA_PROVENANCE_DIR"
+```
+
+The gate checks the complete schema-4 bundle and exact reviewed metadata, leaf
+bytes and processing receipts. It then requires raw and typed parity and
+replays the separately acquired TEA reports listed in
+`teadata/reference_cases/native_peims_transfers.json`. The reports cover each
+PEIMS scope and each transfer year. The result records the pinned manifest,
+whole-source parity, and observed publisher comparisons separately. Missing
+source evidence or mismatches prevent qualification. This command checks an
+unpublished or retained bundle offline. Deployment and profile activation
+remain separate operations.
 
 ## File organization and names
 

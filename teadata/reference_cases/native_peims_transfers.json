@@ -1,0 +1,142 @@
+{
+  "20a6d38ed2e2f11419b9a740dbff94bdc664e77c4da1c0d1a9aa6c2d3de8dc33": {
+    "artifact": "4fa2fcd4a4b2c50dd04c5a7c21bf6fecd212a6cc93a17c3cc092e5dbd0d260f1",
+    "metadata_sha256": "7a1a0111477cb70a8efefeb773b86e72d0de3e15c682931efb0a67b181015f8a",
+    "processing_id": "0e7dea1c32deccc3a6b65f7f9936c0f938f5ff8447d11100ff0fd66dada6dfcb",
+    "reports": [
+      {
+        "entity": "227901 AUSTIN ISD",
+        "receipt": "58fc62ae2bf8c38c21fce35e158cc1bac41e7ad206f9d62b01948ab8fee40af6"
+      },
+      {
+        "entity": "246906 HUTTO ISD",
+        "receipt": "cabef4e3fb380e0cfdf772dbf6c0ac4f31187c8629cc07d95d5a0267bb9dee4f"
+      },
+      {
+        "entity": "108810 BRILLANTE ACADEMY",
+        "receipt": "8b237c05e6e3da45abef6ab7d7d0474c2f88c806380fb9b858e64ba7145b7c3f"
+      }
+    ],
+    "sha256": "fadbdcbb072e3497a8ba98cca00b89ce7100c24375df9dd99e7f3e53eb960e2c"
+  },
+  "250a19ed945282407fdfcfdf37c873e6641215d75b0540738e56a3dab68174ae": {
+    "artifact": "b60c520c33f90ef9cbdaef176dc34ca97c8dfa7770081f48ac5f3a82b0717bd1",
+    "metadata_sha256": "c22b78d6186a1cda7726d19499e03483d9fc1556be7d523686d160046b241201",
+    "processing_id": "ee8696f65e58275f7f990e220fdf26be98314106219e17c0dfc3f9c4dee84ad4",
+    "reports": [
+      {
+        "entity": "state",
+        "receipt": "0e0e37924f2c5dbecf1031a2c2ce7d5db2f9836d6b552bed09c37cfacabbd443"
+      }
+    ],
+    "sha256": "92a8735aea4c780d4ad3aa114c8cceb73dbd7dd7ef0531a0d8ed1bcb9be46e4c"
+  },
+  "26be8974b100f6b66e892fb13bd4f4945881fcaa55a7a286d3d71ce4096d65c6": {
+    "artifact": "209d9275ca0f86e8f7a7b816cc94b40c430c4d615fc5103fc7229d2fb90a9eef",
+    "metadata_sha256": "19b7ea9e29816e55b42394bbce9fa831b5c220886e732fef52ed148d4f6b813c",
+    "processing_id": "a4262094ee1a49c90f42770b141127daa05988d459fab83d8c8b2d6ecd78e056",
+    "reports": [
+      {
+        "entity": "227901",
+        "receipt": "c29e524f1ce07c0795efd2bc2a4cb003d037290aa91ff243ad4d475874d4e4f0"
+      },
+      {
+        "entity": "227910",
+        "receipt": "d57f7ea3daa2d3df48a9acdbc1200e10857acbb525feeeab51eeafca234a70c7"
+      }
+    ],
+    "sha256": "b5280932a96b953842105b12de953bbd1225a39b0317e5e4a4d840f6e80401d1"
+  },
+  "39a1e18b10c77d15bb76fedd51f16c5c3cf0c9a3877018a7507d801f2eec2d5e": {
+    "artifact": "00b2dd1635e79123f3d4a0ef1b037c173434ea66ef487f463449779ea0a722be",
+    "metadata_sha256": "7309e0b30bdcb4b17faaea8926a280b39f2993ddfa72dd8ff3bd255552714dba",
+    "processing_id": "5231cd685a2bc02b3e6a3a0b25d97433487ec9d71ed988ab48fec4e7e9f848a2",
+    "reports": [
+      {
+        "entity": "057829001",
+        "receipt": "1007442d96b05eb9839f36a7b23fcb7b4bfa055c27a5eebaddf76efe2db0bcf3"
+      }
+    ],
+    "sha256": "219292a1a51e9f40e8ad2720e62d12ade6aec6c3c0641d6627fefc67ecf820c4"
+  },
+  "4211224d836434a06e4622a0efca1ea4df76bcbd9afaeea7cc9741794fa6b5fd": {
+    "artifact": "fade37f5fcf105945a1f09cd104b6b00f112cfc34e1f20757719144089576c71",
+    "metadata_sha256": "c520c516dc08fd27c7f91c6e209f7f5240fd775512d95b05c7a3f8bdf5460af2",
+    "processing_id": "8edac298a0457ee3f9d13a46f57e07b8ef15af6dfb590814f5a78fe9ada03e07",
+    "reports": [
+      {
+        "entity": "227901",
+        "receipt": "03288b78e7ef6ed8faf33cdc710669d07e05611467ad17bc6b5f09ab54809293"
+      },
+      {
+        "entity": "227910",
+        "receipt": "da551f556bed8a0cd727c53189c2a35e477bfa7b119e6b3bb35f7d5db17524d0"
+      }
+    ],
+    "sha256": "27c42166889bc6fb78aa287ba236cc6017378725e8e1cfc2b49a95293cf39fc8"
+  },
+  "8727da07be7521ab75dcdfd07679c0c5e9e4cba4c5f256f12edc845b571f751d": {
+    "artifact": "a32ffd6eda67440713c5357ef804d94703836583881a70b700beaa87b0761ab8",
+    "metadata_sha256": "9a74833136f9f3fa2d081d085b6701f005c902a8d5dc85e82ea88f3a296ede32",
+    "processing_id": "90d1aa2bd9b747ff2be0efbd2ae936869f78b340abe346301b3cf909577a3ad6",
+    "reports": [
+      {
+        "entity": "state",
+        "receipt": "8678c92b4c16e804a20d2a26d4dbd5d9a7ec78204186148540a6d343be9243fc"
+      }
+    ],
+    "sha256": "4e0af2b2adfa3cfc5948eca9bb6fc4a8e362c02282dee1edc1fcf2dfc9a22448"
+  },
+  "c8de52d7b24058f5470fb913ce2f078305b03dac7dae4924598573f3ef2e26c0": {
+    "artifact": "809ce5f57b0eb5796c422a9fdcc22b9849e954292c475d6eff97a639b2e2b51a",
+    "metadata_sha256": "8e9c83bc47a11aad3f6faf93bfda5203a537dc2b0e395c90c5ab63975fa4e114",
+    "processing_id": "34ffe5771c245396d4b64b3f21a1e01a08de3fb3a70032b065967f06280bba07",
+    "reports": [
+      {
+        "entity": "057829001",
+        "receipt": "ec75b056b4c3538f0ed415427e3d71bd0d29ff337f582efebf6d3cc0a79ad07c"
+      }
+    ],
+    "sha256": "55f1de023b1d675ebbfb84114513c7ff38ba93e63962ff7a5ed4999bf808bb6d"
+  },
+  "cb33d5563b2bc1dd91eab5b1e33ff76c44d60e8c398ba4f9a7caf8b659cb40bb": {
+    "artifact": "6efa5ada6c8f3026993c70408c8f2c644830a927c9bd26bc1f751d25c13d8116",
+    "metadata_sha256": "0e25f1e1959437bec33f6fede0789b246c026f9b81f57fa2279b20710ad1fc21",
+    "processing_id": "7ea45b656a5ae28649e9fc58b7e65329b8b7a04c0706475c6b1c50db69d1fe96",
+    "reports": [
+      {
+        "entity": "227901 AUSTIN ISD",
+        "receipt": "853cba76a05c622f855c6484073ef73b91e73193aa2394b16d20dbd95eeb372c"
+      },
+      {
+        "entity": "246906 HUTTO ISD",
+        "receipt": "a7a4cdc35945c7e167b4478bb9b0d1032caf997757f0a79ed156b9a530a656ca"
+      },
+      {
+        "entity": "108810 BRILLANTE ACADEMY",
+        "receipt": "50647f6b57137e9d64552e235a4ef8f8605630c7d0a5c1ed9d3acb72332b1c81"
+      }
+    ],
+    "sha256": "6d37b1f5eb25ecfa475772018dc3fa8e57d6d1d65a1911990bd87ef76834a40e"
+  },
+  "f322f9527e4cf42f31acd0171a5780ac18f3a8a475e46f879bb9c2d7fe5c056b": {
+    "artifact": "450800bb426ff09b65e067a2f718369eb6913d95cea5519421fcd94be9f61add",
+    "metadata_sha256": "57609d2de5aad89cf5d8154461620fcdeab25a7deb7a5b082f0f2d1d9a1aeeda",
+    "processing_id": "1ca5b30a7987f18c737ba51fbf37a861d853403269c3a7c5396f1c41abc9316c",
+    "reports": [
+      {
+        "entity": "227901 AUSTIN ISD",
+        "receipt": "035b97c8cd6053178addd662964a419a1d0e6cc8b324e68628eda5c8d54f7e31"
+      },
+      {
+        "entity": "246906 HUTTO ISD",
+        "receipt": "c7bf1846ba20e34942cf7c1ac1d8d2001b2e688a036518f188b473f558bc2dc7"
+      },
+      {
+        "entity": "108810 BRILLANTE ACADEMY",
+        "receipt": "76f3744a2c9f7dad7611ea1cea62a98fe846f25eb278a5d1e76fc5b6e501c4e2"
+      }
+    ],
+    "sha256": "51f98d941571e4437d2eb8c0a481e03b9025017f4fca5ffd1282d796f8972531"
+  }
+}

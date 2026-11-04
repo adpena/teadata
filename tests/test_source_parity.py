@@ -240,5 +240,5 @@ def test_source_parity_cli_is_explicit_offline_and_reports_its_limited_scope(tmp
     verification.main()
     report = json.loads(capsys.readouterr().out)
     assert report['status'] == 'PASS_RAW_PARITY'
-    assert report['scope'] == 'complete lossless TAPR raw-string leaves only'
+    assert report['scope'] == 'admitted lossless TAPR, typed PEIMS and typed district transfer leaves'
     assert report['scientific_qualification'] is False

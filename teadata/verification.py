@@ -716,6 +716,8 @@ def _validate_tefa_cases(release: DataRelease) -> dict[str, Any]:
 def _validate_release(path: str, kind: str) -> None:
     from teadata.release import DataRelease
     release = DataRelease(Path(path).expanduser())
+    if release.catalog.to_dict()["schema_version"] != 2:
+        raise ReceiptError("Edition catalogs require --native-release with an exact pin and retained source store")
     provenance_records = _validate_release_provenance(release)
     release.verify()
     publisher_checks = _validate_publisher_cases(release)
@@ -730,6 +732,45 @@ def _validate_release(path: str, kind: str) -> None:
     print("TEFA private example coverage: " + json.dumps(private_checks, sort_keys=True))
 
 
+def _retained_store(path: Path):
+    from teadata.provenance import ProvenanceStore
+
+    if not (path / "records").is_dir() or not (path / "objects").is_dir():
+        raise ReceiptError("An existing retained provenance store is required")
+    return ProvenanceStore(path)
+
+
+def _validate_native_release(path: Path, pin: str, source_store: Path) -> dict[str, Any]:
+    from teadata.manifest import ContractError
+    from teadata.native_witnesses import reviewed_native_references, validate_native_witnesses
+    from teadata.release import DataRelease
+    from teadata.source_parity import validate_source_parity
+
+    try:
+        release = DataRelease(path, expected_sha256=pin, offline=True)
+        references = reviewed_native_references()
+        index = release.catalog.to_dict()
+        if (index["schema_version"] != 4 or index["editions"].keys() != references.keys()
+                or index["artifacts"] != {entry["artifact"]: edition for edition, entry in references.items()}):
+            raise ReceiptError("Native release does not contain exactly the reviewed profile editions and leaves")
+        for edition, entry in references.items():
+            artifact = release.catalog.artifact_ref(entry["artifact"])
+            if (artifact.sha256 != entry["sha256"] or artifact.processing_id != entry["processing_id"]
+                    or index["editions"][edition]["metadata"]["sha256"] != entry["metadata_sha256"]):
+                raise ReceiptError("Native leaf, metadata or processing receipt differs from the reviewed identity")
+        release.verify()
+        store = _retained_store(source_store)
+        parity = validate_source_parity(release, store, edition_ids=sorted(references))
+        if parity["status"] != "PASS_RAW_PARITY":
+            return {"status": "HOLD", "build_id": release.build_id, "manifest_sha256": release.manifest_sha256,
+                    "structural_integrity": True, "parity": parity, "publisher_witnesses": None}
+        witnesses = validate_native_witnesses(release, store, references)
+    except ContractError as error:
+        raise ReceiptError(str(error)) from error
+    return {"status": "PASS_REVIEWED_NATIVE", "build_id": release.build_id, "manifest_sha256": release.manifest_sha256,
+            "structural_integrity": True, "parity": parity, "publisher_witnesses": witnesses}
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--kind", choices=("library", "app"), required=True)
@@ -742,7 +783,9 @@ def main() -> None:
     parser.add_argument("--timeout", type=float, default=900, help="Maximum seconds for each check")
     parser.add_argument("--validate-release", help=argparse.SUPPRESS)
     parser.add_argument("--source-parity", type=Path, help="Offline raw fidelity check for selected supported native release editions")
-    parser.add_argument("--source-store", type=Path, help="Existing retained ProvenanceStore for --source-parity")
+    parser.add_argument("--native-release", type=Path, help="Qualify the exact reviewed native profile supplement offline")
+    parser.add_argument("--native-pin", help="Trusted manifest SHA-256 for --native-release")
+    parser.add_argument("--source-store", type=Path, help="Existing retained ProvenanceStore for source or native checks")
     parser.add_argument("--source-edition", action="append", default=[], help="Exact edition ID for --source-parity; repeat explicitly")
     args = parser.parse_args()
     if args.timeout <= 0:
@@ -753,25 +796,31 @@ def main() -> None:
         parser.error("Choose --verify or --verify-latest")
     if args.install_hook and (args.verify or args.verify_latest or args.release):
         parser.error("Install the hook separately from verification or release checks")
-    if args.source_parity:
-        if (args.source_store is None or not args.source_edition or args.validate_release or args.release
-                or args.verify or args.verify_latest or args.install_hook or args.paired_library):
-            parser.error("Source parity requires --source-store and explicit --source-edition; run separately from other modes")
-    elif args.source_store is not None or args.source_edition:
-        parser.error("Source-store and source-edition options require --source-parity")
+    if args.source_parity or args.native_release:
+        if (args.source_store is None or args.validate_release or args.release or args.verify
+                or args.verify_latest or args.install_hook or args.paired_library):
+            parser.error("Source and native checks require --source-store and run separately from other modes")
+        if args.source_parity and (not args.source_edition or args.native_release or args.native_pin):
+            parser.error("Source parity requires explicit --source-edition; run separately from native qualification")
+        if args.native_release and (not args.native_pin or args.source_edition or args.kind != "library"):
+            parser.error("Native qualification requires --kind library and --native-pin and selects its exact reviewed editions")
+    elif args.source_store is not None or args.source_edition or args.native_pin:
+        parser.error("Source options require --source-parity or --native-release")
     try:
         if args.source_parity:
-            from teadata.provenance import ProvenanceStore
             from teadata.release import DataRelease
             from teadata.source_parity import validate_source_parity
 
-            if (not args.source_store.is_dir() or not (args.source_store / "records").is_dir()
-                    or not (args.source_store / "objects").is_dir()):
-                raise ReceiptError("Source parity requires an existing retained provenance store")
             report = validate_source_parity(DataRelease(args.source_parity, offline=True),
-                ProvenanceStore(args.source_store), edition_ids=args.source_edition)
+                _retained_store(args.source_store), edition_ids=args.source_edition)
             print(json.dumps(report, sort_keys=True, ensure_ascii=False, allow_nan=False))
             if report["status"] != "PASS_RAW_PARITY":
+                raise SystemExit(2)
+            return
+        if args.native_release:
+            report = _validate_native_release(args.native_release, args.native_pin, args.source_store)
+            print(json.dumps(report, sort_keys=True, ensure_ascii=False, allow_nan=False))
+            if report["status"] != "PASS_REVIEWED_NATIVE":
                 raise SystemExit(2)
             return
         if args.validate_release:
