@@ -1,11 +1,10 @@
-"""Offline field qualification for the reviewed FY2025 E3 financial actuals."""
+"""Offline field qualification for explicitly selected FY2025 financial actuals."""
 from __future__ import annotations
 
 from dataclasses import dataclass
 from hashlib import sha256
 from html import unescape
 from importlib.metadata import version
-from importlib.resources import files
 from io import BytesIO
 import json
 from pathlib import Path
@@ -23,13 +22,13 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 
 from .analytical import write_leaf_artifact
-from .campus_financial_leaves import _admit_intake, _read_bounded, _read_report
-from .column_schema import source_schema_fingerprint
+from .campus_financial_leaves import _FACTS_PER_CAMPUS, _admit_intake, _read_bounded, _read_report
+from .column_schema import _unique_object, source_schema_fingerprint
 from .dataset_metadata import ArtifactRef, DatasetMetadata, EditionKey, ResolvedDataset
 from .financial_leaves import NS, _package, _xml
 from .manifest import BuildRecorder, canonical_json, file_identity
 from .provenance import ProvenanceStore
-from .release import DataRelease, publish_release
+from .release import DataRelease, _install_candidate, publish_release
 from .teadata_config import load_config_bytes
 from .values import ValueStatus
 
@@ -40,6 +39,7 @@ _CAMPUS_DATASET = "campus_peims_financials"
 _CAMPUS_FIELD = "all_funds_total_expenditures"
 _DISTRICT_DATASET = "district_pwr_actuals"
 _DISTRICT_FIELD = "af_college_career_and_military_readiness_ccmr_pic_38"
+_TABLE = "qualified_actual_expenditures"
 _PIC38 = "College, Career, and Military Readiness (CCMR) (PIC 38)"
 _PDF_TITLE = "2024-2025 PEIMS Actual Financial Data, Organized by Campus"
 _PDF_OBJECT = "Expenditures by Object (Objects 6100-6600)"
@@ -54,6 +54,10 @@ _AMOUNT = re.compile(r"-?[0-9]+")
 _PRINTED_AMOUNT = re.compile(r"\$?-?(?:[0-9]+|[0-9]{1,3}(?:,[0-9]{3})+)")
 _HTML_CELL = re.compile(r"<(td|th)\b([^>]*)>(.*?)</\1>", re.S)
 _CONTEXT = ("source_receipt_id", "source_sheet", "source_cell", "witness_receipt_id", "witness_locator")
+_CASE_IDENTITIES = frozenset({"about_actual_receipt", "accounting_guide_receipt", "campus_preparation_receipt",
+                             "cohort_intake_sha256", "district_pwr_receipt", "district_selector_receipt",
+                             "raw_dictionary_receipt"})
+_SHA256 = re.compile(r"[a-f0-9]{64}")
 
 
 @dataclass(frozen=True)
@@ -228,13 +232,13 @@ def _campus_selection(store: ProvenanceStore, case: dict, pdf_tool: str) -> _Sel
     if (prep["processor"] != "teadata.campus_financial_leaves.materialize_campus_financial_workbooks"
             or prep["parameters"]["intake_sha256"] != case["cohort_intake_sha256"]
             or graph[intake_id]["artifact"]["sha256"] != case["cohort_intake_sha256"]
-            or validation["rows"] != {"campus_reports": 405, "campus_financial_facts": 77760}
             or validation["source_projection_readback_equal"] is not True):
-        raise ValueError("Campus raw preparation is not the reviewed FY2025 E3 intake")
+        raise ValueError("Campus raw preparation is not the reviewed FY2025 intake")
     intake = _bytes(store, graph[intake_id])
     selected = _admit_intake(store, intake)
-    if len(selected) != 405 or {workbook.district for workbook in selected} != case["districts"].keys():
-        raise ValueError("Campus raw preparation differs from the reviewed E3 cohort")
+    if ({workbook.district for workbook in selected} != case["districts"].keys()
+            or validation["rows"] != {"campus_reports": len(selected), "campus_financial_facts": len(selected) * _FACTS_PER_CAMPUS}):
+        raise ValueError("Campus raw preparation differs from the reviewed district selection or row coverage")
     artifact = prep["outputs"]["campus_financial_facts"]
     table = pq.read_table(pa.BufferReader(_bytes(store, {"artifact": artifact})),
         columns=["campus_number", "raw_value", "source_receipt_id"], filters=[("source_cell", "=", "E7")])
@@ -265,7 +269,7 @@ def _campus_selection(store: ProvenanceStore, case: dict, pdf_tool: str) -> _Sel
             values[workbook.campus] = _Amount(raw, value, workbook.receipt_id, fact["worksheet"], "E7", pdf_id, f"page {page}")
         pdf_ids.append(pdf_id)
     return _Selection(_CAMPUS_DATASET, "campus", _CAMPUS_FIELD, "E7", "Total Expenditures", "A1",
-        "Object section, All Funds amount, nominal dollars as published. Only campuses in the 14 E3 profile districts. "
+        "Object section, All Funds amount, nominal dollars as published for the publisher-witnessed campus roster. "
         "Shares, per-student values and membership interpretation remain outside this qualification.",
         f"{_REPORTS}/2425_new_camp_actual.html", tuple(workbook.receipt_id for workbook in selected),
         (prep_id, *pdf_ids), values)
@@ -297,7 +301,7 @@ def _district_selection(store: ProvenanceStore, case: dict) -> _Selection:
         values[district] = _Amount(raw, value, raw_id, "24_25 AF Act", cell, html_id, f"line {line}")
         html_ids.append(html_id)
     return _Selection(_DISTRICT_DATASET, "district", _DISTRICT_FIELD, "BN1", "AF " + _PIC38, "C1",
-        "District All Funds PIC 38 expenditures in nominal dollars, for the 14 E3 profile districts. "
+        "District All Funds PIC 38 expenditures in nominal dollars for the publisher-witnessed district roster. "
         "No denominator, CCMR readiness rate, Outcomes Bonus award or SOF run is implied.",
         _STANDARD_REPORTS, (raw_id,), (raw_id, *html_ids), values)
 
@@ -330,13 +334,13 @@ def _source_config(store: ProvenanceStore, stage: Path, case: dict, selections: 
                   for position, (field, label) in enumerate(zip((identity, selected.field), labels, strict=True), 1)]
         hashes = [store.read_record(identifier)["artifact"]["sha256"] for identifier in selected.sources]
         crosswalk = {"schema_version": 2, "mapping_version": 1, "datasets": [{"dataset": selected.dataset,
-            "edition": str(_YEAR), "source_only": True, "tables": [{"table": "e3_qualified_actual_expenditures",
+            "edition": str(_YEAR), "source_only": True, "tables": [{"table": _TABLE,
             "header_identity": "position", "input_sha256s": hashes, "source_schema_sha256": source_schema_fingerprint(labels, labels),
             "metric_period": _PERIOD, "fields": fields}]}]}
         raw_crosswalk = (canonical_json(crosswalk) + "\n").encode()
         resource = stage / f"{sha256(raw_crosswalk).hexdigest()}.json"
         resource.write_bytes(raw_crosswalk)
-        schema_receipt = _local_observation(store, resource, "Exact reviewed FY2025 E3 finance crosswalk")
+        schema_receipt = _local_observation(store, resource, "Exact reviewed FY2025 finance crosswalk")
         source_refs = [*references, {"reference_id": "columns", "role": "schema", "status": "available",
             "path": resource.name, "reviewed_sha256": file_identity(resource)["sha256"], "provenance_ids": [schema_receipt]}]
         if selected.scope == "district":
@@ -344,7 +348,7 @@ def _source_config(store: ProvenanceStore, stage: Path, case: dict, selections: 
                                           "FY2025 district financial actual selector", f"{_REPORTS}/2425_FinActRep.html"))
             source_refs.append(_reference(store, selected.sources[0], "original_workbook", "source_notes",
                                           "Original FY2025 statewide PWR actual workbook", _PWR_URL))
-        source_metadata = {"title": f"FY2025 E3 {selected.scope} financial actuals", "version": str(_YEAR), "publisher": "Texas Education Agency",
+        source_metadata = {"title": f"FY2025 {selected.scope} financial actuals", "version": str(_YEAR), "publisher": "Texas Education Agency",
             "source_url": selected.source_url, "period": _PERIOD, "identifiers": [identity], "notes": selected.notes,
             "references": source_refs, "metrics": {selected.field: {"field": selected.field, "unit": "currency"}},
             "source_qualifiers": {"family": "peims_financial", "reference_id": "about_actual", "financial_basis": "actual"}}
@@ -388,39 +392,55 @@ def _verify_release(path: Path, pin: str, selections: tuple[_Selection, ...]) ->
             raise ValueError("Qualified finance release readback differs from witnessed signed amounts")
 
 
-def qualify_e3_financial_actuals(store: ProvenanceStore, *, output: Path) -> dict[str, Any]:
+def _qualification_case(raw: bytes) -> dict[str, Any]:
+    case = json.loads(raw, object_pairs_hook=_unique_object)
+    if (not isinstance(case, dict) or set(case) != _CASE_IDENTITIES | {"schema_version", "fiscal_end_year", "districts"}
+            or type(case["schema_version"]) is not int or case["schema_version"] != 1
+            or type(case["fiscal_end_year"]) is not int or case["fiscal_end_year"] != _YEAR
+            or not isinstance(case["districts"], dict) or not case["districts"]):
+        raise ValueError("Select a reviewed FY2025 financial qualification case")
+    identities = [case[name] for name in _CASE_IDENTITIES]
+    for district, witnesses in case["districts"].items():
+        if (district == "000000" or not re.fullmatch(r"[0-9]{6}", district) or not isinstance(witnesses, dict)
+                or set(witnesses) != {"campus_pdf", "district_html"}):
+            raise ValueError("Finance qualification requires exact district identifiers and both publisher witnesses")
+        identities.extend(witnesses.values())
+    if any(not isinstance(identity, str) or not _SHA256.fullmatch(identity) for identity in identities):
+        raise ValueError("Finance qualification requires SHA-256 receipt identities and intake pin")
+    return case
+
+
+def qualify_financial_actuals(store: ProvenanceStore, *, case_path: Path, case_sha256: str, output: Path) -> dict[str, Any]:
     """Create a separate, receipt-bound release for two witnessed nominal dollar fields."""
     if output.exists() or output.is_symlink():
         raise FileExistsError("Finance qualification requires a new exclusive output directory")
+    raw_case = _read_bounded(case_path, case_sha256)
+    case = _qualification_case(raw_case)
     pdf_tool = shutil.which("pdftotext")
     if pdf_tool is None:
         raise ValueError("Finance qualification requires Poppler pdftotext")
-    raw_case = files("teadata").joinpath("reference_cases/e3_financial_actuals_2025.json").read_bytes()
-    case = json.loads(raw_case)
-    if case["schema_version"] != 1 or case["fiscal_end_year"] != _YEAR or len(case["districts"]) != 14:
-        raise ValueError("Invalid reviewed FY2025 E3 financial case")
     selections = (_campus_selection(store, case, pdf_tool), _district_selection(store, case))
     output.parent.mkdir(parents=True, exist_ok=True)
     stage = Path(tempfile.mkdtemp(prefix=".qualified-financials-", dir=output.parent))
     try:
-        case_path = stage / "witness-selection.json"
-        case_path.write_bytes(raw_case)
-        case_id = _local_observation(store, case_path, "Reviewed FY2025 E3 financial source selection")
+        exact_case = stage / "witness-selection.json"
+        exact_case.write_bytes(raw_case)
+        case_id = _local_observation(store, exact_case, "Reviewed FY2025 financial source selection")
         config_path, raw_config = _source_config(store, stage, case, selections)
-        config_id = _local_observation(store, config_path, "Exact FY2025 E3 financial field source configuration")
+        config_id = _local_observation(store, config_path, "Exact FY2025 financial field source configuration")
         cfg = load_config_bytes(raw_config, path=config_path)
         recorder = BuildRecorder(cfg, store)
         toolchain = {"python": sys.version, "pyarrow": version("pyarrow"), "platform": platform.platform(),
                      "pdftotext_sha256": file_identity(Path(pdf_tool))["sha256"]}
-        result: dict[str, Any] = {"status": "unpublished_qualified_e3_financial_fields", "release_activation": False,
+        result: dict[str, Any] = {"status": "unpublished_qualified_financial_fields", "release_activation": False,
                                   "field_correctness_qualified": True, "fiscal_period": _PERIOD, "editions": []}
         for selected in selections:
             source = cfg.resolve_dataset(selected.dataset, _YEAR, reader_profile="source", exact=True)
             table, support = _leaf_table(selected)
             hashes = [store.read_record(identifier)["artifact"]["sha256"] for identifier in selected.sources]
             key = EditionKey(selected.dataset, str(_YEAR), EditionKey.source_revision(tuple(hashes)), selected.scope,
-                "e3_qualified_actual_expenditures", f"one qualified FY2025 dollar amount per {selected.scope} in the 14 E3 districts")
-            recipe = {"operation": "qualify_e3_fy2025_actual_expenditures", "case_sha256": sha256(raw_case).hexdigest(),
+                _TABLE, f"one qualified FY2025 dollar amount per selected {selected.scope}")
+            recipe = {"operation": "qualify_fy2025_actual_expenditures", "case_sha256": case_sha256,
                       "config_sha256": sha256(raw_config).hexdigest(), "field": selected.field, "unit": "currency",
                       "source_locators": {"identity": selected.identity_locator, "measure": selected.measure_locator},
                       "denominators_used": False}
@@ -435,7 +455,7 @@ def qualify_e3_financial_actuals(store: ProvenanceStore, *, output: Path) -> dic
             refs = [identifier for item in source.metadata.references for identifier in item.provenance_ids]
             roots = list(dict.fromkeys([*selected.inputs, *refs, case_id, config_id]))
             processing = store.record_processing(dataset=selected.dataset, inputs=roots, outputs={"leaf": leaf},
-                processor="teadata.finance_qualification.qualify_e3_financial_actuals", code_version=recorder.processor_sha256,
+                processor="teadata.finance_qualification.qualify_financial_actuals", code_version=recorder.processor_sha256,
                 parameters={"leaf_contract_sha256": leaf_id, "recipe": recipe, "toolchain": toolchain},
                 validation={"field_correctness_qualified": True, "publisher_matches": table.num_rows,
                             "raw_readback_equal": True, "release_activation": False})
@@ -448,11 +468,9 @@ def qualify_e3_financial_actuals(store: ProvenanceStore, *, output: Path) -> dic
         manifest_identity = file_identity(manifest)
         _verify_release(manifest, manifest_identity["sha256"], selections)
         result.update(build_id=catalog.build_id, manifest=manifest_identity, release_verified=True,
-                      catalog_readback_equal=True, qualification_scope="FY2025 E3 selected fields only")
+                      catalog_readback_equal=True, qualification_scope="FY2025 selected fields and publisher-witnessed rosters only")
         (stage / "MATERIALIZATION.json").write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
-        if output.exists() or output.is_symlink():
-            raise FileExistsError("Finance qualification output appeared before completion")
-        stage.rename(output)
+        _install_candidate(stage, output)
         return result
     finally:
         if stage.exists():

@@ -52,3 +52,33 @@ uv run --locked --extra scripts python -m teadata.scripts.refresh_financials \
 Actual PWR2024/2025 inspection found narrowed 2025 AF program-code labels while GF retained broader labels, matching changes in only four Notes cells. These observations do not establish semantic equivalence or a publisher error. The original source contracts, reviewed references and later independent field-level examples must resolve what can be compared. Future 2026 workbooks use this same producer only after their own exact sheet/header/unit/period/source contracts are reviewed; a year label alone establishes none of those facts.
 
 Both annual GF/AF sheets also repeat their literal Capital Outlay label at AD1 and CA1. Their Notes crosswalk gives different later column pointers (CC1 and CB1); those pointers must not override the actual headers or establish equal values. Keep both physical observations and their raw/status support. PWR tax-rate denominators/scales and metric periods remain source-review questions; do not force a fractional, per-ADA or per-valuation measure into `count` or `ratio` to satisfy the current canonical unit vocabulary.
+
+## Qualify selected FY2025 dollar fields
+
+Use a reviewed, caller-supplied JSON case and its trusted SHA-256 to compare
+campus All Funds Total Expenditures and district All Funds PIC 38 against
+independent TEA reports. The campus field uses the object-section All Funds
+amount at E7. The district field uses column BN in the statewide PWR workbook
+and matches the individual district's All Funds amount. The case supplies
+`schema_version` `1`, `fiscal_end_year`
+`2025`, `campus_preparation_receipt`, `cohort_intake_sha256`,
+`district_pwr_receipt`, `district_selector_receipt`, `about_actual_receipt`,
+`accounting_guide_receipt`, `raw_dictionary_receipt`, and `districts`. Each
+district entry uses an exact six-digit ID and two acquisition receipt IDs named
+`campus_pdf` and `district_html`.
+
+```sh
+uv run --locked --extra scripts python -m teadata.scripts.refresh_financials \
+  --store /path/to/retained/provenance \
+  --qualification-case /path/to/reviewed/witness-selection.json \
+  --qualification-case-sha256 EXACT_SHA256 \
+  --output /path/to/new/qualified-actuals
+```
+
+The command requires Poppler `pdftotext`. It checks the exact campus roster and
+all selected original and witness dollar cells, preserves signed source values,
+and verifies the completed candidate by reading its leaves back. Qualification
+applies to those two fields and the witnessed scope. It does not include
+per-student denominators, award amounts, or statewide coverage inferred from a
+district selection. The output and supplied store retain the case and scope
+provenance, so use private locations for private project selections.

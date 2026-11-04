@@ -110,9 +110,9 @@ including the independent publisher witnesses used by the native release gate.
 Every unexplained raw, key or contract mismatch blocks qualification. This
 checker supports no exceptions, tolerances or automatic golden updates.
 Repairing ETL to match the publisher needs no exception. A future intentional
-difference would require specific user approval of the identified anomaly,
-evidence and repair; general authorization to fix data is insufficient. E3's
-printed-versus-TEA research comparisons are not ETL waivers.
+difference requires specific user approval of the identified anomaly, evidence and
+repair. Keep research comparisons between independently published sources
+separate from ETL qualification.
 
 ### PEIMS primary-disability counts
 

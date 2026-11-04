@@ -175,8 +175,8 @@ SHA-pinned completed regional batch index. District parsing is independent of
 partitioning: an independently acquired statewide district original, if found,
 can use `--input` without a regional index. No speculative statewide endpoint is
 assumed. All 20 regional originals have been acquired for each of 2023-2024 and
-2024-2025; acquisition alone does not prove every expected district has report
-rows. Any E3 district examples are additional goldens, not the statewide scope.
+2024-2025. Compare their district coverage separately against the expected
+scope. Individual district examples provide additional publisher witnesses.
 
 For a regional batch:
 

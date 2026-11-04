@@ -212,7 +212,7 @@ def materialize_peims_students(store: ProvenanceStore, *, config: Path, config_s
     import pyarrow.parquet as pq
 
     from .analytical import write_leaf_artifact
-    from .release import publish_release
+    from .release import _install_candidate, publish_release
     from .teadata_config import load_config_bytes
 
     if (not selections or len(set(selections)) != len(selections)
@@ -284,18 +284,5 @@ def materialize_peims_students(store: ProvenanceStore, *, config: Path, config_s
         result = {"status": "unpublished_native_peims_candidate", "build_id": catalog.build_id,
                   "field_correctness_qualified": False, "release_activation": False, "editions": results}
         (stage / "MATERIALIZATION.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
-        # Reserve the name exclusively. Publish the manifest last so readers
-        # cannot discover a half-copied candidate.
-        output.mkdir(mode=0o700)
-        moved = []
-        try:
-            for entry in sorted(stage.iterdir(), key=lambda item: item.name == "release.json"):
-                destination = output / entry.name
-                entry.rename(destination)
-                moved.append((destination, entry))
-        except BaseException:
-            for destination, entry in reversed(moved):
-                destination.rename(entry)
-            output.rmdir()
-            raise
+        _install_candidate(stage, output)
         return result

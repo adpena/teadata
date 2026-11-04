@@ -391,6 +391,22 @@ def snapshot_build_id(path: str | Path) -> str:
     return header[len(SNAPSHOT_MAGIC) : -1].decode("ascii")
 
 
+def _install_candidate(stage: Path, output: Path) -> None:
+    """Reserve the candidate name and expose its verified manifest last."""
+    output.mkdir(mode=0o700)
+    moved = []
+    try:
+        for entry in sorted(stage.iterdir(), key=lambda item: item.name == "release.json"):
+            destination = output / entry.name
+            entry.rename(destination)
+            moved.append((destination, entry))
+    except BaseException:
+        for destination, entry in reversed(moved):
+            destination.rename(entry)
+        output.rmdir()
+        raise
+
+
 def publish_release(
     directory: Path,
     catalog: DatasetCatalog,

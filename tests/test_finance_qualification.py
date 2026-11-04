@@ -1,10 +1,14 @@
+from hashlib import sha256
 from io import BytesIO
+import json
+from pathlib import Path
 from zipfile import ZipFile
 
 import pyarrow as pa
 import pytest
 
 from teadata import finance_qualification as finance
+from teadata.provenance import ProvenanceStore
 from teadata.scripts.refresh_financials import main
 
 
@@ -102,6 +106,92 @@ def test_leaf_binds_one_exact_amount_with_raw_status_and_witness_support():
 
 def test_qualified_finance_cli_refuses_other_source_arguments(tmp_path):
     with pytest.raises(SystemExit) as failure:
-        main(["--qualify-e3-fy2025", "--store", str(tmp_path), "--output", str(tmp_path / "result"),
+        main(["--qualification-case", str(tmp_path / "case.json"), "--qualification-case-sha256", "1" * 64,
+              "--store", str(tmp_path), "--output", str(tmp_path / "result"),
               "--source", "district_pwr_actuals", "2025"])
     assert failure.value.code == 2
+
+
+def _case():
+    return {"schema_version": 1, "fiscal_end_year": 2025,
+            **{name: f"{number:064x}" for number, name in enumerate(sorted(finance._CASE_IDENTITIES), 1)},
+            "districts": {"001901": {"campus_pdf": "a" * 64, "district_html": "b" * 64}}}
+
+
+def test_qualification_accepts_an_explicit_single_district_selection():
+    case = _case()
+    assert finance._qualification_case(json.dumps(case).encode()) == case
+
+
+@pytest.mark.parametrize("damage", ["duplicate", "wrong_year", "unpadded", "missing_witness", "invalid_pin"])
+def test_qualification_case_rejects_ambiguous_or_unbound_input(damage):
+    case = _case()
+    if damage == "wrong_year":
+        case["fiscal_end_year"] = 2024
+    if damage == "unpadded":
+        case["districts"]["1901"] = case["districts"].pop("001901")
+    if damage == "missing_witness":
+        del case["districts"]["001901"]["campus_pdf"]
+    if damage == "invalid_pin":
+        case["cohort_intake_sha256"] = "not-an-identity"
+    raw = json.dumps(case)
+    if damage == "duplicate":
+        raw = '{"schema_version": 1, ' + raw[1:]
+    with pytest.raises(ValueError):
+        finance._qualification_case(raw.encode())
+
+
+def test_qualification_rejects_wrong_digest_before_opening_witnesses(tmp_path):
+    case = tmp_path / "case.json"
+    case.write_text(json.dumps(_case()))
+    output = tmp_path / "output"
+    store = ProvenanceStore(tmp_path / "store")
+    with pytest.raises(ValueError, match="pinned size or SHA-256"):
+        finance.qualify_financial_actuals(store, case_path=case, case_sha256="0" * 64, output=output)
+    assert not output.exists()
+    assert not store.root.exists()
+
+
+def test_qualification_cli_requires_and_forwards_explicit_case_and_digest(tmp_path, monkeypatch):
+    case = tmp_path / "case.json"
+    case.write_text(json.dumps(_case()))
+    digest = sha256(case.read_bytes()).hexdigest()
+    output = tmp_path / "output"
+    store = tmp_path / "store"
+    args = ["--store", str(store), "--output", str(output), "--qualification-case", str(case)]
+    with pytest.raises(SystemExit) as failure:
+        main(args)
+    assert failure.value.code == 2
+
+    def qualify(selected_store, *, case_path, case_sha256, output):
+        assert selected_store.root == store and case_path == case and case_sha256 == digest
+        assert output == tmp_path / "output"
+        return {"release_activation": False}
+
+    monkeypatch.setattr(finance, "qualify_financial_actuals", qualify)
+    assert main([*args, "--qualification-case-sha256", digest]) == 0
+
+
+def test_qualified_finance_install_reserves_name_and_exposes_manifest_last(tmp_path, monkeypatch):
+    stage = tmp_path / "staged"
+    stage.mkdir()
+    (stage / "release.json").write_text("manifest")
+    (stage / "leaf.parquet").write_text("leaf")
+    output = tmp_path / "output"
+    output.mkdir()
+    with pytest.raises(FileExistsError):
+        finance._install_candidate(stage, output)
+    assert list(output.iterdir()) == []
+    assert len(list(stage.iterdir())) == 2
+    output.rmdir()
+    rename = Path.rename
+
+    def observe(source, destination):
+        assert not (output / "release.json").exists()
+        if source.name == "release.json":
+            assert (output / "leaf.parquet").is_file()
+        return rename(source, destination)
+
+    monkeypatch.setattr(Path, "rename", observe)
+    finance._install_candidate(stage, output)
+    assert (output / "release.json").read_text() == "manifest"
