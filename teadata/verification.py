@@ -747,6 +747,7 @@ def _validate_native_release(path: Path, pin: str, source_store: Path) -> dict[s
     from teadata.native_staff_spp import qualify_staff_spp, reviewed_staff_spp
     from teadata.native_witnesses import (
         reviewed_composed_disability_references,
+        reviewed_historical_peims_references,
         reviewed_native_references,
         reviewed_primary_disability_references,
         validate_native_witnesses,
@@ -764,8 +765,10 @@ def _validate_native_release(path: Path, pin: str, source_store: Path) -> dict[s
             return qualify_staff_spp(release, _retained_store(release.path.parent / "provenance"),
                                      _retained_store(source_store), staffing_or_evaluation)
         primary_disability = reviewed_primary_disability_references(release.manifest_sha256)
-        references = reviewed_native_references() if primary_disability is None else primary_disability
-        inline_catalog = primary_disability is not None
+        historical_peims = reviewed_historical_peims_references(release.manifest_sha256)
+        inline_references = primary_disability if historical_peims is None else historical_peims
+        references = reviewed_native_references() if inline_references is None else inline_references
+        inline_catalog = inline_references is not None
         composed_disability = {} if inline_catalog else reviewed_composed_disability_references(release.manifest_sha256)
         if references.keys() & composed_disability.keys():
             raise ReceiptError("Reviewed native profile constituents have overlapping editions")

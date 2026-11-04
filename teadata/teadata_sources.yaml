@@ -1,6 +1,452 @@
 contract_version: 1
 year_min: 2009
 value_policies:
+  peims_student_enrollment_by_ethnicity_2023:
+    policy_id: peims_student_enrollment_by_ethnicity_2023
+    reference_id: about
+    tokens:
+      <1,090: &peims_historical_mask_001
+        status: suppressed
+        reason: publisher_ferpa_suppression
+      <1,110: *peims_historical_mask_001
+      <1,170: *peims_historical_mask_001
+      <1,350: *peims_historical_mask_001
+      <1,440: *peims_historical_mask_001
+      <1,450: *peims_historical_mask_001
+      <1,480: *peims_historical_mask_001
+      <1,770: *peims_historical_mask_001
+      <1,930: *peims_historical_mask_001
+      <10: *peims_historical_mask_001
+      <100: *peims_historical_mask_001
+      <110: *peims_historical_mask_001
+      <120: *peims_historical_mask_001
+      <130: *peims_historical_mask_001
+      <140: *peims_historical_mask_001
+      <150: *peims_historical_mask_001
+      <160: *peims_historical_mask_001
+      <170: *peims_historical_mask_001
+      <180: *peims_historical_mask_001
+      <190: *peims_historical_mask_001
+      <2,780: *peims_historical_mask_001
+      <20: *peims_historical_mask_001
+      <200: *peims_historical_mask_001
+      <210: *peims_historical_mask_001
+      <220: *peims_historical_mask_001
+      <230: *peims_historical_mask_001
+      <240: *peims_historical_mask_001
+      <250: *peims_historical_mask_001
+      <260: *peims_historical_mask_001
+      <270: *peims_historical_mask_001
+      <280: *peims_historical_mask_001
+      <290: *peims_historical_mask_001
+      <3,010: *peims_historical_mask_001
+      <30: *peims_historical_mask_001
+      <300: *peims_historical_mask_001
+      <320: *peims_historical_mask_001
+      <330: *peims_historical_mask_001
+      <340: *peims_historical_mask_001
+      <350: *peims_historical_mask_001
+      <360: *peims_historical_mask_001
+      <370: *peims_historical_mask_001
+      <380: *peims_historical_mask_001
+      <390: *peims_historical_mask_001
+      <40: *peims_historical_mask_001
+      <400: *peims_historical_mask_001
+      <410: *peims_historical_mask_001
+      <420: *peims_historical_mask_001
+      <430: *peims_historical_mask_001
+      <440: *peims_historical_mask_001
+      <450: *peims_historical_mask_001
+      <460: *peims_historical_mask_001
+      <470: *peims_historical_mask_001
+      <480: *peims_historical_mask_001
+      <490: *peims_historical_mask_001
+      <50: *peims_historical_mask_001
+      <500: *peims_historical_mask_001
+      <510: *peims_historical_mask_001
+      <520: *peims_historical_mask_001
+      <530: *peims_historical_mask_001
+      <540: *peims_historical_mask_001
+      <550: *peims_historical_mask_001
+      <560: *peims_historical_mask_001
+      <570: *peims_historical_mask_001
+      <580: *peims_historical_mask_001
+      <590: *peims_historical_mask_001
+      <60: *peims_historical_mask_001
+      <600: *peims_historical_mask_001
+      <610: *peims_historical_mask_001
+      <620: *peims_historical_mask_001
+      <630: *peims_historical_mask_001
+      <650: *peims_historical_mask_001
+      <660: *peims_historical_mask_001
+      <670: *peims_historical_mask_001
+      <680: *peims_historical_mask_001
+      <70: *peims_historical_mask_001
+      <700: *peims_historical_mask_001
+      <720: *peims_historical_mask_001
+      <730: *peims_historical_mask_001
+      <770: *peims_historical_mask_001
+      <780: *peims_historical_mask_001
+      <790: *peims_historical_mask_001
+      <80: *peims_historical_mask_001
+      <800: *peims_historical_mask_001
+      <810: *peims_historical_mask_001
+      <90: *peims_historical_mask_001
+      <900: *peims_historical_mask_001
+      <910: *peims_historical_mask_001
+      <980: *peims_historical_mask_001
+  peims_student_enrollment_by_ethnicity_2024:
+    policy_id: peims_student_enrollment_by_ethnicity_2024
+    reference_id: about
+    tokens:
+      <1,260: *peims_historical_mask_001
+      <1,330: *peims_historical_mask_001
+      <1,400: *peims_historical_mask_001
+      <1,440: *peims_historical_mask_001
+      <1,980: *peims_historical_mask_001
+      <10: *peims_historical_mask_001
+      <100: *peims_historical_mask_001
+      <110: *peims_historical_mask_001
+      <120: *peims_historical_mask_001
+      <130: *peims_historical_mask_001
+      <140: *peims_historical_mask_001
+      <150: *peims_historical_mask_001
+      <160: *peims_historical_mask_001
+      <170: *peims_historical_mask_001
+      <180: *peims_historical_mask_001
+      <190: *peims_historical_mask_001
+      <2,000: *peims_historical_mask_001
+      <20: *peims_historical_mask_001
+      <200: *peims_historical_mask_001
+      <210: *peims_historical_mask_001
+      <220: *peims_historical_mask_001
+      <230: *peims_historical_mask_001
+      <240: *peims_historical_mask_001
+      <250: *peims_historical_mask_001
+      <260: *peims_historical_mask_001
+      <270: *peims_historical_mask_001
+      <280: *peims_historical_mask_001
+      <290: *peims_historical_mask_001
+      <3,020: *peims_historical_mask_001
+      <30: *peims_historical_mask_001
+      <300: *peims_historical_mask_001
+      <310: *peims_historical_mask_001
+      <320: *peims_historical_mask_001
+      <330: *peims_historical_mask_001
+      <340: *peims_historical_mask_001
+      <350: *peims_historical_mask_001
+      <360: *peims_historical_mask_001
+      <370: *peims_historical_mask_001
+      <380: *peims_historical_mask_001
+      <390: *peims_historical_mask_001
+      <40: *peims_historical_mask_001
+      <400: *peims_historical_mask_001
+      <410: *peims_historical_mask_001
+      <420: *peims_historical_mask_001
+      <430: *peims_historical_mask_001
+      <440: *peims_historical_mask_001
+      <450: *peims_historical_mask_001
+      <460: *peims_historical_mask_001
+      <470: *peims_historical_mask_001
+      <480: *peims_historical_mask_001
+      <490: *peims_historical_mask_001
+      <50: *peims_historical_mask_001
+      <500: *peims_historical_mask_001
+      <510: *peims_historical_mask_001
+      <520: *peims_historical_mask_001
+      <530: *peims_historical_mask_001
+      <540: *peims_historical_mask_001
+      <550: *peims_historical_mask_001
+      <560: *peims_historical_mask_001
+      <570: *peims_historical_mask_001
+      <580: *peims_historical_mask_001
+      <590: *peims_historical_mask_001
+      <60: *peims_historical_mask_001
+      <600: *peims_historical_mask_001
+      <610: *peims_historical_mask_001
+      <620: *peims_historical_mask_001
+      <630: *peims_historical_mask_001
+      <640: *peims_historical_mask_001
+      <650: *peims_historical_mask_001
+      <670: *peims_historical_mask_001
+      <680: *peims_historical_mask_001
+      <690: *peims_historical_mask_001
+      <70: *peims_historical_mask_001
+      <700: *peims_historical_mask_001
+      <770: *peims_historical_mask_001
+      <790: *peims_historical_mask_001
+      <80: *peims_historical_mask_001
+      <800: *peims_historical_mask_001
+      <810: *peims_historical_mask_001
+      <820: *peims_historical_mask_001
+      <850: *peims_historical_mask_001
+      <870: *peims_historical_mask_001
+      <880: *peims_historical_mask_001
+      <90: *peims_historical_mask_001
+      <900: *peims_historical_mask_001
+  peims_student_enrollment_by_ethnicity_2025:
+    policy_id: peims_student_enrollment_by_ethnicity_2025
+    reference_id: about
+    tokens:
+      <1,120: *peims_historical_mask_001
+      <1,300: *peims_historical_mask_001
+      <1,310: *peims_historical_mask_001
+      <1,380: *peims_historical_mask_001
+      <1,960: *peims_historical_mask_001
+      <1,970: *peims_historical_mask_001
+      <1,980: *peims_historical_mask_001
+      <10: *peims_historical_mask_001
+      <100: *peims_historical_mask_001
+      <110: *peims_historical_mask_001
+      <120: *peims_historical_mask_001
+      <130: *peims_historical_mask_001
+      <140: *peims_historical_mask_001
+      <150: *peims_historical_mask_001
+      <160: *peims_historical_mask_001
+      <170: *peims_historical_mask_001
+      <180: *peims_historical_mask_001
+      <190: *peims_historical_mask_001
+      <20: *peims_historical_mask_001
+      <200: *peims_historical_mask_001
+      <210: *peims_historical_mask_001
+      <220: *peims_historical_mask_001
+      <230: *peims_historical_mask_001
+      <240: *peims_historical_mask_001
+      <250: *peims_historical_mask_001
+      <260: *peims_historical_mask_001
+      <270: *peims_historical_mask_001
+      <280: *peims_historical_mask_001
+      <290: *peims_historical_mask_001
+      <30: *peims_historical_mask_001
+      <300: *peims_historical_mask_001
+      <310: *peims_historical_mask_001
+      <320: *peims_historical_mask_001
+      <330: *peims_historical_mask_001
+      <340: *peims_historical_mask_001
+      <350: *peims_historical_mask_001
+      <360: *peims_historical_mask_001
+      <370: *peims_historical_mask_001
+      <380: *peims_historical_mask_001
+      <390: *peims_historical_mask_001
+      <40: *peims_historical_mask_001
+      <400: *peims_historical_mask_001
+      <410: *peims_historical_mask_001
+      <420: *peims_historical_mask_001
+      <430: *peims_historical_mask_001
+      <440: *peims_historical_mask_001
+      <450: *peims_historical_mask_001
+      <460: *peims_historical_mask_001
+      <480: *peims_historical_mask_001
+      <490: *peims_historical_mask_001
+      <50: *peims_historical_mask_001
+      <500: *peims_historical_mask_001
+      <510: *peims_historical_mask_001
+      <520: *peims_historical_mask_001
+      <530: *peims_historical_mask_001
+      <540: *peims_historical_mask_001
+      <550: *peims_historical_mask_001
+      <560: *peims_historical_mask_001
+      <570: *peims_historical_mask_001
+      <580: *peims_historical_mask_001
+      <590: *peims_historical_mask_001
+      <60: *peims_historical_mask_001
+      <600: *peims_historical_mask_001
+      <610: *peims_historical_mask_001
+      <620: *peims_historical_mask_001
+      <630: *peims_historical_mask_001
+      <640: *peims_historical_mask_001
+      <650: *peims_historical_mask_001
+      <660: *peims_historical_mask_001
+      <670: *peims_historical_mask_001
+      <680: *peims_historical_mask_001
+      <690: *peims_historical_mask_001
+      <70: *peims_historical_mask_001
+      <720: *peims_historical_mask_001
+      <730: *peims_historical_mask_001
+      <740: *peims_historical_mask_001
+      <760: *peims_historical_mask_001
+      <770: *peims_historical_mask_001
+      <790: *peims_historical_mask_001
+      <80: *peims_historical_mask_001
+      <820: *peims_historical_mask_001
+      <870: *peims_historical_mask_001
+      <880: *peims_historical_mask_001
+      <90: *peims_historical_mask_001
+  peims_student_programs_and_special_populations_2023:
+    policy_id: peims_student_programs_and_special_populations_2023
+    reference_id: peims_masking
+    tokens:
+      '-999': *peims_historical_mask_001
+      <10: *peims_historical_mask_001
+      <100: *peims_historical_mask_001
+      <120: *peims_historical_mask_001
+      <130: *peims_historical_mask_001
+      <140: *peims_historical_mask_001
+      <150: *peims_historical_mask_001
+      <160: *peims_historical_mask_001
+      <170: *peims_historical_mask_001
+      <180: *peims_historical_mask_001
+      <190: *peims_historical_mask_001
+      <20: *peims_historical_mask_001
+      <200: *peims_historical_mask_001
+      <210: *peims_historical_mask_001
+      <220: *peims_historical_mask_001
+      <230: *peims_historical_mask_001
+      <240: *peims_historical_mask_001
+      <260: *peims_historical_mask_001
+      <270: *peims_historical_mask_001
+      <280: *peims_historical_mask_001
+      <290: *peims_historical_mask_001
+      <30: *peims_historical_mask_001
+      <300: *peims_historical_mask_001
+      <310: *peims_historical_mask_001
+      <320: *peims_historical_mask_001
+      <330: *peims_historical_mask_001
+      <340: *peims_historical_mask_001
+      <350: *peims_historical_mask_001
+      <370: *peims_historical_mask_001
+      <380: *peims_historical_mask_001
+      <390: *peims_historical_mask_001
+      <40: *peims_historical_mask_001
+      <400: *peims_historical_mask_001
+      <410: *peims_historical_mask_001
+      <420: *peims_historical_mask_001
+      <430: *peims_historical_mask_001
+      <440: *peims_historical_mask_001
+      <450: *peims_historical_mask_001
+      <460: *peims_historical_mask_001
+      <490: *peims_historical_mask_001
+      <50: *peims_historical_mask_001
+      <510: *peims_historical_mask_001
+      <520: *peims_historical_mask_001
+      <540: *peims_historical_mask_001
+      <560: *peims_historical_mask_001
+      <570: *peims_historical_mask_001
+      <590: *peims_historical_mask_001
+      <60: *peims_historical_mask_001
+      <630: *peims_historical_mask_001
+      <650: *peims_historical_mask_001
+      <680: *peims_historical_mask_001
+      <690: *peims_historical_mask_001
+      <70: *peims_historical_mask_001
+      <80: *peims_historical_mask_001
+      <90: *peims_historical_mask_001
+  peims_student_programs_and_special_populations_2024:
+    policy_id: peims_student_programs_and_special_populations_2024
+    reference_id: peims_masking
+    tokens:
+      '-999': *peims_historical_mask_001
+      <10: *peims_historical_mask_001
+      <100: *peims_historical_mask_001
+      <110: *peims_historical_mask_001
+      <120: *peims_historical_mask_001
+      <130: *peims_historical_mask_001
+      <140: *peims_historical_mask_001
+      <150: *peims_historical_mask_001
+      <160: *peims_historical_mask_001
+      <170: *peims_historical_mask_001
+      <180: *peims_historical_mask_001
+      <190: *peims_historical_mask_001
+      <20: *peims_historical_mask_001
+      <200: *peims_historical_mask_001
+      <210: *peims_historical_mask_001
+      <220: *peims_historical_mask_001
+      <230: *peims_historical_mask_001
+      <240: *peims_historical_mask_001
+      <250: *peims_historical_mask_001
+      <260: *peims_historical_mask_001
+      <270: *peims_historical_mask_001
+      <280: *peims_historical_mask_001
+      <290: *peims_historical_mask_001
+      <30: *peims_historical_mask_001
+      <300: *peims_historical_mask_001
+      <320: *peims_historical_mask_001
+      <330: *peims_historical_mask_001
+      <340: *peims_historical_mask_001
+      <350: *peims_historical_mask_001
+      <370: *peims_historical_mask_001
+      <390: *peims_historical_mask_001
+      <40: *peims_historical_mask_001
+      <400: *peims_historical_mask_001
+      <410: *peims_historical_mask_001
+      <420: *peims_historical_mask_001
+      <440: *peims_historical_mask_001
+      <450: *peims_historical_mask_001
+      <470: *peims_historical_mask_001
+      <480: *peims_historical_mask_001
+      <50: *peims_historical_mask_001
+      <500: *peims_historical_mask_001
+      <530: *peims_historical_mask_001
+      <540: *peims_historical_mask_001
+      <550: *peims_historical_mask_001
+      <570: *peims_historical_mask_001
+      <580: *peims_historical_mask_001
+      <60: *peims_historical_mask_001
+      <600: *peims_historical_mask_001
+      <620: *peims_historical_mask_001
+      <670: *peims_historical_mask_001
+      <680: *peims_historical_mask_001
+      <70: *peims_historical_mask_001
+      <80: *peims_historical_mask_001
+      <90: *peims_historical_mask_001
+  peims_student_programs_and_special_populations_2025:
+    policy_id: peims_student_programs_and_special_populations_2025
+    reference_id: peims_masking
+    tokens:
+      '-999': *peims_historical_mask_001
+      <10: *peims_historical_mask_001
+      <100: *peims_historical_mask_001
+      <110: *peims_historical_mask_001
+      <120: *peims_historical_mask_001
+      <130: *peims_historical_mask_001
+      <140: *peims_historical_mask_001
+      <150: *peims_historical_mask_001
+      <160: *peims_historical_mask_001
+      <170: *peims_historical_mask_001
+      <190: *peims_historical_mask_001
+      <20: *peims_historical_mask_001
+      <200: *peims_historical_mask_001
+      <210: *peims_historical_mask_001
+      <220: *peims_historical_mask_001
+      <230: *peims_historical_mask_001
+      <240: *peims_historical_mask_001
+      <250: *peims_historical_mask_001
+      <260: *peims_historical_mask_001
+      <270: *peims_historical_mask_001
+      <280: *peims_historical_mask_001
+      <290: *peims_historical_mask_001
+      <30: *peims_historical_mask_001
+      <300: *peims_historical_mask_001
+      <310: *peims_historical_mask_001
+      <330: *peims_historical_mask_001
+      <340: *peims_historical_mask_001
+      <350: *peims_historical_mask_001
+      <360: *peims_historical_mask_001
+      <370: *peims_historical_mask_001
+      <390: *peims_historical_mask_001
+      <40: *peims_historical_mask_001
+      <400: *peims_historical_mask_001
+      <410: *peims_historical_mask_001
+      <420: *peims_historical_mask_001
+      <430: *peims_historical_mask_001
+      <440: *peims_historical_mask_001
+      <450: *peims_historical_mask_001
+      <460: *peims_historical_mask_001
+      <480: *peims_historical_mask_001
+      <50: *peims_historical_mask_001
+      <500: *peims_historical_mask_001
+      <510: *peims_historical_mask_001
+      <530: *peims_historical_mask_001
+      <540: *peims_historical_mask_001
+      <550: *peims_historical_mask_001
+      <580: *peims_historical_mask_001
+      <60: *peims_historical_mask_001
+      <630: *peims_historical_mask_001
+      <690: *peims_historical_mask_001
+      <70: *peims_historical_mask_001
+      <80: *peims_historical_mask_001
+      <820: *peims_historical_mask_001
+      <90: *peims_historical_mask_001
   spp_ind11_workbook:
     reference_id: spp_masking
     tokens:
@@ -7703,6 +8149,138 @@ data_sources:
               state: 9e2f14a82341f02d8b42fb8db2fa0e534969c1dd8a7aa1efad934bd3b798a1da
               district: b0f0fd61ffb13646bde391d48e017c31e9b27ca1d73d4fed3f9f33a863eb9148
   peims_student_enrollment_by_ethnicity:
+    2023:
+      metadata:
+        metrics: &hist_enrl_001
+          enrollment_by_ethnicity_count:
+            field: enrollment_by_ethnicity_count
+            unit: count
+        notes: October 2022 PEIMS Enrollment snapshot with distinct state, district and campus acquisitions. The
+          publication date and finality of this historical extract are unspecified. Separate from TPRS Membership.
+        period:
+          kind: school_year
+          start_year: 2022
+          end_year: 2023
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - 96d0c2dd1db671d09aa052938f5d23023d64534c9e67f047edc20778d0d7e132
+          reference_id: about
+          reviewed_sha256: ccd81dd0a40d117094b405b833fc9c630634820b3dfae301e735888ebfb6653d
+          role: source_notes
+          status: available
+          title: PEIMS Student Enrollment by Ethnicity definitions and population
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.std_download_selected_report.sas&rpt_subject=about&fname=abtenrl23&ftype=html
+        - &hist_enrl_002
+          provenance_ids:
+          - cacfd931455c3a0ffdde01e794cf9aa8815f7a8b8300618912d0b713b215e885
+          reference_id: peims_masking
+          reviewed_sha256: c940234fd44417fe1e1152cca18d0ee893addd70ed3fc4f7e687492d13ae4954
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS reporting masking rules
+          url: https://tea.texas.gov/data-reports/student-data/discipline-data-products/peims-reporting-masking-web-updated-020125.docx
+        - &hist_enrl_003
+          provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: Publisher PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - &hist_enrl_004
+          path: schemas/peims--2023-2025--student-enrollment-by-ethnicity-crosswalk.json
+          provenance_ids:
+          - a0bb4e411f5bca1e1b82e5524365551dd34576bf8366936ae87fe8ad317ca972
+          reference_id: column_crosswalk
+          reviewed_sha256: b3051b41f9fd0f5758360229fde60494c435db3adb8979d8e3e8fcd59973ff0c
+          role: schema
+          status: available
+          title: PEIMS Student Enrollment by Ethnicity literal headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adste.html
+        title: 2022–23 PEIMS Student Enrollment by Ethnicity
+        value_policy: peims_student_enrollment_by_ethnicity_2023
+        version: '2023'
+      path: data/peims/2023/peims_student_enrollment_by_ethnicity--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2023-2025--student-enrollment-by-ethnicity-crosswalk.json
+            acquisition_ids:
+              state: 42167f9440906de8dd313f1d090f74ee38b6c05739f5b36425a6aaf5590e9b8f
+              district: fcb5be299d1d1fa8673a60a015a983f6716bacf98b62e6b579ce7d885c64cf66
+              campus: 117e779c64823f6f9d061945b04ec1e3a188f40f939fa7426bf6fc5d6734e017
+    2024:
+      metadata:
+        metrics: *hist_enrl_001
+        notes: October 2023 PEIMS Enrollment snapshot with distinct state, district and campus acquisitions. The
+          publication date and finality of this historical extract are unspecified. Separate from TPRS Membership.
+        period:
+          kind: school_year
+          start_year: 2023
+          end_year: 2024
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - b5c6f5f476690b4a3edd6d0f1b58ad96ee3ad379afc099a26227a1a22e089cdf
+          reference_id: about
+          reviewed_sha256: 044818bbc4bbc6be7b55185b1968d2aca58a9c9eb318eb8bff90b6fa33b1627b
+          role: source_notes
+          status: available
+          title: PEIMS Student Enrollment by Ethnicity definitions and population
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.std_download_selected_report.sas&rpt_subject=about&fname=abtenrl24&ftype=html
+        - *hist_enrl_002
+        - *hist_enrl_003
+        - *hist_enrl_004
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adste.html
+        title: 2023–24 PEIMS Student Enrollment by Ethnicity
+        value_policy: peims_student_enrollment_by_ethnicity_2024
+        version: '2024'
+      path: data/peims/2024/peims_student_enrollment_by_ethnicity--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2023-2025--student-enrollment-by-ethnicity-crosswalk.json
+            acquisition_ids:
+              state: 5c29d1e5e0b90797f67c8b3d4471d3e3c0dac362db62be9f5f951bc651b79b47
+              district: d4dedab9c1a633480d500813a14e9294ecff96e44e491f8f915aeb71d32423fa
+              campus: 92f263d890845b239d46e057e398ec2538357cf9993581d59d2853d463c5e637
+    2025:
+      metadata:
+        metrics: *hist_enrl_001
+        notes: October 2024 PEIMS Enrollment snapshot with distinct state, district and campus acquisitions. The
+          publication date and finality of this historical extract are unspecified. Separate from TPRS Membership.
+        period:
+          kind: school_year
+          start_year: 2024
+          end_year: 2025
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - 44249f04d6cfc87119769a52ff1270158535d5edbf3c64ad69eed553bd542bc5
+          reference_id: about
+          reviewed_sha256: fd8fa76a34e5b60b7052324c8e214f8da6bc18609612bb9a3047ad43fc3d9570
+          role: source_notes
+          status: available
+          title: PEIMS Student Enrollment by Ethnicity definitions and population
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.std_download_selected_report.sas&rpt_subject=about&fname=abtenrl25&ftype=html
+        - *hist_enrl_002
+        - *hist_enrl_003
+        - *hist_enrl_004
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adste.html
+        title: 2024–25 PEIMS Student Enrollment by Ethnicity
+        value_policy: peims_student_enrollment_by_ethnicity_2025
+        version: '2025'
+      path: data/peims/2025/peims_student_enrollment_by_ethnicity--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2023-2025--student-enrollment-by-ethnicity-crosswalk.json
+            acquisition_ids:
+              state: 3a394450f40289547451436a5058a4e900ee7a77ed0b5941e8717c72da963f2c
+              district: 69098504790204a80cfbe5f24ad9fa29af5ab414700e54705a89b02e6504528b
+              campus: dad90126210e53550a7081bdc0e71bb0a39e3794a831abf4e29b01e1f4356a4b
     2026:
       metadata:
         metrics:
@@ -7769,6 +8347,167 @@ data_sources:
               district: 96dcd948a7c02b34be090c9e9263f9298925bb03dfff6fa62a326186ecc56221
               campus: b85d0a297159df460a4d928034f9d1096d77be132b1903f4dfcbda031c7ef134
   peims_student_programs_and_special_populations:
+    2023:
+      metadata:
+        metrics: &hist_program_001
+          at_risk_count:
+            field: at_risk_count
+            unit: count
+          bilingual_program_count:
+            field: bilingual_program_count
+            unit: count
+          dyslexia_identification_count:
+            field: dyslexia_identification_count
+            unit: count
+          economically_disadvantaged_count:
+            field: economically_disadvantaged_count
+            unit: count
+          emergent_bilingual_count:
+            field: emergent_bilingual_count
+            unit: count
+          english_as_a_second_language_program_count:
+            field: english_as_a_second_language_program_count
+            unit: count
+          foster_care_count:
+            field: foster_care_count
+            unit: count
+          gifted_and_talented_program_count:
+            field: gifted_and_talented_program_count
+            unit: count
+          homeless_count:
+            field: homeless_count
+            unit: count
+          military_connected_count:
+            field: military_connected_count
+            unit: count
+          section_504_count:
+            field: section_504_count
+            unit: count
+          special_education_program_count:
+            field: special_education_program_count
+            unit: count
+          title_i_program_count:
+            field: title_i_program_count
+            unit: count
+          total_enrollment_count:
+            field: total_enrollment_count
+            unit: count
+        notes: October 2022 PEIMS Enrollment snapshot with distinct state, district and campus acquisitions. The
+          publication date and finality of this historical extract are unspecified. Separate from TPRS Membership.
+          Published program populations can overlap. The CSV labels the EB count EMERGENT BILINGUAL/ENGLISH LEARNER.
+        period:
+          kind: school_year
+          start_year: 2022
+          end_year: 2023
+        publisher: Texas Education Agency
+        references:
+        - &hist_program_002
+          provenance_ids:
+          - 694ada659e1b4b0d9da4ac5df6de02d0a9f493834d784e37f68f1fff9ec50dc2
+          reference_id: about
+          reviewed_sha256: c3ed8f60f083cd143992d1a86e59da73ea4492b629812292e64ca3d880cee17a
+          role: source_notes
+          status: available
+          title: PEIMS Student Program and Special Populations definitions and population
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/About_StudentProgram.html
+        - &hist_program_003
+          provenance_ids:
+          - cacfd931455c3a0ffdde01e794cf9aa8815f7a8b8300618912d0b713b215e885
+          reference_id: peims_masking
+          reviewed_sha256: c940234fd44417fe1e1152cca18d0ee893addd70ed3fc4f7e687492d13ae4954
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS reporting masking rules
+          url: https://tea.texas.gov/data-reports/student-data/discipline-data-products/peims-reporting-masking-web-updated-020125.docx
+        - &hist_program_004
+          provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: Publisher PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - &hist_program_005
+          path: schemas/peims--2023-2025--student-programs-and-special-populations-crosswalk.json
+          provenance_ids:
+          - e6c516546c8f1b9528ededd8dd88e33fb37dec1f343046bcb5ed0945d8207a51
+          reference_id: column_crosswalk
+          reviewed_sha256: 9c0d9b5277deded1d1d2511daec776c48e43ba27150d536eb1047a63d2de4d2a
+          role: schema
+          status: available
+          title: PEIMS Student Program and Special Populations literal headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adspr.html
+        title: 2022–23 PEIMS Student Program and Special Populations
+        value_policy: peims_student_programs_and_special_populations_2023
+        version: '2023'
+      path: data/peims/2023/peims_student_programs_and_special_populations--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2023-2025--student-programs-and-special-populations-crosswalk.json
+            acquisition_ids:
+              state: 1af2523723a0b4b777eac95c371d44270e81586a5b750fc40273cecba07e7b69
+              district: f156acbe4286a84ce713d1a272c62e87cc0ecf1bf815f2d3a6948ce7b36caed0
+              campus: c1bf3cafd75cc86eebe21ffafab9b0408817328b59a8eb2be733494d28186837
+    2024:
+      metadata:
+        metrics: *hist_program_001
+        notes: October 2023 PEIMS Enrollment snapshot with distinct state, district and campus acquisitions. The
+          publication date and finality of this historical extract are unspecified. Separate from TPRS Membership.
+          Published program populations can overlap. The CSV labels the EB count EMERGENT BILINGUAL/ENGLISH LEARNER.
+        period:
+          kind: school_year
+          start_year: 2023
+          end_year: 2024
+        publisher: Texas Education Agency
+        references:
+        - *hist_program_002
+        - *hist_program_003
+        - *hist_program_004
+        - *hist_program_005
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adspr.html
+        title: 2023–24 PEIMS Student Program and Special Populations
+        value_policy: peims_student_programs_and_special_populations_2024
+        version: '2024'
+      path: data/peims/2024/peims_student_programs_and_special_populations--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2023-2025--student-programs-and-special-populations-crosswalk.json
+            acquisition_ids:
+              state: 4743313b4a9e2bd8a7df704db1de2b54d9f39e7f5360dd470562cd4982f1dfaf
+              district: 69e815774286334db0128175443c6ac31bd4328e42a0465afa5df28c75230b7f
+              campus: 45f2029adc9af026c003be4c1e9e53250099dd30d686d760650e4c8365773b8b
+    2025:
+      metadata:
+        metrics: *hist_program_001
+        notes: October 2024 PEIMS Enrollment snapshot with distinct state, district and campus acquisitions. The
+          publication date and finality of this historical extract are unspecified. Separate from TPRS Membership.
+          Published program populations can overlap.
+        period:
+          kind: school_year
+          start_year: 2024
+          end_year: 2025
+        publisher: Texas Education Agency
+        references:
+        - *hist_program_002
+        - *hist_program_003
+        - *hist_program_004
+        - *hist_program_005
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adspr.html
+        title: 2024–25 PEIMS Student Program and Special Populations
+        value_policy: peims_student_programs_and_special_populations_2025
+        version: '2025'
+      path: data/peims/2025/peims_student_programs_and_special_populations--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2023-2025--student-programs-and-special-populations-crosswalk.json
+            acquisition_ids:
+              state: ba261a83d33092f55964b36e6d781338675ab8e0316dda8ad56f5fcdcbfebef5
+              district: 96b64b84242e9ef40ec48efcfb85e9995c05a347b7088b57a5b6f09e5ababe30
+              campus: 11f788f10d66e044f993a19d256f67712571d1e3b7a2a39c9050f1b581b0af86
     2026:
       metadata:
         metrics:

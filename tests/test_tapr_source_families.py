@@ -196,11 +196,14 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     # District transfers have an independent source contract and native writer.
     assert list(current['data_sources'].pop('district_transfer_reports')) == [2024, 2025, 2026]
     assert current['schema']['data_sources'].pop('district_transfer_reports') == ['parquet']
-    # The two 2026 PEIMS source-only registrations have their own exact contract tests.
+    # Student enrollment and programs have their own exact source contracts.
     for dataset in ('peims_student_enrollment_by_ethnicity', 'peims_student_programs_and_special_populations'):
-        assert list(current['data_sources'].pop(dataset)) == [2026]
+        assert list(current['data_sources'].pop(dataset)) == [2023, 2024, 2025, 2026]
         assert current['schema']['data_sources'].pop(dataset) == ['csv']
         assert current['value_policies'].pop(dataset + '_2026')['reference_id'] == 'peims_masking'
+        for year in (2023, 2024, 2025):
+            reference = 'about' if dataset.endswith('_ethnicity') else 'peims_masking'
+            assert current['value_policies'].pop(f'{dataset}_{year}')['reference_id'] == reference
     primary_disability = 'peims_special_education_by_primary_disability'
     assert list(current['data_sources'].pop(primary_disability)) == [2023, 2024, 2025, 2026]
     assert current['schema']['data_sources'].pop(primary_disability) == ['csv']

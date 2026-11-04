@@ -337,6 +337,11 @@ Enrollment and program leaves and three district-transfer editions. It checks
 raw parity and independent publisher reports from the supplied store using
 `teadata/reference_cases/native_peims_transfers.json`.
 
+The standalone [historical PEIMS student candidate](peims-sources.md#publisher-comparisons)
+covers 18 leaves for 2022–23 through 2024–25. It requires the exact schema-3
+manifest in `teadata/reference_cases/native_peims_historical.json`, the
+candidate's bundled parity evidence, and the independent report store.
+
 The schema-3 primary-disability candidate qualifies only with the exact
 manifest digest in `teadata/reference_cases/native_primary_disability.json`.
 It checks the eight state and district leaves using the candidate's bundled

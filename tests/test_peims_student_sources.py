@@ -48,13 +48,12 @@ def test_source_discovery_is_exact_and_excluded_from_retained_builds(
     graph = validate_record_graph(provenance.read_record, roots)
     validate_reference_records(selected, graph.__getitem__, verify_all_claimed=True)
 
-    # Retained builds can request an older year without attempting an
-    # unavailable future-only source. Historical exact lookup still fails.
-    for year in (2024, 2025, 2026, None):
+    # Retained builds can request an older year without opening opt-in sources.
+    for year in (2022, 2023, 2024, 2025, 2026, None):
         assert cfg.is_source_only(dataset, year)
     assert not cfg.is_source_only("accountability", 2025)
     with pytest.raises(KeyError):
-        cfg.resolve_dataset(dataset, 2025, exact=True)
+        cfg.resolve_dataset(dataset, 2022, exact=True)
     with pytest.raises(ContractError, match="Reader profile is required"):
         cfg.load_df(dataset, 2026, exact=True)
     with pytest.raises(ContractError, match="requires a dedicated preparation workflow"):
@@ -90,7 +89,7 @@ def test_mixed_editions_never_hide_required_retained_sources():
     assert not cfg.is_source_only(ENROLLMENT, 2025)
     assert cfg.is_source_only(ENROLLMENT, 2026)
     with pytest.raises(KeyError, match="no prior fallback"):
-        cfg.is_source_only(ENROLLMENT, 2024)
+        cfg.is_source_only(ENROLLMENT, 2022)
 
     # A future active edition also prevents the dataset from being classified
     # as exclusively source-only for an unavailable earlier edition.
@@ -98,7 +97,37 @@ def test_mixed_editions_never_hide_required_retained_sources():
     editions[2027] = active
     assert not cfg.is_source_only(ENROLLMENT, 2027)
     with pytest.raises(KeyError, match="no prior fallback"):
-        cfg.is_source_only(ENROLLMENT, 2024)
+        cfg.is_source_only(ENROLLMENT, 2022)
+
+
+@pytest.mark.parametrize(('dataset', 'year', 'rows'), [
+    (ENROLLMENT, 2023, (7, 6911, 48497)), (ENROLLMENT, 2024, (7, 6912, 48716)),
+    (ENROLLMENT, 2025, (7, 6910, 48850)), (PROGRAMS, 2023, (1, 1209, 9054)),
+    (PROGRAMS, 2024, (1, 1207, 9088)), (PROGRAMS, 2025, (1, 1208, 9088)),
+])
+def test_historical_peims_bind_each_scope_and_preserve_literal_headers(dataset, year, rows):
+    cfg = load_config()
+    selected = cfg.resolve_dataset(dataset, year, exact=True, reader_profile='source')
+    assert selected.metadata.published_at is None
+    assert selected.metadata.period.label == f'{year - 1}-{year}'
+    assert cfg.is_source_only(dataset, year) and cfg.column_schema(dataset, year) is None
+    scopes = reader_options(selected.reader, 'source')['acquisition_ids']
+    provenance = ProvenanceStore(Path(__file__).resolve().parents[1] / 'provenance')
+    roots = [*scopes.values(), *(item for ref in selected.metadata.references for item in ref.provenance_ids)]
+    graph = validate_record_graph(provenance.read_record, roots)
+    validate_reference_records(selected, graph.__getitem__, verify_all_claimed=True)
+    contract = cfg.column_contract(dataset, year, reader_profile='source')
+    assert contract is not None
+    tables = crosswalk_dataset(parse_column_schema(contract['text'].encode()), dataset, str(year))['tables']
+    for table, count in zip(tables, rows, strict=True):
+        record = graph[scopes[table['table']]]
+        assert (record['dataset'], record['resolved_year']) == (dataset, year)
+        assert table_input_sha256s(table) == (record['artifact']['sha256'],)
+        layout = table['layout']
+        assert layout['last_data_record'] - layout['first_data_record'] + 1 == count
+        if dataset == PROGRAMS:
+            label = 'EMERGENT BILINGUAL/ENGLISH LEARNER' if year < 2025 else 'EMERGENT BILINGUAL'
+            assert [f['code'] for f in table['fields'] if f['field'] == 'emergent_bilingual_count'] == [label]
 
 
 @pytest.mark.parametrize(("year", "district_rows"), [(2023, 1209), (2024, 1206), (2025, 1206), (2026, 1201)])

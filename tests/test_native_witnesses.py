@@ -149,6 +149,34 @@ def test_composed_profile_reuses_the_exact_disability_review_inventory():
     assert legacy.keys().isdisjoint(composed) and len(legacy | composed) == 17
 
 
+def test_historical_peims_review_pins_each_year_scope_and_family():
+    import json
+    from importlib.resources import files
+
+    review = json.loads(files("teadata").joinpath("reference_cases/native_peims_historical.json").read_text())
+    editions = native_witnesses.reviewed_historical_peims_references(review["manifest_sha256"])
+    assert editions is not None and len(editions) == 18
+    assert native_witnesses.reviewed_historical_peims_references("0" * 64) is None
+    witnesses = [witness for case in editions.values() for witness in case["reports"]]
+    assert len(witnesses) == len({witness["receipt"] for witness in witnesses}) == 18
+    assert {witness["entity"] for witness in witnesses} == {"state", "227901", "057829001"}
+
+
+def test_historical_campus_ethnicity_witness_does_not_infer_an_unpublished_total():
+    rows = [["Campus", "Ethnicity", "Count"], ["057829001", "Asian", "<10"]]
+    native = [{
+        "ethnicity": "Asian",
+        "enrollment_by_ethnicity_count": None,
+        "peims_status_enrollment_by_ethnicity_count": "suppressed",
+        "peims_raw_enrollment_by_ethnicity_count": "<10",
+    }]
+    key = EditionKey(native_witnesses._ETHNICITY, "2023", "1" * 64, "campus", "campus", "school_year")
+    assert native_witnesses._ethnicity(rows, native, key, "057829001", 200) == 1
+    current = EditionKey(native_witnesses._ETHNICITY, "2026", "1" * 64, "campus", "campus", "school_year")
+    with pytest.raises(ContractError, match="publisher total is missing"):
+        native_witnesses._ethnicity(rows, native, current, "057829001", 200)
+
+
 @pytest.mark.parametrize("damage", [
     None, "pin", "missing-edition", "overlap", "legacy-metadata", "disability-metadata", "receipt",
     "missing-store", "parity",

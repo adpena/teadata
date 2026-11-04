@@ -94,6 +94,11 @@ def reviewed_composed_disability_references(manifest_sha256: str) -> dict[str, A
     return review["editions"] if review["profile_composition_manifest_sha256"] == manifest_sha256 else {}
 
 
+def reviewed_historical_peims_references(manifest_sha256: str) -> dict[str, Any] | None:
+    review = json.loads(files("teadata").joinpath("reference_cases/native_peims_historical.json").read_text())
+    return review["editions"] if review["manifest_sha256"] == manifest_sha256 else None
+
+
 def _label(value: str) -> str:
     return "".join(value.casefold().split())
 
@@ -120,6 +125,8 @@ def _open_witness(store: ProvenanceStore, receipt: str, ref: ArtifactRef, entity
     controls = parameters.get("form_controls", [])
     fields = dict(controls)
     artifact = record["artifact"]
+    historical = key.dataset in (_PROGRAM, _ETHNICITY) and int(key.edition) < 2026
+    student_witness = "reference:peims_student_historical_witness" if historical else "reference:peims_individual_witness"
     expected_method = "POST" if key.dataset in (_PROGRAM, PRIMARY_DISABILITY) and key.scope != "campus" else "GET"
     expected_url = _BROKER if expected_method == "POST" else f"{_BROKER}?{urlencode(fields)}"
     expected_media = "text/csv" if key.dataset == _TRANSFER else "text/html"
@@ -140,8 +147,7 @@ def _open_witness(store: ProvenanceStore, receipt: str, ref: ArtifactRef, entity
                  and fields.get("agg_level") == "district" and fields.get("district") == entity)
     elif key.dataset in (_PROGRAM, PRIMARY_DISABILITY):
         disability = key.dataset == PRIMARY_DISABILITY
-        valid = (record["dataset"] == ("reference:peims_primary_disability_witness" if disability
-                                        else "reference:peims_individual_witness")
+        valid = (record["dataset"] == ("reference:peims_primary_disability_witness" if disability else student_witness)
                  and fields.get("_program") == f"adhoc.std_driver{1 if key.scope == 'state' else 2}.sas"
                  and fields.get("RptClass") == ("SpecEd" if disability else "StudPgm")
                  and fields.get("SchoolYr") == key.edition[-2:]
@@ -149,11 +155,16 @@ def _open_witness(store: ProvenanceStore, receipt: str, ref: ArtifactRef, entity
                  and (not disability or (key.scope in ("state", "district") and fields.get("format") == "html"))
                  and (key.scope == "state" or fields.get(key.scope, "").startswith(f"{entity} ")))
     else:
-        valid = (record["dataset"] == "reference:peims_individual_witness"
-                 and fields.get("_program") == "adhoc.addispatch.sas" and fields.get("grouping") == "e"
+        historical_state = historical and key.scope == "state"
+        selected_key = entity
+        if key.scope == "state":
+            selected_key = "TYPE HERE" if historical_state else ""
+        valid = (record["dataset"] == student_witness
+                 and fields.get("_program") == "adhoc.addispatch.sas"
+                 and fields.get("grouping") == ("e " if historical_state else "e")
                  and fields.get("endyear") == key.edition[-2:]
                  and fields.get("selsumm") == {"state": "ss", "district": "id", "campus": "nc"}[key.scope]
-                 and fields.get("key", "") == ("" if key.scope == "state" else entity))
+                 and fields.get("key", "") == selected_key)
     if not valid:
         raise ContractError(f"Publisher witness selection differs: {receipt}")
     path = store.verify_artifact(artifact["sha256"])
@@ -162,13 +173,17 @@ def _open_witness(store: ProvenanceStore, receipt: str, ref: ArtifactRef, entity
     return path
 
 
-def _program(rows: list[list[str]], native: list[dict[str, Any]], entity: str) -> tuple[int, int]:
+def _program(rows: list[list[str]], native: list[dict[str, Any]], entity: str, *, year: int = 2026) -> tuple[int, int]:
     index, = (index for index, row in enumerate(rows) if "All Enrollment" in row)
     if entity != "state" and not any(f"({entity})" in cell for row in rows[:index] for cell in row):
         raise ContractError("Program publisher report entity differs")
     record, = native
-    facts = [(_PROGRAM_FIELDS[_label(label)], token)
-             for label, token in zip(rows[index], rows[index + 1], strict=True) if _label(label) in _PROGRAM_FIELDS]
+    fields = _PROGRAM_FIELDS
+    if year < 2025:
+        fields = {**fields, "emergentbilingual/englishlearner": fields["emergentbilingual"]}
+        del fields["emergentbilingual"]
+    facts = [(fields[_label(label)], token)
+             for label, token in zip(rows[index], rows[index + 1], strict=True) if _label(label) in fields]
     if len(facts) != len(_PROGRAM_FIELDS) or {field for field, _ in facts} != set(_PROGRAM_FIELDS.values()):
         raise ContractError("Program publisher report lacks its reviewed measures")
     for field, token in facts:
@@ -215,11 +230,14 @@ def _ethnicity(rows: list[list[str]], native: list[dict[str, Any]], key: Edition
         column = rows[header].index(key.scope.title())
         if report_rows[0][column] != entity or any(any(row[:-2]) for row in report_rows[1:]):
             raise ContractError("Ethnicity publisher report entity differs")
-    for row in report_rows[:-1]:
+    has_total = report_rows[-1][-2] == f"{key.scope.title()} Total"
+    # Historical individual campus tables omit the total. Programs publish it separately.
+    if not has_total and (key.scope != "campus" or int(key.edition) >= 2026):
+        raise ContractError("Ethnicity publisher total is missing")
+    for row in report_rows[:-1] if has_total else report_rows:
         name, token = row[-2:]
         _compare_count(data.pop(_label(name)), "enrollment_by_ethnicity_count", token)
-    if (data or report_rows[-1][-2] != f"{key.scope.title()} Total"
-            or _count(report_rows[-1][-1]) != (total, "observed")):
+    if data or (has_total and _count(report_rows[-1][-1]) != (total, "observed")):
         raise ContractError("Ethnicity publisher categories or total differ")
     return len(report_rows)
 
@@ -252,7 +270,7 @@ def validate_native_witnesses(release: DataRelease, store: ProvenanceStore, refe
 
     cases = []
     peims_values = transfer_rows = 0
-    totals: dict[tuple[str, str], int] = {}
+    totals: dict[tuple[str, str, str], int] = {}
     refs = [(release.catalog.artifact_ref(case["artifact"]), case) for case in references.values()]
     for ref, case in sorted(refs, key=lambda item: item[0].edition.dataset != _PROGRAM):
         key = ref.edition
@@ -263,6 +281,7 @@ def validate_native_witnesses(release: DataRelease, store: ProvenanceStore, refe
                     if entry["unit"] == "count"} if key.dataset == PRIMARY_DISABILITY else {})
         for witness in case["reports"]:
             entity, receipt = witness["entity"], witness["receipt"]
+            total_key = (key.edition, key.scope, entity)
             omitted: list[str] = []
             try:
                 if "unreported_codes" in witness and key.dataset != PRIMARY_DISABILITY:
@@ -279,12 +298,12 @@ def validate_native_witnesses(release: DataRelease, store: ProvenanceStore, refe
                     selection = None if key.scope == "state" else field(f"{key.scope}_number") == entity
                     native = table.to_table(filter=selection).to_pylist()
                     if key.dataset == _PROGRAM:
-                        count, totals[(key.scope, entity)] = _program(rows, native, entity)
+                        count, totals[total_key] = _program(rows, native, entity, year=int(key.edition))
                     elif key.dataset == PRIMARY_DISABILITY:
                         count, omitted = _primary_disability(rows, native, key, entity, columns,
                                                             witness.get("unreported_codes", []))
                     else:
-                        count = _ethnicity(rows, native, key, entity, totals[(key.scope, entity)])
+                        count = _ethnicity(rows, native, key, entity, totals[total_key])
                     peims_values += count
             except (ValueError, KeyError, TypeError, IndexError, OSError, csv.Error, ContractError) as error:
                 raise ContractError(f"Publisher witness {receipt} failed for {key.dataset} {entity}: {error}") from error
