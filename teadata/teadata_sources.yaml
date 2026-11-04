@@ -6237,7 +6237,14 @@ data_sources:
         period:
           kind: "unknown"
         identifiers: []
-        metrics: {}
+        metrics:
+          ccmr_annual_graduates_all_students_rate:
+            field: district_2024_college_career_and_military_ready_graduates_all_students_rate
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2023
+              end_year: 2024
         value_policy: null
         estimation: null
         provenance_ids: []
@@ -6290,6 +6297,14 @@ data_sources:
             provenance_ids:
               - "6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554"
             reviewed_sha256: "7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8"
+          - reference_id: austin_isd_ccmr_report
+            role: source_notes
+            title: Austin ISD 2024–25 TPRS CCMR report for 2023–24 annual graduates
+            status: available
+            url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=227901&lev=D&prgopt=reports%2Ftapr%2Fccmr.sas
+            provenance_ids:
+              - 6ce529d6274c8f8528af9ae9af2bcd0454c0bca98fa1100fedc8914944316f4e
+            reviewed_sha256: 1844b3fba2c1fd1ec4dc5a16c72ebec47a97e31b7e783552765299ee692c6ed5
           - reference_id: "columns_source"
             role: "schema"
             path: "schemas/tapr--2025--college-career-military-readiness-crosswalk.json"
@@ -6297,7 +6312,21 @@ data_sources:
             status: "available"
             provenance_ids: []
             reviewed_sha256: "5f6e4eb0765e954157b096de63a11a10333883195ca4677dbca03fb8a03a00e8"
-        notes: "Source-only complete original with every offered checked variable and numerator/denominator/rate. All raw fields remain exact strings. Publisher edition 2025 is not a field measurement period. Table/field period, units, applied value policy and estimation remain unknown; dictionary Number is descriptive, not scientific qualification. All ordered dictionary occurrences and literal headings/locators are retained, including shared denominator contexts. Immutable original acquisition dataset names, controls and download dates are bound through csv_headers without relabeling the HTTP receipts. No default reader, enrichment registration, entity hydration, released 127 replacement or activation is introduced. No State/Region aggregate, Bonus funding, ERC graduate-ever-course proxy, E3 correction or temporal comparability is claimed. Annual-graduate CCMR/college-ready/TSI report, not current student Membership or Outcomes Bonus. DA0GP24N/D/R describe numerator/denominator/reported rate in the College, Career, and Military Ready Graduates (Student Achievement) section. Applicable 2024–25 glossary formulas describe 2023–24 annual graduates. This is context for selected-field review, not a blanket period binding or identity with accepted accountability Working Submission adjustments."
+        notes: >-
+          Annual-graduate CCMR, college readiness, and TSI source-only download.
+          The all-students reported CCMR rate (DA0GP24R) is a percentage for
+          2023–24 annual graduates. The same-edition Austin ISD TPRS report shows
+          87.8% for this rate. The family period and other field periods and units
+          remain unknown. The public report does not independently confirm the
+          numerator or denominator. No value policy or estimate is applied.
+          All raw fields, including blanks and -1, stay exact strings. Ordered
+          dictionary occurrences retain shared denominator contexts. Original
+          acquisition receipts preserve the publisher's controls and dates.
+          This is separate from Outcomes Bonus funding, ERC course participation,
+          and current student Membership. Equivalence to accountability rates
+          that incorporate accepted PEIMS Working Submission adjustments remains
+          unverified. The source profile activates no default reader, entity
+          enrichment, or released data.
       reader:
         profiles:
           source:
@@ -6318,7 +6347,35 @@ data_sources:
         period:
           kind: "unknown"
         identifiers: []
-        metrics: {}
+        metrics:
+          ccmr_annual_graduates_ap_ib_all_students_rate:
+            field: district_2024_ap_ib_met_criteria_in_any_subject_graduates_all_students_rate
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2023
+              end_year: 2024
+          ccmr_annual_graduates_ap_ib_economically_disadvantaged_rate:
+            field: district_2024_ap_ib_met_criteria_in_any_subject_graduates_econ_disadv_rate
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2023
+              end_year: 2024
+          ccmr_annual_graduates_dual_credit_all_students_rate:
+            field: district_2024_dual_credit_graduates_3_hrs_ela_or_math_or_9_hrs_any_subject_all_students_rate
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2023
+              end_year: 2024
+          ccmr_annual_graduates_dual_credit_economically_disadvantaged_rate:
+            field: district_2024_dual_credit_graduates_3_hrs_ela_or_math_or_9_hrs_any_subject_econ_disadv_rate
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2023
+              end_year: 2024
         value_policy: null
         estimation: null
         provenance_ids: []
@@ -6371,6 +6428,14 @@ data_sources:
             provenance_ids:
               - "6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554"
             reviewed_sha256: "7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8"
+          - reference_id: austin_isd_ccmr_report
+            role: source_notes
+            title: Austin ISD 2024–25 TPRS CCMR report for 2023–24 annual graduates
+            status: available
+            url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=227901&lev=D&prgopt=reports%2Ftapr%2Fccmr.sas
+            provenance_ids:
+              - 6ce529d6274c8f8528af9ae9af2bcd0454c0bca98fa1100fedc8914944316f4e
+            reviewed_sha256: 1844b3fba2c1fd1ec4dc5a16c72ebec47a97e31b7e783552765299ee692c6ed5
           - reference_id: "columns_source"
             role: "schema"
             path: "schemas/tapr--2025--college-readiness-components-crosswalk.json"
@@ -6378,7 +6443,20 @@ data_sources:
             status: "available"
             provenance_ids: []
             reviewed_sha256: "7fde7d9858ea83b7cbfb06aaac115884cb578c2d6c869cc7564e88b293f0f7a0"
-        notes: "Source-only complete original with every offered checked variable and numerator/denominator/rate. All raw fields remain exact strings. Publisher edition 2025 is not a field measurement period. Table/field period, units, applied value policy and estimation remain unknown; dictionary Number is descriptive, not scientific qualification. All ordered dictionary occurrences and literal headings/locators are retained, including shared denominator contexts. Immutable original acquisition dataset names, controls and download dates are bound through csv_headers without relabeling the HTTP receipts. No default reader, enrichment registration, entity hydration, released 127 replacement or activation is introduced. No State/Region aggregate, Bonus funding, ERC graduate-ever-course proxy, E3 correction or temporal comparability is claimed. Annual-graduate college-readiness components, not course participation. DA0GY24N/R describe AP/IB examination criterion; DA0GUA24N/R and DA0GP24D describe dual credit3hoursELA/math or9hoursany subject. Applicable 2024–25 glossary formulas describe 2023–24 annual graduates. Neither is E3 ERC ever-enrolled-in-one-course participation. No field period/unit/status or cohort equivalence is assigned from a label alone."
+        notes: >-
+          Annual-graduate college-readiness components from the complete offered
+          source-only download. The AP/IB criterion and dual-credit criterion
+          rates for all students and for economically disadvantaged students
+          are percentages for 2023–24 annual graduates, corroborated by the
+          same-edition Austin ISD TPRS report. The public report does not
+          independently confirm the numerator or denominator. The family
+          period, other field periods and units, and temporal comparability
+          remain unknown. No value policy or estimate is applied. Raw strings,
+          ordered dictionary occurrences, shared denominator contexts and
+          original acquisition receipts are preserved. These criteria are
+          separate from ERC course participation and Outcomes Bonus funding.
+          The source profile activates no default reader, entity enrichment,
+          or released data and infers no State or regional aggregate.
       reader:
         profiles:
           source:

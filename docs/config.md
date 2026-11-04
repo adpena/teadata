@@ -564,13 +564,20 @@ GRAD2 AP/IB criteria and dual-credit readiness are not E3/ERC graduate-ever-cour
 participation measures. Repeated denominator dictionary contexts remain
 discoverable without duplicating physical columns.
 
-These complete contracts do not assign a whole-family measurement period,
-unit, value policy or estimation. Literal publisher descriptions remain
-unchanged. A report edition, dictionary `Number` type or linked masking page
-does not qualify every field scientifically. Selected-field interpretation and
-cohort comparability require a separate reviewed binding. No State or regional
-aggregate is inferred from the district rows. Existing default readers,
-enrichers, snapshots and released data are unchanged.
+Five rates have a reviewed percent unit and 2023–24 annual-graduate period.
+The same-edition Austin ISD TPRS report matches the raw downloads for each:
+
+| Family | Rate | All students | Economically disadvantaged |
+| --- | --- | --- | --- |
+| GRAD1 | CCMR | `DA0GP24R` (87.8%) | |
+| GRAD2 | AP/IB exam criterion | `DA0GY24R` (36.4%) | `DE0GY24R` (16.0%) |
+| GRAD2 | Dual-credit criterion | `DA0GUA24R` (35.6%) | `DE0GUA24R` (24.4%) |
+
+The report does not provide independent numerator or denominator counts. Family
+periods and remaining field periods and units stay unknown. The source reader
+preserves blanks and `-1` as received and applies no value policy or estimation.
+The district rows carry no State or regional aggregate. The reviewed rates are
+available through the explicit source profile and do not enter the default release.
 
 Prepare each family separately with the existing bounded native producer:
 

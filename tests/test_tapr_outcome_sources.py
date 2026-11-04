@@ -13,7 +13,7 @@ from teadata.column_schema import parse_column_schema
 from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
 from teadata.enrichment import _registry
 from teadata.manifest import ContractError, canonical_json
-from teadata.provenance import ProvenanceStore
+from teadata.provenance import ProvenanceStore, validate_record_graph
 from teadata.scripts.build_tapr_profiles import prepare_profiles
 from teadata.scripts.rename_tapr_campus_headers import sanitize_header
 from teadata.teadata_config import Config, load_config
@@ -21,6 +21,18 @@ from teadata.teadata_config import Config, load_config
 
 ROOT = Path(__file__).resolve().parents[1]
 UNKNOWN = {'kind': 'unknown'}
+CCMR_RATE_PERIOD = {'kind': 'school_year', 'start_year': 2023, 'end_year': 2024}
+QUALIFIED_RATES = {
+    'college_career_military_readiness': {
+        'ccmr_annual_graduates_all_students_rate': 'DA0GP24R',
+    },
+    'college_readiness_components': {
+        'ccmr_annual_graduates_ap_ib_all_students_rate': 'DA0GY24R',
+        'ccmr_annual_graduates_ap_ib_economically_disadvantaged_rate': 'DE0GY24R',
+        'ccmr_annual_graduates_dual_credit_all_students_rate': 'DA0GUA24R',
+        'ccmr_annual_graduates_dual_credit_economically_disadvantaged_rate': 'DE0GUA24R',
+    },
+}
 SOURCES = [
     ('four_year_longitudinal_rate', 226, 224,
      '08ef046dbc4b2e3b6b0cb7705882851ec42035891ba98fe3a5ebc441e0eb13da',
@@ -61,7 +73,24 @@ def test_complete_outcome_discovery_stays_source_only(family, width, occurrences
     metadata = cfg.resolve_dataset(dataset, 2025, reader_profile='source').metadata
     assert metadata.version == '2025' and metadata.period.to_dict() == UNKNOWN
     assert metadata.value_policy is None and metadata.estimation is None
-    assert metadata.field_year is None and metadata.metrics == {} and metadata.provenance_ids == ()
+    assert metadata.field_year is None and metadata.provenance_ids == ()
+    qualified = QUALIFIED_RATES.get(family, {})
+    fields_by_code = {field['code']: field['field'] for field in table['fields']}
+    assert {name: metric.to_dict() for name, metric in metadata.metrics.items()} == {
+        name: {'field': fields_by_code[code], 'period': CCMR_RATE_PERIOD, 'unit': 'percent'}
+        for name, code in qualified.items()
+    }
+    if qualified:
+        witness, = [ref for ref in metadata.references if ref.reference_id == 'austin_isd_ccmr_report']
+        record_id, = witness.provenance_ids
+        store = ProvenanceStore(ROOT / 'provenance')
+        graph = validate_record_graph(store.read_record, [record_id])
+        record = graph[record_id]
+        assert witness.role == 'source_notes' and witness.status == 'available'
+        assert record['method'] == 'download' and record['source_metadata']['version'] == '2025'
+        assert witness.url and witness.url == record['requested_url']
+        assert 'ccyy=2025&id=227901&lev=D' in witness.url
+        assert witness.reviewed_sha256 == record['artifact']['sha256']
     original, = [ref for ref in metadata.references if ref.reference_id == 'csv_headers']
     assert original.role == 'source_notes' and original.provenance_ids == (receipt,)
     assert original.reviewed_sha256 == table['input_sha256'] == raw_sha
@@ -72,7 +101,10 @@ def test_complete_outcome_discovery_stays_source_only(family, width, occurrences
     assert len({row['field'] for row in table['fields']}) == width
     assert len({row['code'] for row in table['fields']}) == width
     records = cfg.header_records(dataset, edition='2025', reader_profile='source')
-    assert len(records) == width and all(row['period'] == UNKNOWN for row in records)
+    assert len(records) == width
+    assert {row['code']: row['period'] for row in records if row['period'] != UNKNOWN} == {
+        code: CCMR_RATE_PERIOD for code in qualified.values()
+    }
     for record in records:
         assert record['dictionary_occurrences'] == [row for row in table['dictionary_records']
                                                    if row['code'] == record['code']]
@@ -123,6 +155,7 @@ def test_literal_class_and_annual_graduate_contexts_do_not_become_other_populati
         assert all(row['field'] == sanitize_header(row['label']) for row in source_table(cfg, family)['fields']
                    if row['disposition'] == 'fact')
         metadata = cfg.resolve_dataset('district_tapr_' + family, 2025, reader_profile='source').metadata
+        assert metadata.notes is not None
         assert 'Annual-graduate' in metadata.notes and 'Bonus' in metadata.notes and 'ERC' in metadata.notes
 
 
