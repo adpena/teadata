@@ -4667,8 +4667,8 @@ data_sources:
           title: "TEA Data raw source and publisher header crosswalk"
           status: available
           provenance_ids:
-          - 88f846ef829fa653823645e2995a299e140ee592b9e0a64747cb78bd99d66c45
-          reviewed_sha256: 6f0039e2f0e28d1ed616fcf692e2fa833519c0ff1de13e7912b904cac3053392
+          - d55a11c77185b6d9ac064781837115b31e982dd566251a7f184662d9c26deba5
+          reviewed_sha256: c189fabba15db51b42e7523bfbea0d6d16063d819c50d071f55f115a221f607d
         notes: &tapr_2026_staar_notes >-
           The publisher's STAAR extract retains all original field tokens as
           strings. The source profile and native leaf are explicit opt-ins.
@@ -4962,6 +4962,47 @@ data_sources:
               scope: district
               tables:
                 staar_school_progress: *tapr_2026_staar_school_progress_district_csv
+  region_tapr_staar_school_progress:
+    2026:
+      path: &tapr_2026_staar_school_progress_region_csv data/tapr/raw/2026-R-STAAR_SP-offered.csv
+      metadata:
+        title: "2025–26 TPRS STAAR School Progress (Region)"
+        publisher: Texas Education Agency
+        version: '2026'
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        period: *tapr_2026_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+          title: "Original TEA CSV with exact submitted form controls"
+          status: available
+          provenance_ids:
+          - 2612644f17503fdc52154cdc0fb4e7baf38300995f4302d3b2259237094afbc0
+          reviewed_sha256: a4f382904f5030279b02954c4b42e162f827711da661c1cd9344bbd7c67941c4
+        - reference_id: dictionary
+          role: data_dictionary
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2026&sumlev=R&dsname=STAAR_SP&dd=progress&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+          title: "TEA data dictionary for the publisher file and geography"
+          status: available
+          provenance_ids:
+          - 9aa1e17fe5fe3c6ba14090b0666961f30e09534a616f50cfe37485ccef109471
+          reviewed_sha256: 7c61d2c8b942570ba76ee492a0e1533eea6149be62f9b873ae68e668ab16583f
+        - *tapr_2026_staar_glossary
+        - *tapr_2026_staar_release_guide
+        - *tapr_2026_staar_masking
+        - *tapr_2026_staar_school_progress_schema
+        notes: *tapr_2026_staar_notes
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2026--staar-school-progress-crosswalk.json
+            tapr_source:
+              scope: region
+              tables:
+                staar_school_progress: *tapr_2026_staar_school_progress_region_csv
   campus_tapr_four_year_longitudinal_rate:
     2024:
       path: data/tapr/raw/2024-c-COMP4.csv
@@ -8143,8 +8184,8 @@ data_sources:
           title: "TEA Data raw source and publisher header crosswalk"
           status: available
           provenance_ids:
-          - a853880e266ad7c81dd510d021efb1b647e0beaeb38df08cd7544acaabad0c26
-          reviewed_sha256: 6db6bd51295e1378da22a95106e17bbaa6ebdcfde8e70cf8ffc097a2ea079e8e
+          - e6a617a3de1567fbb3b920e79da50c8edd94833cfb3d129ad054fab51c075204
+          reviewed_sha256: 6f1078aa62e34312ca268484a645e73d34747d80baefc9c9cad534c1bce30085
         notes: *tapr_2026_staar_notes
       reader:
         profiles:
@@ -8381,6 +8422,55 @@ data_sources:
               scope: region
               tables:
                 staar_tested_grade_3: *tapr_2025_staar_grade_3_region_csv
+    2026:
+      path: &tapr_2026_staar_grade_3_region_csv data/tapr/raw/2026-R-STAAR_GR3-offered.csv
+      metadata:
+        title: "2025–26 TPRS Grade 3 STAAR Performance (Region)"
+        publisher: Texas Education Agency
+        version: '2026'
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        period: *tapr_2026_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+          title: "Original TEA tested-grade CSV with exact submitted form controls"
+          status: available
+          provenance_ids:
+          - 4f9d4093329e94b249de8d202ba303f97d62e4952881be83ad6acb1197a6338b
+          reviewed_sha256: 3f318869f3a6b6982e39dc3905e2b58cbea76feca043fd105ed16c15dea105a6
+        - reference_id: dictionary
+          role: data_dictionary
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2026&sumlev=R&dsname=STAAR_GR3&dd=performance&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+          title: "TEA tested-grade data dictionary"
+          status: available
+          provenance_ids:
+          - 3e218b31354368e6b910083e2b2e1e9dc406820f4caa0c211b12541c0dcda1be
+          reviewed_sha256: 00b25fca7cb4a0cc1ab535fbd1498baf6346253924698c14ade9d1bbf17f0b2f
+        - *tapr_2026_staar_glossary
+        - *tapr_2026_staar_release_guide
+        - *tapr_2026_staar_masking
+        - &tapr_2026_staar_regional_report
+          reference_id: regional_report
+          role: source_notes
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2026&id=13&lev=R&prgopt=reports%2Ftapr%2Fperformance.sas"
+          title: "TEA Region 13 named STAAR performance report witness"
+          status: available
+          provenance_ids:
+          - 799bf79af389b9dd72d05995e9225b716c01123f89439ab7f2fed08a6bb1cd31
+          reviewed_sha256: 4295aee7a75f8a7735cd5eea8ee0806027ca73f8d9f37dc1bd28c5ff66b31ad4
+        - *tapr_2026_staar_grade_3_schema
+        notes: *tapr_2026_staar_notes
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2026--staar-tested-grade-3-crosswalk.json
+            tapr_source:
+              scope: region
+              tables:
+                staar_tested_grade_3: *tapr_2026_staar_grade_3_region_csv
   state_tapr_staar_tested_grade_4:
     2025:
       path: &tapr_2025_staar_grade_4_state_csv data/tapr/raw/2025-S-STAAR_GR4-offered.csv
@@ -8467,8 +8557,8 @@ data_sources:
           title: "TEA Data raw source and publisher header crosswalk"
           status: available
           provenance_ids:
-          - d128d9a5619073b487affe14881b3b6a819ddf4927eb1decb6e4849ae223c576
-          reviewed_sha256: dfcebec4319ccfb8b15f1c3fdee973e1e55e6ab9ed06cfb10383f87fe81c2cf6
+          - e38f01164395d38e70e709d831e36877b6467bbf3a0a8d3f25dfb21412f9eb29
+          reviewed_sha256: 11100c308064f1e326844f435af79e2e4a569b02068ed06a5abaf82dfb53dfab
         notes: *tapr_2026_staar_notes
       reader:
         profiles:
@@ -8681,6 +8771,47 @@ data_sources:
               scope: region
               tables:
                 staar_tested_grade_4: *tapr_2025_staar_grade_4_region_csv
+    2026:
+      path: &tapr_2026_staar_grade_4_region_csv data/tapr/raw/2026-R-STAAR_GR4-offered.csv
+      metadata:
+        title: "2025–26 TPRS Grade 4 STAAR Performance (Region)"
+        publisher: Texas Education Agency
+        version: '2026'
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        period: *tapr_2026_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+          title: "Original TEA tested-grade CSV with exact submitted form controls"
+          status: available
+          provenance_ids:
+          - 3da9f58c9440cdb912710179d47f1d38407ffe5ebcf8a236b34c69d7fa8b05af
+          reviewed_sha256: 5699079e4b63026dcd1cd37e9f4ed98e87c1129257b364dda91bd7f8e2b77db6
+        - reference_id: dictionary
+          role: data_dictionary
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2026&sumlev=R&dsname=STAAR_GR4&dd=performance&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+          title: "TEA tested-grade data dictionary"
+          status: available
+          provenance_ids:
+          - 0c64f132ae6e7d5c59af63d86e42f5fb45d4717238cbbb1e94b5a0370f702ecd
+          reviewed_sha256: cf8eaabb727678443784821776383565ccdedb96ee33cc98d3f91d890c21acf1
+        - *tapr_2026_staar_glossary
+        - *tapr_2026_staar_release_guide
+        - *tapr_2026_staar_masking
+        - *tapr_2026_staar_regional_report
+        - *tapr_2026_staar_grade_4_schema
+        notes: *tapr_2026_staar_notes
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2026--staar-tested-grade-4-crosswalk.json
+            tapr_source:
+              scope: region
+              tables:
+                staar_tested_grade_4: *tapr_2026_staar_grade_4_region_csv
   state_tapr_staar_tested_grade_5:
     2025:
       path: &tapr_2025_staar_grade_5_state_csv data/tapr/raw/2025-S-STAAR_GR5-offered.csv
@@ -8767,8 +8898,8 @@ data_sources:
           title: "TEA Data raw source and publisher header crosswalk"
           status: available
           provenance_ids:
-          - 647df2faad3d16e51cd2109e2eff89c0d5567319c3ad8b96e3e2530cf7869b77
-          reviewed_sha256: 5e704d54da4069ce688bdbf3d088ad36fc54122800767bf02ad80f0dd87de167
+          - 2630c966879609352c94f61294bba5318866221135c9fa607e1e612ab7eeafcf
+          reviewed_sha256: 035bdcf6aa5180584cef31ed38c115e4ecc13a1a3bd27894fb87fbd621844382
         notes: *tapr_2026_staar_notes
       reader:
         profiles:
@@ -8981,6 +9112,47 @@ data_sources:
               scope: region
               tables:
                 staar_tested_grade_5: *tapr_2025_staar_grade_5_region_csv
+    2026:
+      path: &tapr_2026_staar_grade_5_region_csv data/tapr/raw/2026-R-STAAR_GR5-offered.csv
+      metadata:
+        title: "2025–26 TPRS Grade 5 STAAR Performance (Region)"
+        publisher: Texas Education Agency
+        version: '2026'
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        period: *tapr_2026_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+          title: "Original TEA tested-grade CSV with exact submitted form controls"
+          status: available
+          provenance_ids:
+          - 8ca56d4e4af5a626b4fbcb76166828758cedff82ed9f0bf8e5902df38416f9f3
+          reviewed_sha256: 28408543caf63594b9267333b2c4b3ba164a5025e2fc9e5dc5b87d71a004b14c
+        - reference_id: dictionary
+          role: data_dictionary
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2026&sumlev=R&dsname=STAAR_GR5&dd=performance&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+          title: "TEA tested-grade data dictionary"
+          status: available
+          provenance_ids:
+          - e8228e72f192d9110f3889da025b7d9f849477a58f3071c09ef680785f1fa555
+          reviewed_sha256: 703c0a9fe656eb7c018788d88e13eac00f5e00a564243244825590dc22aa5bd3
+        - *tapr_2026_staar_glossary
+        - *tapr_2026_staar_release_guide
+        - *tapr_2026_staar_masking
+        - *tapr_2026_staar_regional_report
+        - *tapr_2026_staar_grade_5_schema
+        notes: *tapr_2026_staar_notes
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2026--staar-tested-grade-5-crosswalk.json
+            tapr_source:
+              scope: region
+              tables:
+                staar_tested_grade_5: *tapr_2026_staar_grade_5_region_csv
   state_tapr_staar_tested_grade_6:
     2025:
       path: &tapr_2025_staar_grade_6_state_csv data/tapr/raw/2025-S-STAAR_GR6-offered.csv
@@ -9067,8 +9239,8 @@ data_sources:
           title: "TEA Data raw source and publisher header crosswalk"
           status: available
           provenance_ids:
-          - f3399a92e0cfd16fa93edc4a3fbe2a65ca647d0ab0261813bc5e4ee5e95be4e5
-          reviewed_sha256: 7ab28bae018cec9dee5c30b77fd79cdb179fcb18728ed8651d39ca571186ea18
+          - a3fd1250e3d7b5d56d75e8517bb290187b17655a6f7e27ec34ee5ec62ec293f7
+          reviewed_sha256: ffc5b814601384ed88779053eef53df15cef5b5fb56db7abb72b05bea86b4968
         notes: *tapr_2026_staar_notes
       reader:
         profiles:
@@ -9289,6 +9461,47 @@ data_sources:
               scope: region
               tables:
                 staar_tested_grade_6: *tapr_2025_staar_grade_6_region_csv
+    2026:
+      path: &tapr_2026_staar_grade_6_region_csv data/tapr/raw/2026-R-STAAR_GR6-offered.csv
+      metadata:
+        title: "2025–26 TPRS Grade 6 STAAR Performance (Region)"
+        publisher: Texas Education Agency
+        version: '2026'
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        period: *tapr_2026_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+          title: "Original TEA tested-grade CSV with exact submitted form controls"
+          status: available
+          provenance_ids:
+          - 8123c585b78c6c050065da7c6d731d66c0987b34024e6f6146d8f4c987d85cb0
+          reviewed_sha256: c6a62f349e248b0cb677a86849720351e11b5c51b19d3d41319ce8d79445b76e
+        - reference_id: dictionary
+          role: data_dictionary
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2026&sumlev=R&dsname=STAAR_GR6&dd=performance&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+          title: "TEA tested-grade data dictionary"
+          status: available
+          provenance_ids:
+          - 8e5983ffe73fe921e71e7970d82a8d6450219221f880ef8ea726c540427bad51
+          reviewed_sha256: 3ad553a2141a35da22c908d4e334c836bf3d59a4494d64966ba0dd86999e99d4
+        - *tapr_2026_staar_glossary
+        - *tapr_2026_staar_release_guide
+        - *tapr_2026_staar_masking
+        - *tapr_2026_staar_regional_report
+        - *tapr_2026_staar_grade_6_schema
+        notes: *tapr_2026_staar_notes
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2026--staar-tested-grade-6-crosswalk.json
+            tapr_source:
+              scope: region
+              tables:
+                staar_tested_grade_6: *tapr_2026_staar_grade_6_region_csv
   state_tapr_staar_tested_grade_7:
     2025:
       path: &tapr_2025_staar_grade_7_state_csv data/tapr/raw/2025-S-STAAR_GR7-offered.csv
@@ -9375,8 +9588,8 @@ data_sources:
           title: "TEA Data raw source and publisher header crosswalk"
           status: available
           provenance_ids:
-          - 71717638c7bfffcedf3a979309f8efeef8ea85c412d8072944686220413796dd
-          reviewed_sha256: 9ba347f3b836a0f18526b176e276bff45e3c527efc7d2e95e9a4a8860ea87080
+          - 8d07af62884516a2b1647c23422cc20dcb871b58c12b7d6981288825274aa7bb
+          reviewed_sha256: 069e3fc39b7a5b6c175c2331b044b47a09dc2925fc94ef8147f6b95309349604
         notes: *tapr_2026_staar_notes
       reader:
         profiles:
@@ -9589,6 +9802,47 @@ data_sources:
               scope: region
               tables:
                 staar_tested_grade_7: *tapr_2025_staar_grade_7_region_csv
+    2026:
+      path: &tapr_2026_staar_grade_7_region_csv data/tapr/raw/2026-R-STAAR_GR7-offered.csv
+      metadata:
+        title: "2025–26 TPRS Grade 7 STAAR Performance (Region)"
+        publisher: Texas Education Agency
+        version: '2026'
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        period: *tapr_2026_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+          title: "Original TEA tested-grade CSV with exact submitted form controls"
+          status: available
+          provenance_ids:
+          - b9b40f1ff8b3f8d2cf494a8637e2141a17677b19f5d35dfa260544b116556b66
+          reviewed_sha256: 63319f7edf020aaebaa19d4113f0303d624cabca2140b1f610c15730ff78ca6d
+        - reference_id: dictionary
+          role: data_dictionary
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2026&sumlev=R&dsname=STAAR_GR7&dd=performance&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+          title: "TEA tested-grade data dictionary"
+          status: available
+          provenance_ids:
+          - a1be98bd97732f01499f7a49234b1bda828376ff32135f55c3f171f90636aa0b
+          reviewed_sha256: c6358c0712d404f9db0c3587d2783b9741760aad8c57bb244bb998112aa4fd49
+        - *tapr_2026_staar_glossary
+        - *tapr_2026_staar_release_guide
+        - *tapr_2026_staar_masking
+        - *tapr_2026_staar_regional_report
+        - *tapr_2026_staar_grade_7_schema
+        notes: *tapr_2026_staar_notes
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2026--staar-tested-grade-7-crosswalk.json
+            tapr_source:
+              scope: region
+              tables:
+                staar_tested_grade_7: *tapr_2026_staar_grade_7_region_csv
   state_tapr_staar_tested_grade_8:
     2025:
       path: &tapr_2025_staar_grade_8_state_csv data/tapr/raw/2025-S-STAAR_GR8-offered.csv
@@ -9675,8 +9929,8 @@ data_sources:
           title: "TEA Data raw source and publisher header crosswalk"
           status: available
           provenance_ids:
-          - 9e8bf463d1adf6cab6e294f40abd22a2d84dbc0c7790922f773d8c4854551792
-          reviewed_sha256: f80f2fd2e90197dba757055ad80f808fb2887ecd1bad507be5f62cb75728fd7d
+          - e0c77cecb0ca3d3bc1fbb8f19e7f313072da31f556ec71dfb60959b6256794e1
+          reviewed_sha256: 2da15d19a7f8193d1cfc7419d6b2f1ba3ca7c9cd2b88c94da13bb6470fa11077
         notes: *tapr_2026_staar_notes
       reader:
         profiles:
@@ -9889,6 +10143,47 @@ data_sources:
               scope: region
               tables:
                 staar_tested_grade_8: *tapr_2025_staar_grade_8_region_csv
+    2026:
+      path: &tapr_2026_staar_grade_8_region_csv data/tapr/raw/2026-R-STAAR_GR8-offered.csv
+      metadata:
+        title: "2025–26 TPRS Grade 8 STAAR Performance (Region)"
+        publisher: Texas Education Agency
+        version: '2026'
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        period: *tapr_2026_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+          title: "Original TEA tested-grade CSV with exact submitted form controls"
+          status: available
+          provenance_ids:
+          - e2b900320eb1039b6e34e615eab5161b3fb18abf492469a8c805ac6380af696c
+          reviewed_sha256: 2e6c46b8bafbbb91e2dceba350bb8b368efb2d580b8464242c997ca38dd59bab
+        - reference_id: dictionary
+          role: data_dictionary
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2026&sumlev=R&dsname=STAAR_GR8&dd=performance&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+          title: "TEA tested-grade data dictionary"
+          status: available
+          provenance_ids:
+          - dd3008b7f43289e83f94eaa8420be4b61509688abfe95e74354c9e202aeaea3d
+          reviewed_sha256: 88de5b0952a78ee3cc0a26b1471fd8c3ec5e385caa91f8df8f4d7849d7b525bf
+        - *tapr_2026_staar_glossary
+        - *tapr_2026_staar_release_guide
+        - *tapr_2026_staar_masking
+        - *tapr_2026_staar_regional_report
+        - *tapr_2026_staar_grade_8_schema
+        notes: *tapr_2026_staar_notes
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2026--staar-tested-grade-8-crosswalk.json
+            tapr_source:
+              scope: region
+              tables:
+                staar_tested_grade_8: *tapr_2026_staar_grade_8_region_csv
   state_tapr_staar_grades_3_to_8:
     2026:
       path: &tapr_2026_staar_grades_3_to_8_state_csv data/tapr/raw/2026-STAAR_GR38-offered.csv
@@ -9927,8 +10222,8 @@ data_sources:
           title: "TEA Data raw source and publisher header crosswalk"
           status: available
           provenance_ids:
-          - d9d25a0e8f6f5d94030915ea4748a55c38462b6adcab371d2ee155e3462edd92
-          reviewed_sha256: b9051eb4d49c1df00104c29dd2c0f9018c72144edd1ffed747c8888cee9edca0
+          - fa11935105bd013dd366b9369afae40867fca6ce35ec1c1dcb323adfcbe94a9e
+          reviewed_sha256: 4f26657e2d5e94545efe2f5d8f04d1441489e338161874239c0bf4d4c82aacdd
         notes: *tapr_2026_staar_notes
       reader:
         profiles:
@@ -10020,6 +10315,47 @@ data_sources:
               scope: campus
               tables:
                 staar_grades_3_to_8: *tapr_2026_staar_grades_3_to_8_campus_csv
+  region_tapr_staar_grades_3_to_8:
+    2026:
+      path: &tapr_2026_staar_grades_3_to_8_region_csv data/tapr/raw/2026-R-STAAR_GR38-offered.csv
+      metadata:
+        title: "2025–26 TPRS STAAR Performance for Grades 3–8 (Region)"
+        publisher: Texas Education Agency
+        version: '2026'
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        period: *tapr_2026_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+          title: "Original TEA CSV with exact submitted form controls"
+          status: available
+          provenance_ids:
+          - d907050d4f75e36ef7ac8d4c2318c36e80729c1763bdc98f2555832bc1eb7c86
+          reviewed_sha256: 68f6f23fbc5a1df4d6aa2aa94be2f8dc61f6effd30978f67f840d01556798299
+        - reference_id: dictionary
+          role: data_dictionary
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2026&sumlev=R&dsname=STAAR_GR38&dd=performance&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+          title: "TEA data dictionary for the publisher file and geography"
+          status: available
+          provenance_ids:
+          - c93d67d7f3c0f936399997b0a73e0551b05780f1103a63267f580df3aa0f58df
+          reviewed_sha256: 8e923290ddde8a184912c19db6c77a1c833cf1b547b409922269b98e6554b8fb
+        - *tapr_2026_staar_glossary
+        - *tapr_2026_staar_release_guide
+        - *tapr_2026_staar_masking
+        - *tapr_2026_staar_grades_3_to_8_schema
+        notes: *tapr_2026_staar_notes
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2026--staar-grades-3-to-8-crosswalk.json
+            tapr_source:
+              scope: region
+              tables:
+                staar_grades_3_to_8: *tapr_2026_staar_grades_3_to_8_region_csv
   state_tapr_staar_all_grades:
     2026:
       path: &tapr_2026_staar_all_grades_state_csv data/tapr/raw/2026-STAAR_ALL-offered.csv
@@ -10058,8 +10394,8 @@ data_sources:
           title: "TEA Data raw source and publisher header crosswalk"
           status: available
           provenance_ids:
-          - 13db7ea404f26adb75936c08d7cf0727c24b37fdb80d4976479236845405dff0
-          reviewed_sha256: f3811bb85ae97a3a020b65b4fa04ecbc37b89b46455551d49cd6086973ca46a2
+          - b16a240e77685ad8316ca1b00674184004f5411e72ff16802ddad22417ecd5f0
+          reviewed_sha256: a4fbdc74a83b9ee93e6bd96166da01b442cf4293aaa4bd904237995f24c0cf69
         notes: *tapr_2026_staar_notes
       reader:
         profiles:
@@ -10151,6 +10487,47 @@ data_sources:
               scope: campus
               tables:
                 staar_all_grades: *tapr_2026_staar_all_grades_campus_csv
+  region_tapr_staar_all_grades:
+    2026:
+      path: &tapr_2026_staar_all_grades_region_csv data/tapr/raw/2026-R-STAAR_ALL-offered.csv
+      metadata:
+        title: "2025–26 TPRS STAAR Performance for All Grades (Region)"
+        publisher: Texas Education Agency
+        version: '2026'
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        period: *tapr_2026_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+          title: "Original TEA CSV with exact submitted form controls"
+          status: available
+          provenance_ids:
+          - 778c1610cfb1890238c8f22fe892faf0ec906e03b574a31e6f1b6ed0c24e64f2
+          reviewed_sha256: 344d3f1d5ef6d69b8c2fef0ca17b7f4eabcb3ad1f07fb1783c14d16d7083c16a
+        - reference_id: dictionary
+          role: data_dictionary
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2026&sumlev=R&dsname=STAAR_ALL&dd=performance&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+          title: "TEA data dictionary for the publisher file and geography"
+          status: available
+          provenance_ids:
+          - dcbea40f3a508fe87275066888387f0ab6c9749e32d9c58d914b7293abcc452c
+          reviewed_sha256: c26d7db67d53c5ac4339d3e502485ef63077e2798d86796e6a6a155675fae41d
+        - *tapr_2026_staar_glossary
+        - *tapr_2026_staar_release_guide
+        - *tapr_2026_staar_masking
+        - *tapr_2026_staar_all_grades_schema
+        notes: *tapr_2026_staar_notes
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2026--staar-all-grades-crosswalk.json
+            tapr_source:
+              scope: region
+              tables:
+                staar_all_grades: *tapr_2026_staar_all_grades_region_csv
   state_tapr_staar_end_of_course:
     2026:
       path: &tapr_2026_staar_end_of_course_state_csv data/tapr/raw/2026-STAAR_EOC-offered.csv
@@ -10189,8 +10566,8 @@ data_sources:
           title: "TEA Data raw source and publisher header crosswalk"
           status: available
           provenance_ids:
-          - 6763a24b84dc2235f7ef89fe35a153143027a43562865c9d7f63779b94bb7620
-          reviewed_sha256: 629094673e1dcc6e168bb1c1f1aa880703136b912cfd6e9f2c770c67658d7d67
+          - 994883771f7deaa15f9739bee2f7fa4300a8cdfcbfb19ef2188cdf369d2a4cda
+          reviewed_sha256: d424ff79d0952eb7f030b854c9c789f7bdfa6e6880910f727210b80aca413a18
         notes: *tapr_2026_staar_notes
       reader:
         profiles:
@@ -10282,6 +10659,47 @@ data_sources:
               scope: campus
               tables:
                 staar_end_of_course: *tapr_2026_staar_end_of_course_campus_csv
+  region_tapr_staar_end_of_course:
+    2026:
+      path: &tapr_2026_staar_end_of_course_region_csv data/tapr/raw/2026-R-STAAR_EOC-offered.csv
+      metadata:
+        title: "2025–26 TPRS STAAR End-of-Course Performance (Region)"
+        publisher: Texas Education Agency
+        version: '2026'
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        period: *tapr_2026_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+          title: "Original TEA CSV with exact submitted form controls"
+          status: available
+          provenance_ids:
+          - b75dd1470c0ee306e9d60abc84af7916282d5649570df09ba841b0cb76a002c2
+          reviewed_sha256: 1523c3df7572ba05bf6ed7c3a8cfd4e007eeb83dcf8497f8a355804efe3244a5
+        - reference_id: dictionary
+          role: data_dictionary
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2026&sumlev=R&dsname=STAAR_EOC&dd=performance&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+          title: "TEA data dictionary for the publisher file and geography"
+          status: available
+          provenance_ids:
+          - 487fd49663fa458951b38c24ce0b269cc9f6b7d0206897dd340ba75e69e75d39
+          reviewed_sha256: 6f61b62cc804aff7b6687c37f8e2d0763d779e3c331d799893c4cf0481324fd3
+        - *tapr_2026_staar_glossary
+        - *tapr_2026_staar_release_guide
+        - *tapr_2026_staar_masking
+        - *tapr_2026_staar_end_of_course_schema
+        notes: *tapr_2026_staar_notes
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2026--staar-end-of-course-crosswalk.json
+            tapr_source:
+              scope: region
+              tables:
+                staar_end_of_course: *tapr_2026_staar_end_of_course_region_csv
   state_tapr_staar_participation:
     2026:
       path: &tapr_2026_staar_participation_state_csv data/tapr/raw/2026-PART-offered.csv
@@ -10320,8 +10738,8 @@ data_sources:
           title: "TEA Data raw source and publisher header crosswalk"
           status: available
           provenance_ids:
-          - 66015d5aed32e33e4004cc520f7e64c42500177b1b097cf04b2bf16ad048733b
-          reviewed_sha256: 9cdc1f8a1c4b5dad96b9d8115558b6aeb64b2bc0db1b6c6bde02cd88ccc95071
+          - 00a083b8af350663cd2788e8f04cdf6f7bd13d020256cbb76de8f9e6e709090a
+          reviewed_sha256: f714c479214657b5de52b7494087e9626ec780f191cbbeee3a41b30ffd0661e5
         notes: *tapr_2026_staar_notes
       reader:
         profiles:
@@ -10413,6 +10831,47 @@ data_sources:
               scope: campus
               tables:
                 staar_participation: *tapr_2026_staar_participation_campus_csv
+  region_tapr_staar_participation:
+    2026:
+      path: &tapr_2026_staar_participation_region_csv data/tapr/raw/2026-R-PART-offered.csv
+      metadata:
+        title: "2025–26 TPRS STAAR Participation (Region)"
+        publisher: Texas Education Agency
+        version: '2026'
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        period: *tapr_2026_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+          title: "Original TEA CSV with exact submitted form controls"
+          status: available
+          provenance_ids:
+          - 61ad3d339a63e0aaacc961b571d5b32a1b085518dee5728d676f61e9bd10d5c8
+          reviewed_sha256: c7938d2c6e36bcb7c54eebaa3ad2a411d940c4f12a007b1e11baad3a9871c5a4
+        - reference_id: dictionary
+          role: data_dictionary
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2026&sumlev=R&dsname=PART&dd=participation&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+          title: "TEA data dictionary for the publisher file and geography"
+          status: available
+          provenance_ids:
+          - 83b2c81140905619e123facc27a7c8890bfb35da32c4818a6a5faaaafc8c6202
+          reviewed_sha256: 9c39c6c4cb9453f0f9c4cdb8efff9e3f9bf25d56bc3c7cc54fc85ff7e2967d99
+        - *tapr_2026_staar_glossary
+        - *tapr_2026_staar_release_guide
+        - *tapr_2026_staar_masking
+        - *tapr_2026_staar_participation_schema
+        notes: *tapr_2026_staar_notes
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2026--staar-participation-crosswalk.json
+            tapr_source:
+              scope: region
+              tables:
+                staar_participation: *tapr_2026_staar_participation_region_csv
   state_tapr_staar_bilingual_esl_performance:
     2026:
       path: &tapr_2026_staar_bilingual_esl_performance_state_csv data/tapr/raw/2026-BIL1-offered.csv
@@ -10451,8 +10910,8 @@ data_sources:
           title: "TEA Data raw source and publisher header crosswalk"
           status: available
           provenance_ids:
-          - 5ff114ec86e656721f4e69e2199f43f066e0fa72ccff814221d2464188b27367
-          reviewed_sha256: 9ffa60001fa0920d06a0008b349ef150e39fbad540adcba65bf81a8565bdf68d
+          - 0839ff5c7ffb9470378aad0d53e889d4d904b1e7bb6f50e140f0b62b6b1b5b66
+          reviewed_sha256: b5f59f033dece35efad3f18608b1225dfb4f76cab4987f7afb514c4edc7ea86f
         notes: *tapr_2026_staar_notes
       reader:
         profiles:
@@ -10544,6 +11003,47 @@ data_sources:
               scope: campus
               tables:
                 staar_bilingual_esl_performance: *tapr_2026_staar_bilingual_esl_performance_campus_csv
+  region_tapr_staar_bilingual_esl_performance:
+    2026:
+      path: &tapr_2026_staar_bilingual_esl_performance_region_csv data/tapr/raw/2026-R-BIL1-offered.csv
+      metadata:
+        title: "2025–26 TPRS Bilingual and ESL STAAR Performance (Region)"
+        publisher: Texas Education Agency
+        version: '2026'
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        period: *tapr_2026_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+          title: "Original TEA CSV with exact submitted form controls"
+          status: available
+          provenance_ids:
+          - a93de41978fc892afd829cb38204c5053004950832b1f103dbf81e7f080482f9
+          reviewed_sha256: 6ca8d7ad91a45a4cd2341e75272a26fe2d938d90c047fa72b561bbd6bee2ce76
+        - reference_id: dictionary
+          role: data_dictionary
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2026&sumlev=R&dsname=BIL1&dd=bil&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+          title: "TEA data dictionary for the publisher file and geography"
+          status: available
+          provenance_ids:
+          - 80de58977951402cf1e349cd7e84233b039b60b130e6e2c2cfa8793cfc3d6312
+          reviewed_sha256: e2485d191b92b6dd1a4de8ccc35815b8e19e31e103dcac945cb1ffdb3c279d16
+        - *tapr_2026_staar_glossary
+        - *tapr_2026_staar_release_guide
+        - *tapr_2026_staar_masking
+        - *tapr_2026_staar_bilingual_esl_performance_schema
+        notes: *tapr_2026_staar_notes
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2026--staar-bilingual-esl-performance-crosswalk.json
+            tapr_source:
+              scope: region
+              tables:
+                staar_bilingual_esl_performance: *tapr_2026_staar_bilingual_esl_performance_region_csv
   state_tapr_staar_bilingual_esl_growth:
     2026:
       path: &tapr_2026_staar_bilingual_esl_growth_state_csv data/tapr/raw/2026-BIL2-offered.csv
@@ -10582,8 +11082,8 @@ data_sources:
           title: "TEA Data raw source and publisher header crosswalk"
           status: available
           provenance_ids:
-          - 65e0e652ea601e2e7f557092b6fe2aee0f01537108813a51037c7a2b713e0992
-          reviewed_sha256: 497980fb12633556db255f0cb540f114c7223a4aeb4a700c9ac0a4ba456b1e31
+          - 9f9f8a937dab8b49bf6384c931aa1789e12137fcd8a0d3b88a987c5c28bc0052
+          reviewed_sha256: b606fbe7baee76a1ff86e65554522921c9fedcaa4928e3eafa74dd31fc5cb503
         notes: *tapr_2026_staar_notes
       reader:
         profiles:
@@ -10675,6 +11175,47 @@ data_sources:
               scope: campus
               tables:
                 staar_bilingual_esl_growth: *tapr_2026_staar_bilingual_esl_growth_campus_csv
+  region_tapr_staar_bilingual_esl_growth:
+    2026:
+      path: &tapr_2026_staar_bilingual_esl_growth_region_csv data/tapr/raw/2026-R-BIL2-offered.csv
+      metadata:
+        title: "2025–26 TPRS Bilingual and ESL STAAR Growth (Region)"
+        publisher: Texas Education Agency
+        version: '2026'
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        period: *tapr_2026_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+          title: "Original TEA CSV with exact submitted form controls"
+          status: available
+          provenance_ids:
+          - 36b5f31062365a9ed77abd2a23e8edb1f97b82af60f65eff516a8206e65e4e4c
+          reviewed_sha256: 7afdc828632be3893ac81803778138e8005724f729b5fb61441892fb73c65d6e
+        - reference_id: dictionary
+          role: data_dictionary
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2026&sumlev=R&dsname=BIL2&dd=bil&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+          title: "TEA data dictionary for the publisher file and geography"
+          status: available
+          provenance_ids:
+          - 29ce5d0f1aef86f4168417e320f6c8f69457070fd139287d35568eb66d4eac53
+          reviewed_sha256: 5ff795e0cd2e3b2b0ac2a7616ce1a781ab4ecc76c1de24cae96471e211fd625f
+        - *tapr_2026_staar_glossary
+        - *tapr_2026_staar_release_guide
+        - *tapr_2026_staar_masking
+        - *tapr_2026_staar_bilingual_esl_growth_schema
+        notes: *tapr_2026_staar_notes
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2026--staar-bilingual-esl-growth-crosswalk.json
+            tapr_source:
+              scope: region
+              tables:
+                staar_bilingual_esl_growth: *tapr_2026_staar_bilingual_esl_growth_region_csv
   state_tapr_student_profile:
     2025:
       path: "data/tapr/raw/2025-s-STUD-all_except_class_size.csv"
@@ -13450,11 +13991,15 @@ schema:
     - csv
     campus_tapr_staar_grades_3_to_8:
     - csv
+    region_tapr_staar_grades_3_to_8:
+    - csv
     state_tapr_staar_all_grades:
     - csv
     district_tapr_staar_all_grades:
     - csv
     campus_tapr_staar_all_grades:
+    - csv
+    region_tapr_staar_all_grades:
     - csv
     state_tapr_staar_end_of_course:
     - csv
@@ -13462,11 +14007,15 @@ schema:
     - csv
     campus_tapr_staar_end_of_course:
     - csv
+    region_tapr_staar_end_of_course:
+    - csv
     state_tapr_staar_participation:
     - csv
     district_tapr_staar_participation:
     - csv
     campus_tapr_staar_participation:
+    - csv
+    region_tapr_staar_participation:
     - csv
     state_tapr_staar_bilingual_esl_performance:
     - csv
@@ -13474,11 +14023,15 @@ schema:
     - csv
     campus_tapr_staar_bilingual_esl_performance:
     - csv
+    region_tapr_staar_bilingual_esl_performance:
+    - csv
     state_tapr_staar_bilingual_esl_growth:
     - csv
     district_tapr_staar_bilingual_esl_growth:
     - csv
     campus_tapr_staar_bilingual_esl_growth:
+    - csv
+    region_tapr_staar_bilingual_esl_growth:
     - csv
     state_tapr_student_profile:
     - csv
@@ -13517,6 +14070,8 @@ schema:
     campus_tapr_staar_school_progress:
     - csv
     district_tapr_staar_school_progress:
+    - csv
+    region_tapr_staar_school_progress:
     - csv
     campus_tapr_four_year_longitudinal_rate:
     - csv

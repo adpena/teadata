@@ -1283,19 +1283,20 @@ pass an explicit `counties_path`.
 
 ### Tested-grade STAAR sources
 
-The source profiles `{state,district,campus}_tapr_staar_tested_grade_{3..8}`
+The source profiles `{state,region,district,campus}_tapr_staar_tested_grade_{3..8}`
 select exact 2026 tested-grade STAAR extracts for the accountability subset.
 Each grade is a separate family and has one publisher table per geography.
 The state profile reads TEA's statewide row directly. The six grades share
-the same sets of 1,202 district IDs and 9,105 campus IDs in the retained exports.
+the same sets of 20 education service center, 1,202 district and 9,105 campus
+IDs in the retained exports.
 These counts describe the publisher's extracts, which can contain blank or
 withheld results for a particular grade or group.
 
 The 2024–25 source profiles select edition 2025 and also include
 `region_tapr_staar_tested_grade_{3..8}`. The six grades retain one Texas row,
 20 education service center rows, 1,208 district rows and 9,084 campus rows
-per grade. Use `--edition 2025` and add `--scope region` for these files.
-Regional keys are TEA's literal two-character codes `01` through `20`.
+per grade. Use `--edition 2025` for these files. In both editions, regional
+keys are TEA's literal two-character codes `01` through `20`.
 Each 2025 geography retains its own dictionary, a named TEA report and the
 [2024–25 TAPR masking methodology](https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html).
 The raw reader preserves those tokens without interpreting them.
@@ -1305,7 +1306,7 @@ Prepare a grade using its exact retained CSVs and reference receipts.
 ```bash
 uv run python -m teadata.scripts.build_tapr_profiles \
   --edition 2026 --family staar_tested_grade_3 \
-  --scope state --scope district --scope campus --input-dir raw/ \
+  --scope state --scope region --scope district --scope campus --input-dir raw/ \
   --reference-store provenance --output-dir prepared/staar-2026-grade-3
 ```
 
@@ -1321,7 +1322,8 @@ for the tested-grade population and how it differs from the all-tested reports.
 
 The same source profile and preparation command support these additional exact
 2026 families. Substitute the family name in `--family`. Each family retains its
-own publisher file and dictionary per geography.
+own publisher file and dictionary for Texas, education service centers,
+districts and campuses.
 
 | Family | Publisher file | Fact columns per scope |
 | --- | --- | ---: |
