@@ -381,6 +381,11 @@ def test_regional_staar_addition_preserves_existing_2026_scope_crosswalks():
 
 def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     current = yaml.safe_load((ROOT / 'teadata/teadata_sources.yaml').read_text())
+    selected_students = 'tprs_student_membership_enrollment_reports'
+    selected_entry = current['data_sources'].pop(selected_students)
+    assert list(selected_entry) == [2026, 'latest'] and selected_entry['latest'] == 2026
+    assert current['schema']['data_sources'].pop(selected_students) == ['html']
+    assert current['value_policies'].pop('tprs_student_selected_2026')['reference_id'] == 'legend'
     previous_tested_grades = {}
     for scope in ('state', 'district', 'campus', 'region'):
         for family, *_ in STAAR_TESTED_GRADES:

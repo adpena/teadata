@@ -1,6 +1,22 @@
 contract_version: 1
 year_min: 2009
 value_policies:
+  tprs_student_selected_2026:
+    policy_id: tprs_student_selected_2026
+    reference_id: legend
+    tokens:
+      '*':
+        status: suppressed
+        reason: publisher_small_count_masking
+      '**':
+        status: suppressed
+        reason: publisher_complementary_disability_masking
+      '-':
+        status: not_applicable
+        reason: publisher_no_students_in_group
+      '?':
+        status: invalid
+        reason: publisher_statistically_improbable
   peims_student_enrollment_by_ethnicity_2023:
     policy_id: peims_student_enrollment_by_ethnicity_2023
     reference_id: about
@@ -14828,6 +14844,1252 @@ data_sources:
                 requested_url: https://tea.texas.gov/about-tea/state-funding/charbud26.zip
                 resolved_url: https://tea.texas.gov/about-tea/state-funding/charbud26.zip
 
+  tprs_student_membership_enrollment_reports:
+    2026:
+      path: source-only/tprs/student-selected-2026.html
+      metadata:
+        title: Selected 2025–26 TPRS Membership and Enrollment reports
+        version: '2026'
+        publisher: Texas Education Agency
+        source_url: https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html
+        period:
+          kind: school_year
+          start_year: 2025
+          end_year: 2026
+        value_policy: tprs_student_selected_2026
+        metrics:
+          membership_total_students_count:
+            field: membership_total_students_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_total_students_percent:
+            field: membership_total_students_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_total_students_count:
+            field: enrollment_total_students_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_total_students_percent:
+            field: enrollment_total_students_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_early_childhood_education_count:
+            field: membership_early_childhood_education_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_early_childhood_education_percent:
+            field: membership_early_childhood_education_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_early_childhood_education_count:
+            field: enrollment_early_childhood_education_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_early_childhood_education_percent:
+            field: enrollment_early_childhood_education_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_pre_kindergarten_count:
+            field: membership_pre_kindergarten_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_pre_kindergarten_percent:
+            field: membership_pre_kindergarten_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_pre_kindergarten_count:
+            field: enrollment_pre_kindergarten_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_pre_kindergarten_percent:
+            field: enrollment_pre_kindergarten_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_pre_kindergarten_3_year_old_count:
+            field: membership_pre_kindergarten_3_year_old_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_pre_kindergarten_3_year_old_percent:
+            field: membership_pre_kindergarten_3_year_old_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_pre_kindergarten_3_year_old_count:
+            field: enrollment_pre_kindergarten_3_year_old_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_pre_kindergarten_3_year_old_percent:
+            field: enrollment_pre_kindergarten_3_year_old_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_pre_kindergarten_4_year_old_count:
+            field: membership_pre_kindergarten_4_year_old_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_pre_kindergarten_4_year_old_percent:
+            field: membership_pre_kindergarten_4_year_old_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_pre_kindergarten_4_year_old_count:
+            field: enrollment_pre_kindergarten_4_year_old_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_pre_kindergarten_4_year_old_percent:
+            field: enrollment_pre_kindergarten_4_year_old_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_kindergarten_count:
+            field: membership_kindergarten_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_kindergarten_percent:
+            field: membership_kindergarten_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_kindergarten_count:
+            field: enrollment_kindergarten_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_kindergarten_percent:
+            field: enrollment_kindergarten_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_1_count:
+            field: membership_grade_1_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_1_percent:
+            field: membership_grade_1_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_1_count:
+            field: enrollment_grade_1_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_1_percent:
+            field: enrollment_grade_1_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_2_count:
+            field: membership_grade_2_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_2_percent:
+            field: membership_grade_2_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_2_count:
+            field: enrollment_grade_2_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_2_percent:
+            field: enrollment_grade_2_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_3_count:
+            field: membership_grade_3_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_3_percent:
+            field: membership_grade_3_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_3_count:
+            field: enrollment_grade_3_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_3_percent:
+            field: enrollment_grade_3_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_4_count:
+            field: membership_grade_4_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_4_percent:
+            field: membership_grade_4_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_4_count:
+            field: enrollment_grade_4_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_4_percent:
+            field: enrollment_grade_4_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_5_count:
+            field: membership_grade_5_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_5_percent:
+            field: membership_grade_5_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_5_count:
+            field: enrollment_grade_5_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_5_percent:
+            field: enrollment_grade_5_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_6_count:
+            field: membership_grade_6_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_6_percent:
+            field: membership_grade_6_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_6_count:
+            field: enrollment_grade_6_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_6_percent:
+            field: enrollment_grade_6_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_7_count:
+            field: membership_grade_7_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_7_percent:
+            field: membership_grade_7_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_7_count:
+            field: enrollment_grade_7_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_7_percent:
+            field: enrollment_grade_7_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_8_count:
+            field: membership_grade_8_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_8_percent:
+            field: membership_grade_8_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_8_count:
+            field: enrollment_grade_8_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_8_percent:
+            field: enrollment_grade_8_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_9_count:
+            field: membership_grade_9_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_9_percent:
+            field: membership_grade_9_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_9_count:
+            field: enrollment_grade_9_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_9_percent:
+            field: enrollment_grade_9_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_10_count:
+            field: membership_grade_10_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_10_percent:
+            field: membership_grade_10_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_10_count:
+            field: enrollment_grade_10_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_10_percent:
+            field: enrollment_grade_10_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_11_count:
+            field: membership_grade_11_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_11_percent:
+            field: membership_grade_11_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_11_count:
+            field: enrollment_grade_11_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_11_percent:
+            field: enrollment_grade_11_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_12_count:
+            field: membership_grade_12_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_grade_12_percent:
+            field: membership_grade_12_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_12_count:
+            field: enrollment_grade_12_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_grade_12_percent:
+            field: enrollment_grade_12_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_african_american_count:
+            field: membership_african_american_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_african_american_percent:
+            field: membership_african_american_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_african_american_count:
+            field: enrollment_african_american_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_african_american_percent:
+            field: enrollment_african_american_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_hispanic_count:
+            field: membership_hispanic_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_hispanic_percent:
+            field: membership_hispanic_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_hispanic_count:
+            field: enrollment_hispanic_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_hispanic_percent:
+            field: enrollment_hispanic_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_white_count:
+            field: membership_white_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_white_percent:
+            field: membership_white_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_white_count:
+            field: enrollment_white_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_white_percent:
+            field: enrollment_white_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_american_indian_count:
+            field: membership_american_indian_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_american_indian_percent:
+            field: membership_american_indian_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_american_indian_count:
+            field: enrollment_american_indian_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_american_indian_percent:
+            field: enrollment_american_indian_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_asian_count:
+            field: membership_asian_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_asian_percent:
+            field: membership_asian_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_asian_count:
+            field: enrollment_asian_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_asian_percent:
+            field: enrollment_asian_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_pacific_islander_count:
+            field: membership_pacific_islander_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_pacific_islander_percent:
+            field: membership_pacific_islander_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_pacific_islander_count:
+            field: enrollment_pacific_islander_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_pacific_islander_percent:
+            field: enrollment_pacific_islander_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_two_or_more_races_count:
+            field: membership_two_or_more_races_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_two_or_more_races_percent:
+            field: membership_two_or_more_races_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_two_or_more_races_count:
+            field: enrollment_two_or_more_races_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_two_or_more_races_percent:
+            field: enrollment_two_or_more_races_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_female_count:
+            field: membership_female_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_female_percent:
+            field: membership_female_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_female_count:
+            field: enrollment_female_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_female_percent:
+            field: enrollment_female_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_male_count:
+            field: membership_male_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_male_percent:
+            field: membership_male_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_male_count:
+            field: enrollment_male_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_male_percent:
+            field: enrollment_male_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_economically_disadvantaged_count:
+            field: membership_economically_disadvantaged_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_economically_disadvantaged_percent:
+            field: membership_economically_disadvantaged_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_economically_disadvantaged_count:
+            field: enrollment_economically_disadvantaged_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_economically_disadvantaged_percent:
+            field: enrollment_economically_disadvantaged_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_non_educationally_disadvantaged_count:
+            field: membership_non_educationally_disadvantaged_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_non_educationally_disadvantaged_percent:
+            field: membership_non_educationally_disadvantaged_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_non_educationally_disadvantaged_count:
+            field: enrollment_non_educationally_disadvantaged_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_non_educationally_disadvantaged_percent:
+            field: enrollment_non_educationally_disadvantaged_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_section_504_students_count:
+            field: membership_section_504_students_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_section_504_students_percent:
+            field: membership_section_504_students_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_section_504_students_count:
+            field: enrollment_section_504_students_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_section_504_students_percent:
+            field: enrollment_section_504_students_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_eb_students_el_count:
+            field: membership_eb_students_el_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_eb_students_el_percent:
+            field: membership_eb_students_el_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_eb_students_el_count:
+            field: enrollment_eb_students_el_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_eb_students_el_percent:
+            field: enrollment_eb_students_el_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_students_w_dyslexia_count:
+            field: membership_students_w_dyslexia_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_students_w_dyslexia_percent:
+            field: membership_students_w_dyslexia_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_students_w_dyslexia_count:
+            field: enrollment_students_w_dyslexia_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_students_w_dyslexia_percent:
+            field: enrollment_students_w_dyslexia_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_foster_care_count:
+            field: membership_foster_care_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_foster_care_percent:
+            field: membership_foster_care_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_foster_care_count:
+            field: enrollment_foster_care_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_foster_care_percent:
+            field: enrollment_foster_care_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_homeless_count:
+            field: membership_homeless_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_homeless_percent:
+            field: membership_homeless_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_homeless_count:
+            field: enrollment_homeless_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_homeless_percent:
+            field: enrollment_homeless_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_immigrant_count:
+            field: membership_immigrant_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_immigrant_percent:
+            field: membership_immigrant_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_immigrant_count:
+            field: enrollment_immigrant_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_immigrant_percent:
+            field: enrollment_immigrant_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_migrant_count:
+            field: membership_migrant_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_migrant_percent:
+            field: membership_migrant_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_migrant_count:
+            field: enrollment_migrant_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_migrant_percent:
+            field: enrollment_migrant_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_title_i_count:
+            field: membership_title_i_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_title_i_percent:
+            field: membership_title_i_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_title_i_count:
+            field: enrollment_title_i_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_title_i_percent:
+            field: enrollment_title_i_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_military_connected_count:
+            field: membership_military_connected_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_military_connected_percent:
+            field: membership_military_connected_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_military_connected_count:
+            field: enrollment_military_connected_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_military_connected_percent:
+            field: enrollment_military_connected_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_at_risk_count:
+            field: membership_at_risk_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_at_risk_percent:
+            field: membership_at_risk_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_at_risk_count:
+            field: enrollment_at_risk_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_at_risk_percent:
+            field: enrollment_at_risk_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_bilingual_esl_education_count:
+            field: membership_bilingual_esl_education_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_bilingual_esl_education_percent:
+            field: membership_bilingual_esl_education_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_bilingual_esl_education_count:
+            field: enrollment_bilingual_esl_education_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_bilingual_esl_education_percent:
+            field: enrollment_bilingual_esl_education_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_gifted_and_talented_education_count:
+            field: membership_gifted_and_talented_education_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_gifted_and_talented_education_percent:
+            field: membership_gifted_and_talented_education_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_gifted_and_talented_education_count:
+            field: enrollment_gifted_and_talented_education_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_gifted_and_talented_education_percent:
+            field: enrollment_gifted_and_talented_education_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_special_education_count:
+            field: membership_special_education_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_special_education_percent:
+            field: membership_special_education_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_special_education_count:
+            field: enrollment_special_education_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          enrollment_special_education_percent:
+            field: enrollment_special_education_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+        references:
+        - reference_id: definitions
+          title: 2026 TPRS glossary profile definitions (PDF 37–40)
+          role: glossary
+          status: available
+          url: https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/comprehensive-tprs-glossary.pdf
+          reviewed_sha256: 8fb51b87853918759ab321d5522ab9f56b8ac318c7d856f5f6f43e947b8a80bb
+          provenance_ids:
+          - 075b06040a75b5cff9d50364d21de15d6ea0886812dd87bd886b512c109328a3
+        - reference_id: report_grid
+          title: Reviewed report layout, labels, field scope and definitions
+          role: methodology
+          status: available
+          path: methodologies/tprs-students-2026.json
+          reviewed_sha256: e7759843a9296a25d03f79782b14c061f696cf9700c76f77d6f1b17c234d9dd5
+          provenance_ids:
+          - c3770cc98d201aa4cddfaef3b6d7fa2b2a26e61d77fe2c40c8ae8bc4f5f85f3f
+        - reference_id: columns
+          title: Derived row-label projection (not CSV codes)
+          role: schema
+          status: available
+          path: schemas/tprs--2026--student-selected-reports-crosswalk.json
+          reviewed_sha256: d9522732b04ff29ca7bf10237383e41cf9eb36fc62b8ca0c10cc1ce47692d2a1
+          provenance_ids:
+          - 128e2aebbd507ab5434b4a96412f4d92092337e6e1272bba99ed3b7845c5614e
+        - reference_id: legend
+          title: Exact 2026 selected report disclosure legend
+          role: masking_methodology
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2026&id=S&lev=S&prgopt=reports%2Ftapr%2Fstudent.sas
+          reviewed_sha256: ffb93666f4748b7abbc33a031e318b3eb2a2e25d610dd1eba76380ec0ffce3b6
+          provenance_ids:
+          - 6aee427354eccb8b3d238c81f34429178816be63566c899998553044efd21946
+        - reference_id: schedule
+          title: 2026 TPRS release guide
+          role: source_notes
+          status: available
+          url: https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/tprs-user-guide-2026.pdf
+          reviewed_sha256: 911ca6bdfeef3f1780ddcc6fadce1a57bebd95872945bc793c9a177fcd038cf8
+          provenance_ids:
+          - f6a2d6f9390bfcf8d01d624db953d9ddadc00ef75e8858abf50d9a46a71ae012
+        notes: Explicit selected-report collection; not statewide bulk coverage or default enrichment. Row-label
+          positional crosswalk codes are literal HTML row labels, not invented CSV variable names. Entire
+          raw current table stays in the reader/retained HTML; only reviewed current Membership/Enrollment
+          fields are native. Missing grade rows are absent observations, never zero. CTE, grouped-disability,
+          lagged and embedded-benchmark cells remain raw/HOLD.
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tprs--2026--student-selected-reports-crosswalk.json
+            report_grid: methodologies/tprs-students-2026.json
+            exemplar_receipts:
+              state: 6aee427354eccb8b3d238c81f34429178816be63566c899998553044efd21946
+              district: 600b4d3a6204146154ba727ee84278290e3f26a123648d1b4de20b78090b098f
+              campus: 3a32e0912f838de49aa272d2161a2b6bc6351f4b59f883c451b206599eb976ff
+    latest: 2026
 spatial:
   districts:
     2025:
@@ -15022,6 +16284,7 @@ spatial:
         column_schema: schemas/spatial--campuses--2025--4826bcd2--default.json
 schema:
   data_sources:
+    tprs_student_membership_enrollment_reports: [html]
     peims_financial_single_file_actuals:
     - zip
     peims_financial_single_file_budgets:

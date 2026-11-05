@@ -1430,3 +1430,81 @@ Source absence does not establish noncollection. These profiles preserve raw
 strings without activating a default reader, release or app enrichment.
 
 Checksum-verified release SQLite artifacts are read from the checkpointed main file: default map, entity and boundary lookups ignore unverified WAL sidecars. Explicit paths and caller-owned `EntityStore`/`BoundaryStore` instances remain ordinary read-only SQLite readers and can observe committed WAL state. `DataRelease` retains checksum/catalog validation and stat-cache ownership; native Parquet/edition resources keep their existing validation path.
+
+### Selected 2026 TPRS student Membership and Enrollment reports
+
+`tprs_student_membership_enrollment_reports` is an explicit `source` profile for
+TEA's 2025–26 Student Information HTML reports. It accepts receipt-pinned direct
+state, district and campus reports; it does not assert statewide district or
+campus coverage. District and campus identifiers remain literal six- and
+nine-digit strings. Texas comes from its direct state report, rather than a sum
+of local reports or their embedded benchmark columns.
+
+`teadata.tprs_students.read_student_report` validates the official request,
+edition, geography, headings, current-table layout and disclosure legend. Its
+typed observations retain every cell from Total Students through the grouped
+disability rows, stopping before Mobility. The complete original HTML remains
+in the provenance store. Each observation carries its raw token, population,
+local/benchmark role, period and parsed table row/column locator. These locators
+are not HTML source line numbers.
+Each HTML report is limited to 2 MiB and an explicit selected intake to 64 MiB
+of original HTML; oversize selections refuse without a partial publication.
+
+The sole reviewed field contract is
+`teadata/methodologies/tprs-students-2026.json`. It defines 42 current row labels
+across Membership and Enrollment, with count and percent measures: 168 native
+fields. Membership excludes students served less than two hours daily;
+Enrollment follows TEA's Fall PEIMS Snapshot definition. Percentages use Total
+Students within the same reported population. Pre-K total and age detail rows
+overlap, as do program and student cohorts; these are not disjoint components.
+The retained 2026 glossary supplies the definitions, and the report's own legend
+supplies the value policy. Observed zero, masked `*`/`**`, no-students `-`, and
+invalid `?` remain distinct. Complementary `**` masking is interpreted only
+within the documented disability grouping, which is held outside this native
+projection. A missing campus grade row is a missing observation.
+
+CTE cells, grouped disability cells, embedded local-report benchmarks and the
+explicitly lagged 2024–25 disciplinary row remain raw, outside the qualified
+native metrics. In particular, the retained legend does not define literal
+`.` tokens, and the CTE 9–12 denominator is not qualified. No dot is converted
+to zero or missing. Mobility, attrition, class sizes and staffing are outside
+this family. A previously unseen token in a qualified field blocks preparation.
+
+Build an offline candidate with an explicit JSON intake:
+
+```json
+{
+  "schema_version": 1,
+  "dataset": "tprs_student_membership_enrollment_reports",
+  "edition": "2026",
+  "reports": [
+    {"receipt": "<exact-acquisition-receipt-sha256>", "sha256": "<exact-html-sha256>",
+     "scope": "district", "identifier": "001902"}
+  ]
+}
+```
+
+```sh
+uv run python -m teadata.scripts.refresh_tprs_students \
+  --store /path/to/retained-provenance \
+  --config teadata/teadata_sources.yaml --config-sha256 <exact-config-sha256> \
+  --intake /path/to/intake.json --intake-sha256 <exact-intake-sha256> \
+  --output /path/to/new-candidate
+```
+
+The field contract and value policy are packaged authorities; callers cannot
+replace them. The build freezes actual ordered input hashes and selected
+coverage into a derived crosswalk and the existing schema-4 native catalog.
+Raw/status/locator companion columns remain alongside each metric. The
+materialization report lists raw-field HOLDs and keeps whole-report semantic
+qualification false. Three independent publisher XLSX exports provide exact
+current-table presentation witnesses, including grade rows; they do not prove
+every selected report has a separate workbook witness. Receipt/byte integrity
+is distinct from publisher authenticity and semantic qualification.
+
+Older retained acquisitions with unspecified year or HTTP method preserve
+those original limitations. Only after exact request and report validation does
+the builder create a parent-linked `local_observation` of the same bytes with
+the verified edition. Its new observation time is never a download timestamp.
+This command does not fetch TEA, activate a default engine, publish a release,
+bind statewide DSL comparisons or replace an application's saved exports.
