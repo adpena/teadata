@@ -1310,6 +1310,28 @@ default snapshot and entity enrichment.
 See [TEA's TPRS glossary](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/comprehensive-tprs-glossary.pdf#page=2)
 for the tested-grade population and how it differs from the all-tested reports.
 
+The same source profile and preparation command support these additional exact
+2026 families. Substitute the family name in `--family`. Each family retains its
+own publisher file and dictionary per geography.
+
+| Family | Publisher file | Fact columns per scope |
+| --- | --- | ---: |
+| `staar_grades_3_to_8` | `STAAR_GR38` | 300 |
+| `staar_all_grades` | `STAAR_ALL` | 945 |
+| `staar_end_of_course` | `STAAR_EOC` | 1,134 |
+| `staar_participation` | `PART` | 2,106 |
+| `staar_bilingual_esl_performance` | `BIL1` | 527 |
+| `staar_bilingual_esl_growth` | `BIL2` | 270 |
+
+`STAAR_ALL` is the all-grades publisher file in the accountability reporting
+product. For the separate all-tested population, see TEA's all-tested reports.
+The bilingual and ESL dictionaries leave 72 performance fields and 36 growth
+fields per scope undocumented. The crosswalk retains those fields and their
+raw values with explicit dictionary status. Some publisher codes recur across
+families. Keep those source identities when selecting a bundle for analysis.
+For the participation file, prepare and publish one geography per candidate.
+Putting all three geographies in one schema 3 manifest exceeds its size limit.
+
 ### Annual and longitudinal graduation-program sources
 
 The explicit 2024 `source` profiles retain the publisher's Annual and

@@ -191,16 +191,29 @@ def test_current_source_contracts_keep_explicit_edition_csv_opt_ins():
     # Full pre-change Config preservation has one current baseline owner below.
 
 
-@pytest.mark.parametrize('grade,facts,occurrences', [
-    (3, 678, 704), (4, 678, 704), (5, 867, 900),
-    (6, 678, 704), (7, 678, 704), (8, 1056, 1096),
-])
-def test_staar_tested_grade_sources_keep_raw_scope_and_exact_receipts(grade, facts, occurrences, monkeypatch):
+STAAR_2026 = [
+    (f'staar_tested_grade_{grade}', f'STAAR_GR{grade}', facts, occurrences, 0)
+    for grade, facts, occurrences in [
+        (3, 678, 704), (4, 678, 704), (5, 867, 900),
+        (6, 678, 704), (7, 678, 704), (8, 1056, 1096),
+    ]
+] + [
+    ('staar_grades_3_to_8', 'STAAR_GR38', 300, 312, 0),
+    ('staar_all_grades', 'STAAR_ALL', 945, 980, 0),
+    ('staar_end_of_course', 'STAAR_EOC', 1134, 1176, 0),
+    ('staar_participation', 'PART', 2106, 2106, 0),
+    ('staar_bilingual_esl_performance', 'BIL1', 527, 455, 72),
+    ('staar_bilingual_esl_growth', 'BIL2', 270, 234, 36),
+]
+
+
+@pytest.mark.parametrize('family,publisher_file,facts,occurrences,undocumented', STAAR_2026)
+def test_staar_sources_keep_raw_scope_and_exact_receipts(
+        family, publisher_file, facts, occurrences, undocumented, monkeypatch):
     cfg = load_config()
     store = ProvenanceStore(ROOT / 'provenance')
     monkeypatch.setattr(store, 'verify_artifact', lambda *a, **k: pytest.fail('Metadata lookup opened an artifact'))
     monkeypatch.setattr('teadata.tapr.read_tapr_table', lambda *a, **k: pytest.fail('Discovery opened source rows'))
-    family = f'staar_tested_grade_{grade}'
     period = {'kind': 'school_year', 'start_year': 2025, 'end_year': 2026}
     for scope, rows, identity_fields in (
         ('state', 1, ()),
@@ -221,13 +234,15 @@ def test_staar_tested_grade_sources_keep_raw_scope_and_exact_receipts(grade, fac
         assert request.key_field == (identity_fields[0] if identity_fields else None)
         letter = scope[0].upper()
         file_scope = '' if scope == 'state' else letter + '-'
-        assert request.path.name == f'2026-{file_scope}STAAR_GR{grade}-offered.csv'
+        assert request.path.name == f'2026-{file_scope}{publisher_file}-offered.csv'
         assert request.mapping['table'] == family and request.mapping['metric_period'] == period
         assert reviewed_tapr_data_record_count(request.mapping) == rows
         fields = request.mapping['fields']
         assert len(fields) == facts + len(identity_fields)
         assert tuple(field['field'] for field in fields if field['disposition'] == 'identity') == identity_fields
-        assert all(field['dictionary_status'] == 'documented' for field in fields[len(identity_fields):])
+        fact_fields = fields[len(identity_fields):]
+        documented = {field['code'] for field in fact_fields if field['dictionary_status'] == 'documented'}
+        assert len(documented) == facts - undocumented
 
         references = {reference.reference_id: reference for reference in metadata.references}
         assert references['masking'].status == 'unreviewed' and not references['masking'].provenance_ids
@@ -240,18 +255,20 @@ def test_staar_tested_grade_sources_keep_raw_scope_and_exact_receipts(grade, fac
         assert raw['artifact']['sha256'] == request.mapping['input_sha256']
         controls = dict(raw['parameters']['form_controls'])
         assert (controls['ccyy'], controls['sumlev'], controls['dsname'], controls['datafmt']) == (
-            '2026', letter, f'STAAR_GR{grade}', 'csv')
+            '2026', letter, publisher_file, 'csv')
         dictionary = request.mapping['dictionary_records']
         assert len(dictionary) == occurrences
         assert {record['source_sha256'] for record in dictionary} == {references['dictionary'].reviewed_sha256}
-        assert {record['code'] for record in dictionary} == {field['code'] for field in fields[len(identity_fields):]}
+        complete_definitions = {record['code'] for record in dictionary
+                                if record['publisher_type'] is not None and record['publisher_description'] is not None}
+        assert complete_definitions & {field['code'] for field in fact_fields} == documented
 
 
 def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     current = yaml.safe_load((ROOT / 'teadata/teadata_sources.yaml').read_text())
     for scope in ('state', 'district', 'campus'):
-        for grade in range(3, 9):
-            dataset = f'{scope}_tapr_staar_tested_grade_{grade}'
+        for family, *_ in STAAR_2026:
+            dataset = f'{scope}_tapr_{family}'
             assert list(current['data_sources'].pop(dataset)) == [2026]
             assert current['schema']['data_sources'].pop(dataset) == ['csv']
     # District transfers have an independent source contract and native writer.
