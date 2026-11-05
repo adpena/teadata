@@ -46,7 +46,7 @@ def _unique_object(pairs: list[tuple[str, object]]) -> dict:
 
 @lru_cache(maxsize=1)
 def _bindings() -> dict:
-    path = Path(__file__).with_name("schemas") / "staar-tested-grade-comparison-bindings.json"
+    path = Path(__file__).with_name("methodologies") / "staar-tested-grade-comparison-bindings.json"
     with path.open("rb") as stream:
         body = stream.read(1024 * 1024 + 1)
     if len(body) > 1024 * 1024:
