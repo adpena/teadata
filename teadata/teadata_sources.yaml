@@ -5785,6 +5785,88 @@ data_sources:
               scope: campus
               tables:
                 dropout_attendance: data/tapr/raw/2024-c-DROP_ATT.csv
+    2025:
+      path: data/tapr/raw/2025-C-DROP_ATT.csv
+      metadata:
+        title: 2025 TAPR Attendance, Chronic Absenteeism, and Annual Dropout
+        version: '2025'
+        publisher: Texas Education Agency
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        period:
+          kind: unknown
+        notes: Source-only observations from all four groups offered for publisher edition 2025. Literal
+          2024 and SY 2023-24 labels, ordered dictionary sections, geographic identifiers, and raw values
+          are preserved. The dictionary documents 108 of 162 fact fields. The other 54 retain unknown
+          definitions. Measurement periods, units and token interpretation remain unqualified.
+        provenance_ids:
+        - 816805b8ef38d0d25b66d3f01d16cc9bd48c82c9e81bbf182fe28084a6773f10
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          title: Original all-offered DROP_ATT CSV
+          status: available
+          provenance_ids:
+          - 816805b8ef38d0d25b66d3f01d16cc9bd48c82c9e81bbf182fe28084a6773f10
+          reviewed_sha256: 4e1104ac2edd417f11efab4a3ac01a0c7136b70f632475308ee938c8f806aa1f
+        - reference_id: menu
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&tapr=all_c&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr.sas
+          title: Official 2025 TAPR geography menu
+          status: available
+          provenance_ids:
+          - 6d09711009cb1d0bc19de0e513d595fb9e27a3a347e35683e974f51e5a8e4c32
+          reviewed_sha256: c4d0972e797965229fed206e25cbbb7148e8f67b3459f2f25a6742b61d1b9dd9
+        - reference_id: selection
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+          title: Official 2025 DROP_ATT variable selection
+          status: available
+          provenance_ids:
+          - 628436ffb8c69b6d2ca7075c7238ee4c8dc6a97b220282e66f6961bf8f219c17
+          reviewed_sha256: dca844b0011100bc315cab37a7fd12746d3f58d5ce42ef1a9aab7c5bb1d827db
+        - reference_id: dictionary
+          role: data_dictionary
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=C&dsname=DROP_ATT&dd=attendgrad&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          title: Official 2025 DROP_ATT dictionary
+          status: available
+          provenance_ids:
+          - a45b7115ebcc2a53b0b417f84f7af56471622174f87a4edef3803b1710aa754e
+          reviewed_sha256: 20aaa1e7a1cb519d97abcb1a7ca24ff6a4e38128e321d9460bd099c85b7bdf07
+        - reference_id: glossary
+          role: glossary
+          url: https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf
+          title: 2024-25 Comprehensive TAPR Glossary
+          status: available
+          provenance_ids:
+          - e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db
+          reviewed_sha256: 846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416
+        - reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html
+          title: 2024-2025 TAPR Masking Rules
+          status: available
+          provenance_ids:
+          - 6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554
+          reviewed_sha256: 7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2025--dropout-attendance-crosswalk.json
+          title: Reviewed 2025 DROP_ATT header and dictionary crosswalk
+          status: available
+          provenance_ids:
+          - ccd3d8acfb292ab2df67bf469bd5c7e0bd00f4ca55d0ab979abc691d94b7e1c0
+          reviewed_sha256: 12d158cc9f0dc2d764334f2838ab564bc3fbf0c6672914fa8e3c88799fb5f77e
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2025--dropout-attendance-crosswalk.json
+            tapr_source:
+              scope: campus
+              tables:
+                dropout_attendance: data/tapr/raw/2025-C-DROP_ATT.csv
   district_tapr_dropout_attendance:
     2024:
       path: data/tapr/raw/2024-d-DROP_ATT.csv
@@ -5879,6 +5961,88 @@ data_sources:
               scope: district
               tables:
                 dropout_attendance: data/tapr/raw/2024-d-DROP_ATT.csv
+    2025:
+      path: data/tapr/raw/2025-D-DROP_ATT.csv
+      metadata:
+        title: 2025 TAPR Attendance, Chronic Absenteeism, and Annual Dropout
+        version: '2025'
+        publisher: Texas Education Agency
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        period:
+          kind: unknown
+        notes: Source-only observations from all four groups offered for publisher edition 2025. Literal
+          2024 and SY 2023-24 labels, ordered dictionary sections, geographic identifiers, and raw values
+          are preserved. The dictionary documents 108 of 162 fact fields. The other 54 retain unknown
+          definitions. Measurement periods, units and token interpretation remain unqualified.
+        provenance_ids:
+        - e4f57bf9d4f5e9be9673e27442c9d3bfe8cc0a73a81a861ebdd67f978f33ef7e
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          title: Original all-offered DROP_ATT CSV
+          status: available
+          provenance_ids:
+          - e4f57bf9d4f5e9be9673e27442c9d3bfe8cc0a73a81a861ebdd67f978f33ef7e
+          reviewed_sha256: 6505ade867e79214c85c69fc3b34bd037ff603fd7c7d1c7fbf1045d9ee200d82
+        - reference_id: menu
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&tapr=all_d&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr.sas
+          title: Official 2025 TAPR geography menu
+          status: available
+          provenance_ids:
+          - 20aad621d40f204039cb8cfc8450a3a1211f3c49eb3b1f53d7f6e0bd40a892bf
+          reviewed_sha256: d99117b8b20a6e255af08ae8c2dfae1775c6d625fd0a4997bfacc24b9f8cdc88
+        - reference_id: selection
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+          title: Official 2025 DROP_ATT variable selection
+          status: available
+          provenance_ids:
+          - 369d62f3a6609d7de84b981ba925ee6f2348f30a04b42259dcccbd9e327fbce3
+          reviewed_sha256: 2f57cf8b3e766055e99c43f28a446e86962b763904e0637a405efcf784cf2857
+        - reference_id: dictionary
+          role: data_dictionary
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=D&dsname=DROP_ATT&dd=attendgrad&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          title: Official 2025 DROP_ATT dictionary
+          status: available
+          provenance_ids:
+          - 3a4d3e633b7fa5c9df66bab2be869c50bf6ac78b77faa90bf106f984489d545b
+          reviewed_sha256: 294f146d7030089c2303533eed0de06e1c2a812ac6d7d0949f5888a4d11fcb6c
+        - reference_id: glossary
+          role: glossary
+          url: https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf
+          title: 2024-25 Comprehensive TAPR Glossary
+          status: available
+          provenance_ids:
+          - e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db
+          reviewed_sha256: 846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416
+        - reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html
+          title: 2024-2025 TAPR Masking Rules
+          status: available
+          provenance_ids:
+          - 6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554
+          reviewed_sha256: 7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2025--dropout-attendance-crosswalk.json
+          title: Reviewed 2025 DROP_ATT header and dictionary crosswalk
+          status: available
+          provenance_ids:
+          - ccd3d8acfb292ab2df67bf469bd5c7e0bd00f4ca55d0ab979abc691d94b7e1c0
+          reviewed_sha256: 12d158cc9f0dc2d764334f2838ab564bc3fbf0c6672914fa8e3c88799fb5f77e
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2025--dropout-attendance-crosswalk.json
+            tapr_source:
+              scope: district
+              tables:
+                dropout_attendance: data/tapr/raw/2025-D-DROP_ATT.csv
   campus_tapr_historical_enrollment:
     2015:
       path: data/tapr/CAMPPROF_2014-2015_FINAL.xlsx
@@ -11660,6 +11824,118 @@ data_sources:
               tables:
                 staar_all_grades: *tapr_2026_staar_all_grades_region_csv
   state_tapr_staar_end_of_course:
+    2024:
+      path: &tapr_2024_eoc_state_csv data/tapr/raw/2024-S-STAAR_EOC-offered.csv
+      metadata:
+        title: 2023–24 TAPR STAAR End-of-Course Performance (State)
+        publisher: Texas Education Agency
+        version: '2024'
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        period: *tapr_2024_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          title: Original TEA CSV and exact publisher selections
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          provenance_ids:
+          - d0bdfe99cdcea7a7b352ca345187df6a11473d24106b5677c919c3edb3f4b579
+          reviewed_sha256: ae3c974ed936a734750100ab200882956874005773a779f88ff3bc3fee7aa0ec
+        - reference_id: dictionary
+          role: data_dictionary
+          title: TEA End-of-Course dictionary for this reporting level
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=S&dsname=STAAR_EOC&dd=performance&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          provenance_ids:
+          - 6a3513174d18f81c0ca684ad432e94e59f372b79e3c14e004b2234dc116caff3
+          reviewed_sha256: cff661b6123d7509a99ef8db8c07a8bdb2aa95f65aa31c177d89dff184d62422
+        - *tapr_2024_staar_glossary
+        - *tapr_2024_staar_masking
+        - reference_id: named_report
+          role: source_notes
+          title: TEA STAAR Performance named End-of-Course rate witness
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&lev=S&id=S&prgopt=reports%2Ftapr%2Fperformance.sas
+          provenance_ids:
+          - 9f9e446e999ff0a291c48abfa5bd1085242cfa851570854c6ea00ad0ccad36cc
+          reviewed_sha256: 74c2449bafd573eba45e9b4f95a27c5a411ea40b1733cfea4bb78dbd7db72ad3
+        - &tapr_2024_eoc_schema
+          reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2024--staar-end-of-course-crosswalk.json
+          title: TEA Data raw source and publisher header crosswalk
+          status: available
+          provenance_ids:
+          - db23794c192d943ae0f47f39dfba87fd1699b74ea2a8f535842d14c7c268edd5
+          reviewed_sha256: ed735fd0c87cdab485008374a0f21d49a1c96aa02556d083f2a85894aec5b096
+        notes: Publisher raw End-of-Course facts for this accountability reporting edition, including separate accelerated tester or SAT/ACT fields where offered. The
+          source reader retains raw publisher tokens and applies no value policy.
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--staar-end-of-course-crosswalk.json
+            tapr_source:
+              scope: state
+              tables:
+                staar_end_of_course: *tapr_2024_eoc_state_csv
+    2025:
+      path: &tapr_2025_eoc_state_csv data/tapr/raw/2025-S-STAAR_EOC-offered.csv
+      metadata:
+        title: 2024–25 TAPR STAAR End-of-Course Performance (State)
+        publisher: Texas Education Agency
+        version: '2025'
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        period: *tapr_2025_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          title: Original TEA CSV and exact publisher selections
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          provenance_ids:
+          - c53e647324929eeaf2ad4dbe770191e2bdaa6593031c3a9f7ba78c3e9e487d4b
+          reviewed_sha256: e19346ac32336a90dce461cf0b1389f0a198af574ea0f6ed0d826fd65d6f14fc
+        - reference_id: dictionary
+          role: data_dictionary
+          title: TEA End-of-Course dictionary for this reporting level
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=S&dsname=STAAR_EOC&dd=performance&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          provenance_ids:
+          - a8f9ce5c02e0fd438e22dc21731c402822c3f465eb1d9e25d0fd5b52ccd56fab
+          reviewed_sha256: 129fb349692a3afa38a9e2007e07cf8b8e61f9a8e80caea5181b3cbea6904a94
+        - *tapr_2025_staar_glossary
+        - *tapr_2025_staar_masking
+        - reference_id: named_report
+          role: source_notes
+          title: TEA STAAR Performance named End-of-Course rate witness
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&lev=S&id=S&prgopt=reports%2Ftapr%2Fperformance.sas
+          provenance_ids:
+          - 05050d07fb233bf7908c8382ff76e95b11ecbfe81a109d994fd8ca6b1cfa5206
+          reviewed_sha256: 4edbad7a99ee69a432021c84aeacdf1c9886b7253e771c3c5da2b5f861cf50bf
+        - &tapr_2025_eoc_schema
+          reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2025--staar-end-of-course-crosswalk.json
+          title: TEA Data raw source and publisher header crosswalk
+          status: available
+          provenance_ids:
+          - 6c65febcae95b47e20cd8f0e56c9c8f943e470fbc0ba31988a1a268152a7ba79
+          reviewed_sha256: 8d6f73e848c989e4b07d1b88f3c5df8f0401177d4735146b91fa66f14901bdb3
+        notes: Publisher raw End-of-Course facts for this accountability reporting edition, including separate accelerated tester or SAT/ACT fields where offered. The
+          source reader retains raw publisher tokens and applies no value policy.
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2025--staar-end-of-course-crosswalk.json
+            tapr_source:
+              scope: state
+              tables:
+                staar_end_of_course: *tapr_2025_eoc_state_csv
     2026:
       path: &tapr_2026_staar_end_of_course_state_csv data/tapr/raw/2026-STAAR_EOC-offered.csv
       metadata:
@@ -11709,6 +11985,102 @@ data_sources:
               tables:
                 staar_end_of_course: *tapr_2026_staar_end_of_course_state_csv
   district_tapr_staar_end_of_course:
+    2024:
+      path: &tapr_2024_eoc_district_csv data/tapr/raw/2024-D-STAAR_EOC-offered.csv
+      metadata:
+        title: 2023–24 TAPR STAAR End-of-Course Performance (District)
+        publisher: Texas Education Agency
+        version: '2024'
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        period: *tapr_2024_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          title: Original TEA CSV and exact publisher selections
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          provenance_ids:
+          - 850b8d1fa0da8d5124c052881779613013ec7fae595194728dae10a6f2e9b475
+          reviewed_sha256: 8ee27b9d42b1854658b3f68207a840d68ebc059a228486a95fa97e24706b774b
+        - reference_id: dictionary
+          role: data_dictionary
+          title: TEA End-of-Course dictionary for this reporting level
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=D&dsname=STAAR_EOC&dd=performance&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          provenance_ids:
+          - 47c15ddee61ec80c644a5782d2bd27461246d7664d64bfc252e37322bbf01f42
+          reviewed_sha256: e8f9b465b4183256fd61860156aae14d1283b7bda96566138858686232340601
+        - *tapr_2024_staar_glossary
+        - *tapr_2024_staar_masking
+        - reference_id: named_report
+          role: source_notes
+          title: TEA STAAR Performance named End-of-Course rate witness
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&lev=D&id=227901&prgopt=reports%2Ftapr%2Fperformance.sas
+          provenance_ids:
+          - 502428d0d3cb0e2af018ed6a5560d47873d4d194e548bd66e7d09197d8945efe
+          reviewed_sha256: dff6badb73b1f4b94e9381c2afa7e8725b5d4716c64ca0c150de715c3dad740e
+        - *tapr_2024_eoc_schema
+        notes: Publisher raw End-of-Course facts for this accountability reporting edition, including separate accelerated tester or SAT/ACT fields where offered. The
+          source reader retains raw publisher tokens and applies no value policy.
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--staar-end-of-course-crosswalk.json
+            tapr_source:
+              scope: district
+              tables:
+                staar_end_of_course: *tapr_2024_eoc_district_csv
+    2025:
+      path: &tapr_2025_eoc_district_csv data/tapr/raw/2025-D-STAAR_EOC-offered.csv
+      metadata:
+        title: 2024–25 TAPR STAAR End-of-Course Performance (District)
+        publisher: Texas Education Agency
+        version: '2025'
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        period: *tapr_2025_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          title: Original TEA CSV and exact publisher selections
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          provenance_ids:
+          - b1055f5d115d31145e84e36293a6bd128272473bd2116e02ec6240c2237442ea
+          reviewed_sha256: a751634be774bada5bbf4be147687b4d98baad347bfc35fbf5b74dedc2d608c1
+        - reference_id: dictionary
+          role: data_dictionary
+          title: TEA End-of-Course dictionary for this reporting level
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=D&dsname=STAAR_EOC&dd=performance&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          provenance_ids:
+          - eaa2c1d45ddba78a3a231c3198d33b1136ed89522101680394e9468f7b09b5c8
+          reviewed_sha256: cb297d1ee7975821fcda9622fd0c88554a116f45d244c07bdcdbb239c3b7acf1
+        - *tapr_2025_staar_glossary
+        - *tapr_2025_staar_masking
+        - reference_id: named_report
+          role: source_notes
+          title: TEA STAAR Performance named End-of-Course rate witness
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&lev=D&id=227901&prgopt=reports%2Ftapr%2Fperformance.sas
+          provenance_ids:
+          - 0e9d7618ba99fe458101e0aa1044cb189b5fcb8bcd1d0a16f8e8ad15e8f727ff
+          reviewed_sha256: fd56cd641a2410830911fd78157a8879a1624d091039c5850e1628c864017274
+        - *tapr_2025_eoc_schema
+        notes: Publisher raw End-of-Course facts for this accountability reporting edition, including separate accelerated tester or SAT/ACT fields where offered. The
+          source reader retains raw publisher tokens and applies no value policy.
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2025--staar-end-of-course-crosswalk.json
+            tapr_source:
+              scope: district
+              tables:
+                staar_end_of_course: *tapr_2025_eoc_district_csv
     2026:
       path: &tapr_2026_staar_end_of_course_district_csv data/tapr/raw/2026-D-STAAR_EOC-offered.csv
       metadata:
@@ -11750,6 +12122,102 @@ data_sources:
               tables:
                 staar_end_of_course: *tapr_2026_staar_end_of_course_district_csv
   campus_tapr_staar_end_of_course:
+    2024:
+      path: &tapr_2024_eoc_campus_csv data/tapr/raw/2024-C-STAAR_EOC-offered.csv
+      metadata:
+        title: 2023–24 TAPR STAAR End-of-Course Performance (Campus)
+        publisher: Texas Education Agency
+        version: '2024'
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        period: *tapr_2024_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          title: Original TEA CSV and exact publisher selections
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          provenance_ids:
+          - 18d2bb2a10e749123e222407a3320faf942a3c2a444c6d9d46ecf18632f8b552
+          reviewed_sha256: 8470f7338dbd61f038b77055d56a1a6c63b8ac6a0f45f9dae3db0bd84949e9b3
+        - reference_id: dictionary
+          role: data_dictionary
+          title: TEA End-of-Course dictionary for this reporting level
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=C&dsname=STAAR_EOC&dd=performance&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          provenance_ids:
+          - aca5e72d3dedbba1998e6b89d7a8c2df588c64bfb899c92ed11990ef921f2c7c
+          reviewed_sha256: 4b38cb0f0615006b5d66019fdc3c04e403d13a442d90b472eaff0ba5f7801041
+        - *tapr_2024_staar_glossary
+        - *tapr_2024_staar_masking
+        - reference_id: named_report
+          role: source_notes
+          title: TEA STAAR Performance named End-of-Course rate witness
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&lev=C&id=227901002&prgopt=reports%2Ftapr%2Fperformance.sas
+          provenance_ids:
+          - fb1944c749316706057a3e6aa3104cec9bb345a5f1fcdb1e15c8556a4fd924bd
+          reviewed_sha256: b4641852cc836e5d48c69bef2024f4498b14d13f0f20fc54547fa064ecd16ede
+        - *tapr_2024_eoc_schema
+        notes: Publisher raw End-of-Course facts for this accountability reporting edition, including separate accelerated tester or SAT/ACT fields where offered. The
+          source reader retains raw publisher tokens and applies no value policy.
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--staar-end-of-course-crosswalk.json
+            tapr_source:
+              scope: campus
+              tables:
+                staar_end_of_course: *tapr_2024_eoc_campus_csv
+    2025:
+      path: &tapr_2025_eoc_campus_csv data/tapr/raw/2025-C-STAAR_EOC-offered.csv
+      metadata:
+        title: 2024–25 TAPR STAAR End-of-Course Performance (Campus)
+        publisher: Texas Education Agency
+        version: '2025'
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        period: *tapr_2025_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          title: Original TEA CSV and exact publisher selections
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          provenance_ids:
+          - c05eea988182e803a520efabdf4f254091d487e8a8b2c27c1ba6b3a81adb2ccc
+          reviewed_sha256: 2d567476b4eedff645d61bdcb22b534f3e8f262aec525f6ec7b64f94ceaa2751
+        - reference_id: dictionary
+          role: data_dictionary
+          title: TEA End-of-Course dictionary for this reporting level
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=C&dsname=STAAR_EOC&dd=performance&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          provenance_ids:
+          - 219a7fd5652320bcacc7688a959b8282e55c96f0eced5b86b1ed320294be311b
+          reviewed_sha256: a00378758382b0d3a0f9b23f23f7b57725b9bd407c73ae1da398c5d3e0e99a5b
+        - *tapr_2025_staar_glossary
+        - *tapr_2025_staar_masking
+        - reference_id: named_report
+          role: source_notes
+          title: TEA STAAR Performance named End-of-Course rate witness
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&lev=C&id=227901002&prgopt=reports%2Ftapr%2Fperformance.sas
+          provenance_ids:
+          - e9785b815c796d90943291f9398d66d09b15808004765a36af12dde4e02685fa
+          reviewed_sha256: f0f4bc3530b9340d0da4ac5abab45f6a193c3fc03f40aab24f68ba939ce38a74
+        - *tapr_2025_eoc_schema
+        notes: Publisher raw End-of-Course facts for this accountability reporting edition, including separate accelerated tester or SAT/ACT fields where offered. The
+          source reader retains raw publisher tokens and applies no value policy.
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2025--staar-end-of-course-crosswalk.json
+            tapr_source:
+              scope: campus
+              tables:
+                staar_end_of_course: *tapr_2025_eoc_campus_csv
     2026:
       path: &tapr_2026_staar_end_of_course_campus_csv data/tapr/raw/2026-C-STAAR_EOC-offered.csv
       metadata:
@@ -11791,6 +12259,102 @@ data_sources:
               tables:
                 staar_end_of_course: *tapr_2026_staar_end_of_course_campus_csv
   region_tapr_staar_end_of_course:
+    2024:
+      path: &tapr_2024_eoc_region_csv data/tapr/raw/2024-R-STAAR_EOC-offered.csv
+      metadata:
+        title: 2023–24 TAPR STAAR End-of-Course Performance (Region)
+        publisher: Texas Education Agency
+        version: '2024'
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        period: *tapr_2024_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          title: Original TEA CSV and exact publisher selections
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          provenance_ids:
+          - 44d83fd1f2aa8c94c58aeae9223336f3250a69343bed436ffac0c0c312c96ac2
+          reviewed_sha256: 4dd5d459662b8e853ce2c552dd25bbe64e500c0c9588e72d9d93241883bb704e
+        - reference_id: dictionary
+          role: data_dictionary
+          title: TEA End-of-Course dictionary for this reporting level
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=R&dsname=STAAR_EOC&dd=performance&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          provenance_ids:
+          - 1014564453fddac991fb94467441d8ded0ead2f36fb8866a5df8eda41b93263c
+          reviewed_sha256: 5ab9236d484671d0be7f510ddbb394c95fb9be10544cc509c1f4f721aad161c0
+        - *tapr_2024_staar_glossary
+        - *tapr_2024_staar_masking
+        - reference_id: named_report
+          role: source_notes
+          title: TEA STAAR Performance named End-of-Course rate witness
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&lev=R&id=13&prgopt=reports%2Ftapr%2Fperformance.sas
+          provenance_ids:
+          - 2b559a1306079e768a6186a38e9f45f909b04b884eaed0bfdc6e70c13d35ceed
+          reviewed_sha256: 38bf0807066ad4dde638c88e41e74a7542223d80487f4623abc9e5d6c1f61b4d
+        - *tapr_2024_eoc_schema
+        notes: Publisher raw End-of-Course facts for this accountability reporting edition, including separate accelerated tester or SAT/ACT fields where offered. The
+          source reader retains raw publisher tokens and applies no value policy.
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--staar-end-of-course-crosswalk.json
+            tapr_source:
+              scope: region
+              tables:
+                staar_end_of_course: *tapr_2024_eoc_region_csv
+    2025:
+      path: &tapr_2025_eoc_region_csv data/tapr/raw/2025-R-STAAR_EOC-offered.csv
+      metadata:
+        title: 2024–25 TAPR STAAR End-of-Course Performance (Region)
+        publisher: Texas Education Agency
+        version: '2025'
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        period: *tapr_2025_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          title: Original TEA CSV and exact publisher selections
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          provenance_ids:
+          - c392105b8827aca64f24c65565843ad4a7a76351e25715e24a8a86d0738bb87b
+          reviewed_sha256: fa7b57c96fb913916b91a55228f8dc07551fb3c8a648621a29dcdcd498f440ef
+        - reference_id: dictionary
+          role: data_dictionary
+          title: TEA End-of-Course dictionary for this reporting level
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=R&dsname=STAAR_EOC&dd=performance&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          provenance_ids:
+          - 2db54e6cde1a658f88fc7c98cc249a43d3e5a0f2ff56dcc2828b24a062975906
+          reviewed_sha256: 3f1a0a537761783ed312e464e54d5a188b3f950ba7d6dcce4f59b2730442c57d
+        - *tapr_2025_staar_glossary
+        - *tapr_2025_staar_masking
+        - reference_id: named_report
+          role: source_notes
+          title: TEA STAAR Performance named End-of-Course rate witness
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&lev=R&id=13&prgopt=reports%2Ftapr%2Fperformance.sas
+          provenance_ids:
+          - 1573110287d37bdf900a555d735f8e4e8494802bedf8205927399292481123eb
+          reviewed_sha256: e685ec0d8b53ae2442c35552370174d65bd227147d5cd060b990d1417ace8ca4
+        - *tapr_2025_eoc_schema
+        notes: Publisher raw End-of-Course facts for this accountability reporting edition, including separate accelerated tester or SAT/ACT fields where offered. The
+          source reader retains raw publisher tokens and applies no value policy.
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2025--staar-end-of-course-crosswalk.json
+            tapr_source:
+              scope: region
+              tables:
+                staar_end_of_course: *tapr_2025_eoc_region_csv
     2026:
       path: &tapr_2026_staar_end_of_course_region_csv data/tapr/raw/2026-R-STAAR_EOC-offered.csv
       metadata:

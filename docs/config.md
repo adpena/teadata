@@ -541,6 +541,27 @@ GRAD. Their original HTTP dates and annual context receipts remain immutable;
 the schema has its own genuine local observation. This registration supplies
 contracts, not prepared outputs, released/default facts or app activation.
 
+### 2025 TAPR attendance and dropout sources
+
+Use the `source` profile for edition `2025` of
+`campus_tapr_dropout_attendance` or `district_tapr_dropout_attendance`.
+The publisher's all-offered `DROP_ATT` export includes attendance, chronic
+absenteeism, and annual dropout for grades 7–8 and 9–12. The campus export has
+9,084 rows and 166 columns. The district export has 1,208 rows and 164 columns.
+Both scopes contain 162 fact fields. Geographic keys match the corresponding
+retained 2025 staff exports.
+
+The crosswalk preserves both literal CSV header records, dictionary occurrence
+order and source coordinates. The dictionary documents 108 fact fields at each
+scope. The remaining 54 retain unknown definitions. The raw contract keeps
+the publisher's `2024` and `SY 2023-24` labels and leaves reference periods,
+units and token interpretation unqualified.
+
+Use `--edition 2025 --family dropout_attendance` with the existing TAPR source
+preparation command. Supply the original CSVs and receipt store explicitly.
+The qualification compared every fact cell with separate publisher exports
+for the four offered groups.
+
 The 2024 `campus_tapr_four_year_longitudinal_rate` and
 `district_tapr_four_year_longitudinal_rate` source profiles retain the complete
 228/226-column COMP4 observations: 224 facts per scope and their original
@@ -1370,6 +1391,20 @@ districts and campuses.
 | `staar_participation` | `PART` | 2,106 |
 | `staar_bilingual_esl_performance` | `BIL1` | 527 |
 | `staar_bilingual_esl_growth` | `BIL2` | 270 |
+
+The End-of-Course family also supports exact editions 2024 and 2025 at all four
+reporting levels. Use `--family staar_end_of_course` and the corresponding
+`--edition`. Both retain one Texas row and 20 education service center rows.
+Edition 2024 retains 1,207 districts and 9,082 campuses with 1,092 fact columns
+per scope. Edition 2025 retains 1,208 districts and 9,084 campuses with 1,134
+fact columns per scope. The 2025 regional CSV has a wrapped label header that
+the crosswalk records as an exact preamble. Edition-specific dictionaries and
+masking references preserve the meanings and raw tokens of each source.
+Separate TEA reports verify all-student performance rates in the five EOC
+subjects for Texas, ESC Region 13, Austin ISD and Austin High School in each
+edition. These source profiles retain separate accelerated tester or SAT/ACT
+fields where offered. They expose raw observations for explicit selection and
+carry no statewide or cross-edition comparison policy.
 
 `STAAR_ALL` is the all-grades publisher file in the accountability reporting
 product. For the separate all-tested population, see TEA's all-tested reports.

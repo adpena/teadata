@@ -52,6 +52,7 @@ SOURCES = [
 ]
 NEW_DATASETS = {scope + '_tapr_' + family for scope, family, *_ in SOURCES}
 HISTORICAL_FAMILY_YEARS = {
+    'dropout_attendance': [2024, 2025],
     'four_year_longitudinal_rate': [2024, 2025],
     'staar_school_progress': [2024, 2026],
 }
@@ -124,8 +125,9 @@ def test_complete_source_only_discovery_and_typed_receipts_need_no_artifact_io(s
         catalog.policy(dataset)
     with pytest.raises(ContractError, match='Reader profile is required'):
         cfg.load_df(dataset, 2024)
-    if family == 'four_year_longitudinal_rate':
-        assert len(cfg.header_records(dataset, edition='2025', reader_profile='source')) == width
+    if family in {'dropout_attendance', 'four_year_longitudinal_rate'}:
+        expected_width = {'campus': 166, 'district': 164}[scope] if family == 'dropout_attendance' else width
+        assert len(cfg.header_records(dataset, edition='2025', reader_profile='source')) == expected_width
         assert cfg.is_source_only(dataset, 2025)
     else:
         with pytest.raises(ContractError, match='edition unavailable'):
@@ -231,6 +233,8 @@ STAAR_2026 = STAAR_TESTED_GRADES + [
     *((2024, *row) for row in STAAR_TESTED_GRADES_2024),
     *((2025, *row) for row in STAAR_TESTED_GRADES),
     *((2026, *row) for row in STAAR_2026),
+    (2024, 'staar_end_of_course', 'STAAR_EOC', 1092, 1134, 0),
+    (2025, 'staar_end_of_course', 'STAAR_EOC', 1134, 1176, 0),
 ])
 def test_staar_sources_keep_raw_scope_and_exact_receipts(
         year, family, publisher_file, facts, occurrences, undocumented, monkeypatch):
@@ -253,7 +257,7 @@ def test_staar_sources_keep_raw_scope_and_exact_receipts(
         assert metadata.version == str(year) and metadata.period.to_dict() == period
         assert not metadata.metrics and metadata.value_policy is None and metadata.estimation is None
         assert cfg.is_source_only(dataset, 2025) and cfg.is_source_only(dataset, 2026)
-        if family.startswith('staar_tested_grade_'):
+        if family.startswith('staar_tested_grade_') or publisher_file == 'STAAR_EOC':
             assert cfg.data_sources[dataset].available_years() == [2024, 2025, 2026]
         elif scope == 'region':
             assert cfg.data_sources[dataset].available_years() == [2026]
@@ -299,7 +303,7 @@ def test_staar_sources_keep_raw_scope_and_exact_receipts(
             dictionary_id, = references['dictionary'].provenance_ids
             params = parse_qs(urlsplit(graph[dictionary_id]['requested_url']).query)
             assert (params['ccyy'], params['sumlev'], params['dsname']) == ([str(year)], [letter], [publisher_file])
-        if year == 2024:
+        if year == 2024 and publisher_file != 'STAAR_EOC':
             witness_id, = references['state_report_witness'].provenance_ids
             witness_query = parse_qs(urlsplit(graph[witness_id]['requested_url']).query)
             assert (witness_query['ccyy'], witness_query['lev'], witness_query['id'], witness_query['prgopt']) == (
@@ -327,14 +331,21 @@ def test_staar_sources_keep_raw_scope_and_exact_receipts(
                 witnesses = [graph[record] for record in graph[schema_id]['source_metadata']['provenance_ids']
                              if graph[record]['artifact']['filename'].startswith(f'2024-{letter}-{publisher_file}-partition-')]
                 assert len(witnesses) == partitions
-        elif year == 2025:
+        elif year in (2024, 2025):
             witness_id, = references['named_report'].provenance_ids
             witness_query = parse_qs(urlsplit(graph[witness_id]['requested_url']).query)
             assert (witness_query['ccyy'], witness_query['lev'], witness_query['prgopt']) == (
-                ['2025'], [letter], ['reports/tapr/performance.sas'])
-            if scope == 'region':
-                assert witness_query['id'] == ['13']
-            assert all('SY 2024-25,' in field['label'] for field in fact_fields)
+                [str(year)], [letter], ['reports/tapr/performance.sas'])
+            expected_id = {'state': 'S', 'region': '13', 'district': '227901', 'campus': '227901002'}
+            if publisher_file == 'STAAR_EOC' or scope == 'region':
+                assert witness_query['id'] == [expected_id[scope]]
+            if year == 2025:
+                assert all('SY 2024-25,' in field['label'] for field in fact_fields)
+            if (year, scope, publisher_file) == (2025, 'region', 'STAAR_EOC'):
+                layout = request.mapping['layout']
+                assert (layout['label_record'], layout['code_record'], layout['first_data_record']) == (None, 3, 4)
+                preamble, = layout['annotations']
+                assert (preamble['kind'], preamble['first_record'], preamble['last_record']) == ('preamble', 1, 2)
         else:
             assert masking.status == 'unreviewed' and not masking.provenance_ids
             if scope == 'region':
@@ -392,6 +403,9 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
             dataset = f'{scope}_tapr_{family}'
             current['data_sources'][dataset].pop(2024)
             previous_tested_grades[dataset] = current['data_sources'][dataset]
+        historical_eoc = current['data_sources'][f'{scope}_tapr_staar_end_of_course']
+        for year in (2024, 2025):
+            assert historical_eoc.pop(year)['metadata']['version'] == str(year)
     assert sha256(canonical_json(previous_tested_grades).encode()).hexdigest() == '64178e073e15880351cfd020b6bb0c9d78b22c1d346fb5c1c81ce7f05975f0cb'
     for family, *_ in STAAR_2026:
         regional = 'region_tapr_' + family
@@ -461,6 +475,7 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
         assert list(current['data_sources'].pop(statewide)) == [2025]
         assert current['schema']['data_sources'].pop(statewide) == ['csv']
     for scope in ('campus', 'district'):
+        current['data_sources'][scope + '_tapr_dropout_attendance'].pop(2025)
         versions = current['data_sources'][scope + '_tapr_four_year_longitudinal_rate']
         versions.pop(2025)
         # The reviewed 2024 COMP4 metric bindings and report evidence have dedicated checks.
