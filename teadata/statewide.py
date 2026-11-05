@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal
 from functools import lru_cache
 from hashlib import sha256
+import json
 from math import isfinite
 from typing import TYPE_CHECKING, Any
 
@@ -20,6 +21,7 @@ from .peims_leaves import PRIMARY_DISABILITY, SCOPES_BY_DATASET, _key_columns
 from .staar_comparison import FAMILIES as STAAR_FAMILIES, staar_rate_contract
 from .tapr import tapr_source_identifiers
 from .teadata_config import load_config
+from . import tprs_students as students
 from .values import MeasurementUnit, TokenRule, ValuePolicy, ValueStatus, measure
 
 if TYPE_CHECKING:
@@ -111,14 +113,132 @@ class _Statistic:
 
 
 @dataclass(frozen=True)
+class _StudentContract:
+    scope: str
+    fields: Mapping[str, Mapping[str, Any]]
+    policy: ValuePolicy
+    columns: Mapping[str, tuple[str, ...]]
+    sources: Mapping[str, tuple[str, str]]
+    local_columns: Mapping[tuple[str, str], int]
+
+    def value(self, row: dict[str, Any], field: str, unit: str) -> tuple[str | None, str, Number | None]:
+        spec = self.fields[field]
+        raw_column, status_column, row_column, column_column, reason_column = self.columns[field]
+        raw, status, value = row[raw_column], row[status_column], row[field]
+        locator, column, reason = row[row_column], row[column_column], row[reason_column]
+        identifier = "S" if self.scope == "state" else row[f"{self.scope}_number"]
+        if ((row["tprs_report_receipt"], row["tprs_report_sha256"]) != self.sources.get(identifier)
+                or unit != spec["unit"]):
+            raise ContractError("Student comparison row differs from its exact source binding")
+        if raw is None:
+            if (self.scope != "campus" or spec["section"] != "Students by Grade"
+                    or status != "missing" or value is not None or locator is not None or column is not None
+                    or reason != "row_not_published"):
+                raise ContractError("Student comparison requires an explicit missing campus grade row")
+            return None, status, None
+        if (not isinstance(raw, str) or type(locator) is not int or locator <= 0
+                or type(column) is not int or column != self.local_columns[spec["population"], spec["quantity"]]):
+            raise ContractError("Student comparison requires exact raw tokens and local cell locators")
+        cell = students.StudentCell(spec["section"], spec["label"], spec["population"], spec["quantity"],
+                                    "local", raw, locator, column, field, None, students.PERIOD)
+        measured = cell.measurement(self.policy)
+        valid_type = type(value) is (int if unit == "count" else float) if status == "observed" else value is None
+        if (measured.status == ValueStatus.INVALID or measured.status.value != status
+                or not valid_type or measured.value != value or measured.reason != reason):
+            raise ContractError("Student comparison typed value differs from its retained token and status")
+        return raw, status, value
+
+
+def _reviewed_students(release: DataRelease, key: EditionKey) -> tuple[str, str, DatasetMetadata, str, _StudentContract]:
+    keys = [] if key.scope == "state" else [f"{key.scope}_number"]
+    grain = STATEWIDE_SINGLETON_GRAIN if not keys else f"one row per {keys[0]}"
+    if (key.dataset != students.DATASET or key.edition != str(students.EDITION)
+            or key.scope not in students.SCOPES or key.table != key.scope or key.grain != grain):
+        raise ContractError("Student comparison requires the reviewed edition, scope and grain")
+    config = load_config()
+    review = config.resolve_dataset(students.DATASET, students.EDITION, exact=True, reader_profile="source").metadata
+    metadata = release.catalog.metadata(key.dataset, edition=key)
+    # Selected coverage changes the genuine derived schema observation, not the
+    # field definitions, policy, or other publisher interpretation references.
+    expected = {ref.reference_id: ref for ref in review.references}
+    actual = {ref.reference_id: ref for ref in metadata.references}
+    if set(actual) != set(expected) or len(actual) != len(metadata.references):
+        raise ContractError("Student comparison requires the reviewed source references")
+    columns = actual["columns"]
+    if (replace(columns, path=expected["columns"].path, reviewed_sha256=expected["columns"].reviewed_sha256,
+                provenance_ids=expected["columns"].provenance_ids) != expected["columns"]
+            or any(actual[name] != ref for name, ref in expected.items() if name != "columns")
+            or replace(metadata, references=review.references) != review):
+        raise ContractError("Student comparison metadata differs from the packaged field contract")
+    if review.value_policy is None:
+        raise ContractError("Student comparison requires its reviewed disclosure policy")
+    policy = config.value_policies[review.value_policy]
+    if release.catalog.policy(key.dataset, edition=key) != policy:
+        raise ContractError("Student comparison requires the reviewed disclosure policy")
+    acquisitions = release.catalog.acquisitions(key.dataset, edition=key)
+    document = release.catalog.to_dict()
+    if document["schema_version"] == 4:
+        document = json.loads(release.catalog.edition_metadata_bytes(key.identity))
+    records = document["provenance"]  # Already closed and verified by DatasetCatalog.
+    hashes, sources = [], {}
+    for acquisition in acquisitions:
+        parameters = acquisition.get("parameters", {})
+        identifier = parameters.get("identifier")
+        students._identifier(key.scope, identifier)
+        original = parameters.get("original_download_receipt")
+        if (parameters.get("scope") != key.scope or identifier in sources
+                or original not in acquisition["source_metadata"].get("provenance_ids", ())):
+            raise ContractError("Student comparison requires exact original-report lineage and unique identifiers")
+        parent = records.get(original)
+        if (acquisition.get("method") != "local_observation" or parent is None
+                or any(acquisition["artifact"][name] != parent["artifact"][name] for name in ("sha256", "size_bytes"))):
+            raise ContractError("Student comparison requires a local observation of the exact original bytes")
+        digest = acquisition["artifact"]["sha256"]
+        students._validate_report_acquisition(parent, scope=key.scope, identifier=identifier, expected_sha256=digest)
+        hashes.append(digest)
+        sources[identifier] = original, digest
+    if key.revision_sha256 != EditionKey.source_revision(tuple(hashes)):
+        raise ContractError("Student comparison source revision differs from its ordered inputs")
+    fields = {field["field"]: field for field in students.semantic_fields()}
+    plans = release.catalog.resolve_artifacts([(key, field) for field in fields], period=students.PERIOD)
+    if len(plans) != 1:
+        raise ContractError("Student comparison requires one complete reviewed native leaf")
+    artifact = plans[0]["artifact"]
+    contract = artifact.contract
+    if (contract["inputs"] != hashes or contract["rows"] != len(sources)
+            or (key.scope == "state" and len(sources) != 1)):
+        raise ContractError("Student comparison leaf differs from its exact selected source coverage")
+    support = artifact.column_support
+    pointers = {}
+    for field in fields:
+        names = tuple(f"tprs_{kind}_{field}" for kind in ("raw", "status", "row", "column", "reason"))
+        expected_support = {"representation": "normalized", "raw": names[0], "status": names[1],
+                            "auxiliary": list(names[2:]), "context": ["tprs_report_receipt", "tprs_report_sha256", *keys]}
+        if support is None or support.projection(field) != expected_support:
+            raise ContractError("Student comparison requires the retained raw/status/locator support")
+        pointers[field] = names
+    table, = students._crosswalk({key.scope: hashes})["datasets"][0]["tables"]
+    mapping = sha256(canonical_json(table).encode()).hexdigest()
+    policy_hash = sha256(canonical_json(policy.to_dict()).encode()).hexdigest()
+    local_columns = {(population, quantity): index + 2
+                     for index, (population, quantity, role) in enumerate(students.definition()["column_roles"][key.scope])
+                     if role == "local"}
+    typed = _StudentContract(key.scope, fields, policy, pointers, sources, local_columns)
+    return key.revision_sha256, mapping, replace(review, references=metadata.references), policy_hash, typed
+
+
+@dataclass(frozen=True)
 class _Projection:
     artifact: ArtifactRef
     columns: tuple[str, ...]
     support: Mapping[str, tuple[str, str]]
     raw_policy: ValuePolicy | None
     integer_rates: bool = False
+    student: _StudentContract | None = None
 
-    def value(self, row: dict[str, Any], field: str, unit: str) -> tuple[str, str, Number | None]:
+    def value(self, row: dict[str, Any], field: str, unit: str) -> tuple[str | None, str, Number | None]:
+        if self.student is not None:
+            return self.student.value(row, field, unit)
         if self.raw_policy is not None:
             raw = row[field]
             if not isinstance(raw, str) or unit not in {"count", "percent"}:
@@ -143,7 +263,7 @@ class _Projection:
 
 def _projection(release: DataRelease, key: EditionKey, fields: list[tuple[str, DataPeriod]], *,
                 keys: list[str], mapping: str, policy: str | None, raw_policy: ValuePolicy | None,
-                integer_rates: bool = False) -> _Projection:
+                integer_rates: bool = False, student: _StudentContract | None = None) -> _Projection:
     by_period: dict[DataPeriod, list[tuple[EditionKey, str]]] = {}
     for field, period in fields:
         by_period.setdefault(period, []).append((key, field))
@@ -170,7 +290,7 @@ def _projection(release: DataRelease, key: EditionKey, fields: list[tuple[str, D
             if not {"raw", "status"} <= selected.keys():
                 raise ContractError("PEIMS comparison requires normalized values with raw and status support")
             field_support[field] = selected["raw"], selected["status"]
-    return _Projection(artifact, columns, field_support, raw_policy, integer_rates)
+    return _Projection(artifact, columns, field_support, raw_policy, integer_rates, student)
 
 
 def _statistics(local: EditionKey, local_metadata: DatasetMetadata,
@@ -208,6 +328,7 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
     local_metadata = catalog.metadata(local.dataset, edition=local)
     state_metadata = catalog.metadata(statewide.dataset, edition=statewide)
     raw_policy = None
+    left_student = right_student = None
     staar = local.table in STAAR_FAMILIES and local.table == statewide.table
     if staar:
         if local.grain != f"one row per {key_column}" or statewide.grain != STATEWIDE_SINGLETON_GRAIN or dimensions:
@@ -222,6 +343,12 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
             raise ContractError("STAAR comparison requires one reviewed same-edition rate policy")
         left_review, right_review = local_metadata, state_metadata
         left_policy = right_policy = None
+    elif local.dataset == statewide.dataset == students.DATASET:
+        if dimensions:
+            raise ContractError("Student comparison has no additional publisher dimensions")
+        local_keys, state_keys = [key_column], []
+        left_revision, left_mapping, left_review, left_policy, left_student = _reviewed_students(release, local)
+        right_revision, right_mapping, right_review, right_policy, right_student = _reviewed_students(release, statewide)
     elif course_pair or (local.dataset == statewide.dataset and local.dataset in SCOPES_BY_DATASET):
         scopes = {"state", "district"} if course_pair else SCOPES_BY_DATASET[local.dataset]
         if local.scope not in scopes or local.table != local.scope or statewide.table != "state":
@@ -259,10 +386,10 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
     statistics = _statistics(local, local_metadata, state_metadata, left_review, right_review, metric)
     return (statistics, _projection(release, local, [(stat.local_field, stat.period) for stat in statistics],
                                     keys=local_keys, mapping=left_mapping, policy=left_policy, raw_policy=raw_policy,
-                                    integer_rates=staar),
+                                    integer_rates=staar, student=left_student),
             _projection(release, statewide, [(stat.statewide_field, stat.period) for stat in statistics],
                         keys=state_keys, mapping=right_mapping, policy=right_policy, raw_policy=raw_policy,
-                        integer_rates=staar))
+                        integer_rates=staar, student=right_student))
 
 
 def compare_statewide(items: Sequence[object], *, release: DataRelease, local: EditionKey,

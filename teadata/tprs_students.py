@@ -195,20 +195,12 @@ def parse_student_report(raw: bytes, *, scope: str, identifier: str, receipt: st
     return StudentReport(scope, identifier, receipt, sha256(raw).hexdigest(), tuple(cells))
 
 
-def read_student_report(store: ProvenanceStore, receipt: str, *, scope: str, identifier: str,
-                        expected_sha256: str) -> StudentReport:
-    """Bind exact public request controls, receipt closure, bytes and geography."""
+def _validate_report_acquisition(record: Mapping[str, Any], *, scope: str, identifier: str,
+                                 expected_sha256: str) -> None:
+    """Check retained request metadata without opening or interpreting HTML."""
     _identifier(scope, identifier)
-    _need(isinstance(receipt, str) and isinstance(expected_sha256, str)
-          and _DIGEST.fullmatch(receipt) is not None and _DIGEST.fullmatch(expected_sha256) is not None,
-          "Student report requires exact receipt and content pins")
-    preliminary = store.read_record(receipt)
-    _need(preliminary.get("artifact", {}).get("sha256") == expected_sha256,
-          "Student report acquisition does not bind the exact public request")
-    size = preliminary.get("artifact", {}).get("size_bytes")
+    size = record.get("artifact", {}).get("size_bytes")
     _need(type(size) is int and 0 < size <= MAX_REPORT_BYTES, "Student report exceeds the bounded HTML size")
-    _need((store.root / "objects" / expected_sha256).stat().st_size == size, "Student report size differs")
-    record = store.verify_record_closure([receipt])[receipt]
     parameters = record["parameters"]
     url = urlsplit(record["requested_url"])
     query = parse_qsl(url.query, keep_blank_values=True)
@@ -228,6 +220,24 @@ def read_student_report(store: ProvenanceStore, receipt: str, *, scope: str, ide
           and record["response_headers"].get("content-type", "").split(";")[0] == "text/html"
           and bool(record["downloaded_at"]) and record["artifact"]["sha256"] == expected_sha256,
           "Student report acquisition does not bind the exact public request")
+
+
+def read_student_report(store: ProvenanceStore, receipt: str, *, scope: str, identifier: str,
+                        expected_sha256: str) -> StudentReport:
+    """Bind exact public request controls, receipt closure, bytes and geography."""
+    _identifier(scope, identifier)
+    _need(isinstance(receipt, str) and isinstance(expected_sha256, str)
+          and _DIGEST.fullmatch(receipt) is not None and _DIGEST.fullmatch(expected_sha256) is not None,
+          "Student report requires exact receipt and content pins")
+    preliminary = store.read_record(receipt)
+    _need(preliminary.get("artifact", {}).get("sha256") == expected_sha256,
+          "Student report acquisition does not bind the exact public request")
+    size = preliminary.get("artifact", {}).get("size_bytes")
+    _need(type(size) is int and 0 < size <= MAX_REPORT_BYTES, "Student report exceeds the bounded HTML size")
+    _need((store.root / "objects" / expected_sha256).stat().st_size == size, "Student report size differs")
+    record = store.verify_record_closure([receipt])[receipt]
+    _validate_report_acquisition(record, scope=scope, identifier=identifier, expected_sha256=expected_sha256)
+    parameters = record["parameters"]
     path = store.verify_artifact(expected_sha256)
     _need(path.stat().st_size == size, "Student report size differs")
     report = parse_student_report(_source_bytes(path, expected_sha256, size), scope=scope, identifier=identifier, receipt=receipt)

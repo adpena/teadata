@@ -45,6 +45,47 @@ the exact local source edition. Results retain both edition identities, the
 measurement period, raw tokens, value statuses and numeric values. A percent
 comparison exposes its difference in percentage points as `difference_pp`.
 
+Prepared [2026 TPRS student bundles](config.md#selected-2026-tprs-student-membership-and-enrollment-reports)
+use this same interface for all 168 reviewed Membership/Enrollment count and
+percent fields. Select the local and direct Texas editions from one explicit
+bundle; engine entities supply identifiers only, not observations from their
+own build. For example, with Austin ISD included in the selected intake:
+
+```python
+from teadata import DataRelease
+from teadata.dataset_metadata import EditionKey
+
+students = DataRelease("prepared/tprs-students-2026/release.json", offline=True)
+
+def student_edition(scope):
+    entry, = students.catalog.editions(
+        dataset="tprs_student_membership_enrollment_reports",
+        scope=scope, include_metadata=False,
+    )
+    return EditionKey.from_dict({name: entry[name] for name in EditionKey.__dataclass_fields__})
+
+result = (engine >> ("district", "227901")).compare_statewide(
+    release=students, local=student_edition("district"),
+    statewide=student_edition("state"),
+    metric="membership_total_students_count",
+).first()
+print(result.local_raw, result.statewide_raw, result.difference)
+```
+
+Both editions cover 2025–26 and use the same population and measure: Membership is not
+Enrollment. Published percentages use Total Students within that same
+population. Count differences remain counts; percent differences are percentage
+points. The Texas observation comes from its state report, never a sum of the
+selected local reports or an embedded benchmark. Omit `metric` for all 168 fields.
+
+Selected coverage remains explicit. An entity absent from the bundle is
+`unavailable`; an omitted campus grade row remains `missing`, with a null raw
+token, rather than zero. Private campuses are `not_applicable`. Masked and
+no-students tokens retain their separate statuses; a difference requires two
+observed values. CTE, grouped disability, lagged discipline and embedded
+benchmarks remain outside this comparison contract. No regional or longitudinal
+comparison, default engine activation, or statewide local-entity coverage is implied.
+
 For tested-grade STAAR, prepare a grade bundle containing the local and state
 scopes using the [source preparation workflow](config.md#tested-grade-staar-sources).
 Select exact catalog editions from that bundle. The example below uses a

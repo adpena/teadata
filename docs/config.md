@@ -1506,5 +1506,6 @@ Older retained acquisitions with unspecified year or HTTP method preserve
 those original limitations. Only after exact request and report validation does
 the builder create a parent-linked `local_observation` of the same bytes with
 the verified edition. Its new observation time is never a download timestamp.
-This command does not fetch TEA, activate a default engine, publish a release,
-bind statewide DSL comparisons or replace an application's saved exports.
+This command does not fetch TEA, activate a default engine, publish a release
+or replace an application's saved exports. Prepared local and direct Texas
+editions can be selected explicitly in [statewide comparisons](querying.md#compare-a-published-measure-with-texas).
