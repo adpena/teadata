@@ -29,7 +29,8 @@ TAPR_PROFILE_FAMILIES = ("student_staff_profile", "graduation_profile", "student
                          "annual_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla",
                          "longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla",
                          "5_year_extended_longitudinal_rate", "6_year_extended_longitudinal_rate",
-                         "college_career_military_readiness", "college_readiness_components")
+                         "college_career_military_readiness", "college_readiness_components",
+                         *(f"staar_tested_grade_{grade}" for grade in range(3, 9)))
 TAPR_SOURCE_KEYS = {"campus": "campus_number", "district": "district_number", "state": None}
 
 

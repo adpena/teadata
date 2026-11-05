@@ -391,14 +391,14 @@ Its verified schema-4 candidate is separate from the active snapshot and the
 profile supplement's `--native-release` gate.
 
 The TAPR command prepares every declared publisher column in the selected
-single-table family for both scopes into a **new** directory, validating all
-inputs before staging any output. Its
+single-table family for the requested geographies into a **new** directory.
+It validates all inputs before staging any output. Its
 Parquet files retain raw strings, source crosswalks, annotation records and
 immutable acquisition/processing receipts. Existing directories and retained
 reference workbooks are never replaced. These outputs are source preparations,
 not an activated release or typed scientific measurements. The old year-specific
-builder and the 75-column district renamer are retired; supported 2024 and 2025
-single-table families use this explicit preparation path.
+builder and the 75-column district renamer are retired. Supported single-table
+families use this explicit preparation path.
 
 `--reference-store` supplies the canonical acquisition receipts and exact bytes
 for established reference links. The producer retains only their selected
@@ -1280,6 +1280,35 @@ uv run python examples/restyle_existing_excel.py report.xlsx --sheet-name Sheet1
 Styling requires Excel and the optional `xlwings` package. The campus profile
 example's county-boundary default follows `TEADATA_DATA_DIR`; callers can still
 pass an explicit `counties_path`.
+
+### 2025–26 tested-grade STAAR sources
+
+The source profiles `{state,district,campus}_tapr_staar_tested_grade_{3..8}`
+select exact 2026 tested-grade STAAR extracts for the accountability subset.
+Each grade is a separate family and has one publisher table per geography.
+The state profile reads TEA's statewide row directly. The six grades share
+the same sets of 1,202 district IDs and 9,105 campus IDs in the retained exports.
+These counts describe the publisher's extracts, which can contain blank or
+withheld results for a particular grade or group.
+
+Prepare a grade using its exact retained CSVs and reference receipts.
+
+```bash
+uv run python -m teadata.scripts.build_tapr_profiles \
+  --edition 2026 --family staar_tested_grade_3 \
+  --scope state --scope district --scope campus --input-dir raw/ \
+  --reference-store provenance --output-dir prepared/staar-2026-grade-3
+```
+
+Use the resulting processing receipts with the raw-wide selection above to
+build a separate bundle for a grade. Select the bundle and geography explicitly.
+The source retains publisher column codes, dictionary definitions and raw
+strings, including blanks, `-1` and `-3`. These profiles define no masking policy,
+normalized metrics, or automatic statewide comparison. They are outside the
+default snapshot and entity enrichment.
+
+See [TEA's TPRS glossary](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/comprehensive-tprs-glossary.pdf#page=2)
+for the tested-grade population and how it differs from the all-tested reports.
 
 ### Annual and longitudinal graduation-program sources
 
