@@ -1319,6 +1319,7 @@ own publisher file and dictionary per geography.
 | `staar_grades_3_to_8` | `STAAR_GR38` | 300 |
 | `staar_all_grades` | `STAAR_ALL` | 945 |
 | `staar_end_of_course` | `STAAR_EOC` | 1,134 |
+| `staar_school_progress` | `STAAR_SP` | 2,304 |
 | `staar_participation` | `PART` | 2,106 |
 | `staar_bilingual_esl_performance` | `BIL1` | 527 |
 | `staar_bilingual_esl_growth` | `BIL2` | 270 |
@@ -1329,8 +1330,12 @@ The bilingual and ESL dictionaries leave 72 performance fields and 36 growth
 fields per scope undocumented. The crosswalk retains those fields and their
 raw values with explicit dictionary status. Some publisher codes recur across
 families. Keep those source identities when selecting a bundle for analysis.
-For the participation file, prepare and publish one geography per candidate.
-Putting all three geographies in one schema 3 manifest exceeds its size limit.
+For the participation and school-progress files, prepare and publish one
+geography per candidate to stay within the schema 3 manifest size limit.
+The school-progress crosswalk pins both records of TEA's wrapped label header
+as original preamble bytes and uses the third record as the code header.
+It retains the original label text and links the smaller publisher exports
+that independently reproduced every fact cell.
 
 ### Annual and longitudinal graduation-program sources
 

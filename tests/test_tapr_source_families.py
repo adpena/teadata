@@ -50,6 +50,10 @@ SOURCES = [
     *EXTENDED_SOURCES,
 ]
 NEW_DATASETS = {scope + '_tapr_' + family for scope, family, *_ in SOURCES}
+HISTORICAL_FAMILY_YEARS = {
+    'four_year_longitudinal_rate': [2024, 2025],
+    'staar_school_progress': [2024, 2026],
+}
 
 
 @pytest.fixture(autouse=True)
@@ -75,8 +79,7 @@ def test_complete_source_only_discovery_and_typed_receipts_need_no_artifact_io(s
     assert len(metadata.metrics) == expected_metrics and metadata.provenance_ids == (raw_id,)
     _validate_methodology(metadata, None)
     assert cfg.is_source_only(dataset, 2024) and cfg.column_schema(dataset, 2024) is None
-    assert cfg.availability_report()['data_sources'][dataset]['years'] == (
-        [2024, 2025] if family == 'four_year_longitudinal_rate' else [2024])
+    assert cfg.availability_report()['data_sources'][dataset]['years'] == HISTORICAL_FAMILY_YEARS.get(family, [2024])
     assert cfg.reader_references(dataset, 2024, reader_profile='source') == list(metadata.references)
     roots = [raw_id, *(identifier for ref in metadata.references for identifier in ref.provenance_ids)]
     graph = validate_record_graph(store.read_record, roots)
@@ -185,8 +188,8 @@ def test_unknowns_and_reviewed_names_cannot_be_repaired_by_alias_or_inference(da
 def test_current_source_contracts_keep_explicit_edition_csv_opt_ins():
     current = yaml.safe_load((ROOT / 'teadata/teadata_sources.yaml').read_text())
     for dataset in NEW_DATASETS:
-        assert list(current['data_sources'].pop(dataset)) == (
-            [2024, 2025] if dataset.endswith('_tapr_four_year_longitudinal_rate') else [2024])
+        family = dataset.split('_tapr_', 1)[1]
+        assert list(current['data_sources'].pop(dataset)) == HISTORICAL_FAMILY_YEARS.get(family, [2024])
         assert current['schema']['data_sources'].pop(dataset) == ['csv']
     # Full pre-change Config preservation has one current baseline owner below.
 
@@ -201,6 +204,7 @@ STAAR_2026 = [
     ('staar_grades_3_to_8', 'STAAR_GR38', 300, 312, 0),
     ('staar_all_grades', 'STAAR_ALL', 945, 980, 0),
     ('staar_end_of_course', 'STAAR_EOC', 1134, 1176, 0),
+    ('staar_school_progress', 'STAAR_SP', 2304, 2400, 0),
     ('staar_participation', 'PART', 2106, 2106, 0),
     ('staar_bilingual_esl_performance', 'BIL1', 527, 455, 72),
     ('staar_bilingual_esl_growth', 'BIL2', 270, 234, 36),
@@ -256,6 +260,18 @@ def test_staar_sources_keep_raw_scope_and_exact_receipts(
         controls = dict(raw['parameters']['form_controls'])
         assert (controls['ccyy'], controls['sumlev'], controls['dsname'], controls['datafmt']) == (
             '2026', letter, publisher_file, 'csv')
+        if publisher_file == 'STAAR_SP':
+            layout = request.mapping['layout']
+            assert (layout['label_record'], layout['code_record'], layout['first_data_record']) == (None, 3, 4)
+            preamble, = layout['annotations']
+            assert (preamble['kind'], preamble['first_record'], preamble['last_record']) == ('preamble', 1, 2)
+            assert sum(field['label'].startswith('\n') for field in fact_fields) == 2
+            schema_id, = references['columns_source'].provenance_ids
+            witnesses = [graph[record] for record in graph[schema_id]['source_metadata']['provenance_ids']
+                         if '-batch-' in graph[record]['artifact']['filename']]
+            assert len(witnesses) == 12
+            assert {scope: sum(dict(record['parameters']['form_controls'])['sumlev'] == scope
+                               for record in witnesses) for scope in 'SDC'} == dict.fromkeys('SDC', 4)
         dictionary = request.mapping['dictionary_records']
         assert len(dictionary) == occurrences
         assert {record['source_sha256'] for record in dictionary} == {references['dictionary'].reviewed_sha256}
@@ -269,6 +285,10 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     for scope in ('state', 'district', 'campus'):
         for family, *_ in STAAR_2026:
             dataset = f'{scope}_tapr_{family}'
+            if family == 'staar_school_progress' and scope != 'state':
+                assert list(current['data_sources'][dataset]) == [2024, 2026]
+                current['data_sources'][dataset].pop(2026)
+                continue
             assert list(current['data_sources'].pop(dataset)) == [2026]
             assert current['schema']['data_sources'].pop(dataset) == ['csv']
     # District transfers have an independent source contract and native writer.

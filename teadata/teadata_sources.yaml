@@ -4610,6 +4610,77 @@ data_sources:
               status: available
               provenance_ids: []
               reviewed_sha256: bf848a6c47d7f5ed783b57d862d4fcaefced1e2988b65b75c13abddcd998ec98
+  state_tapr_staar_school_progress:
+    2026:
+      path: &tapr_2026_staar_school_progress_state_csv data/tapr/raw/2026-STAAR_SP-offered.csv
+      metadata:
+        title: "2025–26 TPRS STAAR School Progress (State)"
+        publisher: Texas Education Agency
+        version: '2026'
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        period: &tapr_2026_staar_period {kind: school_year, start_year: 2025, end_year: 2026}
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+          title: "Original TEA CSV with exact submitted form controls"
+          status: available
+          provenance_ids:
+          - ba0e2790c6d7e9142c5b4c63b8a2c90da357a763c1ce23c46b866e2c127cb819
+          reviewed_sha256: 2f268a563fcd2ae353d027fd77848e49495bba3e739b9166c43156d5d078d516
+        - reference_id: dictionary
+          role: data_dictionary
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2026&sumlev=S&dsname=STAAR_SP&dd=progress&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+          title: "TEA data dictionary for the publisher file and geography"
+          status: available
+          provenance_ids:
+          - f2b4e0062b0cf66615a1e56397a74063b3faeb052981fd24a069bf53b5ad44a4
+          reviewed_sha256: a56121bd586e3214f62396b096d0673ceabd7f3fe65988935fe1f66191cec6b9
+        - &tapr_2026_staar_glossary
+          reference_id: glossary
+          role: glossary
+          url: "https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/comprehensive-tprs-glossary.pdf"
+          title: "TEA comprehensive TPRS glossary"
+          status: available
+          provenance_ids:
+          - 075b06040a75b5cff9d50364d21de15d6ea0886812dd87bd886b512c109328a3
+          reviewed_sha256: 8fb51b87853918759ab321d5522ab9f56b8ac318c7d856f5f6f43e947b8a80bb
+        - &tapr_2026_staar_release_guide
+          reference_id: release_guide
+          role: source_notes
+          url: "https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/tprs-user-guide-2026.pdf"
+          title: "TEA TPRS user guide and release schedule"
+          status: available
+          provenance_ids:
+          - f6a2d6f9390bfcf8d01d624db953d9ddadc00ef75e8858abf50d9a46a71ae012
+          reviewed_sha256: 911ca6bdfeef3f1780ddcc6fadce1a57bebd95872945bc793c9a177fcd038cf8
+        - &tapr_2026_staar_masking
+          reference_id: masking
+          role: masking_methodology
+          status: unreviewed
+        - &tapr_2026_staar_school_progress_schema
+          reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2026--staar-school-progress-crosswalk.json
+          title: "TEA Data raw source and publisher header crosswalk"
+          status: available
+          provenance_ids:
+          - 88f846ef829fa653823645e2995a299e140ee592b9e0a64747cb78bd99d66c45
+          reviewed_sha256: 6f0039e2f0e28d1ed616fcf692e2fa833519c0ff1de13e7912b904cac3053392
+        notes: &tapr_2026_staar_notes >-
+          The publisher's STAAR extract retains all original field tokens as
+          strings. The source profile and native leaf are explicit opt-ins.
+          Numeric interpretation and masking rules require separate qualification.
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2026--staar-school-progress-crosswalk.json
+            tapr_source:
+              scope: state
+              tables:
+                staar_school_progress: *tapr_2026_staar_school_progress_state_csv
   campus_tapr_staar_school_progress:
     2024:
       path: data/tapr/raw/2024-campus-staar-school-progress.csv
@@ -4710,6 +4781,46 @@ data_sources:
               scope: campus
               tables:
                 staar_school_progress: data/tapr/raw/2024-campus-staar-school-progress.csv
+    2026:
+      path: &tapr_2026_staar_school_progress_campus_csv data/tapr/raw/2026-C-STAAR_SP-offered.csv
+      metadata:
+        title: "2025–26 TPRS STAAR School Progress (Campus)"
+        publisher: Texas Education Agency
+        version: '2026'
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        period: *tapr_2026_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+          title: "Original TEA CSV with exact submitted form controls"
+          status: available
+          provenance_ids:
+          - 08a3e337ef9335625d1a5c4c14e06d535d9f4b172f09c5fab56960462138b570
+          reviewed_sha256: 8576715faad11af68ba0f32063f45e034860b3eaec318ecce924b137b7bfe4c1
+        - reference_id: dictionary
+          role: data_dictionary
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2026&sumlev=C&dsname=STAAR_SP&dd=progress&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+          title: "TEA data dictionary for the publisher file and geography"
+          status: available
+          provenance_ids:
+          - 74bfd08acba883bd8ae3ce3bb9edc9c42a43931252d5edd741f795dea06ef281
+          reviewed_sha256: b9c26c0b1514368adc6a11d81717f151b434a0fe2b4777dc6626e832aed5a837
+        - *tapr_2026_staar_glossary
+        - *tapr_2026_staar_release_guide
+        - *tapr_2026_staar_masking
+        - *tapr_2026_staar_school_progress_schema
+        notes: *tapr_2026_staar_notes
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2026--staar-school-progress-crosswalk.json
+            tapr_source:
+              scope: campus
+              tables:
+                staar_school_progress: *tapr_2026_staar_school_progress_campus_csv
   district_tapr_staar_school_progress:
     2024:
       path: data/tapr/raw/2024-district-staar-school-progress.csv
@@ -4811,6 +4922,46 @@ data_sources:
               scope: district
               tables:
                 staar_school_progress: data/tapr/raw/2024-district-staar-school-progress.csv
+    2026:
+      path: &tapr_2026_staar_school_progress_district_csv data/tapr/raw/2026-D-STAAR_SP-offered.csv
+      metadata:
+        title: "2025–26 TPRS STAAR School Progress (District)"
+        publisher: Texas Education Agency
+        version: '2026'
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        period: *tapr_2026_staar_period
+        value_policy: null
+        metrics: {}
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+          title: "Original TEA CSV with exact submitted form controls"
+          status: available
+          provenance_ids:
+          - a94bfdb64bac5947903f2e0841fdc9bd9c71d66c6df510d173306926bd8db824
+          reviewed_sha256: 2f5fd05c43a40bbb6fd703ddb9a20ed3084e8a7e26fa1e68c7d7ee7414d0c18b
+        - reference_id: dictionary
+          role: data_dictionary
+          url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2026&sumlev=D&dsname=STAAR_SP&dd=progress&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+          title: "TEA data dictionary for the publisher file and geography"
+          status: available
+          provenance_ids:
+          - 86b3e19d9aaf8cd8dc68d771f7b11a8e0603a5e7c641aca1d3c1312c6193b0e0
+          reviewed_sha256: bbb6c5f63d4cf4399d115c95143f12e4a6a6cfb3189fdcb23a82cf33af5f6f8d
+        - *tapr_2026_staar_glossary
+        - *tapr_2026_staar_release_guide
+        - *tapr_2026_staar_masking
+        - *tapr_2026_staar_school_progress_schema
+        notes: *tapr_2026_staar_notes
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2026--staar-school-progress-crosswalk.json
+            tapr_source:
+              scope: district
+              tables:
+                staar_school_progress: *tapr_2026_staar_school_progress_district_csv
   campus_tapr_four_year_longitudinal_rate:
     2024:
       path: data/tapr/raw/2024-c-COMP4.csv
@@ -7884,7 +8035,7 @@ data_sources:
         publisher: Texas Education Agency
         version: '2026'
         source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
-        period: &tapr_2026_staar_period {kind: school_year, start_year: 2025, end_year: 2026}
+        period: *tapr_2026_staar_period
         value_policy: null
         metrics: {}
         references:
@@ -7904,28 +8055,9 @@ data_sources:
           provenance_ids:
           - d3d98e459ac630f05fb6055c03fd8dc5450cd0df45f0179cb76785c027a3b718
           reviewed_sha256: 0f38d8f31d01ecc6293591456ba23144376d217a53a4796c70076647de019df4
-        - &tapr_2026_staar_glossary
-          reference_id: glossary
-          role: glossary
-          url: "https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/comprehensive-tprs-glossary.pdf"
-          title: "TEA comprehensive TPRS glossary"
-          status: available
-          provenance_ids:
-          - 075b06040a75b5cff9d50364d21de15d6ea0886812dd87bd886b512c109328a3
-          reviewed_sha256: 8fb51b87853918759ab321d5522ab9f56b8ac318c7d856f5f6f43e947b8a80bb
-        - &tapr_2026_staar_release_guide
-          reference_id: release_guide
-          role: source_notes
-          url: "https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/tprs-user-guide-2026.pdf"
-          title: "TEA TPRS user guide and release schedule"
-          status: available
-          provenance_ids:
-          - f6a2d6f9390bfcf8d01d624db953d9ddadc00ef75e8858abf50d9a46a71ae012
-          reviewed_sha256: 911ca6bdfeef3f1780ddcc6fadce1a57bebd95872945bc793c9a177fcd038cf8
-        - &tapr_2026_staar_masking
-          reference_id: masking
-          role: masking_methodology
-          status: unreviewed
+        - *tapr_2026_staar_glossary
+        - *tapr_2026_staar_release_guide
+        - *tapr_2026_staar_masking
         - &tapr_2026_staar_grade_3_schema
           reference_id: columns_source
           role: schema
@@ -7935,10 +8067,7 @@ data_sources:
           provenance_ids:
           - a853880e266ad7c81dd510d021efb1b647e0beaeb38df08cd7544acaabad0c26
           reviewed_sha256: 6db6bd51295e1378da22a95106e17bbaa6ebdcfde8e70cf8ffc097a2ea079e8e
-        notes: &tapr_2026_staar_notes >-
-          The publisher's STAAR extract retains all original field tokens as
-          strings. The source profile and native leaf are explicit opt-ins.
-          Numeric interpretation and masking rules require separate qualification.
+        notes: *tapr_2026_staar_notes
       reader:
         profiles:
           source:
@@ -12294,6 +12423,8 @@ schema:
     campus_tapr_graduation_profile:
     - csv
     district_tapr_graduation_profile:
+    - csv
+    state_tapr_staar_school_progress:
     - csv
     campus_tapr_staar_school_progress:
     - csv
