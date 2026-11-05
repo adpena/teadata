@@ -4346,7 +4346,7 @@ wheels = [
 
 [[package]]
 name = "teadata"
-version = "0.0.128"
+version = "0.0.129"
 source = { editable = "." }
 dependencies = [
     { name = "certifi" },

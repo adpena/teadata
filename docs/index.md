@@ -22,7 +22,7 @@ uv sync
 Select a published version and retain your application's lockfile:
 
 ```bash
-uv add "teadata==0.0.128"
+uv add "teadata==0.0.129"
 ```
 
 ### 3) Load the configured release
