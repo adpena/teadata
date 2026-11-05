@@ -6650,46 +6650,6 @@ data_sources:
         metrics: {}
       reader:
         column_schema: schemas/data_sources--campus_planned_closures--2025--default.json
-  tepsac:
-    2025:
-      path: data/tepsac/tepsac_geocoded_FINAL.csv
-      metadata:
-        title: Tepsac
-        publisher: Texas Private School Accreditation Commission
-        version: '2025'
-        period:
-          kind: unknown
-        identifiers: []
-        notes: Migrated local input. Original download timestamp and acquisition URL
-          are unknown; local observation must not be presented as an original download.
-        provenance_ids:
-        - f28b6ae19f550a8243d84adb50f8bc63a974d6ecdfac72b8bf897d8b568b5611
-        - f5d62240acddb207b6cab8a8868777a6a5b6e38e7ae0e8351c28cb4c51b9c812
-        references:
-        - reference_id: dictionary
-          role: data_dictionary
-          status: unreviewed
-          provenance_ids: []
-        - reference_id: masking
-          role: masking_methodology
-          status: unreviewed
-          provenance_ids: []
-        - reference_id: columns_default
-          role: schema
-          path: schemas/data_sources--tepsac--2025--default.json
-          title: TEA Data tepsac 2025 default reader column baseline; not a publisher
-            dictionary
-          status: available
-          provenance_ids:
-          - 24bebb67959b9990b18feaf6f9150390828b1c7f732e5b9ec7f3ed9558939cce
-          reviewed_sha256: 7ab1456b60ddb2144f3b0339194cbaf0c5f05e32f6c09fbb9f3d4ef532d50ecb
-        value_policy: numeric
-        metrics: {}
-      reader:
-        dtype:
-          district_number: str
-          school_number: str
-        column_schema: schemas/data_sources--tepsac--2025--default.json
   tefa:
     2025:
       path: data/tefa/tx_efa_finder.xlsx
@@ -15246,8 +15206,6 @@ schema:
     - xlsx
     campus_planned_closures:
     - xlsx
-    tepsac:
-    - csv
     tefa:
     - xlsx
     - json

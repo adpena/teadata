@@ -24,7 +24,7 @@ PyYAML's supported pure Python implementation is tested on 3.15.
 
 ```bash
 uv venv
-uv pip install teadata==0.0.130
+uv pip install teadata==0.0.131
 ```
 
 ### Development (recommended)

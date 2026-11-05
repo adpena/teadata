@@ -471,6 +471,26 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
         current['schema']['data_sources'].pop(dataset)
     # Exclude the deliberately revised TAPR entries and official private roster.
     # Their mappings, periods and provenance have dedicated source-grounded checks.
+    # Reconstruct the retired TEPSAC raw-reader declaration only for the historical
+    # fingerprint. Its immutable observation preserves an unknown period; the old
+    # 2025 catalog key is not evidence of a measurement school year.
+    assert 'tepsac' not in current['data_sources'] and 'tepsac' not in current['schema']['data_sources']
+    retired_id = 'f5d62240acddb207b6cab8a8868777a6a5b6e38e7ae0e8351c28cb4c51b9c812'
+    retired = ProvenanceStore(ROOT / 'provenance').read_record(retired_id)
+    assert retired['dataset'] == 'tepsac' and retired['method'] == 'local_observation'
+    assert retired['artifact']['sha256'] == 'f378d8e2fb2994223cad5c652c80f55b7319632f2d2627622d3afccaa9c18820'
+    retired_metadata = deepcopy(retired['source_metadata'])
+    assert retired_metadata['period'] == {'kind': 'unknown'}
+    retired_metadata['provenance_ids'] = [
+        'f28b6ae19f550a8243d84adb50f8bc63a974d6ecdfac72b8bf897d8b568b5611', retired_id,
+    ]
+    retired_schema, = [ref for ref in retired_metadata['references'] if ref['reference_id'] == 'columns_default']
+    current['data_sources']['tepsac'] = {2025: {
+        'path': 'data/tepsac/' + retired['artifact']['filename'], 'metadata': retired_metadata,
+        'reader': {'dtype': {'district_number': 'str', 'school_number': 'str'},
+                   'column_schema': retired_schema['path']},
+    }}
+    current['schema']['data_sources']['tepsac'] = ['csv']
     # Freeze all remaining cd837181 content, including 2024 and legacy bindings.
     for scope in ('campus', 'district'):
         for family in ('student_staff_profile', 'student_profile'):

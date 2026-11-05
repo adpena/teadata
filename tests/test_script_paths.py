@@ -19,9 +19,7 @@ SCRIPT_MODULES = [
     "build_tapr_profiles",
     "download_campus_peims_financials",
     "flatten_districts_geojson",
-    "geocode_tepsac_data",
     "rename_tapr_campus_headers",
-    "rename_tepsac_headers",
 ]
 
 
@@ -82,30 +80,10 @@ def test_excel_example_help_does_not_require_excel(tmp_path):
     assert not list(tmp_path.iterdir())
 
 
-def test_geocoder_help_does_not_import_processing_dependencies(tmp_path):
-    probe = """
-import sys
-
-class RejectProcessingImports:
-    def find_spec(self, fullname, *_):
-        if fullname.split(".")[0] in {"aiohttp", "geopy", "pandas", "requests", "tqdm"}:
-            raise AssertionError(f"Geocoder help imported {fullname}")
-
-sys.meta_path.insert(0, RejectProcessingImports())
-from teadata.scripts.geocode_tepsac_data import main
-main(["--help"])
-"""
-    result = subprocess.run([sys.executable, "-c", probe], cwd=tmp_path, capture_output=True, text=True, timeout=20)
-    assert result.returncode == 0, result.stderr
-    assert "--output" in result.stdout
-
-
 @pytest.mark.parametrize(
     "module",
     [
         "download_campus_peims_financials",
-        "geocode_tepsac_data",
-        "rename_tepsac_headers",
     ],
 )
 def test_importing_scripts_does_not_read_source_files(monkeypatch, tmp_path, module):
@@ -120,79 +98,6 @@ def test_importing_scripts_does_not_read_source_files(monkeypatch, tmp_path, mod
     read_csv.assert_not_called()
     read_excel.assert_not_called()
     assert not list(tmp_path.iterdir())
-
-
-@pytest.mark.parametrize("explicit_paths", [False, True])
-def test_tepsac_conversion_uses_selected_paths(monkeypatch, tmp_path, explicit_paths):
-    from teadata.scripts.rename_tepsac_headers import main
-
-    root = tmp_path / "datasets"
-    source = root / "tepsac" / "tepsac_geocoded.csv"
-    source.parent.mkdir(parents=True)
-    pd.DataFrame(
-        [
-            {
-                "School Name": "Example School",
-                "School Number": 123,
-                "Grade Low": "K",
-                "Grade High": "12",
-                "Enrollment": 100,
-                "School Full Address": "Example address",
-                "School Website": "",
-                "School Accreditations": "",
-                "District Number": 456,
-                "Best Lat": 30.0,
-                "Best Lng": -97.0,
-                "Best Provider": "fixture",
-            }
-        ]
-    ).to_csv(source, index=False)
-    monkeypatch.chdir(tmp_path)
-    if explicit_paths:
-        monkeypatch.setenv("TEADATA_DATA_DIR", str(tmp_path / "unused"))
-        output = tmp_path / "output" / "schools.csv"
-        main(["--input", str(source), "--output", str(output)])
-    else:
-        monkeypatch.setenv("TEADATA_DATA_DIR", str(root))
-        output = root / "tepsac" / "tepsac_geocoded_FINAL.csv"
-        main([])
-
-    result = pd.read_csv(output)
-    assert result.loc[0, "school_name"] == "Example School"
-    assert result.loc[0, "school_number"] == "'000000123"
-    assert result.loc[0, "district_number"] == "'000456"
-
-
-def test_geocoder_uses_explicit_paths_with_stubbed_providers(monkeypatch, tmp_path):
-    from teadata.scripts import geocode_tepsac_data as script
-
-    source = tmp_path / "schools.xlsx"
-    output = tmp_path / "output" / "geocoded.csv"
-    pd.DataFrame(
-        [
-            {
-                "Closed": False,
-                "School Street": "123 Example St",
-                "School City": "Austin",
-                "School State": "TX",
-                "School Zip": "78701",
-            }
-        ]
-    ).to_excel(source, index=False)
-
-    async def results(addresses):
-        return {
-            address: {"arcgis": {"lat": 30.0, "lng": -97.0, "score": 99}}
-            for address in addresses
-        }
-
-    monkeypatch.setattr(script, "build_results_map_with_progress", results)
-    monkeypatch.setenv("TEADATA_DATA_DIR", str(tmp_path / "unused"))
-    script.main(["--input", str(source), "--output", str(output)])
-
-    result = pd.read_csv(output)
-    assert result.loc[0, "Best Provider"] == "arcgis"
-    assert result.loc[0, "Best Lat"] == 30.0
 
 
 @pytest.mark.parametrize("write_failure", [False, True, "missing_reference_store"])

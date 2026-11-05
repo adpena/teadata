@@ -89,8 +89,10 @@ def citation(release: DataRelease | None = None) -> Citation:
         if label == "Homepage"
     )
     manifest_url = None
+    # Named manifests are adjacent, portable ASCII basenames of at most 255 bytes.
     if release is not None and re.fullmatch(
-        re.escape(repository_url) + r"/releases/download/v[0-9]+\.[0-9]+\.[0-9]+/release\.json",
+        re.escape(repository_url) + r"/releases/download/v[0-9]+\.[0-9]+\.[0-9]+/"
+        r"(?:release\.json|[A-Za-z0-9][A-Za-z0-9_-]{0,241}\.release\.json)",
         release.source,
     ):
         manifest_url = release.source

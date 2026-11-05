@@ -2744,7 +2744,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
             repo = _build_repo(districts_fp, campuses_fp, cfg_obj=cfg)
             expected = (
                 ({name for name in cfg.data_sources
-                  if not cfg.is_source_only(name, YEAR)} - {"tepsac", "tefa"})
+                  if not cfg.is_source_only(name, YEAR)} - {"tefa"})
                 | {cfg.options["private_dataset"]}
                 | set(cfg.spatial)
             )

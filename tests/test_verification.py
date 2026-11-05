@@ -33,6 +33,37 @@ def passing():
     return [Check("example", ("@python", "-c", "print('checked')"))]
 
 
+@pytest.mark.parametrize("kind,override,expected", [
+    ("library", None, 3600), ("app", None, 900), ("library", "42", 42),
+])
+def test_cli_passes_the_appropriate_runtime_budget_to_checks(tmp_path, monkeypatch, kind, override, expected):
+    captured = []
+    receipt = tmp_path / "receipt.json"
+    receipt.write_text(json.dumps({"status": "passed"}))
+
+    def run(_root, **options):
+        captured.append(options["timeout"])
+        return receipt
+
+    monkeypatch.setattr("teadata.verification.run_checks", run)
+    arguments = ["verification", "--kind", kind, "--root", str(tmp_path)]
+    if override is not None:
+        arguments.extend(("--timeout", override))
+    monkeypatch.setattr(sys, "argv", arguments)
+    main()
+    assert captured == [expected]
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "nan", "inf", "-inf"])
+def test_cli_refuses_unbounded_or_nonpositive_budgets_before_running_checks(tmp_path, monkeypatch, value):
+    monkeypatch.setattr("teadata.verification.run_checks", lambda *a, **k: pytest.fail("Started invalid budget"))
+    monkeypatch.setattr(sys, "argv", ["verification", "--kind", "library", "--root", str(tmp_path),
+                                      "--timeout=" + value])
+    with pytest.raises(SystemExit) as error:
+        main()
+    assert error.value.code == 2
+
+
 def test_real_push_hook_checks_foreign_repositories_without_mutating_owner(tmp_path):
     from teadata import verification
 

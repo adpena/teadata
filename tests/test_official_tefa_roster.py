@@ -118,6 +118,20 @@ def test_private_selection_is_independent_of_public_build_year(cfg, monkeypatch)
     assert {campus.meta["private_source_version"] for campus in repo._campuses.values()} == {"2026-27"}
 
 
+def test_retired_tepsac_reader_fails_before_io_without_rebinding_to_tefa(monkeypatch):
+    config = load_config(ROOT / "teadata/teadata_sources.yaml")
+    assert "tepsac" not in config.data_sources
+    assert "tepsac" not in config.schema.data_sources
+    assert config.options["private_dataset"] == "tefa"
+    assert config.resolve_dataset("tefa").metadata.publisher == "Texas Comptroller of Public Accounts"
+    monkeypatch.setattr(config, "_load_table", lambda *a, **k: pytest.fail("Retired reader performed source I/O"))
+    with pytest.raises(KeyError, match="tepsac"):
+        config.load_df("tepsac", 2025)
+    config.options["private_dataset"] = "tepsac"
+    with pytest.raises(ContractError, match="supported opaque identity contract"):
+        _load_private_entities(DataEngine(), config)
+
+
 @pytest.mark.parametrize("field,value", [
     ("vendorType", "Other"), ("vendorTypes", ["Other"]),
     ("type", "Public School"), ("costOptions", "EFA-Pending"),

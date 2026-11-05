@@ -313,12 +313,12 @@ Set `TEADATA_DATA_DIR` to point the scripts at an existing source-data tree:
 
 ```bash
 export TEADATA_DATA_DIR="$HOME/datasets/teadata"
-uv run python -m teadata.scripts.rename_tepsac_headers
+uv run python -m teadata.scripts.rename_tapr_campus_headers
 uv run python -m teadata.scripts.build_tapr_profiles \
   --edition 2024 --reference-store provenance --output-dir prepared/tapr-2024
 ```
 
-The variable names the directory containing `tapr/`, `shapes/`, `tepsac/`, and
+The variable names the directory containing `tapr/`, `shapes/`, and
 `campus_peims_financials/`. `~` and environment variables in this value are
 expanded; a relative value is resolved from the invoking working directory.
 The default and the override use the same layout. For an installed package,
@@ -333,8 +333,6 @@ uv run python -m teadata.scripts.rename_tapr_campus_headers \
   --output output/campus.xlsx
 uv run python -m teadata.scripts.download_campus_peims_financials \
   --year 2025 --store provenance --district 227901 --campus 227901002
-uv run python -m teadata.scripts.geocode_tepsac_data \
-  --input raw/schools.xlsx --output output/geocoded.csv
 uv run python -m teadata.scripts.flatten_districts_geojson \
   --input districts.geojson --output districts_flat.geojson
 uv run python -m teadata.scripts.build_tapr_profiles \
@@ -344,6 +342,19 @@ uv run python -m teadata.scripts.build_tapr_profiles \
   --edition 2025 --family staff_profile --input-dir raw/ \
   --reference-store provenance --output-dir prepared/tapr-2025-staff
 ```
+
+The legacy `tepsac` reader and its header-normalization and geocoding commands
+are retired. `cfg.load_df("tepsac", 2025)` raises `KeyError`; it does not fall
+back to another source. Current private-school listings come from the
+[Texas Comptroller's TEFA finder](https://finder.educationfreedom.texas.gov/).
+Use `cfg.resolve_dataset("tefa")` to inspect the selected program edition,
+source links and provenance. TEFA uses opaque listing IDs and does not provide
+enrollment; legacy TEPSAC IDs and columns are not interchangeable with it.
+
+Historical receipts, source bytes and published releases remain preserved.
+The retired entry declared a `2025` catalog version, but its measurement period
+and original download date were unknown. That label is not a verified school
+year. Existing catalog-bound releases retain their frozen source metadata.
 
 Campus PEIMS financial actuals acquisition supports fiscal years ending in 2024
 and 2025. It retains the publisher's district selector, the campus roster for

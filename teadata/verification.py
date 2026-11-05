@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
+from math import isfinite
 import os
 from pathlib import Path
 import signal
@@ -26,6 +27,7 @@ if TYPE_CHECKING:
 
 
 SCHEMA_VERSION = 1
+DEFAULT_CHECK_TIMEOUTS = {"library": 3600.0, "app": 900.0}
 IGNORED_SOURCE_PARTS = frozenset({
     ".git", ".local", ".venv", ".cache", "__pycache__", ".pytest_cache", ".ruff_cache",
 })
@@ -314,6 +316,13 @@ def _check_runtime(root: Path, *, paired: bool) -> tuple[str, str, Path | None, 
     return version, str(python), environment, setup
 
 
+def _resolved_timeout(kind: str, timeout: float | None) -> float:
+    selected = DEFAULT_CHECK_TIMEOUTS[kind] if timeout is None else timeout
+    if not isfinite(selected) or selected <= 0:
+        raise ValueError("--timeout must be finite and positive")
+    return selected
+
+
 def run_checks(
     root: Path,
     *,
@@ -321,8 +330,9 @@ def run_checks(
     paired_library: Path | None = None,
     release: str | None = None,
     checks: Sequence[Check] | None = None,
-    timeout: float = 900,
+    timeout: float | None = None,
 ) -> Path:
+    timeout = _resolved_timeout(kind, timeout)
     root = root.resolve()
     paired_library = paired_library.resolve() if paired_library is not None else None
     before = _input_identity(root, kind=kind, paired_library=paired_library, release=release)
@@ -849,7 +859,8 @@ def main() -> None:
     parser.add_argument("--verify", type=Path, help="Verify an existing receipt instead of executing checks")
     parser.add_argument("--verify-latest", action="store_true")
     parser.add_argument("--install-hook", action="store_true", help="Install an optional pre-push code-check hook, preserving Git LFS")
-    parser.add_argument("--timeout", type=float, default=900, help="Maximum seconds for each check")
+    parser.add_argument("--timeout", type=float, help="Maximum seconds for each check "
+                        f"(default: library {DEFAULT_CHECK_TIMEOUTS['library']:g}; app {DEFAULT_CHECK_TIMEOUTS['app']:g})")
     parser.add_argument("--validate-release", help=argparse.SUPPRESS)
     parser.add_argument("--source-parity", type=Path, help="Offline raw fidelity check for selected supported native release editions")
     parser.add_argument("--native-release", type=Path, help="Qualify an exact reviewed native bundle offline")
@@ -862,8 +873,10 @@ def main() -> None:
     parser.add_argument("--source-store", type=Path, help="Existing retained ProvenanceStore for source or native checks")
     parser.add_argument("--source-edition", action="append", default=[], help="Exact edition ID for --source-parity; repeat explicitly")
     args = parser.parse_args()
-    if args.timeout <= 0:
-        parser.error("--timeout must be positive")
+    try:
+        args.timeout = _resolved_timeout(args.kind, args.timeout)
+    except ValueError as error:
+        parser.error(str(error))
     if args.paired_library and args.kind != "app":
         parser.error("Paired mode applies to the app")
     if args.verify and args.verify_latest:
