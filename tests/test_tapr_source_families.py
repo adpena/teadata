@@ -202,6 +202,20 @@ STAAR_TESTED_GRADES = [
         (6, 678, 704), (7, 678, 704), (8, 1056, 1096),
     ]
 ]
+STAAR_TESTED_GRADES_2024 = [
+    (f'staar_tested_grade_{grade}', f'STAAR_GR{grade}', facts, occurrences, 0)
+    for grade, facts, occurrences in [
+        (3, 652, 678), (4, 652, 678), (5, 834, 867),
+        (6, 652, 678), (7, 652, 678), (8, 1016, 1056),
+    ]
+]
+STAAR_2024_WRAPPED = {('state', 'STAAR_GR3'), ('state', 'STAAR_GR6')}
+STAAR_2024_WARNING_PARTS = {
+    ('state', 'STAAR_GR3'): 3, ('state', 'STAAR_GR4'): 3,
+    ('region', 'STAAR_GR5'): 4, ('region', 'STAAR_GR6'): 4,
+    ('region', 'STAAR_GR7'): 3, ('district', 'STAAR_GR7'): 3,
+    ('region', 'STAAR_GR8'): 4,
+}
 STAAR_2026 = STAAR_TESTED_GRADES + [
     ('staar_grades_3_to_8', 'STAAR_GR38', 300, 312, 0),
     ('staar_all_grades', 'STAAR_ALL', 945, 980, 0),
@@ -214,6 +228,7 @@ STAAR_2026 = STAAR_TESTED_GRADES + [
 
 
 @pytest.mark.parametrize('year,family,publisher_file,facts,occurrences,undocumented', [
+    *((2024, *row) for row in STAAR_TESTED_GRADES_2024),
     *((2025, *row) for row in STAAR_TESTED_GRADES),
     *((2026, *row) for row in STAAR_2026),
 ])
@@ -224,7 +239,7 @@ def test_staar_sources_keep_raw_scope_and_exact_receipts(
     monkeypatch.setattr(store, 'verify_artifact', lambda *a, **k: pytest.fail('Metadata lookup opened an artifact'))
     monkeypatch.setattr('teadata.tapr.read_tapr_table', lambda *a, **k: pytest.fail('Discovery opened source rows'))
     period = {'kind': 'school_year', 'start_year': year - 1, 'end_year': year}
-    district_rows, campus_rows = (1208, 9084) if year == 2025 else (1202, 9105)
+    district_rows, campus_rows = {2024: (1207, 9082), 2025: (1208, 9084), 2026: (1202, 9105)}[year]
     scopes = [
         ('state', 1, ()),
         ('district', district_rows, ('district_number', 'district_name')),
@@ -238,9 +253,10 @@ def test_staar_sources_keep_raw_scope_and_exact_receipts(
         assert metadata.version == str(year) and metadata.period.to_dict() == period
         assert not metadata.metrics and metadata.value_policy is None and metadata.estimation is None
         assert cfg.is_source_only(dataset, 2025) and cfg.is_source_only(dataset, 2026)
-        if scope == 'region':
-            assert cfg.data_sources[dataset].available_years() == (
-                [2025, 2026] if family.startswith('staar_tested_grade_') else [2026])
+        if family.startswith('staar_tested_grade_'):
+            assert cfg.data_sources[dataset].available_years() == [2024, 2025, 2026]
+        elif scope == 'region':
+            assert cfg.data_sources[dataset].available_years() == [2026]
         assert cfg.column_schema(dataset, year) is None
         with pytest.raises(ContractError, match='Reader profile is required'):
             cfg.load_df(dataset, year)
@@ -248,7 +264,7 @@ def test_staar_sources_keep_raw_scope_and_exact_receipts(
         assert qualified_tapr_family(dataset, request.key_field) == family
         assert request.key_field == (identity_fields[0] if identity_fields else None)
         letter = scope[0].upper()
-        unprefixed_state = scope == 'state' and (year == 2026 or publisher_file == 'STAAR_GR3')
+        unprefixed_state = scope == 'state' and (year == 2026 or (year == 2025 and publisher_file == 'STAAR_GR3'))
         file_scope = '' if unprefixed_state else letter + '-'
         assert request.path.name == f'{year}-{file_scope}{publisher_file}-offered.csv'
         assert request.mapping['table'] == family and request.mapping['metric_period'] == period
@@ -257,7 +273,8 @@ def test_staar_sources_keep_raw_scope_and_exact_receipts(
         assert len(fields) == facts + len(identity_fields)
         assert tuple(field['field'] for field in fields if field['disposition'] == 'identity') == identity_fields
         if scope == 'region':
-            assert fields[0]['code'] == 'REGION' and fields[0]['label'] == 'ESC Region #'
+            assert fields[0]['code'] == 'REGION'
+            assert fields[0]['label'] == ('2 Digit ESC Region' if year == 2024 else 'ESC Region #')
         fact_fields = fields[len(identity_fields):]
         documented = {field['code'] for field in fact_fields if field['dictionary_status'] == 'documented'}
         assert len(documented) == facts - undocumented
@@ -274,14 +291,43 @@ def test_staar_sources_keep_raw_scope_and_exact_receipts(
         assert (controls['ccyy'], controls['sumlev'], controls['dsname'], controls['datafmt']) == (
             str(year), letter, publisher_file, 'csv')
         masking = references['masking']
-        if year == 2025:
+        if year in (2024, 2025):
             assert masking.status == 'available' and masking.role == 'masking_methodology'
             mask_id, = masking.provenance_ids
-            assert graph[mask_id]['requested_url'] == 'https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html'
+            assert graph[mask_id]['requested_url'] == f'https://rptsvr1.tea.texas.gov/perfreport/tapr/{year}/masking.html'
             assert [value for name, value in raw['parameters']['form_controls'] if name == 'var_type'] == ['N', 'D', 'R']
             dictionary_id, = references['dictionary'].provenance_ids
             params = parse_qs(urlsplit(graph[dictionary_id]['requested_url']).query)
-            assert (params['ccyy'], params['sumlev'], params['dsname']) == (['2025'], [letter], [publisher_file])
+            assert (params['ccyy'], params['sumlev'], params['dsname']) == ([str(year)], [letter], [publisher_file])
+        if year == 2024:
+            witness_id, = references['state_report_witness'].provenance_ids
+            witness_query = parse_qs(urlsplit(graph[witness_id]['requested_url']).query)
+            assert (witness_query['ccyy'], witness_query['lev'], witness_query['id'], witness_query['prgopt']) == (
+                ['2024'], ['S'], ['S'], ['reports/tapr/performance.sas'])
+            prefixes = [f'{scope.title()} 2024 {label}' for label in ('Domain 1A: ', '(STAAR Only) - ', '(STAAR & EOC) - ')]
+            labels = [field['label'].lstrip('\n') for field in fact_fields]
+            assert [sum(label.startswith(prefix) for label in labels) for prefix in prefixes] == [facts - 288, 72, 216]
+            layout = request.mapping['layout']
+            annotations = layout['annotations']
+            if (scope, publisher_file) in STAAR_2024_WRAPPED:
+                assert (layout['label_record'], layout['code_record'], layout['first_data_record']) == (None, 3, 4)
+                preamble = annotations[0]
+                assert (preamble['kind'], preamble['first_record'], preamble['last_record']) == ('preamble', 1, 2)
+                annotations = annotations[1:]
+            else:
+                assert (layout['label_record'], layout['code_record'], layout['first_data_record']) == (1, 2, 3)
+            partitions = STAAR_2024_WARNING_PARTS.get((scope, publisher_file), 0)
+            assert len(annotations) == bool(partitions)
+            if partitions:
+                footer, = annotations
+                footer_record = layout['last_data_record'] + 1
+                assert footer == {'kind': 'footer', 'first_record': footer_record, 'last_record': footer_record,
+                                  'sha256': '76cc1ea0db298b4c2230783ea487a94c8979e1f3bdfeeb0ae53b536f1e087f91'}
+                schema_id, = references['columns_source'].provenance_ids
+                witnesses = [graph[record] for record in graph[schema_id]['source_metadata']['provenance_ids']
+                             if graph[record]['artifact']['filename'].startswith(f'2024-{letter}-{publisher_file}-partition-')]
+                assert len(witnesses) == partitions
+        elif year == 2025:
             witness_id, = references['named_report'].provenance_ids
             witness_query = parse_qs(urlsplit(graph[witness_id]['requested_url']).query)
             assert (witness_query['ccyy'], witness_query['lev'], witness_query['prgopt']) == (
@@ -335,6 +381,13 @@ def test_regional_staar_addition_preserves_existing_2026_scope_crosswalks():
 
 def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     current = yaml.safe_load((ROOT / 'teadata/teadata_sources.yaml').read_text())
+    previous_tested_grades = {}
+    for scope in ('state', 'district', 'campus', 'region'):
+        for family, *_ in STAAR_TESTED_GRADES:
+            dataset = f'{scope}_tapr_{family}'
+            current['data_sources'][dataset].pop(2024)
+            previous_tested_grades[dataset] = current['data_sources'][dataset]
+    assert sha256(canonical_json(previous_tested_grades).encode()).hexdigest() == '64178e073e15880351cfd020b6bb0c9d78b22c1d346fb5c1c81ce7f05975f0cb'
     for family, *_ in STAAR_2026:
         regional = 'region_tapr_' + family
         years = [2025, 2026] if family.startswith('staar_tested_grade_') else [2026]

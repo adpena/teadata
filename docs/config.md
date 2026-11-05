@@ -1301,6 +1301,15 @@ Each 2025 geography retains its own dictionary, a named TEA report and the
 [2024–25 TAPR masking methodology](https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html).
 The raw reader preserves those tokens without interpreting them.
 
+The same four scopes are available for edition 2024. Each grade retains
+one Texas row, 20 education service center rows, 1,207 district rows and
+9,082 campus rows. Its crosswalk keeps the tested-grade Domain 1A,
+STAAR-only enrolled-grade and STAAR-or-EOC enrolled-grade fields separate.
+Reviewed layouts identify wrapped headers and SAS warning footers in the
+original files. Separate publisher exports reproduce the data rows from the
+warning-bearing files. The edition retains the
+[2023–24 TAPR masking methodology](https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html).
+
 Prepare a grade using its exact retained CSVs and reference receipts.
 
 ```bash
