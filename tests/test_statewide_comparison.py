@@ -24,7 +24,8 @@ PERIOD = {"kind": "school_year", "start_year": 2023, "end_year": 2024}
 
 
 @pytest.fixture
-def comparison_release(tmp_path, monkeypatch):
+def comparison_release(tmp_path, monkeypatch, request):
+    family = getattr(request, "param", FAMILY)
     store = ProvenanceStore(tmp_path / "source-store")
     masking = tmp_path / "masking.txt"
     masking.write_text("Synthetic reviewed rate masking methodology")
@@ -36,19 +37,32 @@ def comparison_release(tmp_path, monkeypatch):
         ("campus", [["057909002", "33.8"]]),
         ("state", [["25.1"]]),
     ):
-        dataset = f"{scope}_tapr_{FAMILY}"
+        dataset = f"{scope}_tapr_{family}"
         path = tmp_path / f"{scope}.csv"
         key = f"{scope}_number" if scope != "state" else None
         labels, codes, fields = (["ID"], [scope.upper()], [key]) if key else ([], [], [])
         labels += ["Dual credit rate"]
         codes += ["RATE"]
         fields += ["dual_credit_rate"]
+        metrics = {METRIC: {"field": "dual_credit_rate", "unit": "percent"}}
+        table_period = PERIOD
+        if family == "student_profile":
+            table_period = {"kind": "unknown"}
+            metrics[METRIC]["period"] = PERIOD
+            labels += ["Membership count"]
+            codes += ["COUNT"]
+            fields += ["membership_count"]
+            observations = [row + ["1200" if scope == "state" else "105"] for row in observations]
+            metrics["membership_count"] = {
+                "field": "membership_count", "unit": "count",
+                "period": {"kind": "school_year", "start_year": 2024, "end_year": 2025},
+            }
         with path.open("w", newline="") as stream:
             csv.writer(stream).writerows([labels, codes, *observations])
         mapping = {
-            "table": FAMILY, "input_sha256": sha256(path.read_bytes()).hexdigest(),
+            "table": family, "input_sha256": sha256(path.read_bytes()).hexdigest(),
             "source_schema_sha256": source_schema_fingerprint(labels, codes),
-            "metric_period": PERIOD,
+            "metric_period": table_period,
             "layout": {"label_record": 1, "code_record": 2, "first_data_record": 3,
                        "last_data_record": 2 + len(observations), "annotations": []},
             "fields": [{"position": i, "code": code, "label": label, "field": field,
@@ -65,8 +79,8 @@ def comparison_release(tmp_path, monkeypatch):
         headers = store.record_acquisition(schema, ResolvedDataset(dataset + ":schema", "reference", 2025, 2025,
                                             str(schema), DatasetMetadata()))
         definitions[dataset] = {2025: {"path": str(path), "metadata": {
-            "version": "2025", "period": PERIOD, "provenance_ids": [original],
-            "metrics": {METRIC: {"field": "dual_credit_rate", "unit": "percent"}},
+            "version": "2025", "period": table_period, "provenance_ids": [original],
+            "metrics": metrics,
             "references": [
                 {"reference_id": "columns_source", "role": "schema", "path": schema.name,
                  "status": "available", "reviewed_sha256": sha256(schema.read_bytes()).hexdigest(),
@@ -75,11 +89,11 @@ def comparison_release(tmp_path, monkeypatch):
                  "status": "available", "reviewed_sha256": sha256(masking.read_bytes()).hexdigest(),
                  "provenance_ids": [masking_id]}]},
             "reader": {"profiles": {"source": {"column_schema": schema.name, "tapr_source": {
-                "scope": scope, "tables": {FAMILY: str(path)}}}}}}}
+                "scope": scope, "tables": {family: str(path)}}}}}}}
     cfg = Config.from_dict({"data_sources": definitions})
     cfg.base_dir = tmp_path
     prepared = tmp_path / "prepared"
-    result = prepare_profiles(cfg, edition="2025", family=FAMILY, scopes=["district", "campus", "state"],
+    result = prepare_profiles(cfg, edition="2025", family=family, scopes=["district", "campus", "state"],
                               input_dir=None, output_dir=prepared, reference_store=store)
     selected = {entry["dataset"]: (entry["processing_record_id"], () if scope == "state" else (f"{scope}_number",))
                 for scope, entry in result["scopes"].items()}
@@ -151,6 +165,20 @@ def test_raw_parity_replays_the_statewide_row_without_a_geographic_key(compariso
                                    edition_ids=[editions["state"].identity])
     assert result["status"] == "PASS_RAW_PARITY"
     assert (result["coverage"]["raw_cells"], result["coverage"]["compared_cells"]) == (1, 2)
+
+
+@pytest.mark.parametrize("comparison_release", ["student_profile"], indirect=True)
+def test_student_profile_comparison_keeps_counts_and_distinct_periods(comparison_release):
+    release, editions = comparison_release
+    districts = [District(uuid4(), "Observed", district_number="227901"),
+                 District(uuid4(), "Uninterpreted", district_number="001902")]
+    rows = list(Query(districts, repo=None).compare_statewide(
+        release=release, local=editions["district"], statewide=editions["state"]))
+    rate, count, unknown, _ = rows
+    assert (rate.unit, rate.period.end_year, rate.difference_pp) == ("percent", 2024, 10.5)
+    assert (count.unit, count.period.end_year, count.local_value, count.statewide_value) == ("count", 2025, 105, 1200)
+    assert count.difference_pp is None
+    assert (unknown.local_raw, unknown.local_status, unknown.difference) == ("-1", "uninterpreted", None)
 
 
 def test_campus_course_geography_hold_precedes_any_leaf_or_catalog_read():

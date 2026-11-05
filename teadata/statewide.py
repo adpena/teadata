@@ -23,20 +23,21 @@ from .values import MeasurementUnit, TokenRule, ValuePolicy, ValueStatus, measur
 if TYPE_CHECKING:
     from .release import DataRelease
 
-_TAPR_RATE_FAMILIES = {"college_career_military_readiness", "college_readiness_components",
-                       "four_year_longitudinal_rate"}
+_TAPR_RAW_FAMILIES = {"college_career_military_readiness", "college_readiness_components",
+                      "four_year_longitudinal_rate", "student_profile"}
 EDITION = 2025
 _TAPR_RATE_POLICY = ValuePolicy(
     "tapr_2025_reviewed_rates",
     {"-1": TokenRule(ValueStatus.SUPPRESSED, "TEA masked the rate")},
     reference_id="masking",
 )
+_TAPR_STUDENT_POLICY = ValuePolicy("tapr_2025_reviewed_student_profile", {}, reference_id="masking")
 _NUMERIC_UNITS = frozenset(MeasurementUnit) - {MeasurementUnit.TEXT}
 _VALUE_STATUSES = frozenset(item.value for item in ValueStatus)
 Number = int | float
 
 
-@lru_cache(maxsize=9)
+@lru_cache(maxsize=12)
 def _reviewed_tapr(scope: str, family: str) -> tuple[str, str, DatasetMetadata]:
     config = load_config()
     dataset = f"{scope}_tapr_{family}"
@@ -111,13 +112,14 @@ class _Projection:
     artifact: ArtifactRef
     columns: tuple[str, ...]
     support: Mapping[str, tuple[str, str]]
+    raw_policy: ValuePolicy | None
 
-    def value(self, row: dict[str, Any], field: str) -> tuple[str, str, Number | None]:
-        if not self.support:
+    def value(self, row: dict[str, Any], field: str, unit: str) -> tuple[str, str, Number | None]:
+        if self.raw_policy is not None:
             raw = row[field]
-            if not isinstance(raw, str):
-                raise ContractError("TAPR rate must preserve its publisher token")
-            value = measure(raw, _TAPR_RATE_POLICY, unit="percent", minimum=0, maximum=100)
+            if not isinstance(raw, str) or unit not in {"count", "percent"}:
+                raise ContractError("TAPR comparison requires a publisher token with a reviewed count or percent unit")
+            value = measure(raw, self.raw_policy, unit=unit, minimum=0, maximum=100 if unit == "percent" else None)
             status = "uninterpreted" if value.status == ValueStatus.INVALID else value.status.value
             return raw, status, value.numeric
 
@@ -132,13 +134,17 @@ class _Projection:
         return raw, status, float(value) if isinstance(value, Decimal) else value
 
 
-def _projection(release: DataRelease, key: EditionKey, fields: list[str], *,
-                keys: list[str], mapping: str, policy: str | None, period: DataPeriod) -> _Projection:
-    plans = release.catalog.resolve_artifacts(((key, field) for field in fields), period=period)
-    if len(plans) != 1:
+def _projection(release: DataRelease, key: EditionKey, fields: list[tuple[str, DataPeriod]], *,
+                keys: list[str], mapping: str, policy: str | None, raw_policy: ValuePolicy | None) -> _Projection:
+    by_period: dict[DataPeriod, list[tuple[EditionKey, str]]] = {}
+    for field, period in fields:
+        by_period.setdefault(period, []).append((key, field))
+    plans = [plan for period, selected in by_period.items()
+             for plan in release.catalog.resolve_artifacts(selected, period=period)]
+    if len({plan["artifact"].identity for plan in plans}) != 1:
         raise ContractError("Comparison requires one reviewed leaf per edition")
-    plan, = plans
-    artifact = plan["artifact"]
+    artifact = plans[0]["artifact"]
+    columns = tuple(dict.fromkeys(column for plan in plans for column in plan["columns"]))
     contract = artifact.contract
     if (contract["mapping_sha256"] != mapping or contract["policy_sha256"] != policy
             or contract["key_columns"] != keys):
@@ -146,17 +152,17 @@ def _projection(release: DataRelease, key: EditionKey, fields: list[str], *,
     support = artifact.column_support
     field_support = {}
     if policy is None:
-        if support is not None or set(plan["columns"]) != set(keys + fields):
+        if raw_policy is None or support is not None or set(columns) != {*keys, *(field for field, _ in fields)}:
             raise ContractError("TAPR comparison requires exact raw columns")
     else:
         if support is None:
             raise ContractError("PEIMS comparison requires normalized values with raw and status support")
-        for field in fields:
+        for field, _ in fields:
             selected = support.projection(field)
             if not {"raw", "status"} <= selected.keys():
                 raise ContractError("PEIMS comparison requires normalized values with raw and status support")
             field_support[field] = selected["raw"], selected["status"]
-    return _Projection(artifact, plan["columns"], field_support)
+    return _Projection(artifact, columns, field_support, raw_policy)
 
 
 def _statistics(local: EditionKey, local_metadata: DatasetMetadata,
@@ -193,6 +199,7 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
     catalog = release.catalog
     local_metadata = catalog.metadata(local.dataset, edition=local)
     state_metadata = catalog.metadata(statewide.dataset, edition=statewide)
+    raw_policy = None
     if course_pair or (local.dataset == statewide.dataset and local.dataset in SCOPES_BY_DATASET):
         scopes = {"state", "district"} if course_pair else SCOPES_BY_DATASET[local.dataset]
         if local.scope not in scopes or local.table != local.scope or statewide.table != "state":
@@ -207,7 +214,7 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
         expected_dimensions = set(state_keys) - {"school_year"}
         if set(dimensions) != expected_dimensions:
             raise ContractError(f"Expected exact publisher dimensions {sorted(expected_dimensions)}")
-    elif (local.table in _TAPR_RATE_FAMILIES and local.table == statewide.table
+    elif (local.table in _TAPR_RAW_FAMILIES and local.table == statewide.table
           and local.dataset == f"{local.scope}_tapr_{local.table}"
           and statewide.dataset == f"state_tapr_{local.table}" and local.edition == str(EDITION)):
         if local.grain != f"one row per {key_column}" or statewide.grain != STATEWIDE_SINGLETON_GRAIN or dimensions:
@@ -216,9 +223,10 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
         left_revision, left_mapping, left_review = _reviewed_tapr(local.scope, local.table)
         right_revision, right_mapping, right_review = _reviewed_tapr("state", local.table)
         left_policy = right_policy = None
-        masking = next((ref for ref in left_review.references if ref.reference_id == _TAPR_RATE_POLICY.reference_id), None)
+        raw_policy = _TAPR_STUDENT_POLICY if local.table == "student_profile" else _TAPR_RATE_POLICY
+        masking = next((ref for ref in left_review.references if ref.reference_id == raw_policy.reference_id), None)
         if masking is None or not masking.provenance_ids or masking not in local_metadata.references:
-            raise ContractError("Statewide comparison requires the retained TAPR rate masking methodology")
+            raise ContractError("Statewide comparison requires the retained TAPR masking methodology")
     else:
         raise ContractError("These editions have no reviewed statewide comparison contract")
     if (local.revision_sha256, statewide.revision_sha256) != (left_revision, right_revision):
@@ -227,13 +235,10 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
            for selected, review in ((local_metadata, left_review), (state_metadata, right_review))):
         raise ContractError("Comparison requires the reviewed methodology and source references")
     statistics = _statistics(local, local_metadata, state_metadata, left_review, right_review, metric)
-    period = statistics[0].period
-    if any(stat.period != period for stat in statistics):
-        raise ContractError("Select metrics with one common reference period")
-    return (statistics, _projection(release, local, [stat.local_field for stat in statistics],
-                                    keys=local_keys, mapping=left_mapping, policy=left_policy, period=period),
-            _projection(release, statewide, [stat.statewide_field for stat in statistics],
-                        keys=state_keys, mapping=right_mapping, policy=right_policy, period=period))
+    return (statistics, _projection(release, local, [(stat.local_field, stat.period) for stat in statistics],
+                                    keys=local_keys, mapping=left_mapping, policy=left_policy, raw_policy=raw_policy),
+            _projection(release, statewide, [(stat.statewide_field, stat.period) for stat in statistics],
+                        keys=state_keys, mapping=right_mapping, policy=right_policy, raw_policy=raw_policy))
 
 
 def compare_statewide(items: Sequence[object], *, release: DataRelease, local: EditionKey,
@@ -267,7 +272,7 @@ def compare_statewide(items: Sequence[object], *, release: DataRelease, local: E
     if state_rows.num_rows != 1:
         raise ContractError("Select exactly one published statewide observation")
     state_row, = state_rows.to_pylist()
-    state_values = [state_plan.value(state_row, stat.statewide_field) for stat in statistics]
+    state_values = [state_plan.value(state_row, stat.statewide_field, stat.unit) for stat in statistics]
 
     identifiers = [item.lookup_key if isinstance(item, Campus) else item.district_number_canon
                    if isinstance(item, District) else None for item in items]
@@ -293,7 +298,7 @@ def compare_statewide(items: Sequence[object], *, release: DataRelease, local: E
             if local_row is None:
                 raw, status, value = None, "unavailable" if applies else "not_applicable", None
             else:
-                raw, status, value = local_plan.value(local_row, stat.local_field)
+                raw, status, value = local_plan.value(local_row, stat.local_field, stat.unit)
             difference = None
             if value is not None and state_value is not None:
                 difference = (value - state_value if isinstance(value, int) and isinstance(state_value, int)

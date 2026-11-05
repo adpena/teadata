@@ -542,6 +542,27 @@ value_policies:
       '<1,910': *peims_2026_suppression, '<2,000': *peims_2026_suppression,
       '<2,790': *peims_2026_suppression,
     }
+  research_graduation_class_2025:
+    reference_id: publisher_disclosure
+    tokens:
+      '-1':
+        status: suppressed
+        reason: small_count_suppression
+      '-3':
+        status: suppressed
+        reason: complementary_suppression
+      .:
+        status: not_applicable
+        reason: no_students_in_group
+      na:
+        status: not_applicable
+        reason: aea_measure_unavailable
+      n/a:
+        status: not_applicable
+        reason: aea_measure_unavailable
+      ? ''
+      : status: missing
+        reason: blank_source_cell
   frc_ppe_published:
     reference_id: frc_ppe_blank_note
     tokens:
@@ -2025,7 +2046,95 @@ data_sources:
           provenance_ids:
           - 6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554
           reviewed_sha256: 7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2025--student-profile-crosswalk.json
+          title: Reviewed 2025 Student Information raw source crosswalk
+          status: available
+          provenance_ids:
+          - 9ab6b41f80eaaf1aae1c5f33121d84e84421563770353a2f7081b06c0465e4d8
+          reviewed_sha256: 43bc586c00425e9a16c37dadf400c1510c0bb639bbc1d366d73a79486beaf1c7
         metrics:
+          student_membership_special_ed_count:
+            field: campus_2025_student_membership_special_ed_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_special_ed_percent:
+            field: campus_2025_student_membership_special_ed_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_special_ed_count:
+            field: campus_2025_student_enrollment_special_ed_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_special_ed_percent:
+            field: campus_2025_student_enrollment_special_ed_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_gifted_and_talented_count:
+            field: campus_2025_student_membership_gifted_and_talented_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_gifted_and_talented_percent:
+            field: campus_2025_student_membership_gifted_and_talented_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_gifted_and_talented_count:
+            field: campus_2025_student_enrollment_gifted_and_talented_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_gifted_and_talented_percent:
+            field: campus_2025_student_enrollment_gifted_and_talented_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_dyslexia_count:
+            field: campus_2025_student_membership_dyslexia_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_dyslexia_percent:
+            field: campus_2025_student_membership_dyslexia_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_dyslexia_count:
+            field: campus_2025_student_enrollment_dyslexia_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_dyslexia_percent:
+            field: campus_2025_student_enrollment_dyslexia_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_eb_el_count:
+            field: campus_2025_student_membership_eb_el_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_eb_el_percent:
+            field: campus_2025_student_membership_eb_el_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_eb_el_count:
+            field: campus_2025_student_enrollment_english_learner_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_eb_el_percent:
+            field: campus_2025_student_enrollment_english_learner_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_section_504_count:
+            field: campus_2025_student_membership_section_504_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_section_504_percent:
+            field: campus_2025_student_membership_section_504_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_section_504_count:
+            field: campus_2025_student_enrollment_section_504_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_section_504_percent:
+            field: campus_2025_student_enrollment_section_504_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
           student_membership_mobility_all_students_count:
             field: campus_2025_student_membership_2024_mobility_all_students_count
             unit: count
@@ -2426,14 +2535,6 @@ data_sources:
               scope: campus
               tables:
                 student_profile: data/tapr/raw/2025-campus-STUD-all-checked.csv
-            references:
-            - reference_id: columns_source
-              role: schema
-              path: schemas/tapr--2025--student-profile-crosswalk.json
-              title: Reviewed complete 2025 student_profile source-only contract
-              status: available
-              provenance_ids: []
-              reviewed_sha256: 43bc586c00425e9a16c37dadf400c1510c0bb639bbc1d366d73a79486beaf1c7
   campus_tapr_staff_profile:
     2024:
       path: data/tapr/raw/2024 Campus Staff Information.csv
@@ -2833,7 +2934,95 @@ data_sources:
           provenance_ids:
           - 6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554
           reviewed_sha256: 7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2025--student-profile-crosswalk.json
+          title: Reviewed 2025 Student Information raw source crosswalk
+          status: available
+          provenance_ids:
+          - 931c2c826727d467a8d3cd655127904b2185ed77bad471f5af98299513cdb081
+          reviewed_sha256: 43bc586c00425e9a16c37dadf400c1510c0bb639bbc1d366d73a79486beaf1c7
         metrics:
+          student_membership_special_ed_count:
+            field: district_2025_student_membership_special_ed_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_special_ed_percent:
+            field: district_2025_student_membership_special_ed_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_special_ed_count:
+            field: district_2025_student_enrollment_special_ed_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_special_ed_percent:
+            field: district_2025_student_enrollment_special_ed_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_gifted_and_talented_count:
+            field: district_2025_student_membership_gifted_and_talented_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_gifted_and_talented_percent:
+            field: district_2025_student_membership_gifted_and_talented_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_gifted_and_talented_count:
+            field: district_2025_student_enrollment_gifted_and_talented_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_gifted_and_talented_percent:
+            field: district_2025_student_enrollment_gifted_and_talented_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_dyslexia_count:
+            field: district_2025_student_membership_dyslexia_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_dyslexia_percent:
+            field: district_2025_student_membership_dyslexia_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_dyslexia_count:
+            field: district_2025_student_enrollment_dyslexia_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_dyslexia_percent:
+            field: district_2025_student_enrollment_dyslexia_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_eb_el_count:
+            field: district_2025_student_membership_eb_el_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_eb_el_percent:
+            field: district_2025_student_membership_eb_el_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_eb_el_count:
+            field: district_2025_student_enrollment_english_learner_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_eb_el_percent:
+            field: district_2025_student_enrollment_english_learner_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_section_504_count:
+            field: district_2025_student_membership_section_504_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_section_504_percent:
+            field: district_2025_student_membership_section_504_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_section_504_count:
+            field: district_2025_student_enrollment_section_504_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_section_504_percent:
+            field: district_2025_student_enrollment_section_504_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
           student_membership_mobility_all_students_count:
             field: district_2025_student_membership_2024_mobility_all_students_count
             unit: count
@@ -3234,14 +3423,6 @@ data_sources:
               scope: district
               tables:
                 student_profile: data/tapr/raw/2025-district-STUD-all-checked.csv
-            references:
-            - reference_id: columns_source
-              role: schema
-              path: schemas/tapr--2025--student-profile-crosswalk.json
-              title: Reviewed complete 2025 student_profile source-only contract
-              status: available
-              provenance_ids: []
-              reviewed_sha256: 43bc586c00425e9a16c37dadf400c1510c0bb639bbc1d366d73a79486beaf1c7
   district_tapr_staff_profile:
     2024:
       path: data/tapr/raw/2024 District Staff Information.csv
@@ -7695,6 +7876,376 @@ data_sources:
               scope: "district"
               tables:
                 college_readiness_components: "data/tapr/raw/2025-d-GRAD2-offered-original.csv"
+  state_tapr_student_profile:
+    2025:
+      path: "data/tapr/raw/2025-s-STUD-all_except_class_size.csv"
+      metadata:
+        title: "2024–25 TAPR State Student Information selection (STUD)"
+        publisher: "Texas Education Agency"
+        version: "2025"
+        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        metrics:
+          daep_count:
+            field: state_2024_daep_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          daep_percent:
+            field: state_2024_daep_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_african_american_count:
+            field: state_2025_student_enrollment_african_american_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_african_american_percent:
+            field: state_2025_student_enrollment_african_american_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_all_students_count:
+            field: state_2025_student_enrollment_all_students_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_asian_count:
+            field: state_2024_25_asian_students_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_asian_percent:
+            field: state_2024_25_asian_students_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_dyslexia_count:
+            field: state_2025_student_enrollment_dyslexia_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_dyslexia_percent:
+            field: state_2025_student_enrollment_dyslexia_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_eb_el_count:
+            field: state_2025_student_enrollment_english_learner_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_eb_el_percent:
+            field: state_2025_student_enrollment_english_learner_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_gifted_and_talented_count:
+            field: state_2025_student_enrollment_gifted_and_talented_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_gifted_and_talented_percent:
+            field: state_2025_student_enrollment_gifted_and_talented_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_hispanic_count:
+            field: state_2025_student_enrollment_hispanic_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_hispanic_percent:
+            field: state_2025_student_enrollment_hispanic_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_pacific_islander_count:
+            field: state_2025_student_enrollment_pacific_islander_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_pacific_islander_percent:
+            field: state_2025_student_enrollment_pacific_islander_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_section_504_count:
+            field: state_2025_student_enrollment_section_504_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_section_504_percent:
+            field: state_2025_student_enrollment_section_504_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_special_ed_count:
+            field: state_2025_student_enrollment_special_ed_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_special_ed_percent:
+            field: state_2025_student_enrollment_special_ed_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_two_or_more_races_count:
+            field: state_2025_student_enrollment_two_or_more_races_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_two_or_more_races_percent:
+            field: state_2025_student_enrollment_two_or_more_races_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_white_count:
+            field: state_2025_student_enrollment_white_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_white_percent:
+            field: state_2025_student_enrollment_white_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_african_american_count:
+            field: state_2025_student_membership_african_american_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_african_american_percent:
+            field: state_2025_student_membership_african_american_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_all_students_count:
+            field: state_2025_student_membership_all_students_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_american_indian_count:
+            field: state_2025_student_membership_american_indian_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_american_indian_percent:
+            field: state_2025_student_membership_american_indian_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_asian_count:
+            field: state_2025_student_membership_asian_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_asian_percent:
+            field: state_2025_student_membership_asian_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_dyslexia_count:
+            field: state_2025_student_membership_dyslexia_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_dyslexia_percent:
+            field: state_2025_student_membership_dyslexia_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_eb_el_count:
+            field: state_2025_student_membership_eb_el_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_eb_el_percent:
+            field: state_2025_student_membership_eb_el_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_gifted_and_talented_count:
+            field: state_2025_student_membership_gifted_and_talented_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_gifted_and_talented_percent:
+            field: state_2025_student_membership_gifted_and_talented_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_hispanic_count:
+            field: state_2025_student_membership_hispanic_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_hispanic_percent:
+            field: state_2025_student_membership_hispanic_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_mobility_african_american_count:
+            field: state_2025_student_membership_2024_mobility_african_american_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_african_american_percent:
+            field: state_2025_student_membership_2024_mobility_african_american_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_all_students_count:
+            field: state_2025_student_membership_2024_mobility_all_students_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_all_students_percent:
+            field: state_2025_student_membership_2024_mobility_all_students_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_american_indian_count:
+            field: state_2025_student_membership_2024_mobility_american_indian_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_american_indian_percent:
+            field: state_2025_student_membership_2024_mobility_american_indian_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_asian_count:
+            field: state_2025_student_membership_2024_mobility_asian_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_asian_percent:
+            field: state_2025_student_membership_2024_mobility_asian_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_eb_el_count:
+            field: state_2025_student_membership_2024_mobility_eb_el_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_eb_el_percent:
+            field: state_2025_student_membership_2024_mobility_eb_el_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_econ_disadv_count:
+            field: state_2025_student_membership_2024_mobility_econ_disadv_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_econ_disadv_percent:
+            field: state_2025_student_membership_2024_mobility_econ_disadv_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_hispanic_count:
+            field: state_2025_student_membership_2024_mobility_hispanic_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_hispanic_percent:
+            field: state_2025_student_membership_2024_mobility_hispanic_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_pacific_islander_count:
+            field: state_2025_student_membership_2024_mobility_pacific_islander_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_pacific_islander_percent:
+            field: state_2025_student_membership_2024_mobility_pacific_islander_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_special_ed_count:
+            field: state_2025_student_membership_2024_mobility_special_ed_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_special_ed_percent:
+            field: state_2025_student_membership_2024_mobility_special_ed_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_two_or_more_races_count:
+            field: state_2025_student_membership_2024_mobility_two_or_more_races_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_two_or_more_races_percent:
+            field: state_2025_student_membership_2024_mobility_two_or_more_races_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_white_count:
+            field: state_2025_student_membership_2024_mobility_white_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_white_percent:
+            field: state_2025_student_membership_2024_mobility_white_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_pacific_islander_count:
+            field: state_2025_student_membership_pacific_islander_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_pacific_islander_percent:
+            field: state_2025_student_membership_pacific_islander_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_section_504_count:
+            field: state_2025_student_membership_section_504_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_section_504_percent:
+            field: state_2025_student_membership_section_504_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_special_ed_count:
+            field: state_2025_student_membership_special_ed_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_special_ed_percent:
+            field: state_2025_student_membership_special_ed_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_two_or_more_races_count:
+            field: state_2025_student_membership_two_or_more_races_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_two_or_more_races_percent:
+            field: state_2025_student_membership_two_or_more_races_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_white_count:
+            field: state_2025_student_membership_white_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_white_percent:
+            field: state_2025_student_membership_white_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+        references:
+          - reference_id: "csv_headers"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+            title: "Published statewide STUD CSV selection without class size"
+            status: "available"
+            provenance_ids:
+              - "ba756c3da078c35f33eb1b23aac5f378ba91fdfc7f9f1cccd37945c7da776609"
+            reviewed_sha256: "a7877feaf77183af290733ce480a4098ea59c8e856c0315f815db7885670e964"
+          - reference_id: "selection"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker"
+            title: "Published statewide STUD download controls"
+            status: "available"
+            provenance_ids:
+              - "12e139fd84383d549dd4a7460e38aa6d18a00d279a0b0852ba6169c2d147e968"
+            reviewed_sha256: "4ac2c98acdaaab3463ad36de29cc1c8d20feedba6fe8c7c74d6c69ba168118d7"
+          - reference_id: "dictionary"
+            role: "data_dictionary"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=S&dsname=STUD&dd=student&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
+            title: "Published statewide STUD data dictionary"
+            status: "available"
+            provenance_ids:
+              - "36fdf16397e4bacfe213a182b7c003690ff4d3a3e6b731fe04f24d6bcba323aa"
+            reviewed_sha256: "90da908c9ae39e2297f3eaff617eefbc0a6cf400c6e0467fee4f058059015b88"
+          - reference_id: "state_student_report"
+            role: "source_notes"
+            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=S&lev=S&prgopt=reports%2Ftapr%2Fstudent.sas"
+            title: "Independent 2024–25 statewide TPRS Student Information report"
+            status: "available"
+            provenance_ids:
+              - "05d8b500dfdbab97e6b5e0dfe13f8458f9d6b7b45df9c4630db79f6498e23606"
+            reviewed_sha256: "a4fa6bb001446cd39a43c2a86e1eb39eaa451803457b0cf2d8816ae96c239d5c"
+          - reference_id: "glossary"
+            role: "glossary"
+            url: "https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf"
+            title: "2024–25 TAPR glossary"
+            status: "available"
+            provenance_ids:
+              - "e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db"
+            reviewed_sha256: "846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416"
+          - reference_id: "masking"
+            role: "masking_methodology"
+            url: "https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html"
+            title: "2024–25 TAPR masking methodology"
+            status: "available"
+            provenance_ids:
+              - "6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554"
+            reviewed_sha256: "7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8"
+          - reference_id: "columns_source"
+            role: "schema"
+            path: "schemas/tapr--2025--state-student-profile-crosswalk.json"
+            title: "TEA Data statewide STUD crosswalk"
+            status: "available"
+            provenance_ids:
+              - "962ca4883616b7eafab4136024c58b51a423b02f6e5083b2f24c914fcd3d0da6"
+            reviewed_sha256: "51ddeb2bb627d58a17ee2492392f8462041f2bb1e23ac09daaa620db6ccad3cf"
+        notes: >-
+          This successful statewide selection retains the 228 publisher fields
+          offered outside class size. Membership and Enrollment remain distinct.
+          Mobility and disciplinary placements use the 2023–24 reference year.
+          Attrition is retained raw while its glossary cohort discrepancy is open.
+          SPNTINDC and SPNTINDP retain the publisher's disputed Asian labels and
+          remain unbound. SPNTASIC and SPNTASIP match the published Asian enrollment
+          row. All other raw fields require separate semantic qualification.
+      reader:
+        profiles:
+          source:
+            column_schema: "schemas/tapr--2025--state-student-profile-crosswalk.json"
+            tapr_source:
+              scope: "state"
+              tables:
+                student_profile: "data/tapr/raw/2025-s-STUD-all_except_class_size.csv"
   state_tapr_four_year_longitudinal_rate:
     2025:
       path: "data/tapr/raw/2025-s-COMP4-csv.csv"
@@ -8063,6 +8614,322 @@ data_sources:
               scope: "state"
               tables:
                 college_readiness_components: "data/tapr/raw/2025-s-GRAD2-offered-original.csv"
+  accountability_research_four_year_graduation:
+    2025:
+      path: data/research/graduation/2025/district-data-download-4yr-2025.xlsx
+      metadata:
+        title: Class of 2025 TEA Accountability Research four-year longitudinal graduation
+        publisher: Texas Education Agency
+        version: '2025'
+        source_url: https://tea.texas.gov/data-reports/school-performance/accountability-research/completion-graduation-and-dropout/four-year-graduation-and-dropout-data-class-2025
+        value_policy: research_graduation_class_2025
+        metrics:
+          dist_alld:
+            field: dist_alld
+            unit: count
+            period: &research_2025_graduation_cutoff
+              kind: as_of
+              as_of: '2025-08-31'
+          dist_alln_grad:
+            field: dist_alln_grad
+            unit: count
+            period: *research_2025_graduation_cutoff
+          dist_allr_grad:
+            field: dist_allr_grad
+            unit: percent
+            period: *research_2025_graduation_cutoff
+          dist_ecnd:
+            field: dist_ecnd
+            unit: count
+            period: *research_2025_graduation_cutoff
+          dist_ecnn_grad:
+            field: dist_ecnn_grad
+            unit: count
+            period: *research_2025_graduation_cutoff
+          dist_ecnr_grad:
+            field: dist_ecnr_grad
+            unit: percent
+            period: *research_2025_graduation_cutoff
+          dist_lepd:
+            field: dist_lepd
+            unit: count
+            period: *research_2025_graduation_cutoff
+          dist_lepn_grad:
+            field: dist_lepn_grad
+            unit: count
+            period: *research_2025_graduation_cutoff
+          dist_lepr_grad:
+            field: dist_lepr_grad
+            unit: percent
+            period: *research_2025_graduation_cutoff
+          dist_sped:
+            field: dist_sped
+            unit: count
+            period: *research_2025_graduation_cutoff
+          dist_spen_grad:
+            field: dist_spen_grad
+            unit: count
+            period: *research_2025_graduation_cutoff
+          dist_sper_grad:
+            field: dist_sper_grad
+            unit: percent
+            period: *research_2025_graduation_cutoff
+          camp_alld:
+            field: camp_alld
+            unit: count
+            period: &research_2025_graduation_cutoff_002
+              kind: as_of
+              as_of: '2025-08-31'
+          camp_alln_grad:
+            field: camp_alln_grad
+            unit: count
+            period: *research_2025_graduation_cutoff_002
+          camp_allr_grad:
+            field: camp_allr_grad
+            unit: percent
+            period: *research_2025_graduation_cutoff_002
+          camp_ecnd:
+            field: camp_ecnd
+            unit: count
+            period: *research_2025_graduation_cutoff_002
+          camp_ecnn_grad:
+            field: camp_ecnn_grad
+            unit: count
+            period: *research_2025_graduation_cutoff_002
+          camp_ecnr_grad:
+            field: camp_ecnr_grad
+            unit: percent
+            period: *research_2025_graduation_cutoff_002
+          camp_lepd:
+            field: camp_lepd
+            unit: count
+            period: *research_2025_graduation_cutoff_002
+          camp_lepn_grad:
+            field: camp_lepn_grad
+            unit: count
+            period: *research_2025_graduation_cutoff_002
+          camp_lepr_grad:
+            field: camp_lepr_grad
+            unit: percent
+            period: *research_2025_graduation_cutoff_002
+          camp_sped:
+            field: camp_sped
+            unit: count
+            period: *research_2025_graduation_cutoff_002
+          camp_spen_grad:
+            field: camp_spen_grad
+            unit: count
+            period: *research_2025_graduation_cutoff_002
+          camp_sper_grad:
+            field: camp_sper_grad
+            unit: percent
+            period: *research_2025_graduation_cutoff_002
+          camp_alln_grad_aea:
+            field: camp_alln_grad_aea
+            unit: count
+          camp_alln_cont_aea:
+            field: camp_alln_cont_aea
+            unit: count
+          camp_alln_txchse_aea:
+            field: camp_alln_txchse_aea
+            unit: count
+          camp_alln_drop_aea:
+            field: camp_alln_drop_aea
+            unit: count
+          camp_alln_cmp4:
+            field: camp_alln_cmp4
+            unit: count
+          camp_allr_cmp4:
+            field: camp_allr_cmp4
+            unit: percent
+          state_alld:
+            field: state_alld
+            unit: count
+            period: &research_2025_graduation_cutoff_003
+              kind: as_of
+              as_of: '2025-08-31'
+          state_alln_grad:
+            field: state_alln_grad
+            unit: count
+            period: *research_2025_graduation_cutoff_003
+          state_allr_grad:
+            field: state_allr_grad
+            unit: percent
+            period: *research_2025_graduation_cutoff_003
+          state_ecnd:
+            field: state_ecnd
+            unit: count
+            period: *research_2025_graduation_cutoff_003
+          state_ecnn_grad:
+            field: state_ecnn_grad
+            unit: count
+            period: *research_2025_graduation_cutoff_003
+          state_ecnr_grad:
+            field: state_ecnr_grad
+            unit: percent
+            period: *research_2025_graduation_cutoff_003
+          state_lepd:
+            field: state_lepd
+            unit: count
+            period: *research_2025_graduation_cutoff_003
+          state_lepn_grad:
+            field: state_lepn_grad
+            unit: count
+            period: *research_2025_graduation_cutoff_003
+          state_lepr_grad:
+            field: state_lepr_grad
+            unit: percent
+            period: *research_2025_graduation_cutoff_003
+          state_sped:
+            field: state_sped
+            unit: count
+            period: *research_2025_graduation_cutoff_003
+          state_spen_grad:
+            field: state_spen_grad
+            unit: count
+            period: *research_2025_graduation_cutoff_003
+          state_sper_grad:
+            field: state_sper_grad
+            unit: percent
+            period: *research_2025_graduation_cutoff_003
+        references:
+        - reference_id: publisher_selection
+          role: source_notes
+          url: https://tea.texas.gov/data-reports/school-performance/accountability-research/completion-graduation-and-dropout/four-year-graduation-and-dropout-data-class-2025
+          title: TEA Class of 2025 publisher index
+          status: available
+          provenance_ids:
+          - bb06b6688430e51dd93a27996564e29d0bb6fa7434446dff31d304962bc0977b
+          reviewed_sha256: 2a945ba42fb738d3c839f83d4e2fff4dd239e29ebd0c246265ca48e0cbaf8b5e
+        - reference_id: district_dictionary
+          role: data_dictionary
+          url: https://tea.texas.gov/data-reports/school-performance/accountability-research/completion-graduation-and-dropout/district-data-download-4yr-2025.xlsx
+          title: District workbook Data_Dictionary worksheet
+          status: available
+          provenance_ids:
+          - 7a0a9674318163517ca9fcb8cfb9af43902e06025cc84c6494cb222ea6525171
+          reviewed_sha256: 1daed595801a579fa93c960b3a73d904ce3eea3d1896e267d06f7c5b1b28d3e3
+        - reference_id: publisher_disclosure
+          role: masking_methodology
+          url: https://tea.texas.gov/data-reports/school-performance/accountability-research/completion-graduation-and-dropout/campus-data-download-4yr-2025.xlsx
+          title: Campus workbook Overview masking and absence notes
+          status: available
+          provenance_ids:
+          - a1830572a55bcc9d16638c0222196c6c48c49a5bd083cc8507abd73036f22853
+          reviewed_sha256: 385149cd4fc38902c3b28c1c2368e5c5f88913c42392d2a717e54962d6b48d9b
+        - reference_id: campus_dictionary
+          role: data_dictionary
+          url: https://tea.texas.gov/data-reports/school-performance/accountability-research/completion-graduation-and-dropout/campus-data-download-4yr-2025.xlsx
+          title: Campus workbook Data_Dictionary worksheet
+          status: available
+          provenance_ids:
+          - a1830572a55bcc9d16638c0222196c6c48c49a5bd083cc8507abd73036f22853
+          reviewed_sha256: 385149cd4fc38902c3b28c1c2368e5c5f88913c42392d2a717e54962d6b48d9b
+        - reference_id: processing_methods
+          role: methodology
+          url: https://tea.texas.gov/data-reports/school-performance/accountability-research/dropcomp-4yr-processing-class-2025.pdf
+          title: TEA Class of 2025 district processing methods
+          status: available
+          provenance_ids:
+          - e271f53bce8a93c269f8ea888687207b6c7e66ac87550690a2fae36550c82c85
+          reviewed_sha256: fdb2306f74c0c6d71ec7ebd6d5845c6be134f0a63fa2e48609ce0c08cb7fe862
+        - reference_id: state_longitudinal
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/acctres/completion/2025/state.html
+          title: Direct statewide all-students cohort counts and rate
+          status: available
+          provenance_ids:
+          - 7d6ef6d7bd7103c622f5b1218989f89a4c872ce8a5a95492caaddaed2d8faa1f
+          reviewed_sha256: c0723a609d0acf22008268e70dff20e79fd9ff5e8ffc8839321877fc13ef0dae
+        - reference_id: state_demographics
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/acctres/completion/2025/state_demo.html
+          title: Direct statewide demographic cohort counts and rates
+          status: available
+          provenance_ids:
+          - 173f52c1332b2203712444680afe5662624497604f4f58139accaee7a1f90c23
+          reviewed_sha256: dfde8fbc01784d25320017624b8e8f3bb22445d92e4d7bc420bccb5a5676eb01
+        - reference_id: state_programs
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/acctres/completion/2025/state_prgm.html
+          title: Direct statewide program cohort counts and rates
+          status: available
+          provenance_ids:
+          - 20441c3de091dff78f98692d10367a915b7f0782d40a49fa8787956f0cc28281
+          reviewed_sha256: 86dfb8586c096cf8ff234ef2e96de491a51bca59fcd93a00e555d1b89850eba4
+        - reference_id: state_annual_report
+          role: methodology
+          url: https://tea.texas.gov/data-reports/school-performance/accountability-research/dropcomp-2024-25.pdf
+          title: State longitudinal scope and Federal Report Card cross-tabulation (PDF pages 144 and 150)
+          status: available
+          provenance_ids:
+          - 9cad41ae09021d88297033d89b448d016daf595676b1e82b32e556ddd0ee29b3
+          reviewed_sha256: f13be8ba0a8a8300236ff39e07a4de5f7707dec0bdf958ea37d1c1864b9988c2
+        - reference_id: district_austin
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=acctres.armast.sas&prgopt=completion%2F2025%2Fdistsum.sas&year4=2025&year2=25&topic=completion&search=district&namenum=227901
+          title: TEA separate selected Accountability Research report
+          status: available
+          provenance_ids:
+          - ba172ea1c729aa71c673dd8568a332762dbdc867e02269928487f0a572a3d116
+          reviewed_sha256: 9c4900ac933379943ec67384e87649e72751fd9386587ca568e41abfd7a3c482
+        - reference_id: campus_garland
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=acctres.armast.sas&prgopt=completion%2F2025%2Fcampsum.sas&year4=2025&year2=25&topic=completion&search=campus&namenum=057909002
+          title: TEA separate selected Accountability Research report
+          status: available
+          provenance_ids:
+          - 4b89edfc6460b73c9844ae2792fa7cdd7016bdf78c3e90b75b2d54f4f8ca5952
+          reviewed_sha256: a0250058c87206d5c6b73b173f1c53d3af41498f678af44c21200aca4ea15318
+        - reference_id: campus_andrews
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=acctres.armast.sas&prgopt=completion%2F2025%2Fcampsum.sas&year4=2025&year2=25&topic=completion&search=campus&namenum=002901002
+          title: TEA separate selected Accountability Research report
+          status: available
+          provenance_ids:
+          - f70a4b267ae315a573cdc2a3808702283d3b154837e7b2e96de41fc1aa6d1731
+          reviewed_sha256: 9648e9d37876abd12846ce264d5d005146e7e8a605ef226c520c9cafc14c7297
+        - reference_id: campus_transition
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=acctres.armast.sas&prgopt=completion%2F2025%2Fcampsum.sas&year4=2025&year2=25&topic=completion&search=campus&namenum=227909005
+          title: TEA separate selected Accountability Research report
+          status: available
+          provenance_ids:
+          - 28c7d0da3a8a6715a81bb8e988dbd03e5a4a6e336b05a943addfa55e40dbba33
+          reviewed_sha256: 61081d4d1763bc5318b6bd2d84dfe0baf0686db2d16336b207f828a8d3d0c7bc
+        - reference_id: columns_source
+          role: schema
+          path: schemas/research--2025--four-year-longitudinal-graduation-crosswalk.json
+          title: TEA Data exact source crosswalk
+          status: available
+          provenance_ids:
+          - f788edae032263a148fae3e69a9035cd742078e1929c71771a84881cb2e9e2c2
+          reviewed_sha256: 26fff1e333d76cfe50b8736b0418b4f81d7651f62e4bcebe94c4d018ce2a1663
+        notes: Class of 2025 began Grade 9 in 2021–22 or transferred into that cohort. Graduation cutoff August 31,
+          2025, with cohort status resolved using fall 2025 records. Federal and statutory district/campus observations
+          have distinct exclusion criteria. Texas is a direct published cohort without those campus/district exclusions.
+          Campus AEA completion is a separate calculation. State field codes are local selectors for the literal HTML
+          labels.
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/research--2025--four-year-longitudinal-graduation-crosswalk.json
+            acquisition_ids:
+              district:
+              - 7a0a9674318163517ca9fcb8cfb9af43902e06025cc84c6494cb222ea6525171
+              campus:
+              - a1830572a55bcc9d16638c0222196c6c48c49a5bd083cc8507abd73036f22853
+              state:
+              - 7d6ef6d7bd7103c622f5b1218989f89a4c872ce8a5a95492caaddaed2d8faa1f
+              - 173f52c1332b2203712444680afe5662624497604f4f58139accaee7a1f90c23
+              - 20441c3de091dff78f98692d10367a915b7f0782d40a49fa8787956f0cc28281
+            witness_ids:
+              district:
+                '227901': ba172ea1c729aa71c673dd8568a332762dbdc867e02269928487f0a572a3d116
+              campus:
+                057909002: 4b89edfc6460b73c9844ae2792fa7cdd7016bdf78c3e90b75b2d54f4f8ca5952
+                002901002: f70a4b267ae315a573cdc2a3808702283d3b154837e7b2e96de41fc1aa6d1731
+                '227909005': 28c7d0da3a8a6715a81bb8e988dbd03e5a4a6e336b05a943addfa55e40dbba33
   frc_per_pupil_expenditure:
     2025:
       path: data/frc/2025/per-pupil-expenditure.html
@@ -9708,6 +10575,8 @@ schema:
     - xlsx
     district_transfer_reports:
     - parquet
+    accountability_research_four_year_graduation:
+    - xlsx
     frc_per_pupil_expenditure:
     - html
     peims_teacher_course_enrollment:
@@ -9727,6 +10596,8 @@ schema:
     campus_tapr_college_readiness_components:
     - csv
     district_tapr_college_readiness_components:
+    - csv
+    state_tapr_student_profile:
     - csv
     state_tapr_four_year_longitudinal_rate:
     - csv

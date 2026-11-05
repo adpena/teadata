@@ -158,9 +158,9 @@ def test_statewide_peims_comparison_preserves_counts_and_both_statuses(tmp_path,
 
 @pytest.mark.parametrize("invalid_value", [0, False, "0"])
 def test_statewide_comparison_rejects_a_value_on_a_suppressed_cell(invalid_value):
-    projection = _Projection(None, (), {FIELD: ("raw", "status")})
+    projection = _Projection(None, (), {FIELD: ("raw", "status")}, None)
     with pytest.raises(ContractError, match="raw/status"):
-        projection.value({FIELD: invalid_value, "raw": "-999", "status": "suppressed"}, FIELD)
+        projection.value({FIELD: invalid_value, "raw": "-999", "status": "suppressed"}, FIELD, "count")
 
 
 @pytest.mark.parametrize(("damage", "message"), [

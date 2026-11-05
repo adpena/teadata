@@ -19,6 +19,7 @@ from teadata.teadata_config import load_config
 DATASET = "state_tapr_college_readiness_components"
 GRAD1_DATASET = "state_tapr_college_career_military_readiness"
 COMP4_DATASET = "state_tapr_four_year_longitudinal_rate"
+STUDENT_DATASET = "state_tapr_student_profile"
 EDITION = 2025
 GROUPS = {
     "A": "State", "B": "AfricanAmerican", "H": "Hispanic", "W": "White",
@@ -67,7 +68,7 @@ def verify_rates(values: dict[str, str], rows: list[list[str]], *, measures: dic
 
 
 def _verify_source(store: ProvenanceStore, dataset: str,
-                   verify: Callable[[dict[str, str], Callable[[str], Path]], int]) -> dict[str, int]:
+                   verify: Callable[[dict[str, str], Callable[[str], Path], set[str]], dict[str, int]]) -> dict[str, int]:
     cfg = load_config()
     metadata = cfg.resolve_dataset(dataset, EDITION, exact=True, reader_profile="source").metadata
     refs = {ref.reference_id: ref for ref in metadata.references if ref.provenance_ids}
@@ -96,17 +97,19 @@ def _verify_source(store: ProvenanceStore, dataset: str,
     occurrences = extract_tapr_dictionary(original("dictionary").read_bytes(), encoding="cp1252")
     if [item.column_record() for item in occurrences] != request.mapping["dictionary_records"]:
         raise ValueError("Statewide TAPR dictionary differs from the reviewed occurrence mapping")
+    field_codes = {field["field"]: field["code"] for field in fields}
+    bound_codes = {field_codes[metric.field] for metric in metadata.metrics.values()}
     return {
         "raw_cells": len(values),
         "dictionary_occurrences": len(occurrences),
-        "displayed_rates": verify(dict(zip(codes, values, strict=True)), original),
+        **verify(dict(zip(codes, values, strict=True)), original, bound_codes),
     }
 
 
 def _verify_ccmr(store: ProvenanceStore, dataset: str, measures: dict[str, str]) -> dict[str, int]:
-    def verify(values: dict[str, str], original: Callable[[str], Path]) -> int:
+    def verify(values: dict[str, str], original: Callable[[str], Path], _bound_codes: set[str]) -> dict[str, int]:
         rows = _Rows(original("state_ccmr_report").read_text(encoding="cp1252")).rows
-        return verify_rates(values, rows, measures=measures)
+        return {"displayed_rates": verify_rates(values, rows, measures=measures)}
 
     return _verify_source(store, dataset, verify)
 
@@ -120,7 +123,7 @@ def verify_state_grad1(store: ProvenanceStore) -> dict[str, int]:
 
 
 def verify_state_comp4(store: ProvenanceStore) -> dict[str, int]:
-    def verify(values: dict[str, str], original: Callable[[str], Path]) -> int:
+    def verify(values: dict[str, str], original: Callable[[str], Path], _bound_codes: set[str]) -> dict[str, int]:
         original("cohort_methodology")
         cohort, graduates = int(values["SA0C424D"]), int(values["SAGC424N"])
         rate = Decimal(values["SAGC424R"])
@@ -143,15 +146,74 @@ def verify_state_comp4(store: ProvenanceStore) -> dict[str, int]:
                 or not any(row[:4] == ["", "State", "District", "Campus"] for row in school[:school.index(federal)])
                 or school[school.index(federal) + 1][:5] != ["Graduation", "Class of 2024", f"{rate:.1f}%", "92.5%", "91.7%"]):
             raise ValueError("Garland school report card federal graduation values disagree")
-        return 1
+        return {"displayed_rates": 1}
 
     return _verify_source(store, COMP4_DATASET, verify)
+
+
+def verify_state_student_profile(store: ProvenanceStore) -> dict[str, int]:
+    def verify(values: dict[str, str], original: Callable[[str], Path], bound_codes: set[str]) -> dict[str, int]:
+        rows = _Rows(original("state_student_report").read_text(encoding="cp1252")).rows
+        if (rows[1:3] != [["2024-25 Student Information"], ["State"]]
+                or rows[4:6] != [["", "Membership", "Enrollment"],
+                                 ["Student Information", "Count", "Percent", "Count", "Percent"]]):
+            raise ValueError("Unexpected statewide student report edition, scope, or populations")
+
+        def section(start: str, stop: str) -> dict[str, list[str]]:
+            if rows.count([start]) != 1 or rows.count([stop]) != 1:
+                raise ValueError(f"Unexpected student profile report section: {start}")
+            entries = rows[rows.index([start]) + 1:rows.index([stop])]
+            by_label = {entry[0]: entry[1:] for entry in entries if entry}
+            if len(by_label) != len(entries):
+                raise ValueError(f"Duplicate statewide student report labels: {start}")
+            return by_label
+
+        def control(stem: str, cells: list[str], suffixes: str = "CP") -> dict[str, str]:
+            return {stem + suffix: cell for suffix, cell in zip(suffixes, cells, strict=True)}
+
+        races = {"BLA": "African American", "HIS": "Hispanic", "WHI": "White", "IND": "American Indian",
+                 "ASI": "Asian", "PCI": "Pacific Islander", "TWO": "Two or More Races"}
+        ethnic = section("Ethnic Distribution", "Sex")
+        programs = section("Students by Instructional Program", "Students with Disabilities by Type of Primary Disability")
+        other = section("Other Student Cohorts", "Students by Instructional Program")
+        mobility = section("Mobility (2023-24)", "Student Attrition (2023-24)")
+        if rows[6][0] != "Total Students":
+            raise ValueError("Unexpected statewide student total row")
+        expected = {"SPETALLC": rows[6][1], "SPNTALLC": rows[6][3]}
+        for code, label in races.items():
+            expected.update(control("SPET" + code, ethnic[label][:2]))
+            expected.update(control("SPNT" + code, ethnic[label][2:]))
+            expected.update(control("SPEM" + code, mobility[label][:2]))
+        for code, label in {"SPE": "Special Education", "GIF": "Gifted and Talented Education",
+                            "DSL": "Students w/ Dyslexia", "LEP": "EB Students/EL", "504": "Section 504 Students"}.items():
+            cells = (programs if label in programs else other)[label]
+            expected.update(control("SPET" + code, cells[:2]))
+            expected.update(control("SPNT" + code, cells[2:]))
+        for code, label in {"ALL": "Total Mobile Students", "SPE": "Special Ed Students who are Mobile",
+                            "LEP": "Count and Percent of EB Students/EL who are Mobile",
+                            "ECO": "Count and Percent of Econ Dis Students who are Mobile"}.items():
+            expected.update(control("SPEM" + code, mobility[label][:2]))
+        expected.update(control("SPETDIS", other["Students w/ Disciplinary Placements (2023-24)"][:2]))
+        attrition = rows[rows.index(["Student Attrition (2023-24)"]) + 1]
+        if attrition[0] != "Total Student Attrition":
+            raise ValueError("Unexpected statewide student attrition row")
+        expected.update(control("SPETATT", attrition[1:3]))
+        for code, displayed in expected.items():
+            if Decimal(values[code]) != Decimal(displayed.removesuffix("%").replace(",", "")):
+                raise ValueError(f"Statewide student report differs for {code}")
+        held = {"SPNTINDC", "SPNTINDP", "SPETATTC", "SPETATTP"}
+        if bound_codes != expected.keys() - held:
+            raise ValueError("Statewide student bindings differ from the independently reviewed report fields")
+        return {"displayed_comparable_cells": len(bound_codes), "displayed_held_cells": len(held)}
+
+    return _verify_source(store, STUDENT_DATASET, verify)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--store", required=True, type=Path)
-    verifiers = {"GRAD1": verify_state_grad1, "GRAD2": verify_state_grad2, "COMP4": verify_state_comp4}
+    verifiers = {"GRAD1": verify_state_grad1, "GRAD2": verify_state_grad2, "COMP4": verify_state_comp4,
+                 "STUD": verify_state_student_profile}
     parser.add_argument("--family", choices=verifiers, default="GRAD2")
     args = parser.parse_args()
     print(json.dumps(verifiers[args.family](ProvenanceStore(args.store)), sort_keys=True))

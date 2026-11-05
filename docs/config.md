@@ -727,6 +727,8 @@ following families when the release contains both scopes.
 | --- | --- | --- |
 | TAPR 2025 GRAD2 | District, campus | None |
 | TAPR 2025 GRAD1 overall CCMR | District, campus | None |
+| TAPR 2025 COMP4 federal graduation rate | District, campus | None |
+| TAPR 2025 STUD | District, campus | None |
 | PEIMS Student Program and Special Populations | District, campus | None |
 | PEIMS Student Enrollment by Ethnicity | District, campus | `ethnicity`, such as `"Hispanic/Latino"` |
 | PEIMS Primary Disability | District | None |
@@ -750,6 +752,29 @@ The reviewed TEA rate policy preserves `-1` as suppressed. Blank tokens,
 absent local rows, and uninterpreted tokens carry separate statuses and
 yield no gap. TAPR is not applicable to private campuses. Resolve ambiguous
 source revisions explicitly before comparing. These native leaves are opt-in.
+
+The 2024–25 STUD state selection retains 228 columns outside class size and
+241 ordered dictionary entries. The full-state selection returned a SAS error.
+The independent statewide report corroborates 72 comparison fields covering
+Membership, Enrollment, mobility and disciplinary placements. The latter two
+carry 2023–24 periods, and a wildcard comparison retains each field's period.
+Special education, gifted and talented, dyslexia, emergent bilingual and
+Section 504 have separate Membership and Enrollment measures. Mobility uses
+the publisher's campus-based calculation at each scope.
+The `daep_count` and `daep_percent` selectors follow the bulk shorthand.
+The glossary's disciplinary placements measure includes both disciplinary
+alternative education and juvenile justice alternative education programs.
+
+The state CSV and dictionary label `SPNTINDC/P` as Asian, while the independent
+report places those values in American Indian Enrollment. Both fields retain
+their original labels and codes and stay outside the comparison contract.
+Attrition remains raw in the state edition while the glossary's cohort conflict
+is open. The separate `SPNTASIC/P` pair matches published Asian Enrollment.
+[TEA statewide Student Information](https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=S&lev=S&prgopt=reports%2Ftapr%2Fstudent.sas)
+
+```sh
+uv run python -m teadata.scripts.verify_tapr_state_grad2 --family STUD --store provenance
+```
 
 Prepare each family separately with the existing bounded native producer:
 

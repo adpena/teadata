@@ -303,6 +303,40 @@ def test_literal_class_and_annual_graduate_contexts_do_not_become_other_populati
         assert 'Annual-graduate' in metadata.notes and 'Bonus' in metadata.notes and 'ERC' in metadata.notes
 
 
+def test_state_student_profile_preserves_conflicts_and_explicit_population_periods():
+    cfg = load_config()
+    dataset = 'state_tapr_student_profile'
+    table = source_table(cfg, 'student_profile', 'state')
+    metadata = cfg.resolve_dataset(dataset, 2025, exact=True, reader_profile='source').metadata
+    fields = {row['code']: row for row in table['fields']}
+    assert len(fields) == 228 and len(table['dictionary_records']) == 241
+    assert table['metric_period'] == metadata.period.to_dict() == UNKNOWN
+    assert len(metadata.metrics) == 72
+    assert 'Asian' in fields['SPNTINDC']['label'] and fields['SPNTINDC']['field'].endswith('_spntindc')
+    held = {'SPNTINDC', 'SPNTINDP', 'SPETATTC', 'SPETATTP'}
+    assert {fields[code]['field'] for code in held}.isdisjoint(metric.field for metric in metadata.metrics.values())
+    state_codes = {row['field']: code for code, row in fields.items()}
+    for scope in ('district', 'campus'):
+        local_dataset = f'{scope}_tapr_student_profile'
+        local = cfg.resolve_dataset(local_dataset, 2025, exact=True, reader_profile='source').metadata
+        local_codes = {row['field']: row['code'] for row in source_table(cfg, 'student_profile', scope)['fields']}
+        for name, state_metric in metadata.metrics.items():
+            local_metric = local.metrics[name]
+            assert (local_metric.period, local_metric.unit) == (state_metric.period, state_metric.unit)
+            assert local_codes[local_metric.field][1:] == state_codes[state_metric.field][1:]
+    for name, code, unit, year in (
+        ('student_membership_special_ed_count', 'SPETSPEC', 'count', 2025),
+        ('student_enrollment_special_ed_percent', 'SPNTSPEP', 'percent', 2025),
+        ('student_enrollment_asian_count', 'SPNTASIC', 'count', 2025),
+        ('student_membership_mobility_all_students_percent', 'SPEMALLP', 'percent', 2024),
+        ('daep_count', 'SPETDISC', 'count', 2024),
+    ):
+        metric = metadata.metrics[name]
+        assert metric.field == fields[code]['field'] and metric.unit == unit
+        assert metric.period.to_dict() == {'kind': 'school_year', 'start_year': year - 1, 'end_year': year}
+    assert cfg.is_source_only(dataset, 2025)
+
+
 def test_state_comp4_binds_only_the_witnessed_federal_rate():
     cfg = load_config()
     family = 'four_year_longitudinal_rate'

@@ -230,6 +230,10 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     assert list(current['data_sources'].pop(per_pupil)) == [2025]
     assert current['schema']['data_sources'].pop(per_pupil) == ['html']
     assert current['value_policies'].pop('frc_ppe_published')['reference_id'] == 'frc_ppe_blank_note'
+    research = 'accountability_research_four_year_graduation'
+    assert list(current['data_sources'].pop(research)) == [2025]
+    assert current['schema']['data_sources'].pop(research) == ['xlsx']
+    assert current['value_policies'].pop('research_graduation_class_2025')['reference_id'] == 'publisher_disclosure'
     # Remove only the explicitly added 2025 outcome opt-ins before reconstructing history.
     for scope in ('campus', 'district'):
         for family in ('college_career_military_readiness', 'college_readiness_components'):
@@ -237,7 +241,7 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
             assert list(current['data_sources'].pop(dataset)) == [2025]
             assert current['schema']['data_sources'].pop(dataset) == ['csv']
     for family in ('college_career_military_readiness', 'college_readiness_components',
-                   'four_year_longitudinal_rate'):
+                   'four_year_longitudinal_rate', 'student_profile'):
         statewide = 'state_tapr_' + family
         assert list(current['data_sources'].pop(statewide)) == [2025]
         assert current['schema']['data_sources'].pop(statewide) == ['csv']
