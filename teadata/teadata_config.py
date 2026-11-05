@@ -758,7 +758,14 @@ class Config:
         reader_profile: str | None = None,
     ) -> dict[str, str] | None:
         """Load the exact reviewed reader resource without source-row I/O."""
-        from .column_schema import load_column_contract, reader_options
+        resource = self._read_column_contract(dataset, year, section=section, reader_profile=reader_profile)
+        return resource[0] if resource is not None else None
+
+    def _read_column_contract(
+        self, dataset: str, year: int | None, *, section: str = "data_sources",
+        reader_profile: str | None = None,
+    ) -> tuple[dict[str, str], dict[str, Any]] | None:
+        from .column_schema import read_column_contract, reader_options
         from .manifest import ContractError
 
         source = self.resolve_dataset(dataset, year, section=section)
@@ -784,7 +791,7 @@ class Config:
                 )
             if self.base_dir is None:
                 raise ValueError("Column schema requires a source contract directory")
-            return load_column_contract(
+            return read_column_contract(
                 self.base_dir, resource, references[0].reviewed_sha256
             )
         except (OSError, ValueError) as error:
@@ -813,15 +820,15 @@ class Config:
         reader_profile: str | None = None,
     ) -> list[str] | None:
         """Derive ordered reader columns from the same reviewed resource."""
-        from .column_schema import header_records, parse_column_schema, schema_columns
+        from .column_schema import header_records, schema_columns
         from .manifest import ContractError
 
-        contract = self.column_contract(dataset, year, section=section, reader_profile=reader_profile)
-        if contract is None:
+        resource = self._read_column_contract(dataset, year, section=section, reader_profile=reader_profile)
+        if resource is None:
             return None
+        _, document = resource
         try:
             source = self.resolve_dataset(dataset, year, section=section, reader_profile=reader_profile)
-            document = parse_column_schema(contract["text"].encode())
             if document["schema_version"] == 2:
                 if source.metadata.version is None:
                     raise ValueError("Header crosswalk requires an explicit source edition")
@@ -832,6 +839,16 @@ class Config:
         except ValueError as error:
             raise ContractError(f"Invalid column schema for {dataset}: {error}") from error
 
+    def _header_source_edition(self, dataset: str, edition: str) -> tuple[str, int]:
+        from .manifest import ContractError
+
+        choices = [(section, year) for section in ("data_sources", "spatial")
+                   for name, versions in getattr(self, section).items() if name == dataset
+                   for year, definition in versions.entries.items() if definition.metadata.version == edition]
+        if len(choices) != 1:
+            raise ContractError(f"Source-contract header crosswalk edition unavailable or ambiguous: {dataset!r}, {edition!r}")
+        return choices[0]
+
     def header_records(self, dataset: str, *, edition: str,
                        table: str | None = None, reader_profile: str | None = None) -> list[dict[str, Any]]:
         """Return reviewed source-contract mappings without any dataset reads.
@@ -840,21 +857,17 @@ class Config:
         a data release. Editions are exact metadata versions, never prior-year
         fallbacks or guesses from filenames.
         """
-        from .column_schema import parse_column_schema, header_records
+        from .column_schema import header_records
         from .manifest import ContractError
 
-        choices = [(section, year) for section in ("data_sources", "spatial")
-                   for name, versions in getattr(self, section).items() if name == dataset
-                   for year, definition in versions.entries.items() if definition.metadata.version == edition]
-        if len(choices) != 1:
-            raise ContractError(f"Source-contract header crosswalk edition unavailable or ambiguous: {dataset!r}, {edition!r}")
-        section, year = choices[0]
-        contract = self.column_contract(dataset, year, section=section, reader_profile=reader_profile)
-        if contract is None:
+        section, year = self._header_source_edition(dataset, edition)
+        resource = self._read_column_contract(dataset, year, section=section, reader_profile=reader_profile)
+        if resource is None:
             raise ContractError(f"Source-contract header crosswalk unavailable: {dataset!r}")
+        _, document = resource
         try:
             source = self.resolve_dataset(dataset, year, section=section, reader_profile=reader_profile)
-            return header_records(parse_column_schema(contract["text"].encode()),
+            return header_records(document,
                                   dataset=dataset, edition=edition, table=table, metadata=source.metadata)
         except ValueError as error:
             raise ContractError(str(error)) from error
@@ -868,16 +881,16 @@ class Config:
         Source-only datasets can be excluded from release coverage even when
         their first edition is newer than the requested build year.
         """
-        from .column_schema import crosswalk_dataset, has_default_reader, parse_column_schema
+        from .column_schema import crosswalk_dataset, has_default_reader
 
         def source_only(edition_year: int | None) -> bool:
             source = self.resolve_dataset(dataset, edition_year, section=section)
             if has_default_reader(source.reader) or "source" not in source.reader.get("profiles", {}):
                 return False
-            contract = self.column_contract(dataset, edition_year, section=section, reader_profile="source")
-            if contract is None:
+            resource = self._read_column_contract(dataset, edition_year, section=section, reader_profile="source")
+            if resource is None:
                 return False
-            document = parse_column_schema(contract["text"].encode())
+            _, document = resource
             if document["schema_version"] != 2:
                 return False
             if source.metadata.version is None:
@@ -914,7 +927,7 @@ class Config:
         prepared inputs. Raw preparation has its own real processing receipt;
         it cannot masquerade as a schema2 release build or replace those bytes.
         """
-        from .column_schema import crosswalk_dataset, parse_column_schema, reader_options
+        from .column_schema import crosswalk_dataset, header_records, reader_options
         from .manifest import ACTIVE_BUILD, ContractError
         from .tapr import TAPR_SOURCE_KEYS, TaprSourceRequest, tapr_source_selection
 
@@ -928,13 +941,18 @@ class Config:
             selection = tapr_source_selection(options)
         except ValueError as error:
             raise ContractError(str(error)) from error
-        contract = self.column_contract(dataset, year, reader_profile="source")
-        if contract is None:
+        resource = self._read_column_contract(dataset, year, reader_profile="source")
+        if resource is None:
             raise ContractError("Full TAPR source preparation requires a reviewed crosswalk")
-        selected = crosswalk_dataset(parse_column_schema(contract["text"].encode()), dataset, source.metadata.version)
+        _, document = resource
+        selected = crosswalk_dataset(document, dataset, source.metadata.version)
         # The same metadata-only projection used by discovery rejects field
         # conflicts before opening any source table.
-        self.header_records(dataset, edition=source.metadata.version, reader_profile="source")
+        self._header_source_edition(dataset, source.metadata.version)
+        try:
+            header_records(document, dataset=dataset, edition=source.metadata.version, metadata=source.metadata)
+        except ValueError as error:
+            raise ContractError(str(error)) from error
         if selected.get("source_only") and any(table["metric_period"] != source.metadata.period.to_dict()
                                                for table in selected["tables"]):
             raise ContractError("Source-only metric period differs from its declared source metadata")

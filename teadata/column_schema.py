@@ -341,11 +341,20 @@ def parse_column_schema(data: bytes) -> dict[str, Any]:
 
 def load_column_contract(base_dir: Path, relative: str, reviewed_sha256: str) -> dict[str, str]:
     """Return verified exact resource text for binding into a build catalog."""
+    contract, _ = read_column_contract(base_dir, relative, reviewed_sha256)
+    return contract
+
+
+def read_column_contract(
+    base_dir: Path, relative: str, reviewed_sha256: str,
+) -> tuple[dict[str, str], dict[str, Any]]:
+    """Read the verified resource and its validated document in one pass."""
     data = portable_schema_path(base_dir, relative).read_bytes()
     if sha256(data).hexdigest() != reviewed_sha256:
         raise ValueError("Column schema bytes differ from the reviewed contract")
-    parse_column_schema(data)
-    return {"path": relative, "sha256": reviewed_sha256, "text": data.decode("utf-8")}
+    document = parse_column_schema(data)
+    contract = {"path": relative, "sha256": reviewed_sha256, "text": data.decode("utf-8")}
+    return contract, document
 
 
 def crosswalk_dataset(document: Mapping[str, Any], dataset: str, edition: str) -> dict[str, Any]:
@@ -460,5 +469,5 @@ def header_rename_map(records: list[dict[str, Any]], *, from_: str = "code", to:
 
 def load_column_schema(base_dir: Path, relative: str, reviewed_sha256: str, *,
                        dataset: str | None = None, edition: str | None = None) -> list[str]:
-    contract = load_column_contract(base_dir, relative, reviewed_sha256)
-    return schema_columns(parse_column_schema(contract["text"].encode()), dataset=dataset, edition=edition)
+    _, document = read_column_contract(base_dir, relative, reviewed_sha256)
+    return schema_columns(document, dataset=dataset, edition=edition)

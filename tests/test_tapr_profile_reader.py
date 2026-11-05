@@ -582,15 +582,44 @@ def test_all_scopes_validate_before_any_writer_or_archive(tmp_path, monkeypatch)
 
 
 def test_source_requests_are_metadata_only_and_do_not_open_raw_paths(tmp_path, monkeypatch):
+    from teadata import column_schema
+    from teadata.manifest import ContractError
+
     cfg, paths, _ = configured_sources(tmp_path)
+    original_parse = column_schema.parse_column_schema
+    parses = []
+
+    def parse_once(data):
+        parses.append(sha256(data).hexdigest())
+        return original_parse(data)
+
     original_open = Path.open
+
     def open_path(path, *args, **kwargs):
         if path in paths.values():
             pytest.fail("Metadata-only source selection opened raw rows")
         return original_open(path, *args, **kwargs)
+
+    monkeypatch.setattr(column_schema, "parse_column_schema", parse_once)
     monkeypatch.setattr(Path, "open", open_path)
     requests = cfg.tapr_source_requests(DATASET, 2025)
     assert len(requests) == 1 and requests[0].path == paths["campus"]
+    schema = paths["campus"].with_name("schema.json")
+    original = schema.read_bytes()
+    assert parses == [sha256(original).hexdigest()]
+    schema.write_bytes(original + b"\n")
+    with pytest.raises(ContractError, match="bytes differ from the reviewed contract"):
+        cfg.tapr_source_requests(DATASET, 2025)
+    assert len(parses) == 1
+
+
+def test_source_requests_retain_the_exact_header_edition_guard(tmp_path):
+    from teadata.manifest import ContractError
+
+    cfg, _, _ = configured_sources(tmp_path)
+    cfg.spatial[DATASET] = cfg.data_sources[DATASET]
+    with pytest.raises(ContractError, match="edition unavailable or ambiguous"):
+        cfg.tapr_source_requests(DATASET, 2025)
 
 
 def test_bounded_producer_uses_exact_row_groups_and_original_processing_closure(tmp_path, monkeypatch):
