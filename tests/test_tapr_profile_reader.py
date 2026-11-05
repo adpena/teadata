@@ -13,7 +13,8 @@ from teadata.column_schema import source_schema_fingerprint, validate_header_tab
 from teadata.identifiers import canonical_source_identifier, canonical_source_identifiers
 from teadata.scripts.build_tapr_profiles import prepare_profiles
 from teadata.tapr import (
-    TaprReadBudget, TaprSourceRequest, TaprSourceTable, merge_tapr_tables, read_tapr_table,
+    TaprReadBudget, TaprSourceRequest, TaprSourceTable, compare_tapr_tables, merge_tapr_tables, read_tapr_table,
+    tapr_source_identifiers,
 )
 
 
@@ -72,6 +73,53 @@ def test_state_source_has_one_exact_row_and_no_synthetic_identity(tmp_path):
     mapping["fields"][0]["disposition"] = "identity"
     with pytest.raises(ValueError, match="without a publisher identity field"):
         read_source(path, mapping=mapping, key_field=None, dataset=dataset)
+
+
+def regional_source(path, *, labels, codes):
+    mapping = mapping_for(path, labels=labels, codes=codes, fields=["region_number", "example_value"])
+    return read_source(path, mapping=mapping, key_field="region_number", dataset="region_tapr_staar_tested_grade_3")
+
+
+def test_regional_source_preserves_esc_codes_and_compares_exact_keys(tmp_path):
+    labels, codes = ["Education Service Center", "Example Value"], ["REGION", "VALUE"]
+    old_path = write_source(tmp_path, [labels, codes, ["01", "0"], ["13", "-1"]])
+    old = regional_source(old_path, labels=labels, codes=codes)
+    new_path = write_source(tmp_path, [labels, codes, ["20", "8"], ["01", "0"], ["13", "-3"]])
+    new = regional_source(new_path, labels=labels, codes=codes)
+    assert merge_tapr_tables([old], key_field="region_number")["region_number"].to_pylist() == ["01", "13"]
+    report = compare_tapr_tables(old, new, key_field="region_number")
+    assert report["scope"] == "region"
+    assert report["keysets"]["new_only"]["examples"] == ["20"]
+
+
+@pytest.mark.parametrize("key", ["", "00", "1", "21", "013", "13 ", "13\n", "'13", "13.0", "１３"])
+def test_regional_source_rejects_esc_code_aliases_and_out_of_range_values(tmp_path, key):
+    labels, codes = ["Education Service Center", "Example Value"], ["REGION", "VALUE"]
+    path = write_source(tmp_path, [labels, codes, [key, "0"]])
+    with pytest.raises(ValueError, match=r"invalid region_number:.*source record 3"):
+        regional_source(path, labels=labels, codes=codes)
+
+
+def test_regional_source_rejects_duplicate_codes_and_unbound_identity(tmp_path):
+    labels, codes = ["Education Service Center", "Example Value"], ["REGION", "VALUE"]
+    path = write_source(tmp_path, [labels, codes, ["13", "0"], ["13", "-1"]])
+    with pytest.raises(ValueError, match=r"duplicate region_number at records \[3, 4\]"):
+        regional_source(path, labels=labels, codes=codes)
+    codes[0] = "DISTRICT"
+    path = write_source(tmp_path, [labels, codes, ["13", "0"]])
+    with pytest.raises(ValueError, match="must bind publisher code 'REGION'"):
+        regional_source(path, labels=labels, codes=codes)
+
+
+@pytest.mark.parametrize("kind", [pa.string(), pa.large_string()])
+def test_regional_source_key_projection_preserves_an_empty_target(kind):
+    keys = pa.chunked_array([], type=kind)
+    assert tapr_source_identifiers(keys, key_field="region_number").equals(keys)
+
+
+def test_regional_source_key_projection_requires_arrow_strings():
+    with pytest.raises(ValueError, match="require Arrow strings"):
+        tapr_source_identifiers(pa.array([13]), key_field="region_number")
 
 
 @pytest.mark.parametrize("override", ["CamelCase", "naïve", "2025_name", "class", ""])

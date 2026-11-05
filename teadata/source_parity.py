@@ -15,7 +15,7 @@ from .dataset_metadata import COLUMN_SCHEMA_MAX_BYTES, STATEWIDE_SINGLETON_GRAIN
 from .manifest import ContractError, canonical_json
 from .peims_leaves import DATASETS as PEIMS_DATASETS
 from .provenance import validate_record_graph
-from .tapr import TAPR_SOURCE_KEYS, TaprReadBudget, TaprSourceRequest, qualified_tapr_family
+from .tapr import TAPR_KEY_WIDTHS, TAPR_SOURCE_KEYS, TaprReadBudget, TaprSourceRequest, qualified_tapr_family, tapr_source_identifiers
 
 if TYPE_CHECKING:
     from .provenance import ProvenanceStore
@@ -148,7 +148,6 @@ def _compare(selection: _Selection, *, max_examples: int, working_bytes: int) ->
     import pyarrow as pa
     import pyarrow.compute as arrow_compute
     import pyarrow.parquet as pq
-    from .identifiers import canonical_source_identifiers
 
     pc: Any = arrow_compute
     names = [field['field'] for field in selection.mapping['fields']]
@@ -169,15 +168,15 @@ def _compare(selection: _Selection, *, max_examples: int, working_bytes: int) ->
         raise _Uncovered('No original raw rows are available for parity coverage')
     raw = pa.Table.from_batches(batches)
     del batches, batch
-    width = 9 if selection.key.scope == 'campus' else 6
     key_field = selection.key_field
+    width = TAPR_KEY_WIDTHS.get(key_field or '', 0)
     raw_index_bound = 0
     raw_keys = raw_set = None
     if key_field is not None:
         raw_index_bound = (width + 10) * (raw.num_rows + 1)
         if 2 * raw_index_bound > slot:
             raise _Uncovered('Raw alignment buffers exceed their explicit working-byte slot')
-        raw_keys = canonical_source_identifiers(raw[key_field], width=width)
+        raw_keys = tapr_source_identifiers(raw[key_field], key_field=key_field)
         if raw_keys.nbytes > selection.budget.key_bytes:
             raise _Uncovered('Raw identity index exceeds its recorded byte budget')
         raw_set = raw_keys.combine_chunks()
@@ -213,7 +212,7 @@ def _compare(selection: _Selection, *, max_examples: int, working_bytes: int) ->
             scratch_base = 2 * raw_index_bound + 2 * (width + 10) * (actual.num_rows + 1) + 8 * raw.num_rows
             if scratch_base > slot:
                 raise _Uncovered(stage + ' alignment exceeds its explicit working-byte slot')
-            keys = canonical_source_identifiers(actual[key_field], width=width)
+            keys = tapr_source_identifiers(actual[key_field], key_field=key_field)
             if pc.any(pc.is_null(keys)).as_py():
                 raise ValueError(stage + ' has malformed source identities')
             if keys.nbytes > selection.budget.key_bytes:

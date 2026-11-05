@@ -1281,7 +1281,7 @@ Styling requires Excel and the optional `xlwings` package. The campus profile
 example's county-boundary default follows `TEADATA_DATA_DIR`; callers can still
 pass an explicit `counties_path`.
 
-### 2025–26 tested-grade STAAR sources
+### Tested-grade STAAR sources
 
 The source profiles `{state,district,campus}_tapr_staar_tested_grade_{3..8}`
 select exact 2026 tested-grade STAAR extracts for the accountability subset.
@@ -1290,6 +1290,15 @@ The state profile reads TEA's statewide row directly. The six grades share
 the same sets of 1,202 district IDs and 9,105 campus IDs in the retained exports.
 These counts describe the publisher's extracts, which can contain blank or
 withheld results for a particular grade or group.
+
+The 2024–25 source profiles select edition 2025 and also include
+`region_tapr_staar_tested_grade_{3..8}`. The six grades retain one Texas row,
+20 education service center rows, 1,208 district rows and 9,084 campus rows
+per grade. Use `--edition 2025` and add `--scope region` for these files.
+Regional keys are TEA's literal two-character codes `01` through `20`.
+Each 2025 geography retains its own dictionary, a named TEA report and the
+[2024–25 TAPR masking methodology](https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html).
+The raw reader preserves those tokens without interpreting them.
 
 Prepare a grade using its exact retained CSVs and reference receipts.
 

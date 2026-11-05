@@ -21,7 +21,7 @@ from teadata.acquisition import AcquisitionClient, NoRedirect, acquire_form, rep
 from teadata.column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
 from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
 from teadata.provenance import ProvenanceStore, _identifier
-from teadata.tapr import compare_tapr_tables, read_tapr_table
+from teadata.tapr import TAPR_SOURCE_KEYS, compare_tapr_tables, read_tapr_table
 
 INSPECTION_OUTPUT_MAX_BYTES = 8 * 1024 * 1024
 
@@ -383,7 +383,7 @@ def main(argv: list[str] | None = None) -> int:
     compare = commands.add_parser('compare', help='Compare two pinned reviewed original inputs offline')
     compare.add_argument('--store', type=Path, required=True, help='Append-only report/provenance archive')
     compare.add_argument('--output', type=Path, required=True, help='New report path; never overwritten')
-    compare.add_argument('--scope', required=True, choices=['campus', 'district'])
+    compare.add_argument('--scope', required=True, choices=[scope for scope, key in TAPR_SOURCE_KEYS.items() if key is not None])
     compare.add_argument('--max-examples', type=int, default=20)
     for side in ['old', 'new']:
         for name in ['store', 'schema', 'dictionary']:

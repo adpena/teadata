@@ -24,14 +24,13 @@ from typing import Any
 from teadata.column_schema import crosswalk_dataset, parse_column_schema, reader_options, table_input_sha256s
 from teadata.analytical import write_leaf_artifact
 from teadata.dataset_metadata import STATEWIDE_SINGLETON_GRAIN, ArtifactRef, DatasetMetadata, EditionKey
-from teadata.identifiers import canonical_source_identifiers
 from teadata.manifest import BuildRecorder, _validate_methodology, canonical_json, file_identity, processor_identity, verify_reference_receipts
 from teadata.provenance import ProvenanceStore, validate_reference_records
 from teadata.release import publish_release
 from teadata.scripts.paths import data_path
 from teadata.tapr import (
-    TAPR_PROFILE_FAMILIES, TAPR_SOURCE_KEYS, TaprReadBudget, TaprSourceRequest, TaprSourceSummary, qualified_tapr_family,
-    reviewed_tapr_data_record_count, tapr_source_selection, validate_tapr_key,
+    TAPR_KEY_WIDTHS, TAPR_PROFILE_FAMILIES, TAPR_SOURCE_KEYS, TaprReadBudget, TaprSourceRequest, TaprSourceSummary,
+    qualified_tapr_family, reviewed_tapr_data_record_count, tapr_source_identifiers, tapr_source_selection, validate_tapr_key,
 )
 from teadata.teadata_config import load_config
 
@@ -348,7 +347,7 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
                        for value in (record.get("code_version"), parameters.get("preparation_code_sha256")))):
             raise ValueError("Prepared leaf requires recorded bounded producer identities and its complete read budget")
         source_budget = TaprReadBudget(**raw_budget)
-        if keys and source_rows * ((9 if scope == "campus" else 6) + 18) > source_budget.key_bytes:
+        if keys and source_rows * (TAPR_KEY_WIDTHS[keys[0]] + 18) > source_budget.key_bytes:
             raise ValueError("Prepared source identity index exceeds the admitted key byte budget")
         artifact = record["outputs"]["prepared_source"]
         raw_sha = table_inputs[0]
@@ -449,8 +448,8 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
                     identities = []
                     key_bytes = 0
                     for batch in _prepared_batches(native, source_budget):
-                        canonical = canonical_source_identifiers(batch.column(schema.get_field_index(keys[0])),
-                            width=9 if keys[0] == "campus_number" else 6)
+                        canonical = tapr_source_identifiers(batch.column(schema.get_field_index(keys[0])),
+                            key_field=keys[0])
                         if pc.any(pc.is_null(canonical)).as_py():
                             raise ValueError("Prepared source has missing physical keys")
                         key_bytes += canonical.nbytes

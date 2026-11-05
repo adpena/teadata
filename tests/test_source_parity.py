@@ -18,13 +18,16 @@ from teadata.tapr import TaprReadBudget
 from teadata.teadata_config import Config
 
 
-def fixture_release(tmp_path, *, damage=None, schema_version=3, batch_bytes=1024):
+def fixture_release(tmp_path, *, damage=None, schema_version=3, batch_bytes=1024, scope='district'):
     store = ProvenanceStore(tmp_path / 'history')
-    dataset = 'district_tapr_student_profile'
-    names = ['district_number', 'membership', 'enrollment']
-    labels, codes = ['District', 'Membership', 'Enrollment'], ['DISTRICT', 'DPETALLC', 'DPNTALLC']
+    dataset = f'{scope}_tapr_student_profile'
+    names = [f'{scope}_number', 'membership', 'enrollment']
+    prefix = scope[0].upper()
+    labels, codes = [scope.title(), 'Membership', 'Enrollment'], [scope.upper(), prefix + 'PETALLC', prefix + 'PNTALLC']
+    keys = ['01', '13', '20'] if scope == 'region' else ['001001', '001002', '001003']
     raw = tmp_path / 'source.csv'
-    raw.write_text('District,Membership,Enrollment\nDISTRICT,DPETALLC,DPNTALLC\n001001,0,11\n001002,-999,.\n001003,17,\n')
+    raw.write_text('\n'.join([','.join(labels), ','.join(codes), f'{keys[0]},0,11',
+                             f'{keys[1]},-999,.', f'{keys[2]},17,', '']))
     source = ResolvedDataset(dataset, 'data_sources', 2025, 2025, str(raw), DatasetMetadata(version='2025'))
     acquisition = store.record_acquisition(raw, source)
     raw_sha = file_identity(raw)['sha256']
@@ -47,7 +50,7 @@ def fixture_release(tmp_path, *, damage=None, schema_version=3, batch_bytes=1024
              'reviewed_sha256': schema_sha, 'provenance_ids': [schema_observation]}]}}}}})
     cfg.base_dir = tmp_path
     source = cfg.resolve_dataset(dataset, 2025, reader_profile='source')
-    actual = pa.table(dict(zip(names, [['001001', '001002', '001003'], ['0', '-999', '17'], ['11', '.', '']], strict=True)))
+    actual = pa.table(dict(zip(names, [keys, ['0', '-999', '17'], ['11', '.', '']], strict=True)))
     if damage == 'prepared_wrong':
         actual = actual.set_column(1, 'membership', pa.array(['0', '-999', '18']))
     prepared = tmp_path / 'prepared.parquet'
@@ -83,12 +86,12 @@ def fixture_release(tmp_path, *, damage=None, schema_version=3, batch_bytes=1024
         actual = actual.append_column('membership_status', pa.array(['observed', 'suppressed', 'observed']))
         support = {'fields': {'membership': {'raw': 'membership_raw', 'status': 'membership_status'}}, 'context': []}
     recorder = BuildRecorder(cfg, store)
-    key = EditionKey(dataset, '2025', EditionKey.source_revision((raw_sha,)), 'district', 'STUD', 'one row per district_number')
+    key = EditionKey(dataset, '2025', EditionKey.source_revision((raw_sha,)), scope, 'STUD', f'one row per {names[0]}')
     recipe = {'operation': 'unsupported_transform' if damage == 'unknown_recipe' else 'lossless_admitted_source_row_groups',
         'values_interpreted': False, 'source_read_budget': vars(budget), 'preparation_code_sha256': historical_code}
     toolchain = {'python': sys.version, 'pyarrow': pa.__version__}
     contract = recorder.leaf_contract(key, source, native_schema=actual.schema.serialize().to_pybytes(), columns=actual.schema.names,
-        key_columns=['district_number'], rows=3, inputs=[raw_sha, file_identity(prepared)['sha256']],
+        key_columns=names[:1], rows=3, inputs=[raw_sha, file_identity(prepared)['sha256']],
         recipe=recipe, toolchain=toolchain, column_support=support)
     leaf_id = sha256(canonical_json(contract).encode()).hexdigest()
     leaf = tmp_path / 'leaf.parquet'
@@ -112,8 +115,9 @@ def fixture_release(tmp_path, *, damage=None, schema_version=3, batch_bytes=1024
 
 @pytest.mark.parametrize('schema_version', [3, 4])
 @pytest.mark.parametrize('damage', [None, 'reordered'])
-def test_complete_raw_parity_preserves_zero_masks_leading_zeros_and_historical_code(tmp_path, schema_version, damage):
-    release, store, key, _ = fixture_release(tmp_path, damage=damage, schema_version=schema_version)
+@pytest.mark.parametrize('scope', ['district', 'region'])
+def test_complete_raw_parity_preserves_zero_masks_leading_zeros_and_historical_code(tmp_path, schema_version, damage, scope):
+    release, store, key, _ = fixture_release(tmp_path, damage=damage, schema_version=schema_version, scope=scope)
     report = validate_source_parity(release, store, edition_ids=[key.identity])
     assert report['status'] == 'PASS_RAW_PARITY'
     assert report['coverage'] == {'requested_editions': 1, 'checked_editions': 1, 'uncovered_editions': 0,
