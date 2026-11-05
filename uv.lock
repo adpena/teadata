@@ -3838,10 +3838,7 @@ notebooks = [
 ]
 scripts = [
     { name = "fastexcel" },
-    { name = "idna" },
-    { name = "requests" },
     { name = "tqdm" },
-    { name = "urllib3" },
 ]
 speedups = [
     { name = "polars" },
@@ -3865,7 +3862,6 @@ requires-dist = [
     { name = "idna", marker = "extra == 'dev'", specifier = ">=3.15" },
     { name = "idna", marker = "extra == 'docs'", specifier = ">=3.15" },
     { name = "idna", marker = "extra == 'notebooks'", specifier = ">=3.15" },
-    { name = "idna", marker = "extra == 'scripts'", specifier = ">=3.15" },
     { name = "ipyleaflet", marker = "extra == 'notebooks'", specifier = ">=0.18" },
     { name = "ipython", marker = "extra == 'notebooks'", specifier = ">=8.0" },
     { name = "ipywidgets", marker = "extra == 'notebooks'", specifier = ">=8.0" },
@@ -3910,7 +3906,6 @@ requires-dist = [
     { name = "requests", marker = "extra == 'dev'", specifier = ">=2.33.0" },
     { name = "requests", marker = "extra == 'docs'", specifier = ">=2.33.0" },
     { name = "requests", marker = "extra == 'notebooks'", specifier = ">=2.33.0" },
-    { name = "requests", marker = "extra == 'scripts'", specifier = ">=2.33.0" },
     { name = "rpds-py", marker = "python_full_version >= '3.15' and extra == 'notebooks'", specifier = ">=2026.5.1" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.5" },
     { name = "scipy", marker = "python_full_version < '3.15'", specifier = ">=1.10" },
@@ -3928,7 +3923,6 @@ requires-dist = [
     { name = "urllib3", marker = "extra == 'dev'", specifier = ">=2.8.0" },
     { name = "urllib3", marker = "extra == 'docs'", specifier = ">=2.8.0" },
     { name = "urllib3", marker = "extra == 'notebooks'", specifier = ">=2.8.0" },
-    { name = "urllib3", marker = "extra == 'scripts'", specifier = ">=2.8.0" },
     { name = "wheel", marker = "extra == 'dev'", specifier = ">=0.46.2" },
 ]
 provides-extras = ["speedups", "dev", "docs", "notebooks", "database", "scripts"]
