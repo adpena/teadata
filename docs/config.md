@@ -1322,9 +1322,20 @@ uv run python -m teadata.scripts.build_tapr_profiles \
 Use the resulting processing receipts with the raw-wide selection above to
 build a separate bundle for a grade. Select the bundle and geography explicitly.
 The source retains publisher column codes, dictionary definitions and raw
-strings, including blanks, `-1` and `-3`. These profiles define no masking policy,
-normalized metrics, or automatic statewide comparison. They are outside the
+strings, including blanks, `-1` and `-3`. These profiles remain outside the
 default snapshot and entity enrichment.
+
+For editions 2025 and 2026, a separate reviewed rate contract supports
+[explicit same-edition statewide comparisons](querying.md#compare-a-published-measure-with-texas)
+for district, campus and education service center observations. The contract
+exposes the publisher's rounded percentages, exact source and mapping hashes,
+and retained interpretation references without reading data leaves. It accepts
+only canonical integer rates from 0 through 100, literal `-1` suppression and
+empty missing values. Other tokens remain uninterpreted. Numerator and
+denominator columns retain their raw tokens; the rate contract does not
+normalize counts or reconstruct masked values. Edition 2024 remains raw-only
+for this comparison interface. Same-edition support does not establish
+longitudinal comparability, including for the former-special-education group.
 
 See [TEA's TPRS glossary](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/comprehensive-tprs-glossary.pdf#page=2)
 for the tested-grade population and how it differs from the all-tested reports.

@@ -1,6 +1,10 @@
 import csv
+from copy import deepcopy
 from dataclasses import replace
 from hashlib import sha256
+import json
+from pathlib import Path
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -16,27 +20,34 @@ from teadata.release import DataRelease
 from teadata.scripts.build_tapr_profiles import prepare_profiles
 from teadata.source_parity import validate_source_parity
 from teadata.statewide import _reviewed_tapr
-from teadata.teadata_config import Config
+from teadata.staar_comparison import _source as _reviewed_staar_source
+from teadata.staar_comparison import _bindings, _parse_bindings, staar_rate_contract
+from teadata.teadata_config import Config, load_config
 
 FAMILY = "college_readiness_components"
 METRIC = "ccmr_annual_graduates_dual_credit_all_students_rate"
 PERIOD = {"kind": "school_year", "start_year": 2023, "end_year": 2024}
+STAAR_METRIC = "staar_performance_reading_language_arts_grade_3_all_students_percent_at_meets_gl_standard_or_above"
 
 
 @pytest.fixture
 def comparison_release(tmp_path, monkeypatch, request):
     family = getattr(request, "param", FAMILY)
+    staar = family == "staar_tested_grade_3"
     store = ProvenanceStore(tmp_path / "source-store")
     masking = tmp_path / "masking.txt"
     masking.write_text("Synthetic reviewed rate masking methodology")
     masking_id = store.record_acquisition(masking, ResolvedDataset("reference:masking", "reference", 2025,
                                           2025, str(masking), DatasetMetadata()))
     definitions = {}
-    for scope, observations in (
+    scopes = [
         ("district", [["227901", "35.6"], ["001901", "0"], ["001902", "-1"], ["001903", ""]]),
         ("campus", [["057909002", "33.8"]]),
         ("state", [["25.1"]]),
-    ):
+    ]
+    if staar:
+        scopes.append(("region", [["13", "35.6"], ["03", "-1"], ["01", "0"], ["02", ""], ["04", "-3"]]))
+    for scope, observations in scopes:
         dataset = f"{scope}_tapr_{family}"
         path = tmp_path / f"{scope}.csv"
         key = f"{scope}_number" if scope != "state" else None
@@ -46,6 +57,16 @@ def comparison_release(tmp_path, monkeypatch, request):
         fields += ["dual_credit_rate"]
         metrics = {METRIC: {"field": "dual_credit_rate", "unit": "percent"}}
         table_period = PERIOD
+        if staar:
+            table_period = {"kind": "school_year", "start_year": 2024, "end_year": 2025}
+            labels[-1] = "STAAR Performance, Reading/Language Arts (Grade 3), SY 2024-25, All Students, % At Meets GL Standard or Above"
+            codes[-1] = scope[0].upper() + "DA03ARE1225R"
+            fields[-1] = f"{scope}_2025_{STAAR_METRIC}"
+            labels += ["Number at criterion", "Number of tests"]
+            codes += ["NUMERATOR", "DENOMINATOR"]
+            fields += ["raw_numerator", "raw_denominator"]
+            observations = [[*row[:-1], row[-1].split(".")[0], "-3", "-3"] for row in observations]
+            metrics = {}
         if family == "student_profile":
             table_period = {"kind": "unknown"}
             metrics[METRIC]["period"] = PERIOD
@@ -67,8 +88,9 @@ def comparison_release(tmp_path, monkeypatch, request):
                        "last_data_record": 2 + len(observations), "annotations": []},
             "fields": [{"position": i, "code": code, "label": label, "field": field,
                         "disposition": "identity" if field == key else "fact",
-                        "publisher_type": None, "publisher_description": None,
-                        "dictionary_status": "not_applicable" if field == key else "not_documented"}
+                        "publisher_type": "Number" if staar and field != key else None,
+                        "publisher_description": label if staar and field != key else None,
+                        "dictionary_status": "not_applicable" if field == key else "documented" if staar else "not_documented"}
                        for i, (code, label, field) in enumerate(zip(codes, labels, fields, strict=True), 1)],
         }
         schema = tmp_path / f"{scope}.json"
@@ -92,8 +114,27 @@ def comparison_release(tmp_path, monkeypatch, request):
                 "scope": scope, "tables": {family: str(path)}}}}}}}
     cfg = Config.from_dict({"data_sources": definitions})
     cfg.base_dir = tmp_path
+    if staar:
+        binding = {"rates": {STAAR_METRIC: {"code": "DA03ARE1225R", "label": labels[1], "field": STAAR_METRIC}}, "scopes": {}}
+        for scope, _ in scopes:
+            dataset = f"{scope}_tapr_{family}"
+            source = cfg.resolve_dataset(dataset, 2025, exact=True, reader_profile="source")
+            source_request, = cfg.tapr_source_requests(dataset, 2025)
+            binding["scopes"][scope] = {
+                "raw_sha256": source_request.mapping["input_sha256"],
+                "mapping_sha256": sha256(canonical_json(source_request.mapping).encode()).hexdigest(),
+                "metadata_sha256": [sha256(canonical_json(source.metadata.to_dict()).encode()).hexdigest()],
+            }
+        rules = {"-1": {"status": "suppressed", "reason": "Synthetic reviewed publisher mask"}}
+        monkeypatch.setattr("teadata.staar_comparison._bindings", lambda: {
+            "notes": [], "editions": {"2025": {
+                "period": table_period, "rate_tokens": rules, "families": {family: binding},
+                "methodology": [{"url": "https://example.org/synthetic-mask", "provenance_id": masking_id,
+                                 "sha256": sha256(masking.read_bytes()).hexdigest()}]}}})
+        monkeypatch.setattr("teadata.staar_comparison.load_config", lambda: cfg)
+        _reviewed_staar_source.cache_clear()
     prepared = tmp_path / "prepared"
-    result = prepare_profiles(cfg, edition="2025", family=family, scopes=["district", "campus", "state"],
+    result = prepare_profiles(cfg, edition="2025", family=family, scopes=[scope for scope, _ in scopes],
                               input_dir=None, output_dir=prepared, reference_store=store)
     selected = {entry["dataset"]: (entry["processing_record_id"], () if scope == "state" else (f"{scope}_number",))
                 for scope, entry in result["scopes"].items()}
@@ -103,11 +144,12 @@ def comparison_release(tmp_path, monkeypatch, request):
     release = DataRelease(output / "release.json", offline=True)
     editions = {entry["key"]["scope"]: EditionKey.from_dict(entry["key"]) for entry in built["datasets"].values()}
     assert built["datasets"][editions["state"].dataset]["key_columns"] == []
-    assert len(release.verify()) == 3
+    assert len(release.verify()) == len(scopes)
     monkeypatch.setattr("teadata.statewide.load_config", lambda: cfg)
     _reviewed_tapr.cache_clear()
     yield release, editions
     _reviewed_tapr.cache_clear()
+    _reviewed_staar_source.cache_clear()
 
 
 def test_statewide_operator_keeps_exact_values_and_distinguishes_unavailable(comparison_release):
@@ -188,3 +230,141 @@ def test_campus_course_geography_hold_precedes_any_leaf_or_catalog_read():
     with pytest.raises(ContractError, match="geography qualification"):
         Query([campus], repo=None).compare_statewide(
             release=None, local=local, statewide=statewide, dimensions={"course_code": "03100500"})
+
+
+@pytest.mark.parametrize("comparison_release", ["staar_tested_grade_3"], indirect=True)
+def test_staar_published_rates_keep_masked_counts_and_literal_region_ids(comparison_release):
+    release, editions = comparison_release
+    rows = list(Query(["13", "03", "01", "02", "04", "20"], repo=None).compare_statewide(
+        release=release, local=editions["region"], statewide=editions["state"], metric=STAAR_METRIC))
+    assert [(row.identifier, row.local_raw, row.local_status, row.difference_pp) for row in rows] == [
+        ("13", "35", "observed", 10), ("03", "-1", "suppressed", None),
+        ("01", "0", "observed", -25), ("02", "", "missing", None),
+        ("04", "-3", "uninterpreted", None), ("20", None, "unavailable", None),
+    ]
+    assert all(row.scope == "region" and row.unit == "percent" and row.period.end_year == 2025 for row in rows)
+    district = District(uuid4(), "Austin", district_number="227901")
+    row = Query([district], repo=None).compare_statewide(
+        release=release, local=editions["district"], statewide=editions["state"], metric=STAAR_METRIC).first()
+    assert (row.local_value, row.statewide_value, row.difference_pp) == (35, 25, 10)
+    local, = release.catalog.resolve_artifacts([(editions["district"], "raw_numerator")])
+    original = release.analytical_dataset(local["artifact"].identity).to_table(columns=["raw_numerator", "raw_denominator"])
+    assert original.to_pylist() == [{"raw_numerator": "-3", "raw_denominator": "-3"}] * 4
+    contract = staar_rate_contract(release, editions["region"])
+    assert contract.metadata.metrics[STAAR_METRIC].field == f"region_2025_{STAAR_METRIC}"
+    legend, = [ref for ref in contract.metadata.references if ref.reference_id == contract.value_policy.reference_id]
+    assert legend.provenance_ids and legend.reviewed_sha256 and legend.url
+    assert contract.value_policy.tokens["-1"].status.value == "suppressed"
+
+
+@pytest.mark.parametrize("comparison_release", ["staar_tested_grade_3"], indirect=True)
+def test_staar_only_interprets_reviewed_integer_rate_spellings(comparison_release):
+    from teadata.statewide import _compare_source
+
+    release, editions = comparison_release
+    statistics, local, _ = _compare_source(release, editions["region"], editions["state"], STAAR_METRIC, {})
+    field = statistics[0].local_field
+    for raw in ("-1.0", "35.6", ".", "101", "-3", " 35", "35.0", "035", "３５"):
+        assert local.value({field: raw}, field, "percent") == (raw, "uninterpreted", None)
+    for raw, value in (("0", 0), ("35", 35), ("100", 100)):
+        assert local.value({field: raw}, field, "percent") == (raw, "observed", value)
+    with pytest.raises(ContractError, match="reviewed numeric"):
+        Query(["13"], repo=None).compare_statewide(
+            release=release, local=editions["region"], statewide=editions["state"], metric="raw_numerator")
+
+
+@pytest.mark.parametrize("comparison_release", ["staar_tested_grade_3"], indirect=True)
+def test_staar_comparison_rejects_changed_source_period_and_metadata_before_reads(comparison_release, monkeypatch):
+    release, editions = comparison_release
+    metadata = release.catalog.metadata
+    monkeypatch.setattr(release, "analytical_dataset", lambda *a: pytest.fail("Unreviewed source opened a leaf"))
+
+    def changed(dataset, *, edition):
+        value = metadata(dataset, edition=edition)
+        return replace(value, notes="Changed source binding")
+
+    monkeypatch.setattr(release.catalog, "metadata", changed)
+    with pytest.raises(ContractError, match="source references and metadata"):
+        Query(["13"], repo=None).compare_statewide(
+            release=release, local=editions["region"], statewide=editions["state"], metric=STAAR_METRIC)
+
+
+@pytest.mark.parametrize("identifier", ["3", " 03", "03 ", "00", "21", "０３", "03\n", 3, True])
+def test_region_comparison_requires_an_exact_publisher_literal_before_reads(identifier):
+    local = EditionKey("region_tapr_staar_tested_grade_3", "2025", "1" * 64,
+                       "region", "staar_tested_grade_3", "one row per region_number")
+    statewide = EditionKey("state_tapr_staar_tested_grade_3", "2025", "2" * 64,
+                           "state", "staar_tested_grade_3", "one statewide observation")
+    with pytest.raises(ContractError, match="literal education service center"):
+        Query([identifier], repo=None).compare_statewide(release=None, local=local, statewide=statewide)
+
+
+@pytest.mark.parametrize("year", [2025, 2026])
+def test_packaged_staar_comparison_metadata_discovers_exact_scope_neutral_rates(year, monkeypatch):
+    cfg = load_config()
+    store = ProvenanceStore(Path(__file__).resolve().parents[1] / "provenance")
+    monkeypatch.setattr(store, "verify_artifact", lambda *a, **k: pytest.fail("Metadata lookup opened raw bytes"))
+    _reviewed_staar_source.cache_clear()
+    total = 0
+    for grade, expected in ((3, 84), (4, 84), (5, 126), (6, 84), (7, 84), (8, 168)):
+        common = None
+        for scope in ("state", "district", "campus", "region"):
+            dataset = f"{scope}_tapr_staar_tested_grade_{grade}"
+            request, = cfg.tapr_source_requests(dataset, year)
+            key = EditionKey(dataset, str(year), EditionKey.source_revision((request.mapping["input_sha256"],)),
+                             scope, f"staar_tested_grade_{grade}",
+                             "one statewide observation" if scope == "state" else f"one row per {scope}_number")
+            release = SimpleNamespace(catalog=SimpleNamespace(metadata=lambda name, *, edition:
+                cfg.resolve_dataset(name, year, exact=True, reader_profile="source").metadata))
+            contract = staar_rate_contract(release, key)
+            metrics = contract.metadata.metrics
+            assert len(metrics) == expected and all(metric.unit == "percent" and metric.period.end_year == year
+                                                     for metric in metrics.values())
+            assert {metric.field for metric in metrics.values()} <= {field["field"] for field in request.mapping["fields"]}
+            if common is not None:
+                assert set(metrics) == common
+            common = set(metrics)
+            legend = next(ref for ref in contract.metadata.references if ref.reference_id == "staar_rate_legend")
+            record = store.read_record(legend.provenance_ids[0])
+            assert record["artifact"]["sha256"] == legend.reviewed_sha256
+            assert contract.value_policy.reference_id == legend.reference_id
+            assert set(contract.value_policy.tokens) == {"-1"}
+        total += expected
+    assert total == 630
+    _reviewed_staar_source.cache_clear()
+
+
+@pytest.mark.parametrize("change", ["raw", "label", "period"])
+def test_staar_rate_bindings_reject_changed_packaged_source_before_catalog_reads(change, monkeypatch):
+    cfg = load_config()
+    request, = cfg.tapr_source_requests("district_tapr_staar_tested_grade_3", 2025)
+    mapping = deepcopy(request.mapping)
+    if change == "raw":
+        mapping["input_sha256"] = "0" * 64
+    elif change == "label":
+        mapping["fields"][5]["label"] += " different population"
+    else:
+        mapping["metric_period"] = PERIOD
+    monkeypatch.setattr(cfg, "tapr_source_requests", lambda *a, **k: (replace(request, mapping=mapping),))
+    monkeypatch.setattr("teadata.staar_comparison.load_config", lambda: cfg)
+    _reviewed_staar_source.cache_clear()
+    with pytest.raises(ContractError, match="publisher source, mapping and period"):
+        _reviewed_staar_source("district", "staar_tested_grade_3", "2025")
+    _reviewed_staar_source.cache_clear()
+
+
+@pytest.mark.parametrize("duplicate", ["json_key", "field", "code"])
+def test_staar_comparison_resource_rejects_ambiguous_bindings(duplicate):
+    if duplicate == "json_key":
+        body = b'{"schema_version":1,"schema_version":1}'
+    else:
+        document = deepcopy(_bindings())
+        rates = document["editions"]["2025"]["families"]["staar_tested_grade_3"]["rates"]
+        first, second = list(rates)[:2]
+        if duplicate == "field":
+            rates[second]["field"] = rates[first]["field"]
+        else:
+            rates[second]["code"] = rates[first]["code"]
+        body = json.dumps(document).encode()
+    with pytest.raises(ContractError, match="Duplicate|unique|binding"):
+        _parse_bindings(body)

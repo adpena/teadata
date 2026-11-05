@@ -17,6 +17,8 @@ from .identifiers import canonical_source_identifiers
 from .manifest import ContractError, canonical_json
 from .peims_courses import DATASET as COURSES, course_key_columns
 from .peims_leaves import PRIMARY_DISABILITY, SCOPES_BY_DATASET, _key_columns
+from .staar_comparison import FAMILIES as STAAR_FAMILIES, staar_rate_contract
+from .tapr import tapr_source_identifiers
 from .teadata_config import load_config
 from .values import MeasurementUnit, TokenRule, ValuePolicy, ValueStatus, measure
 
@@ -34,6 +36,7 @@ _TAPR_RATE_POLICY = ValuePolicy(
 _TAPR_STUDENT_POLICY = ValuePolicy("tapr_2025_reviewed_student_profile", {}, reference_id="masking")
 _NUMERIC_UNITS = frozenset(MeasurementUnit) - {MeasurementUnit.TEXT}
 _VALUE_STATUSES = frozenset(item.value for item in ValueStatus)
+_REGION_CODES = frozenset(f"{code:02d}" for code in range(1, 21))
 Number = int | float
 
 
@@ -113,12 +116,16 @@ class _Projection:
     columns: tuple[str, ...]
     support: Mapping[str, tuple[str, str]]
     raw_policy: ValuePolicy | None
+    integer_rates: bool = False
 
     def value(self, row: dict[str, Any], field: str, unit: str) -> tuple[str, str, Number | None]:
         if self.raw_policy is not None:
             raw = row[field]
             if not isinstance(raw, str) or unit not in {"count", "percent"}:
                 raise ContractError("TAPR comparison requires a publisher token with a reviewed count or percent unit")
+            if (self.integer_rates and raw not in {"", "-1"}
+                    and not (raw.isascii() and raw.isdecimal() and len(raw) <= 3 and raw == str(int(raw)))):
+                return raw, "uninterpreted", None
             value = measure(raw, self.raw_policy, unit=unit, minimum=0, maximum=100 if unit == "percent" else None)
             status = "uninterpreted" if value.status == ValueStatus.INVALID else value.status.value
             return raw, status, value.numeric
@@ -135,7 +142,8 @@ class _Projection:
 
 
 def _projection(release: DataRelease, key: EditionKey, fields: list[tuple[str, DataPeriod]], *,
-                keys: list[str], mapping: str, policy: str | None, raw_policy: ValuePolicy | None) -> _Projection:
+                keys: list[str], mapping: str, policy: str | None, raw_policy: ValuePolicy | None,
+                integer_rates: bool = False) -> _Projection:
     by_period: dict[DataPeriod, list[tuple[EditionKey, str]]] = {}
     for field, period in fields:
         by_period.setdefault(period, []).append((key, field))
@@ -162,7 +170,7 @@ def _projection(release: DataRelease, key: EditionKey, fields: list[tuple[str, D
             if not {"raw", "status"} <= selected.keys():
                 raise ContractError("PEIMS comparison requires normalized values with raw and status support")
             field_support[field] = selected["raw"], selected["status"]
-    return _Projection(artifact, columns, field_support, raw_policy)
+    return _Projection(artifact, columns, field_support, raw_policy, integer_rates)
 
 
 def _statistics(local: EditionKey, local_metadata: DatasetMetadata,
@@ -200,7 +208,21 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
     local_metadata = catalog.metadata(local.dataset, edition=local)
     state_metadata = catalog.metadata(statewide.dataset, edition=statewide)
     raw_policy = None
-    if course_pair or (local.dataset == statewide.dataset and local.dataset in SCOPES_BY_DATASET):
+    staar = local.table in STAAR_FAMILIES and local.table == statewide.table
+    if staar:
+        if local.grain != f"one row per {key_column}" or statewide.grain != STATEWIDE_SINGLETON_GRAIN or dimensions:
+            raise ContractError("STAAR comparison requires the reviewed local grain and statewide singleton")
+        local_keys, state_keys = [key_column], []
+        left = staar_rate_contract(release, local)
+        right = staar_rate_contract(release, statewide)
+        left_revision, left_mapping, local_metadata, raw_policy = (
+            left.revision_sha256, left.mapping_sha256, left.metadata, left.value_policy)
+        right_revision, right_mapping, state_metadata = right.revision_sha256, right.mapping_sha256, right.metadata
+        if raw_policy != right.value_policy:
+            raise ContractError("STAAR comparison requires one reviewed same-edition rate policy")
+        left_review, right_review = local_metadata, state_metadata
+        left_policy = right_policy = None
+    elif course_pair or (local.dataset == statewide.dataset and local.dataset in SCOPES_BY_DATASET):
         scopes = {"state", "district"} if course_pair else SCOPES_BY_DATASET[local.dataset]
         if local.scope not in scopes or local.table != local.scope or statewide.table != "state":
             raise ContractError("Publisher PEIMS statistics are unavailable for the selected scope")
@@ -236,20 +258,26 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
         raise ContractError("Comparison requires the reviewed methodology and source references")
     statistics = _statistics(local, local_metadata, state_metadata, left_review, right_review, metric)
     return (statistics, _projection(release, local, [(stat.local_field, stat.period) for stat in statistics],
-                                    keys=local_keys, mapping=left_mapping, policy=left_policy, raw_policy=raw_policy),
+                                    keys=local_keys, mapping=left_mapping, policy=left_policy, raw_policy=raw_policy,
+                                    integer_rates=staar),
             _projection(release, statewide, [(stat.statewide_field, stat.period) for stat in statistics],
-                        keys=state_keys, mapping=right_mapping, policy=right_policy, raw_policy=raw_policy))
+                        keys=state_keys, mapping=right_mapping, policy=right_policy, raw_policy=raw_policy,
+                        integer_rates=staar))
 
 
 def compare_statewide(items: Sequence[object], *, release: DataRelease, local: EditionKey,
                       statewide: EditionKey, metric: str = "*",
                       dimensions: Mapping[str, str] | None = None) -> list[StatewideComparison]:
     """Compare reviewed metrics against the publisher's exact statewide values."""
-    if local.scope not in {"district", "campus"} or statewide.scope != "state" or local.edition != statewide.edition:
+    if local.scope not in {"district", "campus", "region"} or statewide.scope != "state" or local.edition != statewide.edition:
         raise ContractError("Statewide comparison requires matched local and statewide editions")
+    regional = local.scope == "region"
     entity_type = Campus if local.scope == "campus" else District
-    if any(not isinstance(item, entity_type) for item in items):
+    if not regional and any(not isinstance(item, entity_type) for item in items):
         raise ContractError("Query entities must match the selected local edition scope")
+    if regional and (local.table not in STAAR_FAMILIES
+                     or any(type(item) is not str or item not in _REGION_CODES for item in items)):
+        raise ContractError("Region comparisons require literal education service center codes 01 through 20")
     dimensions = {} if dimensions is None else dimensions
     if not isinstance(dimensions, Mapping) or any(not isinstance(key, str) or not isinstance(value, str)
                                                   for key, value in dimensions.items()):
@@ -274,16 +302,18 @@ def compare_statewide(items: Sequence[object], *, release: DataRelease, local: E
     state_row, = state_rows.to_pylist()
     state_values = [state_plan.value(state_row, stat.statewide_field, stat.unit) for stat in statistics]
 
-    identifiers = [item.lookup_key if isinstance(item, Campus) else item.district_number_canon
+    identifiers = [item if regional and isinstance(item, str) else item.lookup_key if isinstance(item, Campus) else item.district_number_canon
                    if isinstance(item, District) else None for item in items]
     applicable = [not (isinstance(item, Campus) and item.is_private) for item in items]
-    wanted = {"'" + identifier for identifier, applies in zip(identifiers, applicable, strict=True) if applies and identifier}
+    key_prefix = "" if regional else "'"
+    wanted = {key_prefix + identifier for identifier, applies in zip(identifiers, applicable, strict=True) if applies and identifier}
     raw_by_key = {}
     if wanted:
         source_rows = release.analytical_dataset(local_plan.artifact.identity).to_table(
             columns=list(local_plan.columns), filter=predicate)
         key_column = f"{local.scope}_number"
-        keys = canonical_source_identifiers(source_rows[key_column], width=9 if local.scope == "campus" else 6)
+        keys = (tapr_source_identifiers(source_rows[key_column], key_field=key_column) if regional else
+                canonical_source_identifiers(source_rows[key_column], width=9 if local.scope == "campus" else 6))
         selected = pc.is_in(keys, value_set=pa.array(sorted(wanted), type=pa.string()))
         selected_keys = pc.filter(keys, selected).to_pylist()
         if len(selected_keys) != len(set(selected_keys)):
@@ -293,7 +323,7 @@ def compare_statewide(items: Sequence[object], *, release: DataRelease, local: E
     rows = []
     dimension_values = tuple(sorted(dimensions.items()))
     for identifier, applies in zip(identifiers, applicable, strict=True):
-        local_row = raw_by_key.get("'" + identifier) if applies and identifier else None
+        local_row = raw_by_key.get(key_prefix + identifier) if applies and identifier else None
         for stat, (state_raw, state_status, state_value) in zip(statistics, state_values, strict=True):
             if local_row is None:
                 raw, status, value = None, "unavailable" if applies else "not_applicable", None

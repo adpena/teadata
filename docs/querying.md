@@ -37,3 +37,87 @@ print(top5)  # list[(name, enrollment)]
     ```python
     engine >> ("within", d, "campuses") >> (lambda c: c.rating in {"A","B"})
     ```
+
+## Compare a published measure with Texas
+
+`Query.compare_statewide()` selects the publisher's statewide observation for
+the exact local source edition. Results retain both edition identities, the
+measurement period, raw tokens, value statuses and numeric values. A percent
+comparison exposes its difference in percentage points as `difference_pp`.
+
+For tested-grade STAAR, prepare a grade bundle containing the local and state
+scopes using the [source preparation workflow](config.md#tested-grade-staar-sources).
+Select exact catalog editions from that bundle. The example below uses a
+2025–26 Grade 3 bundle and an existing engine containing Austin ISD.
+
+```python
+from teadata import DataRelease
+from teadata.dataset_metadata import EditionKey
+
+release = DataRelease("prepared/staar-2026-grade-3/release.json", offline=True)
+
+def edition_for(scope):
+    dataset = f"{scope}_tapr_staar_tested_grade_3"
+    entry, = (
+        row for row in release.catalog.editions(dataset=dataset, include_metadata=False)
+        if row["edition"] == "2026"
+    )
+    return EditionKey.from_dict({key: value for key, value in entry.items() if key != "edition_id"})
+
+metric = (
+    "staar_performance_reading_language_arts_grade_3_all_students_"
+    "percent_at_meets_gl_standard_or_above"
+)
+comparison = (engine >> ("district", "227901")).compare_statewide(
+    release=release,
+    local=edition_for("district"),
+    statewide=edition_for("state"),
+    metric=metric,
+)
+result = comparison.first()
+print(result.local_raw, result.local_status, result.statewide_raw)
+print(result.period, result.difference_pp)
+```
+
+Omit `metric` to select all reviewed measures common to the two editions.
+Tested-grade bindings cover the independently checked published rates for
+2024–25 and 2025–26. The raw source catalog retains numerator and denominator
+fields alongside these rates. A separately published observed rate can be
+compared when its underlying counts are masked.
+
+Education service centers use their literal two-digit identifiers. A regional
+comparison uses the same interface with a query of region codes and a bundle
+containing the regional and statewide editions.
+
+```python
+from teadata.query import Query
+
+region = Query(["13"], repo=None).compare_statewide(
+    release=release,
+    local=edition_for("region"),
+    statewide=edition_for("state"),
+    metric=metric,
+).first()
+print(region.identifier, region.scope, region.difference_pp)
+```
+
+Inspect the reviewed rate definitions and their interpretation references
+before reading observations. This uses the same contract as the comparison.
+
+```python
+from teadata.staar_comparison import staar_rate_contract
+
+contract = staar_rate_contract(release, edition_for("district"))
+print(contract.metadata.period)
+print(contract.metadata.metrics[metric])
+for reference in contract.metadata.references:
+    print(reference.reference_id, reference.url, reference.provenance_ids)
+print(contract.value_policy)
+```
+
+The source must contain both selected editions. Each comparison requires the
+same grade, school year, subject, student group and criterion. Suppression,
+missing values and unavailable entities retain their individual statuses.
+Observed zero is numeric. A difference is available when both rates are
+observed. The population is the STAAR accountability subset described by
+[TEA's TPRS guidance](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/texas-performance-reporting-system).
