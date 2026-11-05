@@ -11823,6 +11823,318 @@ data_sources:
               scope: region
               tables:
                 staar_all_grades: *tapr_2026_staar_all_grades_region_csv
+  state_tapr_dropout_attendance:
+    2024:
+      path: data/tapr/raw/2024-S-DROP_ATT.csv
+      metadata:
+        title: 2024 TAPR Attendance, Chronic Absenteeism, and Annual Dropout (State)
+        publisher: Texas Education Agency
+        version: '2024'
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        period:
+          kind: unknown
+        metrics: {}
+        notes: Source-only direct publisher DROP_ATT observations from all four offered groups. All
+          raw facts match the four independent group exports. The dictionary documents 108 of 162
+          fact fields. The other 54 retain unknown definitions. Four named-report rates corroborate
+          school year 2022-23 within publisher edition 2024. The full table period, units and token
+          interpretation remain unqualified.
+        provenance_ids:
+        - 578c57d1ebd7eb99d2a147174b19e88c91e1a32e365035dce28f320a0ba13398
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          title: Original all-offered DROP_ATT CSV
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          provenance_ids:
+          - 578c57d1ebd7eb99d2a147174b19e88c91e1a32e365035dce28f320a0ba13398
+          reviewed_sha256: 04661754c653b21cfa65eda9e5ad54e55cc223ed9ecc05a751b6ee0c1b9135c5
+        - reference_id: menu
+          role: source_notes
+          title: Official TAPR geography menu
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&tapr=all_s&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr.sas
+          provenance_ids:
+          - a17bad51ede966f2c1ba89d4757ef10c1c4bb873d06be082d8968ae0c80cf915
+          reviewed_sha256: 0b3444b30aeb5ed72e3da989588fb346d702244a700bdfdba572b695ead6184d
+        - reference_id: selection
+          role: source_notes
+          title: Official DROP_ATT variable selection
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+          provenance_ids:
+          - 3266383f34f778d9de5d2fdfd87c87dd8443b831a2f7074f8aefb58eabcc49b7
+          reviewed_sha256: 8a9dd17ae7b272f5c34152768270caac3d39a1fcc4d1f0fadacbb245b49fe2d6
+        - reference_id: dictionary
+          role: data_dictionary
+          title: Official DROP_ATT dictionary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=S&dsname=DROP_ATT&dd=attendgrad&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          provenance_ids:
+          - 17c1432c305910f81dc8489a70cba4b22359a29fafa80ed94cbe78d24cb54d11
+          reviewed_sha256: ec250ff6023fef592da45443081ba9ede383312e7c41839a8f8be8b3a2abb9d5
+        - reference_id: named_report
+          role: source_notes
+          title: Official named attendance and dropout rate report
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&id=S&lev=S&prgopt=reports%2Ftapr%2Fattendgrad.sas
+          provenance_ids:
+          - 30ae14e8584dfc31b1cabaf6f96f6b9f074dc6c5f51da3b71f60b91f5d942b3f
+          reviewed_sha256: 9767ecacd6f25c20f50a03edac584c83ac62544369e84f9f77386d0f9ae95ef6
+        - *tapr_2024_staar_glossary
+        - *tapr_2024_staar_masking
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2024--state-region-dropout-attendance-crosswalk.json
+          title: Reviewed TAPR DROP_ATT source header and layout crosswalk
+          status: available
+          provenance_ids:
+          - 0ce1ffedaba7b34ecae9c4ad76c8be1d82b24b4144b9a56474fde226becd9efc
+          reviewed_sha256: c41b69d3c13484f5a54627f6f8f2ff967b7e789cbd01b29ef9ad5e5309055434
+      reader:
+        profiles:
+          source:
+            tapr_source:
+              scope: state
+              tables:
+                dropout_attendance: data/tapr/raw/2024-S-DROP_ATT.csv
+            column_schema: schemas/tapr--2024--state-region-dropout-attendance-crosswalk.json
+    2025:
+      path: data/tapr/raw/2025-S-DROP_ATT.csv
+      metadata:
+        title: 2025 TAPR Attendance, Chronic Absenteeism, and Annual Dropout (State)
+        publisher: Texas Education Agency
+        version: '2025'
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        period:
+          kind: unknown
+        metrics: {}
+        notes: Source-only direct publisher DROP_ATT observations from all four offered groups. All
+          raw facts match the four independent group exports. The dictionary documents 108 of 162
+          fact fields. The other 54 retain unknown definitions. Four named-report rates corroborate
+          school year 2023-24 within publisher edition 2025. The full table period, units and token
+          interpretation remain unqualified. The publisher appended a SAS error message after the
+          final data record. The original bytes and the exact footer annotation are retained.
+        provenance_ids:
+        - 31f693774c18fb53bfd383a75c89495d0ae10fc25d91bd1e5ae90ff545f3a4fb
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          title: Original all-offered DROP_ATT CSV
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          provenance_ids:
+          - 31f693774c18fb53bfd383a75c89495d0ae10fc25d91bd1e5ae90ff545f3a4fb
+          reviewed_sha256: 251d09ec3447e6d3e77f0265e50817184ae9e6888cbf2b3023fb3470b3dd4d18
+        - reference_id: menu
+          role: source_notes
+          title: Official TAPR geography menu
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&tapr=all_s&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr.sas
+          provenance_ids:
+          - 0abc5dc68bdef652e56413f23ccd373bb9ae5719ee3aa80ee10ca460793250f3
+          reviewed_sha256: 69cc3a0d96feec07151eb054fe53de896904bdb35ff23dd2e64f33a03faa0e8f
+        - reference_id: selection
+          role: source_notes
+          title: Official DROP_ATT variable selection
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+          provenance_ids:
+          - edd42bdc3f5664a9e93d795fa45c3beffcd6ea69c15630d0b01e785e65cb04ed
+          reviewed_sha256: 6b280e82191c76d9a5e4908869ff0c6f58f343373bb1119b73c344608391861c
+        - reference_id: dictionary
+          role: data_dictionary
+          title: Official DROP_ATT dictionary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=S&dsname=DROP_ATT&dd=attendgrad&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          provenance_ids:
+          - a8a6590f8f7f102833ab8d4c06cc8b97d93215143ca6d5cbc8ebbf2f5151259b
+          reviewed_sha256: 4e8c40a98ac9a6ecba76f898851066353df10ec650ff69f479cdffe04049fd38
+        - reference_id: named_report
+          role: source_notes
+          title: Official named attendance and dropout rate report
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&id=S&lev=S&prgopt=reports%2Ftapr%2Fattendgrad.sas
+          provenance_ids:
+          - d84d8dc891072a2e4fe306ea6398db097a58aef4b323e4e65bb9744625959d91
+          reviewed_sha256: 31dce77d647c264346586257077163894b2da2762ac2e6352792f74c1d1e30cb
+        - *tapr_2025_staar_glossary
+        - *tapr_2025_staar_masking
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2025--state-region-dropout-attendance-crosswalk.json
+          title: Reviewed TAPR DROP_ATT source header and layout crosswalk
+          status: available
+          provenance_ids:
+          - fa96bb22ea602c958dbe100ca555d471063e7b47f946cd3a7bb6ff95326c50a4
+          reviewed_sha256: 1828bcfddd179312a43d98397bc68edc68d1ae365813e14e14d4d708e6fe4ea6
+      reader:
+        profiles:
+          source:
+            tapr_source:
+              scope: state
+              tables:
+                dropout_attendance: data/tapr/raw/2025-S-DROP_ATT.csv
+            column_schema: schemas/tapr--2025--state-region-dropout-attendance-crosswalk.json
+  region_tapr_dropout_attendance:
+    2024:
+      path: data/tapr/raw/2024-R-DROP_ATT.csv
+      metadata:
+        title: 2024 TAPR Attendance, Chronic Absenteeism, and Annual Dropout (Region)
+        publisher: Texas Education Agency
+        version: '2024'
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        period:
+          kind: unknown
+        metrics: {}
+        notes: Source-only direct publisher DROP_ATT observations from all four offered groups. All
+          raw facts match the four independent group exports. The dictionary documents 108 of 162
+          fact fields. The other 54 retain unknown definitions. Four named-report rates corroborate
+          school year 2022-23 within publisher edition 2024. The full table period, units and token
+          interpretation remain unqualified. The publisher appended a SAS error message after the
+          final data record. The original bytes and the exact footer annotation are retained.
+        provenance_ids:
+        - cd76be122e065f8f688bb346689e06f8b5c438416fcf096302f189042ce4a3de
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          title: Original all-offered DROP_ATT CSV
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          provenance_ids:
+          - cd76be122e065f8f688bb346689e06f8b5c438416fcf096302f189042ce4a3de
+          reviewed_sha256: 90633a53b2e7e2fdcd1af334f9602a45e81ad6b8181fd24b39ed1bc671b4342e
+        - reference_id: menu
+          role: source_notes
+          title: Official TAPR geography menu
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&tapr=all_r&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr.sas
+          provenance_ids:
+          - 8467511fbc5ea1c7b99c85fb5a16cf4b5b6bfbad8189f450718b1c79dc2f5fc3
+          reviewed_sha256: 757d861eddcd3fb8264b1f3dddc7abd4879cd9e34991e9db667683c3b892bbb1
+        - reference_id: selection
+          role: source_notes
+          title: Official DROP_ATT variable selection
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+          provenance_ids:
+          - dc3d0f7ee16f9e931e6dfc39d99f2b5e06033a03b0f35bc5f04880c86c00c5e3
+          reviewed_sha256: 7843434248fe93b02ed31c63ebba3c9c680cde9c3ab0a4df31c9e7df10b004c0
+        - reference_id: dictionary
+          role: data_dictionary
+          title: Official DROP_ATT dictionary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=R&dsname=DROP_ATT&dd=attendgrad&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          provenance_ids:
+          - f0ffd673287d1b185028cfdac83a8bdfb2c171233a87f22e54b19a9beed0324f
+          reviewed_sha256: f1069c040e370749ad6db76f8848bb33f2749fd9effde3cdc0bee11297d9a054
+        - reference_id: named_report
+          role: source_notes
+          title: Official named attendance and dropout rate report
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&id=13&lev=R&prgopt=reports%2Ftapr%2Fattendgrad.sas
+          provenance_ids:
+          - 244b95dc860a4f0e1137270f5d06e5e145bd14fd3bad9ebfa6f59fdebc7b4d18
+          reviewed_sha256: 257da2b2877aa4c830b07384a0ea9fb757fed999a8588b6ea0d8ed398fd1af6a
+        - *tapr_2024_staar_glossary
+        - *tapr_2024_staar_masking
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2024--state-region-dropout-attendance-crosswalk.json
+          title: Reviewed TAPR DROP_ATT source header and layout crosswalk
+          status: available
+          provenance_ids:
+          - 0ce1ffedaba7b34ecae9c4ad76c8be1d82b24b4144b9a56474fde226becd9efc
+          reviewed_sha256: c41b69d3c13484f5a54627f6f8f2ff967b7e789cbd01b29ef9ad5e5309055434
+      reader:
+        profiles:
+          source:
+            tapr_source:
+              scope: region
+              tables:
+                dropout_attendance: data/tapr/raw/2024-R-DROP_ATT.csv
+            column_schema: schemas/tapr--2024--state-region-dropout-attendance-crosswalk.json
+    2025:
+      path: data/tapr/raw/2025-R-DROP_ATT.csv
+      metadata:
+        title: 2025 TAPR Attendance, Chronic Absenteeism, and Annual Dropout (Region)
+        publisher: Texas Education Agency
+        version: '2025'
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        period:
+          kind: unknown
+        metrics: {}
+        notes: Source-only direct publisher DROP_ATT observations from all four offered groups. All
+          raw facts match the four independent group exports. The dictionary documents 108 of 162
+          fact fields. The other 54 retain unknown definitions. Four named-report rates corroborate
+          school year 2023-24 within publisher edition 2025. The full table period, units and token
+          interpretation remain unqualified.
+        provenance_ids:
+        - c82bf5f0f24934ad811a10973eff262aef31a8fb60c7efe3864b8274b4cdf5ba
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          title: Original all-offered DROP_ATT CSV
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          provenance_ids:
+          - c82bf5f0f24934ad811a10973eff262aef31a8fb60c7efe3864b8274b4cdf5ba
+          reviewed_sha256: 1402a2c414e47285e3691267c60e06b28d7209164a704ef2e225a77ca983049b
+        - reference_id: menu
+          role: source_notes
+          title: Official TAPR geography menu
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&tapr=all_r&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr.sas
+          provenance_ids:
+          - f11c1d29c6dabec1d3b95a9f6c9666ab1e060be25352e03ee32357897514eb9e
+          reviewed_sha256: 54669c8833ab2da2b191af8b25f5972cbf7f4365966408e8b65ff22d39c70aaf
+        - reference_id: selection
+          role: source_notes
+          title: Official DROP_ATT variable selection
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+          provenance_ids:
+          - 30728799e0f7c46586dfbfa092be3519a6e915a2746f9f978a033c00baaa4a0d
+          reviewed_sha256: af10ad0655828e001d51ed4df16ca4912893f5081383fa667cedf913aa109efc
+        - reference_id: dictionary
+          role: data_dictionary
+          title: Official DROP_ATT dictionary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=R&dsname=DROP_ATT&dd=attendgrad&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          provenance_ids:
+          - eb242b6bc4eeb57373f4f9d087a6c78b4391cdf84bed3de4d7dfe5f8b1124056
+          reviewed_sha256: 62198f2d142b3ec241aa73b6d5517ac4cc2714e1cff496f9e7b38362369c16bd
+        - reference_id: named_report
+          role: source_notes
+          title: Official named attendance and dropout rate report
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&id=13&lev=R&prgopt=reports%2Ftapr%2Fattendgrad.sas
+          provenance_ids:
+          - 0a2802c1a39b3953a20553e1a2aac2fd3c7976ad2f6d8971155084b006ef7f4a
+          reviewed_sha256: b7bdb43dfa5bb04d077931af3ec3231706d5154bbf75ca2e13a5677b981368be
+        - *tapr_2025_staar_glossary
+        - *tapr_2025_staar_masking
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2025--state-region-dropout-attendance-crosswalk.json
+          title: Reviewed TAPR DROP_ATT source header and layout crosswalk
+          status: available
+          provenance_ids:
+          - fa96bb22ea602c958dbe100ca555d471063e7b47f946cd3a7bb6ff95326c50a4
+          reviewed_sha256: 1828bcfddd179312a43d98397bc68edc68d1ae365813e14e14d4d708e6fe4ea6
+      reader:
+        profiles:
+          source:
+            tapr_source:
+              scope: region
+              tables:
+                dropout_attendance: data/tapr/raw/2025-R-DROP_ATT.csv
+            column_schema: schemas/tapr--2025--state-region-dropout-attendance-crosswalk.json
   state_tapr_staar_end_of_course:
     2024:
       path: &tapr_2024_eoc_state_csv data/tapr/raw/2024-S-STAAR_EOC-offered.csv
@@ -17026,6 +17338,10 @@ schema:
     campus_tapr_dropout_attendance:
     - csv
     district_tapr_dropout_attendance:
+    - csv
+    state_tapr_dropout_attendance:
+    - csv
+    region_tapr_dropout_attendance:
     - csv
     campus_tapr_historical_enrollment:
     - xlsx

@@ -521,46 +521,45 @@ not additional metric keys or automatic `.meta` hydration. No current geometry
 roster limits source coverage. Unknown field units and reference periods remain
 unknown; the existing qualified metric bindings retain their lagged periods.
 
-The 2024 `campus_tapr_reference` / `district_tapr_reference` and
-`campus_tapr_dropout_attendance` / `district_tapr_dropout_attendance` branches
-are also source-only. Select `reader_profile="source"` explicitly to discover
-their complete 22/12 and 166/164 ordered fields. One reviewed crosswalk binds
-the exact two CSV header records, finite data ranges, original raw checksums
-and dictionary occurrences. Human-readable field names retain a leading label
-year after its literal Campus/District word; `county_number` and `esc_region`
-omit only the label's digit-width naming prefix. The original codes, labels
-and years remain available through `header_records` / `header_mapping`.
+The 2024 `campus_tapr_reference` and `district_tapr_reference` branches are
+source-only. Select `reader_profile="source"` explicitly to discover their
+complete 22 and 12 ordered fields. The crosswalk binds the exact two CSV
+header records, finite data ranges, original checksums and dictionary
+occurrences. Human-readable field names retain the leading label year after
+its literal Campus/District word. `county_number` and `esc_region` omit only
+the label's digit-width naming prefix. `header_records` and `header_mapping`
+preserve the original codes, labels and years. Dictionary Type and Length
+describe the publisher's metadata. Field periods, scientific types, units
+and value interpretation remain unqualified. The original acquisition and
+annual context receipts accompany the crosswalk's own local observation.
 
-All 54 undocumented DROP_ATT fact columns per scope remain present with unknown
-type and definition. Every field period is unknown, with no metric, estimation
-or applied value policy; interpretation therefore fails rather than assigning
-a status from `N`/`D`/`R`, a label year, or a masking-looking string. REF dictionary
-Type/Length values are literal publisher metadata, not scientific types, units
-or CSV-value limits. These current-interface families are independent of legacy
-GRAD. Their original HTTP dates and annual context receipts remain immutable;
-the schema has its own genuine local observation. This registration supplies
-contracts, not prepared outputs, released/default facts or app activation.
+### 2024 and 2025 TAPR attendance and dropout sources
 
-### 2025 TAPR attendance and dropout sources
-
-Use the `source` profile for edition `2025` of
-`campus_tapr_dropout_attendance` or `district_tapr_dropout_attendance`.
+Use the `source` profile for edition `2024` or `2025` of
+`campus_tapr_dropout_attendance`, `district_tapr_dropout_attendance`,
+`region_tapr_dropout_attendance`, or `state_tapr_dropout_attendance`.
 The publisher's all-offered `DROP_ATT` export includes attendance, chronic
-absenteeism, and annual dropout for grades 7–8 and 9–12. The campus export has
-9,084 rows and 166 columns. The district export has 1,208 rows and 164 columns.
-Both scopes contain 162 fact fields. Geographic keys match the corresponding
-retained 2025 staff exports.
+absenteeism, and annual dropout for grades 7–8 and 9–12. Each scope contains
+162 fact fields. The campus exports have 9,082 and 9,084 rows with 166 columns.
+The district exports have 1,207 and 1,208 rows with 164 columns. Both editions
+include a direct statewide row and all 20 education service center regions.
+The 2025 campus and district keys match the corresponding retained staff exports.
 
 The crosswalk preserves both literal CSV header records, dictionary occurrence
 order and source coordinates. The dictionary documents 108 fact fields at each
 scope. The remaining 54 retain unknown definitions. The raw contract keeps
-the publisher's `2024` and `SY 2023-24` labels and leaves reference periods,
-units and token interpretation unqualified.
+the publisher's literal labels and leaves the full table period, units and
+token interpretation unqualified. The named Texas and Region 13 reports
+corroborate four rates each for school year 2022–23 in publisher edition 2024
+and 2023–24 in edition 2025.
 
-Use `--edition 2025 --family dropout_attendance` with the existing TAPR source
-preparation command. Supply the original CSVs and receipt store explicitly.
-The qualification compared every fact cell with separate publisher exports
-for the four offered groups.
+Use `--edition 2024` or `--edition 2025` with `--family dropout_attendance`
+in the existing TAPR source preparation command. Supply the original CSVs and
+receipt store explicitly. Every statewide and regional fact cell matched a
+separate publisher export for its group. The 2024 region and 2025 state
+all-offered CSVs end with a SAS error message after the data. The crosswalks
+retain each exact footer as a byte-pinned annotation. The 2025 campus and
+district fact cells also matched separate exports for all four groups.
 
 The 2024 `campus_tapr_four_year_longitudinal_rate` and
 `district_tapr_four_year_longitudinal_rate` source profiles retain the complete

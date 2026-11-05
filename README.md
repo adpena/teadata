@@ -24,7 +24,7 @@ PyYAML's supported pure Python implementation is tested on 3.15.
 
 ```bash
 uv venv
-uv pip install teadata==0.0.131
+uv pip install teadata==0.0.132
 ```
 
 ### Development (recommended)
@@ -111,6 +111,8 @@ export TEADATA_RELEASE_SHA256="9dd062128273cbb90f3b9c952b072d74a629de6ecbcff8065
 
 For a downloaded bundle, set `TEADATA_RELEASE` to its local `release.json`
 instead. The manifest binds the selected artifacts to their content hashes.
+Use the [TAPR and TPRS supplements](docs/data-releases.md#tapr-and-tprs-supplements)
+to access separately versioned assessment, attendance, dropout, and student profile tables.
 
 ```python
 from teadata import DataEngine

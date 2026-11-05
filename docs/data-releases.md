@@ -57,6 +57,26 @@ it comes from a versioned GitHub release of this project. Keep that build ID wit
 the analysis and cite the original publisher datasets using the catalog's source
 and methodology references.
 
+### TAPR and TPRS supplements
+
+The [0.0.132 release assets](https://github.com/adpena/teadata/releases/tag/v0.0.132)
+provide three independently pinned manifests. Download a named manifest with
+its adjacent assets or open its versioned URL with `DataRelease` and the
+manifest SHA-256. Use `release.catalog.editions()` to discover the exact
+edition, geography, and source revision before selecting fields.
+
+| Manifest | Coverage | Manifest SHA-256 |
+| --- | --- | --- |
+| `tapr-staar-end-of-course-2024-2026.release.json` | 2023–24 through 2025–26, campus, district, ESC region, and Texas. TAPR/TPRS assessment populations. | `2e62fb58db2c8afb9510c66feb6f385be8dd4439f6d5b71befa8c2bd4b317fc3` |
+| `tapr-dropout-attendance-2024-2025.release.json` | 2023–24 and 2024–25 TAPR editions, campus, district, ESC region, and Texas. Check each source field's measurement period. | `44ef31be36985e4c2a7eb3be303288e1b658e4a09a74463f85e43c613d356257` |
+| `tprs-student-profile-2026.release.json` | Preliminary 2025–26 student profile with selected fields for 14 districts, six campuses, and Texas. Supports the reviewed `Query.compare_statewide` student-profile comparisons. | `6665755760ed8ef59faebb9ded4d335207778336fc2112b27a81723cccc1df61` |
+
+The two TAPR families expose publisher tokens, exact headers, and dictionary
+references. Their raw fields require source-specific interpretation before use
+as typed or longitudinal measures. The supplements use their own data-build
+identities. The default engine continues to use its separately configured
+snapshot.
+
 ### Exact retained-source parity
 
 An offline check compares every raw cell in explicitly selected complete TAPR,

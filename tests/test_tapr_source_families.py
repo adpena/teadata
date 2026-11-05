@@ -474,6 +474,10 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
         statewide = 'state_tapr_' + family
         assert list(current['data_sources'].pop(statewide)) == [2025]
         assert current['schema']['data_sources'].pop(statewide) == ['csv']
+    for scope in ('state', 'region'):
+        dataset = scope + '_tapr_dropout_attendance'
+        assert list(current['data_sources'].pop(dataset)) == [2024, 2025]
+        assert current['schema']['data_sources'].pop(dataset) == ['csv']
     for scope in ('campus', 'district'):
         current['data_sources'][scope + '_tapr_dropout_attendance'].pop(2025)
         versions = current['data_sources'][scope + '_tapr_four_year_longitudinal_rate']
