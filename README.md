@@ -24,7 +24,7 @@ PyYAML's supported pure Python implementation is tested on 3.15.
 
 ```bash
 uv venv
-uv pip install teadata==0.0.127
+uv pip install teadata==0.0.128
 ```
 
 ### Development (recommended)
@@ -105,7 +105,8 @@ Python packages contain code and metadata; data bundles are distributed
 separately. Select an immutable bundle before running the example:
 
 ```bash
-export TEADATA_RELEASE_URL="https://github.com/adpena/teadata/releases/download/v0.0.127/release.json"
+export TEADATA_RELEASE_URL="https://github.com/adpena/teadata/releases/download/v0.0.128/release.json"
+export TEADATA_RELEASE_SHA256="9dd062128273cbb90f3b9c952b072d74a629de6ecbcff8065c4295b511eaa9aa"
 ```
 
 For a downloaded bundle, set `TEADATA_RELEASE` to its local `release.json`

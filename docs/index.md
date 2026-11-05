@@ -22,7 +22,7 @@ uv sync
 Select a published version and retain your application's lockfile:
 
 ```bash
-uv add "teadata==0.0.127"
+uv add "teadata==0.0.128"
 ```
 
 ### 3) Load the configured release
@@ -32,7 +32,8 @@ immutable remote release manifest. Python packages contain code and metadata,
 with data bundles distributed separately. For example:
 
 ```bash
-export TEADATA_RELEASE_URL="https://github.com/adpena/teadata/releases/download/v0.0.127/release.json"
+export TEADATA_RELEASE_URL="https://github.com/adpena/teadata/releases/download/v0.0.128/release.json"
+export TEADATA_RELEASE_SHA256="9dd062128273cbb90f3b9c952b072d74a629de6ecbcff8065c4295b511eaa9aa"
 ```
 
 A source checkout may instead have a local `teadata/.cache/release.json`;
