@@ -137,24 +137,28 @@ def test_acquire_cli_captures_actual_shape_metadata_config_controls_and_closed_h
     observed = []
     def opened(request, timeout):
         observed.append(request)
-        assert timeout == 20
+        assert timeout == 45
         assert request.full_url == 'https://rptsvr1.tea.texas.gov/cgi/sas/broker/'
         assert request.get_method() == 'POST' and request.data == urlencode(controls).encode()
+        if len(observed) == 1:
+            raise TimeoutError("Publisher response timed out")
         response = Response(b'complete original public CSV bytes')
         response.url = request.full_url
         return response
     def client(store, **kwargs):
-        assert kwargs['attempts'] == 1 and kwargs['max_retry_wait'] == 0
+        assert kwargs['attempts'] == 3 and kwargs['max_retry_wait'] == 30
         assert any(isinstance(handler, NoRedirect) for handler in kwargs['opener'].handlers)
         kwargs['opener'] = SimpleNamespace(open=opened)
         return AcquisitionClient(store, **kwargs)
     monkeypatch.setattr(refresh, 'AcquisitionClient', client)
+    monkeypatch.setattr('teadata.acquisition.time.sleep', lambda delay: None)
     monkeypatch.setattr('socket.socket', lambda *a, **k: pytest.fail('Real socket attempted'))
     assert main(args) == 0
     result = json.loads(capsys.readouterr().out)
     archive = ProvenanceStore(tmp_path / 'observations')
     record = archive.read_record(result['record_id'])
-    assert len(observed) == 1 and record['dataset'] == 'campus_tapr_student_staff_profile'
+    assert len(observed) == 2 and record['dataset'] == 'campus_tapr_student_staff_profile'
+    assert record['parameters']['transport_attempts'] == 2
     assert record['section'] == 'data_sources' and record['requested_year'] == record['resolved_year'] == 2025
     actual = DatasetMetadata.from_dict(record['source_metadata'])
     expected = DatasetMetadata.from_dict(json.loads(original_metadata))
@@ -176,7 +180,7 @@ def test_acquire_reference_section_is_explicit_and_does_not_require_config(tmp_p
     for name in ['--config', '--config-sha256', '--year']:
         index = args.index(name)
         del args[index:index + 2]
-    args.extend(['--section', 'reference'])
+    args.extend(['--section', 'reference', '--timeout', '90', '--attempts', '1', '--max-retry-wait', '0'])
     args[args.index('--dataset') + 1] = 'tapr_2024_masking_reference'
     args[args.index('--method') + 1] = 'GET'
     def client(store, **kwargs):
@@ -187,6 +191,9 @@ def test_acquire_reference_section_is_explicit_and_does_not_require_config(tmp_p
     archive = ProvenanceStore(tmp_path / 'observations')
     record = archive.read_record(json.loads(capsys.readouterr().out)['record_id'])
     assert record['section'] == 'reference' and record['dataset'] == 'tapr_2024_masking_reference'
+    assert record['parameters']['transport_limits'] == {
+        'timeout': 90, 'attempts': 1, 'max_retry_wait': 0, 'max_bytes': 32 * 1024 * 1024,
+    }
     assert record['requested_year'] is record['resolved_year'] is None
     assert replace(DatasetMetadata.from_dict(record['source_metadata']), provenance_ids=()).to_dict() == DatasetMetadata.from_dict(json.loads(metadata.read_bytes())).to_dict()
 

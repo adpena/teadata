@@ -357,7 +357,10 @@ def main(argv: list[str] | None = None) -> int:
     replay.add_argument('--content-type', help='Explicit type for a legacy receipt that did not retain it')
     for command in [acquire, replay]:
         command.add_argument('--store', type=Path, required=True)
-        command.add_argument('--timeout', type=float, default=20)
+        command.add_argument('--timeout', type=float, default=45, help='Socket timeout per attempt, in seconds')
+        command.add_argument('--attempts', type=int, default=3, help='Total transport attempts per request')
+        command.add_argument('--max-retry-wait', type=float, default=30,
+                             help='Defer when the next retry requires a longer wait, in seconds')
         command.add_argument('--max-bytes', type=int, default=32 * 1024 * 1024)
     dictionary = commands.add_parser('dictionary', help='Inspect one retained HTML dictionary offline; keep partial ordered occurrences')
     dictionary.add_argument('--source-store', type=Path, required=True)
@@ -399,14 +402,15 @@ def main(argv: list[str] | None = None) -> int:
         result = inspect_form(args)
     else:
         archive = ProvenanceStore(args.store)
-        if args.command == 'replay':
-            client = AcquisitionClient(archive, timeout=args.timeout, attempts=1, max_bytes=args.max_bytes, max_retry_wait=0)
+        source = acquisition_source(args, archive) if args.command == 'acquire' else None
+        client = AcquisitionClient(
+            archive, timeout=args.timeout, attempts=args.attempts,
+            max_bytes=args.max_bytes, max_retry_wait=args.max_retry_wait,
+            opener=build_opener(NoRedirect()) if getattr(args, 'no_redirects', False) else None,
+        )
+        if source is None:
             acquired = replay_acquisition(client, args.record, content_type=args.content_type)
         else:
-            source = acquisition_source(args, archive)
-            client = AcquisitionClient(archive, timeout=args.timeout, attempts=1,
-                max_bytes=args.max_bytes, max_retry_wait=0,
-                opener=build_opener(NoRedirect()) if args.no_redirects else None)
             acquired = acquire_form(client, args.url, source, filename=args.filename, method=args.method,
                                     fields=args.field, content_type=args.content_type)
             archive.verify_record_closure([acquired.record_id])

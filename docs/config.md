@@ -860,8 +860,17 @@ uv run python -m teadata.scripts.refresh_tapr replay \
   --record ORIGINAL_RECORD_ID --store provenance
 ```
 
-`acquire` and `replay` are the only network commands. Defaults are one attempt,
-20 seconds and 32 MiB per response. For POST, supply the observed content type
+`acquire` and `replay` are the only network commands. Both default to three
+transport attempts, a 45-second socket timeout and a 32 MiB response limit.
+Retries start the transfer from the beginning and repeat the same request.
+The client backs off for timeouts, interrupted responses and temporary HTTP
+errors. It honors `Retry-After` and defers if the wait exceeds 30 seconds.
+Use `--timeout 90 --attempts 4` for a slow endpoint, or `--attempts 1`
+for a single try. Set `--max-retry-wait` to change the wait limit.
+The receipt records the attempt that completed the transfer. Publisher error
+pages returned with HTTP 200 still require separate source qualification.
+
+For POST, supply the observed content type
 and repeat `--field NAME VALUE` in original source order, including repeated
 names and empty values. The command records these controls and request limits.
 POST controls use UTF-8; other charset declarations are rejected before HTTP.

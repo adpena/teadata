@@ -6,7 +6,12 @@ from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from hashlib import sha256
+from http.client import IncompleteRead
+import logging
+from math import isfinite
 from pathlib import Path
+from socket import EAI_AGAIN, gaierror
+from ssl import SSLCertVerificationError
 import tempfile
 import time
 from typing import Callable, Mapping, Sequence
@@ -17,9 +22,15 @@ from urllib.parse import urlencode
 from .dataset_metadata import ResolvedDataset, validate_http_url
 from .provenance import ProvenanceStore
 
+logger = logging.getLogger(__name__)
+
 
 class AcquisitionError(RuntimeError):
     """A source could not be acquired without violating its transport contract."""
+
+
+class _IncompleteTransfer(AcquisitionError):
+    """The response ended before a complete source arrived."""
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -46,8 +57,10 @@ class AcquisitionClient:
         max_bytes: int = 512 * 1024 * 1024,
         max_retry_wait: float = 30,
     ):
-        if timeout <= 0 or attempts < 1 or max_bytes < 1 or max_retry_wait < 0:
-            raise ValueError("Acquisition limits must be positive")
+        if type(attempts) is not int or attempts < 1 or type(max_bytes) is not int or max_bytes < 1:
+            raise ValueError("Acquisition attempts and byte limit must be positive integers")
+        if not isfinite(timeout) or timeout <= 0 or not isfinite(max_retry_wait) or max_retry_wait < 0:
+            raise ValueError("Acquisition requires a finite positive timeout and finite nonnegative retry wait")
         self.store = store
         self.opener = opener or build_opener()
         self.timeout = timeout
@@ -86,6 +99,7 @@ class AcquisitionClient:
         with tempfile.TemporaryDirectory(prefix="teadata-acquisition-") as directory:
             target = Path(directory) / filename
             for attempt in range(self.attempts):
+                validating_headers = False
                 try:
                     with self.opener.open(request, timeout=self.timeout) as response:
                         validate_http_url(response.url)
@@ -93,7 +107,9 @@ class AcquisitionClient:
                         if status != 200:
                             raise AcquisitionError(f"Expected HTTP 200; received {status}")
                         if validate_response is not None:
+                            validating_headers = True
                             validate_response({key.lower(): value for key, value in response.headers.items()})
+                            validating_headers = False
                         declared = response.headers.get("Content-Length")
                         if declared is not None:
                             try:
@@ -109,44 +125,61 @@ class AcquisitionClient:
                                 if size > self.max_bytes:
                                     raise AcquisitionError("Source exceeds the acquisition size limit")
                                 stream.write(block)
-                        if size == 0 or (declared is not None and size != declared):
-                            raise AcquisitionError("Empty or incomplete source transfer")
-                        if validate is not None:
-                            validate(target)
-                        record_id = self.store.record_acquisition(
-                            target,
-                            replace(dataset, path=str(target)),
-                            downloaded_at=datetime.now(timezone.utc),
-                            requested_url=url,
-                            resolved_url=response.url,
-                            response_headers=dict(response.headers),
-                            parameters={
-                                **dict(parameters or {}),
-                                "http_method": request.get_method(),
-                                "http_status": status,
-                                "acquisition_client_sha256": client_identity,
-                            },
-                        )
-                    record = self.store.read_record(record_id)
-                    return AcquiredSource(
-                        record_id, self.store.verify_artifact(record["artifact"]["sha256"])
-                    )
-                except HTTPError as error:
-                    if error.code not in {408, 429, 500, 502, 503, 504} or attempt + 1 == self.attempts:
+                        if size == 0 or (declared is not None and size < declared):
+                            raise _IncompleteTransfer("Empty or incomplete source transfer")
+                        if declared is not None and size > declared:
+                            raise AcquisitionError("Source exceeds its declared Content-Length")
+                        resolved_url = response.url
+                        response_headers = dict(response.headers)
+                        downloaded_at = datetime.now(timezone.utc)
+                    break
+                except (URLError, TimeoutError, ConnectionError, IncompleteRead, _IncompleteTransfer) as error:
+                    if validating_headers:
                         raise
-                    try:
-                        delay = self._retry_delay(error.headers.get("Retry-After"), attempt)
-                    finally:
-                        error.close()
-                except (URLError, TimeoutError, ConnectionError):
                     if attempt + 1 == self.attempts:
+                        if isinstance(error, IncompleteRead):
+                            raise AcquisitionError("Incomplete source transfer") from error
                         raise
-                    delay = self._retry_delay(None, attempt)
+                    retry_after = None
+                    if isinstance(error, HTTPError):
+                        if error.code not in {408, 429, 500, 502, 503, 504}:
+                            raise
+                        with error:
+                            retry_after = error.headers.get("Retry-After") if error.headers else None
+                    else:
+                        reason = error.reason if isinstance(error, URLError) else error
+                        if isinstance(reason, SSLCertVerificationError) or (
+                            isinstance(reason, gaierror) and reason.errno != EAI_AGAIN
+                        ):
+                            raise
+                    delay = self._retry_delay(retry_after, attempt)
+                logger.warning("Retrying source acquisition in %.1f seconds (attempt %d of %d)",
+                               delay, attempt + 2, self.attempts)
                 time.sleep(delay)
-        raise AcquisitionError("Acquisition did not complete")
+            else:
+                raise AcquisitionError("Acquisition did not complete")
+            if validate is not None:
+                validate(target)
+            record_id = self.store.record_acquisition(
+                target,
+                replace(dataset, path=str(target)),
+                downloaded_at=downloaded_at,
+                requested_url=url,
+                resolved_url=resolved_url,
+                response_headers=response_headers,
+                parameters={
+                    **dict(parameters or {}),
+                    "http_method": request.get_method(),
+                    "http_status": status,
+                    "acquisition_client_sha256": client_identity,
+                    "transport_attempts": attempt + 1,
+                },
+            )
+            record = self.store.read_record(record_id)
+            return AcquiredSource(record_id, self.store.verify_artifact(record["artifact"]["sha256"]))
 
     def _retry_delay(self, retry_after: str | None, attempt: int) -> float:
-        delay = float(min(2**attempt, 8))
+        delay = float(2 ** min(attempt, 3))
         if retry_after is not None:
             try:
                 if retry_after.strip().isdigit():
@@ -159,7 +192,7 @@ class AcquisitionClient:
             except (ValueError, TypeError, OverflowError) as error:
                 raise AcquisitionError("Invalid Retry-After; acquisition deferred") from error
         if delay > self.max_retry_wait:
-            raise AcquisitionError("Retry-After exceeds the local wait limit; acquisition deferred")
+            raise AcquisitionError("Retry wait exceeds the local limit; acquisition deferred")
         return delay
 
 

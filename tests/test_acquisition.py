@@ -1,7 +1,10 @@
 from io import BytesIO
+from http.client import IncompleteRead
 import json
+from socket import EAI_NONAME, gaierror
+from ssl import SSLCertVerificationError
 from types import SimpleNamespace
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 
 import pytest
 
@@ -31,6 +34,14 @@ def source():
     return ResolvedDataset("example", "data_sources", 2025, 2025, "")
 
 
+@pytest.mark.parametrize("limits", [
+    {"max_bytes": float("nan")}, {"attempts": 2.5}, {"timeout": float("inf")}, {"max_retry_wait": float("nan")},
+])
+def test_acquisition_rejects_invalid_transport_limits(tmp_path, limits):
+    with pytest.raises(ValueError):
+        client(tmp_path, Response(), **limits)
+
+
 def test_success_preserves_bytes_and_records_http_without_credentials(tmp_path):
     selected = client(tmp_path, Response(headers={"Content-Type":"text/csv", "Set-Cookie":"secret-cookie"}))
     result = selected.fetch("https://example.org/source.csv", source(), filename="source.csv",
@@ -38,7 +49,9 @@ def test_success_preserves_bytes_and_records_http_without_credentials(tmp_path):
     record = selected.store.read_record(result.record_id)
     assert result.path.read_bytes() == b"id\n001\n"
     assert record["downloaded_at"] is not None
-    assert {key: value for key, value in record["parameters"].items() if key != "acquisition_client_sha256"} == {"year":2025, "http_method":"POST", "http_status":200}
+    assert {key: value for key, value in record["parameters"].items() if key != "acquisition_client_sha256"} == {
+        "year": 2025, "http_method": "POST", "http_status": 200, "transport_attempts": 1,
+    }
     assert len(record["parameters"]["acquisition_client_sha256"]) == 64
     assert record["artifact"]["filename"] == "source.csv"
     assert "secret" not in json.dumps(record)
@@ -50,7 +63,7 @@ def test_success_preserves_bytes_and_records_http_without_credentials(tmp_path):
     (b"abc", {"Content-Length":"200"}, 20),
 ])
 def test_invalid_transfer_never_gets_a_success_receipt(tmp_path, payload, headers, limit):
-    selected = client(tmp_path, Response(payload, headers), max_bytes=limit)
+    selected = client(tmp_path, Response(payload, headers), max_bytes=limit, attempts=1)
     with pytest.raises(AcquisitionError):
         selected.fetch("https://example.org/source.csv", source(), filename="source.csv")
     assert not (selected.store.root / "records").exists()
@@ -62,6 +75,68 @@ def test_content_validation_fails_without_retry_or_success_receipt(tmp_path):
         raise AcquisitionError("Expected CSV")
     with pytest.raises(AcquisitionError, match="Expected CSV"):
         selected.fetch("https://example.org/source.csv", source(), filename="source.csv", validate=validate)
+    assert not (selected.store.root / "records").exists()
+
+
+def test_retries_short_body_and_interrupted_read_from_the_start(tmp_path, monkeypatch):
+    class Interrupted(Response):
+        def read(self, size=-1):
+            if self.tell():
+                raise IncompleteRead(b"")
+            return super().read(size)
+
+    sleeps = []
+    monkeypatch.setattr("teadata.acquisition.time.sleep", sleeps.append)
+    responses = iter([Response(b"first prefix", {"Content-Length": "200"}),
+                      Interrupted(b"second prefix"), Response()])
+    selected = AcquisitionClient(ProvenanceStore(tmp_path / "archive"),
+                                 opener=SimpleNamespace(open=lambda *args, **kwargs: next(responses)))
+    validated = []
+    result = selected.fetch("https://example.org/source.csv", source(), filename="source.csv",
+                            validate=lambda path: validated.append(path.read_bytes()))
+    assert sleeps == [1, 2]
+    assert validated == [b"id\n001\n"] and result.path.read_bytes() == validated[0]
+    assert selected.store.read_record(result.record_id)["parameters"]["transport_attempts"] == 3
+    assert len(list((selected.store.root / "records").glob("*.json"))) == 1
+
+
+def test_exhausted_transfer_retries_never_get_a_success_receipt(tmp_path, monkeypatch):
+    sleeps = []
+    monkeypatch.setattr("teadata.acquisition.time.sleep", sleeps.append)
+    responses = iter([Response(b""), Response(b"")])
+    selected = AcquisitionClient(ProvenanceStore(tmp_path / "archive"), attempts=2,
+                                 opener=SimpleNamespace(open=lambda *args, **kwargs: next(responses)))
+    with pytest.raises(AcquisitionError, match="Empty or incomplete"):
+        selected.fetch("https://example.org/source.csv", source(), filename="source.csv")
+    assert sleeps == [1]
+    assert not (selected.store.root / "records").exists()
+
+
+@pytest.mark.parametrize("validation", ["validate", "validate_response"])
+def test_validation_timeout_is_not_a_transport_retry(tmp_path, validation):
+    selected = client(tmp_path, Response())
+    calls = []
+
+    def validate(_):
+        calls.append(1)
+        raise TimeoutError("Validator timed out")
+
+    with pytest.raises(TimeoutError, match="Validator timed out"):
+        selected.fetch("https://example.org/source.csv", source(), filename="source.csv", **{validation: validate})
+    assert calls == [1]
+    assert not (selected.store.root / "records").exists()
+
+
+@pytest.mark.parametrize("reason", [SSLCertVerificationError("Bad certificate"), gaierror(EAI_NONAME, "Unknown host")])
+def test_permanent_url_failures_are_not_retried(tmp_path, monkeypatch, reason):
+    def opened(*args, **kwargs):
+        raise URLError(reason)
+
+    monkeypatch.setattr("teadata.acquisition.time.sleep", lambda delay: pytest.fail("Permanent failure retried"))
+    selected = AcquisitionClient(ProvenanceStore(tmp_path / "archive"), opener=SimpleNamespace(open=opened))
+    with pytest.raises(URLError) as error:
+        selected.fetch("https://example.org/source.csv", source(), filename="source.csv")
+    assert error.value.reason is reason
     assert not (selected.store.root / "records").exists()
 
 
