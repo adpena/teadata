@@ -1,8 +1,30 @@
+from pathlib import Path
 from typing import Any
 
 import pytest
+import yaml
 
-from teadata.teadata_config import Config, SpatialSelection, load_config, load_config_bytes
+from teadata.teadata_config import Config, SpatialSelection, _load_yaml, load_config, load_config_bytes
+
+
+@pytest.mark.parametrize("compiled", [False, True])
+def test_yaml_loader_preserves_config_and_rejects_python_tags(compiled, monkeypatch):
+    if compiled and not hasattr(yaml, "CSafeLoader"):
+        pytest.skip("PyYAML was built without LibYAML")
+    if not compiled:
+        monkeypatch.delattr(yaml, "CSafeLoader", raising=False)
+    config = Path(__file__).resolve().parents[1] / "teadata" / "teadata_sources.yaml"
+    assert load_config().to_json() == load_config(config).to_json()
+    with pytest.raises(yaml.constructor.ConstructorError):
+        _load_yaml("payload: !!python/object/apply:builtins.list []", compiled=True)
+
+
+def test_explicit_yaml_retains_existing_safe_loader_dialect(tmp_path):
+    path = tmp_path / "user-config.yaml"
+    path.write_bytes(b"%YAML 1.0\n---\ndata_sources: {}\n")
+    assert load_config(path).to_json() == load_config_bytes(path.read_bytes(), path=path).to_json()
+    with pytest.raises(yaml.YAMLError):
+        load_config_bytes(b"year_min:\t2025\n", path=path)
 
 
 def test_load_table_json_respects_explicit_lines_kwarg(tmp_path):

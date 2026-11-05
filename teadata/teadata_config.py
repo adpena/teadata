@@ -42,14 +42,15 @@ YEAR_MIN_DEFAULT = 2009
 # ------------------------------
 
 
-def _load_yaml(text: str) -> dict:
+def _load_yaml(text: str, *, compiled: bool = False) -> dict:
     try:
         import yaml  # PyYAML
     except Exception as e:
         raise RuntimeError(
             "PyYAML is required to read .yaml/.yml configs. pip install pyyaml"
         ) from e
-    data = yaml.safe_load(text) or {}
+    loader = getattr(yaml, "CSafeLoader", yaml.SafeLoader) if compiled else yaml.SafeLoader
+    data = yaml.load(text, Loader=loader) or {}
     if not isinstance(data, dict):
         raise ValueError("YAML root must be a mapping (dict).")
     return data
@@ -1512,6 +1513,10 @@ def load_config(path: str | Path | None = None) -> Config:
     p = Path(path) if path is not None else Path(__file__).with_name("teadata_sources.yaml")
     if not p.exists():
         raise FileNotFoundError(p)
+    if path is None:
+        # LibYAML accelerates the fixed packaged dialect. Explicit input paths
+        # and captured bytes retain the public Python SafeLoader dialect.
+        return _config_from_document(_load_yaml(p.read_text(encoding="utf-8"), compiled=True), p)
     return load_config_bytes(p.read_bytes(), path=p)
 
 
@@ -1522,9 +1527,13 @@ def load_config_bytes(raw: bytes, *, path: str | Path) -> Config:
     the file is never reopened. Selection and metadata semantics match load_config.
     """
     p = Path(path)
-    document = _rewrite_relative_paths(_decode_config(raw, p.suffix.lower()), p.resolve().parent)
-    cfg = Config.from_dict(document)
-    cfg.base_dir = p.resolve().parent
+    return _config_from_document(_decode_config(raw, p.suffix.lower()), p)
+
+
+def _config_from_document(document: dict, path: Path) -> Config:
+    base_dir = path.resolve().parent
+    cfg = Config.from_dict(_rewrite_relative_paths(document, base_dir))
+    cfg.base_dir = base_dir
     return cfg
 
 
