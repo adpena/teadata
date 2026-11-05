@@ -54,7 +54,7 @@ NEW_DATASETS = {scope + '_tapr_' + family for scope, family, *_ in SOURCES}
 HISTORICAL_FAMILY_YEARS = {
     'dropout_attendance': [2024, 2025],
     'four_year_longitudinal_rate': [2024, 2025],
-    'staar_school_progress': [2024, 2026],
+    'staar_school_progress': [2024, 2025, 2026],
 }
 
 
@@ -125,8 +125,10 @@ def test_complete_source_only_discovery_and_typed_receipts_need_no_artifact_io(s
         catalog.policy(dataset)
     with pytest.raises(ContractError, match='Reader profile is required'):
         cfg.load_df(dataset, 2024)
-    if family in {'dropout_attendance', 'four_year_longitudinal_rate'}:
-        expected_width = {'campus': 166, 'district': 164}[scope] if family == 'dropout_attendance' else width
+    if family in {'dropout_attendance', 'four_year_longitudinal_rate', 'staar_school_progress'}:
+        identity_width = 4 if scope == 'campus' else 2
+        expected_width = {'dropout_attendance': 162 + identity_width,
+                          'staar_school_progress': 2304 + identity_width}.get(family, width)
         assert len(cfg.header_records(dataset, edition='2025', reader_profile='source')) == expected_width
         assert cfg.is_source_only(dataset, 2025)
     else:
@@ -257,7 +259,7 @@ def test_staar_sources_keep_raw_scope_and_exact_receipts(
         assert metadata.version == str(year) and metadata.period.to_dict() == period
         assert not metadata.metrics and metadata.value_policy is None and metadata.estimation is None
         assert cfg.is_source_only(dataset, 2025) and cfg.is_source_only(dataset, 2026)
-        if family.startswith('staar_tested_grade_') or publisher_file == 'STAAR_EOC':
+        if family.startswith('staar_tested_grade_') or publisher_file in {'STAAR_EOC', 'STAAR_SP', 'PART'}:
             assert cfg.data_sources[dataset].available_years() == [2024, 2025, 2026]
         elif scope == 'region':
             assert cfg.data_sources[dataset].available_years() == [2026]
@@ -390,6 +392,43 @@ def test_regional_staar_addition_preserves_existing_2026_scope_crosswalks():
     assert fingerprint.hexdigest() == '4dd3bebb3a26d11e6e5ef6fc9929b564e3dfa51f0998c85b9e50a6687b84ec69'
 
 
+@pytest.mark.parametrize('year,family,publisher_file,program,facts,dictionary_only,scopes', [
+    (2024, 'staar_school_progress', 'STAAR_SP', 'progress', 2208, 192, ('state', 'region')),
+    (2024, 'staar_participation', 'PART', 'participation', 2028, 0, ('state', 'region', 'district', 'campus')),
+    (2025, 'staar_school_progress', 'STAAR_SP', 'progress', 2304, 96, ('state', 'region', 'district', 'campus')),
+    (2025, 'staar_participation', 'PART', 'participation', 2106, 0, ('state', 'region', 'district', 'campus')),
+])
+def test_historical_progress_participation_bind_logical_records_and_source_witnesses(
+        year, family, publisher_file, program, facts, dictionary_only, scopes):
+    cfg = load_config()
+    store = ProvenanceStore(ROOT / 'provenance')
+    for scope in scopes:
+        dataset = f'{scope}_tapr_{family}'
+        source = cfg.resolve_dataset(dataset, year, exact=True, reader_profile='source')
+        request, = cfg.tapr_source_requests(dataset, year)
+        layout = request.mapping['layout']
+        assert (layout['label_record'], layout['code_record'], layout['first_data_record']) == (1, 2, 3)
+        assert not layout['annotations']
+        assert cfg.is_source_only(dataset, year) and cfg.column_schema(dataset, year) is None
+        assert source.metadata.value_policy is None and not source.metadata.metrics
+        assert source.metadata.period.to_dict() == {'kind': 'school_year', 'start_year': year - 1, 'end_year': year}
+        assert cfg.data_sources[dataset].available_years() == [2024, 2025, 2026]
+        fields = {field['code'] for field in request.mapping['fields'] if field['disposition'] == 'fact'}
+        dictionary = {record['code'] for record in request.mapping['dictionary_records']}
+        assert len(fields) == facts and fields <= dictionary and len(dictionary - fields) == dictionary_only
+        refs = {ref.reference_id: ref for ref in source.metadata.references}
+        graph = validate_record_graph(store.read_record, [rid for ref in refs.values() for rid in ref.provenance_ids])
+        validate_reference_records(source, graph.__getitem__, verify_all_claimed=True)
+        raw, = [graph[rid] for rid in refs['csv_headers'].provenance_ids]
+        controls = dict(raw['parameters']['form_controls'])
+        letter = scope[0].upper()
+        assert (controls['ccyy'], controls['sumlev'], controls['dsname']) == (str(year), letter, publisher_file)
+        assert raw['artifact']['sha256'] == request.mapping['input_sha256']
+        named, = [graph[rid] for rid in refs['named_report'].provenance_ids]
+        query = parse_qs(urlsplit(named['requested_url']).query)
+        assert (query['ccyy'], query['lev'], query['prgopt']) == ([str(year)], [letter], [f'reports/tapr/{program}.sas'])
+
+
 def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     current = yaml.safe_load((ROOT / 'teadata/teadata_sources.yaml').read_text())
     selected_students = 'tprs_student_membership_enrollment_reports'
@@ -406,6 +445,12 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
         historical_eoc = current['data_sources'][f'{scope}_tapr_staar_end_of_course']
         for year in (2024, 2025):
             assert historical_eoc.pop(year)['metadata']['version'] == str(year)
+        participation = current['data_sources'][f'{scope}_tapr_staar_participation']
+        progress = current['data_sources'][f'{scope}_tapr_staar_school_progress']
+        for year in (2024, 2025):
+            assert participation.pop(year)['metadata']['version'] == str(year)
+            if scope in {'state', 'region'} or year == 2025:
+                assert progress.pop(year)['metadata']['version'] == str(year)
     assert sha256(canonical_json(previous_tested_grades).encode()).hexdigest() == '64178e073e15880351cfd020b6bb0c9d78b22c1d346fb5c1c81ce7f05975f0cb'
     for family, *_ in STAAR_2026:
         regional = 'region_tapr_' + family

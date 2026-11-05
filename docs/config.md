@@ -613,11 +613,9 @@ glossary/masking documents do not assign field-specific scientific periods,
 units, token rules, applicability or comparability. Those remain unreviewed,
 with no value policy, metric definitions or estimation. Original dictionary
 section context is unknown and is not synthesized. The charter-transfer
-midpoint never applies to these fields. These declarations are source metadata
-only; actual School Progress preparation is held for the separately reviewed
-bounded producer migration. No released/default catalog or app behavior is
-activated by this source contract.
-Registration does not prepare, publish or activate these sources.
+midpoint never applies to these fields. Use the bounded School Progress
+producer for this source-only contract, retaining its original crosswalk and
+unknown field periods. Registration and native preparation are separate steps.
 
 The 2025 outcome originals are also explicit `source` opt-ins:
 
@@ -1405,6 +1403,18 @@ edition. These source profiles retain separate accelerated tester or SAT/ACT
 fields where offered. They expose raw observations for explicit selection and
 carry no statewide or cross-edition comparison policy.
 
+School Progress and Participation also support editions 2024 and 2025 at all
+four reporting levels. School Progress returns 2,208 fact fields per scope in
+edition 2024 and 2,304 in edition 2025. The corresponding Participation files
+return 2,028 and 2,106. Each historical file has one logical label record,
+one code record and the same roster as that edition's TAPR Grade 3 extract. The label
+record spans several physical lines because TEA quotes the embedded newlines.
+The crosswalks keep dictionary-only entries without adding value columns.
+School Progress retains fractional growth points. Participation refers to
+state accountability and the reports use tests as the denominator. The
+historical contracts preserve all masking tokens and keep the two families
+separate for source discovery and native preparation.
+
 `STAAR_ALL` is the all-grades publisher file in the accountability reporting
 product. For the separate all-tested population, see TEA's all-tested reports.
 The bilingual and ESL dictionaries leave 72 performance fields and 36 growth
@@ -1413,7 +1423,7 @@ raw values with explicit dictionary status. Some publisher codes recur across
 families. Keep those source identities when selecting a bundle for analysis.
 For the participation and school-progress files, prepare and publish one
 geography per candidate to stay within the schema 3 manifest size limit.
-The school-progress crosswalk pins both records of TEA's wrapped label header
+The 2026 school-progress crosswalk pins both records of TEA's wrapped label header
 as original preamble bytes and uses the third record as the code header.
 It retains the original label text and links the smaller publisher exports
 that independently reproduced every fact cell.
