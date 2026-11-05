@@ -1,5 +1,5 @@
 # Runtime Python and package resources come from pyproject.toml's package policy.
-include LICENSE CITATION.cff README.md AGENTS.md pyproject.toml uv.lock mkdocs.yml
+include LICENSE CITATION.cff README.md AGENTS.md pyproject.toml uv.lock mkdocs.yml .python-version
 include scripts/check
 recursive-include tests *.py
 recursive-include tests/fixtures/tapr_dictionary *.html

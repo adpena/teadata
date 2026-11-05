@@ -48,19 +48,23 @@ comparison exposes its difference in percentage points as `difference_pp`.
 For tested-grade STAAR, prepare a grade bundle containing the local and state
 scopes using the [source preparation workflow](config.md#tested-grade-staar-sources).
 Select exact catalog editions from that bundle. The example below uses a
-2025–26 Grade 3 bundle and an existing engine containing Austin ISD.
+2025–26 Grade 3 bundle and an existing engine containing Austin ISD. Set
+`edition` and the bundle path together to select another prepared edition;
+`2024`, `2025` and `2026` describe the 2023–24, 2024–25 and 2025–26
+measurement years, respectively.
 
 ```python
 from teadata import DataRelease
 from teadata.dataset_metadata import EditionKey
 
-release = DataRelease("prepared/staar-2026-grade-3/release.json", offline=True)
+edition = "2026"
+release = DataRelease(f"prepared/staar-{edition}-grade-3/release.json", offline=True)
 
 def edition_for(scope):
     dataset = f"{scope}_tapr_staar_tested_grade_3"
     entry, = (
         row for row in release.catalog.editions(dataset=dataset, include_metadata=False)
-        if row["edition"] == "2026"
+        if row["edition"] == edition
     )
     return EditionKey.from_dict({key: value for key, value in entry.items() if key != "edition_id"})
 
@@ -80,8 +84,12 @@ print(result.period, result.difference_pp)
 ```
 
 Omit `metric` to select all reviewed measures common to the two editions.
-Tested-grade bindings cover the independently checked published rates for
-2024–25 and 2025–26. The raw source catalog retains numerator and denominator
+Tested-grade bindings cover 630 reviewed published-rate selectors across the
+six grades in each of 2023–24, 2024–25 and 2025–26. These selectors have stable
+names across the three editions; each binding retains its own publisher code,
+original header, source field, period and source identity. A stable selector
+does not establish that a student group's definition is comparable over time.
+The raw source catalog retains numerator and denominator
 fields alongside these rates. A separately published observed rate can be
 compared when its underlying counts are masked.
 

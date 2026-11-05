@@ -56,28 +56,30 @@ def _bindings() -> dict:
 
 def _parse_bindings(body: bytes) -> dict:
     document = json.loads(body, object_pairs_hook=_unique_object)
-    if document["schema_version"] != 1 or set(document["editions"]) != {"2025", "2026"}:
+    if document["schema_version"] != 1 or set(document["editions"]) != {"2024", "2025", "2026"}:
         raise ContractError("Unsupported STAAR comparison bindings")
     for year, edition in document["editions"].items():
         if (set(edition["families"]) != FAMILIES
                 or DataPeriod.from_dict(edition["period"]) != DataPeriod("school_year", int(year) - 1, int(year))):
             raise ContractError("STAAR comparison bindings require exact tested-grade families and periods")
-        names, codes = [], []
+        names, codes, fields = [], [], []
         for family in edition["families"].values():
             if set(family["scopes"]) != {"state", "district", "campus", "region"}:
                 raise ContractError("STAAR comparison bindings require all four publisher scopes")
             for name, rate in family["rates"].items():
                 if (set(rate) != {"code", "label", "field"}
                         or any(not isinstance(value, str) or not value for value in rate.values())
-                        or name != rate["field"] or not rate["code"].endswith("R")):
+                        or not isinstance(name, str) or not name or not rate["code"].endswith("R")):
                     raise ContractError("Invalid STAAR published-rate binding")
                 names.append(name)
                 codes.append(rate["code"])
-        if len(names) != 630 or len(set(names)) != 630 or len(set(codes)) != 630:
+                fields.append(rate["field"])
+        if (len(names) != 630 or len(set(names)) != 630 or len(set(codes)) != 630
+                or len(set(fields)) != 630):
             raise ContractError("STAAR comparison requires 630 unique reviewed rate fields and codes per edition")
     return document
 
-@lru_cache(maxsize=48)
+@lru_cache(maxsize=72)
 def _source(scope: str, family: str, edition: str) -> tuple[str, str, dict, dict]:
     try:
         reviewed = _bindings()["editions"][edition]
@@ -100,8 +102,8 @@ def _source(scope: str, family: str, edition: str) -> tuple[str, str, dict, dict
     for name, rate in family_binding["rates"].items():
         field = fields.get(scope[0].upper() + rate["code"])
         if (field is None or field["disposition"] != "fact" or field["dictionary_status"] != "documented"
-                or field["label"].strip() != rate["label"]
-                or field["field"] != f"{scope}_{edition}_{rate['field']}" or name != rate["field"]):
+                or field["label"].strip() != pinned.get("label_prefix", "") + rate["label"]
+                or field["field"] != f"{scope}_{edition}_{rate['field']}"):
             raise ContractError("STAAR comparison requires the reviewed publisher rate label and code")
     return EditionKey.source_revision((pinned["raw_sha256"],)), mapping, reviewed, family_binding
 

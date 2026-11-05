@@ -6,6 +6,7 @@
 # Keep byte-addressed metadata and publisher regression inputs unchanged.
 provenance/records/*.json -text
 teadata/schemas/*.json -text
+teadata/methodologies/*.json -text
 teadata/methodologies/*.md -text
 tests/fixtures/publisher_golden_2025/*.csv -text
 tests/fixtures/spatial/*.json -text
