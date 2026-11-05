@@ -192,11 +192,15 @@ def _compare(selection: _Selection, *, max_examples: int, working_bytes: int) ->
             schema = native.schema_arrow.remove_metadata()
             if schema.names != names or any(not (pa.types.is_string(field.type) or pa.types.is_large_string(field.type)) for field in schema):
                 raise ValueError(stage + ' does not have the complete raw-string schema')
-            for batch in native.iter_batches(batch_size=selection.budget.batch_rows, use_threads=False):
-                size += batch.nbytes
-                if batch.nbytes > selection.budget.batch_bytes or size > slot:
-                    raise _Uncovered(stage + ' table exceeds its explicit native working-byte slot')
-                batches.append(batch)
+            # The producer admits row groups by bytes as well as rows. A single
+            # iterator can combine several groups within the row limit.
+            for index in range(native.metadata.num_row_groups):
+                for batch in native.iter_batches(batch_size=selection.budget.batch_rows,
+                                                 row_groups=[index], use_threads=False):
+                    size += batch.nbytes
+                    if batch.nbytes > selection.budget.batch_bytes or size > slot:
+                        raise _Uncovered(stage + ' table exceeds its explicit native working-byte slot')
+                    batches.append(batch)
         actual = pa.Table.from_batches(batches, schema=schema)
         del batches
         scratch_base = 0

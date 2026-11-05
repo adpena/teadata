@@ -18,7 +18,7 @@ from teadata.tapr import TaprReadBudget
 from teadata.teadata_config import Config
 
 
-def fixture_release(tmp_path, *, damage=None, schema_version=3):
+def fixture_release(tmp_path, *, damage=None, schema_version=3, batch_bytes=1024):
     store = ProvenanceStore(tmp_path / 'history')
     dataset = 'district_tapr_student_profile'
     names = ['district_number', 'membership', 'enrollment']
@@ -52,7 +52,7 @@ def fixture_release(tmp_path, *, damage=None, schema_version=3):
         actual = actual.set_column(1, 'membership', pa.array(['0', '-999', '18']))
     prepared = tmp_path / 'prepared.parquet'
     pq.write_table(actual, prepared, row_group_size=1)
-    budget = TaprReadBudget(batch_rows=2, batch_bytes=1024)
+    budget = TaprReadBudget(batch_rows=2, batch_bytes=batch_bytes)
     historical_code = '1' * 64  # Recorded historical identity; intentionally differs from current code.
     preparation = store.record_processing(dataset=dataset, inputs=[acquisition, schema_observation],
         outputs={'prepared_source': prepared, 'crosswalk': schema}, processor='teadata.scripts.build_tapr_profiles',
@@ -177,12 +177,13 @@ def test_small_working_budget_is_explicit_uncovered_without_large_allocations(tm
     assert 'working-byte' in report['editions'][0]['diagnostic']
 
 
-def test_reordered_multiple_row_groups_use_one_native_scan_per_stage(tmp_path, monkeypatch):
-    from collections import Counter
+def test_reordered_row_groups_are_each_read_once_within_the_byte_budget(tmp_path, monkeypatch):
+    from collections import defaultdict
     import pyarrow.dataset as ds
 
-    release, store, key, _ = fixture_release(tmp_path, damage='reordered')
-    scans: Counter[str] = Counter()
+    # Each one-row group fits, but two groups combined into a two-row batch do not.
+    release, store, key, _ = fixture_release(tmp_path, damage='reordered', batch_bytes=40)
+    scans: dict[str, list[list[int]]] = defaultdict(list)
     original_parquet, original_dataset = pq.ParquetFile, ds.dataset
 
     class CountedParquet:
@@ -199,7 +200,7 @@ def test_reordered_multiple_row_groups_use_one_native_scan_per_stage(tmp_path, m
             self.native.close()
 
         def iter_batches(self, *args, **kwargs):
-            scans[self.path] += 1
+            scans[self.path].append(kwargs['row_groups'])
             return self.native.iter_batches(*args, **kwargs)
 
     class CountedDataset:
@@ -210,14 +211,13 @@ def test_reordered_multiple_row_groups_use_one_native_scan_per_stage(tmp_path, m
             return getattr(self.native, name)
 
         def scanner(self, *args, **kwargs):
-            scans[self.path] += 1
-            return self.native.scanner(*args, **kwargs)
+            pytest.fail('Raw TAPR parity must not rescan with a dataset predicate')
 
     monkeypatch.setattr(pq, 'ParquetFile', CountedParquet)
     monkeypatch.setattr(ds, 'dataset', CountedDataset)
     report = validate_source_parity(release, store, edition_ids=[key.identity])
-    assert report['status'] == 'PASS_RAW_PARITY'
-    assert len(scans) == 2 and list(scans.values()) == [1, 1]
+    assert report['status'] == 'PASS_RAW_PARITY', report['editions'][0].get('diagnostic')
+    assert len(scans) == 2 and all(groups == [[0], [1], [2]] for groups in scans.values())
 
 
 def test_legacy_schema2_is_explicit_uncovered_with_requested_scope(catalog, tmp_path):
