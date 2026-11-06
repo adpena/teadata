@@ -293,6 +293,18 @@ def _export_stream(path_or_buf: str | Path | BinaryIO) -> Generator[BinaryIO, No
         os.link(staged, path)
 
 
+# SpreadsheetML can decode literal escape tokens even in inline text cells.
+_UNSAFE_EXCEL_TEXT = re.compile(r"[\x00-\x08\x0b-\x0d\x0e-\x1f\ud800-\udfff\ufffe\uffff]|_x[0-9a-fA-F]{4}_")
+
+
+def validate_excel_text(value: str) -> None:
+    """Refuse text the XLSX writer would truncate, normalize or encode as invalid XML."""
+    if len(value) > 32_767:
+        raise ValueError("Source text exceeds Excel cell limits")
+    if _UNSAFE_EXCEL_TEXT.search(value):
+        raise ValueError("Source text contains characters the Excel writer cannot preserve")
+
+
 def write_excel(table: _TableExport, path_or_buf: str | Path | BinaryIO) -> None:
     from openpyxl import Workbook
     from openpyxl.cell import WriteOnlyCell
@@ -310,8 +322,10 @@ def write_excel(table: _TableExport, path_or_buf: str | Path | BinaryIO) -> None
                         or isinstance(value, float) and (not isfinite(value) or value != float(format(value, ".15g")))):
                     value = str(value)
                 if isinstance(value, str):
-                    if len(value) > 32_767:
-                        raise ValueError("Source text exceeds Excel cell limits; use CSV for this table")
+                    try:
+                        validate_excel_text(value)
+                    except ValueError as error:
+                        raise ValueError(f"{error}. Use CSV for this table.") from error
                     cell = WriteOnlyCell(sheet, value=value)
                     cell.data_type = "s"
                     yield cell

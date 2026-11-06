@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from hashlib import sha256
 from importlib.metadata import version
 from pathlib import Path
@@ -276,7 +277,8 @@ def materialize_research_graduation(store: ProvenanceStore, *, config: Path, con
     reviewed = canonical.resolve_dataset(DATASET, YEAR, exact=True, reader_profile="source")
     resource = cfg.column_contract(DATASET, YEAR, reader_profile="source")
     policy = cfg.value_policies.get(POLICY)
-    if (source.to_dict() != reviewed.to_dict() or not cfg.is_source_only(DATASET, YEAR)
+    # This reader opens pinned acquisitions, not the resolved path placeholder.
+    if (replace(source, path=reviewed.path) != reviewed or not cfg.is_source_only(DATASET, YEAR)
             or resource is None or resource != canonical.column_contract(DATASET, YEAR, reader_profile="source")
             or policy is None or policy != canonical.value_policies.get(POLICY) or source.metadata.value_policy != POLICY):
         raise ContractError("Research graduation requires the packaged exact source, mapping and value policy")

@@ -5,7 +5,7 @@ from __future__ import annotations
 import ast
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from decimal import Context, Decimal, InvalidOperation, ROUND_HALF_EVEN
+from decimal import Context, Decimal, InvalidOperation, ROUND_FLOOR
 from functools import reduce
 from io import StringIO
 from operator import and_, eq, ge, gt, le, lt, ne, or_
@@ -20,6 +20,7 @@ _PARAMETER = "__teadata_parameter_"
 _QUERY_BYTES = 8192
 _SCALARS = (str, int, float, bool, Decimal)
 _COMPARE = {ast.Eq: eq, ast.NotEq: ne, ast.Lt: lt, ast.LtE: le, ast.Gt: gt, ast.GtE: ge}
+_REVERSE = {eq: eq, ne: ne, lt: gt, le: ge, gt: lt, ge: le}
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,7 +54,7 @@ def _parameter_size(value: object) -> int:
 
 def prepare_predicate(expression: str, params: Mapping[str, object] | None) -> Callable[[Schema], Expression]:
     """Validate a query now and bind numeric operands to the native schema at read time."""
-    from pyarrow import array, types
+    from pyarrow import array, scalar as arrow_scalar, types
     from pyarrow.dataset import field
 
     if (not isinstance(expression, str) or not 0 < len(expression) <= _QUERY_BYTES
@@ -126,14 +127,59 @@ def prepare_predicate(expression: str, params: Mapping[str, object] | None) -> C
             return field(value.name)
         kind = schema.field(column.name).type
         if isinstance(value, _FloatLiteral):
-            if types.is_decimal(kind):
-                return _decimal(Decimal(value.spelling))
             return value.value
-        if types.is_decimal(kind) and type(value) is float:
-            raise ValueError("Use a Decimal parameter to compare with an exact decimal column")
         if type(value) is Decimal and types.is_floating(kind):
             return float(value)
         return value
+
+    def exact_number(value, kind) -> Decimal:
+        decimal_column = types.is_decimal(kind)
+        if type(value) is float and decimal_column:
+            raise ValueError("Use a Decimal parameter to compare with an exact decimal column")
+        if isinstance(value, _FloatLiteral):
+            try:
+                number = Decimal(value.spelling, context=Context(traps=[InvalidOperation]))
+            except InvalidOperation as error:
+                raise ValueError("Query numeric literal exceeds Decimal limits") from error
+            return _decimal(number) if decimal_column else number
+        if type(value) not in (int, float, Decimal):
+            raise ValueError("Integer and decimal predicates require numeric values")
+        number = Decimal.from_float(value) if type(value) is float else Decimal(value)
+        if not number.is_finite():
+            raise ValueError("Integer and decimal predicates require finite values")
+        return number
+
+    def bounds(kind) -> tuple[Decimal, Decimal, Decimal]:
+        if types.is_decimal(kind):
+            maximum = Decimal((0, (9,) * kind.precision, -kind.scale))
+            return maximum.copy_negate(), maximum, Decimal((0, (1,), -kind.scale))
+        if types.is_signed_integer(kind):
+            magnitude = 1 << (kind.bit_width - 1)
+            return Decimal(-magnitude), Decimal(magnitude - 1), Decimal(1)
+        return Decimal(0), Decimal((1 << kind.bit_width) - 1), Decimal(1)
+
+    def lower_point(value: Decimal, unit: Decimal) -> Decimal:
+        # The caller first checks the finite column bounds. Only the result
+        # needs to fit the column's precision, regardless of the input scale.
+        context = Context(prec=76, Emin=-152, Emax=152, rounding=ROUND_FLOOR, traps=[InvalidOperation])
+        return context.quantize(value, unit)
+
+    def native_number(value: Decimal, kind) -> Decimal | int:
+        return value if types.is_decimal(kind) else int(value)
+
+    def exact_comparison(column, operation, value, kind) -> Expression:
+        value = exact_number(value, kind)
+        minimum, maximum, unit = bounds(kind)
+        upper = arrow_scalar(native_number(maximum, kind), type=kind)
+        if value < minimum or value > maximum:
+            always = operation in ((ne, gt, ge) if value < minimum else (ne, lt, le))
+            return column <= upper if always else column > upper
+        floor = lower_point(value, unit)
+        if floor != value:
+            if operation in (eq, ne):
+                return column <= upper if operation is ne else column > upper
+            operation = le if operation in (lt, le) else gt
+        return operation(column, arrow_scalar(native_number(floor, kind), type=kind))
 
     def compare(left, operator, right) -> Callable[[Schema], Expression]:
         if isinstance(operator, (ast.Is, ast.IsNot)):
@@ -148,19 +194,18 @@ def prepare_predicate(expression: str, params: Mapping[str, object] | None) -> C
 
             def membership(schema: Schema) -> Expression:
                 kind = schema.field(left.name).type
-                values = [scalar(value, schema, left) for value in right]
-                if types.is_decimal(kind):
-                    if any(type(value) not in (int, Decimal) for value in values):
-                        raise ValueError("Decimal membership requires exact numeric values")
-                    context = Context(prec=152, Emin=-152, Emax=152, rounding=ROUND_HALF_EVEN,
-                                      traps=[InvalidOperation])
-                    unit = Decimal((0, (1,), -kind.scale))
+                if types.is_integer(kind) or types.is_decimal(kind):
+                    minimum, maximum, unit = bounds(kind)
                     exact = []
-                    for value in values:
-                        candidate = context.quantize(Decimal(value), unit)
-                        if candidate == value and len(candidate.as_tuple().digits) <= kind.precision:
-                            exact.append(candidate)
+                    for operand_value in right:
+                        value = exact_number(operand_value, kind)
+                        if minimum <= value <= maximum:
+                            candidate = lower_point(value, unit)
+                            if candidate == value:
+                                exact.append(native_number(candidate, kind))
                     values = array(exact, type=kind)
+                else:
+                    values = [scalar(value, schema, left) for value in right]
                 member = field(left.name).isin(values)
                 return ~member if isinstance(operator, ast.NotIn) else member
 
@@ -176,6 +221,12 @@ def prepare_predicate(expression: str, params: Mapping[str, object] | None) -> C
                 if (types.is_decimal(left_type) and types.is_floating(right_type)
                         or types.is_floating(left_type) and types.is_decimal(right_type)):
                     raise ValueError("Comparing decimal and floating columns requires an explicit cast")
+            else:
+                column, value = (left, right) if isinstance(left, _Field) else (right, left)
+                kind = schema.field(column.name).type
+                if types.is_integer(kind) or types.is_decimal(kind):
+                    return exact_comparison(field(column.name), operation if column is left else _REVERSE[operation],
+                                            value, kind)
             return operation(scalar(left, schema, right), scalar(right, schema, left))
 
         return comparison

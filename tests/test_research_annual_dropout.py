@@ -4,7 +4,10 @@ from pathlib import Path
 
 import pyarrow as pa
 import pytest
+import yaml
 
+from teadata import frc_ppe, research_graduation, tprs_students
+from teadata.column_schema import reader_options
 from teadata.column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
 from teadata.manifest import ContractError
 from teadata.provenance import ProvenanceStore, validate_record_graph, validate_reference_records
@@ -19,13 +22,20 @@ ROOT = Path(__file__).resolve().parents[1]
 TRIPLE = ("denominator", "numerator", "rate")
 
 
-def test_annual_dropout_accepts_a_relocated_contract(tmp_path, monkeypatch):
+@pytest.mark.parametrize(("dataset", "year", "producer"), [
+    (DATASET, YEAR, materialize_research_annual_dropout),
+    (frc_ppe.DATASET, frc_ppe.YEAR, frc_ppe.materialize_frc_ppe),
+    (research_graduation.DATASET, research_graduation.YEAR, research_graduation.materialize_research_graduation),
+    (tprs_students.DATASET, tprs_students.EDITION, tprs_students.materialize_students),
+])
+def test_receipt_only_producers_accept_relocated_contracts(tmp_path, monkeypatch, dataset, year, producer):
     packaged = ROOT / "teadata"
     source_config = (packaged / "teadata_sources.yaml").read_bytes()
     config = tmp_path / "teadata_sources.yaml"
     config.write_bytes(source_config)
-    schema = Path("schemas/research--2025--annual-dropout-crosswalk.json")
-    (tmp_path / schema).parent.mkdir()
+    source = load_config().resolve_dataset(dataset, year, exact=True, reader_profile="source")
+    schema = Path(reader_options(source.reader, "source")["column_schema"])
+    (tmp_path / schema).parent.mkdir(parents=True)
     (tmp_path / schema).write_bytes((packaged / schema).read_bytes())
     store = ProvenanceStore(tmp_path / "provenance")
 
@@ -33,9 +43,21 @@ def test_annual_dropout_accepts_a_relocated_contract(tmp_path, monkeypatch):
         raise FileNotFoundError("retained sources are required")
 
     monkeypatch.setattr(store, "verify_record_closure", missing_retained_sources)
-    with pytest.raises(FileNotFoundError, match="retained sources are required"):
-        materialize_research_annual_dropout(store, config=config, config_sha256=sha256(source_config).hexdigest(),
-                                            scopes=["state"], output=tmp_path / "bundle")
+    arguments = {"scopes": ["state"]}
+    expected = "retained sources are required"
+    if producer is tprs_students.materialize_students:
+        arguments = {"intake": tmp_path / "intake.json", "intake_sha256": "0" * 64}
+        expected = "intake.json"
+
+    with pytest.raises(FileNotFoundError, match=expected):
+        producer(store, config=config, config_sha256=sha256(source_config).hexdigest(),
+                 output=tmp_path / "bundle", **arguments)
+    changed = yaml.safe_load(source_config)
+    changed["data_sources"][dataset][year]["metadata"]["title"] = "Unreviewed source title"
+    config.write_text(yaml.safe_dump(changed))
+    with pytest.raises(ContractError, match="packaged"):
+        producer(store, config=config, config_sha256=sha256(config.read_bytes()).hexdigest(),
+                 output=tmp_path / "bundle", **arguments)
 
 
 def test_annual_dropout_opt_in_preserves_reviewed_raw_scope_contracts():

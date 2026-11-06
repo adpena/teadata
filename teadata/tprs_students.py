@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from hashlib import sha256
 from importlib.resources import files
 from io import BytesIO
@@ -436,7 +436,8 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
     cfg = load_config_bytes(raw, path=config)
     source = cfg.resolve_dataset(DATASET, EDITION, reader_profile="source", exact=True)
     reviewed = load_config().resolve_dataset(DATASET, EDITION, reader_profile="source", exact=True)
-    _need(source.to_dict() == reviewed.to_dict() and cfg.is_source_only(DATASET, EDITION),
+    # This reader opens pinned acquisitions, not the resolved path placeholder.
+    _need(replace(source, path=reviewed.path) == reviewed and cfg.is_source_only(DATASET, EDITION),
           "Student source differs from packaged definition")
     policy_id = source.metadata.value_policy
     if policy_id is None:

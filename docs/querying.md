@@ -119,9 +119,12 @@ an 8 KiB limit. Parameters accept only scalar values and bounded membership
 lists. The syntax rejects function calls, attribute access, arithmetic and
 implicit local variables.
 
-Decimal literals retain their exact digits when compared with a decimal
-column. Pass `Decimal` values for decimal parameters. To compare a decimal
-column with a floating-point column, use an explicit cast in an Arrow filter.
+Numeric literals retain their exact digits for integer and decimal columns.
+For a threshold between two representable values, comparisons include the
+same rows as an exact comparison against the original threshold. Membership
+matches only representable values. Pass `Decimal` values for decimal
+parameters. To compare a decimal column with a floating-point column, use an
+explicit cast in an Arrow filter.
 
 After materialization, the result supports pandas `.loc` and boolean
 indexing. Use [pandas `.query()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.query.html)

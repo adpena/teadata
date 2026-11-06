@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from dataclasses import replace
 from hashlib import sha256
 from importlib.metadata import version
 from pathlib import Path
@@ -164,7 +165,8 @@ def _admit(config: Config, canonical: Config, store: ProvenanceStore) -> tuple[R
     reviewed = canonical.resolve_dataset(DATASET, YEAR, reader_profile="source", exact=True)
     schema = config.column_contract(DATASET, YEAR, reader_profile="source")
     reviewed_schema = canonical.column_contract(DATASET, YEAR, reader_profile="source")
-    if (source.to_dict() != reviewed.to_dict() or not config.is_source_only(DATASET, YEAR)
+    # This reader opens pinned acquisitions, not the resolved path placeholder.
+    if (replace(source, path=reviewed.path) != reviewed or not config.is_source_only(DATASET, YEAR)
             or source.metadata.period != PERIOD or schema is None or schema != reviewed_schema):
         raise ContractError("FRC PPE source differs from the packaged exact edition")
     policy = config.value_policies.get(source.metadata.value_policy)

@@ -251,6 +251,47 @@ def test_query_decimals_bind_to_the_physical_column_type():
         select('fte == rate')
 
 
+def test_query_exact_thresholds_preserve_nulls_and_native_numeric_ranges():
+    from operator import eq, ge, gt, le, lt, ne
+
+    from pyarrow import dataset
+
+    from teadata.source_predicates import prepare_predicate
+
+    precise_int = 2**53 + 1
+    native = dataset.dataset(pa.table({
+        'fte': pa.array([Decimal('-.35'), Decimal('0'), Decimal('.35'), None], type=pa.decimal128(16, 2)),
+        'signed': pa.array([-(2**63), -1, precise_int, None], type=pa.int64()),
+        'unsigned': pa.array([0, 2**64 - 1, precise_int, None], type=pa.uint64()),
+    }))
+
+    def select(expression, column, params=None):
+        predicate = prepare_predicate(expression, params)(native.schema)
+        return native.to_table(filter=predicate)[column].to_pylist()
+
+    for spelling, operation in [('==', eq), ('!=', ne), ('<', lt), ('<=', le), ('>', gt), ('>=', ge)]:
+        threshold = Decimal('-.349')
+        values = [Decimal('-.35'), Decimal('0'), Decimal('.35')]
+        with localcontext() as context:
+            context.traps[Inexact] = True
+            assert select(f'fte {spelling} -.349', 'fte') == [v for v in values if operation(v, threshold)]
+            assert select(f'-.349 {spelling} fte', 'fte') == [v for v in values if operation(threshold, v)]
+    assert select('1e-75 < fte < 1e37', 'fte') == [Decimal('.35')]
+    assert select('fte == .35' + '0' * 61, 'fte') == [Decimal('.35')]
+    assert select('fte < 10000000000000000000', 'fte') == values
+    assert select('not (fte == 1e37)', 'fte') == values
+    assert select('fte not in [1e37, .351]', 'fte') == [*values, None]
+    assert select('signed == 9007199254740993.0', 'signed') == [precise_int]
+    assert select('signed in [9007199254740993.0]', 'signed') == [precise_int]
+    assert select('signed == @value', 'signed', {'value': float(precise_int)}) == []
+    assert select('1e-1000 < signed < 1e309', 'signed') == [precise_int]
+    assert select('signed < -9223372036854775807.5', 'signed') == [-(2**63)]
+    assert select('18446744073709551615.0 <= unsigned', 'unsigned') == [2**64 - 1]
+    assert select('unsigned in [-1, 18446744073709551615.0]', 'unsigned') == [2**64 - 1]
+    with pytest.raises(ValueError, match='numeric values'):
+        select('signed in [1, True]', 'signed')
+
+
 @pytest.mark.parametrize('expression', [
     "__import__('os').system('echo unsafe')", 'membership.__class__ == 1',
     'membership + 1 == 2', 'membership > @unknown', 'membership > None',
@@ -311,6 +352,18 @@ def test_export_preserves_existing_paths_and_cleans_up_after_failure(tmp_path):
     assert not failed.exists()
     assert set(ALL_TEMP_FILES) == existing_scratch
     assert not list(tmp_path.glob('.teadata-export-*'))
+
+
+@pytest.mark.parametrize('value', ['left\r\nright', 'left\uffffright', 'left_x005F_x000D_right'])
+def test_xlsx_refuses_text_it_cannot_preserve_but_csv_keeps_it(tmp_path, value):
+    release, _, key, _ = fixture_release(tmp_path, last_enrollment=value)
+    csv_buffer = BytesIO()
+    release.to_csv(key, csv_buffer, restore_original_headers=True)
+    assert list(csv.reader(StringIO(csv_buffer.getvalue().decode(), newline='')))[-1][-1] == value
+    path = tmp_path / 'unsafe.xlsx'
+    with pytest.raises(ValueError, match='cannot preserve. Use CSV'):
+        release.to_excel(key, path, restore_original_headers=True)
+    assert not path.exists()
 
 
 def test_source_projection_keeps_raw_alias_and_resolves_exact_edition(tmp_path):

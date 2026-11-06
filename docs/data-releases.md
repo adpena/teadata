@@ -125,8 +125,9 @@ CSV and Excel stream to a new file or a caller-owned binary buffer. File paths
 must be unused, and the result appears only after the export succeeds. The DataFrame materializes
 the table with Arrow-backed dtypes and uses a two-level column index for the
 restored label and code. Excel writes decimals and values requiring more than
-15 digits of precision as text. Raw
-exports retain source column order, leading zeroes and masking tokens. CSV
+15 digits of precision as text. If text would be changed or would produce
+invalid worksheet XML, the Excel export directs you to CSV. Raw exports
+retain source column order, leading zeroes and masking tokens. CSV
 and DataFrame exports distinguish empty strings from nulls; spreadsheet
 readers can represent empty Excel cells as missing. CSV quoting and line
 endings follow the export writer.
