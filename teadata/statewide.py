@@ -18,6 +18,7 @@ from .identifiers import canonical_source_identifiers
 from .manifest import ContractError, canonical_json
 from .peims_courses import DATASET as COURSES, course_key_columns
 from .peims_leaves import PRIMARY_DISABILITY, SCOPES_BY_DATASET, _key_columns
+from .release import _student_attachments
 from .staar_comparison import FAMILIES as STAAR_FAMILIES, staar_rate_contract
 from .tapr import tapr_source_identifiers
 from .teadata_config import load_config
@@ -120,6 +121,7 @@ class _StudentContract:
     columns: Mapping[str, tuple[str, ...]]
     sources: Mapping[str, tuple[str, str]]
     local_columns: Mapping[tuple[str, str], int]
+    cohort: tuple[str, str, str, str] | None = None
 
     def value(self, row: dict[str, Any], field: str, unit: str) -> tuple[str | None, str, Number | None]:
         spec = self.fields[field]
@@ -175,35 +177,21 @@ def _reviewed_students(release: DataRelease, key: EditionKey) -> tuple[str, str,
     policy = config.value_policies[review.value_policy]
     if release.catalog.policy(key.dataset, edition=key) != policy:
         raise ContractError("Student comparison requires the reviewed disclosure policy")
-    acquisitions = release.catalog.acquisitions(key.dataset, edition=key)
-    document = release.catalog.to_dict()
-    if document["schema_version"] == 4:
-        document = json.loads(release.catalog.edition_metadata_bytes(key.identity))
-    records = document["provenance"]  # Already closed and verified by DatasetCatalog.
-    hashes, sources = [], {}
-    for acquisition in acquisitions:
-        parameters = acquisition.get("parameters", {})
-        identifier = parameters.get("identifier")
-        students._identifier(key.scope, identifier)
-        original = parameters.get("original_download_receipt")
-        if (parameters.get("scope") != key.scope or identifier in sources
-                or original not in acquisition["source_metadata"].get("provenance_ids", ())):
-            raise ContractError("Student comparison requires exact original-report lineage and unique identifiers")
-        parent = records.get(original)
-        if (acquisition.get("method") != "local_observation" or parent is None
-                or any(acquisition["artifact"][name] != parent["artifact"][name] for name in ("sha256", "size_bytes"))):
-            raise ContractError("Student comparison requires a local observation of the exact original bytes")
-        digest = acquisition["artifact"]["sha256"]
-        students._validate_report_acquisition(parent, scope=key.scope, identifier=identifier, expected_sha256=digest)
-        hashes.append(digest)
-        sources[identifier] = original, digest
-    if key.revision_sha256 != EditionKey.source_revision(tuple(hashes)):
-        raise ContractError("Student comparison source revision differs from its ordered inputs")
     fields = {field["field"]: field for field in students.semantic_fields()}
     plans = release.catalog.resolve_artifacts([(key, field) for field in fields], period=students.PERIOD)
     if len(plans) != 1:
         raise ContractError("Student comparison requires one complete reviewed native leaf")
     artifact = plans[0]["artifact"]
+    cohort = None
+    attachments = _student_attachments(release.catalog, artifact)
+    if attachments:
+        reports, cohort = release._statewide_student_ledger(artifact, attachments)
+        sources = {item.identifier: (item.receipt, item.sha256) for item in reports}
+    else:
+        sources = _selected_student_sources(release, key)
+    hashes = [digest for _, digest in sources.values()]
+    if key.revision_sha256 != EditionKey.source_revision(tuple(hashes)):
+        raise ContractError("Student comparison source revision differs from its ordered inputs")
     contract = artifact.contract
     if (contract["inputs"] != hashes or contract["rows"] != len(sources)
             or (key.scope == "state" and len(sources) != 1)):
@@ -223,8 +211,33 @@ def _reviewed_students(release: DataRelease, key: EditionKey) -> tuple[str, str,
     local_columns = {(population, quantity): index + 2
                      for index, (population, quantity, role) in enumerate(students.definition()["column_roles"][key.scope])
                      if role == "local"}
-    typed = _StudentContract(key.scope, fields, policy, pointers, sources, local_columns)
+    typed = _StudentContract(key.scope, fields, policy, pointers, sources, local_columns, cohort)
     return key.revision_sha256, mapping, replace(review, references=metadata.references), policy_hash, typed
+
+
+def _selected_student_sources(release: DataRelease, key: EditionKey) -> dict[str, tuple[str, str]]:
+    acquisitions = release.catalog.acquisitions(key.dataset, edition=key)
+    document = release.catalog.to_dict()
+    if document["schema_version"] == 4:
+        document = json.loads(release.catalog.edition_metadata_bytes(key.identity))
+    records = document["provenance"]  # Already closed and verified by DatasetCatalog.
+    sources = {}
+    for acquisition in acquisitions:
+        parameters = acquisition.get("parameters", {})
+        identifier = parameters.get("identifier")
+        students._identifier(key.scope, identifier)
+        original = parameters.get("original_download_receipt")
+        if (parameters.get("scope") != key.scope or identifier in sources
+                or original not in acquisition["source_metadata"].get("provenance_ids", ())):
+            raise ContractError("Student comparison requires exact original-report lineage and unique identifiers")
+        parent = records.get(original)
+        if (acquisition.get("method") != "local_observation" or parent is None
+                or any(acquisition["artifact"][name] != parent["artifact"][name] for name in ("sha256", "size_bytes"))):
+            raise ContractError("Student comparison requires a local observation of the exact original bytes")
+        digest = acquisition["artifact"]["sha256"]
+        students._validate_report_acquisition(parent, scope=key.scope, identifier=identifier, expected_sha256=digest)
+        sources[identifier] = original, digest
+    return sources
 
 
 @dataclass(frozen=True)
@@ -349,6 +362,8 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
         local_keys, state_keys = [key_column], []
         left_revision, left_mapping, left_review, left_policy, left_student = _reviewed_students(release, local)
         right_revision, right_mapping, right_review, right_policy, right_student = _reviewed_students(release, statewide)
+        if left_student.cohort != right_student.cohort:
+            raise ContractError("Student comparison requires the same pinned statewide cohort")
     elif course_pair or (local.dataset == statewide.dataset and local.dataset in SCOPES_BY_DATASET):
         scopes = {"state", "district"} if course_pair else SCOPES_BY_DATASET[local.dataset]
         if local.scope not in scopes or local.table != local.scope or statewide.table != "state":
@@ -434,11 +449,16 @@ def compare_statewide(items: Sequence[object], *, release: DataRelease, local: E
     applicable = [not (isinstance(item, Campus) and item.is_private) for item in items]
     key_prefix = "" if regional else "'"
     wanted = {key_prefix + identifier for identifier, applies in zip(identifiers, applicable, strict=True) if applies and identifier}
+    full_student = local_plan.student if local_plan.student is not None and local_plan.student.cohort is not None else None
     raw_by_key = {}
     if wanted:
-        source_rows = release.analytical_dataset(local_plan.artifact.identity).to_table(
-            columns=list(local_plan.columns), filter=predicate)
         key_column = f"{local.scope}_number"
+        local_filter = predicate
+        if full_student is not None:
+            # This leaf has already committed to exact unquoted publisher IDs.
+            local_filter = ds.field(key_column).isin([key[1:] for key in sorted(wanted)])
+        source_rows = release.analytical_dataset(local_plan.artifact.identity).to_table(
+            columns=list(local_plan.columns), filter=local_filter)
         keys = (tapr_source_identifiers(source_rows[key_column], key_field=key_column) if regional else
                 canonical_source_identifiers(source_rows[key_column], width=9 if local.scope == "campus" else 6))
         selected = pc.is_in(keys, value_set=pa.array(sorted(wanted), type=pa.string()))
@@ -451,6 +471,8 @@ def compare_statewide(items: Sequence[object], *, release: DataRelease, local: E
     dimension_values = tuple(sorted(dimensions.items()))
     for identifier, applies in zip(identifiers, applicable, strict=True):
         local_row = raw_by_key.get(key_prefix + identifier) if applies and identifier else None
+        if local_row is None and full_student is not None and applies and identifier in full_student.sources:
+            raise ContractError("Statewide student leaf omits a requested district from its report ledger")
         for stat, (state_raw, state_status, state_value) in zip(statistics, state_values, strict=True):
             if local_row is None:
                 raw, status, value = None, "unavailable" if applies else "not_applicable", None

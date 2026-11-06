@@ -1644,6 +1644,38 @@ def test_v4_index_discovery_and_construction_never_prefetch_children(edition_ind
     assert not catalog._edition_views[first["edition_id"]]._validated_editions  # no crosswalk needed for source metadata
 
 
+def test_entity_observation_plan_preserves_pinned_primary_bindings_and_grain(
+    edition_fixture, edition_index_fixture, selected_catalog, monkeypatch,
+):
+    from teadata.observations import _ObservationRequest
+    from teadata.release import DataRelease
+
+    entity_build = DataEngine()
+    entity_build.catalog = selected_catalog
+    left = DataRelease(edition_fixture["root"], offline=True)
+    right = DataRelease(edition_index_fixture["root"], offline=True)
+    key, ref, _ = edition_fixture["leaves"]["student"]
+    period = DataPeriod(kind="calendar_year", year=2024)
+    monkeypatch.setattr(DataRelease, "artifact", lambda *a, **k: pytest.fail("Observation plan opened a native leaf"))
+    model = entity_build._observation_model([left, right])
+    with pytest.raises(ContractError, match="exact measurement period"):
+        _ObservationRequest(key, "amount", None)  # type: ignore[arg-type]
+    with pytest.raises(ContractError, match="ambiguous"):
+        model.plan([_ObservationRequest(key, "amount", period)])
+    request = _ObservationRequest(key, "amount", period, right.manifest_sha256)
+    with pytest.raises(ContractError, match="period"):
+        model.plan([replace(request, period=DataPeriod(kind="calendar_year", year=2025))])
+    plan = model.plan([request, request])
+    binding, = plan.bindings
+    projection, = plan.projections
+    assert plan.entity_build_id == selected_catalog.build_id
+    assert binding.binding.artifact_id == projection.artifact.identity == ref.identity
+    assert binding.binding.column == "amount"
+    assert binding.manifest_sha256 == projection.manifest_sha256 == right.manifest_sha256
+    assert projection.grain_columns == ("campus_number",)
+    assert projection.columns == ("campus_number", "amount")
+
+
 def test_v4_migration_preserves_detached_public_projections_and_every_identity(edition_index_fixture):
     fixture = edition_index_fixture
     old, current = fixture["legacy"], fixture["catalog"]

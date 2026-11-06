@@ -38,6 +38,19 @@ print(top5)  # list[(name, enrollment)]
     engine >> ("within", d, "campuses") >> (lambda c: c.rating in {"A","B"})
     ```
 
+## School years and source editions
+
+`Query` starts from the entities in the engine's loaded snapshot. It has no
+school-year selector today. The [source coverage table](source-coverage.md)
+shows how the snapshot combines inputs from several periods.
+
+For a separately published table, open its pinned `DataRelease` and select
+an exact edition key. Check the catalog's measurement period before selecting
+an edition. For example, the 2025 annual dropout edition measures school year
+2024–25, even though TEA published it in 2026. Some datasets also publish
+fields with periods that differ from the table's report period. Year selection
+is separate from the attribute access used for dataset and field names.
+
 ## Select an entity's published source fields
 
 An explicit native release can expose fields in dataset namespaces. Start

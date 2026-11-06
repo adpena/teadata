@@ -2,6 +2,25 @@
 
 Bring in external datasets (accountability, finance, etc.) and attach fields directly to objects.
 
+The [source coverage table](source-coverage.md) lists the entity build inputs,
+their loaded periods, and their configured editions. The builder records its
+exact sources. Separate native source tables are available through `DataRelease`.
+
+## Observations across school years
+
+An entity identifies a district or campus. An observation also needs its
+measurement period, source revision, and the publisher's row keys. For example,
+annual dropout has separate rows for grade span and reporting calculation. A
+single value in an entity's metadata cannot represent those distinctions.
+
+The internal observation planner links a specific entity build to explicitly
+selected native releases. It resolves exact field bindings and selects their
+required columns and row keys without opening a data file. The native tables
+retain raw values and suppression status. The planner does not change the
+existing snapshot or make current geography or roster membership historical.
+Public year selection in `Query`, historical joins, and activation of those
+releases in the default enrichment build are still pending.
+
 ## Districts
 
 ```python

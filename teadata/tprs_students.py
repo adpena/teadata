@@ -7,19 +7,21 @@ the explicitly reviewed Membership/Enrollment measures in the packaged grid.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, replace
+import gzip
 from hashlib import sha256
 from importlib.resources import files
 from io import BytesIO
 import json
+from itertools import chain, zip_longest
 import platform
 from pathlib import Path
 import re
 import sys
 from tempfile import TemporaryDirectory
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qsl, urlsplit
 
 import pyarrow as pa
@@ -33,6 +35,9 @@ from .native_witnesses import _Rows
 from .provenance import ProvenanceStore
 from .teadata_config import load_config, load_config_bytes
 from .values import Measurement, ValuePolicy, ValueStatus, measure
+
+if TYPE_CHECKING:
+    from .tprs_statewide_intake import ReportSelection
 
 DATASET = "tprs_student_membership_enrollment_reports"
 EDITION = 2026
@@ -250,7 +255,7 @@ def read_student_report(store: ProvenanceStore, receipt: str, *, scope: str, ide
     return StudentReport(report.scope, report.identifier, report.receipt, report.sha256, report.cells, tuple(notes))
 
 
-def projection(reports: Sequence[StudentReport], policy: ValuePolicy) -> tuple[pa.Table, dict[str, Any], dict[str, Any]]:
+def projection(reports: Sequence[StudentReport], policy: ValuePolicy, *, audit_raw: bool = False) -> tuple[pa.Table, dict[str, Any], dict[str, Any]]:
     """Project only reviewed fields; retain exact raw/status and cell locators."""
     _need(bool(reports) and len({r.scope for r in reports}) == 1, "Select one nonempty source scope")
     scope = reports[0].scope
@@ -275,6 +280,8 @@ def projection(reports: Sequence[StudentReport], policy: ValuePolicy) -> tuple[p
                     "section": cell.section, "label": cell.label, "population": cell.population,
                     "measure": cell.measure, "reason": cell.hold,
                     "token_status": interpreted.status.value, "token_reason": interpreted.reason})
+                if audit_raw:
+                    holds[-1]["raw"] = cell.raw
     arrays = {}
     for f in fields:
         name = f["field"]
@@ -423,11 +430,45 @@ def verify_workbook_witnesses(store: ProvenanceStore) -> dict[str, Any]:
             "scope": "Three named publisher exports only; literal dots/blank cells remain uninterpreted raw cells"}
 
 
+_STATEWIDE_BATCH_ROWS = 16
+
+
+def _statewide_batches(store: ProvenanceStore, entries: Sequence[ReportSelection], policy: ValuePolicy
+                       ) -> Iterator[tuple[pa.Table, dict[str, Any], dict[str, Any]]]:
+    for offset in range(0, len(entries), _STATEWIDE_BATCH_ROWS):
+        reports = [read_student_report(store, item.receipt, scope=item.scope, identifier=item.identifier,
+                                       expected_sha256=item.sha256)
+                   for item in entries[offset:offset + _STATEWIDE_BATCH_ROWS]]
+        yield projection(reports, policy, audit_raw=True)
+
+
+def _verify_statewide_projection(store: ProvenanceStore, entries: tuple[ReportSelection, ...],
+                                 policy: ValuePolicy, path: Path, audit_path: Path) -> None:
+    from .dataset_metadata import COLUMN_SCHEMA_MAX_BYTES
+    from .tprs_statewide_intake import audit_rows
+
+    with audit_path.open("rb") as stream:
+        raw = stream.read(COLUMN_SCHEMA_MAX_BYTES + 1)
+    _need(len(raw) <= COLUMN_SCHEMA_MAX_BYTES, "Compressed student audit exceeds its bounds")
+    audit = audit_rows(raw, entries)
+    batches = pq.ParquetFile(path).iter_batches(batch_size=_STATEWIDE_BATCH_ROWS)
+    for projection_result, observed in zip_longest(_statewide_batches(store, entries, policy), batches):
+        _need(projection_result is not None and observed is not None, "Statewide student readback row count differs")
+        assert projection_result is not None and observed is not None
+        table, _, audit_data = projection_result
+        _need(table.equals(pa.Table.from_batches([observed]).replace_schema_metadata(None)),
+              "Statewide student native readback differs from the original reports")
+        for expected in audit_data["raw_field_holds"]:
+            _need(next(audit, None) == expected, "Statewide student raw audit differs from the original report")
+    _need(next(audit, None) is None, "Statewide student raw audit has extra rows")
+
+
 def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256: str,
                          intake: Path, intake_sha256: str, output: Path) -> dict[str, Any]:
     """Build a new, explicit receipt-selected native projection entirely offline."""
     from .analytical import write_leaf_artifact
-    from .release import _install_candidate, publish_release
+    from .release import _install_candidate, _schema_publication_destinations, publish_release
+    from .tprs_statewide_intake import STATEWIDE_OPERATION, ReportSelection, admit_statewide_selection
 
     _need(not output.exists() and not output.is_symlink(), "Student candidate requires a new output directory")
     with config.open("rb") as stream:
@@ -453,14 +494,17 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
         body = stream.read(4 * 1024**2 + 1)
     _need(0 < len(body) <= 4 * 1024**2 and sha256(body).hexdigest() == intake_sha256, "Student intake pin differs")
     selection = json.loads(body, object_pairs_hook=_unique_object)
-    _need(isinstance(selection, dict) and set(selection) == {"schema_version", "dataset", "edition", "reports"}
-          and type(selection["schema_version"]) is int and selection["schema_version"] == 1
-          and selection["dataset"] == DATASET and selection["edition"] == "2026"
-          and isinstance(selection["reports"], list) and 0 < len(selection["reports"]) <= 20000,
-          "Invalid selected-report intake")
+    statewide = (admit_statewide_selection(store, selection)
+                 if isinstance(selection, dict) and selection.get("schema_version") == 2 else None)
+    if statewide is None:
+        _need(isinstance(selection, dict) and set(selection) == {"schema_version", "dataset", "edition", "reports"}
+              and type(selection["schema_version"]) is int and selection["schema_version"] == 1
+              and selection["dataset"] == DATASET and selection["edition"] == "2026"
+              and isinstance(selection["reports"], list) and 0 < len(selection["reports"]) <= 20000,
+              "Invalid selected-report intake")
     groups: dict[str, list[StudentReport]] = {}
     selected_bytes = 0
-    for item in selection["reports"]:
+    for item in (() if statewide else selection["reports"]):
         _need(isinstance(item, dict) and set(item) == {"receipt", "sha256", "scope", "identifier"}, "Invalid report selection")
         _need(all(isinstance(value, str) for value in item.values())
               and _DIGEST.fullmatch(item["receipt"]) is not None and _DIGEST.fullmatch(item["sha256"]) is not None,
@@ -473,11 +517,20 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
         report = read_student_report(store, item["receipt"], scope=item["scope"], identifier=item["identifier"],
                                      expected_sha256=item["sha256"])
         groups.setdefault(report.scope, []).append(report)
-    # All semantic/source checks finish before an output stage is made.
+    # Legacy selections fit in memory. Statewide projection validates in a
+    # private stage and installs nothing until the complete readback passes.
     projections = {scope: projection(reports, policy) for scope, reports in groups.items()}
+    if statewide:
+        source_groups = {scope: tuple(item for item in statewide.reports if item.scope == scope)
+                         for scope in ("district", "state")}
+    else:
+        source_groups = {scope: tuple(ReportSelection(r.scope, r.identifier, r.receipt, r.sha256) for r in reports)
+                         for scope, reports in groups.items()}
     witnesses = verify_workbook_witnesses(store)
-    crosswalk = _crosswalk({scope: [r.sha256 for r in reports] for scope, reports in groups.items()})
-    roots = [r.receipt for reports in groups.values() for r in reports]
+    crosswalk = _crosswalk({scope: [r.sha256 for r in reports] for scope, reports in source_groups.items()})
+    roots = [r.receipt for reports in source_groups.values() for r in reports]
+    roster_receipts = [entry["receipt"] for entry in statewide.roster.values()] if statewide else []
+    roots.extend(roster_receipts)
     roots.extend(rid for ref in source.metadata.references for rid in ref.provenance_ids)
     roots.extend(w[role] for w in definition()["witnesses"].values() for role in ("html_receipt", "xlsx_receipt"))
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -485,6 +538,15 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
         stage = Path(temporary) / "bundle"
         stage.mkdir(mode=0o700)
         target = ProvenanceStore(stage / "provenance")
+        roster_path = grid_path = None
+        grid_bytes = files("teadata").joinpath(RESOURCE).read_bytes()
+        grid_digest = sha256(grid_bytes).hexdigest()
+        if statewide:
+            roster_bytes = (canonical_json(statewide.roster) + "\n").encode()
+            roster_path = stage / f"tprs-roster-{sha256(roster_bytes).hexdigest()}.json"
+            roster_path.write_bytes(roster_bytes)
+            grid_path = stage / f"tprs-grid-{grid_digest}.json"
+            grid_path.write_bytes(grid_bytes)
         for rid in dict.fromkeys(roots):
             target.copy_record_from(store, rid)
         captured = Path(temporary) / "intake.json"
@@ -516,26 +578,60 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
         selected = dynamic_cfg.resolve_dataset(DATASET, EDITION, reader_profile="source", exact=True)
         recorder = BuildRecorder(dynamic_cfg, target)
         results = []
-        for scope, reports in groups.items():
-            table, support, audit = projections[scope]
+        edition_keys = {
+            scope: EditionKey(DATASET, "2026", EditionKey.source_revision(tuple(r.sha256 for r in entries)), scope, scope,
+                              STATEWIDE_SINGLETON_GRAIN if scope == "state" else f"one row per {scope}_number")
+            for scope, entries in source_groups.items()
+        }
+        for scope, reports in source_groups.items():
+            if statewide:
+                chunks = _statewide_batches(target, reports, policy)
+                first = next(chunks)
+                table, support, _ = first
+            else:
+                table, support, audit = projections[scope]
             hashes = [r.sha256 for r in reports]
             keys = [] if scope == "state" else [scope + "_number"]
-            key = EditionKey(DATASET, "2026", EditionKey.source_revision(tuple(hashes)), scope, scope,
-                             STATEWIDE_SINGLETON_GRAIN if not keys else "one row per " + keys[0])
-            recipe = {"operation": "selected_tprs_student_membership_enrollment", "definition_sha256": sha256(
-                files("teadata").joinpath(RESOURCE).read_bytes()).hexdigest(), "intake_sha256": intake_sha256,
+            key = edition_keys[scope]
+            recipe: dict[str, Any] = {"operation": "selected_tprs_student_membership_enrollment",
+                "definition_sha256": grid_digest, "intake_sha256": intake_sha256,
                 "source_locators": "one-based parsed HTML row and column", "projection_qualified": True,
                 "whole_report_semantics_qualified": False}
+            if statewide:
+                recipe.update(operation=STATEWIDE_OPERATION, report_ledger_version=2,
+                              cohort={name: edition.identity for name, edition in edition_keys.items()})
             toolchain = {"python": sys.version, "pyarrow": str(pa.__version__), "platform": platform.platform()}
             contract = recorder.leaf_contract(key, selected, native_schema=table.schema.serialize().to_pybytes(),
-                columns=table.column_names, key_columns=keys, rows=len(table), inputs=hashes, recipe=recipe,
+                columns=table.column_names, key_columns=keys, rows=len(reports), inputs=hashes, recipe=recipe,
                 toolchain=toolchain, column_support=support)
             identity = sha256(canonical_json(contract).encode()).hexdigest()
             path = stage / (identity + ".parquet")
-            physical = write_leaf_artifact(path, table.to_batches(max_chunksize=512), contract=contract, batch_bytes=8 * 1024**2)
-            _need(table.equals(pq.read_table(path).replace_schema_metadata(None)), "Student native readback differs")
-            observations = []
-            for report in reports:
+            outputs = {"leaf": path}
+            observations = [r.receipt for r in reports] if statewide else []
+            if statewide:
+                assert roster_path is not None and grid_path is not None
+                audit_tmp = stage / f"{scope}-raw-audit.tmp"
+                audit = {"qualified_fields": len(support["fields"]), "selected_reports": len(reports),
+                         "raw_observations": 0, "raw_field_hold_count": 0,
+                         "whole_report_semantics_qualified": False, "projection_qualified": True}
+                with audit_tmp.open("xb") as compressed, gzip.GzipFile(filename="", fileobj=compressed, mode="wb", mtime=0) as stream:
+                    def batches():
+                        for chunk, _, part in chain([first], chunks):
+                            audit["raw_observations"] += part["raw_observations"]
+                            audit["raw_field_hold_count"] += len(part["raw_field_holds"])
+                            for hold in part["raw_field_holds"]:
+                                stream.write((canonical_json(hold) + "\n").encode())
+                            yield from chunk.to_batches()
+
+                    physical = write_leaf_artifact(path, batches(), contract=contract, batch_bytes=8 * 1024**2)
+                _verify_statewide_projection(target, reports, policy, path, audit_tmp)
+                audit_path = stage / f"tprs-raw_audit-{sha256(audit_tmp.read_bytes()).hexdigest()}.jsonl.gz"
+                audit_tmp.rename(audit_path)
+                outputs.update(roster=roster_path, raw_audit=audit_path, grid=grid_path)
+            else:
+                physical = write_leaf_artifact(path, table.to_batches(max_chunksize=512), contract=contract, batch_bytes=8 * 1024**2)
+                _need(table.equals(pq.read_table(path).replace_schema_metadata(None)), "Student native readback differs")
+            for report in groups.get(scope, ()):
                 observation = target.record_acquisition(target.verify_artifact(report.sha256), ResolvedDataset(
                     DATASET, "data_sources", EDITION, EDITION, "", DatasetMetadata(
                         title="Locally verified retained2026 TPRS student report", version="2026", period=PERIOD,
@@ -544,19 +640,23 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
                     parameters={"original_download_receipt": report.receipt, "scope": scope,
                                 "identifier": report.identifier, "original_acquisition_notes": list(report.acquisition_notes)})
                 observations.append(observation)
-            processing = target.record_processing(dataset=DATASET, inputs=[*[r.receipt for r in reports], *observations, intake_receipt, config_receipt],
-                outputs={"leaf": path}, processor="teadata.tprs_students", code_version=recorder.processor_sha256,
+            processing = target.record_processing(dataset=DATASET, inputs=list(dict.fromkeys(
+                [*[r.receipt for r in reports], *observations, *roster_receipts, intake_receipt, config_receipt])),
+                outputs=outputs, processor="teadata.tprs_students", code_version=recorder.processor_sha256,
                 parameters={"recipe": recipe, "leaf_contract_sha256": identity, "toolchain": toolchain},
                 validation={**audit, "release_activation": False})
             ref = ArtifactRef(key, physical["sha256"], physical["size_bytes"], path.name, canonical_json(contract), processing, "leaf")
             recorder.record_edition(key, selected, artifacts=[ref], acquisition_ids=observations)
-            results.append({"edition": key.to_dict(), "rows": len(table), **audit,
+            results.append({"edition": key.to_dict(), "rows": len(reports), **audit,
                 "original_acquisition_notes": [{"receipt": report.receipt, "notes": list(report.acquisition_notes)}
-                                               for report in reports if report.acquisition_notes]})
+                                               for report in groups.get(scope, ()) if report.acquisition_notes]})
         catalog = recorder.catalog(schema_version=4)
         publish_release(stage, catalog, schema_version=4)
         result = {"status": "PASS_REVIEWED_PROJECTION_WITH_EXPLICIT_RAW_HOLDS", "release_activation": False,
                   "whole_report_semantics_qualified": False, "publisher_witnesses": witnesses, "editions": results}
+        if statewide:
+            _, locations = _schema_publication_destinations(catalog)
+            result["release_assets"] = ["release.json", *locations]
         (stage / "MATERIALIZATION.json").write_text(canonical_json(result) + "\n", encoding="utf-8")
         _install_candidate(stage, output)
         return result

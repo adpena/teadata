@@ -20,7 +20,7 @@ from urllib.request import urlopen
 from platformdirs import user_cache_path
 
 from .analytical import ANALYTICAL_DATASETS, ANALYTICAL_ROLES, analytical_dataset, validate_artifact, validate_leaf_artifact
-from .dataset_metadata import COLUMN_SCHEMA_MAX_BYTES, ColumnSchemaRef, EditionKey, EditionMetadataRef, validate_http_url
+from .dataset_metadata import ArtifactRef, COLUMN_SCHEMA_MAX_BYTES, ColumnSchemaRef, EditionKey, EditionMetadataRef, validate_http_url
 from .manifest import (
     ContractError,
     DatasetCatalog,
@@ -32,6 +32,9 @@ from .manifest import (
 if TYPE_CHECKING:
     from .entities import Campus, District
     from .source_views import EntitySources, SourceTable
+    from .tprs_statewide_intake import ReportSelection
+
+_StudentCohort = tuple[str, str, str, str]
 
 
 ROLES = frozenset({"snapshot", "entities", "maps", "boundaries"})
@@ -113,7 +116,9 @@ def _capture_column_schema(path: Path, descriptor: ColumnSchemaRef | EditionMeta
         raise ContractError("Invalid column-schema resource filesystem entry") from error
 
 
-def _schema_publication_destinations(catalog: DatasetCatalog) -> tuple[ColumnSchemaRef | EditionMetadataRef, ...]:
+def _schema_publication_destinations(
+    catalog: DatasetCatalog,
+) -> tuple[tuple[ColumnSchemaRef | EditionMetadataRef, ...], tuple[str, ...]]:
     """Reject every colliding local destination before metadata resolution/writes."""
     names = {"release.json"}
     def reserve(location):
@@ -122,20 +127,37 @@ def _schema_publication_destinations(catalog: DatasetCatalog) -> tuple[ColumnSch
         if not key or "\0" in name or key in names:
             raise ContractError("Schema3 publication destinations collide with a reserved root or another resource")
         names.add(key)
-    if catalog.to_dict()["schema_version"] == 4:
+    document = catalog.to_dict()
+    if document["schema_version"] == 4:
         # Child metadata must be read to discover destinations; no schema/leaf
         # is opened until every destination has passed this same preflight.
         resources, descriptors = catalog._publication_metadata()
-        artifacts = [descriptor.to_dict() for descriptor in descriptors]
     else:
         resources = catalog.column_schema_refs()
-        artifacts = catalog.to_dict()["artifacts"].values()
-    for artifact in artifacts:
-        if "://" not in artifact["location"]:
-            reserve(artifact["location"])
+        descriptors = tuple(ArtifactRef.from_dict(row) for row in document["artifacts"].values())
+    attachments = {item for descriptor in descriptors for item in _student_attachments(catalog, descriptor).values()}
+    for attachment in attachments:
+        reserve(attachment.location)
+    for artifact in descriptors:
+        if "://" not in artifact.location:
+            reserve(artifact.location)
     for resource in resources:
         reserve(resource.location)
-    return resources
+    locations = sorted([*(artifact.location for artifact in descriptors),
+                        *(resource.location for resource in resources),
+                        *(attachment.location for attachment in attachments)])
+    return resources, tuple(locations)
+
+
+def _student_attachments(catalog: DatasetCatalog, artifact: ArtifactRef) -> dict[str, ColumnSchemaRef]:
+    if artifact.edition.dataset != "tprs_student_membership_enrollment_reports":
+        return {}
+    from .tprs_statewide_intake import statewide_resources
+
+    refs = statewide_resources(catalog._processing_record(artifact))
+    if refs and not getattr(catalog, "_v4", False):
+        raise ContractError("Statewide student attachments require a schema4 release")
+    return refs
 
 
 class DataRelease:
@@ -325,8 +347,87 @@ class DataRelease:
         artifact = partial(self.artifact, discard_cached_reads=True) if discard_cached_reads else self.artifact
         if self._v3:
             self.catalog.verify_metadata()
-            return {identifier: artifact(identifier) for identifier in self.catalog.to_dict()["artifacts"]}
+            document = self.catalog.to_dict()
+            paths = {identifier: artifact(identifier) for identifier in document["artifacts"]}
+            if document["schema_version"] == 4:
+                self._verify_student_cohorts(document, paths)
+            else:
+                for descriptor in document["artifacts"].values():
+                    if descriptor["edition"]["dataset"] == "tprs_student_membership_enrollment_reports":
+                        _student_attachments(self.catalog, ArtifactRef.from_dict(descriptor))
+            return paths
         return {role: artifact(role) for role in sorted(self._artifacts)}
+
+    def _verify_student_cohorts(self, document: dict, paths: dict[str, Path]) -> None:
+        cohorts: dict[_StudentCohort, set[str]] = {}
+        for identifier, edition_id in document["artifacts"].items():
+            if document["editions"][edition_id]["key"]["dataset"] != "tprs_student_membership_enrollment_reports":
+                continue
+            artifact = self.catalog.artifact_ref(identifier)
+            refs = _student_attachments(self.catalog, artifact)
+            if not refs:
+                continue
+            cohort = self._verify_statewide_student_leaf(artifact, paths[identifier], refs)
+            scope = artifact.edition.scope
+            seen = cohorts.setdefault(cohort, set())
+            if scope in seen:
+                raise ContractError("Duplicate student leaf in the statewide cohort")
+            seen.add(scope)
+        if any(scopes != {"district", "state"} for scopes in cohorts.values()):
+            raise ContractError("A statewide student cohort requires matching district and Texas leaves")
+
+    def _statewide_student_ledger(
+        self, artifact: ArtifactRef, refs: dict[str, ColumnSchemaRef],
+    ) -> tuple[tuple[ReportSelection, ...], _StudentCohort]:
+        from .tprs_statewide_intake import statewide_ledger
+        record = self.catalog._processing_record(artifact)
+        key = artifact.edition
+        try:
+            recipe = record["parameters"]["recipe"]
+            if recipe["cohort"].get(key.scope) != key.identity:
+                raise ContractError("Statewide student leaf does not belong to its cohort")
+            document = json.loads(self.catalog.edition_metadata_bytes(key.identity))
+            reports = statewide_ledger(document, key, self._column_schema_bytes(refs["roster"]), record)
+            hashes = [item.sha256 for item in reports]
+            if (artifact.contract["inputs"] != hashes or artifact.contract["rows"] != len(reports)
+                    or key.revision_sha256 != EditionKey.source_revision(tuple(hashes))):
+                raise ContractError("Statewide student leaf differs from its ordered publisher receipts")
+            return reports, (recipe["cohort"]["district"], recipe["cohort"]["state"],
+                             recipe["intake_sha256"], refs["roster"].sha256)
+        except (KeyError, OSError, EOFError, TypeError, ValueError) as error:
+            raise ContractError("Invalid statewide student ledger") from error
+
+    def _verify_statewide_student_leaf(
+        self, artifact: ArtifactRef, path: Path, refs: dict[str, ColumnSchemaRef],
+    ) -> _StudentCohort:
+        import pyarrow.parquet as pq
+
+        from .tprs_statewide_intake import verify_audit_coverage
+
+        reports, cohort = self._statewide_student_ledger(artifact, refs)
+        try:
+            columns = (["district_number"] if artifact.edition.scope == "district" else []) + ["tprs_report_receipt", "tprs_report_sha256"]
+            expected = iter(reports)
+            for batch in pq.ParquetFile(path).iter_batches(columns=columns, batch_size=256):
+                for row in batch.to_pylist():
+                    item = next(expected, None)
+                    if (item is None or (row.get("district_number", "S"), row["tprs_report_receipt"], row["tprs_report_sha256"])
+                            != (item.identifier, item.receipt, item.sha256)):
+                        raise ContractError("Statewide student row identity differs from its report ledger")
+            if next(expected, None) is not None:
+                raise ContractError("Statewide student leaf omits report rows")
+            metadata = self.catalog.metadata(artifact.edition.dataset, edition=artifact.edition)
+            grid, = [ref for ref in metadata.references if ref.reference_id == "report_grid"]
+            if refs["grid"].sha256 != grid.reviewed_sha256:
+                raise ContractError("Statewide student audit grid differs from the reviewed source reference")
+            count = self.catalog._processing_record(artifact)["validation"]["raw_field_hold_count"]
+            if type(count) is not int or count != verify_audit_coverage(
+                self._column_schema_bytes(refs["raw_audit"]), reports, self._column_schema_bytes(refs["grid"]),
+            ):
+                raise ContractError("Statewide student raw audit count differs")
+            return cohort
+        except (KeyError, OSError, EOFError, TypeError, ValueError) as error:
+            raise ContractError("Invalid statewide student leaf or attachment") from error
 
     def analytical_dataset(self, name: str):
         """Return a standard Arrow Dataset for campus, district, attributes or sources.
@@ -474,7 +575,7 @@ def publish_release(
             raise ContractError("Release manifest is too large")
         if (directory / "release.json").exists() or (directory / "release.json").is_symlink():
             raise FileExistsError("Schema3 candidate root already exists")
-        resources = _schema_publication_destinations(catalog)
+        resources, _ = _schema_publication_destinations(catalog)
         catalog.verify_metadata()
         admitted = []
         for descriptor in resources:

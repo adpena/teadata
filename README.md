@@ -232,6 +232,9 @@ Included enrichers cover:
 - planned closure overlays
 - charter network augmentation
 
+See [entity enrichment sources and years](docs/source-coverage.md) for the inputs
+in the published entity release and the editions configured for each source.
+
 Required source, schema, methodology, and transfer-join failures stop publication.
 The previous release remains active when a staged build fails. Geometry coverage
 and pending source review remain explicit in the processing receipt.

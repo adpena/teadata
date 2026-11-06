@@ -8,7 +8,7 @@ from copy import copy
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
-from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Tuple
 import fnmatch
 import gzip
 import logging
@@ -50,6 +50,10 @@ from .geometry import (
     probably_lonlat,
 )
 from .query import Query, unwrap_query
+
+if TYPE_CHECKING:
+    from .observations import _ObservationModel
+    from .release import DataRelease
 
 GZIP_MAGIC = b"\x1f\x8b"
 
@@ -265,6 +269,14 @@ class _CharterCache:
 
 class DataEngine:
     catalog: DatasetCatalog
+
+    def _observation_model(self, sources: Iterable[DataRelease]) -> _ObservationModel:
+        from .observations import _ObservationModel
+
+        catalog = getattr(self, "catalog", None)
+        if catalog is None:
+            raise ContractError("Observation planning requires an entity build catalog")
+        return _ObservationModel(catalog, sources)
 
     @classmethod
     def from_snapshot(

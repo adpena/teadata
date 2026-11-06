@@ -1,5 +1,6 @@
 from copy import deepcopy
 from datetime import datetime, timezone
+import gzip
 from hashlib import sha256
 from html import escape
 import json
@@ -11,7 +12,7 @@ import pyarrow as pa
 import pytest
 import yaml
 
-from teadata import tprs_students as students
+from teadata import tprs_statewide_intake, tprs_students as students
 from teadata.column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
 from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
 from teadata.manifest import ContractError, canonical_json
@@ -425,6 +426,45 @@ def test_selected_aggregate_size_refuses_before_parsing_or_staging(tmp_path, gri
         students.materialize_students(store, config=config, config_sha256=sha256(config.read_bytes()).hexdigest(),
             intake=intake, intake_sha256=sha256(intake.read_bytes()).hexdigest(), output=output)
     assert not output.exists()
+
+
+def test_statewide_intake_requires_complete_roster_and_original_report_parent(tmp_path, grid, monkeypatch):
+    monkeypatch.setattr(tprs_statewide_intake, "REGIONS", ("19",))
+    monkeypatch.setattr(tprs_statewide_intake, "DISTRICT_COUNT", 1)
+    store = ProvenanceStore(tmp_path / "store")
+    roster = tmp_path / "roster.json"
+    roster.write_text('[{"DISTRICT":"071901","REGION":"19"}]')
+    controls = [("_service", "marykay"), ("_debug", "0"), ("_program", "perfrept.acct_json_response.sas"),
+                ("prmv_level", "D"), ("ccyy", "2026"), ("prmv_var", "region"), ("prmv_text", "19")]
+    url = students.BROKER + "?" + urlencode(controls)
+    roster_id = store.record_acquisition(roster, ResolvedDataset("reference:roster", "reference", 2026, 2026, "",
+        DatasetMetadata(version="2026")), downloaded_at=datetime(2026, 11, 4, tzinfo=timezone.utc),
+        requested_url=url, resolved_url=url, response_headers={"content-type": "application/json"},
+        parameters={"form_url": students.BROKER, "http_method": "GET", "http_status": 200,
+                    "form_controls": [list(pair) for pair in controls]})
+    state = html(report_rows(grid, "state", "S"))
+    district = html(report_rows(grid, "district", "071901"))
+    state_id = receipt(store, tmp_path, state, scope="state", identifier="S")
+    district_id = receipt(store, tmp_path, district, identifier="071901")
+    reports = [{"receipt": state_id, "sha256": sha256(state).hexdigest(), "scope": "state", "identifier": "S"},
+               {"receipt": district_id, "sha256": sha256(district).hexdigest(), "scope": "district", "identifier": "071901"}]
+    intake = {"schema_version": 2, "dataset": students.DATASET, "edition": "2026", "rosters": {"19": roster_id}}
+    with pytest.raises(ContractError, match="Incomplete statewide report selection"):
+        tprs_statewide_intake.admit_statewide_selection(store, {**intake, "reports": reports[:1]})
+    with pytest.raises(ContractError, match="exact regional roster parent"):
+        tprs_statewide_intake.admit_statewide_selection(store, {**intake, "reports": reports})
+
+
+def test_statewide_audit_rejects_missing_held_cell_despite_valid_gzip(grid, policy):
+    report = parse(grid, scope="state", identifier="S")
+    _, _, audit = students.projection([report], policy, audit_raw=True)
+    rows = audit["raw_field_holds"]
+    selection = (tprs_statewide_intake.ReportSelection("state", "S", report.receipt, report.sha256),)
+    grid_bytes = canonical_json(grid).encode()
+    encoded = [(canonical_json(row) + "\n").encode() for row in rows]
+    assert tprs_statewide_intake.verify_audit_coverage(gzip.compress(b"".join(encoded)), selection, grid_bytes) == 36
+    with pytest.raises(ContractError, match="required report slot"):
+        tprs_statewide_intake.verify_audit_coverage(gzip.compress(b"".join(encoded[:-1])), selection, grid_bytes)
 
 
 def test_dynamic_crosswalk_changes_only_ordered_actual_input_identity():

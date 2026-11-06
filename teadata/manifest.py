@@ -843,9 +843,22 @@ class DatasetCatalog:
         except KeyError as error:
             raise ContractError("Unknown selected artifact ID") from error
 
+    def _processing_record(self, artifact: ArtifactRef) -> Mapping[str, Any]:
+        catalog = self._edition_view(artifact.edition.identity) if getattr(self, "_v4", False) else self
+        if catalog._artifact_refs.get(artifact.identity) != artifact:
+            raise ContractError("Processing lookup requires the exact registered artifact")
+        return catalog._records[artifact.processing_id]
+
     def resolve_artifacts(self, fields: Iterable[tuple[EditionKey, str]], *, period: DataPeriod | None = None) -> tuple[dict[str, Any], ...]:
         """Resolve exact fields/dependencies; only selected metadata may need I/O."""
+        plans, _ = self._resolve_field_projections((key, field, period) for key, field in fields)
+        return tuple({"artifact": artifact, "columns": columns} for artifact, columns in plans)
+
+    def _resolve_field_projections(
+        self, fields: Iterable[tuple[EditionKey, str, DataPeriod | None]],
+    ) -> tuple[tuple[tuple[ArtifactRef, tuple[str, ...]], ...], dict[tuple[EditionKey, str], FieldBinding]]:
         self._require_index()
+        bindings: dict[tuple[EditionKey, str], FieldBinding] = {}
         columns: dict[str, list[str]] = {}
         column_sets: dict[str, set[str]] = {}
         artifacts: dict[str, ArtifactRef] = {}
@@ -896,7 +909,7 @@ class DatasetCatalog:
                     column_sets[identifier].add(column)
             for dependency in binding.dependencies:
                 visit(dependency)
-        for key, field in fields:
+        for key, field, period in fields:
             qualified = key.identity, field
             if self._edition_keys.get(key.identity) != key:
                 raise ContractError("Exact qualified field unavailable")
@@ -908,6 +921,7 @@ class DatasetCatalog:
             actual_period = DataPeriod.from_dict(catalog._field_headers[qualified]["period"])
             if period is not None and (period.kind == "unknown" or actual_period != period):
                 raise ContractError("Requested reference period is unsupported")
+            bindings[key, field] = catalog._field_bindings[qualified]
             visit(qualified)
         # Keep revalidation per operation: even a lazy input iterable may change
         # a resource between requested fields. Recheck bytes/stat, not the graph.
@@ -921,8 +935,7 @@ class DatasetCatalog:
             if descriptor not in checked_schemas:
                 catalog.column_schema_bytes(digest)
                 checked_schemas.add(descriptor)
-        return tuple({"artifact": artifacts[identifier], "columns": tuple(selected)}
-                     for identifier, selected in columns.items())
+        return tuple((artifacts[identifier], tuple(selected)) for identifier, selected in columns.items()), bindings
 
     @classmethod
     def create(

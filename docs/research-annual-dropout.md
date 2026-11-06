@@ -48,4 +48,26 @@ Pin the resulting manifest and select an exact `EditionKey` from
 codes `78`, `912` and `712`. Texas and ESC leaves also retain the corresponding
 display label as source context. Workbook rows carry their original worksheet
 row number. Read the exact raw fields through the native source view or the
-edition's Arrow dataset.
+edition's Arrow dataset. For example, this reads Austin ISD's state-accountability
+grade 9–12 rate as a raw publisher token from the [v0.0.135 release](https://github.com/adpena/teadata/releases/tag/v0.0.135):
+
+```python
+from teadata.dataset_metadata import EditionKey
+from teadata.release import DataRelease
+
+release = DataRelease(
+    "https://github.com/adpena/teadata/releases/download/v0.0.135/annual-dropout-2024-25.release.json",
+    expected_sha256="cd9221718c3077d3de6f571e7c383435f71fa71cf30c9136f67e404ed5bed2f0",
+)
+edition, = release.catalog.editions(scope="district", include_metadata=False)
+key = EditionKey.from_dict({name: value for name, value in edition.items() if name != "edition_id"})
+table = release.table(key)
+austin = table.where(
+    (table["district_number"] == "227901")
+    & (table["grade_span"] == "912")
+    & (table["calc_for_state_acct"] == "Yes")
+).select("dist_allr").to_df()
+```
+
+The frame includes the row keys and source locator. The value in `dist_allr`
+is the string `"1.9"` (percent), not a numeric estimate derived from masked counts.
