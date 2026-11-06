@@ -73,6 +73,11 @@ class SourceTable:
     _entity_build: tuple[str, str] | None = None
     _entity_ids: tuple[str, ...] | None = None
 
+    @property
+    def measurement_period(self) -> DataPeriod | None:
+        """The resolved measurement period of an observation view."""
+        return self._period
+
     def select(self, *fields: str) -> SourceTable:
         """Select distinct public fields and retain their key and source columns."""
         if not fields or any(not isinstance(name, str) or not name for name in fields) or len(set(fields)) != len(fields):
@@ -291,8 +296,10 @@ def prepare_export(release: DataRelease, edition: EditionKey, *, restore_origina
         rows = tuple(tuple(row[kind] for row in headers) for kind in ("label", "code"))
     lineage: dict[str, Any] = {"build_id": release.build_id, "edition": edition.to_dict(), "artifact_sha256": artifact.sha256,
                                "manifest_sha256": release.manifest_sha256}
-    if entity_build is not None and period is not None:
-        lineage.update(entity_build_id=entity_build[0], entity_manifest_sha256=entity_build[1], measurement_period=period.to_dict())
+    if period is not None:
+        lineage["measurement_period"] = period.to_dict()
+    if entity_build is not None:
+        lineage.update(entity_build_id=entity_build[0], entity_manifest_sha256=entity_build[1])
     return _TableExport(scanner, rows, restore_original_headers, artifact.contract["rows"], lineage)
 
 

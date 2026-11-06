@@ -423,7 +423,7 @@ class Query:
         return handler(self, op)
 
     # ---------------------- individual handlers ----------------------
-    def observations(self, dataset: str, *fields: str, school_year: int, scope: str | None = None,
+    def observations(self, dataset: str, *fields: str, school_year: int | None = None, scope: str | None = None,
                      edition: EditionKey | None = None, release: DataRelease | None = None) -> SourceTable:
         """Plan published rows for the selected public entities and a measurement school year."""
         from .manifest import ContractError

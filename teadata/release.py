@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable, Iterator
 from functools import lru_cache, partial
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -563,39 +564,85 @@ class DataRelease:
             raise TypeError("Native table selection requires an exact EditionKey")
         return SourceTable(self, edition)
 
-    def observations(self, dataset: str, *fields: str, school_year: int,
-                     scope: str, edition: EditionKey | None = None) -> SourceTable:
-        """Plan a native view from this entity release by measurement school year."""
-        from .observations import _ObservationModel, _ObservationRequest
-        from .source_views import SourceTable
-
-        if type(school_year) is not int or not 2 <= school_year <= 9999:
-            raise ValueError("School year must be its integer ending year")
+    def _observation_year_options(
+        self, dataset: str, fields: tuple[str, ...], scope: str, edition: EditionKey | None,
+    ) -> Iterator[tuple[DataRelease, EditionKey, dict[str, int]]]:
+        if any(not isinstance(value, str) or not value.strip() for value in (dataset, scope)):
+            raise ValueError("Observation selection requires a dataset and scope")
         if not fields or any(not isinstance(field, str) or not field for field in fields) or len(set(fields)) != len(fields):
             raise ValueError("Select one or more distinct source fields")
         if edition is not None and not isinstance(edition, EditionKey):
             raise TypeError("Edition selection requires an exact EditionKey")
-        period = DataPeriod(kind="school_year", start_year=school_year - 1, end_year=school_year)
-        matches = []
-        parent = self.source if self.remote else self.path
-        for ref in self.catalog.native_sources:
-            keys = [key for key in ref.editions if key.dataset == dataset and key.scope == scope
-                    and (edition is None or key == edition)]
-            if not keys:
-                continue
-            child = _open_native_source(ref, parent, offline=self.offline, cache_dir=getattr(self, "_cache_dir", None))
+
+        def sources():
+            if self._v3:
+                yield self, (
+                    EditionKey.from_dict({name: value for name, value in row.items() if name != "edition_id"})
+                    for row in self.catalog.editions(dataset=dataset, scope=scope, include_metadata=False)
+                )
+                return
+            parent = self.source if self.remote else self.path
+            for ref in self.catalog.native_sources:
+                keys = [key for key in ref.editions if key.dataset == dataset and key.scope == scope
+                        and (edition is None or key == edition)]
+                if keys:
+                    yield _open_native_source(ref, parent, offline=self.offline,
+                                              cache_dir=getattr(self, "_cache_dir", None)), keys
+
+        for child, keys in sources():
             for key in keys:
-                if all((info := child.catalog.field_metadata(field, scope=scope, edition=key)) is not None
-                       and DataPeriod.from_dict(info["period"]) == period for field in fields):
-                    matches.append((child, key))
-        if len(matches) != 1:
-            raise ContractError("Fields are unavailable or ambiguous for this school year and scope; select an exact edition")
+                if edition is not None and key != edition:
+                    continue
+                periods = child.catalog._field_periods(key, fields)
+                yield child, key, {field: period.end_year for field, period in periods.items()
+                                   if period.kind == "school_year" and period.end_year is not None}
+
+    @staticmethod
+    def _years_by_field(
+        fields: tuple[str, ...], options: Iterable[tuple[DataRelease, EditionKey, dict[str, int]]],
+    ) -> dict[str, tuple[int, ...]]:
+        years: dict[str, set[int]] = {}
+        for _, _, periods in options:
+            for field, year in periods.items():
+                years.setdefault(field, set()).add(year)
+        return {field: tuple(sorted(years.get(field, ()))) for field in fields}
+
+    def observation_years(self, dataset: str, *fields: str, scope: str,
+                          edition: EditionKey | None = None) -> dict[str, tuple[int, ...]]:
+        """List exact measurement years per field from release metadata without opening data leaves."""
+        return self._years_by_field(fields, self._observation_year_options(dataset, fields, scope, edition))
+
+    def observations(self, dataset: str, *fields: str, school_year: int | None = None,
+                     scope: str, edition: EditionKey | None = None) -> SourceTable:
+        """Plan one native table by exact or latest shared measurement school year."""
+        from .observations import _ObservationModel, _ObservationRequest
+        from .source_views import SourceTable
+
+        if school_year is not None and (type(school_year) is not int or not 2 <= school_year <= 9999):
+            raise ValueError("School year must be its integer ending year")
+        options = list(self._observation_year_options(dataset, fields, scope, edition))
+        available = self._years_by_field(fields, options)
+        if school_year is None:
+            latest = {years[-1] for years in available.values() if years}
+            if len(latest) != 1 or any(not years for years in available.values()):
+                raise ContractError(f"Fields do not share a latest school year for {scope}. Available years: {available}")
+            school_year = latest.pop()
+
+        matches = [(child, key) for child, key, years in options
+                   if all(years.get(field) == school_year for field in fields)]
+        if not matches:
+            raise ContractError(f"Fields are unavailable together for school year {school_year} and {scope}. "
+                                f"Available years: {available}")
+        if len(matches) > 1:
+            choices = [key.to_dict() for _, key in sorted(matches, key=lambda match: match[1].identity)]
+            raise ContractError(f"Multiple editions match school year {school_year} and {scope}. Select edition: {choices}")
         child, key = matches[0]
+        period = DataPeriod("school_year", school_year - 1, school_year)
         plan = _ObservationModel(self.catalog, [child]).plan(_ObservationRequest(key, field, period) for field in fields)
         if len(plan.projections) != 1:
             raise ContractError("Observation view requires fields from one native table")
         return SourceTable(child, key, _fields=fields, _period=period,
-                           _entity_build=(self.build_id, self.manifest_sha256))
+                           _entity_build=None if self._v3 else (self.build_id, self.manifest_sha256))
 
     def to_csv(self, edition: EditionKey, path_or_buf: str | Path | BinaryIO, *,
                restore_original_headers: bool = False) -> None:

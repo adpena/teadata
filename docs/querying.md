@@ -42,13 +42,17 @@ print(top5)  # list[(name, enrollment)]
 
 `Query` starts from entities in the loaded snapshot. When the entity build pins
 a native source, `observations` selects its fields by measurement school year.
-Pass the ending year as an integer. The result is a lazy `SourceTable`.
+Pass the ending year as an integer for an exact selection. Omit it to use the
+latest school year when every selected field has that same latest year and one
+edition provides them together. The result is a lazy `SourceTable`.
 
 ```python
 dataset = "tprs_student_membership_enrollment_reports"
 field = "membership_total_students_count"
+years = release.observation_years(dataset, field, scope="district")[field]
 districts = engine >> ("district", "Austin ISD")
 observations = districts.observations(dataset, field, school_year=2026)
+period = observations.measurement_period
 frame = observations.to_df()
 
 # Read the direct publisher statewide observation from the same entity release.
@@ -56,19 +60,24 @@ texas = release.observations(dataset, field, school_year=2026, scope="state").to
 ```
 
 The equivalent chain operation is `districts >> ("observations", dataset,
-2026, (field,))`. Empty entity queries require an explicit `scope`. Use an exact
-`EditionKey` when several eligible editions match. To reopen a saved entity
+2026, (field,))`. Use `None` in the year slot for latest. Empty entity queries
+require an explicit `scope`. An unavailable year raises with the available
+measurement years for each field. Use an exact `EditionKey` when several
+eligible editions match. To reopen a saved entity
 build, pass its pinned `DataRelease` as `release=` or enter its `using_release`
 context. The DataFrame lineage records both the entity manifest and the native
 manifest, edition, artifact and measurement period.
 
-For a separately published table, open its pinned `DataRelease` and select
-an exact edition key. Check the catalog's measurement period before selecting
-an edition. For example, the 2025 annual dropout edition measures school year
-2024–25, even though TEA published it in 2026. Some datasets also publish
-fields with periods that differ from the table's report period. Year selection
-is separate from the attribute access used for dataset and field names. See
-[entity build inputs](source-coverage.md) for the published snapshot's coverage.
+The same year selection works directly on a separately published native
+`DataRelease`. Filter its source keys to reach historical entities absent from
+the current snapshot. For several years, iterate the desired values from
+`observation_years` and check each edition's definitions before comparing.
+Discovery and planning may read selected catalog metadata, while execution
+opens the data leaf. Online releases can fetch that metadata and the selected
+leaf into their verified cache. Offline releases require those bytes locally.
+The 2025 annual dropout edition measures school year 2024–25, even though
+TEA published it in 2026. Check field periods separately from the report
+period. See [entity build inputs](source-coverage.md) for snapshot coverage.
 
 ## Select an entity's published source fields
 

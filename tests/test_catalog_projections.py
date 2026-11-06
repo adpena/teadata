@@ -1742,6 +1742,9 @@ def test_school_year_query_keeps_the_saved_parent_and_native_grain(tmp_path, sel
     monkeypatch.setattr(DataRelease, "artifact", selected_only)
     with using_release(old):
         planned = query >> ("observations", "campus_student", 2024, ("amount",))
+        latest = query >> ("observations", "campus_student", None, ("amount",))
+    assert latest.measurement_period == planned.measurement_period == DataPeriod("school_year", 2023, 2024)
+    assert latest.edition == planned.edition
     assert calls == []
     with using_release(current):
         with pytest.raises(ContractError, match="release for their entity build"):
@@ -1763,6 +1766,72 @@ def test_school_year_query_keeps_the_saved_parent_and_native_grain(tmp_path, sel
     old_leaf.write_bytes(b"different bytes")
     with pytest.raises(ContractError, match="checksum or size"):
         old.verify_native_sources()
+
+
+@pytest.mark.parametrize("schema_version", [3, 4])
+def test_native_observation_year_discovery_does_not_open_leaves(tmp_path, schema_version, monkeypatch):
+    from teadata.release import DataRelease, publish_release
+
+    period = DataPeriod("school_year", 2023, 2024)
+    fixture = make_edition_fixture(tmp_path, families=("student",), normalized=True,
+                                  amount_period=period.to_dict(), entity_grain=True)
+    root = fixture["root"]
+    if schema_version == 4:
+        root = publish_release(tmp_path, fixture["catalog"].externalize_editions(), schema_version=4)
+    release = DataRelease(root, offline=True)
+    key, _, _ = fixture["leaves"]["student"]
+    calls = []
+    original = DataRelease.artifact
+
+    def track_artifact(instance, role, **kwargs):
+        calls.append(role)
+        return original(instance, role, **kwargs)
+
+    monkeypatch.setattr(DataRelease, "artifact", track_artifact)
+    assert release.observation_years(key.dataset, "amount", "campus_name", scope="campus") == {
+        "amount": (2024,), "campus_name": (),
+    }
+    assert release.observation_years(key.dataset, "amount", scope="district") == {"amount": ()}
+    assert release.observation_years(key.dataset, "amount", scope="campus", edition=key) == {"amount": (2024,)}
+    absent = replace(key, revision_sha256="f" * 64)
+    assert release.observation_years(key.dataset, "amount", scope="campus", edition=absent) == {"amount": ()}
+    with pytest.raises(ValueError, match="dataset and scope"):
+        release.observation_years(key.dataset, "amount", scope=None)
+    with pytest.raises(ContractError, match=r"Available years: \{'amount': \(2024,\)\}"):
+        release.observations(key.dataset, "amount", scope="campus", school_year=2025)
+    with pytest.raises(ContractError, match="share a latest school year"):
+        release.observations(key.dataset, "amount", "campus_name", scope="campus")
+    table = release.observations(key.dataset, "amount", scope="campus")
+    assert calls == []
+    assert table.edition == key
+    assert table.measurement_period == period
+    frame = table.query("campus_number == @id", params={"id": "004"}).to_df()
+    assert frame["amount"].tolist() == [5]
+    assert frame.attrs["teadata"]["measurement_period"] == period.to_dict()
+    assert frame.attrs["teadata"]["manifest_sha256"] == release.manifest_sha256
+    assert "entity_manifest_sha256" not in frame.attrs["teadata"]
+    assert len(calls) == 1
+
+
+def test_observation_selection_rejects_mixed_years_and_same_year_revisions(tmp_path, monkeypatch):
+    from teadata.release import DataRelease
+
+    fixture = make_edition_fixture(tmp_path, families=("student",))
+    release = DataRelease(fixture["root"], offline=True)
+    key, _, _ = fixture["leaves"]["student"]
+    revision = replace(key, revision_sha256="f" * 64)
+    choices = [(release, key, {"amount": 2024, "campus_name": 2024}),
+               (release, revision, {"amount": 2025, "campus_name": 2024})]
+    monkeypatch.setattr(release, "_observation_year_options", lambda *args: iter(choices))
+    with pytest.raises(ContractError, match="share a latest school year"):
+        release.observations(key.dataset, "amount", "campus_name", scope="campus")
+    choices[1][2]["amount"] = 2024
+    with pytest.raises(ContractError, match=revision.revision_sha256):
+        release.observations(key.dataset, "amount", "campus_name", scope="campus")
+    choices[1][2].pop("campus_name")
+    choices[0][2].pop("amount")
+    with pytest.raises(ContractError, match="unavailable together"):
+        release.observations(key.dataset, "amount", "campus_name", scope="campus")
 
 
 def test_v4_migration_preserves_detached_public_projections_and_every_identity(edition_index_fixture):
@@ -1903,10 +1972,17 @@ def test_v4_offline_remote_root_and_selected_children_share_existing_cache(editi
     release = DataRelease("https://example.invalid/index.json", expected_sha256=pin)
     assert len(list(release.catalog.editions(include_metadata=False))) == 2 and len(requests) == 1
     key, _, _ = fixture["leaves"]["student"]
+    assert release.observation_years(key.dataset, "unknown_field", scope="campus") == {"unknown_field": ()}
+    assert len(requests) == 2  # The edition field index suffices without its crosswalk.
+    assert release.observation_years(key.dataset, "amount", scope="campus") == {"amount": ()}
+    assert len(requests) == 3
     assert len(list(release.catalog.variables(edition=key))) == 3 and len(requests) == 3
     offline = DataRelease(release.source, expected_sha256=pin, offline=True)
+    assert offline.observation_years(key.dataset, "amount", scope="campus") == {"amount": ()}
     assert len(list(offline.catalog.variables(edition=key))) == 3 and len(requests) == 3
     staff, _, _ = fixture["leaves"]["staff"]
+    with pytest.raises(ContractError, match="not cached"):
+        offline.observation_years(staff.dataset, "amount", scope="campus")
     with pytest.raises(ContractError, match="not cached"):
         list(offline.catalog.variables(edition=staff))
     release.path.unlink()

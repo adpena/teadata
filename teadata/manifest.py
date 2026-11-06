@@ -1224,6 +1224,22 @@ class DatasetCatalog:
         resolved = self._resolve_field(field, scope)
         return self._field_metadata(*resolved) if resolved is not None else None
 
+    def _field_periods(self, edition: EditionKey, fields: tuple[str, ...]) -> dict[str, DataPeriod]:
+        """Read selected periods from the same validated headers as field_metadata."""
+        self._require_index()
+        identifier = edition.identity
+        if self._edition_keys.get(identifier) != edition:
+            raise ContractError("Exact edition selection is missing")
+        catalog = self._edition_view(identifier) if getattr(self, "_v4", False) else self
+        selected = [field for field in fields if (identifier, field) in catalog._field_bindings]
+        if not selected:
+            return {}
+        catalog._ensure_edition(identifier)
+        return {
+            field: DataPeriod.from_dict(catalog._field_headers[identifier, field]["period"])
+            for field in selected
+        }
+
     def metric_metadata(self, metric: str, *, scope: str = "campus") -> dict[str, Any]:
         """Describe the exact canonical binding, including metric period overrides."""
         return self._field_metadata(*self._resolve_metric(metric, scope))
