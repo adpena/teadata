@@ -28,6 +28,8 @@ FAMILY = "college_readiness_components"
 METRIC = "ccmr_annual_graduates_dual_credit_all_students_rate"
 PERIOD = {"kind": "school_year", "start_year": 2023, "end_year": 2024}
 STAAR_METRIC = "staar_performance_reading_language_arts_grade_3_all_students_percent_at_meets_gl_standard_or_above"
+ALL_GRADES_METRIC = "staar_performance_all_subjects_all_students_percent_at_meets_gl_standard_or_above"
+EOC_METRIC = "staar_performance_eoc_algebra_i_all_students_percent_at_meets_gl_standard_or_above"
 
 
 @pytest.fixture
@@ -345,12 +347,14 @@ def test_packaged_staar_comparison_metadata_discovers_exact_scope_neutral_rates(
     _reviewed_staar_source.cache_clear()
 
 
-@pytest.mark.parametrize(("year", "family", "metric"), [
-    (2025, "staar_all_grades", "staar_performance_all_subjects_all_students_percent_at_meets_gl_standard_or_above"),
-    (2026, "staar_all_grades", "staar_performance_all_subjects_all_students_percent_at_meets_gl_standard_or_above"),
-    (2026, "staar_end_of_course", "staar_performance_eoc_algebra_i_all_students_percent_at_meets_gl_standard_or_above"),
+@pytest.mark.parametrize(("year", "family", "metric", "source_field"), [
+    (2025, "staar_all_grades", ALL_GRADES_METRIC, ALL_GRADES_METRIC),
+    (2026, "staar_all_grades", ALL_GRADES_METRIC, ALL_GRADES_METRIC),
+    (2024, "staar_end_of_course", EOC_METRIC, "domain_1a_meets_grade_level_std_all_students_eoc_algebra_i_rate"),
+    (2025, "staar_end_of_course", EOC_METRIC, "eoc_algebra_i_all_students_percent_at_meets_gl_standard_or_above"),
+    (2026, "staar_end_of_course", EOC_METRIC, EOC_METRIC),
 ])
-def test_packaged_aggregate_staar_contract_uses_exact_scope_and_source(year, family, metric):
+def test_packaged_aggregate_staar_contract_uses_exact_scope_and_source(year, family, metric, source_field):
     cfg = load_config()
     release = SimpleNamespace(catalog=SimpleNamespace(metadata=lambda name, *, edition:
         cfg.resolve_dataset(name, year, exact=True, reader_profile="source").metadata))
@@ -364,16 +368,16 @@ def test_packaged_aggregate_staar_contract_uses_exact_scope_and_source(year, fam
         metrics = contract.metadata.metrics
         assert len(metrics) == 210 and all("sat_act" not in name for name in metrics)
         assert names is None or names == set(metrics)
-        assert metrics[metric].field == f"{scope}_{year}_{metric}"
+        assert metrics[metric].field == f"{scope}_{year}_{source_field}"
         assert metrics[metric].period.end_year == year
         assert contract.value_policy.tokens["-1"].status.value == "suppressed"
+        if year < 2026 and family == "staar_end_of_course":
+            legend, = (ref for ref in contract.metadata.references if ref.reference_id == contract.value_policy.reference_id)
+            assert legend.url == f"https://rptsvr1.tea.texas.gov/perfreport/tapr/{year}/masking.html"
         with pytest.raises(ContractError, match="reviewed publisher revision"):
             staar_rate_contract(release, replace(key, revision_sha256="a" * 64))
         with pytest.raises(ContractError, match="No reviewed STAAR comparison"):
-            staar_rate_contract(release, replace(key, edition="2024"))
-        if family == "staar_end_of_course":
-            with pytest.raises(ContractError, match="No reviewed STAAR comparison"):
-                staar_rate_contract(release, replace(key, edition="2025"))
+            staar_rate_contract(release, replace(key, edition="2023" if family == "staar_end_of_course" else "2024"))
         names = set(metrics)
 
 

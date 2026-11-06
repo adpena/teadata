@@ -30,20 +30,21 @@ measure, population definition, and measurement period match.
 
 ### Historical archive routes
 
-Use 2012–13 as the first school year to check for the historical backfill.
-Coverage varies by source and geography. The publisher routes below identify
-what can be requested. Consult the selected release's catalog for the exact
-editions, fields, and geographies available to query.
+The historical backfill targets all 14 school years from 2012–13 through
+2025–26. Track each source family and geography separately for every year.
+An archive listing establishes publisher availability. Retained files,
+field qualification, and query availability are separate stages.
+Consult the selected release's catalog for queryable editions and fields.
 
-| Source | Evidence at the historical starting years | Published scopes and limits |
+| Source | Publisher archive and example editions | Published scopes and limits |
 | --- | --- | --- |
-| TAPR | Advanced downloads for [2012–13](https://rptsvr1.tea.texas.gov/perfreport/tapr/2013/download.html) and [2013–14](https://rptsvr1.tea.texas.gov/perfreport/tapr/2014/download.html) | Statewide district and campus files, ESC regions, and direct Texas tables where offered. Use the year-specific data element reference and masking instructions linked by TEA. |
+| TAPR | [TEA's TAPR archive](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/texas-academic-performance-reports) lists every edition from 2012–13 through 2024–25 and schedules the formal 2025–26 edition for December 2026. | Prefer statewide district and campus files, ESC regions, and direct Texas tables where offered. Use each edition's data element reference and masking instructions. Keep rolling TPRS observations separate from the formal TAPR edition. |
 | Historical TPRS | [TPRS archive](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/texas-performance-reporting-system-archives) lists editions starting in 2012–13 | District, campus, region, and Texas reports. Check domain and bulk availability for each edition independently of TAPR. |
 | PEIMS standard reports | [TEA product index](https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports) lists years separately for each product. See the [primary-disability series](data-releases.md#peims-primary-disability-counts) for one historical example. | Enrollment and programs have campus, district, and Texas products. The primary-disability series has district, county, region, and Texas scope. |
 | Accountability | [2013](https://rptsvr1.tea.texas.gov/perfreport/account/2013/) and [2014](https://rptsvr1.tea.texas.gov/perfreport/account/2014/) final ratings, manuals, and data download links | District and campus ratings, with separate region and Texas summaries. Calendar-year systems and rating scales can change. |
 | PEIMS financial actuals and budgets | District and charter [single-file archives](https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads) include both years. The [financial reports index](https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-financial-standard-reports) also lists both years of campus actuals. | District and charter account files are separate populations. The historical reports organized by campus require a district selection. Retain direct Texas figures from their own published reports. See [financial sources](financial-sources.md). |
 | Summary of Finances | Verified [School District State Aid Reports](https://tealprod.tea.state.tx.us/Tea.FspReports.Web/) district and charter downloads for 2012–13 and 2013–14 | These summaries are direct statewide totals for separate sectors. TEA also offers individual district and charter reports. Keep the run-list date, workbook update date, run, status, and any row-level run IDs separately. |
-| Geography | TEA's historical campus locator layers include [2012–13](https://schoolsdata2-tea-texas.opendata.arcgis.com/datasets/school2012) and [2013–14](https://schoolsdata2-tea-texas.opendata.arcgis.com/datasets/school2013) | Campus points and district polygons have separate vintages. Establish historical polygon coverage independently and associate each geometry with its own source period. |
+| Geography | [TEA's ArcGIS archive](https://schoolsdata2-db440-tea-texas.opendata.arcgis.com/) and historical locator layers for [2012–13](https://schoolsdata2-tea-texas.opendata.arcgis.com/datasets/school2012) and [2013–14](https://schoolsdata2-tea-texas.opendata.arcgis.com/datasets/school2013) | Campus points and district polygons have separate vintages. Preserve records with absent coordinates and investigate duplicate campus identifiers before using points for joins. Establish historical polygon coverage independently. |
 | Discipline and transfers | [Discipline summary archive](https://tea.texas.gov/data-reports/student-data/discipline-data-products/discipline-reports) and [district transfer reports](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/district_transfer_report.html) reach the starting years | Discipline offers statewide district, campus, and Texas downloads. TEA documents [statewide campus transfer CSVs](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/about_transfer_reports.html) beginning in 2020–21. |
 
 For TAPR, use the master reference for file codes, the report dictionary to

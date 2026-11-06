@@ -26,7 +26,8 @@ _TESTED_GRADE_COUNTS = dict(zip(
 ))
 FAMILIES = frozenset(_TESTED_GRADE_COUNTS)
 _AGGREGATE_COUNTS = {
-    "2025": {"staar_all_grades": 210},
+    "2024": {"staar_end_of_course": 210},
+    "2025": {"staar_all_grades": 210, "staar_end_of_course": 210},
     "2026": {"staar_all_grades": 210, "staar_end_of_course": 210},
 }
 _AGGREGATE_FAMILIES = frozenset(family for counts in _AGGREGATE_COUNTS.values() for family in counts)
