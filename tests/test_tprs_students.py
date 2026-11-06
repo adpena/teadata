@@ -107,6 +107,45 @@ def test_packaged_student_contract_is_explicit_and_source_only(grid):
                    for field in table["fields"])
 
 
+def test_reviewed_grid_reuses_exact_config_and_revalidates_resources(monkeypatch, tmp_path):
+    config_path = tmp_path / "teadata_sources.yaml"
+    grid_path = tmp_path / students.RESOURCE
+    config_bytes = students._PACKAGED_CONFIG_PATH.read_bytes()
+    grid_bytes = (ROOT / "teadata" / students.RESOURCE).read_bytes()
+    config_path.write_bytes(config_bytes)
+    grid_path.parent.mkdir()
+    grid_path.write_bytes(grid_bytes)
+    monkeypatch.setattr(students, "_PACKAGED_CONFIG_PATH", config_path)
+    monkeypatch.setattr(students, "files", lambda _package: tmp_path)
+    load = students._load_packaged_config
+    parsed_configs = []
+
+    def count_parse(raw, path):
+        parsed_configs.append(raw)
+        return load(raw, path)
+
+    monkeypatch.setattr(students, "_load_packaged_config", count_parse)
+    first = students.definition()
+    first["rows"].clear()
+    assert students.definition()["rows"]
+    assert parsed_configs == [config_bytes]
+
+    grid_path.write_bytes(grid_bytes + b"\n")
+    with pytest.raises(ContractError, match="Reviewed student-report grid changed"):
+        students.definition()
+    assert parsed_configs == [config_bytes]
+    grid_path.write_bytes(grid_bytes)
+
+    changed_config = config_bytes.replace(sha256(grid_bytes).hexdigest().encode(), b"a" * 64)
+    assert changed_config != config_bytes
+    config_path.write_bytes(changed_config)
+    with pytest.raises(ContractError, match="Reviewed student-report grid changed"):
+        students.definition()
+    config_path.write_bytes(config_bytes)
+    assert students.definition()["rows"]
+    assert parsed_configs == [config_bytes, changed_config, config_bytes]
+
+
 @pytest.mark.parametrize("scope,identifier", [("state", "S"), ("district", "001902"), ("campus", "001902001")])
 def test_all_raw_current_cells_and_lagged_period_remain_visible(grid, policy, scope, identifier):
     report = parse(grid, scope=scope, identifier=identifier)

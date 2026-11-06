@@ -36,6 +36,7 @@ if TYPE_CHECKING:
     from .tapr import TaprSourceRequest, TaprSourceTable
 
 YEAR_MIN_DEFAULT = 2009
+_PACKAGED_CONFIG_PATH = Path(__file__).with_name("teadata_sources.yaml")
 
 # ------------------------------
 # Loading utilities (YAML/TOML)
@@ -1528,14 +1529,20 @@ def load_config(path: str | Path | None = None) -> Config:
     This never selects or fetches a data release. Source files need not exist
     for schema/crosswalk discovery; rows are read only by load_df.
     """
-    p = Path(path) if path is not None else Path(__file__).with_name("teadata_sources.yaml")
+    p = Path(path) if path is not None else _PACKAGED_CONFIG_PATH
     if not p.exists():
         raise FileNotFoundError(p)
     if path is None:
         # LibYAML accelerates the fixed packaged dialect. Explicit input paths
         # and captured bytes retain the public Python SafeLoader dialect.
-        return _config_from_document(_load_yaml(p.read_text(encoding="utf-8"), compiled=True), p)
+        return _load_packaged_config(p.read_bytes(), p)
     return load_config_bytes(p.read_bytes(), path=p)
+
+
+def _load_packaged_config(raw: bytes, path: Path) -> Config:
+    # Match read_text's universal newline handling for the captured YAML bytes.
+    text = raw.decode("utf-8").replace("\r\n", "\n").replace("\r", "\n")
+    return _config_from_document(_load_yaml(text, compiled=True), path)
 
 
 def load_config_bytes(raw: bytes, *, path: str | Path) -> Config:

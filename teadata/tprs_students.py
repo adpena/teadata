@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, replace
+from functools import lru_cache
 import gzip
 from hashlib import sha256
 from importlib.resources import files
@@ -33,7 +34,7 @@ from .dataset_metadata import STATEWIDE_SINGLETON_GRAIN, ArtifactRef, DataPeriod
 from .manifest import BuildRecorder, ContractError, canonical_json
 from .native_witnesses import _Rows
 from .provenance import ProvenanceStore
-from .teadata_config import load_config, load_config_bytes
+from .teadata_config import _PACKAGED_CONFIG_PATH, _load_packaged_config, load_config, load_config_bytes
 from .values import Measurement, ValuePolicy, ValueStatus, measure
 
 if TYPE_CHECKING:
@@ -52,12 +53,21 @@ _COUNT = re.compile(r"(?:0|[1-9][0-9]*|[1-9][0-9]{0,2}(?:,[0-9]{3})+)")
 _PERCENT = re.compile(r"(?:0|[1-9][0-9]*)(?:\.[0-9])?%")
 
 
+@lru_cache(maxsize=1)
+def _reviewed_grid_sha256(config_bytes: bytes, config_path: Path) -> str | None:
+    source = _load_packaged_config(config_bytes, config_path).resolve_dataset(
+        DATASET, EDITION, reader_profile="source", exact=True
+    )
+    reference, = [ref for ref in source.metadata.references if ref.reference_id == "report_grid"]
+    return reference.reviewed_sha256
+
+
 def definition() -> dict[str, Any]:
     """Return a detached copy of the sole reviewed field/layout authority."""
     raw = files("teadata").joinpath(RESOURCE).read_bytes()
-    source = load_config().resolve_dataset(DATASET, EDITION, reader_profile="source", exact=True)
-    reference, = [ref for ref in source.metadata.references if ref.reference_id == "report_grid"]
-    _need(sha256(raw).hexdigest() == reference.reviewed_sha256, "Reviewed student-report grid changed")
+    config_path = _PACKAGED_CONFIG_PATH
+    reviewed = _reviewed_grid_sha256(config_path.read_bytes(), config_path)
+    _need(sha256(raw).hexdigest() == reviewed, "Reviewed student-report grid changed")
     return json.loads(raw, object_pairs_hook=_unique_object)
 
 
