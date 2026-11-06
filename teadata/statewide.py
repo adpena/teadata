@@ -19,7 +19,7 @@ from .manifest import ContractError, canonical_json
 from .peims_courses import DATASET as COURSES, course_key_columns
 from .peims_leaves import PRIMARY_DISABILITY, SCOPES_BY_DATASET, _key_columns
 from .release import _student_attachments
-from .staar_comparison import FAMILIES as STAAR_FAMILIES, staar_rate_contract
+from .staar_comparison import staar_rate_contract, supports_staar_rates
 from .tapr import tapr_source_identifiers
 from .teadata_config import load_config
 from . import tprs_students as students
@@ -342,7 +342,7 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
     state_metadata = catalog.metadata(statewide.dataset, edition=statewide)
     raw_policy = None
     left_student = right_student = None
-    staar = local.table in STAAR_FAMILIES and local.table == statewide.table
+    staar = supports_staar_rates(local.table, local.edition) and local.table == statewide.table
     if staar:
         if local.grain != f"one row per {key_column}" or statewide.grain != STATEWIDE_SINGLETON_GRAIN or dimensions:
             raise ContractError("STAAR comparison requires the reviewed local grain and statewide singleton")
@@ -417,7 +417,7 @@ def compare_statewide(items: Sequence[object], *, release: DataRelease, local: E
     entity_type = Campus if local.scope == "campus" else District
     if not regional and any(not isinstance(item, entity_type) for item in items):
         raise ContractError("Query entities must match the selected local edition scope")
-    if regional and (local.table not in STAAR_FAMILIES
+    if regional and (not supports_staar_rates(local.table, local.edition)
                      or any(type(item) is not str or item not in _REGION_CODES for item in items)):
         raise ContractError("Region comparisons require literal education service center codes 01 through 20")
     dimensions = {} if dimensions is None else dimensions

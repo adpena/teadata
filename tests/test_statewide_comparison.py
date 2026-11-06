@@ -345,6 +345,34 @@ def test_packaged_staar_comparison_metadata_discovers_exact_scope_neutral_rates(
     _reviewed_staar_source.cache_clear()
 
 
+@pytest.mark.parametrize(("family", "metric"), [
+    ("staar_all_grades", "staar_performance_all_subjects_all_students_percent_at_meets_gl_standard_or_above"),
+    ("staar_end_of_course", "staar_performance_eoc_algebra_i_all_students_percent_at_meets_gl_standard_or_above"),
+])
+def test_packaged_aggregate_staar_contract_uses_exact_2026_scope_and_source(family, metric):
+    cfg = load_config()
+    release = SimpleNamespace(catalog=SimpleNamespace(metadata=lambda name, *, edition:
+        cfg.resolve_dataset(name, 2026, exact=True, reader_profile="source").metadata))
+    names = None
+    for scope in ("state", "district", "campus", "region"):
+        dataset = f"{scope}_tapr_{family}"
+        source, = cfg.tapr_source_requests(dataset, 2026)
+        key = EditionKey(dataset, "2026", EditionKey.source_revision((source.mapping["input_sha256"],)),
+                         scope, family, "one statewide observation" if scope == "state" else f"one row per {scope}_number")
+        contract = staar_rate_contract(release, key)
+        metrics = contract.metadata.metrics
+        assert len(metrics) == 210 and all("sat_act" not in name for name in metrics)
+        assert names is None or names == set(metrics)
+        assert metrics[metric].field == f"{scope}_2026_{metric}"
+        assert metrics[metric].period.end_year == 2026
+        assert contract.value_policy.tokens["-1"].status.value == "suppressed"
+        with pytest.raises(ContractError, match="reviewed publisher revision"):
+            staar_rate_contract(release, replace(key, revision_sha256="a" * 64))
+        with pytest.raises(ContractError, match="No reviewed STAAR comparison"):
+            staar_rate_contract(release, replace(key, edition="2025"))
+        names = set(metrics)
+
+
 @pytest.mark.parametrize("change", ["source_field", "scope_prefix"])
 @pytest.mark.parametrize("comparison_release", [("staar_tested_grade_3", 2024)], indirect=True)
 def test_2024_semantic_alias_requires_exact_source_field_and_scope_heading(comparison_release, monkeypatch, change):

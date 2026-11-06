@@ -19,7 +19,19 @@ if TYPE_CHECKING:
     from .release import DataRelease
 
 
-FAMILIES = frozenset(f"staar_tested_grade_{grade}" for grade in range(3, 9))
+_TESTED_GRADE_COUNTS = dict(zip(
+    (f"staar_tested_grade_{grade}" for grade in range(3, 9)),
+    (84, 84, 126, 84, 84, 168),
+    strict=True,
+))
+FAMILIES = frozenset(_TESTED_GRADE_COUNTS)
+_AGGREGATE_COUNTS = {"staar_all_grades": 210, "staar_end_of_course": 210}
+_AGGREGATE_EDITION = "2026"
+
+
+def supports_staar_rates(family: str, edition: str) -> bool:
+    """Identify the comparison routes with a reviewed rate-only contract."""
+    return family in FAMILIES or (edition == _AGGREGATE_EDITION and family in _AGGREGATE_COUNTS)
 
 
 @dataclass(frozen=True)
@@ -46,26 +58,39 @@ def _unique_object(pairs: list[tuple[str, object]]) -> dict:
 
 @lru_cache(maxsize=1)
 def _bindings() -> dict:
-    path = Path(__file__).with_name("methodologies") / "staar-tested-grade-comparison-bindings.json"
+    return _read_bindings("staar-tested-grade-comparison-bindings.json")
+
+
+@lru_cache(maxsize=1)
+def _aggregate_bindings() -> dict:
+    return _read_bindings("staar-aggregate-comparison-bindings.json", aggregate=True)
+
+
+def _read_bindings(resource: str, *, aggregate: bool = False) -> dict:
+    path = Path(__file__).with_name("methodologies") / resource
     with path.open("rb") as stream:
         body = stream.read(1024 * 1024 + 1)
     if len(body) > 1024 * 1024:
         raise ContractError("STAAR comparison bindings exceed the metadata budget")
-    return _parse_bindings(body)
+    return _parse_bindings(body, aggregate=aggregate)
 
 
-def _parse_bindings(body: bytes) -> dict:
+def _parse_bindings(body: bytes, *, aggregate: bool = False) -> dict:
     document = json.loads(body, object_pairs_hook=_unique_object)
-    if document["schema_version"] != 1 or set(document["editions"]) != {"2024", "2025", "2026"}:
+    expected_editions = {_AGGREGATE_EDITION} if aggregate else {"2024", "2025", "2026"}
+    expected_counts = _AGGREGATE_COUNTS if aggregate else _TESTED_GRADE_COUNTS
+    if document["schema_version"] != 1 or set(document["editions"]) != expected_editions:
         raise ContractError("Unsupported STAAR comparison bindings")
     for year, edition in document["editions"].items():
-        if (set(edition["families"]) != FAMILIES
+        if (set(edition["families"]) != expected_counts.keys()
                 or DataPeriod.from_dict(edition["period"]) != DataPeriod("school_year", int(year) - 1, int(year))):
-            raise ContractError("STAAR comparison bindings require exact tested-grade families and periods")
+            raise ContractError("STAAR comparison bindings require exact families and periods")
         names, codes, fields = [], [], []
-        for family in edition["families"].values():
+        for family_name, family in edition["families"].items():
             if set(family["scopes"]) != {"state", "district", "campus", "region"}:
                 raise ContractError("STAAR comparison bindings require all four publisher scopes")
+            if len(family["rates"]) != expected_counts[family_name]:
+                raise ContractError("STAAR comparison bindings have an incomplete rate family")
             for name, rate in family["rates"].items():
                 if (set(rate) != {"code", "label", "field"}
                         or any(not isinstance(value, str) or not value for value in rate.values())
@@ -74,15 +99,15 @@ def _parse_bindings(body: bytes) -> dict:
                 names.append(name)
                 codes.append(rate["code"])
                 fields.append(rate["field"])
-        if (len(names) != 630 or len(set(names)) != 630 or len(set(codes)) != 630
-                or len(set(fields)) != 630):
-            raise ContractError("STAAR comparison requires 630 unique reviewed rate fields and codes per edition")
+        if not len(names) == len(set(names)) == len(set(codes)) == len(set(fields)):
+            raise ContractError("STAAR comparison requires unique reviewed rate fields and codes per edition")
     return document
 
-@lru_cache(maxsize=72)
+@lru_cache(maxsize=80)
 def _source(scope: str, family: str, edition: str) -> tuple[str, str, dict, dict]:
     try:
-        reviewed = _bindings()["editions"][edition]
+        document = _aggregate_bindings() if family in _AGGREGATE_COUNTS else _bindings()
+        reviewed = document["editions"][edition]
         family_binding = reviewed["families"][family]
         pinned = family_binding["scopes"][scope]
     except KeyError as error:
@@ -131,16 +156,19 @@ def staar_rate_contract(release: DataRelease, edition: EditionKey) -> StaarRateC
     period = DataPeriod.from_dict(reviewed["period"])
     metrics = {name: MetricDefinition(f"{key.scope}_{key.edition}_{rate['field']}", period, "percent")
                for name, rate in family["rates"].items()}
+    aggregate = key.table in _AGGREGATE_COUNTS
+    kind = "aggregate" if aggregate else "tested-grade"
     references = tuple(ReferenceDocument.from_dict({
         "reference_id": "staar_rate_legend" if index == 0 else f"staar_rate_reference_{index}",
         "role": "masking_methodology" if index == 0 else "source_notes",
-        "title": f"TEA {key.edition} tested-grade rate interpretation evidence",
+        "title": f"TEA {key.edition} {kind} rate interpretation evidence",
         "url": witness["url"], "status": "available", "reviewed_sha256": witness["sha256"],
         "provenance_ids": [witness["provenance_id"]],
     }) for index, witness in enumerate(reviewed["methodology"]))
-    policy = ValuePolicy(f"staar_tested_grade_{key.edition}_published_rates",
+    policy = ValuePolicy(f"staar_{kind.replace('-', '_')}_{key.edition}_published_rates",
                          {token: TokenRule(ValueStatus(rule["status"]), rule["reason"])
                           for token, rule in reviewed["rate_tokens"].items()}, reference_id="staar_rate_legend")
+    document = _aggregate_bindings() if aggregate else _bindings()
     metadata = replace(metadata, metrics=metrics, references=(*metadata.references, *references),
-                       notes=" ".join((metadata.notes or "", *_bindings()["notes"], *reviewed.get("notes", []))).strip())
+                       notes=" ".join((metadata.notes or "", *document["notes"], *reviewed.get("notes", []))).strip())
     return StaarRateContract(revision, mapping, metadata, policy)

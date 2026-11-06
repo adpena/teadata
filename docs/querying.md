@@ -258,6 +258,17 @@ The raw source catalog retains numerator and denominator
 fields alongside these rates. A separately published observed rate can be
 compared when its underlying counts are masked.
 
+For 2025–26, the same interface also supports 210 published rates each for
+`staar_all_grades` and `staar_end_of_course`. Select the local and direct
+state editions from a release that contains both scopes. For example, use
+`staar_performance_all_subjects_all_students_percent_at_meets_gl_standard_or_above`
+with the All Grades editions. These bindings cover the named report groups
+within the STAAR accountability subset. SAT/ACT and the all-tested reports
+are separate populations. The published
+[All Grades (v0.0.133)](https://github.com/adpena/teadata/releases/tag/v0.0.133)
+and [End-of-Course (v0.0.132)](https://github.com/adpena/teadata/releases/tag/v0.0.132)
+manifests each contain all four 2025–26 scopes.
+
 Education service centers use their literal two-digit identifiers. A regional
 comparison uses the same interface with a query of region codes and a bundle
 containing the regional and statewide editions.
