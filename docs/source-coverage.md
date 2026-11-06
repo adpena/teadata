@@ -20,6 +20,14 @@ This table describes the [v0.0.128 entity release](https://github.com/adpena/tea
 
 A configured edition means the [source configuration](../teadata/teadata_sources.yaml) defines a reader for that version. Loading this entity release supplies the periods in the third column. The TAPR profile editions `2024` and `2025` refer to school years 2023–24 and 2024–25. Some individual fields measure a different period than the report. Use field metadata when the measurement year matters. Fiscal years, calendar years, and dated reference snapshots keep their own period types.
 
+## Statewide district and campus sources
+
+When TEA publishes statewide district and campus products, each is authoritative
+at its own grain. Verify coverage separately against each product's reporting
+roster and exact edition, and report any gaps by scope. Use a direct Texas
+report for [statewide comparisons](querying.md#compare-a-published-measure-with-texas) when the
+measure, population definition, and measurement period match.
+
 ## Published 2026 entity snapshot
 
 The explicit [v0.0.136 entity snapshot](data-releases.md#2026-entity-snapshot-and-tprs-student-data)
