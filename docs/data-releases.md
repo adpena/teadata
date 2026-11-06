@@ -77,6 +77,22 @@ as typed or longitudinal measures. The supplements use their own data-build
 identities. The default engine continues to use its separately configured
 snapshot.
 
+### 2026 entity snapshot and TPRS student data
+
+Select the [v0.0.136 release assets](https://github.com/adpena/teadata/releases/tag/v0.0.136)
+with `DataRelease(manifest_url, expected_sha256=manifest_sha256)`. The entity
+manifest pins the native TPRS attachment. Select the attachment directly
+for source-table work that does not need the entity snapshot.
+
+| Manifest | Manifest SHA-256 |
+| --- | --- |
+| [`release.json`](https://github.com/adpena/teadata/releases/download/v0.0.136/release.json) | `5fcf6d2a5fe7647fb2da75258fd603237446dbe4bc56f0485cf8f45e906321ec` |
+| [`tprs-students-2026.release.json`](https://github.com/adpena/teadata/releases/download/v0.0.136/tprs-students-2026.release.json) | `373041dfb0eb994ccde4a88f1e7e630e7b395bf9f7a51199655d843788a2b5f6` |
+
+See [source coverage](source-coverage.md#published-2026-entity-snapshot) for
+the exact scope and periods, and [school-year queries](querying.md#school-years-and-source-editions)
+for examples using the attachment through the entity release.
+
 ### STAAR editions in v0.0.133
 
 The [v0.0.133 assets](https://github.com/adpena/teadata/releases/tag/v0.0.133)
