@@ -13,8 +13,8 @@ from teadata.provenance import ProvenanceStore  # noqa: E402
 from teadata.teadata_config import load_config  # noqa: E402
 
 
-@pytest.fixture
-def catalog():
+@pytest.fixture(scope="session")
+def _catalog_document():
     cfg = load_config(ROOT / "teadata" / "teadata_sources.yaml")
     datasets = {}
     records = {}
@@ -47,4 +47,9 @@ def catalog():
         processor="2" * 64,
         records=records,
         metric_bindings=cfg.resolved_metric_bindings(),
-    )
+    ).to_dict()
+
+
+@pytest.fixture
+def catalog(_catalog_document):
+    return DatasetCatalog(_catalog_document)
