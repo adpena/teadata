@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import csv
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from decimal import Decimal
@@ -44,6 +44,7 @@ class SourceTable:
     edition: EditionKey
     _fields: tuple[str, ...] | None = None
     _predicate: Expression | None = None
+    _queries: tuple[Callable[[pa.Schema], Expression], ...] = ()
 
     def select(self, *fields: str) -> SourceTable:
         """Select distinct public fields and retain their key and source columns."""
@@ -61,9 +62,9 @@ class SourceTable:
 
     def query(self, expression: str, *, params: Mapping[str, object] | None = None) -> SourceTable:
         """Add a bounded query string with explicit parameters to this lazy scan."""
-        from .source_predicates import compile_predicate
+        from .source_predicates import prepare_predicate
 
-        return self.where(compile_predicate(expression, params))
+        return replace(self, _queries=(*self._queries, prepare_predicate(expression, params)))
 
     @overload
     def __getitem__(self, key: str) -> Expression: ...
@@ -82,7 +83,8 @@ class SourceTable:
 
     def _prepare(self, *, restore_original_headers: bool = False) -> _TableExport:
         return prepare_export(self.release, self.edition, restore_original_headers=restore_original_headers,
-                              selected_fields=self._fields, predicate=self._predicate, include_support=True)
+                              selected_fields=self._fields, predicate=self._predicate, queries=self._queries,
+                              include_support=True)
 
     def to_arrow(self) -> pa.Table:
         """Materialize the filtered projection with its keys and source support."""
@@ -219,6 +221,7 @@ class _TableExport:
 
 def prepare_export(release: DataRelease, edition: EditionKey, *, restore_original_headers: bool,
                    selected_fields: tuple[str, ...] | None = None, predicate: Expression | None = None,
+                   queries: tuple[Callable[[pa.Schema], Expression], ...] = (),
                    include_support: bool = False) -> _TableExport:
     import pyarrow as pa
     from .tapr import TAPR_SOURCE_KEYS, qualified_tapr_family
@@ -248,6 +251,9 @@ def prepare_export(release: DataRelease, edition: EditionKey, *, restore_origina
         else:
             columns = fields
     native = release.analytical_dataset(artifact.identity)
+    for query in queries:
+        expression = query(native.schema)
+        predicate = expression if predicate is None else predicate & expression
     scanner = native.scanner(columns=list(columns), filter=predicate, batch_size=256, use_threads=False)
     rows = (columns,)
     if restore_original_headers:

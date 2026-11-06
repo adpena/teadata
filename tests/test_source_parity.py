@@ -1,6 +1,7 @@
 """Genuine local source/preparation/leaf receipts; no publisher science claims."""
 import csv
 from dataclasses import replace
+from decimal import Decimal, Inexact, localcontext
 from hashlib import sha256
 from io import BytesIO, StringIO
 import sys
@@ -220,6 +221,34 @@ def test_source_query_string_uses_the_same_native_filter(tmp_path):
     assert query.to_arrow().equals(inline.to_arrow())
     assert table.query("district_number in @ids and not enrollment == '@literal'",
                        params={'ids': ['001001', '001002']}).select('membership').to_arrow().num_rows == 2
+
+
+def test_query_decimals_bind_to_the_physical_column_type():
+    from pyarrow import dataset
+
+    from teadata.source_predicates import prepare_predicate
+
+    values = [Decimal('0.34'), Decimal('0.35'), Decimal('0.36')]
+    native = dataset.dataset(pa.table({'fte': pa.array(values, type=pa.decimal128(16, 2)),
+                                       'rate': [float(value) for value in values], 'count': [1, 2, 3]}))
+
+    def select(expression, params=None):
+        return native.to_table(filter=prepare_predicate(expression, params)(native.schema))['fte'].to_pylist()
+
+    assert select('fte == 0.35') == select('rate == 0.35') == [values[1]]
+    assert select('fte > 0.35') == [values[2]]
+    assert select('fte in [0.34, 0.36]') == [values[0], values[2]]
+    with localcontext() as context:
+        context.traps[Inexact] = True
+        assert select('fte in [1, .35, 0.351]') == [values[1]]
+    assert select('fte > -(.35)') == values
+    assert select('count in [1.0, 2.1]') == [values[0]]
+    assert select('count > 1e-100') == values
+    assert select('fte == @value', {'value': values[1]}) == [values[1]]
+    with pytest.raises(ValueError, match='Decimal parameter'):
+        select('fte == @value', {'value': 0.35})
+    with pytest.raises(ValueError, match='explicit cast'):
+        select('fte == rate')
 
 
 @pytest.mark.parametrize('expression', [

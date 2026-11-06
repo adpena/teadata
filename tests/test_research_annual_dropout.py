@@ -1,4 +1,5 @@
 from copy import deepcopy
+from hashlib import sha256
 from pathlib import Path
 
 import pyarrow as pa
@@ -9,12 +10,32 @@ from teadata.manifest import ContractError
 from teadata.provenance import ProvenanceStore, validate_record_graph, validate_reference_records
 from teadata.research_annual_dropout import (
     DATASET, KEYS, PERIOD, YEAR, _report_input, _report_table, _validate_keys, _validate_triples,
+    materialize_research_annual_dropout,
 )
 from teadata.teadata_config import load_config
 
 
 ROOT = Path(__file__).resolve().parents[1]
 TRIPLE = ("denominator", "numerator", "rate")
+
+
+def test_annual_dropout_accepts_a_relocated_contract(tmp_path, monkeypatch):
+    packaged = ROOT / "teadata"
+    source_config = (packaged / "teadata_sources.yaml").read_bytes()
+    config = tmp_path / "teadata_sources.yaml"
+    config.write_bytes(source_config)
+    schema = Path("schemas/research--2025--annual-dropout-crosswalk.json")
+    (tmp_path / schema).parent.mkdir()
+    (tmp_path / schema).write_bytes((packaged / schema).read_bytes())
+    store = ProvenanceStore(tmp_path / "provenance")
+
+    def missing_retained_sources(_):
+        raise FileNotFoundError("retained sources are required")
+
+    monkeypatch.setattr(store, "verify_record_closure", missing_retained_sources)
+    with pytest.raises(FileNotFoundError, match="retained sources are required"):
+        materialize_research_annual_dropout(store, config=config, config_sha256=sha256(source_config).hexdigest(),
+                                            scopes=["state"], output=tmp_path / "bundle")
 
 
 def test_annual_dropout_opt_in_preserves_reviewed_raw_scope_contracts():

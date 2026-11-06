@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from hashlib import sha256
 from importlib.metadata import version
 from pathlib import Path
@@ -315,7 +316,9 @@ def materialize_research_annual_dropout(store: ProvenanceStore, *, config: Path,
     source = cfg.resolve_dataset(DATASET, YEAR, exact=True, reader_profile="source")
     reviewed = canonical.resolve_dataset(DATASET, YEAR, exact=True, reader_profile="source")
     resource = cfg.column_contract(DATASET, YEAR, reader_profile="source")
-    if (source.to_dict() != reviewed.to_dict() or not cfg.is_source_only(DATASET, YEAR)
+    # The source profile reads only pinned receipts. The configured path is
+    # a placeholder resolved relative to the caller's copy of the contract.
+    if (replace(source, path=reviewed.path) != reviewed or not cfg.is_source_only(DATASET, YEAR)
             or resource is None or resource != canonical.column_contract(DATASET, YEAR, reader_profile="source")
             or source.metadata.period != PERIOD or source.metadata.metrics or source.metadata.value_policy is not None):
         raise ContractError("Annual dropout requires the packaged exact raw source and mapping")

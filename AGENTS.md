@@ -66,6 +66,8 @@ Python 3.14 and 3.15 are required compatibility targets alongside supported earl
 
 ## Landing Review Gate
 
+For consequential data or API changes, use the [Elephant & Goldfish Model](https://github.com/google/elephant-goldfish-model) before implementation. Write a short design in the workspace and give one fresh Goldfish the draft, applicable standard, and only the source files needed to challenge it. Record the decisions, then use the resulting acceptance criteria to choose checks. Keep reviewers serial and reuse matching evidence.
+
 Adversarial review of the final diff is required before landing. Resolve findings and run the applicable checks against the exact revision to be landed. Draft review branches are permitted; a prior review of an earlier revision does not satisfy this gate.
 
 ## Publisher Authority and Source Correctness

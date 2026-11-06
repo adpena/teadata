@@ -137,6 +137,10 @@ because normalized or projected tables cannot reproduce its source layout.
 For typed tables, exports contain public fields. Use `SourceFields.select()`
 to include available raw tokens and statuses for a district or campus.
 
+CSV preserves literal publisher text, including text that spreadsheet apps
+may interpret as formulas. Use the XLSX export to open those values as text
+in a spreadsheet.
+
 An offline check compares every raw cell in explicitly selected complete TAPR,
 PEIMS student Enrollment, program and primary-disability, and district-transfer native leaves
 against retained publisher CSV. It also compares the retained TAPR and transfer
