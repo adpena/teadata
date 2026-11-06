@@ -116,25 +116,39 @@ def _capture_column_schema(path: Path, descriptor: ColumnSchemaRef | EditionMeta
     def signature(state):
         return tuple(getattr(state, key) for key in
                      ("st_dev", "st_ino", "st_mode", "st_uid", "st_size", "st_mtime_ns", "st_ctime_ns"))
+
+    def regular(state):
+        return stat.S_ISREG(state.st_mode) and not (
+            getattr(state, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT)
+
+    nofollow = getattr(os, "O_NOFOLLOW", 0)
     try:
         state = path.stat(follow_symlinks=False)
-        if (not stat.S_ISREG(state.st_mode) or not 0 < descriptor.size_bytes <= COLUMN_SCHEMA_MAX_BYTES
+        if (not regular(state) or not 0 < descriptor.size_bytes <= COLUMN_SCHEMA_MAX_BYTES
                 or state.st_size != descriptor.size_bytes):
             raise ContractError("Column-schema resource must be regular and match its declared bounded size")
         before = signature(state)
-        if cached is not None and cached[:2] == (path, before):
+        if nofollow and cached is not None and cached[:2] == (path, before):
             return cached[2], before
-        fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+        flags = os.O_RDONLY | nofollow | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0)
+        fd = os.open(path, flags)
         with os.fdopen(fd, "rb") as stream:
             opened = os.fstat(stream.fileno())
-            if (not stat.S_ISREG(opened.st_mode) or opened.st_size != descriptor.size_bytes
-                    or signature(opened) != before):
+            opened_stamp = signature(opened)
+            # Windows pathname and descriptor stat expose different identity
+            # fields. Compare their size and mtime, then recheck each separately.
+            matches = (opened_stamp == before if nofollow else
+                       (opened.st_size, opened.st_mtime_ns) == (state.st_size, state.st_mtime_ns))
+            if not regular(opened) or not matches:
                 raise ContractError("Column-schema resource changed before reading")
             raw = stream.read(descriptor.size_bytes + 1)
-            if signature(os.fstat(stream.fileno())) != before:
+            current = os.fstat(stream.fileno())
+            if not regular(current) or signature(current) != opened_stamp:
                 raise ContractError("Column-schema resource changed during reading")
-        if (signature(path.stat(follow_symlinks=False)) != before or len(raw) != descriptor.size_bytes
-                or sha256(raw).hexdigest() != descriptor.sha256):
+            current = path.stat(follow_symlinks=False)
+            if not regular(current) or signature(current) != before:
+                raise ContractError("Column-schema resource changed during reading")
+        if len(raw) != descriptor.size_bytes or sha256(raw).hexdigest() != descriptor.sha256:
             raise ContractError("Column-schema resource checksum, size or identity mismatch")
         return raw, before
     except OSError as error:
@@ -334,7 +348,8 @@ class DataRelease:
     def _column_schema_bytes(self, descriptor: ColumnSchemaRef | EditionMetadataRef) -> bytes:
         path = self._resource_path(descriptor.location, descriptor.sha256, descriptor.size_bytes)
         raw, before = _capture_column_schema(path, descriptor, cached=self._column_schema_data.get(descriptor.sha256))
-        self._column_schema_data[descriptor.sha256] = path, before, raw
+        if getattr(os, "O_NOFOLLOW", 0):
+            self._column_schema_data[descriptor.sha256] = path, before, raw
         return raw
 
     def __getstate__(self) -> dict:

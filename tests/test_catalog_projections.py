@@ -3,14 +3,17 @@
 from copy import deepcopy
 import gzip
 from hashlib import sha256
+import os
 import pickle
 from pathlib import Path
 from dataclasses import replace
 import json
+import stat
 import subprocess
 import sys
 from importlib.metadata import version
 from io import BytesIO
+from types import SimpleNamespace
 from typing import Any
 from urllib.parse import urlparse
 
@@ -1479,6 +1482,8 @@ def test_metadata_destinations_preflight_before_every_resolution_and_write(editi
 
 @pytest.mark.parametrize("boundary", ["selected", "publisher"])
 @pytest.mark.parametrize("entry", ["fifo", "symlink", "directory", "oversize", "replacement_fifo"])
+@pytest.mark.skipif(not all(hasattr(os, name) for name in ("mkfifo", "O_NOFOLLOW", "O_NONBLOCK")),
+                    reason="Requires POSIX FIFO and guarded open capabilities")
 def test_metadata_regular_file_admission_has_a_finite_filesystem_harness(edition_fixture, tmp_path, boundary, entry):
     """A regression to blocking FIFO open fails a bounded child, never hangs pytest."""
     script = r'''
@@ -1546,6 +1551,7 @@ print('bounded metadata rejection PASS')
     assert result.stdout.strip() == "bounded metadata rejection PASS"
 
 
+@pytest.mark.skipif(not hasattr(os, "O_NOFOLLOW"), reason="Metadata memo requires guarded open capabilities")
 def test_metadata_regular_capture_reuses_only_same_file_signature(edition_fixture, monkeypatch):
     from teadata.release import DataRelease
     release = DataRelease(edition_fixture["root"])
@@ -1570,6 +1576,65 @@ def test_metadata_regular_capture_reuses_only_same_file_signature(edition_fixtur
     monkeypatch.setattr(transport.os, "open", count_open)
     assert len(list(release.catalog.variables(edition=key))) == 3
     assert calls == [path]
+
+
+def test_portable_metadata_capture_rechecks_bytes_without_nofollow(edition_fixture, monkeypatch):
+    from teadata.release import DataRelease
+
+    monkeypatch.delattr(os, "O_NOFOLLOW", raising=False)
+    release = DataRelease(edition_fixture["root"])
+    key, _, _ = edition_fixture["leaves"]["student"]
+    assert len(list(release.catalog.variables(edition=key))) == 3
+    assert not release._column_schema_data
+    digest = release.catalog.to_dict()["editions"][key.identity]["column_schema_sha256"]
+    descriptor = next(ref for ref in release.catalog.column_schema_refs() if ref.sha256 == digest)
+    path = release.path.with_name(descriptor.location)
+    before = path.stat()
+    raw = path.read_bytes()
+    path.write_bytes(bytes([raw[0] ^ 1]) + raw[1:])
+    os.utime(path, ns=(before.st_atime_ns, before.st_mtime_ns))
+    with pytest.raises(ContractError, match="resource checksum"):
+        list(release.catalog.variables(edition=key))
+
+
+@pytest.mark.parametrize("entry", ["regular", "path_changed", "handle_changed", "reparse"])
+def test_portable_metadata_capture_checks_path_and_handle_separately(tmp_path, monkeypatch, entry):
+    import teadata.release as transport
+
+    raw = b"{}"
+    path = tmp_path / "columns.json"
+    path.write_bytes(raw)
+    descriptor = ColumnSchemaRef(sha256(raw).hexdigest(), len(raw), path.name)
+    actual = path.stat()
+    values = {name: getattr(actual, name) for name in
+              ("st_dev", "st_ino", "st_mode", "st_uid", "st_size", "st_mtime_ns", "st_ctime_ns")}
+    before = SimpleNamespace(**values, st_file_attributes=0)
+    opened = SimpleNamespace(**(values | {"st_ino": actual.st_ino + 1, "st_ctime_ns": actual.st_ctime_ns + 1}))
+    after = SimpleNamespace(**vars(before))
+    handle_after = SimpleNamespace(**vars(opened))
+    if entry == "path_changed":
+        after.st_ino += 1
+    if entry == "handle_changed":
+        handle_after.st_ctime_ns += 1
+    if entry == "reparse":
+        before.st_file_attributes = stat.FILE_ATTRIBUTE_REPARSE_POINT
+
+    path_stats = iter((before, after))
+    handle_stats = iter((opened, handle_after))
+    original_stat = type(path).stat
+    file_api = SimpleNamespace(O_RDONLY=os.O_RDONLY, O_BINARY=getattr(os, "O_BINARY", 0),
+                               open=os.open, fdopen=os.fdopen, fstat=lambda fd: next(handle_stats))
+    monkeypatch.setattr(transport, "os", file_api)
+    monkeypatch.setattr(type(path), "stat", lambda p, **kw: next(path_stats) if p == path else original_stat(p, **kw))
+    if entry == "regular":
+        assert transport._capture_column_schema(path, descriptor)[0] == raw
+    elif entry == "reparse":
+        with pytest.raises(ContractError, match="must be regular"):
+            transport._capture_column_schema(path, descriptor)
+        assert next(handle_stats) is opened
+    else:
+        with pytest.raises(ContractError, match="changed during reading"):
+            transport._capture_column_schema(path, descriptor)
 
 
 @pytest.fixture
