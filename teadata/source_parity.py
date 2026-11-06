@@ -275,18 +275,26 @@ def _compare(selection: _Selection, *, max_examples: int, working_bytes: int) ->
 def _compare_csv_export(release: DataRelease, selection: _Selection) -> dict[str, Any]:
     layout = selection.mapping["layout"]
     fields = selection.mapping["fields"]
+    code_only = layout.get("code_only_export", False)
     rows = 0
     with TemporaryFile(mode="w+b") as output, selection.raw.open("rb") as source:
         release.to_csv(selection.key, output, restore_original_headers=True)
         output.seek(0)
         with TextIOWrapper(output, encoding="utf-8", newline="") as text:
             exported = csv.reader(text, strict=True)
-            for kind in ("label", "code"):
-                if next(exported, None) != [field[kind] for field in fields]:
-                    raise ValueError(f"CSV export differs from the reviewed {kind} header")
+            code_header = next(exported, None) if code_only else None
+            verified_code_header = False
+            if not code_only:
+                for kind in ("label", "code"):
+                    if next(exported, None) != [field[kind] for field in fields]:
+                        raise ValueError(f"CSV export differs from the reviewed {kind} header")
             lines = SourceLines(source, selection.budget.record_bytes, "CSV parity source record exceeds its reviewed budget")
             for number, row in enumerate(csv.reader(lines, strict=True), 1):
                 lines.record.clear()
+                if code_only and number == layout["code_record"]:
+                    if code_header != row:
+                        raise ValueError("CSV export differs from the original code header")
+                    verified_code_header = True
                 if not layout["first_data_record"] <= number <= layout["last_data_record"]:
                     continue
                 if any(note["first_record"] <= number <= note["last_record"] for note in layout["annotations"]):
@@ -296,9 +304,12 @@ def _compare_csv_export(release: DataRelease, selection: _Selection) -> dict[str
                 rows += 1
             if next(exported, None) is not None or rows != reviewed_tapr_data_record_count(selection.mapping):
                 raise ValueError("CSV export and source row counts differ")
+            if code_only and not verified_code_header:
+                raise ValueError("CSV source lacks the reviewed code header record")
             if lines.digest.hexdigest() != selection.mapping["input_sha256"]:
                 raise ValueError("Original CSV bytes changed during export comparison")
-    return {"status": "PASS_EXACT_CSV_EXPORT", "rows": rows, "cells": rows * len(fields), "header_records": 2}
+    return {"status": "PASS_EXACT_CSV_EXPORT", "rows": rows, "cells": rows * len(fields),
+            "header_records": 1 if code_only else 2}
 
 
 def validate_source_parity(release: DataRelease, store: ProvenanceStore, *, edition_ids: Sequence[str],

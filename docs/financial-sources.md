@@ -10,6 +10,14 @@ multi-member ZIPs and direct CSVs require reader support as well as review
 of their headers, fiscal period, and population. The [publisher dictionary](https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/reports-and-downloadable-data/datadictionary.pdf)
 documents the account codes.
 
+The dictionary's first page identifies the product as audited actuals. Its
+`ACTAMT` paragraph on page 2 describes budget amounts and an as-of date.
+The `FUNDYEAR` layout lists a small integer of length 2. Its narrative
+describes one-character submissions displayed as four characters. Determine
+budget versus actual and field representation from the exact edition,
+archive label, and bytes. The `ACTAMT` entry explicitly allows negative
+amounts.
+
 `teadata.scripts.refresh_financials` uses one offline native producer for explicitly reviewed financial workbook editions. It does not edit active source configuration, select a latest year, activate an engine, derive a state aggregate, or publish a data release. Its unpublished candidate retains `field_correctness_qualified: false` and `release_activation: false`; structural admission and readback are separate from scientific qualification.
 
 The existing Config source profile owns worksheet selection. The existing `column_schema` resource owns ordered literal publisher headers and canonical fields. An example source-profile fragment is:

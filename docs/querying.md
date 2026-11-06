@@ -118,7 +118,7 @@ where the bound snapshot supplies them. Unmapped fields keep their canonical
 names. The DataFrame's `attrs["teadata"]` records the build and restored
 label/code pairs. These describe the columns, including when callers have
 edited entity values. Use this mode with queries of a single bound entity
-scope. Duplicate output labels raise an error. To export both header rows for an
+scope. Duplicate output labels raise an error. To restore the headers of an
 entire source table, use the [native export methods](data-releases.md#exact-retained-source-parity).
 
 ## Filter a source table before loading it into pandas
@@ -144,7 +144,8 @@ selection and filtering. Each call returns a new view. `to_arrow()`, `to_df()`,
 
 The DataFrame records its manifest, edition and artifact identity in
 `attrs["teadata"]`. For raw TAPR tables, `restore_original_headers=True`
-restores the selected labels and codes in publisher order. CSV and Excel
+restores the reviewed headers in publisher order, including single-row code
+headers where the crosswalk specifies that layout. CSV and Excel
 contain the selected rows and columns. Keep the manifest and filter with a
 file export to reproduce the subset.
 

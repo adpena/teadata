@@ -258,8 +258,11 @@ def _adjacent_filename(value: Any) -> None:
 
 def validate_source_layout(layout: Any) -> None:
     """Require reviewed record coordinates; never guess where notes end."""
+    required = {"code_record", "label_record", "first_data_record", "last_data_record", "annotations"}
     if (not isinstance(layout, dict)
-            or set(layout) != {"code_record", "label_record", "first_data_record", "last_data_record", "annotations"}
+            or not required <= layout.keys() <= required | {"code_only_export"}
+            or type(layout.get("code_only_export", False)) is not bool
+            or (layout.get("code_only_export") and layout["label_record"] is not None)
             or any(type(layout[key]) is not int or layout[key] < 1
                    for key in ("code_record", "first_data_record", "last_data_record"))
             or (layout["label_record"] is not None

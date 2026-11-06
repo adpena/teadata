@@ -11,7 +11,7 @@ import pyarrow.parquet as pq
 import pytest
 
 from teadata.analytical import write_leaf_artifact
-from teadata.column_schema import source_schema_fingerprint
+from teadata.column_schema import source_schema_fingerprint, validate_source_layout
 from teadata.dataset_metadata import ArtifactRef, DatasetMetadata, EditionKey, ResolvedDataset
 from teadata.manifest import BuildRecorder, ContractError, canonical_json, file_identity
 from teadata.provenance import ProvenanceStore
@@ -22,7 +22,7 @@ from teadata.teadata_config import Config
 
 
 def fixture_release(tmp_path, *, damage=None, schema_version=3, batch_bytes=1024, scope='district',
-                    annotation=False, alias=False, last_enrollment=''):
+                    annotation=False, alias=False, last_enrollment='', source_headers='labels'):
     store = ProvenanceStore(tmp_path / 'history')
     dataset = f'{scope}_tapr_student_profile'
     names = [f'{scope}_number', 'membership', 'enrollment']
@@ -35,18 +35,35 @@ def fixture_release(tmp_path, *, damage=None, schema_version=3, batch_bytes=1024
     enrollment = ['11', '.', last_enrollment]
     raw = tmp_path / 'source.csv'
     data = [f'{key},{count},{other}' for key, count, other in zip(keys, membership, enrollment, strict=True)]
+    prefix_rows = [','.join(labels)] if source_headers == 'labels' else []
     notes = []
+    if source_headers == 'wrapped':
+        prefix_rows = ['Source preamble', 'Wrapped label material']
+        notes.extend({'kind': 'preamble', 'first_record': i, 'last_record': i,
+                      'sha256': sha256((row + '\n').encode()).hexdigest()}
+                     for i, row in enumerate(prefix_rows, 1))
+    code_record = len(prefix_rows) + 1
     if annotation:
         note = 'Source note'
         data.insert(1, note)
-        notes.append({'kind': 'note', 'first_record': 4, 'last_record': 4, 'sha256': sha256((note + '\n').encode()).hexdigest()})
-    raw.write_text('\n'.join([','.join(labels), ','.join(codes), *data, '']))
+        notes.append({'kind': 'note', 'first_record': code_record + 2, 'last_record': code_record + 2,
+                      'sha256': sha256((note + '\n').encode()).hexdigest()})
+    code_only = source_headers in {'code_only', 'trailing_code'}
+    first_data_record = code_record + 1
+    if source_headers == 'trailing_code':
+        code_record, first_data_record = len(data) + 1, 1
+        records = [*data, ','.join(codes)]
+    else:
+        records = [*prefix_rows, ','.join(codes), *data]
+    raw.write_text('\n'.join([*records, '']), encoding='utf-8', newline='\n')
     source = ResolvedDataset(dataset, 'data_sources', 2025, 2025, str(raw), DatasetMetadata(version='2025'))
     acquisition = store.record_acquisition(raw, source)
     raw_sha = file_identity(raw)['sha256']
     table = {'table': 'STUD', 'input_sha256': raw_sha,
         'source_schema_sha256': source_schema_fingerprint(labels, codes), 'metric_period': {'kind': 'unknown'},
-        'layout': {'label_record': 1, 'code_record': 2, 'first_data_record': 3, 'last_data_record': 2 + len(data), 'annotations': notes},
+        'layout': {'label_record': 1 if source_headers == 'labels' else None, 'code_record': code_record,
+                   'first_data_record': first_data_record, 'last_data_record': first_data_record + len(data) - 1,
+                   'annotations': notes, **({'code_only_export': True} if code_only else {})},
         'fields': [{'position': i, 'code': code, 'label': label, 'field': name,
             'disposition': 'identity' if i == 1 else 'fact', 'publisher_type': None, 'publisher_description': None,
             'dictionary_status': 'not_applicable' if i == 1 else 'not_documented'}
@@ -160,6 +177,46 @@ def test_excel_and_dataframe_export_share_reviewed_headers(tmp_path, restore):
         assert rows[-1][-1].data_type == 's'
     finally:
         book.close()
+
+
+@pytest.mark.parametrize(('source_headers', 'schema_version'), [
+    ('code_only', 3), ('code_only', 4), ('trailing_code', 4), ('dictionary', 4), ('wrapped', 4),
+])
+def test_code_layout_restores_only_the_reviewed_header_layers(tmp_path, source_headers, schema_version):
+    from openpyxl import load_workbook
+
+    release, store, key, _ = fixture_release(tmp_path, schema_version=schema_version, source_headers=source_headers)
+    view = release.table(key).select('enrollment', 'membership')
+    codes = ['DISTRICT', 'DPETALLC', 'DPNTALLC']
+    headers = [codes] if source_headers in {'code_only', 'trailing_code'} else [['District', 'Membership', 'Enrollment'], codes]
+    data = [['001001', '0', '11'], ['001002', '-999', '.'], ['001003', '17', '']]
+    frame = view.to_df(restore_original_headers=True)
+    assert frame.columns.tolist() == (codes if len(headers) == 1 else list(zip(*headers, strict=True)))
+    assert frame.to_numpy().tolist() == data
+    output = BytesIO()
+    view.to_csv(output, restore_original_headers=True)
+    assert list(csv.reader(StringIO(output.getvalue().decode(), newline=''))) == headers + data
+    output = BytesIO()
+    view.to_excel(output, restore_original_headers=True)
+    book = load_workbook(output, read_only=True)
+    try:
+        assert [list(row) for row in book['Data'].values] == headers + [*data[:2], ['001003', '17', None]]
+    finally:
+        book.close()
+    checked = validate_source_parity(release, store, edition_ids=[key.identity], verify_export=True)
+    assert checked['editions'][0]['csv_export'] == {
+        'status': 'PASS_EXACT_CSV_EXPORT', 'rows': 3, 'cells': 9, 'header_records': len(headers)}
+    if source_headers == 'code_only':
+        selected = view.select('membership').to_df(restore_original_headers=True)
+        assert selected.columns.tolist() == ['DISTRICT', 'DPETALLC']
+        assert selected.to_numpy().tolist() == [row[:2] for row in data]
+
+
+@pytest.mark.parametrize(('flag', 'label_record'), [('true', None), (1, None), (True, 1)])
+def test_code_only_export_rejects_invalid_layout(flag, label_record):
+    with pytest.raises(ValueError, match='Invalid source record layout'):
+        validate_source_layout({'code_record': 2, 'label_record': label_record, 'first_data_record': 3,
+                                'last_data_record': 5, 'annotations': [], 'code_only_export': flag})
 
 
 def test_typed_exports_preserve_nullable_integers(tmp_path):

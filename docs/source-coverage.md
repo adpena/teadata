@@ -46,6 +46,25 @@ editions, fields, and geographies available to query.
 | Geography | TEA's historical campus locator layers include [2012–13](https://schoolsdata2-tea-texas.opendata.arcgis.com/datasets/school2012) and [2013–14](https://schoolsdata2-tea-texas.opendata.arcgis.com/datasets/school2013) | Campus points and district polygons have separate vintages. Establish historical polygon coverage independently and associate each geometry with its own source period. |
 | Discipline and transfers | [Discipline summary archive](https://tea.texas.gov/data-reports/student-data/discipline-data-products/discipline-reports) and [district transfer reports](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/district_transfer_report.html) reach the starting years | Discipline offers statewide district, campus, and Texas downloads. TEA documents [statewide campus transfer CSVs](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/about_transfer_reports.html) beginning in 2020–21. |
 
+For TAPR, use the master reference for file codes, the report dictionary to
+locate printed cells, the glossary for the measure and population, and the
+masking guide for the table's published tokens. The old Profile masking
+guides use `-2` for values outside a reasonable range. Performance and
+advanced count downloads have separate rules.
+
+| Edition | Field and report references | Definitions and disclosure |
+| --- | --- | --- |
+| 2012–13 TAPR | [Master reference](https://rptsvr1.tea.texas.gov/perfreport/tapr/2013/xplore/taprref.html) · [Report dictionary](https://rptsvr1.tea.texas.gov/perfreport/tapr/2013/datadict.pdf) | [Glossary](https://rptsvr1.tea.texas.gov/perfreport/tapr/2013/glossary.pdf) · [Masking guide](https://rptsvr1.tea.texas.gov/perfreport/tapr/2013/masking.html) |
+| 2013–14 TAPR | [Master reference](https://rptsvr1.tea.texas.gov/perfreport/tapr/2014/xplore/taprref.html) · [Report dictionary](https://rptsvr1.tea.texas.gov/perfreport/tapr/2014/datadict.pdf) | [Glossary](https://rptsvr1.tea.texas.gov/perfreport/tapr/2014/glossary.pdf) · [Masking guide](https://rptsvr1.tea.texas.gov/perfreport/tapr/2014/masking.html) |
+| 2024–25 TAPR | [Edition index](https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html) · [Bulk download selector](https://rptsvr1.tea.texas.gov/perfreport/tapr/tapr_dd_download.html?year=2025) | [Glossary](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf) · [Masking guide](https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html) |
+| 2025–26 TPRS observations | [2026–27 user guide and publication schedule](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/tprs-user-guide-2026.pdf) | [Comprehensive glossary](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/comprehensive-tprs-glossary.pdf) and the disclosure legend on the exact report. |
+
+PEIMS [submission standards](https://tea.texas.gov/data-reports/data-submission/peims/peims-data-standards/peims-data-standards)
+document input elements and codes. Public aggregate products have their own
+definitions and disclosure rules, such as the [primary-disability report criteria](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/abtspeced.html)
+and the legend on each report. The [PEIMS financial file dictionary](financial-sources.md)
+documents a separate layout for account data.
+
 Keep school years, measurement periods, and publication editions distinct.
 Check keys against each edition's own roster, including entities without
 geometry. Verify units, masking, and comparability at the field level before

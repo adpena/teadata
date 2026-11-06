@@ -128,8 +128,9 @@ raw value. The tested-grade manifests can be used for the separately reviewed
 ### Exact retained-source parity
 
 Export one exact native table with canonical field names by default. For a
-complete raw TAPR table, all three formats can use the original TEA label
-and code headers.
+complete raw TAPR table, all three formats can restore the reviewed TEA
+headers in publisher column order. A crosswalk that records a code-only
+export restores one header row. Other crosswalks restore label and code rows.
 
 ```python
 release.to_csv(edition_key, "source.csv", restore_original_headers=True)
@@ -139,8 +140,8 @@ frame = release.to_df(edition_key, restore_original_headers=True)
 
 CSV and Excel stream to a new file or a caller-owned binary buffer. File paths
 must be unused, and the result appears only after the export succeeds. The DataFrame materializes
-the table with Arrow-backed dtypes and uses a two-level column index for the
-restored label and code. Excel writes decimals and values requiring more than
+the table with Arrow-backed dtypes. Restored code-only headers use a flat
+column index. Label and code headers use a two-level index. Excel writes decimals and values requiring more than
 15 digits of precision as text. If text would be changed or would produce
 invalid worksheet XML, the Excel export directs you to CSV. Raw exports
 retain source column order, leading zeroes and masking tokens. CSV

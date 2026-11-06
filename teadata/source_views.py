@@ -242,7 +242,7 @@ class _TableExport:
 
         frame = self.to_arrow().to_pandas(types_mapper=pd.ArrowDtype)
         if self.restore_original_headers:
-            frame.columns = pd.MultiIndex.from_arrays(self.headers)
+            frame.columns = pd.Index(self.headers[0]) if len(self.headers) == 1 else pd.MultiIndex.from_arrays(self.headers)
         frame.attrs["teadata"] = self.lineage
         return frame
 
@@ -293,7 +293,7 @@ def prepare_export(release: DataRelease, edition: EditionKey, *, restore_origina
     if restore_original_headers:
         if not all(pa.types.is_string(field.type) or pa.types.is_large_string(field.type) for field in scanner.projected_schema):
             raise ContractError(original_error)
-        rows = tuple(tuple(row[kind] for row in headers) for kind in ("label", "code"))
+        rows = tuple(tuple(row[kind] for row in headers) for kind in release.catalog._source_header_kinds(edition))
     lineage: dict[str, Any] = {"build_id": release.build_id, "edition": edition.to_dict(), "artifact_sha256": artifact.sha256,
                                "manifest_sha256": release.manifest_sha256}
     if period is not None:
