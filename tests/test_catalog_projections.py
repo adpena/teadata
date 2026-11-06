@@ -790,13 +790,13 @@ def test_stream_download_accepts_legacy_full_identity_and_root_cache_keys_includ
     url, pin = base + "/root.json", file_identity(edition_fixture["root"])["sha256"]
     _load_release.cache_clear()
     try:
-        online = _load_release(url, 0, pin, False)
-        offline = _load_release(url, 0, pin, True)
+        online = _load_release(url, None, pin, False)
+        offline = _load_release(url, None, pin, True)
         assert online is not offline and offline.offline is True
         with pytest.raises(ContractError, match="trusted pin"):
-            _load_release(url, 0, "f" * 64, False)
+            _load_release(url, None, "f" * 64, False)
         with pytest.raises(ContractError, match="expected manifest"):
-            _load_release(url, 0, None, True)
+            _load_release(url, None, None, True)
         assert requests == ["/student.parquet", "/root.json"]
     finally:
         _load_release.cache_clear()

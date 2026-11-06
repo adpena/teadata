@@ -12,6 +12,7 @@ import gzip
 import os
 from pathlib import Path
 import stat
+import sys
 import tempfile
 from typing import TYPE_CHECKING, BinaryIO
 import unicodedata
@@ -37,6 +38,8 @@ if TYPE_CHECKING:
     from .tprs_statewide_intake import ReportSelection
 
 _StudentCohort = tuple[str, str, str, str]
+_ManifestStamp = tuple[int, int, int, int, int]
+_LocalManifest = tuple[Path, _ManifestStamp]
 
 
 ROLES = frozenset({"snapshot", "entities", "maps", "boundaries"})
@@ -182,11 +185,24 @@ def _student_attachments(catalog: DatasetCatalog, artifact: ArtifactRef) -> dict
     return refs
 
 
+def _manifest_stamp(state: os.stat_result) -> _ManifestStamp:
+    return state.st_dev, state.st_ino, state.st_size, state.st_mtime_ns, state.st_ctime_ns
+
+
+def _local_manifest_stamp(path: Path) -> _ManifestStamp:
+    if os.name == "nt":
+        # Windows pathname stat reports creation time as ctime. Use the
+        # descriptor's change time to match the checks around the read.
+        with path.open("rb") as stream:
+            return _manifest_stamp(os.fstat(stream.fileno()))
+    return _manifest_stamp(path.stat())
+
+
 class DataRelease:
     """A complete bundle with one catalog and content hashes for every artifact."""
 
     def __init__(self, manifest: str | Path, *, expected_sha256: str | None = None, offline: bool = False,
-                 cache_dir: Path | None = None):
+                 cache_dir: Path | None = None, _local_manifest: _LocalManifest | None = None):
         self.source = str(manifest)
         self.remote = "://" in self.source
         self._cache_dir = cache_dir.expanduser().resolve() if cache_dir is not None else None
@@ -210,9 +226,15 @@ class DataRelease:
                 _download(self.source, path, expected={"sha256": expected_sha256} if expected_sha256 else None)
         else:
             path = Path(manifest).expanduser().resolve()
+        if _local_manifest is not None and path != _local_manifest[0]:
+            raise ContractError("Local release manifest changed during selection")
         self.path = path
         with path.open("rb") as stream:
+            if _local_manifest is not None and _manifest_stamp(os.fstat(stream.fileno())) != _local_manifest[1]:
+                raise ContractError("Local release manifest changed before reading")
             raw = stream.read(4 * 1024 * 1024 + 1)
+            if _local_manifest is not None and _manifest_stamp(os.fstat(stream.fileno())) != _local_manifest[1]:
+                raise ContractError("Local release manifest changed during reading")
         if len(raw) > 4 * 1024 * 1024:
             raise ContractError("Release manifest is too large")
         self._manifest_sha256 = sha256(raw).hexdigest()
@@ -668,8 +690,9 @@ class DataRelease:
 
 
 @lru_cache(maxsize=4)
-def _load_release(source: str, stamp: int, expected_sha256: str | None = None, offline: bool = False) -> DataRelease:
-    return DataRelease(source, expected_sha256=expected_sha256, offline=offline)
+def _load_release(source: str, local_manifest: _LocalManifest | None, expected_sha256: str | None = None,
+                  offline: bool = False) -> DataRelease:
+    return DataRelease(source, expected_sha256=expected_sha256, offline=offline, _local_manifest=local_manifest)
 
 
 def release_offline() -> bool:
@@ -692,8 +715,16 @@ def current_release() -> DataRelease:
         source = str(Path(__file__).with_name(".cache") / "release.json")
     expected_sha256 = os.environ.get("TEADATA_RELEASE_SHA256")
     offline = release_offline()
-    stamp = 0 if "://" in source else Path(source).expanduser().stat().st_mtime_ns
-    return _load_release(source, stamp, expected_sha256, offline)
+    local_manifest = None
+    if "://" not in source:
+        configured_path = Path(source).expanduser()
+        if os.name == "nt" and sys.version_info < (3, 12):
+            # Python 3.11 on Windows also reports creation time from fstat.
+            configured_path.stat()
+            return DataRelease(source, expected_sha256=expected_sha256, offline=offline)
+        path = configured_path.resolve(strict=True)
+        local_manifest = path, _local_manifest_stamp(configured_path)
+    return _load_release(source, local_manifest, expected_sha256, offline)
 
 
 @contextmanager

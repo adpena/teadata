@@ -8,6 +8,7 @@ import json
 import os
 import pickle
 import sqlite3
+import sys
 from unittest.mock import Mock
 from uuid import UUID
 
@@ -257,6 +258,82 @@ def test_current_release_applies_pin_to_the_selected_local_manifest(release, mon
     monkeypatch.setenv("TEADATA_RELEASE_SHA256", "")
     with pytest.raises(ContractError, match="Manifest pin must be a SHA-256 identity"):
         release_module.current_release()
+
+
+@pytest.mark.parametrize("atomic", [False, True])
+def test_current_release_detects_local_replacement_with_preserved_mtime(release, monkeypatch, atomic):
+    original = release.read_bytes().rstrip() + b"\n"
+    revised = original[:-1] + b" "
+    release.write_bytes(original)
+    monkeypatch.setenv("TEADATA_RELEASE", str(release))
+    monkeypatch.setenv("TEADATA_RELEASE_SHA256", sha256(original).hexdigest())
+    selected = release_module.current_release()
+    cache_uses_change_time = os.name != "nt" or sys.version_info >= (3, 12)
+    if cache_uses_change_time:
+        assert release_module.current_release() is selected
+
+    before = release.stat()
+    before_stamp = release_module._local_manifest_stamp(release)
+    target = release.with_suffix(".replacement") if atomic else release
+    target.write_bytes(revised)
+    os.utime(target, ns=(before.st_atime_ns, before.st_mtime_ns))
+    if atomic:
+        target.replace(release)
+    after = release.stat()
+    assert after.st_mtime_ns == before.st_mtime_ns
+    if not atomic and cache_uses_change_time and release_module._local_manifest_stamp(release) == before_stamp:
+        pytest.skip("Filesystem did not expose the in-place change in stat metadata")
+
+    with release_module.using_release(selected):
+        assert release_module.current_release() is selected
+    with pytest.raises(ContractError, match="trusted pin"):
+        release_module.current_release()
+    monkeypatch.setenv("TEADATA_RELEASE_SHA256", sha256(revised).hexdigest())
+    assert release_module.current_release().manifest_sha256 == sha256(revised).hexdigest()
+
+
+def test_current_release_tracks_alias_target_even_with_a_shared_inode(release, tmp_path, monkeypatch):
+    other_dir = tmp_path / "other"
+    other_dir.mkdir()
+    other = other_dir / release.name
+    other.hardlink_to(release)
+    alias = tmp_path / "active.json"
+    try:
+        alias.symlink_to(release)
+    except OSError as error:
+        if getattr(error, "winerror", None) == 1314:
+            pytest.skip("Windows account cannot create symbolic links")
+        raise
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("TEADATA_RELEASE", alias.name)
+    monkeypatch.delenv("TEADATA_RELEASE_SHA256", raising=False)
+
+    selected = release_module.current_release()
+    assert selected.source == alias.name
+    assert selected.path == release
+    alias.unlink()
+    alias.symlink_to(other)
+    assert release_module.current_release().path == other
+
+
+@pytest.mark.skipif(os.name == "nt" and sys.version_info < (3, 12), reason="Local manifests bypass the cache")
+def test_current_release_rejects_replacement_between_stat_and_open(release, monkeypatch):
+    original = release.read_bytes()
+    replacement = release.with_suffix(".replacement")
+    replacement.write_bytes(original + b" ")
+    monkeypatch.setenv("TEADATA_RELEASE", str(release))
+    monkeypatch.delenv("TEADATA_RELEASE_SHA256", raising=False)
+    load_release = release_module._load_release
+
+    def swap_before_load(*args, **kwargs):
+        if replacement.exists():
+            replacement.replace(release)
+        return load_release(*args, **kwargs)
+
+    monkeypatch.setattr(release_module, "_load_release", swap_before_load)
+    with pytest.raises(ContractError, match="Local release manifest changed"):
+        release_module.current_release()
+    assert release_module.current_release().manifest_sha256 == sha256(original + b" ").hexdigest()
 
 
 def test_release_offline_reads_policy_without_selecting_a_manifest(release, tmp_path, monkeypatch):
