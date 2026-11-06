@@ -1,5 +1,15 @@
 # Financial workbook source candidates
 
+The [PEIMS single-file archive](https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads)
+publishes separate district and charter account files. Historical packaging
+varies. The FY2014 and FY2018 district budget ZIPs include a charter CSV
+alongside the district CSV, and some historical charter budget links return
+CSV directly. The current [single-file candidate reader](data-releases.md#peims-single-file-financial-budgets)
+requires a ZIP containing exactly one member, the reviewed CSV. These
+multi-member ZIPs and direct CSVs require reader support as well as review
+of their headers, fiscal period, and population. The [publisher dictionary](https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/reports-and-downloadable-data/datadictionary.pdf)
+documents the account codes.
+
 `teadata.scripts.refresh_financials` uses one offline native producer for explicitly reviewed financial workbook editions. It does not edit active source configuration, select a latest year, activate an engine, derive a state aggregate, or publish a data release. Its unpublished candidate retains `field_correctness_qualified: false` and `release_activation: false`; structural admission and readback are separate from scientific qualification.
 
 The existing Config source profile owns worksheet selection. The existing `column_schema` resource owns ordered literal publisher headers and canonical fields. An example source-profile fragment is:
