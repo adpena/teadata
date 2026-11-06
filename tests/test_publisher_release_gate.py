@@ -1,6 +1,7 @@
 """Release checks read persisted values, independently of excerpt construction."""
 
 from dataclasses import replace
+from importlib.resources import files
 import json
 import sqlite3
 from types import SimpleNamespace
@@ -116,6 +117,62 @@ def test_publisher_gate_refuses_changed_source_before_opening_store(stored_publi
     monkeypatch.setattr("teadata.entity_store.EntityStore", lambda *args, **kwargs: pytest.fail("Read data before source fence"))
     with pytest.raises(verification.ReceiptError, match="source changed: accountability"):
         verification._validate_publisher_cases(release)
+
+
+@pytest.fixture
+def publisher_2026_inputs():
+    edition = json.loads(files("teadata").joinpath("reference_cases/publisher_2026.json").read_text())
+    datasets = {}
+    for dataset, source, period in (
+        ("accountability", edition["accountability"], {"kind": "calendar_year", "year": 2026}),
+        ("campus_transfer_reports", edition["campus_transfers"],
+         {"kind": "school_year", "start_year": 2025, "end_year": 2026}),
+    ):
+        datasets[dataset] = {"status": "loaded", "artifact": {"sha256": source["sha256"]},
+            "requested_year": 2026, "resolved_year": 2026,
+            "metadata": {"version": "2026", "period": period, "references": [
+                {"reference_id": name, "provenance_ids": [receipt]} for name, receipt in source["references"].items()
+            ]}}
+    datasets["accountability"]["metadata"]["source_qualifiers"] = {
+        "family": "accountability", "publisher_release_status": "preliminary", "reference_id": "publication",
+    }
+    return datasets
+
+
+def test_2026_publisher_reference_replaces_only_edition_specific_witnesses(publisher_2026_inputs):
+    original = verification._publisher_reference()
+    current = verification._publisher_reference_for_release(publisher_2026_inputs)
+    before = {case["case_id"]: case for case in original["cases"]}
+    after = {case["case_id"]: case for case in current["cases"]}
+    active = current["release_validation"]["case_ids"]
+    assert set(active) == (set(original["release_validation"]["case_ids"]) - {"rocketship-reporting-only-notrated"}
+                           | {"trinity-beeville-reporting-only-2026"})
+    for key in set(before) & set(active):
+        assert [fact for fact in before[key]["facts"] if fact["field"] != "overall_rating"] == [
+            fact for fact in after[key]["facts"] if fact["field"] != "overall_rating"]
+    austin, = [fact for fact in after["austin-isd-2025"]["facts"] if fact["field"] == "overall_rating"]
+    assert (austin["source"]["cell"], austin["expected"]["value"], austin["expected"]["period"]["year"]) == ("G9343", "B", 2026)
+    campus = after["trinity-beeville-reporting-only-2026"]
+    assert campus["attribute_metrics"] == {"rating": "overall_rating"}
+    assert campus["facts"][0]["expected"]["status"] == "observed"
+    assert campus["facts"][0]["expected"]["value"] == "Not Rated: Minimum Size rules"
+    assert verification._publisher_reference() == original
+
+
+@pytest.mark.parametrize("failure", ["transfer_hash", "masking_receipt", "final_label", "workbook_year"])
+def test_2026_publisher_reference_requires_exact_input_lineage(publisher_2026_inputs, failure):
+    accountability = publisher_2026_inputs["accountability"]
+    transfers = publisher_2026_inputs["campus_transfer_reports"]
+    if failure == "transfer_hash":
+        transfers["artifact"]["sha256"] = "0" * 64
+    elif failure == "masking_receipt":
+        transfers["metadata"]["references"] = []
+    elif failure == "final_label":
+        accountability["metadata"]["source_qualifiers"]["publisher_release_status"] = "final"
+    else:
+        accountability["resolved_year"] = 2025
+    with pytest.raises(verification.ReceiptError, match="2026 publisher"):
+        verification._publisher_reference_for_release(publisher_2026_inputs)
 
 
 def test_publisher_gate_rejects_a_bad_asian_mapping_even_when_enrollment_is_correct(stored_publisher_cases):

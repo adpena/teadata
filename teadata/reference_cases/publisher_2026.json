@@ -1,0 +1,34 @@
+{
+  "accountability": {
+    "sha256": "ec9833e67a33141ab0d9eb49753fad1e2609674f698e7d29f0a1ae7f7794612d",
+    "url": "https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2026-statewide-multi-year-ratings-spreadsheet.xlsx",
+    "sheet": "2011-2026 Summary",
+    "references": {
+      "publication": "710e1d2cd9348c9b4e4f18745890c1713a60a257d82bc6e3f87bfb883c25b4df",
+      "publisher_workbook": "bce1d7ae24b3ee57e54df9972b9d7b1c5eadcad3d4fc3418bd79ea5095b1d393"
+    }
+  },
+  "campus_transfers": {
+    "sha256": "6cbc650aa1618b8cf02fb681096a98bcccc07b8dcfc17aad0a91eca8285ffe98",
+    "references": {
+      "masking": "f7feea636a5bb61447566389cc135413798918cd70ec2bd3200058460fdf417d"
+    }
+  },
+  "rating_rows": {
+    "austin-isd-2025": {"row": 9343, "raw_token": "B"},
+    "kiker-disclosure-and-five-model": {"row": 9448, "raw_token": "A"},
+    "basis-san-antonio-year-and-spatial": {"row": 444, "raw_token": "A"}
+  },
+  "replace_case": "rocketship-reporting-only-notrated",
+  "reporting_campus": {
+    "case_id": "trinity-beeville-reporting-only-2026",
+    "entity": {
+      "governing_district": "046802",
+      "name": "TRINITY CHARTER SCHOOLS-PRESCHOOL-BEEVILLE CAMPUS",
+      "number": "046802029",
+      "type": "campus"
+    },
+    "row": 1966,
+    "raw_token": "Not Rated: Minimum Size rules"
+  }
+}

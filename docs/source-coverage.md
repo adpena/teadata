@@ -20,6 +20,15 @@ This table describes the published [v0.0.128 entity release](https://github.com/
 
 A configured edition means the [source configuration](../teadata/teadata_sources.yaml) defines a reader for that version. Loading this entity release supplies the periods in the third column. The TAPR profile editions `2024` and `2025` refer to school years 2023–24 and 2024–25. Some individual fields measure a different period than the report. Use field metadata when the measurement year matters. Fiscal years, calendar years, and dated reference snapshots keep their own period types.
 
+The release verifier recognizes a separate 2026 candidate with TEA's exact
+preliminary accountability workbook and 2025–26 campus transfer preparation.
+It checks four rating witnesses, including the literal minimum-size rating for
+a reporting-only campus, and the applicable 2025 TAPR witnesses. The 2025
+release baseline remains available for its exact source. The 2026 scalar check
+pins the transfer preparation and original CSV receipt; qualifying the transfer
+edges also requires the separately retained preparation and readback evidence.
+[TEA's preliminary accountability release](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2026-accountability-rating-system)
+
 ## Separately published source tables
 
 A native source release holds a verified table with its original row keys, source revision, and field definitions. You can query and export it directly through `DataRelease`. These tables are currently separate from the default entity enrichment build. See [published TAPR and TPRS supplements](data-releases.md#tapr-and-tprs-supplements) and [annual dropout](research-annual-dropout.md) for how to use them.

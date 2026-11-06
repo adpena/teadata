@@ -545,6 +545,66 @@ def _publisher_reference() -> dict[str, Any]:
     return json.loads(files("teadata").joinpath("reference_cases/publisher_2025.json").read_text())
 
 
+def _publisher_reference_for_release(datasets: Mapping[str, Any]) -> dict[str, Any]:
+    from importlib.resources import files
+
+    reference = _publisher_reference()
+    edition = json.loads(files("teadata").joinpath("reference_cases/publisher_2026.json").read_text())
+    workbook = edition["accountability"]
+    if datasets.get("accountability", {}).get("artifact", {}).get("sha256") != workbook["sha256"]:
+        return reference
+
+    calendar_year = {"kind": "calendar_year", "year": 2026}
+    school_year = {"kind": "school_year", "start_year": 2025, "end_year": 2026}
+    for dataset, source, period in (
+        ("accountability", workbook, calendar_year),
+        ("campus_transfer_reports", edition["campus_transfers"], school_year),
+    ):
+        entry = datasets.get(dataset, {})
+        metadata = entry.get("metadata", {})
+        if (entry.get("artifact", {}).get("sha256") != source["sha256"] or entry.get("status") != "loaded"
+                or (entry.get("requested_year"), entry.get("resolved_year")) != (2026, 2026)
+                or metadata.get("version") != "2026" or metadata.get("period") != period):
+            raise ReceiptError(f"2026 publisher reference input differs: {dataset}")
+        receipts = {ref["reference_id"]: ref.get("provenance_ids", []) for ref in metadata.get("references", [])}
+        if any(receipt not in receipts.get(name, []) for name, receipt in source["references"].items()):
+            raise ReceiptError(f"2026 publisher reference input lacks retained source evidence: {dataset}")
+    if datasets["accountability"]["metadata"].get("source_qualifiers") != {
+        "family": "accountability", "publisher_release_status": "preliminary", "reference_id": "publication",
+    }:
+        raise ReceiptError("2026 publisher accountability reference requires the preliminary release status")
+
+    source_id = "accountability_2026"
+    reference["sources"][source_id] = {"url": workbook["url"], "sha256": workbook["sha256"],
+        "release_input": {"dataset": "accountability", "sha256": workbook["sha256"]}}
+
+    def rating(witness: Mapping[str, Any]) -> dict[str, Any]:
+        row, raw = witness["row"], witness["raw_token"]
+        return {"field": "overall_rating", "source": {"source_id": source_id, "raw_token": raw,
+                    "sheet": workbook["sheet"], "cell": f"G{row}",
+                    "identifier_cells": {"district": f"A{row}", "campus": f"C{row}"}},
+                "expected": {"metric": "overall_rating", "value": raw, "status": "observed",
+                    "period": calendar_year, "unit": "text"}}
+
+    coverage = reference["release_validation"]
+    updates = edition["rating_rows"]
+    cases = [case for case in reference["cases"] if case["case_id"] in coverage["case_ids"]]
+    for case in cases:
+        case_id = case["case_id"]
+        if case_id in updates:
+            case["facts"] = [rating(updates[case_id]) if fact["field"] == "overall_rating" else fact
+                             for fact in case["facts"]]
+    reporting = edition["reporting_campus"]
+    reference["cases"].append({"case_id": reporting["case_id"], "entity": reporting["entity"],
+                               "facts": [rating(reporting)], "attribute_metrics": {"rating": "overall_rating"}})
+    coverage["case_ids"] = [reporting["case_id"] if key == edition["replace_case"] else key
+                            for key in coverage["case_ids"]]
+    coverage["uncovered"] += ["2025 Rocketship campus enrollment and membership in the 2026 entity build",
+                              "2026 accountability scores and distinctions",
+                              "2026 campus transfer values in this scalar gate; use the separate edge readback"]
+    return reference
+
+
 def _validate_publisher_cases(release: DataRelease) -> dict[str, Any]:
     """Compare a small reviewed publisher baseline with actual stored records."""
     from types import SimpleNamespace
@@ -552,13 +612,13 @@ def _validate_publisher_cases(release: DataRelease) -> dict[str, Any]:
     from teadata.entity_store import EntityStore
     from teadata.manifest import ContractError
 
-    reference = _publisher_reference()
+    datasets = release.catalog.datasets
+    reference = _publisher_reference_for_release(datasets)
     coverage = reference["release_validation"]
     selected = {case["case_id"]: case for case in reference["cases"]}
     cases = [selected[key] for key in coverage["case_ids"]]
     if not cases:
         raise ReceiptError("Publisher reference coverage is empty")
-    datasets = release.catalog.datasets
     source_ids = {fact["source"]["source_id"] for case in cases for fact in case["facts"]}
     for source_id in sorted(source_ids):
         source = reference["sources"][source_id]
