@@ -21,6 +21,7 @@ from platformdirs import user_cache_path
 
 from .analytical import ANALYTICAL_DATASETS, ANALYTICAL_ROLES, analytical_dataset, validate_artifact, validate_leaf_artifact
 from .dataset_metadata import ArtifactRef, COLUMN_SCHEMA_MAX_BYTES, ColumnSchemaRef, EditionKey, EditionMetadataRef, validate_http_url
+from .dataset_metadata import DataPeriod, NativeSourceRef
 from .manifest import (
     ContractError,
     DatasetCatalog,
@@ -43,6 +44,20 @@ SNAPSHOT_MAGIC = b"TEADATA_SNAPSHOT_V1 "
 _ACTIVE_RELEASE: ContextVar[DataRelease | None] = ContextVar(
     "teadata_active_release", default=None
 )
+
+
+def _open_native_source(ref: NativeSourceRef, parent: str | Path, *, offline: bool) -> DataRelease:
+    location = ref.location
+    if "://" not in location:
+        location = urljoin(str(parent), location) if "://" in str(parent) else str(Path(parent).parent / location)
+    child = DataRelease(location, expected_sha256=ref.manifest_sha256, offline=offline)
+    if not child._v3 or child.build_id != ref.build_id:
+        raise ContractError("Native source manifest has a different catalog type or build ID")
+    editions = {EditionKey.from_dict({name: value for name, value in row.items() if name != "edition_id"})
+                for row in child.catalog.editions(include_metadata=False)}
+    if editions != set(ref.editions):
+        raise ContractError("Native source editions differ from the entity catalog")
+    return child
 
 
 def _safe_filename(value: object) -> str:
@@ -228,8 +243,11 @@ class DataRelease:
         self._processing = canonical_json(processing)
         self._artifacts = document["artifacts"]
         self._verified: dict[str, tuple[Path, tuple[int, int, int, int]]] = {}
+        if record["parameters"].get("native_sources", []) != [ref.to_dict() for ref in self.catalog.native_sources]:
+            raise ContractError("Processing receipt differs from the entity catalog's native sources")
+        names = {Path(self.source).name.casefold()}
         for artifact in self._artifacts.values():
-            _safe_filename(artifact.get("filename"))
+            names.add(_safe_filename(artifact.get("filename")).casefold())
             digest = artifact.get("sha256")
             if (
                 not isinstance(digest, str)
@@ -242,6 +260,8 @@ class DataRelease:
                 or artifact["size_bytes"] <= 0
             ):
                 raise ContractError("Release artifacts require positive byte sizes")
+        if any(ref.location.casefold() in names for ref in self.catalog.native_sources):
+            raise ContractError("Native manifest location collides with an entity release file")
         for role, artifact in self._artifacts.items():
             output = record.get("outputs", {}).get(role, {})
             if any(
@@ -356,7 +376,23 @@ class DataRelease:
                     if descriptor["edition"]["dataset"] == "tprs_student_membership_enrollment_reports":
                         _student_attachments(self.catalog, ArtifactRef.from_dict(descriptor))
             return paths
-        return {role: artifact(role) for role in sorted(self._artifacts)}
+        paths = {role: artifact(role) for role in sorted(self._artifacts)}
+        self.verify_native_sources(discard_cached_reads=discard_cached_reads)
+        return paths
+
+    def verify_native_sources(self, *, discard_cached_reads: bool = False) -> dict[str, dict[str, Path]]:
+        """Verify attached native roots and return their manifests and content-addressed files."""
+        verified = {}
+        parent = self.source if self.remote else self.path
+        for ref in self.catalog.native_sources:
+            child = _open_native_source(ref, parent, offline=self.offline)
+            child.verify(discard_cached_reads=discard_cached_reads)
+            verified[ref.manifest_sha256] = {
+                "manifest": child.path,
+                **{digest: path for digest, (path, _) in child._verified_bytes.items()},
+                **{digest: path for digest, (path, _, _) in child._column_schema_data.items()},
+            }
+        return verified
 
     def _verify_student_cohorts(self, document: dict, paths: dict[str, Path]) -> None:
         cohorts: dict[_StudentCohort, set[str]] = {}
@@ -468,6 +504,40 @@ class DataRelease:
         if not isinstance(edition, EditionKey):
             raise TypeError("Native table selection requires an exact EditionKey")
         return SourceTable(self, edition)
+
+    def observations(self, dataset: str, *fields: str, school_year: int,
+                     scope: str, edition: EditionKey | None = None) -> SourceTable:
+        """Plan a native view from this entity release by measurement school year."""
+        from .observations import _ObservationModel, _ObservationRequest
+        from .source_views import SourceTable
+
+        if type(school_year) is not int or not 2 <= school_year <= 9999:
+            raise ValueError("School year must be its integer ending year")
+        if not fields or any(not isinstance(field, str) or not field for field in fields) or len(set(fields)) != len(fields):
+            raise ValueError("Select one or more distinct source fields")
+        if edition is not None and not isinstance(edition, EditionKey):
+            raise TypeError("Edition selection requires an exact EditionKey")
+        period = DataPeriod(kind="school_year", start_year=school_year - 1, end_year=school_year)
+        matches = []
+        parent = self.source if self.remote else self.path
+        for ref in self.catalog.native_sources:
+            keys = [key for key in ref.editions if key.dataset == dataset and key.scope == scope
+                    and (edition is None or key == edition)]
+            if not keys:
+                continue
+            child = _open_native_source(ref, parent, offline=self.offline)
+            for key in keys:
+                if all((info := child.catalog.field_metadata(field, scope=scope, edition=key)) is not None
+                       and DataPeriod.from_dict(info["period"]) == period for field in fields):
+                    matches.append((child, key))
+        if len(matches) != 1:
+            raise ContractError("Fields are unavailable or ambiguous for this school year and scope; select an exact edition")
+        child, key = matches[0]
+        plan = _ObservationModel(self.catalog, [child]).plan(_ObservationRequest(key, field, period) for field in fields)
+        if len(plan.projections) != 1:
+            raise ContractError("Observation view requires fields from one native table")
+        return SourceTable(child, key, _fields=fields, _period=period,
+                           _entity_build=(self.build_id, self.manifest_sha256))
 
     def to_csv(self, edition: EditionKey, path_or_buf: str | Path | BinaryIO, *,
                restore_original_headers: bool = False) -> None:
@@ -650,7 +720,7 @@ def publish_release(
         stream.flush()
         os.fsync(stream.fileno())
     try:
-        DataRelease(temporary, offline=schema_version in (3, 4)).verify()
+        DataRelease(temporary, offline=True).verify()
         if schema_version in (3, 4):
             os.link(temporary, directory / "release.json")
         else:

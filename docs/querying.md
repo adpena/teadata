@@ -40,16 +40,35 @@ print(top5)  # list[(name, enrollment)]
 
 ## School years and source editions
 
-`Query` starts from the entities in the engine's loaded snapshot. It has no
-school-year selector today. The [source coverage table](source-coverage.md)
-shows how the snapshot combines inputs from several periods.
+`Query` starts from entities in the loaded snapshot. When the entity build pins
+a native source, `observations` selects its fields by measurement school year.
+Pass the ending year as an integer. The result is a lazy `SourceTable`.
+
+```python
+dataset = "tprs_student_membership_enrollment_reports"
+field = "membership_total_students_count"
+districts = engine >> ("district", "Austin ISD")
+observations = districts.observations(dataset, field, school_year=2026)
+frame = observations.to_df()
+
+# Read the direct publisher statewide observation from the same entity release.
+texas = release.observations(dataset, field, school_year=2026, scope="state").to_df()
+```
+
+The equivalent chain operation is `districts >> ("observations", dataset,
+2026, (field,))`. Empty entity queries require an explicit `scope`. Use an exact
+`EditionKey` when several eligible editions match. To reopen a saved entity
+build, pass its pinned `DataRelease` as `release=` or enter its `using_release`
+context. The DataFrame lineage records both the entity manifest and the native
+manifest, edition, artifact and measurement period.
 
 For a separately published table, open its pinned `DataRelease` and select
 an exact edition key. Check the catalog's measurement period before selecting
 an edition. For example, the 2025 annual dropout edition measures school year
 2024–25, even though TEA published it in 2026. Some datasets also publish
 fields with periods that differ from the table's report period. Year selection
-is separate from the attribute access used for dataset and field names.
+is separate from the attribute access used for dataset and field names. See
+[entity build inputs](source-coverage.md) for the published snapshot's coverage.
 
 ## Select an entity's published source fields
 

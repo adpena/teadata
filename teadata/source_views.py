@@ -15,25 +15,49 @@ import re
 from tempfile import TemporaryDirectory
 from typing import TYPE_CHECKING, Any, BinaryIO, Generator, Iterator, overload
 
-from .dataset_metadata import ArtifactRef, EditionKey
+from .dataset_metadata import ArtifactRef, DataPeriod, EditionKey
 from .identifiers import canonical_source_identifiers
 from .manifest import ContractError
 
 if TYPE_CHECKING:
     import pandas as pd
     import pyarrow as pa
-    from pyarrow.dataset import Expression, Scanner
+    from pyarrow.dataset import Dataset, Expression, Scanner
 
     from .release import DataRelease
 
 
-def _projection(release: DataRelease, edition: EditionKey, fields: tuple[str, ...]) -> tuple[ArtifactRef, tuple[str, ...]]:
+def _projection(release: DataRelease, edition: EditionKey, fields: tuple[str, ...], *,
+                period: DataPeriod | None = None) -> tuple[ArtifactRef, tuple[str, ...]]:
     if not fields or len(set(fields)) != len(fields):
         raise ValueError("Select one or more distinct source fields")
-    plans = release.catalog.resolve_artifacts((edition, name) for name in fields)
+    plans = release.catalog.resolve_artifacts(((edition, name) for name in fields), period=period)
     if len(plans) != 1:
         raise ContractError("Projection requires fields from one native table")
     return plans[0]["artifact"], plans[0]["columns"]
+
+
+def _entity_key(artifact: ArtifactRef) -> str:
+    scope = artifact.edition.scope
+    key = scope + "_number"
+    if scope not in {"district", "campus"} or key not in artifact.contract["key_columns"]:
+        raise ContractError("Source table has no matching entity key")
+    return key
+
+
+def _entity_predicate(native: Dataset, entity_key: str, identifiers: tuple[str, ...]) -> Expression:
+    import pyarrow as pa
+    import pyarrow.compute as arrow_compute
+    from pyarrow.dataset import field, scalar
+
+    pc: Any = arrow_compute
+    if not identifiers:
+        return scalar(False)
+    keys = native.to_table(columns=[entity_key])[entity_key]
+    normalized = canonical_source_identifiers(keys, width=6 if entity_key == "district_number" else 9)
+    selected = pa.array(["'" + identifier for identifier in identifiers], type=keys.type)
+    aliases = pc.unique(pc.filter(keys, pc.is_in(normalized, value_set=selected)))
+    return field(entity_key).isin(aliases)
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -45,6 +69,9 @@ class SourceTable:
     _fields: tuple[str, ...] | None = None
     _predicate: Expression | None = None
     _queries: tuple[Callable[[pa.Schema], Expression], ...] = ()
+    _period: DataPeriod | None = None
+    _entity_build: tuple[str, str] | None = None
+    _entity_ids: tuple[str, ...] | None = None
 
     def select(self, *fields: str) -> SourceTable:
         """Select distinct public fields and retain their key and source columns."""
@@ -84,7 +111,13 @@ class SourceTable:
     def _prepare(self, *, restore_original_headers: bool = False) -> _TableExport:
         return prepare_export(self.release, self.edition, restore_original_headers=restore_original_headers,
                               selected_fields=self._fields, predicate=self._predicate, queries=self._queries,
-                              include_support=True)
+                              include_support=True, period=self._period, entity_build=self._entity_build,
+                              entity_ids=self._entity_ids)
+
+    def _for_entity_ids(self, identifiers: tuple[str, ...]) -> SourceTable:
+        artifact, _ = _projection(self.release, self.edition, self._fields or (), period=self._period)
+        _entity_key(artifact)
+        return replace(self, _entity_ids=identifiers)
 
     def to_arrow(self) -> pa.Table:
         """Materialize the filtered projection with its keys and source support."""
@@ -117,20 +150,10 @@ class SourceFields:
 
     def select(self, *fields: str, where: Expression | None = None) -> pa.Table:
         """Project selected fields, native keys and their available source support."""
-        import pyarrow.compute as arrow_compute
-        from pyarrow.dataset import field
-
-        pc: Any = arrow_compute
         artifact, columns = _projection(self.release, self.edition, fields)
-        entity_key = self.edition.scope + "_number"
-        if entity_key not in artifact.contract["key_columns"]:
-            raise ContractError("Source table has no matching entity key")
+        entity_key = _entity_key(artifact)
         native = self.release.analytical_dataset(artifact.identity)
-        keys = native.to_table(columns=[entity_key])[entity_key]
-        width = 6 if self.edition.scope == "district" else 9
-        normalized = canonical_source_identifiers(keys, width=width)
-        aliases = pc.unique(pc.filter(keys, pc.equal(normalized, "'" + self.identifier)))
-        predicate = field(entity_key).isin(aliases)
+        predicate = _entity_predicate(native, entity_key, (self.identifier,))
         if where is not None:
             predicate = predicate & where
         return native.to_table(columns=list(columns), filter=predicate)
@@ -222,7 +245,9 @@ class _TableExport:
 def prepare_export(release: DataRelease, edition: EditionKey, *, restore_original_headers: bool,
                    selected_fields: tuple[str, ...] | None = None, predicate: Expression | None = None,
                    queries: tuple[Callable[[pa.Schema], Expression], ...] = (),
-                   include_support: bool = False) -> _TableExport:
+                   include_support: bool = False, period: DataPeriod | None = None,
+                   entity_build: tuple[str, str] | None = None,
+                   entity_ids: tuple[str, ...] | None = None) -> _TableExport:
     import pyarrow as pa
     from .tapr import TAPR_SOURCE_KEYS, qualified_tapr_family
 
@@ -232,7 +257,7 @@ def prepare_export(release: DataRelease, edition: EditionKey, *, restore_origina
     headers = release.catalog.header_records(edition.dataset, edition_key=edition) if (
         selected_fields is None or restore_original_headers) else []
     fields = tuple(row["field"] for row in headers) if headers else selected_fields or ()
-    artifact, projected = _projection(release, edition, fields if selected_fields is None else selected_fields)
+    artifact, projected = _projection(release, edition, fields if selected_fields is None else selected_fields, period=period)
     columns = projected if include_support else fields
     original_error = "Original label and code headers require a complete raw TAPR table"
     if restore_original_headers:
@@ -250,7 +275,11 @@ def prepare_export(release: DataRelease, edition: EditionKey, *, restore_origina
                 raise ContractError(original_error)
         else:
             columns = fields
+    entity_key = _entity_key(artifact) if entity_ids is not None else None
     native = release.analytical_dataset(artifact.identity)
+    if entity_key is not None and entity_ids is not None:
+        expression = _entity_predicate(native, entity_key, entity_ids)
+        predicate = expression if predicate is None else predicate & expression
     for query in queries:
         expression = query(native.schema)
         predicate = expression if predicate is None else predicate & expression
@@ -260,8 +289,10 @@ def prepare_export(release: DataRelease, edition: EditionKey, *, restore_origina
         if not all(pa.types.is_string(field.type) or pa.types.is_large_string(field.type) for field in scanner.projected_schema):
             raise ContractError(original_error)
         rows = tuple(tuple(row[kind] for row in headers) for kind in ("label", "code"))
-    lineage = {"build_id": release.build_id, "edition": edition.to_dict(), "artifact_sha256": artifact.sha256,
-               "manifest_sha256": release.manifest_sha256}
+    lineage: dict[str, Any] = {"build_id": release.build_id, "edition": edition.to_dict(), "artifact_sha256": artifact.sha256,
+                               "manifest_sha256": release.manifest_sha256}
+    if entity_build is not None and period is not None:
+        lineage.update(entity_build_id=entity_build[0], entity_manifest_sha256=entity_build[1], measurement_period=period.to_dict())
     return _TableExport(scanner, rows, restore_original_headers, artifact.contract["rows"], lineage)
 
 

@@ -79,7 +79,11 @@ def test_qualification_rejects_missing_or_foreign_ancestor_before_artifact_reads
         document["provenance"][ancestor] = store.read_record(unrelated)
     release.catalog = SimpleNamespace(to_dict=lambda: document)
     release.verify = lambda: pytest.fail("Invalid record graph reached release artifact bytes")
-    monkeypatch.setattr("teadata.release.DataRelease", lambda _: release)
+    def open_offline(_, *, offline):
+        assert offline
+        return release
+
+    monkeypatch.setattr("teadata.release.DataRelease", open_offline)
     with pytest.raises(ReceiptError, match="provenance record graph is incomplete or invalid"):
         _validate_release("unused-metadata-fixture", "library")
     assert document["datasets"]["sample"] == current_facts

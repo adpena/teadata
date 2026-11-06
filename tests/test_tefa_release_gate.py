@@ -52,6 +52,8 @@ def private_release(monkeypatch):
         stored[projected["lookup_key"]] = record
 
     class Catalog:
+        native_sources = ()
+
         def to_dict(self):
             return deepcopy(document)
 
@@ -253,7 +255,7 @@ def test_canonical_release_validation_keeps_public_and_private_coverage(
 ):
     release = private_release.release
     calls = []
-    monkeypatch.setattr("teadata.release.DataRelease", lambda path: release)
+    monkeypatch.setattr("teadata.release.DataRelease", lambda path, *, offline: release)
     monkeypatch.setattr(verification, "_validate_release_provenance", lambda value: 1)
     release.verify = lambda: calls.append("artifacts")
 
@@ -276,3 +278,15 @@ def test_canonical_release_validation_keeps_public_and_private_coverage(
     text = capsys.readouterr().out
     assert '"measurements": 73' in text and 'TEFA private example coverage:' in text
     assert '"private_measurements": 48' in text and '"raw_fields": 192' in text
+
+
+def test_composed_release_holds_until_attached_sources_are_qualified(monkeypatch):
+    pin = "a" * 64
+    catalog = SimpleNamespace(to_dict=lambda: {"schema_version": 2},
+                              native_sources=[SimpleNamespace(manifest_sha256=pin)])
+    release = SimpleNamespace(catalog=catalog, verify=lambda: None)
+    monkeypatch.setattr("teadata.release.DataRelease", lambda path, *, offline: release)
+    for name in ("_validate_release_provenance", "_validate_publisher_cases", "_validate_tefa_cases"):
+        monkeypatch.setattr(verification, name, lambda value: None)
+    with pytest.raises(verification.ReceiptError, match="structural verification only.*" + pin):
+        verification._validate_release("candidate.json", "app")

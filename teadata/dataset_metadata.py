@@ -8,6 +8,7 @@ from datetime import date, datetime
 from hashlib import sha256
 from functools import cached_property
 import json
+import re
 from typing import Any, Literal, Mapping, get_args
 from urllib.parse import urlparse
 
@@ -155,6 +156,59 @@ class EditionKey:
     @property
     def identity(self) -> str:
         return sha256(_record_json(self.to_dict()).encode()).hexdigest()
+
+
+@dataclass(frozen=True, slots=True)
+class NativeSourceRef:
+    """A native release and its admitted editions in an entity build."""
+
+    location: str
+    manifest_sha256: str
+    build_id: str
+    editions: tuple[EditionKey, ...]
+
+    def __post_init__(self) -> None:
+        _digest_text(self.manifest_sha256)
+        _digest_text(self.build_id)
+        location = self.location
+        if not isinstance(location, str) or not location or any(c.isspace() or ord(c) < 32 for c in location):
+            raise ValueError("Native manifest location is required")
+        if any(c in location for c in "\\?#"):
+            raise ValueError("Native manifest location cannot contain a query, fragment or backslash")
+        if "://" in location:
+            validate_http_url(location)
+        elif not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*\.json", location) or location.lower() == "release.json":
+            raise ValueError("Native manifest requires a distinct adjacent JSON filename or an immutable HTTP(S) URL")
+        if (not isinstance(self.editions, tuple) or not self.editions
+                or any(not isinstance(edition, EditionKey) for edition in self.editions)
+                or len(set(self.editions)) != len(self.editions)):
+            raise ValueError("Native source requires distinct exact editions")
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, Any]) -> NativeSourceRef:
+        if (not isinstance(raw, Mapping) or set(raw) != {"location", "manifest_sha256", "build_id", "editions"}
+                or not isinstance(raw["editions"], list)
+                or any(not isinstance(edition, dict) or set(edition) != set(EditionKey.__dataclass_fields__)
+                       for edition in raw["editions"])):
+            raise ValueError("Invalid native source descriptor")
+        return cls(raw["location"], raw["manifest_sha256"], raw["build_id"],
+                   tuple(EditionKey.from_dict(edition) for edition in raw["editions"]))
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"location": self.location, "manifest_sha256": self.manifest_sha256, "build_id": self.build_id,
+                "editions": [edition.to_dict() for edition in self.editions]}
+
+
+def parse_native_sources(raw: object) -> tuple[NativeSourceRef, ...]:
+    if not isinstance(raw, list):
+        raise ValueError("Native sources must be a list of exact descriptors")
+    sources = tuple(NativeSourceRef.from_dict(item) for item in raw)
+    editions = [edition for source in sources for edition in source.editions]
+    locations = {source.location if "://" in source.location else source.location.casefold() for source in sources}
+    if (len(locations) != len(sources) or len({source.manifest_sha256 for source in sources}) != len(sources)
+            or len(set(editions)) != len(editions)):
+        raise ValueError("Native sources cannot repeat a location, manifest or exact edition")
+    return sources
 
 
 @dataclass(frozen=True)

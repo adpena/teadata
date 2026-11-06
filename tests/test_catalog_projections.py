@@ -144,7 +144,7 @@ def edition_fixture(tmp_path):
 
 def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staff"), multiple_inputs=False, damage_inputs=None,
                          normalized=False, support_damage=None, source_qualifiers=None, row_runs=None,
-                         qualifier_reference_damage=None):
+                         qualifier_reference_damage=None, amount_period=None, observed_amount=5, entity_grain=False):
     """The same tiny fixture, optionally widened without adding source rows."""
     import pyarrow as pa
     import pyarrow.csv as pacsv
@@ -159,7 +159,7 @@ def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staf
         raw = tmp_path / (family + ".csv")
         extra_codes = [f"EXTRA{i:03d}" for i in range(extra_fields)]
         extra_names = [f"extra_{i:03d}" for i in range(extra_fields)]
-        raw.write_text(("ID,NAME,VALUE\n001,Zero,0\n002,Suppressed,-999\n003,Missing,.\n004,Observed,5\n") if normalized else
+        raw.write_text((f"ID,NAME,VALUE\n001,Zero,0\n002,Suppressed,-999\n003,Missing,.\n004,Observed,{observed_amount}\n") if normalized else
                        ",".join(["ID", "NAME", "VALUE", *extra_codes]) + "\n"
                        + ",".join(["001", "One", "5", *["1"] * extra_fields]) + "\n")
         if row_runs is not None:
@@ -209,7 +209,8 @@ def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staf
         (tmp_path / (schema_sha + ".json")).write_bytes(schemas[schema_sha])
         datasets[dataset] = {2025: {"path": str(raw), "metadata": {
             "version": "2025", "value_policy": "numeric", "metrics": {
-                "amount": {"field": "amount", "unit": "count", "period": {"kind": "calendar_year", "year": 2024}}}},
+                "amount": {"field": "amount", "unit": "count",
+                           "period": amount_period or {"kind": "calendar_year", "year": 2024}}}},
             "reader": {"profiles": {"source": {"column_schema": resource.name,
                 "references": [{"reference_id": "columns", "role": "schema", "path": resource.name,
                     "reviewed_sha256": schema_sha, "status": "available", "provenance_ids": [schema_observation]}]}}}}}
@@ -289,7 +290,7 @@ def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staf
                                  ("name_support", pa.array(["fixture name context"] * actual.num_rows))]:
                 actual = actual.append_column(name, values)
             native = actual.schema.remove_metadata()
-            keys = ["source_record"]
+            keys = ["campus_number", "source_record"] if entity_grain else ["source_record"]
             support = {"fields": {"amount": {"raw": "VALUE", "status": "amount_status"},
                                   "campus_name": {"raw": "NAME", "auxiliary": ["name_support"]}},
                        "context": ["source_record", "row_kind"]}
@@ -1674,6 +1675,94 @@ def test_entity_observation_plan_preserves_pinned_primary_bindings_and_grain(
     assert binding.manifest_sha256 == projection.manifest_sha256 == right.manifest_sha256
     assert projection.grain_columns == ("campus_number",)
     assert projection.columns == ("campus_number", "amount")
+
+
+def test_school_year_query_keeps_the_saved_parent_and_native_grain(tmp_path, selected_catalog, monkeypatch):
+    from teadata.dataset_metadata import NativeSourceRef
+    from teadata.entities import Campus
+    from teadata.query import Query
+    from teadata.release import DataRelease, ROLES, using_release
+    from uuid import UUID
+
+    def compose(year, amount):
+        stage = tmp_path / str(year)
+        stage.mkdir()
+        period = DataPeriod("school_year", year - 1, year).to_dict()
+        fixture = make_edition_fixture(stage, normalized=True, amount_period=period,
+                                       observed_amount=amount, entity_grain=True)
+        child = DataRelease(fixture["root"].rename(stage / "native.json"), offline=True)
+        ref = NativeSourceRef("native.json", child.manifest_sha256, child.build_id,
+                              tuple(key for key, _, _ in fixture["leaves"].values()))
+        catalog = selected_catalog.to_dict()
+        catalog.pop("build_id")
+        catalog["native_sources"] = [ref.to_dict()]
+        catalog["build_id"] = sha256(canonical_json(catalog).encode()).hexdigest()
+        assets = {role: {"filename": role, "sha256": "0" * 64, "size_bytes": 1} for role in ROLES}
+        record = {"kind": "processing", "parameters": {"build_id": catalog["build_id"],
+                    "native_sources": [ref.to_dict()]}, "outputs": assets}
+        parent = stage / "release.json"
+        parent.write_text(canonical_json({"schema_version": 1, "catalog": catalog, "artifacts": assets,
+            "processing": {"record_id": sha256((canonical_json(record) + "\n").encode()).hexdigest(), "record": record}}))
+        return DataRelease(parent, offline=True), fixture["leaves"]["student"][2]
+
+    old, old_leaf = compose(2024, 5)
+    current, _ = compose(2025, 7)
+    assert old.build_id != current.build_id
+    mismatched = json.loads(old.path.read_bytes())
+    mismatched["catalog"] = selected_catalog.to_dict()
+    record = mismatched["processing"]["record"]
+    record["parameters"]["build_id"] = selected_catalog.build_id
+    mismatched["processing"]["record_id"] = sha256((canonical_json(record) + "\n").encode()).hexdigest()
+    mismatched_path = old.path.with_name("receipt-only-source.json")
+    mismatched_path.write_text(canonical_json(mismatched))
+    with pytest.raises(ContractError, match="Processing receipt differs"):
+        DataRelease(mismatched_path, offline=True)
+    assert old.verify_native_sources().keys() == {old.catalog.native_sources[0].manifest_sha256}
+    engine = DataEngine()
+    engine.catalog = old.catalog
+    campus = Campus(id=UUID(int=1), district_id=UUID(int=2), name="Observed", charter_type="", is_charter=False)
+    campus.campus_number = "000000004"
+    query = Query([campus], engine)
+    with pytest.raises(ContractError, match="entities bound to the snapshot"):
+        query.observations("campus_student", "amount", school_year=2024, release=old)
+    foreign_engine = DataEngine()
+    foreign_engine.catalog = current.catalog
+    campus._repo = foreign_engine
+    with pytest.raises(ContractError, match="another data release"):
+        query.observations("campus_student", "amount", school_year=2024, release=old)
+    campus._repo = engine
+    original = DataRelease.artifact
+    calls = []
+
+    def selected_only(release, role, **kwargs):
+        path = original(release, role, **kwargs)
+        calls.append(path)
+        return path
+
+    monkeypatch.setattr(DataRelease, "artifact", selected_only)
+    with using_release(old):
+        planned = query >> ("observations", "campus_student", 2024, ("amount",))
+    assert calls == []
+    with using_release(current):
+        with pytest.raises(ContractError, match="release for their entity build"):
+            query.observations("campus_student", "amount", school_year=2024)
+        pinned = query.observations("campus_student", "amount", school_year=2024, release=old)
+        with pytest.raises(ContractError, match="school year"):
+            old.observations("campus_student", "amount", school_year=2025, scope="campus")
+        query >> (lambda _: False)
+        assert pinned.to_arrow()["amount"].to_pylist() == [5]
+    df = planned.to_df()
+    assert df[["campus_number", "source_record", "amount", "VALUE", "amount_status"]].iloc[0].tolist() == ["004", 5, 5, "5", "observed"]
+    assert df.attrs["teadata"]["entity_manifest_sha256"] == old.manifest_sha256
+    assert df.attrs["teadata"]["measurement_period"] == DataPeriod("school_year", 2023, 2024).to_dict()
+    assert calls == [old_leaf, old_leaf]
+    with pytest.raises(ContractError, match="period"):
+        planned.select("campus_name").to_arrow()
+    assert query.observations("campus_student", "amount", school_year=2024, scope="campus", release=old).to_arrow().num_rows == 0
+    assert current.observations("campus_student", "amount", school_year=2025, scope="campus").to_arrow()["amount"][-1].as_py() == 7
+    old_leaf.write_bytes(b"different bytes")
+    with pytest.raises(ContractError, match="checksum or size"):
+        old.verify_native_sources()
 
 
 def test_v4_migration_preserves_detached_public_projections_and_every_identity(edition_index_fixture):

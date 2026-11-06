@@ -18,6 +18,7 @@ from typing import Any, Callable, Iterable, Mapping
 
 from ._sqlite import readonly_connection
 from .dataset_metadata import ArtifactRef, ColumnSchemaRef, DataPeriod, DatasetMetadata, EditionKey, EditionMetadataRef, FieldBinding, LeafColumnSupport, MetricDefinition, ResolvedDataset
+from .dataset_metadata import NativeSourceRef, parse_native_sources
 from .metric_bindings import MetricBinding, parse_bindings
 from .provenance import ProvenanceStore, validate_record_graph, validate_reference_records
 from .values import Measurement, ValuePolicy, ValueStatus, measure
@@ -200,6 +201,11 @@ class DatasetCatalog:
             raise ContractError("Dataset catalog identity mismatch")
         if expected_build_id is not None and identity != expected_build_id:
             raise ContractError("Dataset catalog build ID projection mismatch")
+        if "native_sources" in document:
+            try:
+                self._native_sources = parse_native_sources(document["native_sources"])
+            except ValueError as error:
+                raise ContractError(f"Invalid native sources: {error}") from error
         sources = document.get("datasets")
         if not isinstance(sources, dict) or not sources:
             raise ContractError("A data release requires loaded dataset metadata")
@@ -948,6 +954,7 @@ class DatasetCatalog:
         environment: Mapping[str, Any] | None = None,
         metric_bindings: Mapping[str, Any] | None = None,
         column_schemas: Mapping[str, str] | None = None,
+        native_sources: tuple[NativeSourceRef, ...] = (),
     ) -> DatasetCatalog:
         content = {
             "schema_version": CATALOG_SCHEMA,
@@ -960,6 +967,8 @@ class DatasetCatalog:
         }
         if column_schemas:
             content["column_schemas"] = dict(column_schemas)
+        if native_sources:
+            content["native_sources"] = [source.to_dict() for source in native_sources]
         return cls(
             {
                 **content,
@@ -970,6 +979,10 @@ class DatasetCatalog:
     @property
     def build_id(self) -> str:
         return self._build_id
+
+    @property
+    def native_sources(self) -> tuple[NativeSourceRef, ...]:
+        return getattr(self, "_native_sources", ())
 
     @property
     def datasets(self) -> dict[str, Any]:
@@ -1650,10 +1663,13 @@ class BuildRecorder:
             _validate_leaf_support(result, field_rows, source.metadata)
         return result
 
-    def catalog(self, *, schema_version: int = CATALOG_SCHEMA) -> DatasetCatalog:
+    def catalog(self, *, schema_version: int = CATALOG_SCHEMA,
+                native_sources: tuple[NativeSourceRef, ...] = ()) -> DatasetCatalog:
         if processor_identity() != self.processor_sha256:
             raise ContractError("Processing source changed during the build")
         if type(schema_version) is int and schema_version in (3, 4):
+            if native_sources:
+                raise ContractError("Only entity catalogs can attach native sources")
             records = self.store.verify_record_closure(sorted(self.edition_roots))
             resources = {digest: text.encode() for digest, text in self.column_schemas.items()}
             descriptors = {digest: ColumnSchemaRef(digest, len(raw), digest + ".json").to_dict()
@@ -1700,6 +1716,7 @@ class BuildRecorder:
                 },
             },
             column_schemas=self.column_schemas,
+            native_sources=native_sources,
         )
 
 

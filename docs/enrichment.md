@@ -13,13 +13,23 @@ measurement period, source revision, and the publisher's row keys. For example,
 annual dropout has separate rows for grade span and reporting calculation. A
 single value in an entity's metadata cannot represent those distinctions.
 
-The internal observation planner links a specific entity build to explicitly
-selected native releases. It resolves exact field bindings and selects their
-required columns and row keys without opening a data file. The native tables
-retain raw values and suppression status. The planner does not change the
-existing snapshot or make current geography or roster membership historical.
-Public year selection in `Query`, historical joins, and activation of those
-releases in the default enrichment build are still pending.
+An entity build can attach native releases through `options.native_sources` in
+its build configuration. Each entry supplies `location`, `manifest_sha256`,
+`build_id`, and `editions`. The editions are the complete list of `EditionKey`
+dictionaries from the selected native release. Use an immutable HTTP(S) URL or
+a distinct JSON filename adjacent to the entity manifest. Stage the complete
+native bundle before building. The builder verifies it offline and includes the
+pins in the entity build ID and processing receipt.
+
+Composed builds are available for local research. Bundle verification checks
+the pinned child artifacts and their structure. The release gate holds these
+builds until it can verify semantic qualification for each attached source.
+
+The observation planner resolves selected fields by measurement period before
+opening a data file. Execution retains the native row keys, raw values and
+suppression status. An entity query filters those rows by selected TEA numbers.
+The historical population and geography still require their own dated sources.
+See [school-year selection](querying.md#school-years-and-source-editions).
 
 ## Districts
 

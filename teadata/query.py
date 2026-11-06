@@ -8,6 +8,7 @@ if TYPE_CHECKING:
     from .dataset_metadata import EditionKey
     from .engine import DataEngine
     from .release import DataRelease
+    from .source_views import SourceTable
 
 from .entities import (
     Campus,
@@ -422,6 +423,44 @@ class Query:
         return handler(self, op)
 
     # ---------------------- individual handlers ----------------------
+    def observations(self, dataset: str, *fields: str, school_year: int, scope: str | None = None,
+                     edition: EditionKey | None = None, release: DataRelease | None = None) -> SourceTable:
+        """Plan published rows for the selected public entities and a measurement school year."""
+        from .manifest import ContractError
+        from .release import current_release
+
+        identifiers = []
+        for item in self._items:
+            if isinstance(item, District):
+                item_scope, identifier = "district", item.district_number_canon
+            elif isinstance(item, Campus) and not item.is_private:
+                item_scope, identifier = "campus", item.lookup_key
+            else:
+                raise ValueError("Observation queries require public districts or campuses")
+            if scope is None:
+                scope = item_scope
+            if scope != item_scope or not identifier:
+                raise ValueError("Observation queries require one entity scope and exact TEA numbers")
+            identifiers.append(identifier)
+        if scope not in {"district", "campus"}:
+            raise ValueError("Observation queries require district or campus scope")
+        catalog = getattr(self._repo, "catalog", None)
+        if catalog is None or not catalog.native_sources:
+            raise ContractError("The query's entity build has no attached native sources")
+        if any(catalog._entity_build_id(item) != catalog.build_id for item in self._items):
+            raise ContractError("Observation queries require entities bound to the snapshot")
+        parent = release if release is not None else current_release()
+        if parent.build_id != catalog.build_id:
+            raise ContractError("Observation queries require the release for their entity build")
+        return parent.observations(dataset, *fields, school_year=school_year, scope=scope, edition=edition)._for_entity_ids(
+            tuple(dict.fromkeys(identifiers)))
+
+    def _op_observations(self, op: tuple) -> SourceTable:
+        if not 4 <= len(op) <= 6 or not isinstance(op[3], (tuple, list)):
+            raise ValueError("Observations require a dataset, school year and field list, with optional scope and edition")
+        return self.observations(op[1], *op[3], school_year=op[2], scope=op[4] if len(op) >= 5 else None,
+                                 edition=op[5] if len(op) == 6 else None)
+
     def compare_statewide(self, *, release: DataRelease, local: EditionKey,
                           statewide: EditionKey, metric: str = "*",
                           dimensions: Mapping[str, str] | None = None) -> Query:
@@ -731,6 +770,7 @@ _register("take", Query._op_take)
 _register("sort", Query._op_sort)
 _register("map", Query._op_map)
 _register("compare_statewide", Query._op_compare_statewide)
+_register("observations", Query._op_observations)
 _register("distinct", Query._op_distinct)
 _register("grade_overlap", Query._op_grade_overlap)
 _register("campuses_in", Query._op_campuses_in)

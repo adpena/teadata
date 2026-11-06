@@ -20,7 +20,8 @@ from teadata.manifest import ACTIVE_BUILD, BuildRecorder, ContractError, write_s
 from teadata.enrichment import EnrichmentOutcome, _record_outcome
 from teadata.provenance import ProvenanceStore
 from teadata.identifiers import canonical_source_identifier, campus_lookup_key, normalize_campus_lookup_key
-from teadata.release import publish_release, SNAPSHOT_MAGIC
+from teadata.dataset_metadata import parse_native_sources
+from teadata.release import _open_native_source, publish_release, SNAPSHOT_MAGIC
 from teadata.transfer_summary import transfer_measurement, normalized_transfer_measurement
 
 from datetime import datetime, date
@@ -2732,6 +2733,9 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
         .resolve()
     )
     output.mkdir(exist_ok=True)
+    native_sources = parse_native_sources(cfg.options.get("native_sources", []))
+    for ref in native_sources:
+        _open_native_source(ref, output / "release.json", offline=True).verify()
     store = ProvenanceStore(
         os.environ.get("TEADATA_PROVENANCE_DIR", str(Path.cwd() / "provenance"))
     )
@@ -2752,7 +2756,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                 raise ContractError(
                     f"Build source coverage mismatch: {sorted(expected - set(build.datasets))}"
                 )
-            repo.catalog = build.catalog()
+            repo.catalog = build.catalog(native_sources=native_sources)
             for scope, entities in (("district", repo._districts.values()), ("campus", repo._campuses.values())):
                 for entity in entities:
                     if scope == "campus" and entity.is_private:
@@ -2792,12 +2796,15 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
                 for value in build.datasets.values()
                 for receipt in value["metadata"]["provenance_ids"]
             ]
+            parameters: dict[str, Any] = {"build_id": repo.catalog.build_id}
+            if native_sources:
+                parameters["native_sources"] = [ref.to_dict() for ref in native_sources]
             processing_id = store.record_processing(
                 dataset="teadata_release",
                 inputs=inputs,
                 outputs=artifacts,
                 processor="teadata.load_data",
-                parameters={"build_id": repo.catalog.build_id},
+                parameters=parameters,
                 code_version=repo.catalog.to_dict()["processor_sha256"],
                 validation=validation,
                 diagnostics={"analytical": analytical_report["runtime"]},

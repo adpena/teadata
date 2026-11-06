@@ -431,6 +431,31 @@ def verify_workbook_witnesses(store: ProvenanceStore) -> dict[str, Any]:
 
 
 _STATEWIDE_BATCH_ROWS = 16
+_STATEWIDE_ROW_GROUP_ROWS = 128
+_LEAF_BATCH_BYTES = 8 * 1024**2
+
+
+def _statewide_row_groups(batches: Iterator[pa.RecordBatch]) -> Iterator[pa.RecordBatch]:
+    """Pack small parser batches into bounded Parquet row groups in source order."""
+    def combine(parts: list[pa.RecordBatch]) -> Iterator[pa.RecordBatch]:
+        if len(parts) == 1:
+            yield parts[0]
+            return
+        combined = pa.Table.from_batches(parts).combine_chunks()
+        yield from combined.to_batches() if combined.nbytes <= _LEAF_BATCH_BYTES else parts
+
+    pending: list[pa.RecordBatch] = []
+    rows = size = 0
+    for batch in batches:
+        if pending and (rows + batch.num_rows > _STATEWIDE_ROW_GROUP_ROWS or size + batch.nbytes > _LEAF_BATCH_BYTES):
+            yield from combine(pending)
+            pending.clear()
+            rows = size = 0
+        pending.append(batch)
+        rows += batch.num_rows
+        size += batch.nbytes
+    if pending:
+        yield from combine(pending)
 
 
 def _statewide_batches(store: ProvenanceStore, entries: Sequence[ReportSelection], policy: ValuePolicy
@@ -599,6 +624,7 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
                 "whole_report_semantics_qualified": False}
             if statewide:
                 recipe.update(operation=STATEWIDE_OPERATION, report_ledger_version=2,
+                              parquet_row_group_max_rows=_STATEWIDE_ROW_GROUP_ROWS,
                               cohort={name: edition.identity for name, edition in edition_keys.items()})
             toolchain = {"python": sys.version, "pyarrow": str(pa.__version__), "platform": platform.platform()}
             contract = recorder.leaf_contract(key, selected, native_schema=table.schema.serialize().to_pybytes(),
@@ -623,13 +649,15 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
                                 stream.write((canonical_json(hold) + "\n").encode())
                             yield from chunk.to_batches()
 
-                    physical = write_leaf_artifact(path, batches(), contract=contract, batch_bytes=8 * 1024**2)
+                    physical = write_leaf_artifact(path, _statewide_row_groups(batches()), contract=contract,
+                                                   batch_bytes=_LEAF_BATCH_BYTES)
                 _verify_statewide_projection(target, reports, policy, path, audit_tmp)
                 audit_path = stage / f"tprs-raw_audit-{sha256(audit_tmp.read_bytes()).hexdigest()}.jsonl.gz"
                 audit_tmp.rename(audit_path)
                 outputs.update(roster=roster_path, raw_audit=audit_path, grid=grid_path)
             else:
-                physical = write_leaf_artifact(path, table.to_batches(max_chunksize=512), contract=contract, batch_bytes=8 * 1024**2)
+                physical = write_leaf_artifact(path, table.to_batches(max_chunksize=512), contract=contract,
+                                               batch_bytes=_LEAF_BATCH_BYTES)
                 _need(table.equals(pq.read_table(path).replace_schema_metadata(None)), "Student native readback differs")
             for report in groups.get(scope, ()):
                 observation = target.record_acquisition(target.verify_artifact(report.sha256), ResolvedDataset(

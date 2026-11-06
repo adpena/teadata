@@ -209,6 +209,16 @@ def _input_identity(root: Path, *, kind: str, paired_library: Path | None, relea
             asset = path.parent / filename
             identities[role] = {"filename": filename, "sha256": _digest(asset), "size_bytes": asset.stat().st_size}
         result["release_artifacts"] = identities
+        if document.get("catalog", {}).get("native_sources"):
+            from teadata.manifest import ContractError
+            from teadata.release import DataRelease
+
+            try:
+                sources = DataRelease(path, expected_sha256=result["release_manifest_sha256"], offline=True).verify_native_sources()
+                result["native_sources"] = {pin: {name: _digest(asset) for name, asset in files.items()}
+                                            for pin, files in sources.items()}
+            except (ContractError, OSError, ValueError) as error:
+                raise ReceiptError(f"A release check requires verified retained native sources: {error}") from error
     return result
 
 
@@ -734,7 +744,7 @@ def _validate_tefa_cases(release: DataRelease) -> dict[str, Any]:
 
 def _validate_release(path: str, kind: str) -> None:
     from teadata.release import DataRelease
-    release = DataRelease(Path(path).expanduser())
+    release = DataRelease(Path(path).expanduser(), offline=True)
     if release.catalog.to_dict()["schema_version"] != 2:
         raise ReceiptError("Edition catalogs require --native-release with an exact pin and retained source store")
     provenance_records = _validate_release_provenance(release)
@@ -745,6 +755,10 @@ def _validate_release(path: str, kind: str) -> None:
         from teadata.manifest import processor_identity
         if release.catalog.to_dict()["processor_sha256"] != processor_identity():
             raise ReceiptError("Release was built from different processing code or lockfile; rebuild it")
+    if release.catalog.native_sources:
+        pins = ", ".join(ref.manifest_sha256 for ref in release.catalog.native_sources)
+        raise ReceiptError(f"Attached native sources passed structural verification only. "
+                           f"Release qualification requires reviewed source evidence for {pins}")
     print(f"Verified data release {release.build_id}")
     print(f"Verified provenance record graph: {provenance_records} records")
     print("Publisher example coverage: " + json.dumps(publisher_checks, sort_keys=True))
