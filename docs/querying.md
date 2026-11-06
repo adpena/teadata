@@ -309,13 +309,28 @@ before reading observations. This uses the same contract as the comparison.
 ```python
 from teadata.staar_comparison import staar_rate_contract
 
-contract = staar_rate_contract(release, edition_for("district"))
+district_edition = edition_for("district")
+contract = staar_rate_contract(release, district_edition)
 print(contract.metadata.period)
 print(contract.metadata.metrics[metric])
 for reference in contract.metadata.references:
     print(reference.reference_id, reference.url, reference.provenance_ids)
 print(contract.value_policy)
+print(release.catalog.metadata(district_edition.dataset, edition=district_edition).references)
 ```
+
+For 2025–26 End-of-Course, `staar_rate_legend` is the interpretation
+reference for the 210 reviewed rate fields. In the named TPRS reports
+checked, `*` matched raw rate `-1`, which the comparison marks `suppressed`.
+The report's `-` matched an empty raw rate string. The comparison preserves
+that empty string and marks it `missing`. A numeric rate can remain observed
+when the raw component counts are `-3`. The comparison does not infer those
+counts or a masking threshold.
+
+The raw bulk edition's `masking` reference is still `unreviewed`. TEA's
+[TPRS glossary](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/comprehensive-tprs-glossary.pdf)
+dates the linked TAPR masking rules to 2024–25. The reviewed rate legend
+does not govern the entire 2025–26 bulk table or other products.
 
 The source must contain both selected editions. Each comparison requires the
 same grade, school year, subject, student group and criterion. Suppression,
