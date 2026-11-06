@@ -410,7 +410,7 @@ class Query:
     # ------------------------------------------------------------------
     def __rshift__(self, op):
         if callable(op):
-            return self._op_filter_callable(op)
+            return Query(self._items, self._repo)._op_filter_callable(op)
         if not (isinstance(op, tuple) and op):
             raise ValueError(f"Unsupported >> operation on Query: {op!r}")
 
@@ -420,7 +420,7 @@ class Query:
         handler = self._HANDLERS.get(key)
         if handler is None:
             raise ValueError(f"Unsupported Query op: {op!r}")
-        return handler(self, op)
+        return handler(Query(self._items, self._repo), op)
 
     # ---------------------- individual handlers ----------------------
     def observations(self, dataset: str, *fields: str, school_year: int | None = None, scope: str | None = None,
@@ -628,7 +628,7 @@ class Query:
         miles = float(op[2])
         limit = int(op[3]) if len(op) >= 4 and op[3] is not None else None
         charter_only = bool(op[4]) if len(op) >= 5 else False
-        items = self._repo.campuses_within_radius(
+        items = self._repo.radius_campuses(
             coords[0], coords[1], miles, charter_only=charter_only, limit=limit
         )
         return Query(items, self._repo)
@@ -723,12 +723,8 @@ class Query:
             for to_c, cnt, masked in self._repo.transfers_out(c):
                 if charter_only and not (to_c is not None and is_charter(to_c)):
                     continue
-                if pred_to is not None:
-                    try:
-                        if not pred_to(to_c):
-                            continue
-                    except Exception:
-                        continue
+                if pred_to is not None and not pred_to(to_c):
+                    continue
                 rows.append((c, to_c, cnt, masked))
         self._items = rows
         return self
@@ -752,11 +748,8 @@ class Query:
         for it in self._items:
             if isinstance(it, tuple) and len(it) >= 2:
                 to_c = it[1]
-                try:
-                    if pred(to_c):
-                        new_items.append(it)
-                except Exception:
-                    pass
+                if pred(to_c):
+                    new_items.append(it)
         self._items = new_items
         return self
 

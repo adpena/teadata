@@ -92,17 +92,20 @@ def euclidean(a: Tuple[float, float], b: Tuple[float, float]) -> float:
     return math.hypot(x2 - x1, y2 - y1)
 
 
+EARTH_RADIUS_MILES = 3958.7613
+
+
 def haversine_miles(x1: float, y1: float, x2: float, y2: float) -> float:
     """Approximate great-circle distance between two lon/lat points in miles."""
     from math import atan2, cos, radians, sin, sqrt
 
-    R = 3958.7613  # Earth radius in miles
     lon1, lat1, lon2, lat2 = map(radians, (x1, y1, x2, y2))
     dlon = lon2 - lon1
     dlat = lat2 - lat1
     a = sin(dlat / 2) ** 2 + cos(lat1) * cos(lat2) * sin(dlon / 2) ** 2
+    a = min(max(a, 0.0), 1.0)
     c = 2 * atan2(sqrt(a), sqrt(1 - a))
-    return R * c
+    return EARTH_RADIUS_MILES * c
 
 
 def point_xy(pt: Any) -> Tuple[float, float] | None:

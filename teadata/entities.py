@@ -320,6 +320,14 @@ class Campus:
             object.__setattr__(self, "grade_range_high_code", high)
             return
         object.__setattr__(self, name, value)
+        if name in {"_point", "location", "school_type", "is_charter"}:
+            try:
+                repo = object.__getattribute__(self, "_repo")
+            except AttributeError:
+                return
+            registry = getattr(repo, "_campuses", None)
+            if registry is not None and registry.get(self.id) is self:
+                repo._clear_spatial_indexes()
 
     def __post_init__(self):
         self.name = self.name.upper()

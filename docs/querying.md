@@ -20,6 +20,12 @@ top5 = (
 print(top5)  # list[(name, enrollment)]
 ```
 
+Each shift returns a result from the original selection. Assign the returned
+query to keep a filtered or sorted branch. Branches share the same entity
+objects, so editing an entity is visible through any branch that contains it.
+Transfer predicates propagate exceptions. A predicate can explicitly accept
+or reject a missing destination.
+
 ## Common Operators
 
 - `>> ("campuses_in",)` — expand the current district query into its district-operated campuses (excludes charters and private schools)
@@ -27,6 +33,7 @@ print(top5)  # list[(name, enrollment)]
 - `>> ("filter", predicate)` or `>> (lambda x: ...)`
 - `>> ("sort", key_fn, descending: bool=False)`
 - `>> ("take", n)`
+- `>> ("radius", (longitude, latitude), miles)` — campuses within an inclusive great-circle distance. Radius and KNN use valid longitude and latitude coordinates.
 - `>> ("nearest_charter", coords, mile_limit, k)` — from repo-level query context
 - `first()` — take first element
 - Attribute fall-through: `Query.attr` proxies to `first().attr` for convenience.

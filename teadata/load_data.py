@@ -468,34 +468,6 @@ def _entity_store_path(districts_fp: str, campuses_fp: str) -> Path:
     return d / tag
 
 
-def _prepare_repo_for_pickle(repo: DataEngine) -> None:
-    """Drop transient spatial indexes so the pickle is small and portable."""
-    for attr in (
-        "_district_cover_index",
-        "_kdtree",
-        "_kdtree_charter",
-        "_xy_deg",
-        "_xy_rad",
-        "_campus_list",
-        "_xy_deg_charter",
-        "_xy_rad_charter",
-        "_campus_list_charter",
-        "_point_tree",
-        "_point_geoms",
-        "_point_ids",
-        "_geom_id_to_index",
-        "_xy_deg_np",
-        "_campus_list_np",
-        "_xy_deg_np_charter",
-        "_campus_list_np_charter",
-        "_all_xy_np",
-        "_all_campuses_np",
-        "_xy_to_index",
-    ):
-        if hasattr(repo, attr):
-            setattr(repo, attr, None)
-
-
 def _strip_repo_boundaries(repo: DataEngine) -> None:
     for district in repo._districts.values():
         district.boundary = None
@@ -2208,7 +2180,6 @@ def _save_entity_store(
 
 def _save_repo_snapshot(repo: DataEngine, districts_fp: str, campuses_fp: str) -> Path:
     path = _snapshot_path(districts_fp, campuses_fp).with_suffix(".pkl.gz")
-    _prepare_repo_for_pickle(repo)
     with (
         path.open("wb") as stream,
         gzip.GzipFile(filename="", fileobj=stream, mode="wb", mtime=0) as compressed,

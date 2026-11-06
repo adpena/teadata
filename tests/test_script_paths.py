@@ -211,7 +211,6 @@ def test_snapshot_writer_only_writes_staging(monkeypatch, tmp_path, catalog):
     build_cache = tmp_path / "build"
     build_cache.mkdir()
     monkeypatch.setattr(load_data, "_repo_cache_dir", lambda: build_cache)
-    monkeypatch.setattr(load_data, "_prepare_repo_for_pickle", lambda _: None)
     repo = SimpleNamespace(example="snapshot fixture", catalog=catalog)
     path = load_data._save_repo_snapshot(repo, "districts.geojson", "campuses.geojson")
     with gzip.open(path, "rb") as stream:

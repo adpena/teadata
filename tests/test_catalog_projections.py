@@ -1752,7 +1752,8 @@ def test_school_year_query_keeps_the_saved_parent_and_native_grain(tmp_path, sel
         pinned = query.observations("campus_student", "amount", school_year=2024, release=old)
         with pytest.raises(ContractError, match="school year"):
             old.observations("campus_student", "amount", school_year=2025, scope="campus")
-        query >> (lambda _: False)
+        empty = query >> (lambda _: False)
+        assert list(query) == [campus]
         assert pinned.to_arrow()["amount"].to_pylist() == [5]
     df = planned.to_df()
     assert df[["campus_number", "source_record", "amount", "VALUE", "amount_status"]].iloc[0].tolist() == ["004", 5, 5, "5", "observed"]
@@ -1761,7 +1762,7 @@ def test_school_year_query_keeps_the_saved_parent_and_native_grain(tmp_path, sel
     assert calls == [old_leaf, old_leaf]
     with pytest.raises(ContractError, match="period"):
         planned.select("campus_name").to_arrow()
-    assert query.observations("campus_student", "amount", school_year=2024, scope="campus", release=old).to_arrow().num_rows == 0
+    assert empty.observations("campus_student", "amount", school_year=2024, scope="campus", release=old).to_arrow().num_rows == 0
     assert current.observations("campus_student", "amount", school_year=2025, scope="campus").to_arrow()["amount"][-1].as_py() == 7
     old_leaf.write_bytes(b"different bytes")
     with pytest.raises(ContractError, match="checksum or size"):

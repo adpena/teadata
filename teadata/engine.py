@@ -6,12 +6,13 @@ from collections import defaultdict
 from contextlib import contextmanager
 from copy import copy
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
+from heapq import nsmallest
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Tuple
 import fnmatch
 import gzip
 import logging
+import math
 import os
 import pickle
 import sys
@@ -37,6 +38,7 @@ from .entities import (
     is_private,
 )
 from .geometry import (
+    EARTH_RADIUS_MILES,
     SHAPELY,
     MultiPolygon,
     ShapelyPoint,
@@ -254,6 +256,7 @@ def _discover_snapshot(explicit: str | Path | None = None) -> Path:
     )
 
 
+# Legacy warmed snapshots can refer to these classes during unpickling.
 @dataclass
 class _CharterCacheEntry:
     objects: list[Campus]
@@ -265,6 +268,99 @@ class _CharterCacheEntry:
 class _CharterCache:
     has_numpy: bool
     entries: Dict[str, _CharterCacheEntry]
+
+
+def _unit_sphere_xyz(points):
+    import numpy as np
+
+    lon, lat = np.radians(points).T
+    cos_lat = np.cos(lat)
+    return np.stack((cos_lat * np.cos(lon), cos_lat * np.sin(lon), np.sin(lat)), axis=-1)
+
+
+@dataclass
+class _SphericalCampusIndex:
+    campuses: list[Campus]
+    points: list[tuple[float, float]]
+    xyz: Any
+    tree: Any
+
+    @classmethod
+    def build(cls, entries: list[tuple[Campus, tuple[float, float]]]) -> _SphericalCampusIndex:
+        campuses = [campus for campus, _ in entries]
+        points = [point for _, point in entries]
+        xyz = _unit_sphere_xyz(points)
+        try:
+            from scipy.spatial import cKDTree  # type: ignore[unresolved-import]
+        except ImportError:
+            tree = None
+        else:
+            tree = cKDTree(xyz)
+        return cls(campuses, points, xyz, tree)
+
+    def candidates(
+        self, origin: tuple[float, float], limit: int | None, miles: float | None
+    ) -> Iterable[int]:
+        import numpy as np
+
+        if (limit is not None and limit <= 0) or (miles is not None and not miles >= 0):
+            return ()
+        size = len(self.campuses)
+        if miles is None and (limit is None or limit >= size):
+            return range(size)
+        seed = _unit_sphere_xyz(origin)
+        chord = (
+            2 * math.sin(min(math.pi, miles / EARTH_RADIUS_MILES) / 2)
+            if miles is not None else math.inf
+        )
+        # Expand only the candidate boundary. Final ranking and cutoff use haversine.
+        slack = 8 * math.ulp(1.0)
+        if self.tree is not None:
+            if limit is not None and limit < size:
+                kth = self.tree.query(seed, k=[limit])[0][0]
+                chord = min(chord, float(kth))
+            return sorted(self.tree.query_ball_point(seed, chord + slack))
+
+        delta = self.xyz - seed
+        squared = np.einsum("ij,ij->i", delta, delta)
+        if limit is not None and limit < size:
+            kth = np.partition(squared, limit - 1)[limit - 1]
+            chord = min(chord, math.sqrt(kth))
+        return np.flatnonzero(squared <= (chord + slack) ** 2).tolist()
+
+    def rank(
+        self,
+        origin: tuple[float, float],
+        limit: int | None,
+        miles: float | None = None,
+        *,
+        exclude: uuid.UUID | None = None,
+    ) -> list[tuple[float, Campus]]:
+        candidate_limit = limit
+        if exclude is not None and limit is not None:
+            candidate_limit = limit + 1
+        results = []
+        for i in self.candidates(origin, candidate_limit, miles):
+            campus = self.campuses[i]
+            if campus.id != exclude:
+                distance = haversine_miles(*origin, *self.points[i])
+                if miles is None or distance <= miles:
+                    results.append((distance, campus))
+        results.sort(key=lambda row: row[0])
+        return results[:limit]
+
+
+@dataclass
+class _CampusSpatialCaches:
+    geodesic: dict[bool, _SphericalCampusIndex] | None = None
+    by_school_type: dict[str, _SphericalCampusIndex] | None = None
+    bounding_box: tuple[Any, list[Campus]] | None = None
+    containment: tuple[Any, list[Campus]] | None = None
+
+
+def _campus_point(campus: Campus) -> tuple[float, float] | None:
+    point = point_xy(campus.point) or point_xy(campus.location)
+    return point if point is not None and all(map(math.isfinite, point)) else None
 
 
 class DataEngine:
@@ -377,35 +473,7 @@ class DataEngine:
         self._xfers_unresolved = []
         self._transfer_measurements = {}
         self._in_bulk = False
-        # Spatial/attribute indexes (optional, built on demand)
-        self._kdtree = None
-        self._kdtree_charter = None
-        self._xy_deg = None
-        self._xy_rad = None
-        self._campus_list = None
-        self._xy_deg_charter = None
-        self._xy_rad_charter = None
-        self._campus_list_charter = None
-
-        # Shapely STRtree for campus points (built lazily)
-        self._point_tree = None
-        self._point_geoms = None
-        self._point_ids = None
-        self._geom_id_to_index = None
-
-        # Vectorized fallback arrays (NumPy) for haversine when KDTree unavailable
-        self._xy_deg_np = None
-        self._campus_list_np = None
-        self._xy_deg_np_charter = None
-        self._campus_list_np_charter = None
-
-        # All-campus XY caches (NumPy) for bbox candidate generation
-        self._all_xy_np = None
-        self._all_campuses_np = None
-
-        # Coordinate → index lists (robust legacy mapping when STRtree returns copies)
-        self._xy_to_index = None  # dict[(x,y)] -> [index]
-        self._charter_cache = None
+        self._clear_spatial_indexes()
         self._boundary_store = None
         self._boundary_store_path = None
 
@@ -452,12 +520,6 @@ class DataEngine:
             self._ensure_charter_cache()
         except Exception:
             pass
-        # Prime NumPy fallbacks for both charter/non-charter sets if available
-        try:
-            self._numpy_coords_and_campuses(False)
-            self._numpy_coords_and_campuses(True)
-        except Exception:
-            pass
         import gc
 
         gc.collect()
@@ -467,27 +529,7 @@ class DataEngine:
         Force-clear all spatial, vectorized, and name-lookup caches to free up memory.
         The engine remains fully functional; caches will be rebuilt lazily on demand.
         """
-        self._district_cover_index = None
-        self._kdtree = None
-        self._kdtree_charter = None
-        self._xy_deg = None
-        self._xy_rad = None
-        self._campus_list = None
-        self._xy_deg_charter = None
-        self._xy_rad_charter = None
-        self._campus_list_charter = None
-        self._point_tree = None
-        self._point_geoms = None
-        self._point_ids = None
-        self._geom_id_to_index = None
-        self._xy_deg_np = None
-        self._campus_list_np = None
-        self._xy_deg_np_charter = None
-        self._campus_list_np_charter = None
-        self._all_xy_np = None
-        self._all_campuses_np = None
-        self._xy_to_index = None
-        self._charter_cache = None
+        self._clear_spatial_indexes()
 
         # Keep identity indexes available to validate inserts even with caches cleared.
         self._campus_by_name_lower = {}
@@ -1010,12 +1052,27 @@ class DataEngine:
             pass
         return geom
 
-    def _clear_charter_cache(self):
-        self._charter_cache = None
+    def __getstate__(self) -> dict[str, Any]:
+        state = self.__dict__.copy()
+        state.pop("_campus_spatial_caches", None)
+        state["_district_cover_index"] = None
+        return state
 
     def _clear_spatial_indexes(self) -> None:
         self._district_cover_index = None
+        self._campus_spatial_caches: _CampusSpatialCaches | None = None
+
+    def _spatial_caches(self) -> _CampusSpatialCaches:
+        caches = getattr(self, "_campus_spatial_caches", None)
+        if caches is None:
+            caches = self._campus_spatial_caches = _CampusSpatialCaches()
+        return caches
+
+    def _drop_legacy_spatial_indexes(self) -> None:
+        # Old pickles can still contain these derived attributes.
         for attr in (
+            "_charter_cache",
+            "_all_xy_np",
             "_kdtree",
             "_kdtree_charter",
             "_xy_deg",
@@ -1033,12 +1090,10 @@ class DataEngine:
             "_campus_list_np",
             "_xy_deg_np_charter",
             "_campus_list_np_charter",
-            "_all_xy_np",
             "_all_campuses_np",
             "_xy_to_index",
         ):
-            setattr(self, attr, None)
-        self._charter_cache = None
+            self.__dict__.pop(attr, None)
 
     def _set_indexes_enabled(self, enabled: bool) -> None:
         self._indexes_enabled = bool(enabled)
@@ -1053,70 +1108,25 @@ class DataEngine:
             },
         )
 
-    def _ensure_charter_cache(self) -> _CharterCache:
-        if not getattr(self, "_indexes_enabled", True):
-            cache = _CharterCache(has_numpy=False, entries={})
-            self._charter_cache = cache
-            _log_memory(
-                "indexes.charter_cache.disabled",
-                {
-                    "entries": 0,
-                    "districts": len(getattr(self, "_districts", {})),
-                    "campuses": len(getattr(self, "_campuses", {})),
-                },
-            )
-            return cache
-        cache = getattr(self, "_charter_cache", None)
-        if cache is not None:
-            return cache
-        try:
-            import numpy as np  # type: ignore
-        except Exception:
-            np = None  # type: ignore
-        coords_by_type: Dict[str, list[tuple[float, float]]] = defaultdict(list)
-        objs_by_type: Dict[str, list[Campus]] = defaultdict(list)
-        for cand in self._campuses.values():
-            if not is_charter(cand):
+    def _charter_points_by_type(self) -> dict[str, list[tuple[Campus, tuple[float, float]]]]:
+        entries = defaultdict(list)
+        for campus in tuple(self._campuses.values()):
+            if not is_charter(campus) or is_private(campus):
                 continue
-            st = (getattr(cand, "school_type", None) or "").strip()
-            if not st:
-                continue
-            p = getattr(cand, "point", None) or getattr(cand, "location", None)
-            if p is None:
-                continue
-            try:
-                x, y = float(p.x), float(p.y)
-            except Exception:
-                continue
-            coords_by_type[st].append((x, y))
-            objs_by_type[st].append(cand)
-        entries: Dict[str, _CharterCacheEntry] = {}
-        for st, coords in coords_by_type.items():
-            if not coords:
-                continue
-            tree = None
-            coords_payload: Any = coords
-            if np is not None:
-                arr_deg = np.array(coords, dtype=float)
-                try:
-                    from scipy.spatial import cKDTree  # type: ignore
-                except Exception:
-                    coords_payload = arr_deg
-                else:
-                    coords_payload = arr_deg
-                    tree = cKDTree(np.radians(arr_deg))
-            entries[st] = _CharterCacheEntry(objs_by_type[st], coords_payload, tree)
-        cache = _CharterCache(has_numpy=np is not None, entries=entries)
-        self._charter_cache = cache
-        _log_memory(
-            "indexes.charter_cache.built",
-            {
-                "entries": len(entries),
-                "districts": len(getattr(self, "_districts", {})),
-                "campuses": len(getattr(self, "_campuses", {})),
-            },
-        )
-        return cache
+            school_type = (campus.school_type or "").strip()
+            point = _campus_point(campus)
+            if school_type and point is not None and probably_lonlat(*point):
+                entries[school_type].append((campus, point))
+        return entries
+
+    def _ensure_charter_cache(self) -> dict[str, _SphericalCampusIndex]:
+        caches = self._spatial_caches()
+        if caches.by_school_type is None:
+            caches.by_school_type = {
+                school_type: _SphericalCampusIndex.build(group)
+                for school_type, group in self._charter_points_by_type().items()
+            }
+        return caches.by_school_type
 
     def _rebuild_indexes(self) -> None:
         district_numbers: dict[str, uuid.UUID] = {}
@@ -1138,27 +1148,8 @@ class DataEngine:
         for c in self._campuses.values():
             if c.district_id in self._districts:
                 self._campuses_by_district[c.district_id].append(c.id)
-        # Invalidate spatial index; rebuilt lazily
-        self._kdtree = None
-        self._kdtree_charter = None
-        self._xy_deg = None
-        self._xy_rad = None
-        self._campus_list = None
-        self._xy_deg_charter = None
-        self._xy_rad_charter = None
-        self._campus_list_charter = None
-        # Invalidate Shapely STRtree and vectorized caches
-        self._point_tree = None
-        self._point_geoms = None
-        self._point_ids = None
-        self._geom_id_to_index = None
-        self._xy_deg_np = None
-        self._campus_list_np = None
-        self._xy_deg_np_charter = None
-        self._campus_list_np_charter = None
-        self._all_xy_np = None
-        self._all_campuses_np = None
-        self._xy_to_index = None
+        self._clear_spatial_indexes()
+        self._drop_legacy_spatial_indexes()
 
         # Rebuild name indexes separately from the entity identity constraint.
         try:
@@ -1205,14 +1196,6 @@ class DataEngine:
             self._campus_wildcard_cache = {}
             self._name_lookup_version = getattr(self, "_name_lookup_version", 0) + 1
 
-        self._charter_cache = None
-        try:
-            cache_clear = getattr(self.nearest_campus, "cache_clear", None)
-            if cache_clear:
-                cache_clear()
-        except Exception:
-            pass
-
         if not hasattr(self, "_xfers_missing"):
             self._xfers_missing = {"src": 0, "dst": 0, "either": 0}
 
@@ -1220,196 +1203,66 @@ class DataEngine:
         global ENABLE_PROFILING
         ENABLE_PROFILING = bool(on)
 
-    def _ensure_point_strtree(self):
-        """Build a Shapely STRtree over campus points for fast spatial containment queries (Shapely 2.x–only)."""
-        if not getattr(self, "_indexes_enabled", True):
-            return
-        if not SHAPELY:
-            self._point_tree = None
-            self._point_geoms = None
-            self._point_ids = None
-            return
+    def _ensure_point_strtree(self) -> tuple[Any, list[Campus]] | None:
+        if not self._indexes_enabled or not SHAPELY:
+            return None
+        caches = self._spatial_caches()
+        if caches.containment is None:
+            from shapely.strtree import STRtree
 
-        # Already built?
-        if getattr(self, "_point_tree", None) is not None:
-            return
+            campuses, points = [], []
+            for campus in tuple(self._campuses.values()):
+                point = _campus_point(campus)
+                if point is not None:
+                    campuses.append(campus)
+                    geometry = campus.point
+                    points.append(geometry if isinstance(geometry, ShapelyPoint) else ShapelyPoint(*point))
+            if campuses:
+                caches.containment = STRtree(points), campuses
+        return caches.containment
 
-        try:
-            from shapely.strtree import STRtree  # Shapely 2.x API
-        except Exception:
-            # Shapely not available or too old
-            self._point_tree = None
-            self._point_geoms = None
-            self._point_ids = None
-            return
+    def _ensure_kdtree(self) -> dict[bool, _SphericalCampusIndex]:
+        if not self._indexes_enabled:
+            return {}
+        # Builders publish only into the generation they started in. A mutation
+        # detaches it, so a slow build cannot refill a cache after invalidation.
+        caches = self._spatial_caches()
+        if caches.geodesic is not None:
+            return caches.geodesic
 
-        geoms: list = []
-        ids: list = []
-        for cid, c in self._campuses.items():
-            p = getattr(c, "point", None) or getattr(c, "location", None)
-            if p is None:
+        all_entries: list[tuple[Campus, tuple[float, float]]] = []
+        charters: list[tuple[Campus, tuple[float, float]]] = []
+        for campus in tuple(self._campuses.values()):
+            point = _campus_point(campus)
+            if point is None:
                 continue
-            try:
-                # Ensure numeric coordinates to avoid lazy/proxy objects
-                float(p.x)
-                float(p.y)
-            except Exception:
-                continue
-            geoms.append(p)
-            ids.append(cid)
+            entry = (campus, point)
+            all_entries.append(entry)
+            if is_charter(campus) and not is_private(campus):
+                charters.append(entry)
+        caches.geodesic = {
+            charter_only: _SphericalCampusIndex.build(entries)
+            for charter_only, entries in ((False, all_entries), (True, charters))
+            if entries and all(probably_lonlat(*point) for _, point in entries)
+        }
+        return caches.geodesic
 
-        if not geoms:
-            self._point_tree = None
-            self._point_geoms = None
-            self._point_ids = None
-            return
-
-        self._point_tree = STRtree(geoms)
-        self._point_geoms = geoms
-        self._point_ids = ids
-        # Clear legacy maps; we rely on indices-only in Shapely 2.x
-        self._geom_id_to_index = None
-        self._geom_wkb_to_index = None
-        self._xy_to_index = None
-        _log_memory(
-            "indexes.strtree.built",
-            {
-                "points": len(geoms),
-                "districts": len(getattr(self, "_districts", {})),
-                "campuses": len(getattr(self, "_campuses", {})),
-            },
-        )
-
-        if ENABLE_PROFILING:
-            try:
-                print(f"[strtree] built with {len(geoms)} points")
-            except Exception:
-                pass
-
-    def _ensure_kdtree(self):
-        """
-        Build a KD-tree over campus points (in radians) for fast radius/KNN queries.
-        Uses scipy.spatial.cKDTree if available; otherwise leaves tree as None.
-        """
-        if not getattr(self, "_indexes_enabled", True):
-            return
-        if (
-            getattr(self, "_kdtree", None) is not None
-            and getattr(self, "_kdtree_charter", None) is not None
-        ):
-            return
-        try:
+    def _ensure_all_xy_arrays(self) -> tuple[Any, list[Campus]] | None:
+        if not self._indexes_enabled:
+            return None
+        caches = self._spatial_caches()
+        if caches.bounding_box is None:
             import numpy as np
-            from scipy.spatial import cKDTree  # type: ignore
-        except Exception:
-            # No SciPy/NumPy available; skip building the tree
-            self._kdtree = None
-            self._xy_deg = None
-            self._xy_rad = None
-            self._campus_list = None
-            self._kdtree_charter = None
-            self._xy_deg_charter = None
-            self._xy_rad_charter = None
-            self._campus_list_charter = None
-            return
 
-        xy = []
-        campus_list = []
-        xy_charter = []
-        campus_list_charter = []
-        for c in self._campuses.values():
-            p = getattr(c, "point", None) or getattr(c, "location", None)
-            if p is None:
-                continue
-            try:
-                coords = (float(p.x), float(p.y))
-            except Exception:
-                continue
-            xy.append(coords)
-            campus_list.append(c)
-            if is_charter(c):
-                xy_charter.append(coords)
-                campus_list_charter.append(c)
-
-        if not xy:
-            self._kdtree = None
-            self._xy_deg = None
-            self._xy_rad = None
-            self._campus_list = None
-            self._kdtree_charter = None
-            self._xy_deg_charter = None
-            self._xy_rad_charter = None
-            self._campus_list_charter = None
-            return
-
-        import numpy as np
-
-        self._xy_deg = np.array(xy, dtype=float)
-        self._xy_rad = np.radians(self._xy_deg)
-        from scipy.spatial import cKDTree  # type: ignore
-
-        self._kdtree = cKDTree(self._xy_rad)
-        self._campus_list = campus_list
-
-        if xy_charter:
-            self._xy_deg_charter = np.array(xy_charter, dtype=float)
-            self._xy_rad_charter = np.radians(self._xy_deg_charter)
-            self._kdtree_charter = cKDTree(self._xy_rad_charter)
-            self._campus_list_charter = campus_list_charter
-        else:
-            self._xy_deg_charter = None
-            self._xy_rad_charter = None
-            self._kdtree_charter = None
-            self._campus_list_charter = None
-        _log_memory(
-            "indexes.kdtree.built",
-            {
-                "points": len(xy),
-                "charter_points": len(xy_charter),
-                "districts": len(getattr(self, "_districts", {})),
-                "campuses": len(getattr(self, "_campuses", {})),
-            },
-        )
-
-    def _ensure_all_xy_arrays(self):
-        """Build NumPy arrays of all campus coordinates for fast bbox candidate queries."""
-        if not getattr(self, "_indexes_enabled", True):
-            return
-        try:
-            import numpy as np  # type: ignore
-        except Exception:
-            self._all_xy_np = None
-            self._all_campuses_np = None
-            return
-        if self._all_xy_np is not None and self._all_campuses_np is not None:
-            return
-        xy = []
-        clist = []
-        for c in self._campuses.values():
-            p = getattr(c, "point", None) or getattr(c, "location", None)
-            if p is None:
-                continue
-            try:
-                xy.append((float(p.x), float(p.y)))
-                clist.append(c)
-            except Exception:
-                continue
-        if not xy:
-            self._all_xy_np = None
-            self._all_campuses_np = None
-            return
-        import numpy as np  # type: ignore
-
-        self._all_xy_np = np.array(xy, dtype=float)
-        self._all_campuses_np = clist
-        _log_memory(
-            "indexes.all_xy.built",
-            {
-                "points": len(xy),
-                "districts": len(getattr(self, "_districts", {})),
-                "campuses": len(getattr(self, "_campuses", {})),
-            },
-        )
+            campuses, points = [], []
+            for campus in tuple(self._campuses.values()):
+                point = _campus_point(campus)
+                if point is not None:
+                    campuses.append(campus)
+                    points.append(point)
+            if campuses:
+                caches.bounding_box = np.array(points, dtype=float), campuses
+        return caches.bounding_box
 
     @staticmethod
     def _extract_polygon_coords(poly) -> List[Tuple[float, float]]:
@@ -1462,74 +1315,58 @@ class DataEngine:
             return out
 
         # NumPy fast path
-        self._ensure_all_xy_arrays()
-        if self._all_xy_np is None:
+        index = self._ensure_all_xy_arrays()
+        if index is None:
             return []
-        import numpy as np  # type: ignore
 
+        points, campuses = index
         minx, miny, maxx, maxy = poly.bounds
-        xs = self._all_xy_np[:, 0]
-        ys = self._all_xy_np[:, 1]
+        xs, ys = points.T
         mask = (xs >= minx) & (xs <= maxx) & (ys >= miny) & (ys <= maxy)
-        idxs = np.nonzero(mask)[0]
-        return [self._all_campuses_np[int(i)] for i in idxs]
+        return [campuses[i] for i in mask.nonzero()[0]]
 
-    def _numpy_coords_and_campuses(
-        self, charter_only: bool
-    ) -> tuple[Any, Any] | tuple[None, None]:
-        """Build or reuse NumPy coordinate arrays keyed by charter filter."""
-        try:
-            import numpy as np  # type: ignore
-        except Exception:
-            return (None, None)
+    def _nearby_campuses(
+        self,
+        origin: tuple[float, float],
+        *,
+        limit: int | None,
+        miles: float | None,
+        charter_only: bool,
+        geodesic: bool,
+        allow_planar: bool,
+    ) -> list[Campus]:
+        if (limit is not None and limit <= 0) or (miles is not None and not miles >= 0):
+            return []
+        if not all(map(math.isfinite, origin)):
+            return []
+        geographic_origin = geodesic and probably_lonlat(*origin)
+        if geographic_origin:
+            index = self._ensure_kdtree().get(charter_only)
+            if index is not None:
+                return [campus for _, campus in index.rank(origin, limit, miles)]
+        elif not allow_planar:
+            return []
 
-        if charter_only:
-            coords = self._xy_deg_np_charter
-            clist = self._campus_list_np_charter
-        else:
-            coords = self._xy_deg_np
-            clist = self._campus_list_np
-
-        if coords is not None and clist is not None:
-            return coords, clist
-
-        xy = []
-        campuses = []
-        for c in self._campuses.values():
-            p = getattr(c, "point", None) or getattr(c, "location", None)
-            if p is None:
+        results = []
+        for campus in tuple(self._campuses.values()):
+            if charter_only and (not is_charter(campus) or is_private(campus)):
                 continue
-            if charter_only and not is_charter(c):
+            point = _campus_point(campus)
+            if point is None:
                 continue
-            try:
-                xy.append((float(p.x), float(p.y)))
-                campuses.append(c)
-            except Exception:
+            if geographic_origin and probably_lonlat(*point):
+                distance = haversine_miles(*origin, *point)
+            elif allow_planar:
+                distance = euclidean(origin, point)
+            else:
                 continue
-
-        if not xy:
-            return (None, None)
-
-        coords_arr = np.array(xy, dtype=float)
-        if charter_only:
-            self._xy_deg_np_charter = coords_arr
-            self._campus_list_np_charter = campuses
-        else:
-            self._xy_deg_np = coords_arr
-            self._campus_list_np = campuses
-        return coords_arr, campuses
-
-    def _haversine_miles_vec(self, lon: float, lat: float, coords):
-        import numpy as np
-
-        R = 3958.7613
-        lon1, lat1 = np.radians([lon, lat])
-        lon2 = np.radians(coords[:, 0])
-        lat2 = np.radians(coords[:, 1])
-        dlon = lon2 - lon1
-        dlat = lat2 - lat1
-        a = np.sin(dlat / 2) ** 2 + np.cos(lat1) * np.cos(lat2) * np.sin(dlon / 2) ** 2
-        return R * 2 * np.arctan2(np.sqrt(a), np.sqrt(1 - a))
+            if miles is None or distance <= miles:
+                results.append((distance, campus))
+        ordered = (
+            sorted(results, key=lambda row: row[0])
+            if limit is None else nsmallest(limit, results, key=lambda row: row[0])
+        )
+        return [campus for _, campus in ordered]
 
     @timeit
     def radius_campuses(
@@ -1541,346 +1378,55 @@ class DataEngine:
         charter_only: bool = False,
         limit: Optional[int] = None,
     ) -> List[Campus]:
-        """
-        Fast radius query using KDTree when available; robust haversine fallback otherwise.
-        Returns campuses within 'miles' of (lon, lat), optionally filtered to charters, optionally limited.
-        """
-        if not getattr(self, "_indexes_enabled", True):
-            results: List[Tuple[float, Campus]] = []
-            for c in self._campuses.values():
-                if c.point is None:
-                    continue
-                if charter_only and not is_charter(c):
-                    continue
-                x, y = c.point.x, c.point.y
-                d = haversine_miles(lon, lat, x, y)
-                if d <= miles:
-                    results.append((d, c))
-            results.sort(key=lambda t: t[0])
-            if limit is not None:
-                results = results[:limit]
-            return [c for _, c in results]
-        # Try KDTree path
-        self._ensure_kdtree()
-        try:
-            import numpy as np  # noqa: F401
-        except Exception:
-            pass
-
-        results: List[Tuple[float, Campus]] = []
-
-        tree = self._kdtree_charter if charter_only else self._kdtree
-        xy_arr = self._xy_deg_charter if charter_only else self._xy_deg
-        clist = self._campus_list_charter if charter_only else self._campus_list
-
-        if tree is not None and xy_arr is not None and clist is not None:
-            # Query in radians
-            R = 3958.7613
-            r = miles / R
-            import numpy as np
-
-            idxs = tree.query_ball_point(np.radians([lon, lat]), r=r)
-            idxs = idxs if isinstance(idxs, list) else idxs[0]
-            for i in idxs:
-                c = clist[i]
-                x, y = xy_arr[i]
-                d = haversine_miles(lon, lat, x, y)
-                results.append((d, c))
-        else:
-            # Fallback: vectorized haversine if NumPy available; else brute-force
-            try:
-                import numpy as np  # noqa: F401
-            except Exception:
-                for c in self._campuses.values():
-                    if c.point is None:
-                        continue
-                    if charter_only and not is_charter(c):
-                        continue
-                    x, y = c.point.x, c.point.y
-                    d = haversine_miles(lon, lat, x, y)
-                    if d <= miles:
-                        results.append((d, c))
-            else:
-                coords, clist = self._numpy_coords_and_campuses(charter_only)
-                if coords is None or clist is None:
-                    return []
-                dists = self._haversine_miles_vec(lon, lat, coords)
-                import numpy as np
-
-                idxs = np.where(dists <= miles)[0]
-                order = np.argsort(dists[idxs])
-                idxs = [int(idxs[i]) for i in order]
-                if limit is not None:
-                    idxs = idxs[:limit]
-                return [clist[i] for i in idxs]
-
-        results.sort(key=lambda t: t[0])
-        if limit is not None:
-            results = results[:limit]
-        return [c for _, c in results]
+        """Return campuses within an inclusive great-circle distance in miles."""
+        return self._nearby_campuses(
+            (lon, lat), limit=limit, miles=miles, charter_only=charter_only,
+            geodesic=True, allow_planar=False,
+        )
 
     @timeit
     def knn_campuses(
         self, lon: float, lat: float, k: int, *, charter_only: bool = False
     ) -> List[Campus]:
-        """
-        k-nearest neighbor query. KDTree if available; else brute-force sort by haversine.
-        """
-        self._ensure_kdtree()
-        results: List[Tuple[float, Campus]] = []
-
-        tree = self._kdtree_charter if charter_only else self._kdtree
-        xy_arr = self._xy_deg_charter if charter_only else self._xy_deg
-        clist = self._campus_list_charter if charter_only else self._campus_list
-
-        if tree is not None and xy_arr is not None and clist is not None:
-            import numpy as np
-
-            dists, idxs = tree.query(np.radians([lon, lat]), k=k if k > 1 else 1)
-            # Normalize outputs
-            if k == 1:
-                dists = [float(dists)]
-                idxs = [int(idxs)]
-            # Re-compute accurate miles and filter charter if needed
-            for d0, i in zip(dists, idxs):
-                c = clist[int(i)]
-                x, y = xy_arr[int(i)]
-                dm = haversine_miles(lon, lat, x, y)
-                results.append((dm, c))
-        else:
-            # Fallback: brute-force
-            for c in self._campuses.values():
-                if c.point is None:
-                    continue
-                if charter_only and not is_charter(c):
-                    continue
-                dm = haversine_miles(lon, lat, c.point.x, c.point.y)
-                results.append((dm, c))
-
-        results.sort(key=lambda t: t[0])
-        return [c for _, c in results[:k]]
+        """Return up to k campuses in increasing great-circle distance."""
+        return self._nearby_campuses(
+            (lon, lat), limit=k, miles=None, charter_only=charter_only,
+            geodesic=True, allow_planar=False,
+        )
 
     def nearest_charter_same_type(
         self,
-        campuses: Iterable["Campus"],
+        campuses: Iterable[Campus],
         *,
         k: int = 1,
     ) -> Dict[str, Dict[str, Any]]:
-        """Return the nearest charter campus of the same school type for each campus."""
-        from collections import defaultdict
-
-        def _same_campus(a: Campus, b: Campus) -> bool:
-            aid = getattr(a, "id", None)
-            bid = getattr(b, "id", None)
-            if aid is not None and bid is not None:
-                return aid == bid
-            return a is b
-
-        targets_by_type: Dict[str, list[Campus]] = defaultdict(list)
+        """Return one nearest peer charter of the same school type per campus."""
         results: Dict[str, Dict[str, Any]] = {}
+        indexes = None
+        groups = None
         for campus in campuses:
-            cid = getattr(campus, "id", None)
-            if cid is None:
+            results[str(campus.id)] = {"match": None, "miles": None}
+            school_type = (campus.school_type or "").strip()
+            point = _campus_point(campus)
+            if is_private(campus) or not school_type or point is None or not probably_lonlat(*point):
                 continue
-            results[str(cid)] = {"match": None, "miles": None}
-            if is_private(campus):
-                continue
-            st = (getattr(campus, "school_type", None) or "").strip()
-            pt = getattr(campus, "point", None) or getattr(campus, "location", None)
-            if not st or pt is None:
-                continue
-            targets_by_type[st].append(campus)
-
-        if not targets_by_type:
-            return results
-
-        if not getattr(self, "_indexes_enabled", True):
-            candidates_by_type: Dict[str, list[tuple[Campus, tuple[float, float]]]] = (
-                defaultdict(list)
-            )
-            for cand in self._campuses.values():
-                if not is_charter(cand):
-                    continue
-                st = (getattr(cand, "school_type", None) or "").strip()
-                if not st:
-                    continue
-                pt = getattr(cand, "point", None) or getattr(cand, "location", None)
-                if pt is None:
-                    continue
-                try:
-                    lon2, lat2 = float(pt.x), float(pt.y)
-                except Exception:
-                    continue
-                candidates_by_type[st].append((cand, (lon2, lat2)))
-
-            for st, targets in targets_by_type.items():
-                cand_list = candidates_by_type.get(st, [])
-                if not cand_list:
-                    continue
-                for campus in targets:
-                    pt = getattr(campus, "point", None) or getattr(
-                        campus, "location", None
-                    )
-                    cid = getattr(campus, "id", None)
-                    if cid is None or pt is None:
-                        continue
-                    try:
-                        lon1, lat1 = float(pt.x), float(pt.y)
-                    except Exception:
-                        continue
-
-                    best_dm: Optional[float] = None
-                    best_obj: Optional[Campus] = None
-                    for cand, (lon2, lat2) in cand_list:
-                        if _same_campus(campus, cand):
-                            continue
-                        dm = haversine_miles(lon1, lat1, lon2, lat2)
-                        if best_dm is None or dm < best_dm:
-                            best_dm = float(dm)
-                            best_obj = cand
-                    results[str(cid)] = {"match": best_obj, "miles": best_dm}
-            return results
-
-        cache = self._ensure_charter_cache()
-        entries = cache.entries
-
-        np_mod = None
-        if cache.has_numpy:
-            try:
-                import numpy as np  # type: ignore
-            except Exception:
-                np_mod = None
+            if self._indexes_enabled:
+                if indexes is None:
+                    indexes = self._ensure_charter_cache()
+                index = indexes.get(school_type)
+                ranked = index.rank(point, 1, exclude=campus.id) if index else []
+                best = ranked[0] if ranked else None
             else:
-                np_mod = np
-
-        R = 3958.7613
-
-        for st, targets in targets_by_type.items():
-            entry = entries.get(st)
-            if entry is None or not entry.objects:
-                continue
-
-            cand_objs = entry.objects
-            cand_deg = entry.coords_deg
-            cand_idxs_by_id: Dict[Any, list[int]] = defaultdict(list)
-            for idx, obj in enumerate(cand_objs):
-                oid = getattr(obj, "id", None)
-                if oid is not None:
-                    cand_idxs_by_id[oid].append(idx)
-
-            tgt_pairs: list[tuple[float, float]] = []
-            tgt_list: list[Campus] = []
-            for campus in targets:
-                pt = getattr(campus, "point", None) or getattr(campus, "location", None)
-                if pt is None:
-                    continue
-                try:
-                    lon, lat = float(pt.x), float(pt.y)
-                except Exception:
-                    continue
-                tgt_pairs.append((lon, lat))
-                tgt_list.append(campus)
-
-            if not tgt_list:
-                continue
-
-            if entry.tree is not None and np_mod is not None:
-                for (lon1, lat1), campus in zip(tgt_pairs, tgt_list):
-                    cid = getattr(campus, "id", None)
-                    if cid is None:
-                        continue
-
-                    self_present = bool(cand_idxs_by_id.get(cid))
-                    qk = 2 if self_present and len(cand_objs) > 1 else 1
-                    _d, idx = entry.tree.query(
-                        np_mod.radians([lon1, lat1]), k=qk if qk > 1 else 1
-                    )
-                    idx_vals = np_mod.atleast_1d(idx)
-                    picked: Optional[int] = None
-                    for raw in idx_vals:
-                        j = int(raw)
-                        cand = cand_objs[j]
-                        if _same_campus(campus, cand):
-                            continue
-                        picked = j
-                        break
-
-                    if picked is None:
-                        best_dm: Optional[float] = None
-                        best_obj: Optional[Campus] = None
-                        for (lon2, lat2), cand in zip(cand_deg, cand_objs):
-                            if _same_campus(campus, cand):
-                                continue
-                            dm = haversine_miles(
-                                float(lon1), float(lat1), float(lon2), float(lat2)
-                            )
-                            if best_dm is None or dm < best_dm:
-                                best_dm = float(dm)
-                                best_obj = cand
-                        results[str(cid)] = {"match": best_obj, "miles": best_dm}
-                        continue
-
-                    lon2, lat2 = entry.coords_deg[picked]
-                    dm = haversine_miles(
-                        float(lon1), float(lat1), float(lon2), float(lat2)
-                    )
-                    results[str(cid)] = {
-                        "match": cand_objs[picked],
-                        "miles": float(dm),
-                    }
-                continue
-
-            if np_mod is not None:
-                cand_arr = (
-                    cand_deg
-                    if isinstance(cand_deg, np_mod.ndarray)
-                    else np_mod.array(cand_deg, dtype=float)
+                if groups is None:
+                    groups = self._charter_points_by_type()
+                candidates = (
+                    (haversine_miles(*point, *other_point), other)
+                    for other, other_point in groups.get(school_type, ())
+                    if other.id != campus.id
                 )
-                for (lon1, lat1), campus in zip(tgt_pairs, tgt_list):
-                    cid = getattr(campus, "id", None)
-                    if cid is None:
-                        continue
-                    lon1r, lat1r = np_mod.radians([lon1, lat1])
-                    lon2r = np_mod.radians(cand_arr[:, 0])
-                    lat2r = np_mod.radians(cand_arr[:, 1])
-                    dlon = lon2r - lon1r
-                    dlat = lat2r - lat1r
-                    a = (
-                        np_mod.sin(dlat / 2) ** 2
-                        + np_mod.cos(lat1r)
-                        * np_mod.cos(lat2r)
-                        * np_mod.sin(dlon / 2) ** 2
-                    )
-                    miles = R * 2 * np_mod.arctan2(np_mod.sqrt(a), np_mod.sqrt(1 - a))
-                    for self_idx in cand_idxs_by_id.get(cid, []):
-                        miles[self_idx] = np_mod.inf
-                    j = int(np_mod.argmin(miles))
-                    if not bool(np_mod.isfinite(miles[j])):
-                        continue
-                    results[str(cid)] = {
-                        "match": cand_objs[j],
-                        "miles": float(miles[j]),
-                    }
-                continue
-
-            cand_list = list(cand_deg)
-            for (lon1, lat1), campus in zip(tgt_pairs, tgt_list):
-                cid = getattr(campus, "id", None)
-                if cid is None:
-                    continue
-                best_dm: Optional[float] = None
-                best_obj: Optional[Campus] = None
-                for (lon2, lat2), cand in zip(cand_list, cand_objs):
-                    if _same_campus(campus, cand):
-                        continue
-                    dm = haversine_miles(
-                        float(lon1), float(lat1), float(lon2), float(lat2)
-                    )
-                    if best_dm is None or dm < best_dm:
-                        best_dm = float(dm)
-                        best_obj = cand
-                results[str(cid)] = {"match": best_obj, "miles": best_dm}
-
+                best = min(candidates, key=lambda row: row[0], default=None)
+            if best is not None:
+                results[str(campus.id)] = {"match": best[1], "miles": best[0]}
         return results
 
     def nearest_charter_transfer_destination(
@@ -2002,6 +1548,7 @@ class DataEngine:
             raise TypeError("add_campus requires a Campus")
         if not self._add_entity(c, self._campuses, self._campus_by_key):
             return
+        self._clear_spatial_indexes()
         # Only append to _campuses_by_district if the district exists
         if not self._in_bulk:
             if c.district_id in self._districts:
@@ -2024,7 +1571,6 @@ class DataEngine:
                 self._campus_name_upper_index.append(((c.name or "").upper(), c.id))
             self._campus_wildcard_cache = {}
             self._name_lookup_version += 1
-            self._clear_charter_cache()
 
     def campuses_in(self, d: Any) -> "EntityList":
         """
@@ -2085,12 +1631,11 @@ class DataEngine:
 
         # STRtree (Shapely 2.x) fast path using indices
         if SHAPELY and getattr(self, "_indexes_enabled", True):
-            self._ensure_point_strtree()
-            if self._point_tree is not None:
+            index = self._ensure_point_strtree()
+            if index is not None:
+                tree, campuses = index
                 try:
-                    idxs = self._point_tree.query(
-                        poly, predicate="covers", return_indices=True
-                    )
+                    idxs = tree.query(poly, predicate="covers")
                     # Some builds return (geoms, idxs) if return_geometry=True sneaks in; normalize:
                     if isinstance(idxs, tuple):
                         _, idxs = idxs
@@ -2105,10 +1650,7 @@ class DataEngine:
                     prep = getattr(district, "prepared", None)
                     out: List[Campus] = []
                     for i in idxs:
-                        cid = self._point_ids[i]
-                        c = self._campuses.get(cid)
-                        if c is None:
-                            continue
+                        c = campuses[i]
                         try:
                             if not predicate(c):
                                 continue
@@ -2422,114 +1964,12 @@ class DataEngine:
         geodesic : bool
             If True (default) and x/y look like lon/lat, compute great-circle miles.
         """
-        results: List[Tuple[float, Campus]] = []
-
-        use_geodesic = geodesic and probably_lonlat(x, y)
-
-        # KDTree fast path (geodesic lon/lat only)
-        if use_geodesic and getattr(self, "_indexes_enabled", True):
-            self._ensure_kdtree()
-            try:
-                import numpy as np
-            except Exception:
-                np = None  # type: ignore[assignment]
-
-            if np is not None:
-                tree = self._kdtree_charter if charter_only else self._kdtree
-                xy_arr = self._xy_deg_charter if charter_only else self._xy_deg
-                clist = self._campus_list_charter if charter_only else self._campus_list
-                if tree is not None and xy_arr is not None and clist is not None:
-                    total = len(clist)
-                    if total == 0:
-                        return []
-
-                    if max_miles is not None:
-                        R = 3958.7613
-                        idxs = tree.query_ball_point(
-                            np.radians([x, y]), r=(max_miles / R)
-                        )
-                        if not idxs:
-                            return []
-                        for idx in idxs:
-                            c = clist[int(idx)]
-                            x2, y2 = xy_arr[int(idx)]
-                            dm = haversine_miles(x, y, float(x2), float(y2))
-                            if dm <= max_miles:
-                                results.append((dm, c))
-                        results.sort(key=lambda t: t[0])
-                        if limit is not None:
-                            results = results[:limit]
-                        return [c for _, c in results]
-
-                    want = total if limit is None else max(1, min(int(limit), total))
-                    dists_rad, idxs = tree.query(
-                        np.radians([x, y]), k=want if want > 1 else 1
-                    )
-                    dists_rad = np.atleast_1d(dists_rad)
-                    idxs_arr = np.atleast_1d(idxs)
-
-                    for _dist_rad, idx in zip(dists_rad, idxs_arr):
-                        c = clist[int(idx)]
-                        x2, y2 = xy_arr[int(idx)]
-                        dm = haversine_miles(x, y, float(x2), float(y2))
-                        results.append((dm, c))
-                        if limit is not None and len(results) >= limit:
-                            break
-
-                    results.sort(key=lambda t: t[0])
-                    if limit is not None:
-                        results = results[:limit]
-                    return [c for _, c in results]
-
-            # Vectorized geodesic fallback if NumPy is available
-            coords, clist = self._numpy_coords_and_campuses(charter_only)
-            if coords is not None and clist is not None:
-                import numpy as np
-
-                dists = self._haversine_miles_vec(x, y, coords)
-                idxs = np.arange(len(clist))
-                if max_miles is not None:
-                    mask = dists <= max_miles
-                    dists = dists[mask]
-                    idxs = idxs[mask]
-                if dists.size:
-                    order = np.argsort(dists)
-                    idxs = idxs[order]
-                    if limit is not None:
-                        idxs = idxs[:limit]
-                    return [clist[int(i)] for i in idxs]
-
-        # Fallback: planar or brute-force geodesic
-        for c in self._campuses.values():
-            if c.point is None:
-                continue
-            if charter_only and not is_charter(c):
-                continue
-            cxy = point_xy(c.point)
-            if cxy is None:
-                continue
-            if use_geodesic and probably_lonlat(*cxy):
-                d = haversine_miles(x, y, cxy[0], cxy[1])
-            else:
-                if SHAPELY and hasattr(c.point, "distance"):
-                    d = (
-                        c.point.distance(ShapelyPoint(x, y))
-                        if SHAPELY
-                        else euclidean((x, y), cxy)
-                    )
-                else:
-                    d = euclidean((x, y), cxy)
-            if max_miles is not None and d > max_miles:
-                continue
-            results.append((d, c))
-
-        results.sort(key=lambda t: t[0])
-        if limit <= 1:
-            return [results[0][1]] if results else []
-        return [c for _, c in results[:limit]]
+        return self._nearby_campuses(
+            (x, y), limit=limit, miles=max_miles, charter_only=charter_only,
+            geodesic=geodesic, allow_planar=True,
+        )
 
     @timeit
-    @lru_cache(maxsize=2048)
     def nearest_campus(
         self, x: float, y: float, charter_only: bool = False
     ) -> Optional[Campus]:
