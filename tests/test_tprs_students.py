@@ -476,6 +476,62 @@ def campus_cohort(tmp_path, grid):
     return store, {"schema_version": 4, "dataset": students.DATASET, "edition": "2026", "rosters": rosters, "reports": reports}
 
 
+@pytest.fixture
+def campus_partition(tmp_path, grid, monkeypatch):
+    monkeypatch.setattr(tprs_statewide_intake, "CAMPUS_PARTITION_REPORTS", 2)
+    store = ProvenanceStore(tmp_path / "store")
+    ids = ("001901001", "001901002", "001901003")
+    pin = _roster_receipt(store, tmp_path, "01",
+        [{"DISTRICT": key[:6], "CAMPUS": key, "REGION": "01"} for key in reversed(ids)], scope="campus")
+    reports = []
+    for key in ids:
+        raw = html(report_rows(grid, "campus", key))
+        rid = receipt(store, tmp_path, raw, identifier=key, scope="campus", parents=(pin,))
+        reports.append({"receipt": rid, "sha256": sha256(raw).hexdigest(), "scope": "campus", "identifier": key})
+    intake = {"schema_version": 5, "dataset": students.DATASET, "edition": "2026", "rosters": {"01": pin},
+              "partition": 1, "reports": reports[2:]}
+    return store, intake, reports[:2]
+
+
+def test_campus_partition_uses_complete_roster_and_refuses_gaps(campus_partition, monkeypatch):
+    store, intake, earlier = campus_partition
+    monkeypatch.setattr(tprs_statewide_intake, "MAX_CAMPUS_COHORT_REPORTS", 2)
+    first = tprs_statewide_intake.admit_campus_cohort(store, {**intake, "partition": 0, "reports": earlier})
+    last = tprs_statewide_intake.admit_campus_cohort(store, intake)
+    assert [report.identifier for report in (*first.reports, *last.reports)] == ["001901001", "001901002", "001901003"]
+    assert (first.partition, last.partition) == (0, 1)
+    with pytest.raises(ContractError, match="Incomplete campus cohort"):
+        tprs_statewide_intake.admit_campus_cohort(store, {**intake, "reports": []})
+    with pytest.raises(ContractError, match="exact ordered regional roster union"):
+        tprs_statewide_intake.admit_campus_cohort(store, {**intake, "reports": earlier[:1]})
+    with pytest.raises(ContractError, match="outside the pinned regional roster"):
+        tprs_statewide_intake.admit_campus_cohort(store, {**intake, "partition": 2})
+    with pytest.raises(ContractError, match="nonnegative integer"):
+        tprs_statewide_intake.admit_campus_cohort(store, {**intake, "partition": True})
+    with pytest.raises(ContractError, match="exactly one regional roster"):
+        tprs_statewide_intake.admit_campus_cohort(store, {**intake, "rosters": {"01": "a" * 64, "02": "b" * 64}})
+
+
+def test_offline_partition_seals_only_original_roster_bound_reports(campus_partition, tmp_path, grid, monkeypatch):
+    from teadata.scripts import acquire_tprs_campuses as campus
+
+    store, intake, earlier = campus_partition
+    key = intake["reports"][0]["identifier"]
+    raw = html(report_rows(grid, "campus", key))
+    receipt(store, tmp_path, raw, identifier=key, scope="campus",
+            overrides={"downloaded_at": datetime(2026, 11, 5, tzinfo=timezone.utc)})
+    monkeypatch.setattr(campus, "acquire_form", lambda *args, **kwargs: pytest.fail("Offline partition fetched data"))
+    path = tmp_path / "intake.json"
+    result = campus.acquire_region(store, "01", intake["rosters"]["01"], limit=0, intake=path, partition=1)
+    assert result["region_roster_size"] == 3 and result["eligible"] == result["admitted"] == 1
+    assert result["partition"] == 1 and result["requested"] == 0 and not result["holds"]
+    assert json.loads(path.read_bytes()) == intake
+    assert not (store.root / "tprs-campus-broker-pace.json").exists()
+    with pytest.raises(ContractError, match="outside this exact campus scope"):
+        campus.acquire_region(store, "01", intake["rosters"]["01"], limit=0, partition=1,
+                              preferred={earlier[0]["identifier"]: earlier[0]["receipt"]})
+
+
 def test_campus_cohort_requires_complete_sorted_unique_rosters(campus_cohort, tmp_path):
     store, intake = campus_cohort
     admitted = tprs_statewide_intake.admit_campus_cohort(store, intake)
@@ -542,8 +598,12 @@ def test_campus_cohort_rejects_expanded_and_linked_report_objects(campus_cohort,
         tprs_statewide_intake.admit_campus_cohort(store, intake)
 
 
-def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(campus_cohort, tmp_path, grid, monkeypatch):
-    store, intake = campus_cohort
+@pytest.mark.parametrize("partitioned", [False, True])
+def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(partitioned, request, tmp_path, grid, monkeypatch):
+    if partitioned:
+        store, intake, earlier = request.getfixturevalue("campus_partition")
+    else:
+        store, intake = request.getfixturevalue("campus_cohort")
     packaged = ROOT / "teadata"
     document = yaml.safe_load((packaged / "teadata_sources.yaml").read_bytes())
     references = document["data_sources"][students.DATASET][2026]["metadata"]["references"]
@@ -573,16 +633,54 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(campus
     built = students.materialize_students(store, config=config_path, config_sha256=sha256(config).hexdigest(),
         intake=intake_path, intake_sha256=sha256(raw).hexdigest(), output=output)
     entry, = built["editions"]
-    assert built["campus_regions"] == ["01", "02"] and built["release_activation"] is False
-    assert entry["rows"] == 2 and entry["raw_field_hold_count"] == 72
+    if partitioned:
+        assert built["campus_partition"] == {"region": "01", "ordinal": 1}
+        assert "campus_regions" not in built
+    else:
+        assert built["campus_regions"] == ["01", "02"]
+    assert built["release_activation"] is False
+    assert entry["rows"] == len(intake["reports"]) and entry["raw_field_hold_count"] == 36 * entry["rows"]
     release = DataRelease(output / "release.json", offline=True)
     release.verify()
     key = EditionKey.from_dict(entry["edition"])
     table = release.table(key).select("membership_total_students_count")
-    included = table.where(ds.field("campus_number") == "001901001").to_arrow().to_pylist()
+    included = table.where(ds.field("campus_number") == intake["reports"][0]["identifier"]).to_arrow().to_pylist()
     assert len(included) == 1 and included[0]["membership_total_students_count"] == 1
     assert included[0]["tprs_report_receipt"] == intake["reports"][0]["receipt"]
-    assert table.where(ds.field("campus_number") == "003901001").to_arrow().num_rows == 0
+    excluded = earlier[0]["identifier"] if partitioned else "003901001"
+    assert table.where(ds.field("campus_number") == excluded).to_arrow().num_rows == 0
+    if partitioned:
+        artifact_id, = release.catalog.to_dict()["artifacts"]
+        artifact = release.catalog.artifact_ref(artifact_id)
+        processing = release.catalog._processing_record(artifact)
+        document = json.loads(release.catalog.edition_metadata_bytes(key.identity))
+        extra = earlier[0]["receipt"]
+        document["provenance"][extra] = store.read_record(extra)
+        roster, = output.glob("tprs-roster-*.json")
+        with pytest.raises(ContractError, match="exact direct processing inputs"):
+            tprs_statewide_intake.student_report_ledger(document, key, roster.read_bytes(),
+                {**processing, "inputs": [*processing["inputs"], extra]})
+        for label, path in [("intake", intake_path), ("config", config_path)]:
+            dataset = f"reference:tprs_student_{label}"
+            original, = (rid for rid in processing["inputs"] if document["provenance"][rid]["dataset"] == dataset)
+            substitute = store.record_acquisition(path, ResolvedDataset(dataset, "reference", 2026, 2026, "",
+                DatasetMetadata(version="2026")), recorded_at=datetime(2026, 11, 5, tzinfo=timezone.utc))
+            document["provenance"][substitute] = store.read_record(substitute)
+            assert substitute != original
+            for field in ("sha256", "size_bytes"):
+                assert document["provenance"][substitute]["artifact"][field] == document["provenance"][original]["artifact"][field]
+            changed = [substitute if rid == original else rid for rid in processing["inputs"]]
+            with pytest.raises(ContractError, match="exact direct processing inputs bound by its selected schema"):
+                tprs_statewide_intake.student_report_ledger(document, key, roster.read_bytes(), {**processing, "inputs": changed})
+        references = document["edition"]["metadata"]["references"]
+        selected = next(ref for ref in references if ref["reference_id"] == "columns")
+        for decoy_digest in ("0" * 64, selected["reviewed_sha256"]):
+            altered = deepcopy(document)
+            altered_refs = altered["edition"]["metadata"]["references"]
+            next(ref for ref in altered_refs if ref["reference_id"] == "columns")["reference_id"] = "alternate_columns"
+            altered_refs.append({**selected, "reviewed_sha256": decoy_digest})
+            with pytest.raises(ContractError, match="exact selected schema observation"):
+                tprs_statewide_intake.student_report_ledger(altered, key, roster.read_bytes(), processing)
     audit, = output.glob("tprs-raw_audit-*.jsonl.gz")
     audit.write_bytes(b"tampered")
     with pytest.raises(ContractError):

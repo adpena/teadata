@@ -1554,6 +1554,32 @@ and select the exact campus `EditionKey` for queries. Partial geographic
 coverage has an explicit region list, and the existing district and direct
 Texas editions keep their own identities.
 
+For a large region, select a zero-based `--partition` in the campus broker.
+The broker sorts the exact publisher campus IDs and divides them into groups
+of 512. The final group can be shorter. This selects the same IDs whether
+their reports have already been acquired or are still outstanding. The
+broker keeps the shared pacing and lock, and reports `region_roster_size`
+separately from the selected partition's `eligible`, `admitted`, and
+`remaining` values. An explicit `--prefer` must name a campus in that slice
+and an original 2026 report with the same sole roster receipt as parent.
+
+```sh
+uv run --locked python -m teadata.scripts.acquire_tprs_campuses \
+  --store /path/to/retained-provenance --region 04 \
+  --roster-receipt <exact-regional-roster-receipt> \
+  --partition 0 --limit 0 --intake /path/to/region04-partition0.json
+```
+
+A complete partition seals a schema-5 intake, even while other slices are
+incomplete. Pass that intake and its exact digest to `refresh_tprs_students`
+using the command below. The local release retains its original single roster,
+the ordinal, and the selected report receipts. It verifies the exact slice
+before building or opening the verified release. Use the manifest digest
+with the exact edition key, since a single-slice region and its complete-region
+build can have the same report-byte revision. The materialization receipt
+describes `campus_partition` rather than complete region coverage. Combining
+partitions into a region or Texas requires a separate exact union check.
+
 The sole reviewed field contract is
 `teadata/methodologies/tprs-students-2026.json`. It defines 42 current row labels
 across Membership and Enrollment, with count and percent measures: 168 native

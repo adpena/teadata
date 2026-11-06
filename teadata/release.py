@@ -459,12 +459,12 @@ class DataRelease:
     def _student_report_ledger(
         self, artifact: ArtifactRef, refs: dict[str, ColumnSchemaRef],
     ) -> tuple[tuple[ReportSelection, ...], _StudentCohort | None]:
-        from .tprs_statewide_intake import CAMPUS_COHORT_OPERATION, student_report_ledger
+        from .tprs_statewide_intake import CAMPUS_COHORT_OPERATION, CAMPUS_PARTITION_OPERATION, student_report_ledger
         record = self.catalog._processing_record(artifact)
         key = artifact.edition
         try:
             recipe = record["parameters"]["recipe"]
-            campus = recipe["operation"] == CAMPUS_COHORT_OPERATION
+            campus = recipe["operation"] in (CAMPUS_COHORT_OPERATION, CAMPUS_PARTITION_OPERATION)
             if campus:
                 if (key.edition != "2026" or key.scope != "campus" or key.table != "campus"
                         or key.grain != "one row per campus_number" or artifact.contract["key_columns"] != ["campus_number"]):

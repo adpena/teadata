@@ -174,7 +174,7 @@ def test_inventory_cli_is_offline_and_rejects_regional_controls(tmp_path, monkey
     assert result["eligible"] == 1 and result["remaining"] == ["001901001"]
     assert not (tmp_path / "tprs-campus-broker-pace.json").exists()
     for flags in (("--limit", "25"), ("--interval", "8"), ("--roster-receipt", receipts["01"]),
-                  ("--intake", str(tmp_path / "intake.json"))):
+                  ("--intake", str(tmp_path / "intake.json")), ("--partition", "0")):
         monkeypatch.setattr("sys.argv", [*cli, *flags])
         with pytest.raises(SystemExit, match="1"):
             campus.main()

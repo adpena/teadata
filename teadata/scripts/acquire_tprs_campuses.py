@@ -27,7 +27,10 @@ from teadata.column_schema import _unique_object
 from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
 from teadata.manifest import ContractError, canonical_json
 from teadata.provenance import ProvenanceStore, _publish_once
-from teadata.tprs_statewide_intake import CAMPUS_INTAKE_VERSION, REGIONS, ReportSelection, campus_roster
+from teadata.tprs_statewide_intake import (
+    CAMPUS_INTAKE_VERSION, CAMPUS_PARTITION_VERSION, MAX_STATEWIDE_HTML_BYTES, REGIONS, ReportSelection,
+    admit_campus_cohort, campus_partition_ids, campus_report_has_roster, campus_roster,
+)
 from teadata.tprs_students import BROKER, DATASET, EDITION, MAX_REPORT_BYTES, MAX_SELECTION_BYTES, read_student_report
 
 MIN_INTERVAL = 8.0
@@ -92,13 +95,16 @@ def _controls(identifier: str) -> dict[str, str]:
             "ccyy": str(EDITION), "id": identifier, "lev": "C", "prgopt": "reports/tapr/student.sas"}
 
 
-def _retained(store: ProvenanceStore, ids: set[str], preferred: Mapping[str, str]) -> tuple[
+def _retained(store: ProvenanceStore, ids: set[str], preferred: Mapping[str, str], *,
+              roster_receipt: str | None = None) -> tuple[
     dict[str, ReportSelection], dict[str, str]
 ]:
     candidates: dict[str, list[tuple[str, str, str]]] = defaultdict(list)
     for path in (store.root / "records").glob("*.json"):
         record = store.read_record(path.stem)
         if record["kind"] != "acquisition" or record["method"] != "download":
+            continue
+        if roster_receipt is not None and not campus_report_has_roster(record, roster_receipt):
             continue
         parsed = urlsplit(record["requested_url"])
         pairs = parse_qsl(parsed.query, keep_blank_values=True)
@@ -190,17 +196,22 @@ def retained_inventory(store: ProvenanceStore, roster_receipts: Mapping[str, str
 
 def acquire_region(store: ProvenanceStore, region: str, roster_receipt: str, *, limit: int = 25,
                    interval: float = MIN_INTERVAL, intake: Path | None = None,
-                   preferred: Mapping[str, str] | None = None) -> dict[str, Any]:
+                   preferred: Mapping[str, str] | None = None, partition: int | None = None) -> dict[str, Any]:
     """Use verified retained reports first and persist pacing before each request."""
     if type(limit) is not int or not 0 <= limit <= 50 or not MIN_INTERVAL <= interval <= 3600:
         raise ValueError("Use zero to 50 requests per pass and an interval between eight seconds and one hour")
-    ids = set(campus_roster(store, region, roster_receipt))
+    roster = campus_roster(store, region, roster_receipt)
+    ids = set(roster if partition is None else campus_partition_ids(roster, partition))
     choices = preferred or {}
     if not choices.keys() <= ids:
-        raise ContractError("Preferred receipts include campuses outside this exact region")
+        scope = "region" if partition is None else "campus scope"
+        raise ContractError(f"Preferred receipts include campuses outside this exact {scope}")
     client = AcquisitionClient(store, opener=build_opener(NoRedirect()), timeout=60, attempts=1, max_bytes=MAX_REPORT_BYTES)
     with _broker_lock(store) as pace:
-        reports, holds = _retained(store, ids, choices)
+        if partition is None:
+            reports, holds = _retained(store, ids, choices)
+        else:
+            reports, holds = _retained(store, ids, choices, roster_receipt=roster_receipt)
         reused = len(reports)
         state = json.loads(pace.read_bytes()) if pace.exists() else {"not_before": 0}
         not_before = state["not_before"]
@@ -249,14 +260,27 @@ def acquire_region(store: ProvenanceStore, region: str, roster_receipt: str, *, 
                   "admitted": len(reports), "requested": requests, "holds": holds, "stop": stop,
                   "remaining": sorted(ids - reports.keys()),
                   "next_request_at": datetime.fromtimestamp(not_before, timezone.utc).isoformat()}
+        if partition is not None:
+            result.update(partition=partition, region_roster_size=len(roster))
         if intake is not None and ids == reports.keys():
             size = sum(store.read_record(report.receipt)["artifact"]["size_bytes"] for report in reports.values())
-            if size > MAX_SELECTION_BYTES:
-                result["intake_hold"] = "Complete region exceeds the current bounded native materializer"
+            budget = MAX_SELECTION_BYTES if partition is None else MAX_STATEWIDE_HTML_BYTES
+            if size > budget:
+                scope = "region" if partition is None else "partition"
+                result["intake_hold"] = f"Complete {scope} exceeds the current bounded native materializer"
+                return result
+            document = {"dataset": DATASET, "edition": str(EDITION),
+                        "reports": [asdict(reports[key]) for key in sorted(reports)]}
+            if partition is None:
+                document.update(schema_version=CAMPUS_INTAKE_VERSION, region=region, roster_receipt=roster_receipt)
             else:
-                result["intake_sha256"] = _save(intake, {"schema_version": CAMPUS_INTAKE_VERSION,
-                    "dataset": DATASET, "edition": str(EDITION), "region": region, "roster_receipt": roster_receipt,
-                    "reports": [asdict(reports[key]) for key in sorted(reports)]})
+                document.update(schema_version=CAMPUS_PARTITION_VERSION, partition=partition, rosters={region: roster_receipt})
+                try:
+                    admit_campus_cohort(store, document)
+                except (ContractError, OSError, ValueError) as error:
+                    result["intake_hold"] = str(error)
+                    return result
+            result["intake_sha256"] = _save(intake, document)
         return result
 
 
@@ -267,6 +291,7 @@ def main() -> None:
     mode.add_argument("--region", choices=REGIONS)
     mode.add_argument("--inventory", type=Path, help="Read the 20-region roster receipt inventory and report offline coverage")
     parser.add_argument("--roster-receipt")
+    parser.add_argument("--partition", type=int, help="Select a zero-based 512-campus slice of the pinned region")
     parser.add_argument("--limit", type=int, help="Maximum regional requests, including zero for offline coverage")
     parser.add_argument("--interval", type=float)
     parser.add_argument("--intake", type=Path, help="Seal a compatible intake only when the exact roster is complete")
@@ -280,7 +305,7 @@ def main() -> None:
             raise ValueError("Select the existing retained publisher store")
         store = ProvenanceStore(args.store)
         if args.inventory is not None:
-            if any(value is not None for value in (args.roster_receipt, args.limit, args.interval, args.intake)):
+            if any(value is not None for value in (args.roster_receipt, args.limit, args.interval, args.intake, args.partition)):
                 raise ValueError("--inventory does not take regional acquisition options")
             result = retained_inventory(store, _inventory_receipts(args.inventory), preferred=preferred)
         else:
@@ -288,7 +313,7 @@ def main() -> None:
                 parser.error("--region requires --roster-receipt")
             result = acquire_region(store, args.region, args.roster_receipt, intake=args.intake, preferred=preferred,
                                     limit=25 if args.limit is None else args.limit,
-                                    interval=MIN_INTERVAL if args.interval is None else args.interval)
+                                    interval=MIN_INTERVAL if args.interval is None else args.interval, partition=args.partition)
         print(json.dumps(result, sort_keys=True))
     except (ContractError, OSError, ValueError) as error:
         parser.exit(1, f"TPRS campus acquisition failed: {error}\n")

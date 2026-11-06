@@ -495,6 +495,7 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
     from .release import _install_candidate, _schema_publication_destinations, publish_release
     from .tprs_statewide_intake import (
         CAMPUS_COHORT_LEDGER_VERSION, CAMPUS_COHORT_OPERATION, CAMPUS_COHORT_VERSION, CAMPUS_INTAKE_VERSION,
+        CAMPUS_PARTITION_LEDGER_VERSION, CAMPUS_PARTITION_OPERATION, CAMPUS_PARTITION_VERSION,
         STATEWIDE_OPERATION, ReportSelection, admit_campus_cohort, admit_statewide_selection, validate_campus_selection,
     )
 
@@ -523,11 +524,15 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
     _need(0 < len(body) <= 4 * 1024**2 and sha256(body).hexdigest() == intake_sha256, "Student intake pin differs")
     selection = json.loads(body, object_pairs_hook=_unique_object)
     version = selection.get("schema_version") if isinstance(selection, dict) else None
-    campus_cohort = version == CAMPUS_COHORT_VERSION
+    campus_cohort = version in (CAMPUS_COHORT_VERSION, CAMPUS_PARTITION_VERSION)
+    campus_partition = None
     roster_selection = None
     if campus_cohort:
         _need(body == (canonical_json(selection) + "\n").encode(), "Campus cohort requires a canonical JSON intake")
         roster_selection = admit_campus_cohort(store, selection)
+        if roster_selection.partition is not None:
+            region, = roster_selection.roster
+            campus_partition = {"region": region, "ordinal": roster_selection.partition}
     elif version == 2:
         roster_selection = admit_statewide_selection(store, selection)
     campus_receipt = None
@@ -640,7 +645,10 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
                 "definition_sha256": grid_digest, "intake_sha256": intake_sha256,
                 "source_locators": "one-based parsed HTML row and column", "projection_qualified": True,
                 "whole_report_semantics_qualified": False}
-            if campus_cohort:
+            if campus_partition is not None:
+                recipe.update(operation=CAMPUS_PARTITION_OPERATION, report_ledger_version=CAMPUS_PARTITION_LEDGER_VERSION,
+                              parquet_row_group_max_rows=_STATEWIDE_ROW_GROUP_ROWS, campus_partition=campus_partition)
+            elif campus_cohort:
                 assert roster_selection is not None
                 recipe.update(operation=CAMPUS_COHORT_OPERATION, report_ledger_version=CAMPUS_COHORT_LEDGER_VERSION,
                               parquet_row_group_max_rows=_STATEWIDE_ROW_GROUP_ROWS,
@@ -708,7 +716,9 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
         if roster_selection:
             _, locations = _schema_publication_destinations(catalog)
             result["release_assets"] = ["release.json", *locations]
-        if campus_cohort:
+        if campus_partition is not None:
+            result["campus_partition"] = campus_partition
+        elif campus_cohort:
             assert roster_selection is not None
             result["campus_regions"] = sorted(roster_selection.roster)
         (stage / "MATERIALIZATION.json").write_text(canonical_json(result) + "\n", encoding="utf-8")

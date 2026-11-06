@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping
+from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import asdict, dataclass
 import gzip
 
@@ -33,6 +33,8 @@ REGIONS = tuple(f"{number:02}" for number in range(1, 21))
 DISTRICT_COUNT = 1202
 CAMPUS_INTAKE_VERSION = 3
 CAMPUS_COHORT_VERSION = 4
+CAMPUS_PARTITION_VERSION = 5
+CAMPUS_PARTITION_REPORTS = 512
 MAX_ROSTER_BYTES = 256 * 1024
 MAX_CAMPUS_ROSTER_BYTES = 512 * 1024
 MAX_CAMPUS_COHORT_REPORTS = 1500
@@ -53,6 +55,7 @@ class ReportSelection:
 class RosterSelection:
     reports: tuple[ReportSelection, ...]
     roster: dict[str, dict[str, str]]
+    partition: int | None = None
 
 
 def _regional_roster(response: bytes, record: Mapping[str, Any], region: str, scope: str, limit: int) -> tuple[str, ...]:
@@ -202,10 +205,21 @@ def _check_roster_regions(roster: Mapping[str, Any], scope: str) -> None:
         _need(set(roster) == set(REGIONS), "Statewide selection requires all 20 regional rosters")
 
 
+def campus_partition_ids(identifiers: Iterable[str], partition: int) -> tuple[str, ...]:
+    """Select one fixed slice of an already verified publisher campus roster."""
+    _need(type(partition) is int and partition >= 0, "Campus partition requires a nonnegative integer ordinal")
+    ordered = sorted(identifiers)
+    start = partition * CAMPUS_PARTITION_REPORTS
+    _need(start < len(ordered), "Campus partition is outside the pinned regional roster")
+    return tuple(ordered[start:start + CAMPUS_PARTITION_REPORTS])
+
+
 def roster_membership(roster: Mapping[str, Any], records: Mapping[str, Any], *,
-                      scope: str = "district") -> dict[str, str]:
+                      scope: str = "district", partition: int | None = None) -> dict[str, str]:
     """Return publisher identifiers and exact regional roster receipts."""
     _check_roster_regions(roster, scope)
+    if partition is not None:
+        _need(scope == "campus" and len(roster) == 1, "Campus partition requires exactly one regional roster")
     limit = MAX_CAMPUS_ROSTER_BYTES if scope == "campus" else MAX_ROSTER_BYTES
     members: dict[str, str] = {}
     for region, entry in sorted(roster.items()):
@@ -218,11 +232,20 @@ def roster_membership(roster: Mapping[str, Any], records: Mapping[str, Any], *,
         for identifier in _regional_roster(response, record, region, scope, limit):
             _need(identifier not in members, f"Duplicate {scope} across regional rosters")
             members[identifier] = receipt
+    if partition is not None:
+        return {identifier: members[identifier] for identifier in campus_partition_ids(members, partition)}
     if scope == "campus":
         _need(len(members) <= MAX_CAMPUS_COHORT_REPORTS, "Campus cohort exceeds its report count budget")
     else:
         _need(len(members) == DISTRICT_COUNT, "Statewide roster size differs from the reviewed edition")
     return members
+
+
+def campus_report_has_roster(record: Mapping[str, Any], receipt: str) -> bool:
+    """A campus report must have an explicit edition and its sole roster parent."""
+    metadata = record.get("source_metadata", {})
+    return (isinstance(metadata, Mapping) and record.get("requested_year") == record.get("resolved_year") == EDITION
+            and metadata.get("version") == str(EDITION) and metadata.get("provenance_ids") == [receipt])
 
 
 def validate_report_ledger(reports: tuple[ReportSelection, ...], members: Mapping[str, str],
@@ -244,28 +267,38 @@ def validate_report_ledger(reports: tuple[ReportSelection, ...], members: Mappin
         record = records[entry.receipt]
         _validate_report_acquisition(record, scope=entry.scope, identifier=entry.identifier, expected_sha256=entry.sha256)
         metadata = record["source_metadata"]
-        _need(record["requested_year"] == record["resolved_year"] == EDITION
-              and metadata.get("version") == str(EDITION), "Statewide ledger requires original explicit-edition receipts")
-        if entry.scope == "district":
-            _need(members[entry.identifier] in metadata.get("provenance_ids", ()),
-                  "District report receipt lacks its exact regional roster parent")
-        elif entry.scope == "campus":
-            _need(metadata.get("provenance_ids") == [members[entry.identifier]],
-                  "Campus report receipt lacks its sole exact regional roster parent")
+        if entry.scope == "campus":
+            _need(campus_report_has_roster(record, members[entry.identifier]),
+                  "Campus report receipt lacks its sole exact regional roster parent or explicit edition")
+        else:
+            _need(record["requested_year"] == record["resolved_year"] == EDITION
+                  and metadata.get("version") == str(EDITION), "Statewide ledger requires original explicit-edition receipts")
+            if entry.scope == "district":
+                _need(members[entry.identifier] in metadata.get("provenance_ids", ()),
+                      "District report receipt lacks its exact regional roster parent")
         total += record["artifact"]["size_bytes"]
     _need(total <= MAX_STATEWIDE_HTML_BYTES, "Roster report ledger exceeds the aggregate source byte budget")
 
 
 def _admit_roster_selection(store: ProvenanceStore, document: dict[str, Any], *, scope: str) -> RosterSelection:
     campus = scope == "campus"
+    partitioned = campus and document.get("schema_version") == CAMPUS_PARTITION_VERSION
     version = CAMPUS_COHORT_VERSION if campus else 2
-    _need(set(document) == {"schema_version", "dataset", "edition", "rosters", "reports"}
+    fields = {"schema_version", "dataset", "edition", "rosters", "reports"}
+    if partitioned:
+        version = CAMPUS_PARTITION_VERSION
+        fields.add("partition")
+    _need(set(document) == fields
           and type(document["schema_version"]) is int and document["schema_version"] == version
           and document["dataset"] == DATASET and document["edition"] == str(EDITION), "Invalid roster-bound student intake")
     rosters = document["rosters"]
     _need(isinstance(rosters, dict)
           and all(isinstance(value, str) and _DIGEST.fullmatch(value) for value in rosters.values()), "Invalid roster receipt pins")
     _check_roster_regions(rosters, scope)
+    partition = document.get("partition")
+    if partitioned:
+        _need(type(partition) is int and partition >= 0, "Campus partition requires a nonnegative integer ordinal")
+        _need(len(rosters) == 1, "Campus partition requires exactly one regional roster")
     roster = {}
     limit = MAX_CAMPUS_ROSTER_BYTES if campus else MAX_ROSTER_BYTES
     for region, receipt in sorted(rosters.items()):
@@ -280,7 +313,7 @@ def _admit_roster_selection(store: ProvenanceStore, document: dict[str, Any], *,
             response = stream.read(size + 1)
         roster[region] = {"receipt": receipt, "response": response.decode("utf-8")}
     records = {receipt: store.read_record(receipt) for receipt in rosters.values()}
-    members = roster_membership(roster, records, scope=scope)
+    members = roster_membership(roster, records, scope=scope, partition=partition)
     rows = document["reports"]
     _need(isinstance(rows, list) and len(rows) == len(members) + (0 if campus else 1),
           "Incomplete campus cohort report selection" if campus else "Incomplete statewide report selection")
@@ -301,7 +334,7 @@ def _admit_roster_selection(store: ProvenanceStore, document: dict[str, Any], *,
             state = (store.root / "objects" / entry.sha256).stat(follow_symlinks=False)
             _need(S_ISREG(state.st_mode) and state.st_size == report_records[entry.receipt]["artifact"]["size_bytes"],
                   "Retained campus report differs from its declared regular file size")
-    return RosterSelection(selected, roster)
+    return RosterSelection(selected, roster, partition)
 
 
 def admit_statewide_selection(store: ProvenanceStore, document: dict[str, Any]) -> RosterSelection:
@@ -310,13 +343,15 @@ def admit_statewide_selection(store: ProvenanceStore, document: dict[str, Any]) 
 
 
 def admit_campus_cohort(store: ProvenanceStore, document: dict[str, Any]) -> RosterSelection:
-    """Admit the full campus roster for every selected region."""
+    """Admit complete campus regions or one exact partition of a region."""
     return _admit_roster_selection(store, document, scope="campus")
 
 
 STATEWIDE_OPERATION = "statewide_tprs_student_membership_enrollment"
 CAMPUS_COHORT_OPERATION = "regional_cohort_tprs_student_membership_enrollment"
 CAMPUS_COHORT_LEDGER_VERSION = 3
+CAMPUS_PARTITION_OPERATION = "regional_partition_tprs_student_membership_enrollment"
+CAMPUS_PARTITION_LEDGER_VERSION = 4
 MAX_AUDIT_LINE_BYTES = 4096
 MAX_AUDIT_BYTES = 128 * 1024**2
 MAX_AUDIT_ROWS = 1_000_000
@@ -326,20 +361,27 @@ def student_report_resources(record: Mapping[str, Any]) -> dict[str, ColumnSchem
     """Route reviewed attachments by their processing output, never by a path in the intake."""
     recipe = record.get("parameters", {}).get("recipe", {})
     operation = recipe.get("operation")
-    if operation not in (STATEWIDE_OPERATION, CAMPUS_COHORT_OPERATION):
+    if operation not in (STATEWIDE_OPERATION, CAMPUS_COHORT_OPERATION, CAMPUS_PARTITION_OPERATION):
         _need("report_ledger_version" not in recipe, "Unsupported statewide student ledger operation")
         return {}
-    campus = operation == CAMPUS_COHORT_OPERATION
-    version = CAMPUS_COHORT_LEDGER_VERSION if campus else 2
+    partitioned = operation == CAMPUS_PARTITION_OPERATION
+    campus = operation != STATEWIDE_OPERATION
+    version = CAMPUS_PARTITION_LEDGER_VERSION if partitioned else CAMPUS_COHORT_LEDGER_VERSION if campus else 2
     _need(type(recipe.get("report_ledger_version")) is int and recipe["report_ledger_version"] == version
           and record.get("processor") == "teadata.tprs_students"
           and set(record["outputs"]) == {"leaf", "roster", "raw_audit", "grid"}, "Invalid roster-bound student output contract")
     if campus:
-        regions = recipe.get("campus_regions")
-        _need(isinstance(regions, list) and bool(regions) and all(isinstance(region, str) and region in REGIONS for region in regions)
-              and sorted(set(regions)) == regions and "cohort" not in recipe
-              and type(recipe.get("parquet_row_group_max_rows")) is int
-              and recipe["parquet_row_group_max_rows"] == _STATEWIDE_ROW_GROUP_ROWS, "Invalid campus cohort recipe")
+        _need("cohort" not in recipe and type(recipe.get("parquet_row_group_max_rows")) is int
+              and recipe["parquet_row_group_max_rows"] == _STATEWIDE_ROW_GROUP_ROWS, "Invalid campus student recipe")
+        if partitioned:
+            partition = recipe.get("campus_partition")
+            _need(isinstance(partition, dict) and set(partition) == {"region", "ordinal"}
+                  and partition["region"] in REGIONS and type(partition["ordinal"]) is int and partition["ordinal"] >= 0
+                  and "campus_regions" not in recipe, "Invalid campus partition recipe")
+        else:
+            regions = recipe.get("campus_regions")
+            _need(isinstance(regions, list) and bool(regions) and all(isinstance(region, str) and region in REGIONS for region in regions)
+                  and sorted(set(regions)) == regions and "campus_partition" not in recipe, "Invalid campus cohort recipe")
     else:
         pair = recipe.get("cohort")
         _need(isinstance(pair, dict) and set(pair) == {"district", "state"}
@@ -355,12 +397,30 @@ def student_report_resources(record: Mapping[str, Any]) -> dict[str, ColumnSchem
     return refs
 
 
+def _partition_schema_parents(edition: Mapping[str, Any], records: Mapping[str, Any]) -> tuple[str, str]:
+    selected_digest = edition["column_schema_sha256"]
+    references = [ref for ref in edition["metadata"]["references"]
+                  if ref["role"] == "schema" and ref.get("reviewed_sha256") == selected_digest]
+    _need(len(references) == 1 and references[0]["reference_id"] == "columns" and len(references[0]["provenance_ids"]) == 1,
+          "Campus partition requires an exact selected schema observation")
+    schema = records[references[0]["provenance_ids"][0]]
+    _need(schema["dataset"] == "reference:tprs_student_selected_projection_schema" and schema["kind"] == "acquisition"
+          and schema["method"] == "local_observation" and schema["requested_year"] == schema["resolved_year"] == EDITION
+          and schema["artifact"]["sha256"] == selected_digest,
+          "Campus partition requires an exact selected schema observation")
+    parents = schema["source_metadata"]["provenance_ids"]
+    intakes = [identifier for identifier in parents if records[identifier]["dataset"] == "reference:tprs_student_intake"]
+    configs = [identifier for identifier in parents if records[identifier]["dataset"] == "reference:tprs_student_config"]
+    _need(len(intakes) == len(configs) == 1, "Campus partition schema must bind one exact intake and configuration observation")
+    return intakes[0], configs[0]
+
+
 def student_report_ledger(document: Mapping[str, Any], key: EditionKey, roster: bytes,
                           processing: Mapping[str, Any]) -> tuple[ReportSelection, ...]:
     records = document["provenance"]
     inputs = processing["inputs"]
-    intakes = [records[identifier] for identifier in inputs
-               if records[identifier]["dataset"] == "reference:tprs_student_intake"]
+    intake_ids = [identifier for identifier in inputs if records[identifier]["dataset"] == "reference:tprs_student_intake"]
+    intakes = [records[identifier] for identifier in intake_ids]
     recipe = processing["parameters"]["recipe"]
     pin = recipe.get("intake_sha256")
     _need(isinstance(pin, str) and _DIGEST.fullmatch(pin) is not None and len(intakes) == 1
@@ -370,10 +430,12 @@ def student_report_ledger(document: Mapping[str, Any], key: EditionKey, roster: 
           and intakes[0]["artifact"]["sha256"] == pin, "Student ledger differs from its direct exact intake receipt")
     body = json.loads(roster, object_pairs_hook=_unique_object)
     _need(isinstance(body, dict), "Invalid student roster attachment")
-    campus = recipe["operation"] == CAMPUS_COHORT_OPERATION
-    members = roster_membership(body, records, scope="campus" if campus else "district")
-    _need({entry["receipt"] for entry in body.values()} <= set(inputs),
-          "Roster receipts are not direct processing inputs")
+    partitioned = recipe["operation"] == CAMPUS_PARTITION_OPERATION
+    campus = partitioned or recipe["operation"] == CAMPUS_COHORT_OPERATION
+    partition = recipe["campus_partition"]["ordinal"] if partitioned else None
+    members = roster_membership(body, records, scope="campus" if campus else "district", partition=partition)
+    roster_receipts = {entry["receipt"] for entry in body.values()}
+    _need(roster_receipts <= set(inputs), "Roster receipts are not direct processing inputs")
     receipts = document["edition"]["acquisition_ids"]
     _need(set(receipts) <= set(inputs), "Report receipts are not direct processing inputs")
     reports = tuple(ReportSelection(key.scope,
@@ -381,13 +443,25 @@ def student_report_ledger(document: Mapping[str, Any], key: EditionKey, roster: 
         receipt, records[receipt]["artifact"]["sha256"]) for receipt in receipts)
     validate_report_ledger(reports, members, records, scope=key.scope)
     if campus:
-        _need(sorted(body) == recipe["campus_regions"], "Campus cohort recipe differs from the exact roster regions")
         intake = {"schema_version": CAMPUS_COHORT_VERSION, "dataset": DATASET, "edition": str(EDITION),
                   "rosters": {region: entry["receipt"] for region, entry in body.items()},
                   "reports": [asdict(report) for report in reports]}
+        if partitioned:
+            _need(set(body) == {recipe["campus_partition"]["region"]}, "Campus partition recipe differs from the exact roster region")
+            intake_id, config_id = _partition_schema_parents(document["edition"], records)
+            expected = {*roster_receipts, *receipts, intake_id, config_id}
+            _need(intake_ids == [intake_id] and len(inputs) == len(expected) and set(inputs) == expected,
+                  "Campus partition requires exact direct processing inputs bound by its selected schema")
+            config = records[config_id]
+            _need(config["kind"] == "acquisition" and config["method"] == "local_observation"
+                  and config["requested_year"] == config["resolved_year"] == EDITION
+                  and config["source_metadata"].get("version") == str(EDITION), "Invalid campus partition configuration observation")
+            intake.update(schema_version=CAMPUS_PARTITION_VERSION, partition=partition)
+        else:
+            _need(sorted(body) == recipe["campus_regions"], "Campus cohort recipe differs from the exact roster regions")
         raw = (canonical_json(intake) + "\n").encode()
         _need(sha256(raw).hexdigest() == pin and len(raw) == intakes[0]["artifact"]["size_bytes"],
-              "Campus cohort ledger does not reproduce its exact canonical intake")
+              "Campus ledger does not reproduce its exact canonical intake")
     return reports
 
 
