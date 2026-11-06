@@ -55,7 +55,8 @@ def test_primary_disability_witness_keeps_omitted_category_and_suppression_disti
         ["LD", "DB"],
         ["AUSTIN ISD (227901 )", "TRADITIONAL ISD/CSD", "13", "4,129", "N/A"],
     ]
-    native = [{"learning": 4129, "peims_status_learning": "observed", "deafblind": None,
+    native = [{"region_number": "13", "charter_status": "TRADITIONAL ISD/CSD",
+               "learning": 4129, "peims_status_learning": "observed", "deafblind": None,
                "peims_status_deafblind": "suppressed", "delay": 0, "peims_status_delay": "observed"}]
     columns = {"LD": "learning", "DB": "deafblind", "DD": "delay"}
     assert native_witnesses._primary_disability(rows, native, key, "227901", columns, ["DD"]) == (2, ["DD"])
@@ -64,6 +65,21 @@ def test_primary_disability_witness_keeps_omitted_category_and_suppression_disti
     rows[-1][-1] = "0"
     with pytest.raises(ContractError, match="count or status differs"):
         native_witnesses._primary_disability(rows, native, key, "227901", columns, ["DD"])
+    rows[-3][0] = "District Name (District Number)/Region"
+    rows[-1].pop(1)
+    rows[-1][-1] = "N/A"
+    assert native_witnesses._primary_disability(rows, native, key, "227901", columns, ["DD"]) == (2, ["DD"])
+
+
+def test_historical_district_classification_keeps_leading_zeroes_and_unknowns():
+    import pyarrow as pa
+
+    from teadata.district_types import project_district_types
+
+    keys = pa.chunked_array([["001902", "108801"], ["015847", "227901"]])
+    codes, charter = project_district_types(keys, {"001902": "H", "108801": "I", "227901": "A"})
+    assert codes.to_pylist() == ["H", "I", None, "A"]
+    assert charter.to_pylist() == [False, True, None, False]
 
 
 def test_transfer_witness_rejects_a_truncated_data_row_as_a_footer(tmp_path):

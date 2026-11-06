@@ -479,9 +479,14 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
             reference = 'about' if dataset.endswith('_ethnicity') else 'peims_masking'
             assert current['value_policies'].pop(f'{dataset}_{year}')['reference_id'] == reference
     primary_disability = 'peims_special_education_by_primary_disability'
-    assert list(current['data_sources'].pop(primary_disability)) == [2023, 2024, 2025, 2026]
+    disability_editions = current['data_sources'].pop(primary_disability)
+    assert sorted(disability_editions) == list(range(2013, 2027))
+    assert all(entry['metadata']['value_policy'] == ('peims_primary_disability_csv_through_2018' if year <= 2018
+                                                     else 'peims_primary_disability_csv')
+               for year, entry in disability_editions.items())
     assert current['schema']['data_sources'].pop(primary_disability) == ['csv']
     assert current['value_policies'].pop('peims_primary_disability_csv')['reference_id'] == 'peims_disability_masking'
+    assert set(current['value_policies'].pop('peims_primary_disability_csv_through_2018')['tokens']) == {'-9999999'}
     staff = 'peims_staff_fte_and_salary'
     assert list(current['data_sources'].pop(staff)) == [2023, 2024, 2025, 2026]
     assert current['schema']['data_sources'].pop(staff) == ['csv']

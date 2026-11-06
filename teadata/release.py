@@ -46,11 +46,12 @@ _ACTIVE_RELEASE: ContextVar[DataRelease | None] = ContextVar(
 )
 
 
-def _open_native_source(ref: NativeSourceRef, parent: str | Path, *, offline: bool) -> DataRelease:
+def _open_native_source(ref: NativeSourceRef, parent: str | Path, *, offline: bool,
+                        cache_dir: Path | None = None) -> DataRelease:
     location = ref.location
     if "://" not in location:
         location = urljoin(str(parent), location) if "://" in str(parent) else str(Path(parent).parent / location)
-    child = DataRelease(location, expected_sha256=ref.manifest_sha256, offline=offline)
+    child = DataRelease(location, expected_sha256=ref.manifest_sha256, offline=offline, cache_dir=cache_dir)
     if not child._v3 or child.build_id != ref.build_id:
         raise ContractError("Native source manifest has a different catalog type or build ID")
     editions = {EditionKey.from_dict({name: value for name, value in row.items() if name != "edition_id"})
@@ -70,6 +71,11 @@ def _safe_filename(value: object) -> str:
     ):
         raise ContractError("Release artifact names must be portable filenames")
     return value
+
+
+def _require_cache_file(path: Path) -> None:
+    if not stat.S_ISREG(path.stat(follow_symlinks=False).st_mode) or path.resolve(strict=True) != path:
+        raise ContractError("Release cache entries must be regular files without symlink paths")
 
 
 def _download(url: str, path: Path, *, expected: dict | None = None) -> None:
@@ -178,10 +184,12 @@ def _student_attachments(catalog: DatasetCatalog, artifact: ArtifactRef) -> dict
 class DataRelease:
     """A complete bundle with one catalog and content hashes for every artifact."""
 
-    def __init__(self, manifest: str | Path, *, expected_sha256: str | None = None, offline: bool = False):
+    def __init__(self, manifest: str | Path, *, expected_sha256: str | None = None, offline: bool = False,
+                 cache_dir: Path | None = None):
         self.source = str(manifest)
         self.remote = "://" in self.source
-        self.cache = Path(user_cache_path("teadata")) / "releases"
+        self._cache_dir = cache_dir.expanduser().resolve() if cache_dir is not None else None
+        self.cache = self._cache_dir or Path(user_cache_path("teadata")) / "releases"
         if expected_sha256 is not None and (not isinstance(expected_sha256, str) or len(expected_sha256) != 64
                 or any(c not in "0123456789abcdef" for c in expected_sha256)):
             raise ContractError("Manifest pin must be a SHA-256 identity")
@@ -194,6 +202,8 @@ class DataRelease:
             path = self.cache / "manifests" / f"{identity}.json"
             if offline and expected_sha256 is None:
                 raise ContractError("Offline remote roots require an expected manifest SHA-256")
+            if offline:
+                _require_cache_file(path)
             # Existing URI slot and content check; never infer a pin from cached leaves.
             if not offline and (expected_sha256 is None or not path.exists()):
                 _download(self.source, path, expected={"sha256": expected_sha256} if expected_sha256 else None)
@@ -288,6 +298,8 @@ class DataRelease:
         """One location/cache/download path for selected v3 bytes."""
         if "://" in location or self.remote:
             path = self.cache / "objects" / digest
+            if self.offline and path.exists():
+                _require_cache_file(path)
             if not path.exists():
                 if self.offline:
                     raise ContractError("Selected resource is not cached for offline use")
@@ -304,12 +316,14 @@ class DataRelease:
 
     def __getstate__(self) -> dict:
         if self._v3:
-            return {"_v3": True, "source": self.source, "pin": self.manifest_sha256, "offline": self.offline}
+            return {"_v3": True, "source": self.source, "pin": self.manifest_sha256, "offline": self.offline,
+                    "cache_dir": self._cache_dir}
         return self.__dict__.copy()
 
     def __setstate__(self, state: dict) -> None:
         if state.get("_v3") is True:
-            self.__init__(state["source"], expected_sha256=state["pin"], offline=state["offline"])
+            self.__init__(state["source"], expected_sha256=state["pin"], offline=state["offline"],
+                          cache_dir=state.get("cache_dir"))
         else:
             self.__dict__.update(state)
 
@@ -338,6 +352,8 @@ class DataRelease:
         expected = self._artifacts[role]
         if self.remote:
             path = self.cache / "objects" / expected["sha256"]
+            if self.offline and path.exists():
+                _require_cache_file(path)
             if not path.exists():
                 if self.offline:
                     raise ContractError("Release artifact is not cached for offline use")
@@ -364,6 +380,11 @@ class DataRelease:
 
     def verify(self, *, discard_cached_reads: bool = False) -> dict[str, Path]:
         """Verify the complete bundle, optionally releasing already hashed file pages."""
+        paths = self._verify_artifacts(discard_cached_reads=discard_cached_reads)
+        self.verify_native_sources(discard_cached_reads=discard_cached_reads)
+        return paths
+
+    def _verify_artifacts(self, *, discard_cached_reads: bool) -> dict[str, Path]:
         artifact = partial(self.artifact, discard_cached_reads=True) if discard_cached_reads else self.artifact
         if self._v3:
             self.catalog.verify_metadata()
@@ -376,16 +397,14 @@ class DataRelease:
                     if descriptor["edition"]["dataset"] == "tprs_student_membership_enrollment_reports":
                         _student_attachments(self.catalog, ArtifactRef.from_dict(descriptor))
             return paths
-        paths = {role: artifact(role) for role in sorted(self._artifacts)}
-        self.verify_native_sources(discard_cached_reads=discard_cached_reads)
-        return paths
+        return {role: artifact(role) for role in sorted(self._artifacts)}
 
     def verify_native_sources(self, *, discard_cached_reads: bool = False) -> dict[str, dict[str, Path]]:
         """Verify attached native roots and return their manifests and content-addressed files."""
         verified = {}
         parent = self.source if self.remote else self.path
         for ref in self.catalog.native_sources:
-            child = _open_native_source(ref, parent, offline=self.offline)
+            child = _open_native_source(ref, parent, offline=self.offline, cache_dir=getattr(self, "_cache_dir", None))
             child.verify(discard_cached_reads=discard_cached_reads)
             verified[ref.manifest_sha256] = {
                 "manifest": child.path,
@@ -393,6 +412,29 @@ class DataRelease:
                 **{digest: path for digest, (path, _, _) in child._column_schema_data.items()},
             }
         return verified
+
+    def verified_cache_inventory(self) -> dict[str, dict[str, str | int]]:
+        """Verify an offline URL release and list the exact cache files it needs."""
+        if not self.remote or not self.offline or self._v3:
+            raise ContractError("A cache inventory requires an offline entity release URL")
+        _require_cache_file(self.path)
+        if file_identity(self.path)["sha256"] != self.manifest_sha256:
+            raise ContractError("Cached root manifest changed after selection")
+        paths = self._verify_artifacts(discard_cached_reads=True)
+        selected = [(self.path, self.manifest_sha256)]
+        selected.extend((path, self._artifacts[role]["sha256"]) for role, path in paths.items())
+        for pin, files in self.verify_native_sources(discard_cached_reads=True).items():
+            selected.extend((path, pin if name == "manifest" else name) for name, path in files.items())
+        inventory: dict[str, dict[str, str | int]] = {}
+        for path, digest in selected:
+            if not path.is_file() or path.resolve(strict=True) != path or not path.is_relative_to(self.cache):
+                raise ContractError("Release cache files must be regular files within the selected cache")
+            relative = path.relative_to(self.cache).as_posix()
+            identity = {"sha256": digest, "size_bytes": path.stat().st_size}
+            if relative in inventory and inventory[relative] != identity:
+                raise ContractError("Release cache paths have contradictory identities")
+            inventory[relative] = identity
+        return dict(sorted(inventory.items()))
 
     def _verify_student_cohorts(self, document: dict, paths: dict[str, Path]) -> None:
         cohorts: dict[_StudentCohort, set[str]] = {}
@@ -525,7 +567,7 @@ class DataRelease:
                     and (edition is None or key == edition)]
             if not keys:
                 continue
-            child = _open_native_source(ref, parent, offline=self.offline)
+            child = _open_native_source(ref, parent, offline=self.offline, cache_dir=getattr(self, "_cache_dir", None))
             for key in keys:
                 if all((info := child.catalog.field_metadata(field, scope=scope, edition=key)) is not None
                        and DataPeriod.from_dict(info["period"]) == period for field in fields):

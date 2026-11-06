@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING, Any
 
 from .column_schema import crosswalk_dataset, parse_column_schema, reader_options, table_input_sha256s
 from .dataset_metadata import ArtifactRef, DataPeriod, DatasetMetadata, EditionKey, ResolvedDataset
+from .district_types import DISTRICT_TYPE_COLUMNS, DISTRICT_TYPE_REFERENCE, project_district_types, reviewed_district_types
 from .manifest import BuildRecorder, canonical_json, file_identity
 from .peims_staff import (
     STAFF,
@@ -282,7 +283,10 @@ def materialize_peims_students(store: ProvenanceStore, *, config: Path, config_s
             None, "", DatasetMetadata(title="Exact reviewed PEIMS student source Config")))
         results: list[dict[str, Any]] = []
         for source, policy, tables, identifiers, references in sources:
-            for identifier in [*identifiers.values(), *references]:
+            roots = [*identifiers.values(), *references]
+            records = store.verify_record_closure(roots)
+            roster = reviewed_district_types(source.metadata, store, records) if source.dataset == PRIMARY_DISABILITY else None
+            for identifier in roots:
                 target.copy_record_from(store, identifier)
             for table in tables:
                 scope = table["table"]
@@ -295,8 +299,18 @@ def materialize_peims_students(store: ProvenanceStore, *, config: Path, config_s
                 operation = STAFF_RECIPE if source.dataset == STAFF else "reviewed_peims_student_csv_projection"
                 recipe = {"operation": operation, "encoding": ENCODING,
                           "config_sha256": config_sha256, "cli_sha256": cli_sha, "batch_rows": BATCH_ROWS}
+                inputs = [source_sha]
+                if roster is not None and scope == "district" and "charter_status" not in projected.column_names:
+                    ref, = (item for item in source.metadata.references if item.reference_id == DISTRICT_TYPE_REFERENCE)
+                    assert ref.reviewed_sha256 is not None
+                    inputs.append(ref.reviewed_sha256)
+                    recipe["district_type_roster"] = ref.provenance_ids[0]
+                    for name, values in zip(DISTRICT_TYPE_COLUMNS,
+                                            project_district_types(projected["district_number"], roster), strict=True):
+                        projected = projected.append_column(name, values)
+                    support["context"].extend(DISTRICT_TYPE_COLUMNS)
                 contract = recorder.leaf_contract(key, source, native_schema=projected.schema.serialize().to_pybytes(),
-                    columns=projected.column_names, key_columns=keys, rows=projected.num_rows, inputs=[source_sha],
+                    columns=projected.column_names, key_columns=keys, rows=projected.num_rows, inputs=inputs,
                     recipe=recipe, toolchain=toolchain, column_support=support)
                 leaf_id = sha256(canonical_json(contract).encode()).hexdigest()
                 leaf = stage / f"{leaf_id}.parquet"

@@ -18,7 +18,8 @@ import pyarrow.parquet as pq
 from .column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
 from .dataset_metadata import COLUMN_SCHEMA_MAX_BYTES, DataPeriod
 from .manifest import canonical_json
-from .peims_leaves import DATASETS as PEIMS_DATASETS
+from .district_types import DISTRICT_TYPE_COLUMNS, DISTRICT_TYPE_REFERENCE, reviewed_district_types
+from .peims_leaves import DATASETS as PEIMS_DATASETS, PRIMARY_DISABILITY
 from .peims_leaves import ENCODING, SCOPES_BY_DATASET, _count_columns, _key_columns
 from .peims_staff import (
     STAFF,
@@ -72,6 +73,7 @@ class _Typed:
     rows: int
     lineage: dict[str, Any]
     staff_scope: str | None = None
+    district_types: dict[str, str] | None = None
 
 
 def _digest(value: Any) -> str:
@@ -153,6 +155,8 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
         raise ValueError("Typed leaf originals differ from its ordered crosswalk inputs")
     prepared = None
     projection = {}
+    district_types = None
+    attached_hashes = []
     if peims:
         if (key.scope not in SCOPES_BY_DATASET[key.dataset] or key.table != key.scope or len(ids) != 1
                 or recipe.get("encoding") != ENCODING
@@ -184,7 +188,20 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
                 support[STAFF_EMPLOYEE_COUNT]["auxiliary"] = [STAFF_EMPLOYEE_BASIS]
         names.append("peims_source_record")
         keys = _key_columns(key.dataset, key.scope)
-        expected_support = {"fields": support, "context": ["peims_source_record"]}
+        context = ["peims_source_record"]
+        refs = [value for value in metadata.references if value.reference_id == DISTRICT_TYPE_REFERENCE]
+        if refs and key.dataset == PRIMARY_DISABILITY and key.scope == "district" and "charter_status" not in names:
+            roster_ref, = refs
+            roster_receipt, = roster_ref.provenance_ids
+            if roster_receipt not in record["inputs"] or recipe.get("district_type_roster") != roster_receipt:
+                raise ValueError("PEIMS historical charter classification lacks its exact roster input")
+            district_types = reviewed_district_types(metadata, store, graph)
+            attached_hashes.append(roster_ref.reviewed_sha256)
+            names.extend(DISTRICT_TYPE_COLUMNS)
+            context.extend(DISTRICT_TYPE_COLUMNS)
+        elif "district_type_roster" in recipe:
+            raise ValueError("PEIMS historical charter classification has an unexpected roster")
+        expected_support = {"fields": support, "context": context}
         if contract["columns"] != names or contract["key_columns"] != keys or contract.get("column_support") != expected_support:
             raise ValueError("PEIMS leaf does not retain all reviewed fields, raw tokens, statuses and row keys")
         inputs = [(ENCODING, None, contract["rows"], ())]
@@ -239,7 +256,7 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
             inputs.append((encoding, controls[claimed["record_id"]], entry["rows"], tuple(annotation["annotations"])))
         if sum(rows for _, _, rows, _ in inputs) != contract["rows"]:
             raise ValueError("Transfer originals do not account for every native row")
-    if contract["inputs"] != hashes:
+    if contract["inputs"] != [*hashes, *attached_hashes]:
         raise ValueError("Typed leaf inputs differ from its exact physical derivation")
     originals = []
     for claimed, (encoding, region, rows, annotations) in zip(acquisitions, inputs, strict=True):
@@ -259,7 +276,8 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
                   mapping.get("layout") if peims else None, projection, period, policy, contract["rows"],
                   {"leaf_processing_id": ref.processing_id, "leaf_sha256": ref.sha256,
                    "prepared_sha256": hashes[-1] if prepared else None, "crosswalk_sha256": schema.reviewed_sha256,
-                   "acquisitions": acquisitions}, staff_scope=key.scope if staff else None)
+                   "acquisitions": acquisitions}, staff_scope=key.scope if staff else None,
+                  district_types=district_types)
 
 
 def _wire(original: _Original, selection: _Typed, *, limit: int) -> Iterator[tuple[list[str], int, int, int, int]]:
@@ -406,6 +424,10 @@ def _batch(selection: _Typed, index: int, rows: list[list[str]], positions: list
                 "distinct_employees" if role.startswith("TOTAL ") else "positions"
                 for role in arrays["staff_role"].to_pylist()], type=pa.string())
         arrays["peims_source_record"] = pa.array([position[0] for position in positions], type=pa.int64())
+        if selection.district_types is not None:
+            codes = [selection.district_types.get(identifier) for identifier in arrays["district_number"].to_pylist()]
+            arrays[DISTRICT_TYPE_COLUMNS[0]] = pa.array(codes, type=pa.string())
+            arrays[DISTRICT_TYPE_COLUMNS[1]] = pa.array([None if code is None else code == "I" for code in codes], type=pa.bool_())
         return pa.table(arrays)
     context = [pa.array(values, type=pa.int64()) for values in zip(*positions, strict=True)]
     source = pa.Table.from_arrays([*columns, *context],

@@ -205,23 +205,39 @@ separate from ETL qualification.
 ### PEIMS primary-disability counts
 
 `peims_special_education_by_primary_disability` is discoverable as a source-only
-dataset for school years 2022–23 through 2025–26. Select an exact edition by its
+dataset for school years 2012–13 through 2025–26. Select an exact edition by its
 ending year. The reviewed native scopes are Texas and district. TEA also offers
 regional and county reports. Campus results are unavailable through this source.
 Counts are from the October PEIMS snapshot for public schools, including charter
-schools. Preserve each category's raw CSV token and status. `-999` is suppressed
-and `0` is an observed zero. The figures and the program Enrollment and TAPR/TPRS
+schools. Preserve each category's raw CSV token and status. The CSV masking
+token is `-9999999` through 2017–18 and `-999` from 2018–19. `0` is an observed
+zero. The figures and the program Enrollment and TAPR/TPRS
 Membership measures have separate source lineages. Even published category sums
 can differ from the program count. [TEA report selector](https://rptsvr1.tea.texas.gov/adhocrpt/adser.html)
 and [report criteria](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/abtspeced.html).
 
+For 2012–13 through 2015–16, the district leaves add the technical support
+columns `tea_district_type_code` and `tea_is_charter_lea` from the
+[same-year TEA District Type roster](https://tea.texas.gov/taxonomy/school-data#district-type-data-search).
+These columns join by exact six-digit district number. The edition metadata
+links the roster and its receipt. An unmatched classification is null. From
+2016–17 onward, the district leaves retain the original PEIMS `charter_status`
+column. In the overlapping 2016–17 files, all 1,199 PEIMS rows matched the
+district type source and agreed on charter classification. A school-year
+classification records the publisher's category for that year. Opening and
+closure dates have separate sources.
+
 TEA permitted developmental delay classification beginning in 2024–25 and
 ended new use of noncategorical early childhood beginning in 2025–26, with an
 exception for previously identified students before age-six reevaluation.
-The statewide publisher files show 14 and 12 Developmental Delay records in
-2022–23 and 2023–24. Their lineage remains unresolved, and interpretation of
-those counts is on hold. Interpret trends in light of the transition. Specific
+The statewide publisher files show nonzero Developmental Delay records before
+2024–25, including 14 and 12 in 2022–23 and 2023–24. Their lineage remains
+unresolved. These raw counts are retained, and interpretation of the older
+Developmental Delay series is on hold. TEA's 2023–24 TAPR glossary already
+listed the reporting code. The eligibility guidance dates use of the current
+criteria to 2024–25. Specific
 learning disability is a broader category than dyslexia. [TEA eligibility definitions](https://spedsupport.tea.texas.gov/resource-library/disability-condition-eligibility-definitions).
+[TEA reporting glossary, p. 31](https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf#page=31)
 
 Build an unpublished candidate with the exact source configuration and the
 retained public provenance store.
@@ -462,7 +478,7 @@ uv run --locked python -m teadata.scripts.refresh_peims_budgets \
 ### Qualifying reviewed native bundles
 
 The offline gate admits the reviewed native profile supplement, the separate
-four-year PEIMS primary-disability candidate, and their exact schema-4
+PEIMS primary-disability candidates, and the exact schema-4 profile
 composition. Supply the trusted manifest SHA-256 for the bundle and its retained
 source store.
 
@@ -481,13 +497,20 @@ covers 18 leaves for 2022–23 through 2024–25. It requires the exact schema-3
 manifest in `teadata/reference_cases/native_peims_historical.json`, the
 candidate's bundled parity evidence, and the independent report store.
 
-The schema-3 primary-disability candidate qualifies only with the exact
+The schema-3 primary-disability candidates qualify only with the exact
 manifest digest in `teadata/reference_cases/native_primary_disability.json`.
-It checks the eight state and district leaves using the candidate's bundled
+The 2022–23 through 2025–26 gate checks eight state and district leaves using the candidate's bundled
 `provenance` directory and reads independent Austin and Texas HTML reports
 from the supplied store. The 2022–23 and 2023–24 Austin HTML views omit
 Developmental Delay. The gate reports those cells as outside HTML witness
 coverage and compares their actual CSV tokens during raw parity.
+
+The historical gate separately checks all 20 state and district leaves for
+2012–13 through 2021–22, including the first four years' derived district
+classifications. It compares the reported columns of one independent Austin
+report and one Texas report for each edition. Several HTML reports omit a
+disability category that is present in the CSV. The gate lists those
+omissions as outside the HTML witness coverage.
 
 The composed profile manifest is pinned in the primary-disability registry and
 uses the same reviews for all 17 constituent editions. Supply one

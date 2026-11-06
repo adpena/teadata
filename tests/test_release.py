@@ -200,6 +200,11 @@ def test_current_release_reuses_a_pinned_build_cache_offline(release, tmp_path, 
         assert runtime.offline and runtime.build_id == build.build_id
         assert runtime.manifest_sha256 == build.manifest_sha256
         assert runtime.verify() == staged
+        explicit = DataRelease(runtime.source, expected_sha256=runtime.manifest_sha256, offline=True,
+                               cache_dir=runtime.cache)
+        files = explicit.verified_cache_inventory()
+        assert files[explicit.path.relative_to(explicit.cache).as_posix()]["sha256"] == runtime.manifest_sha256
+        assert len(files) == len({path for path in staged.values()}) + 1
 
         monkeypatch.setenv("TEADATA_RELEASE_SHA256", "f" * 64)
         with pytest.raises(ContractError, match="trusted pin"):
@@ -215,6 +220,25 @@ def test_current_release_reuses_a_pinned_build_cache_offline(release, tmp_path, 
         network.assert_not_called()
     finally:
         release_module._load_release.cache_clear()
+
+
+def test_offline_manifest_rejects_fifo_and_symlink_ancestors(tmp_path):
+    url = "https://example.invalid/release.json"
+    name = sha256(url.encode()).hexdigest() + ".json"
+    cache = tmp_path / "cache"
+    slot = cache / "manifests"
+    slot.mkdir(parents=True)
+    os.mkfifo(slot / name)
+    with pytest.raises(ContractError, match="regular files"):
+        DataRelease(url, expected_sha256="0" * 64, offline=True, cache_dir=cache)
+    (slot / name).unlink()
+    slot.rmdir()
+    elsewhere = tmp_path / "elsewhere"
+    elsewhere.mkdir()
+    (elsewhere / name).write_text("{}")
+    slot.symlink_to(elsewhere, target_is_directory=True)
+    with pytest.raises(ContractError, match="without symlink paths"):
+        DataRelease(url, expected_sha256="0" * 64, offline=True, cache_dir=cache)
 
 
 def test_current_release_applies_pin_to_the_selected_local_manifest(release, monkeypatch):

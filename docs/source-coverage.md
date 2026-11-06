@@ -26,6 +26,11 @@ A native source release holds a verified table with its original row keys, sourc
 
 Annual dropout is available for school year 2024–25 across campus, district, county, region, and Texas. A campus or district can have several rows for the same school year, distinguished by grade span and calculation variant. Its published values are raw tokens. The 2025–26 TPRS membership and enrollment candidate covers 1,202 districts from the publisher roster and one direct Texas report. It has 168 qualified fields per scope. Campus reports have a separate qualification gate.
 
+The reviewed [PEIMS primary-disability candidates](data-releases.md#peims-primary-disability-counts)
+cover districts and Texas for 2012–13 through 2025–26. Four historical editions
+include a separate same-year TEA district classification where the PEIMS
+report predates its charter column.
+
 TEA's AskTED archive provides fall and spring files from 2018–19 through 2025–26. The live directory provides a daily observation. Use these files to discover district and campus identifiers, retaining the archive edition or acquisition date for each occurrence. Use each performance report's own roster to establish its reporting population. [AskTED archive index](https://tealprod.tea.state.tx.us/Tea.AskTed.Web/Forms/ArchivedSchoolAndDistrictDataFiles.aspx) · [AskTED directory](https://tealprod.tea.state.tx.us/tea.askted.web/Forms/Home.aspx)
 
 [School-year selection and source identity](querying.md#school-years-and-source-editions)

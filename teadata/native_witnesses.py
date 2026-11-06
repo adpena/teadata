@@ -86,7 +86,10 @@ def _primary_disability_review() -> dict[str, Any]:
 
 def reviewed_primary_disability_references(manifest_sha256: str) -> dict[str, Any] | None:
     review = _primary_disability_review()
-    return review["editions"] if review["manifest_sha256"] == manifest_sha256 else None
+    if review["manifest_sha256"] == manifest_sha256:
+        return review["editions"]
+    historical = review.get("historical", {})
+    return historical["editions"] if historical.get("manifest_sha256") == manifest_sha256 else None
 
 
 def reviewed_composed_disability_references(manifest_sha256: str) -> dict[str, Any]:
@@ -206,15 +209,25 @@ def _primary_disability(rows: list[list[str]], native: list[dict[str, Any]], key
     if (len(codes) != len(set(codes)) or not set(codes) <= set(columns)
             or not isinstance(expected_unreported, list) or omitted != expected_unreported):
         raise ContractError("Primary disability publisher report columns differ")
+    record, = native
     if key.scope == "district":
+        headings = rows[group]
+        if headings == ["District Name (District Number)/Region", "Primary Disability"]:
+            identity_width = 2
+        elif headings == ["District Name (District Number)/Charter Status/Region", "Primary Disability"]:
+            identity_width = 3
+        else:
+            raise ContractError("Primary disability publisher district identity header differs")
         if (not published or not re.search(rf"\({re.escape(entity)}\s*\)$", published[0])
                 or not any("Districtwide for " in cell and published[0] in cell
                            for row in rows[:group] for cell in row)):
             raise ContractError("Primary disability publisher district differs")
-        published = published[3:]
+        if (len(published) != len(codes) + identity_width or published[identity_width - 1] != record["region_number"]
+                or (identity_width == 3 and published[1] != record["charter_status"])):
+            raise ContractError("Primary disability publisher district identity cells differ")
+        published = published[identity_width:]
     elif not any(row == ["Statewide"] for row in rows[:group]):
         raise ContractError("Primary disability publisher state scope differs")
-    record, = native
     for code, token in zip(codes, published, strict=True):
         _compare_count(record, columns[code], token)
     return len(codes), omitted

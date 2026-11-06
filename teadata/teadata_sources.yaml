@@ -597,6 +597,12 @@ value_policies:
       .:
         status: missing
         reason: publisher_unavailable_average_base_pay
+  peims_primary_disability_csv_through_2018:
+    reference_id: peims_disability_masking
+    tokens:
+      '-9999999':
+        status: suppressed
+        reason: ferpa_publisher_mask_counts_from_one_through_four
   peims_primary_disability_csv:
     reference_id: peims_disability_masking
     tokens:
@@ -15984,28 +15990,32 @@ data_sources:
         period: {kind: school_year, start_year: 2022, end_year: 2023}
         publisher: Texas Education Agency
         references: &peims_primary_disability_references
-        - reference_id: about
+        - &peims_primary_disability_about
+          reference_id: about
           role: data_dictionary
           status: available
           title: TEA PEIMS primary-disability report criteria and category definitions
           reviewed_sha256: c4dbf9924f4e5a65d38af409770506e6d70cadedb9c7ad91b7457eaf9a4aaa1a
           provenance_ids: [ebc03a43c43adf5fe01802b336b2f8c7575fffd3abd79360aa9e5dc0b9b08c31]
           url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/abtspeced.html
-        - reference_id: peims_disability_masking
+        - &peims_primary_disability_peims_disability_masking
+          reference_id: peims_disability_masking
           role: masking_methodology
           status: available
           title: TEA PEIMS primary-disability report-specific FERPA masking rules
           reviewed_sha256: c5127e62c2c5f8900570a5015c7ebdc83dbd73b64a7a41eea9f754d4bf8b016f
           provenance_ids: [fa3cf44d0c6f27b6ee0ec2c0ab4ac23174f167857243f7300c70bda0585a2460]
           url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
-        - reference_id: release_listing
+        - &peims_primary_disability_release_listing
+          reference_id: release_listing
           role: source_notes
           status: available
           title: TEA PEIMS Standard Reports dates
           reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
           provenance_ids: [7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356]
           url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
-        - reference_id: eligibility_transition
+        - &peims_primary_disability_eligibility_transition
+          reference_id: eligibility_transition
           role: source_notes
           status: available
           title: TEA developmental delay and noncategorical early childhood eligibility transition
@@ -16097,6 +16107,256 @@ data_sources:
             acquisition_ids:
               state: 9e2f14a82341f02d8b42fb8db2fa0e534969c1dd8a7aa1efad934bd3b798a1da
               district: b0f0fd61ffb13646bde391d48e017c31e9b27ca1d73d4fed3f9f33a863eb9148
+    2013:
+      metadata:
+        metrics: *peims_primary_disability_counts
+        notes: October PEIMS public-school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change. District charter classification is joined from the same-year TEA District Type roster and remains separate from the publisher columns.
+        period: {kind: school_year, start_year: 2012, end_year: 2013}
+        publisher: Texas Education Agency
+        references:
+        - *peims_primary_disability_about
+        - *peims_primary_disability_peims_disability_masking
+        - *peims_primary_disability_release_listing
+        - *peims_primary_disability_eligibility_transition
+        - &peims_primary_disability_historical_crosswalk
+          reference_id: column_crosswalk
+          role: schema
+          status: available
+          title: TEA Data reviewed historical source headers and physical framing
+          reviewed_sha256: 4823db13ecb6ed750ac59e2af4b901f321a3704e50669c74ad5c8895d3e75457
+          provenance_ids: [94df7f03cb0e403613b769ad563fdfb21187cd68074150b905748d719c7a1ad9]
+          path: schemas/peims--2013-2022--primary-disability-crosswalk.json
+        - reference_id: district_type_roster
+          role: source_notes
+          status: available
+          title: TEA public school districts categorized by type, 2012–13
+          url: https://tea.texas.gov/data-reports/school-data/district-type-data-search/texas-public-school-districts-categorized-type-2012-13
+          reviewed_sha256: 3cadb05de5dc8521e2b5ea829f05ef994e7f9b410762dbe53b0769ac2be72b75
+          provenance_ids: [dc783c1e3f083866992907280532c46b81b704bf17585895c439a8ecb326ca3f]
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2012–13 PEIMS Students Receiving Special Education Services by Primary Disability
+        value_policy: peims_primary_disability_csv_through_2018
+        version: '2013'
+      path: data/peims/2013/peims_special_education_by_primary_disability--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2022--primary-disability-crosswalk.json
+            acquisition_ids:
+              state: af1b44fbba4bb089bc3b897aa7c848cf678358fc515b86dbeb428320e8adce7c
+              district: 5fe4f58340b2235116fd375293977d7952367168a282daef5eba06c88f74a582
+    2014:
+      metadata:
+        metrics: *peims_primary_disability_counts
+        notes: October PEIMS public-school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change. District charter classification is joined from the same-year TEA District Type roster and remains separate from the publisher columns.
+        period: {kind: school_year, start_year: 2013, end_year: 2014}
+        publisher: Texas Education Agency
+        references:
+        - *peims_primary_disability_about
+        - *peims_primary_disability_peims_disability_masking
+        - *peims_primary_disability_release_listing
+        - *peims_primary_disability_eligibility_transition
+        - *peims_primary_disability_historical_crosswalk
+        - reference_id: district_type_roster
+          role: source_notes
+          status: available
+          title: TEA public school districts categorized by type, 2013–14
+          url: https://tea.texas.gov/data-reports/school-data/district-type-data-search/texas-public-school-districts-categorized-type-2013-14
+          reviewed_sha256: 7beb6742cc3c70d487b363a0e3959049ef6c459daa7037339476d096f6b9cfb6
+          provenance_ids: [c894cad019007af1335e28d8b6d4462b6a773a602119e193a321ff82b8557e33]
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2013–14 PEIMS Students Receiving Special Education Services by Primary Disability
+        value_policy: peims_primary_disability_csv_through_2018
+        version: '2014'
+      path: data/peims/2014/peims_special_education_by_primary_disability--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2022--primary-disability-crosswalk.json
+            acquisition_ids:
+              state: 3d8fbad9580049a8d6c596ce3184130439c949762b3632062dd03923c190ff88
+              district: b0862e96fa14a7bd5526d7504c3bdea2c5dec97863f9e8f63b855b89cb414197
+    2015:
+      metadata:
+        metrics: *peims_primary_disability_counts
+        notes: October PEIMS public-school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change. District charter classification is joined from the same-year TEA District Type roster and remains separate from the publisher columns.
+        period: {kind: school_year, start_year: 2014, end_year: 2015}
+        publisher: Texas Education Agency
+        references:
+        - *peims_primary_disability_about
+        - *peims_primary_disability_peims_disability_masking
+        - *peims_primary_disability_release_listing
+        - *peims_primary_disability_eligibility_transition
+        - *peims_primary_disability_historical_crosswalk
+        - reference_id: district_type_roster
+          role: source_notes
+          status: available
+          title: TEA public school districts categorized by type, 2014–15
+          url: https://tea.texas.gov/data-reports/school-data/district-type-data-search/texas-public-school-districts-categorized-type-2014-15
+          reviewed_sha256: 81a9eb0a325ba3c0973c5496857edd6766fbddb6b6f692ef4c7a162eeff1e8fe
+          provenance_ids: [73e6673a11ff062d3bc0376df9423fca3122926407db44f0542b844685ce5329]
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2014–15 PEIMS Students Receiving Special Education Services by Primary Disability
+        value_policy: peims_primary_disability_csv_through_2018
+        version: '2015'
+      path: data/peims/2015/peims_special_education_by_primary_disability--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2022--primary-disability-crosswalk.json
+            acquisition_ids:
+              state: b44c2a7d92b6e80bc1462037714df6251abbbcf43bd4301d67a209f6cc16a4ad
+              district: d79e8ef4b3251564ace52445713ed52c2c21bc68772c5441c5ba36212174ddbe
+    2016:
+      metadata:
+        metrics: *peims_primary_disability_counts
+        notes: October PEIMS public-school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change. District charter classification is joined from the same-year TEA District Type roster and remains separate from the publisher columns.
+        period: {kind: school_year, start_year: 2015, end_year: 2016}
+        publisher: Texas Education Agency
+        references:
+        - *peims_primary_disability_about
+        - *peims_primary_disability_peims_disability_masking
+        - *peims_primary_disability_release_listing
+        - *peims_primary_disability_eligibility_transition
+        - *peims_primary_disability_historical_crosswalk
+        - reference_id: district_type_roster
+          role: source_notes
+          status: available
+          title: TEA public school districts categorized by type, 2015–16
+          url: https://tea.texas.gov/data-reports/school-data/district-type-data-search/texas-public-school-districts-categorized-type-2015-16
+          reviewed_sha256: 98ecddc4563977ad4fdec7fa954d345acf85921b0882272fa8533d744369dbc2
+          provenance_ids: [d1278986b0a338d50b6e75a52952b41fabbdaf91f6a0f40c017205857c6e39db]
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2015–16 PEIMS Students Receiving Special Education Services by Primary Disability
+        value_policy: peims_primary_disability_csv_through_2018
+        version: '2016'
+      path: data/peims/2016/peims_special_education_by_primary_disability--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2022--primary-disability-crosswalk.json
+            acquisition_ids:
+              state: ed22ca3a426f85b2fe375ad89d68c1deb176dcb328c3368a38b116ecce34abe2
+              district: 649b4ed978bbead66b4db7c1ac0844d01c1343741f4703451da7f713965d3d82
+    2017:
+      metadata:
+        metrics: *peims_primary_disability_counts
+        notes: October PEIMS public-school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change.
+        period: {kind: school_year, start_year: 2016, end_year: 2017}
+        publisher: Texas Education Agency
+        references: &peims_primary_disability_historical_references
+        - *peims_primary_disability_about
+        - *peims_primary_disability_peims_disability_masking
+        - *peims_primary_disability_release_listing
+        - *peims_primary_disability_eligibility_transition
+        - *peims_primary_disability_historical_crosswalk
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2016–17 PEIMS Students Receiving Special Education Services by Primary Disability
+        value_policy: peims_primary_disability_csv_through_2018
+        version: '2017'
+      path: data/peims/2017/peims_special_education_by_primary_disability--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2022--primary-disability-crosswalk.json
+            acquisition_ids:
+              state: 8c02aac692b236fdf904fefc5c360673d27cf0307e70daa3a8d4943da5a4814c
+              district: c1a0ff511da22b05413b68db2b651724df9abcb196343a5d4c07625f88b2a601
+    2018:
+      metadata:
+        metrics: *peims_primary_disability_counts
+        notes: October PEIMS public-school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change.
+        period: {kind: school_year, start_year: 2017, end_year: 2018}
+        publisher: Texas Education Agency
+        references: *peims_primary_disability_historical_references
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2017–18 PEIMS Students Receiving Special Education Services by Primary Disability
+        value_policy: peims_primary_disability_csv_through_2018
+        version: '2018'
+      path: data/peims/2018/peims_special_education_by_primary_disability--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2022--primary-disability-crosswalk.json
+            acquisition_ids:
+              state: 1a069aaa9ca149b0960c10465702a2248fadeed6dbaf182cc0c60affdfb959db
+              district: 47c62434ff3190c45c0ddc0d6e475b4a7b0bc462ec46c461b706bc02998c6fc2
+    2019:
+      metadata:
+        metrics: *peims_primary_disability_counts
+        notes: October PEIMS public-school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change.
+        period: {kind: school_year, start_year: 2018, end_year: 2019}
+        publisher: Texas Education Agency
+        references: *peims_primary_disability_historical_references
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2018–19 PEIMS Students Receiving Special Education Services by Primary Disability
+        value_policy: peims_primary_disability_csv
+        version: '2019'
+      path: data/peims/2019/peims_special_education_by_primary_disability--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2022--primary-disability-crosswalk.json
+            acquisition_ids:
+              state: 13d8cb2ec6990860de2e4a039661f601bcef92f8f5b567720120d2ed15d1a658
+              district: 53f624ff9699bae8b66fee134a973cd0718de3a2d35eb0e445124a1fade1874c
+    2020:
+      metadata:
+        metrics: *peims_primary_disability_counts
+        notes: October PEIMS public-school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change.
+        period: {kind: school_year, start_year: 2019, end_year: 2020}
+        publisher: Texas Education Agency
+        references: *peims_primary_disability_historical_references
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2019–20 PEIMS Students Receiving Special Education Services by Primary Disability
+        value_policy: peims_primary_disability_csv
+        version: '2020'
+      path: data/peims/2020/peims_special_education_by_primary_disability--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2022--primary-disability-crosswalk.json
+            acquisition_ids:
+              state: 1a5fef5bbb4c38c69a32825870478f8695f1c82a316f96274f765aa899d72308
+              district: 609d47d009a50258da9fa5de19c43da71dcfcf96d90a513bb9c66688cb6f8f41
+    2021:
+      metadata:
+        metrics: *peims_primary_disability_counts
+        notes: October PEIMS public-school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change.
+        period: {kind: school_year, start_year: 2020, end_year: 2021}
+        publisher: Texas Education Agency
+        references: *peims_primary_disability_historical_references
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2020–21 PEIMS Students Receiving Special Education Services by Primary Disability
+        value_policy: peims_primary_disability_csv
+        version: '2021'
+      path: data/peims/2021/peims_special_education_by_primary_disability--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2022--primary-disability-crosswalk.json
+            acquisition_ids:
+              state: 6482e7aad9cbd2ce2c3a854873bd92f67adb871601c83331121429d0614bc5fb
+              district: 3f288e5d26c77aae14e925bf6bed5a17b98b583806367c2087ef71fa27ecf43f
+    2022:
+      metadata:
+        metrics: *peims_primary_disability_counts
+        notes: October PEIMS public-school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change.
+        period: {kind: school_year, start_year: 2021, end_year: 2022}
+        publisher: Texas Education Agency
+        references: *peims_primary_disability_historical_references
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2021–22 PEIMS Students Receiving Special Education Services by Primary Disability
+        value_policy: peims_primary_disability_csv
+        version: '2022'
+      path: data/peims/2022/peims_special_education_by_primary_disability--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2022--primary-disability-crosswalk.json
+            acquisition_ids:
+              state: 91f0d4451162b93e16998737ad1519079b46d13da18c2c8eb595ccfe203fb96d
+              district: a91adb5686193ef4886be24cc3aa17d2952114a94a1be8b77f695c6c7e0a9024
   peims_student_enrollment_by_ethnicity:
     2023:
       metadata:
