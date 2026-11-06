@@ -62,6 +62,13 @@ scenario does not establish district totals or permit a second imputation.
 
 ## Retained campus directional audit
 
+TEA offers statewide campus CSVs beginning in 2020–21. The 2020–21 and
+2021–22 originals pad titles, blank records, and footnotes to the full
+CSV width. The reader accepts that exact historical shape, preserves
+the literal annotation records and source coordinates, and verifies
+the title and masking text before preparing the data. A structural
+read leaves directional equivalence as a separate qualification step.
+
 The older retained, locally observed campus CSV has source SHA
 `acd304693b0e93865d12add2909bd015e7c5f1e4c04370a75202ad4117a35cce`
 and acquisition

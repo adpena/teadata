@@ -45,16 +45,25 @@ def pair_rows(out="0", incoming=None):
 
 
 def original(tmp_path, rows, *, grain="campus", legacy=False, filename="source.csv", report_scope=None,
-             campus_count_header=CAMPUS_HEADER[-1]):
+             campus_count_header=CAMPUS_HEADER[-1], padded_annotations=False):
     path = tmp_path / filename
     with path.open("w", encoding="utf-8", newline="") as stream:
-        if not legacy:
-            stream.write(f"T E X A S  E D U C A T I O N  A G E N C Y\n\n{report_scope or grain.title()} Level Transfer Report\n\nPEIMS Student Transfer Report\n\n")
         writer = csv.writer(stream)
-        writer.writerow([*CAMPUS_HEADER[:-1], campus_count_header] if grain == "campus" else DISTRICT_HEADER)
+        header = [*CAMPUS_HEADER[:-1], campus_count_header] if grain == "campus" else DISTRICT_HEADER
+        if not legacy:
+            preamble = ["T E X A S  E D U C A T I O N  A G E N C Y", "", f"{report_scope or grain.title()} Level Transfer Report",
+                        "", "PEIMS Student Transfer Report", ""]
+            if padded_annotations:
+                writer.writerows([text, *[""] * (len(header) - 1)] for text in preamble)
+            else:
+                stream.write("\n".join(preamble) + "\n")
+        writer.writerow(header)
         writer.writerows(rows)
         if not legacy:
-            stream.write("\n" + "\n\n".join(NOTES) + "\n\n")
+            if padded_annotations:
+                writer.writerows([text, *[""] * (len(header) - 1)] for text in ["", NOTES[0], "", NOTES[1], "", NOTES[2]])
+            else:
+                stream.write("\n" + "\n\n".join(NOTES) + "\n\n")
     return path, sha256(path.read_bytes()).hexdigest()
 
 
@@ -79,6 +88,29 @@ def test_campus_original_preserves_source_strings_notes_coordinates_and_zero(tmp
     assert source.table["transfer_last_line"].to_pylist() == [9, 11, 12]
     assert [note["text"].strip() for note in source.annotations if note["kind"] == "footer"] == [note.strip() for note in NOTES]
     assert validate_campus_directions(source)["matching_observed"] == 1
+
+
+@pytest.mark.parametrize("year", [2021, 2022])
+def test_historical_campus_padding_preserves_literal_annotations_and_counts(tmp_path, year):
+    rows = [[f"{year-1}-{year}", *row[1:]] for row in pair_rows("-999")]
+    path, digest = original(tmp_path, rows, padded_annotations=True)
+    source = read(path, digest, year=year)
+    assert source.table["transfer_count_status"].to_pylist() == ["suppressed", "suppressed"]
+    assert source.table["transfer_source_record"].to_pylist() == [8, 9]
+    assert source.table["transfer_first_line"].to_pylist() == [8, 10]
+    assert source.table["transfer_last_line"].to_pylist() == [9, 11]
+    footnotes = [note for note in source.annotations if note["kind"] == "footer"]
+    assert [next(csv.reader([note["text"]]))[0] for note in footnotes] == NOTES
+    assert all(note["raw_sha256"] == sha256(note["text"].encode()).hexdigest() for note in footnotes)
+    with pytest.raises(ValueError, match="preamble/header schema"):
+        read(path, digest, year=2023)
+
+
+def test_historical_campus_padding_rejects_content_after_footer_begins(tmp_path):
+    rows = [["2020-2021", *row[1:]] for row in pair_rows()]
+    path, _ = original(tmp_path, [rows[0], [""] * len(CAMPUS_HEADER), rows[1]], padded_annotations=True)
+    with pytest.raises(ValueError, match="data row after transfer footer"):
+        read(path, sha256(path.read_bytes()).hexdigest(), year=2021)
 
 
 def test_2026_campus_original_requires_its_literal_count_header(tmp_path):

@@ -517,6 +517,7 @@ def read_transfer_table(path: Path, *, grain: str, year: int, policy: ValuePolic
         raise ValueError("Regional report selection is supported only for district-grain originals")
     report_scope = "Region" if region is not None else grain.title()
     titles = ["T E X A S E D U C A T I O N A G E N C Y", f"{report_scope} Level Transfer Report", "PEIMS Student Transfer Report"]
+    allows_padded_annotations = layout == "original" and grain == "campus" and year in {2021, 2022}
     annotations: list[dict[str, Any]] = []
     nonblank_titles, nonblank_notes = [], []
     batches, positions = [], []
@@ -551,12 +552,17 @@ def read_transfer_table(path: Path, *, grain: str, year: int, policy: ValuePolic
                     break
                 record += 1
                 segment = bytes(lines.record)
+                padded_annotation = (
+                    allows_padded_annotations and len(row) == len(columns)
+                    and row[1] == "" and not any(row[2:])
+                    and " ".join(row[0].split()) in ("", *(_FOOTNOTES if header else titles))
+                )
                 if not header and tuple(row) == columns:
                     if (layout == "original" and nonblank_titles != titles) or (layout == "legacy_prepared" and record != 1):
                         raise ValueError("Transfer header is not preceded by the selected layout's exact publisher titles")
                     header, kind = True, "header"
                 elif not header:
-                    if layout != "original" or len(row) > 1:
+                    if layout != "original" or (len(row) > 1 and not padded_annotation):
                         raise ValueError("Unexpected transfer preamble/header schema")
                     text = " ".join((row[0] if row else "").split())
                     if text:
@@ -564,7 +570,7 @@ def read_transfer_table(path: Path, *, grain: str, year: int, policy: ValuePolic
                         if nonblank_titles != titles[:len(nonblank_titles)]:
                             raise ValueError(f"Unexpected transfer publisher title at CSV record {record}, physical line {first_line}")
                     kind = "preamble" if text else "blank"
-                elif len(row) == len(columns) and not footer:
+                elif len(row) == len(columns) and not footer and not padded_annotation:
                     data = segment.decode(lines.encoding, errors="strict").encode("utf-8")
                     if len(data) + 1 + 8 * len(columns) > 8 * 1024 * 1024:
                         raise ValueError("Transfer record cannot fit native batch admission")
@@ -575,7 +581,7 @@ def read_transfer_table(path: Path, *, grain: str, year: int, policy: ValuePolic
                     continue
                 else:
                     footer = True
-                    if len(row) > 1:
+                    if len(row) > 1 and not padded_annotation:
                         raise ValueError("Unexpected full-width/data row after transfer footer")
                     text = " ".join((row[0] if row else "").split())
                     if text:
