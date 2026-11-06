@@ -106,3 +106,98 @@ def test_fresh_failure_returns_structured_stop(tmp_path, monkeypatch, transport)
     assert result["requested"] == 1 and result["admitted"] == 0
     assert result["stop"] == ("AcquisitionError" if transport else "report_hold")
     assert result["holds"] == ({} if transport else {key: f"{receipt}: unexpected publisher page"})
+
+
+def test_inventory_uses_one_retained_scan_and_exact_rosters(tmp_path, monkeypatch):
+    store = ProvenanceStore(tmp_path)
+    first, second = "001901001", "002901001"
+    receipts = {"01": "a" * 64, "02": "b" * 64}
+    preferred = {first: "c" * 64}
+    selection = campus.ReportSelection("campus", first, preferred[first], "d" * 64)
+    monkeypatch.setattr(campus, "REGIONS", tuple(receipts))
+    rosters = {"01": (first,), "02": (second,)}
+    monkeypatch.setattr(campus, "campus_roster", lambda store, region, receipt: rosters[region])
+    scans = []
+
+    def retained(actual_store, identifiers, choices):
+        scans.append((actual_store, identifiers, choices))
+        return {first: selection}, {second: "publisher body needs review"}
+
+    monkeypatch.setattr(campus, "_retained", retained)
+    result = campus.retained_inventory(store, receipts, preferred=preferred)
+    assert scans == [(store, {first, second}, preferred)]
+    assert result["eligible"] == 2 and result["valid_reports"] == 1
+    assert result["remaining"] == [second]
+    assert result["reports"][first]["receipt"] == preferred[first]
+    assert result["retained_holds"] == {second: "publisher body needs review"}
+    assert result["regions"]["01"] == {"roster": 1, "admitted": 1, "roster_receipt": receipts["01"]}
+    assert result["regions"]["02"]["admitted"] == 0
+    with campus._broker_lock(store), pytest.raises(ContractError, match="Cannot lock"):
+        campus.retained_inventory(store, receipts)
+
+
+def test_inventory_rejects_incomplete_overlapping_and_unrelated_preferences(tmp_path, monkeypatch):
+    store = ProvenanceStore(tmp_path)
+    receipts = {"01": "a" * 64, "02": "b" * 64}
+    monkeypatch.setattr(campus, "REGIONS", tuple(receipts))
+    with pytest.raises(ContractError, match="each TPRS region"):
+        campus.retained_inventory(store, {"01": receipts["01"]})
+    monkeypatch.setattr(campus, "campus_roster", lambda *args: ("001901001",))
+    with pytest.raises(ContractError, match="multiple TPRS regions"):
+        campus.retained_inventory(store, receipts)
+    monkeypatch.setattr(campus, "campus_roster", lambda store, region, receipt: (region + "1901001",))
+    with pytest.raises(ContractError, match="outside the retained statewide roster"):
+        campus.retained_inventory(store, receipts, preferred={"003901001": "c" * 64})
+
+
+def test_inventory_rejects_a_processing_receipt_as_roster(tmp_path, monkeypatch):
+    store = ProvenanceStore(tmp_path)
+    monkeypatch.setattr(campus, "REGIONS", ("01",))
+    monkeypatch.setattr(store, "read_record", lambda receipt: {"kind": "processing", "outputs": {}})
+    with pytest.raises(ContractError, match="Campus roster receipt must identify an acquisition"):
+        campus.retained_inventory(store, {"01": "a" * 64})
+
+
+def test_inventory_cli_is_offline_and_rejects_regional_controls(tmp_path, monkeypatch, capsys):
+    (tmp_path / "records").mkdir()
+    (tmp_path / "objects").mkdir()
+    path = tmp_path / "rosters.json"
+    receipts = {"01": "a" * 64}
+    path.write_text(json.dumps({"edition": "2026", "regions": {"01": {"receipt": receipts["01"], "campuses": 2}}}))
+    monkeypatch.setattr(campus, "REGIONS", tuple(receipts))
+    monkeypatch.setattr(campus, "campus_roster", lambda *args: ("001901001",))
+    monkeypatch.setattr(campus, "AcquisitionClient", lambda *args, **kwargs: pytest.fail("offline inventory made a client"))
+    cli = ["tprs-campuses", "--store", str(tmp_path), "--inventory", str(path)]
+    monkeypatch.setattr("sys.argv", cli)
+    campus.main()
+    result = json.loads(capsys.readouterr().out)
+    assert result["eligible"] == 1 and result["remaining"] == ["001901001"]
+    assert not (tmp_path / "tprs-campus-broker-pace.json").exists()
+    for flags in (("--limit", "25"), ("--interval", "8"), ("--roster-receipt", receipts["01"]),
+                  ("--intake", str(tmp_path / "intake.json"))):
+        monkeypatch.setattr("sys.argv", [*cli, *flags])
+        with pytest.raises(SystemExit, match="1"):
+            campus.main()
+        assert "does not take regional acquisition options" in capsys.readouterr().err
+    path.write_text('{"edition":"2026","regions":{"01":{},"01":{}}}')
+    with pytest.raises(ContractError, match="unique keys"):
+        campus._inventory_receipts(path)
+
+
+def test_regional_cli_preserves_defaults_and_explicit_offline_limit(tmp_path, monkeypatch, capsys):
+    (tmp_path / "records").mkdir()
+    (tmp_path / "objects").mkdir()
+    observed = []
+
+    def acquire(store, region, receipt, **options):
+        observed.append((region, receipt, options["limit"], options["interval"]))
+        return {"region": region}
+
+    monkeypatch.setattr(campus, "acquire_region", acquire)
+    cli = ["tprs-campuses", "--store", str(tmp_path), "--region", "01", "--roster-receipt", "a" * 64]
+    monkeypatch.setattr("sys.argv", cli)
+    campus.main()
+    monkeypatch.setattr("sys.argv", [*cli, "--limit", "0"])
+    campus.main()
+    assert observed == [("01", "a" * 64, 25, campus.MIN_INTERVAL), ("01", "a" * 64, 0, campus.MIN_INTERVAL)]
+    assert [json.loads(line) for line in capsys.readouterr().out.splitlines()] == [{"region": "01"}] * 2

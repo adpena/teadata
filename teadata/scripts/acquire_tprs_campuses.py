@@ -1,4 +1,4 @@
-"""Resume one exact 2025–26 TPRS campus region at a bounded broker pace."""
+"""Resume a 2025–26 TPRS campus region or inventory retained statewide reports."""
 
 from __future__ import annotations
 
@@ -23,6 +23,7 @@ from urllib.parse import parse_qsl, urlsplit
 from urllib.request import build_opener
 
 from teadata.acquisition import AcquisitionClient, AcquisitionError, NoRedirect, acquire_form
+from teadata.column_schema import _unique_object
 from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
 from teadata.manifest import ContractError, canonical_json
 from teadata.provenance import ProvenanceStore, _publish_once
@@ -128,6 +129,65 @@ def _retained(store: ProvenanceStore, ids: set[str], preferred: Mapping[str, str
     return selected, holds
 
 
+def _inventory_receipts(path: Path) -> dict[str, str]:
+    with path.open("rb") as stream:
+        limit = 2 * 1024**2
+        raw = stream.read(limit + 1)
+    if len(raw) > limit:
+        raise ContractError("Campus roster inventory exceeds its byte budget")
+    try:
+        inventory = json.loads(raw, object_pairs_hook=_unique_object)
+    except ValueError as error:
+        raise ContractError("Campus roster inventory must be valid JSON with unique keys") from error
+    if not isinstance(inventory, dict) or inventory.get("edition") != str(EDITION):
+        raise ContractError("Campus roster inventory must identify the 2026 edition")
+    regions = inventory.get("regions")
+    if not isinstance(regions, dict) or set(regions) != set(REGIONS):
+        raise ContractError("Campus roster inventory must include each TPRS region exactly once")
+    receipts = {}
+    for region, entry in regions.items():
+        receipt = entry.get("receipt") if isinstance(entry, dict) else None
+        if not isinstance(receipt, str):
+            raise ContractError(f"Missing roster receipt for region {region}")
+        receipts[region] = receipt
+    return receipts
+
+
+def retained_inventory(store: ProvenanceStore, roster_receipts: Mapping[str, str], *,
+                       preferred: Mapping[str, str] | None = None) -> dict[str, Any]:
+    """Inventory exact regional cohorts against one snapshot of retained reports."""
+    if set(roster_receipts) != set(REGIONS):
+        raise ContractError("Campus roster inventory must include each TPRS region exactly once")
+    rosters: dict[str, set[str]] = {}
+    eligible: set[str] = set()
+    for region in REGIONS:
+        ids = set(campus_roster(store, region, roster_receipts[region]))
+        if eligible & ids:
+            raise ContractError(f"Campus assigned to multiple TPRS regions through region {region}")
+        rosters[region] = ids
+        eligible.update(ids)
+    choices = preferred or {}
+    if not choices.keys() <= eligible:
+        raise ContractError("Preferred receipts include campuses outside the retained statewide roster")
+    with _broker_lock(store):
+        reports, holds = _retained(store, eligible, choices)
+        recorded_at = datetime.now(timezone.utc).isoformat()
+    return {
+        "status": "RETAINED_PUBLISHER_REPORT_INVENTORY",
+        "edition": EDITION,
+        "recorded_at": recorded_at,
+        "eligible": len(eligible),
+        "valid_reports": len(reports),
+        "remaining": sorted(eligible - reports.keys()),
+        "reports": {key: asdict(report) for key, report in reports.items()},
+        "retained_holds": holds,
+        "regions": {
+            region: {"roster": len(ids), "admitted": len(ids & reports.keys()), "roster_receipt": roster_receipts[region]}
+            for region, ids in rosters.items()
+        },
+    }
+
+
 def acquire_region(store: ProvenanceStore, region: str, roster_receipt: str, *, limit: int = 25,
                    interval: float = MIN_INTERVAL, intake: Path | None = None,
                    preferred: Mapping[str, str] | None = None) -> dict[str, Any]:
@@ -203,10 +263,12 @@ def acquire_region(store: ProvenanceStore, region: str, roster_receipt: str, *, 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--store", required=True, type=Path)
-    parser.add_argument("--region", required=True, choices=REGIONS)
-    parser.add_argument("--roster-receipt", required=True)
-    parser.add_argument("--limit", type=int, default=25, help="Maximum requests, including zero for offline coverage")
-    parser.add_argument("--interval", type=float, default=MIN_INTERVAL)
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--region", choices=REGIONS)
+    mode.add_argument("--inventory", type=Path, help="Read the 20-region roster receipt inventory and report offline coverage")
+    parser.add_argument("--roster-receipt")
+    parser.add_argument("--limit", type=int, help="Maximum regional requests, including zero for offline coverage")
+    parser.add_argument("--interval", type=float)
     parser.add_argument("--intake", type=Path, help="Seal a compatible intake only when the exact roster is complete")
     parser.add_argument("--prefer", action="append", default=[], metavar="CAMPUS=RECEIPT")
     args = parser.parse_args()
@@ -216,8 +278,17 @@ def main() -> None:
             raise ValueError("Choose at most one receipt per campus")
         if not (args.store / "records").is_dir() or not (args.store / "objects").is_dir():
             raise ValueError("Select the existing retained publisher store")
-        result = acquire_region(ProvenanceStore(args.store), args.region, args.roster_receipt, limit=args.limit,
-                                interval=args.interval, intake=args.intake, preferred=preferred)
+        store = ProvenanceStore(args.store)
+        if args.inventory is not None:
+            if any(value is not None for value in (args.roster_receipt, args.limit, args.interval, args.intake)):
+                raise ValueError("--inventory does not take regional acquisition options")
+            result = retained_inventory(store, _inventory_receipts(args.inventory), preferred=preferred)
+        else:
+            if args.roster_receipt is None:
+                parser.error("--region requires --roster-receipt")
+            result = acquire_region(store, args.region, args.roster_receipt, intake=args.intake, preferred=preferred,
+                                    limit=25 if args.limit is None else args.limit,
+                                    interval=MIN_INTERVAL if args.interval is None else args.interval)
         print(json.dumps(result, sort_keys=True))
     except (ContractError, OSError, ValueError) as error:
         parser.exit(1, f"TPRS campus acquisition failed: {error}\n")

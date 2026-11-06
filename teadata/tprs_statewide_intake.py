@@ -87,6 +87,7 @@ def campus_roster(store: ProvenanceStore, region: str, receipt: str) -> tuple[st
     """Read one exact 2026 campus region without inferring eligibility."""
     _need(region in REGIONS, "Invalid campus roster region")
     record = store.read_record(receipt)
+    _need(record["kind"] == "acquisition", "Campus roster receipt must identify an acquisition")
     size = record["artifact"]["size_bytes"]
     limit = 512 * 1024
     _need(type(size) is int and 0 < size <= limit, "Campus roster exceeds its byte budget")

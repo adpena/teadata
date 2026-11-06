@@ -1517,6 +1517,23 @@ process the selection within its byte budget. Materialization rechecks the
 sealed intake against its roster receipt and retains that receipt in the
 processing provenance, including when the reports came from older captures.
 
+To report statewide coverage from a retained 2026 roster inventory, pass the
+JSON with `"edition": "2026"` and a `regions` object with keys `"01"`
+through `"20"`. Each region contains its official selector `receipt`.
+The command derives membership from those receipts and verifies retained
+reports without contacting TEA.
+
+```sh
+uv run --locked python -m teadata.scripts.acquire_tprs_campuses \
+  --store /path/to/retained-provenance --inventory /path/to/CAMPUS_ROSTER_INVENTORY.json
+```
+
+The report records when the scan finished, each roster receipt, the selected
+report receipts, unresolved holds, and all remaining campus IDs. It takes the
+same broker lock as acquisition. Counts reflect admitted report receipts.
+Field qualification and intake sealing remain separate steps. Use `--prefer`
+to choose among conflicting retained bodies after review.
+
 The sole reviewed field contract is
 `teadata/methodologies/tprs-students-2026.json`. It defines 42 current row labels
 across Membership and Enrollment, with count and percent measures: 168 native
