@@ -180,7 +180,8 @@ def _compare(selection: _Selection, *, max_examples: int, working_bytes: int) ->
         raw_index_bound = (width + 10) * (raw.num_rows + 1)
         if 2 * raw_index_bound > slot:
             raise _Uncovered('Raw alignment buffers exceed their explicit working-byte slot')
-        raw_keys = tapr_source_identifiers(raw[key_field], key_field=key_field)
+        raw_keys = tapr_source_identifiers(raw[key_field], key_field=key_field,
+                                           dataset=selection.key.dataset, edition=selection.key.edition)
         if raw_keys.nbytes > selection.budget.key_bytes:
             raise _Uncovered('Raw identity index exceeds its recorded byte budget')
         raw_set = raw_keys.combine_chunks()
@@ -216,7 +217,8 @@ def _compare(selection: _Selection, *, max_examples: int, working_bytes: int) ->
             scratch_base = 2 * raw_index_bound + 2 * (width + 10) * (actual.num_rows + 1) + 8 * raw.num_rows
             if scratch_base > slot:
                 raise _Uncovered(stage + ' alignment exceeds its explicit working-byte slot')
-            keys = tapr_source_identifiers(actual[key_field], key_field=key_field)
+            keys = tapr_source_identifiers(actual[key_field], key_field=key_field,
+                                           dataset=selection.key.dataset, edition=selection.key.edition)
             if pc.any(pc.is_null(keys)).as_py():
                 raise ValueError(stage + ' has malformed source identities')
             if keys.nbytes > selection.budget.key_bytes:

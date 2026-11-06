@@ -70,6 +70,10 @@ Keep school years, measurement periods, and publication editions distinct.
 Check keys against each edition's own roster, including entities without
 geometry. Verify units, masking, and comparability at the field level before
 binding a historical series. Use publisher Texas observations where available.
+The 2020–21 through 2022–23 regional TAPR Profile downloads spell ESC codes
+with a leading apostrophe. The reader keeps that spelling in source tables
+and CSV exports. It uses the two-digit code when validating keys and rejects
+duplicate codes even when their source spellings differ.
 
 ## Published 2026 entity snapshot
 

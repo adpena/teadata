@@ -111,6 +111,36 @@ def test_regional_source_rejects_duplicate_codes_and_unbound_identity(tmp_path):
         regional_source(path, labels=labels, codes=codes)
 
 
+@pytest.mark.parametrize("edition", ["2021", "2022", "2023"])
+def test_historical_regional_profile_accepts_quoted_keys_and_retains_literal_values(tmp_path, edition):
+    labels, codes = ["Education Service Center", "Example Value"], ["REGION", "VALUE"]
+    fields = ["region_number", "example_value"]
+    dataset = "region_tapr_student_staff_profile"
+    path = write_source(tmp_path, [labels, codes, ["'01", "0"], ["'13", "-1"]])
+    mapping = mapping_for(path, labels=labels, codes=codes, fields=fields)
+    source = read_source(path, mapping=mapping, key_field=fields[0], dataset=dataset, edition=edition)
+    assert merge_tapr_tables([source], key_field=fields[0])[fields[0]].to_pylist() == ["'01", "'13"]
+    assert compare_tapr_tables(source, source, key_field=fields[0])["keysets"]["overlap"] == 2
+    with pytest.raises(ValueError, match="Invalid education service center code"):
+        read_source(path, mapping=mapping, key_field=fields[0], dataset=dataset, edition="2024")
+    with pytest.raises(ValueError, match="Invalid education service center code"):
+        read_source(path, mapping=mapping, key_field=fields[0], dataset="region_tapr_staar_tested_grade_3",
+                    edition=edition)
+    for invalid in ["''13", "'1", "'21", "'13 "]:
+        with pytest.raises(ValueError, match="Invalid education service center code"):
+            tapr_source_identifiers(pa.array([invalid]), key_field=fields[0], dataset=dataset, edition=edition)
+
+
+def test_historical_regional_profile_rejects_duplicate_lexical_spellings(tmp_path):
+    labels, codes = ["Education Service Center", "Example Value"], ["REGION", "VALUE"]
+    fields = ["region_number", "example_value"]
+    path = write_source(tmp_path, [labels, codes, ["'13", "0"], ["13", "-1"]])
+    mapping = mapping_for(path, labels=labels, codes=codes, fields=fields)
+    with pytest.raises(ValueError, match=r"duplicate region_number at records \[3, 4\]"):
+        read_source(path, mapping=mapping, key_field=fields[0], dataset="region_tapr_student_staff_profile",
+                    edition="2021")
+
+
 @pytest.mark.parametrize("kind", [pa.string(), pa.large_string()])
 def test_regional_source_key_projection_preserves_an_empty_target(kind):
     keys = pa.chunked_array([], type=kind)

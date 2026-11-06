@@ -38,8 +38,9 @@ TAPR_SOURCE_KEYS = {"campus": "campus_number", "district": "district_number",
 TAPR_KEY_WIDTHS = {"campus_number": 9, "district_number": 6, "region_number": 2}
 
 
-def tapr_source_identifiers(values: Any, *, key_field: str):
-    """Keep exact ESC codes and apply the existing LEA source key contract."""
+def tapr_source_identifiers(values: Any, *, key_field: str,
+                            dataset: str | None = None, edition: str | None = None):
+    """Project the publisher's supported key spelling without changing source values."""
     if key_field == "region_number":
         import pyarrow as pa
         import pyarrow.compute as arrow_compute
@@ -49,12 +50,17 @@ def tapr_source_identifiers(values: Any, *, key_field: str):
         ):
             raise ValueError("Source identifier batches require Arrow strings")
         pc: Any = arrow_compute
-        valid = pc.fill_null(pc.match_substring_regex(values, r"^(0[1-9]|1[0-9]|20)\z"), False)
+        # These exact archived Profile editions prefix the two-digit code.
+        # The comparison interface and other sources retain literal ESC keys.
+        identifiers = (pc.replace_substring_regex(values, "^'", "")
+                       if dataset == "region_tapr_student_staff_profile" and edition in {"2021", "2022", "2023"}
+                       else values)
+        valid = pc.fill_null(pc.match_substring_regex(identifiers, r"^(0[1-9]|1[0-9]|20)\z"), False)
         if pc.any(pc.invert(valid)).as_py():
             position = pc.index(valid, False).as_py()
             raise ValueError(f"Invalid education service center code at batch row {position + 1}: "
                              f"{values[position].as_py()!r}")
-        return values
+        return identifiers
     return canonical_source_identifiers(values, width=TAPR_KEY_WIDTHS[key_field])
 
 
@@ -114,7 +120,8 @@ def compare_tapr_tables(old: TaprSourceTable, new: TaprSourceTable, *, key_field
         if set(selected_policy) - {code for code, f in definitions.items() if f.get("disposition", "fact") != "identity"}:
             raise ValueError("Policies must explicitly select actual non-identity publisher codes")
         fields.append(definitions)
-        identity = tapr_source_identifiers(source.table[key_field], key_field=key_field)
+        identity = tapr_source_identifiers(source.table[key_field], key_field=key_field,
+                                           dataset=source.dataset, edition=source.edition)
         if pc.any(pc.is_null(identity)).as_py() or pc.count_distinct(identity).as_py() != source.table.num_rows:
             raise ValueError("Comparison cannot skip missing or duplicate source keys")
         identities.append(identity)
@@ -346,7 +353,8 @@ class TaprSourceReader(Iterator[Any]):
             if request.key_field is None:
                 return table.combine_chunks().to_batches()[0]
             try:
-                identity = tapr_source_identifiers(table[request.key_field], key_field=request.key_field)
+                identity = tapr_source_identifiers(table[request.key_field], key_field=request.key_field,
+                                                   dataset=request.dataset, edition=request.edition)
                 if pc.any(pc.is_null(identity)).as_py():
                     i = pc.index(pc.is_null(identity), True).as_py()
                     raise ValueError(f"record {numbers[i]} has a missing source identifier")
@@ -573,7 +581,8 @@ def merge_tapr_tables(sources: list[TaprSourceTable], *, key_field: str | None):
             raise ValueError("TAPR source merge requires a single raw input per physical table")
         if source.table.column_names != [field["field"] for field in source.mapping["fields"]] or key_field not in source.table.column_names:
             raise ValueError("TAPR native table differs from its reviewed field mapping")
-        identity = tapr_source_identifiers(source.table[key_field], key_field=key_field)
+        identity = tapr_source_identifiers(source.table[key_field], key_field=key_field,
+                                           dataset=source.dataset, edition=source.edition)
         if pc.any(pc.is_null(identity)).as_py() or pc.count_distinct(identity).as_py() != source.table.num_rows:
             raise ValueError("TAPR source table has missing or duplicate identities")
     result = sources[0].table
@@ -585,9 +594,11 @@ def merge_tapr_tables(sources: list[TaprSourceTable], *, key_field: str | None):
         left_names = {name: f"a{index}" for index, name in enumerate(result.column_names)}
         right_names = {name: f"b{index}" for index, name in enumerate(source.table.column_names)}
         left = result.rename_columns(list(left_names.values())).append_column(
-            "identity", tapr_source_identifiers(result[key_field], key_field=key_field))
+            "identity", tapr_source_identifiers(result[key_field], key_field=key_field,
+                                                dataset=source.dataset, edition=source.edition))
         right = source.table.rename_columns(list(right_names.values())).append_column(
-            "identity", tapr_source_identifiers(source.table[key_field], key_field=key_field))
+            "identity", tapr_source_identifiers(source.table[key_field], key_field=key_field,
+                                                dataset=source.dataset, edition=source.edition))
         joined = left.join(right, keys="identity", join_type="full outer")
         columns = list(dict.fromkeys([*result.column_names, *source.table.column_names]))
         arrays = []

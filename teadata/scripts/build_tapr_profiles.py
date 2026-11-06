@@ -449,7 +449,7 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
                     key_bytes = 0
                     for batch in _prepared_batches(native, source_budget):
                         canonical = tapr_source_identifiers(batch.column(schema.get_field_index(keys[0])),
-                            key_field=keys[0])
+                            key_field=keys[0], dataset=dataset, edition=edition)
                         if pc.any(pc.is_null(canonical)).as_py():
                             raise ValueError("Prepared source has missing physical keys")
                         key_bytes += canonical.nbytes
