@@ -25,13 +25,16 @@ _TESTED_GRADE_COUNTS = dict(zip(
     strict=True,
 ))
 FAMILIES = frozenset(_TESTED_GRADE_COUNTS)
-_AGGREGATE_COUNTS = {"staar_all_grades": 210, "staar_end_of_course": 210}
-_AGGREGATE_EDITION = "2026"
+_AGGREGATE_COUNTS = {
+    "2025": {"staar_all_grades": 210},
+    "2026": {"staar_all_grades": 210, "staar_end_of_course": 210},
+}
+_AGGREGATE_FAMILIES = frozenset(family for counts in _AGGREGATE_COUNTS.values() for family in counts)
 
 
 def supports_staar_rates(family: str, edition: str) -> bool:
     """Identify the comparison routes with a reviewed rate-only contract."""
-    return family in FAMILIES or (edition == _AGGREGATE_EDITION and family in _AGGREGATE_COUNTS)
+    return family in FAMILIES or family in _AGGREGATE_COUNTS.get(edition, {})
 
 
 @dataclass(frozen=True)
@@ -77,11 +80,11 @@ def _read_bindings(resource: str, *, aggregate: bool = False) -> dict:
 
 def _parse_bindings(body: bytes, *, aggregate: bool = False) -> dict:
     document = json.loads(body, object_pairs_hook=_unique_object)
-    expected_editions = {_AGGREGATE_EDITION} if aggregate else {"2024", "2025", "2026"}
-    expected_counts = _AGGREGATE_COUNTS if aggregate else _TESTED_GRADE_COUNTS
+    expected_editions = set(_AGGREGATE_COUNTS) if aggregate else {"2024", "2025", "2026"}
     if document["schema_version"] != 1 or set(document["editions"]) != expected_editions:
         raise ContractError("Unsupported STAAR comparison bindings")
     for year, edition in document["editions"].items():
+        expected_counts = _AGGREGATE_COUNTS[year] if aggregate else _TESTED_GRADE_COUNTS
         if (set(edition["families"]) != expected_counts.keys()
                 or DataPeriod.from_dict(edition["period"]) != DataPeriod("school_year", int(year) - 1, int(year))):
             raise ContractError("STAAR comparison bindings require exact families and periods")
@@ -106,7 +109,7 @@ def _parse_bindings(body: bytes, *, aggregate: bool = False) -> dict:
 @lru_cache(maxsize=80)
 def _source(scope: str, family: str, edition: str) -> tuple[str, str, dict, dict]:
     try:
-        document = _aggregate_bindings() if family in _AGGREGATE_COUNTS else _bindings()
+        document = _aggregate_bindings() if family in _AGGREGATE_FAMILIES else _bindings()
         reviewed = document["editions"][edition]
         family_binding = reviewed["families"][family]
         pinned = family_binding["scopes"][scope]
@@ -117,7 +120,8 @@ def _source(scope: str, family: str, edition: str) -> tuple[str, str, dict, dict
     request, = config.tapr_source_requests(dataset, int(edition))
     metadata = config.resolve_dataset(dataset, int(edition), exact=True, reader_profile="source").metadata
     mapping = _digest(request.mapping)
-    if (request.mapping["input_sha256"] != pinned["raw_sha256"]
+    expected_key = None if scope == "state" else f"{scope}_number"
+    if (request.key_field != expected_key or request.mapping["input_sha256"] != pinned["raw_sha256"]
             or mapping != pinned["mapping_sha256"]
             or _digest(metadata.to_dict()) not in pinned["metadata_sha256"]
             or request.mapping["metric_period"] != reviewed["period"]
@@ -156,7 +160,7 @@ def staar_rate_contract(release: DataRelease, edition: EditionKey) -> StaarRateC
     period = DataPeriod.from_dict(reviewed["period"])
     metrics = {name: MetricDefinition(f"{key.scope}_{key.edition}_{rate['field']}", period, "percent")
                for name, rate in family["rates"].items()}
-    aggregate = key.table in _AGGREGATE_COUNTS
+    aggregate = key.table in _AGGREGATE_FAMILIES
     kind = "aggregate" if aggregate else "tested-grade"
     references = tuple(ReferenceDocument.from_dict({
         "reference_id": "staar_rate_legend" if index == 0 else f"staar_rate_reference_{index}",

@@ -130,7 +130,7 @@ def default_checks(kind: str, *, release: str | None = None) -> list[Check]:
             Check("ruff", ("@python", "-m", "ruff", "check", ".")),
             Check("types", ("@python", "-m", "ty", "check", ".")),
             Check("dependencies", ("@python", "-m", "deptry", ".")),
-            Check("pytest", ("@python", "-m", "pytest")),
+            Check("pytest", ("@python", "-m", "pytest", "--durations=15")),
         ]
     elif kind == "app":
         checks = [

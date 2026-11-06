@@ -237,6 +237,7 @@ STAAR_2026 = STAAR_TESTED_GRADES + [
     *((2026, *row) for row in STAAR_2026),
     (2024, 'staar_end_of_course', 'STAAR_EOC', 1092, 1134, 0),
     (2025, 'staar_end_of_course', 'STAAR_EOC', 1134, 1176, 0),
+    (2025, 'staar_all_grades', 'STAAR_ALL', 945, 980, 0),
 ])
 def test_staar_sources_keep_raw_scope_and_exact_receipts(
         year, family, publisher_file, facts, occurrences, undocumented, monkeypatch):
@@ -261,6 +262,8 @@ def test_staar_sources_keep_raw_scope_and_exact_receipts(
         assert cfg.is_source_only(dataset, 2025) and cfg.is_source_only(dataset, 2026)
         if family.startswith('staar_tested_grade_') or publisher_file in {'STAAR_EOC', 'STAAR_SP', 'PART'}:
             assert cfg.data_sources[dataset].available_years() == [2024, 2025, 2026]
+        elif publisher_file == 'STAAR_ALL':
+            assert cfg.data_sources[dataset].available_years() == [2025, 2026]
         elif scope == 'region':
             assert cfg.data_sources[dataset].available_years() == [2026]
         assert cfg.column_schema(dataset, year) is None
@@ -270,9 +273,10 @@ def test_staar_sources_keep_raw_scope_and_exact_receipts(
         assert qualified_tapr_family(dataset, request.key_field) == family
         assert request.key_field == (identity_fields[0] if identity_fields else None)
         letter = scope[0].upper()
-        unprefixed_state = scope == 'state' and (year == 2026 or (year == 2025 and publisher_file == 'STAAR_GR3'))
+        unprefixed_state = scope == 'state' and (year == 2026 or (year == 2025 and publisher_file in {'STAAR_GR3', 'STAAR_ALL'}))
         file_scope = '' if unprefixed_state else letter + '-'
-        assert request.path.name == f'{year}-{file_scope}{publisher_file}-offered.csv'
+        variant = 'original' if year == 2025 and publisher_file == 'STAAR_ALL' and scope != 'state' else 'offered'
+        assert request.path.name == f'{year}-{file_scope}{publisher_file}-{variant}.csv'
         assert request.mapping['table'] == family and request.mapping['metric_period'] == period
         assert reviewed_tapr_data_record_count(request.mapping) == rows
         fields = request.mapping['fields']
@@ -339,11 +343,13 @@ def test_staar_sources_keep_raw_scope_and_exact_receipts(
             assert (witness_query['ccyy'], witness_query['lev'], witness_query['prgopt']) == (
                 [str(year)], [letter], ['reports/tapr/performance.sas'])
             expected_id = {'state': 'S', 'region': '13', 'district': '227901', 'campus': '227901002'}
-            if publisher_file == 'STAAR_EOC' or scope == 'region':
+            if publisher_file in {'STAAR_EOC', 'STAAR_ALL'} or scope == 'region':
                 assert witness_query['id'] == [expected_id[scope]]
             if year == 2025:
                 assert all('SY 2024-25,' in field['label'] for field in fact_fields)
-            if (year, scope, publisher_file) == (2025, 'region', 'STAAR_EOC'):
+            if (year, scope, publisher_file) in {
+                (2025, 'region', 'STAAR_EOC'), (2025, 'state', 'STAAR_ALL'),
+            }:
                 layout = request.mapping['layout']
                 assert (layout['label_record'], layout['code_record'], layout['first_data_record']) == (None, 3, 4)
                 preamble, = layout['annotations']
@@ -454,7 +460,7 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     assert sha256(canonical_json(previous_tested_grades).encode()).hexdigest() == '64178e073e15880351cfd020b6bb0c9d78b22c1d346fb5c1c81ce7f05975f0cb'
     for family, *_ in STAAR_2026:
         regional = 'region_tapr_' + family
-        years = [2025, 2026] if family.startswith('staar_tested_grade_') else [2026]
+        years = [2025, 2026] if family.startswith('staar_tested_grade_') or family == 'staar_all_grades' else [2026]
         assert list(current['data_sources'].pop(regional)) == years
         assert current['schema']['data_sources'].pop(regional) == ['csv']
     for scope in ('state', 'district', 'campus'):
@@ -464,7 +470,7 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
                 assert list(current['data_sources'][dataset]) == [2024, 2026]
                 current['data_sources'][dataset].pop(2026)
                 continue
-            years = [2025, 2026] if family.startswith('staar_tested_grade_') else [2026]
+            years = [2025, 2026] if family.startswith('staar_tested_grade_') or family == 'staar_all_grades' else [2026]
             assert list(current['data_sources'].pop(dataset)) == years
             assert current['schema']['data_sources'].pop(dataset) == ['csv']
     # District transfers have an independent source contract and native writer.

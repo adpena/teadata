@@ -274,9 +274,10 @@ The raw source catalog retains numerator and denominator
 fields alongside these rates. A separately published observed rate can be
 compared when its underlying counts are masked.
 
-For 2025–26, the same interface also supports 210 published rates each for
-`staar_all_grades` and `staar_end_of_course`. Select the local and direct
-state editions from a release that contains both scopes. For example, use
+The same interface supports 210 published rates for `staar_all_grades` in
+2024–25 and 2025–26, and 210 for `staar_end_of_course` in 2025–26.
+Select the local and direct state editions from a release that contains
+both scopes. For example, use
 `staar_performance_all_subjects_all_students_percent_at_meets_gl_standard_or_above`
 with the All Grades editions. These bindings cover the named report groups
 within the STAAR accountability subset. SAT/ACT and the all-tested reports
