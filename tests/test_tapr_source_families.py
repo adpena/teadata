@@ -508,6 +508,9 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     assert list(current['data_sources'].pop(research)) == [2025]
     assert current['schema']['data_sources'].pop(research) == ['xlsx']
     assert current['value_policies'].pop('research_graduation_class_2025')['reference_id'] == 'publisher_disclosure'
+    annual_dropout = 'accountability_research_annual_dropout'
+    assert list(current['data_sources'].pop(annual_dropout)) == [2025]
+    assert current['schema']['data_sources'].pop(annual_dropout) == ['xlsx']
     # Remove only the explicitly added 2025 outcome opt-ins before reconstructing history.
     for scope in ('campus', 'district'):
         for family in ('college_career_military_readiness', 'college_readiness_components'):

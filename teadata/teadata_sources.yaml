@@ -15271,6 +15271,157 @@ data_sources:
                 057909002: 4b89edfc6460b73c9844ae2792fa7cdd7016bdf78c3e90b75b2d54f4f8ca5952
                 002901002: f70a4b267ae315a573cdc2a3808702283d3b154837e7b2e96de41fc1aa6d1731
                 '227909005': 28c7d0da3a8a6715a81bb8e988dbd03e5a4a6e336b05a943addfa55e40dbba33
+  accountability_research_annual_dropout:
+    2025:
+      path: data/research/annual-dropout/2025/district-data-download-drop-2425.xlsx
+      metadata:
+        title: 2024–25 TEA Accountability Research annual dropout
+        version: '2025'
+        publisher: Texas Education Agency
+        source_url: https://tea.texas.gov/data-reports/school-performance/accountability-research/completion-graduation-and-dropout/annual-dropout-data-2024-25
+        period:
+          kind: school_year
+          start_year: 2024
+          end_year: 2025
+        metrics: {}
+        references:
+        - reference_id: publisher_index
+          role: source_notes
+          status: available
+          title: TEA annual dropout data, 2024–25
+          url: https://tea.texas.gov/data-reports/school-performance/accountability-research/completion-graduation-and-dropout/annual-dropout-data-2024-25
+          reviewed_sha256: 537d7713e6368512a4f4cfe66d9b6c2bce23d482bb2d634480c4acb3ba00fbfd
+          provenance_ids:
+          - a6320f8371287972cd33b002bf21143bee6a023907624cbef2092ee36fc60c3f
+        - reference_id: publisher_disclosure
+          role: masking_methodology
+          status: available
+          title: TEA 2024–25 Research glossary and disclosure notes
+          url: https://rptsvr1.tea.texas.gov/acctres/gloss2425.html
+          reviewed_sha256: af0a62bcf1c4f8c3f38e3b86c03169623634cf024e5a33090941bcb7b33fc70c
+          provenance_ids:
+          - 3b0918cbdd24dabcbe24e83c55e958e332cc08e7add11f47477c1bd8fbcceb47
+        - reference_id: region_selector
+          role: source_notes
+          status: available
+          title: TEA annual dropout region selector
+          url: https://rptsvr1.tea.texas.gov/acctres/drop_annual/2425/region.html
+          reviewed_sha256: b9bc5181a9d22549f34f0db4e31f5ddeabdc7f2e26dc942f85cf89793ad95795
+          provenance_ids:
+          - fd6e7459c1ff889d36dbc87cf8547875409c26c1943c0d5e4bdd418314f1d96b
+        - reference_id: district_selector
+          role: source_notes
+          status: available
+          title: TEA annual dropout district selector
+          url: https://rptsvr1.tea.texas.gov/acctres/drop_annual/2425/district.html
+          reviewed_sha256: 9f8cec919ee3dbb51e5daea132a0d46005428cf120c09828059edc8abfcbe9a7
+          provenance_ids:
+          - 80a876c64615cb6339f788ac1642cd877521408715ac6129506bec731539d3e2
+        - reference_id: campus_selector
+          role: source_notes
+          status: available
+          title: TEA annual dropout campus selector
+          url: https://rptsvr1.tea.texas.gov/acctres/drop_annual/2425/campus.html
+          reviewed_sha256: e8d88b813f45e079caa1e76fb3d03eb70170985e35867eae061dd0be0300963e
+          provenance_ids:
+          - fc55c8d36f51469f134b8e4e73d1322927ee7b8c78464fe2e36a449918f5ffb3
+        - reference_id: columns_source
+          role: schema
+          status: available
+          path: schemas/research--2025--annual-dropout-crosswalk.json
+          title: Reviewed workbook and direct report raw crosswalk
+          reviewed_sha256: 78a9af865755dc3db83913d75ceab20637270ee8e232734cc9ca6d33f266a5f4
+          provenance_ids:
+          - 8ab537d5e4abd54fd432a535328cbcec94446980d47f6c72a789bfbf4aaca901
+        notes: Raw publisher observations. State and ESC values come from direct reports. District
+          and campus retain federal and statutory calculation variants. County retains its published
+          series. Raw count, rate, disclosure and threshold tokens are preserved. No scalar metric
+          or default reader is selected.
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/research--2025--annual-dropout-crosswalk.json
+            acquisition_ids:
+              district:
+              - b435430e5984de2152b427ff2b9cedd3790fe8b0e36063b64a90905b125162d2
+              campus:
+              - 9c82351e681d816aa45b1896a3d671dcc1b069c4bfddec4529f51e565ff19c5d
+              county:
+              - 34b284454bc237160c168f6e861916c18fb09406ca3d6b0290cb64023e903ba7
+              state:
+              - 7be558f2bab087941ace03472b01a6c6f4ec8712656cecd02da2ce8322fd3282
+              - ab1972189de4d6901e33010e05edfd8bcefc7d29a925e0e2040ee018d5f0c2df
+              - cf6b2bed73e501d3a63f41eae92d4e44589ff3bda63650d444b9716e81246e43
+              region:
+              - a1f7d1187555f977becd9b4e4b8a95c5b3c39828254fe7a6e34133d02aaf392e
+              - 07e86d541d6eeea5a74208274217be50216213b595c956311bb7a9207692938c
+              - 1852f83c50a0072bd991318af238e56ad2e16b2bb4fe59d267d18f163faa9b1d
+              - 8efe1894406d256c53ee4c83bf4b4ae95ec1e3398a420804fe6798f62547c0bf
+              - 36a28373250017b555e4738fbf42c7faf119dccf5ecd813557f298beeb76b94f
+              - 66742be40ad6e933d709cd96d48fad951529d132af565ae3ee0bc449fa3898a8
+              - 701c6e190ae39d12012b02f2ac2ab9c79221332bf207cbb11f9b3d74d6c6c45a
+              - a13fa96a43fa3c6cb4caedd11fe7f5cfe66c73e714649d51c9c5767171805ec3
+              - 10c5504999676d22e88e5f65e12328dbb696def1e6ee44d0e3b271e7ced3d6da
+              - c2391dbad7a4b8fc8a7444c581511c6d5c85537e2696de612219315c4110cfc8
+              - bfa30cc2f3a6613ba9178eb7f94b6249bb8cbc400f0680f875f0d7083a95a0c8
+              - e819d3a11e77c753240deec95fa0d7ee51c0c2cc38d2c68f3fbdac3d484464a8
+              - ca6bac52bd2b9974a1db6d7094ae8f13c615be6e3c9776ef38b94d1b51624ddd
+              - bda6d22069dc98d97fc9055aadf735b2c2eadc986c79064a54d71c43f93481b9
+              - 8b1144df0bb9456ec2080d7a7e49a230fddf86c4132a0934b4aa3bb2cee2ebe9
+              - 43e39a33bced7af9e871bcd0771a2d4c2be577c4b4882df7c209ea51c383009e
+              - e923ff9e5561e3b38c1c20ca682139d37c4985d25c8b33038fca174824036b16
+              - e1262bb81763946442f3bedb4a25780bcb1b5de8b34fc74eeb9c2450fa6af772
+              - f065d70ed827ee7560b2ce0af49d932489a49bdab4d83680bee58188e558a85b
+              - 9a64b47c060b56335fc159e87fe0a97f8db25afca6b638197aefa2dc9086c0a1
+              - 7aaa213f7f9c126fd9cc87cc0c1075a416db011f332aace89389bd58a9c0a30d
+              - def777dc80af570671af3de5082d03e738430b82598b56fbfe7b20131d536eaa
+              - 15b408975b38cbd567dd559fd0cb1a70715a56b3c1e070a193aa07aa56ace627
+              - c2c08d217eb7fa3e7b99ce7c4c26aa546103d90cac025563fc110c5f89674974
+              - 2350a390cb038abbf4201f695281ed408c3dfe6d1baafc81f71aec035c0e6169
+              - 4c6f679c03a7ab73f4627f1866c3af75473bb1d1d38e9fa842d3c7a3e8f710c8
+              - 34496a5331e24aa0562ac3a12c59d0344616d8074d953272d577c4a798540ce2
+              - 728207cbf850d5468c5988ac46c862cada1d4f7bd9172a7f6ce1467b0a15a67c
+              - 694e05ca2f327d5cd40ca010890f6f5dfd8e34105ef1b87454c33620846263a2
+              - 941042686f31e94f9238168d4767a6bde36bdfd5aabb4c37cf8ba047b90036f8
+              - eb66140b98f45722e58eaec8618a978a6afce4107e0ce65ad6fc597277e72bd4
+              - b209906c5cf104e6b5210d7f11d8ef0d41a73de6dae3430cdaff5ad5813568f9
+              - 6da6ef81dd30307e23b3a2e78186bfdf2dc86c10402af1cb0072e267051e1b19
+              - 6ecb2418c71440dac3a4a9e852839e5e5cc54d737fff9c1285b7323d70234818
+              - b3844183bbc82959243bbbdaf244be3a5cdc302701b067051b8fcd1d665c5fd9
+              - 4d7f8ae1cfa4bd872ca6239403edcc4493bc25bf84acc0e9266c30f50ce447f0
+              - e9cd0bfa32d1cd7836428b7b4ab4ac10106da582d8c2e77c0a3a521fb3ae037b
+              - b0b5f5507bccd7fc11fe464f89ff61cf14e45a011169b905c1447c5e12e678a3
+              - 5b24ea0899e0c6308593d34ecf9686bc17170601e5d52b8a3e333b0d4ba026b5
+              - d24c6ee15d8a80e1e767a5e93414b8c66c28230451db92b02c48701989930567
+              - 202c5b9cbfc1e187387ccb013ca262d61ee76fe924019fa6eb1de76b449ec023
+              - 9344d166f8518f9ef4598cc25a8e2eab84c2b678ed494e854d8c72e69ea370b4
+              - d4a4846d600caf7fc790a941d6fd228dc979bc3bbaeaf26d2583597ca99fb38d
+              - e14b831d01219234df987179697d3bf8b01e23f35c7c2c87cc05504576d34354
+              - b206ecff5e51bd08f2fd92c27257d2d35bd64122fe71a45e60f4623dd6d3ca2a
+              - c5d8d9b64056f079bfbdd832101713d912c29d981752a537afce8b55708e8ddf
+              - ef14a552193f320db52e9a8f9afac784f457e6f927ce08b86b9fd79a039bd1fc
+              - 47f35b763fd6ad3d1d54b4d6591c308e1509cf1b4c56ae8d6f47c4b4001edfc7
+              - 0a3a9ed80412c3336e73a2c87ddb2c9eca80db71a6d8c5c707b8043f6a9012c4
+              - eceed78c9990fe64dde487969995c87a916429cbc2f0db17f5dbd624456e3dcf
+              - e509ea7418d8b5c2b699d2bcbec1d2f80e4d64fd6b65c27a1f2da20ca40ea442
+              - 4d74ae8dd0d0c05f1444825f449e86a80fd66f011983a39e05cfcf471e463f55
+              - 19124272131fccbd58af31235ea616bdaa040ea7e6b466ab78244973ac647dd5
+              - 9baed28d79c1105af6f95709abf3dbec761bfe5e829aba768cc3e63c6de9908f
+              - e669d2e270278e666bad331ff2a8ac0750984048e555f464c5b353f5a428629a
+              - 68bd51f3828bb7e45bca74ac46f7690feed9a200d53edb767771c752c1fb3f1a
+              - ad4a5d7da19575698a85bf6b4779e065e7ade940686d151b40ec0cd3f8115440
+              - 129fe0bc120bf618d72f0b448c4619f0357913d8780bf305b610452e086de83f
+              - 185786c15b1345da4f11acee56608944aeb54447a072bb1356f631a858916d18
+              - e6b80e7cfeec78c750a112469c231d0a70d860c3d1150d732bb084f0e5af84b2
+            witness_ids:
+              district:
+              - 02ce185ad89062e58f51a02a683d39b1295c2902694680e7b468f5eaa1a693b7
+              - 7163f37c3215020b7dc7418d044a6b1b455579f98b98398bcfde756badd01a19
+              - cc862db8d00f718c6da36f0154043d465663a44ea703fe505970c7dc6d1a5626
+              campus:
+              - 874a060ca3fd0298d84129621279da2ce1b46cd0d044cb77caabd9daff2cb07c
+              - e38833e65b38f431378666165534f973960e490cd60c8a604442ae82fe27344e
+              - f364ff137b9f0bafb3fa8ea3a462f9ac3b3134faa2570332923bf1d2b183df93
   frc_per_pupil_expenditure:
     2025:
       path: data/frc/2025/per-pupil-expenditure.html
@@ -18164,6 +18315,8 @@ schema:
     district_transfer_reports:
     - parquet
     accountability_research_four_year_graduation:
+    - xlsx
+    accountability_research_annual_dropout:
     - xlsx
     frc_per_pupil_expenditure:
     - html

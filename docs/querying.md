@@ -73,31 +73,55 @@ edited entity values. Use this mode with queries of a single bound entity
 scope. Duplicate output labels raise an error. To export both header rows for an
 entire source table, use the [native export methods](data-releases.md#exact-retained-source-parity).
 
-## Roadmap: pandas-style selection and filtering
+## Filter a source table before loading it into pandas
 
-The first milestone is a chainable view over one exact catalog edition. It
-will support selecting columns by name and filtering inline with composable
-boolean predicates, following [pandas indexing](https://pandas.pydata.org/docs/user_guide/indexing.html).
-Column names resolve against the selected dataset, table and revision. The
-view will push projection and predicates into the existing native scan, keep
-source keys and relevant value statuses, and materialize a pandas DataFrame
-when the caller asks for one. Filters on typed values will distinguish an
-observed zero from suppression and missingness.
+Use `release.table(edition_key)` for a lazy view of one native edition. For
+example, with the district edition of the 2025–26 TPRS student source:
 
-A later milestone will add a limited string `.query()` syntax for comparisons,
-membership tests, boolean combinations and explicit parameters. It will compile
-to the same predicates as inline filtering. The parser will reject unsupported
-expressions and ambiguous fields. The [pandas query API](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.query.html)
-can execute arbitrary code, so it cannot be the evaluator for this interface.
-Once materialized, the result is an ordinary DataFrame with pandas `.loc`,
-boolean indexing and `.query()` available for trusted local analysis.
+```python
+table = release.table(edition_key)
+count = table["membership_total_students_count"]
+selected = table[(count >= 1_000) & (count < 20_000)][["membership_total_students_count"]]
+frame = selected.to_df()
+```
 
-Before either interface ships, verify both against equivalent Arrow filters
-and pandas results for observed rows, plus fixtures for masks, nulls, quoted
-identifiers, multi-row grains and fields that recur across editions. Check that
-the native scan reads only the selected leaf and required columns and that
-filtered results retain the same source lineage in DataFrame, CSV and Excel
-outputs.
+Column expressions use Arrow comparisons, `&`, `|`, `~`, `.isin()` and
+`.is_null()`. A comparison excludes null values. Select a typed field to keep
+its raw token and status in the result alongside its numeric value. Raw-only
+tables compare the publisher's literal strings. A predicate may use columns
+in the native table that are absent from the result. Unknown fields fail when
+the scan binds. `select()` and `where()` offer named equivalents for column
+selection and filtering. Each call returns a new view. `to_arrow()`, `to_df()`,
+`to_csv()` and `to_excel()` execute the scan and read only the selected leaf.
+
+The DataFrame records its manifest, edition and artifact identity in
+`attrs["teadata"]`. For raw TAPR tables, `restore_original_headers=True`
+restores the selected labels and codes in publisher order. CSV and Excel
+contain the selected rows and columns. Keep the manifest and filter with a
+file export to reproduce the subset.
+
+## Write a query string
+
+The same scan can take a bounded query string with explicit `@` parameters.
+
+```python
+frame = table.query(
+    "@minimum <= membership_total_students_count < @maximum",
+    params={"minimum": 1_000, "maximum": 20_000},
+).select("membership_total_students_count").to_df()
+```
+
+Use comparisons, `and`, `or`, `not`, `in`, `not in`, `is None` and
+`is not None`. Field names are canonical identifiers. Membership follows
+Arrow's `.isin()` behavior. To exclude nulls from a negated membership test,
+also add `field is not None`. Query strings and total parameter use each have
+an 8 KiB limit. Parameters accept only scalar values and bounded membership
+lists. The syntax rejects function calls, attribute access, arithmetic and
+implicit local variables.
+
+After materialization, the result supports pandas `.loc` and boolean
+indexing. Use [pandas `.query()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.query.html)
+only with trusted expressions on that DataFrame because it can execute Python code.
 
 ## Compare a published measure with Texas
 

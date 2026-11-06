@@ -1052,7 +1052,7 @@ class DatasetCatalog:
     def bound_field_headers(self, fields: Iterable[str], *, scope: str) -> dict[str, dict[str, str]]:
         """Return reviewed publisher headers for exact snapshot field bindings."""
         self._require_scalar_interpretation()
-        tables: dict[str, dict[str, dict[str, str]]] = {}
+        tables: dict[str, dict[str, dict[str, str] | None]] = {}
         headers = {}
         for field in fields:
             binding = self._resolve_field(field, scope)
@@ -1062,15 +1062,17 @@ class DatasetCatalog:
             if not self._sources[dataset].get("column_schema_sha256"):
                 continue
             if dataset not in tables:
-                by_field: dict[str, dict[str, str]] = {}
+                by_field: dict[str, dict[str, str] | None] = {}
                 for record in self.header_records(dataset):
                     name = record["field"]
-                    if name in by_field:
-                        raise ContractError(f"Publisher header is ambiguous for {name!r} in {dataset!r}")
-                    by_field[name] = {key: record[key] for key in ("dataset", "edition", "table", "label", "code")}
+                    by_field[name] = None if name in by_field else {
+                        key: record[key] for key in ("dataset", "edition", "table", "label", "code")}
                 tables[dataset] = by_field
             if source_field in tables[dataset]:
-                headers[field] = tables[dataset][source_field]
+                header = tables[dataset][source_field]
+                if header is None:
+                    raise ContractError(f"Publisher header is ambiguous for {source_field!r} in {dataset!r}")
+                headers[field] = header
         return headers
 
     def acquisitions(self, dataset: str, *, edition: EditionKey | None = None) -> list[dict[str, Any]]:

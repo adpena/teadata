@@ -31,7 +31,7 @@ from .manifest import (
 
 if TYPE_CHECKING:
     from .entities import Campus, District
-    from .source_views import EntitySources
+    from .source_views import EntitySources, SourceTable
 
 
 ROLES = frozenset({"snapshot", "entities", "maps", "boundaries"})
@@ -360,6 +360,14 @@ class DataRelease:
             raise ValueError("Native source access requires an entity number and explicit edition")
         return EntitySources(self, scope, identifier, edition)
 
+    def table(self, edition: EditionKey) -> SourceTable:
+        """Start a lazy scan bound to a native edition without opening its table."""
+        from .source_views import SourceTable
+
+        if not isinstance(edition, EditionKey):
+            raise TypeError("Native table selection requires an exact EditionKey")
+        return SourceTable(self, edition)
+
     def to_csv(self, edition: EditionKey, path_or_buf: str | Path | BinaryIO, *,
                restore_original_headers: bool = False) -> None:
         """Stream one native table to a CSV path or writable binary stream."""
@@ -378,17 +386,9 @@ class DataRelease:
 
     def to_df(self, edition: EditionKey, *, restore_original_headers: bool = False):
         """Materialize one native table as a pandas DataFrame."""
-        import pandas as pd
-        import pyarrow as pa
-
         from .source_views import prepare_export
 
-        table = prepare_export(self, edition, restore_original_headers=restore_original_headers)
-        frame = pa.Table.from_batches(table.batches(), schema=table.schema).to_pandas(types_mapper=pd.ArrowDtype)
-        if restore_original_headers:
-            frame.columns = pd.MultiIndex.from_arrays(table.headers)
-        frame.attrs["teadata"] = {"build_id": self.build_id, "edition": edition.to_dict()}
-        return frame
+        return prepare_export(self, edition, restore_original_headers=restore_original_headers).to_df()
 
 
 @lru_cache(maxsize=4)

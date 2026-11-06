@@ -77,6 +77,38 @@ as typed or longitudinal measures. The supplements use their own data-build
 identities. The default engine continues to use its separately configured
 snapshot.
 
+### STAAR editions in v0.0.133
+
+The [v0.0.133 assets](https://github.com/adpena/teadata/releases/tag/v0.0.133)
+cover campus, district, ESC region, and Texas for each listed edition. The
+historical manifests cover the 2023–24 and 2024–25 TAPR editions. The 2026
+manifests cover the 2025–26 TPRS edition. End of Course is in the v0.0.132
+supplement above.
+
+| Manifest | Manifest SHA-256 |
+| --- | --- |
+| `tapr-staar-participation-2024-2025.release.json` | `a57715a99ea692f2c83e3271e6fdd50ca97348dcd2cf348904dbeb96ae8d2cf6` |
+| `tapr-staar-school-progress-2024-2025.release.json` | `86a159c7649fca670078d98e04672aa124b7245c012005d8e96ed403c096c19f` |
+| `tprs-staar-all-grades-2026.release.json` | `b399e271381f944ec3844d435f8e110c3c83049bdd75421e4eaa87e3ffd217c2` |
+| `tprs-staar-bilingual-esl-growth-2026.release.json` | `4af1680438427b9174384ac17a043a8b2235bfdeb0b6de2931e6fa44df5a96de` |
+| `tprs-staar-bilingual-esl-performance-2026.release.json` | `ac787ac1e9b005dddabf35b82abb082583a391fa39dc84fad9079dda8f4c5f54` |
+| `tprs-staar-grades-3-to-8-2026.release.json` | `05654e8c3ce8a32052a4a0893e5defe7808d89c8222587c033b44e7923edce6c` |
+| `tprs-staar-participation-2026.release.json` | `42320fc7cd9e069473708dbed791b18e4f0ec19b6a9113a207b73ae44f9e7a4d` |
+| `tprs-staar-school-progress-2026.release.json` | `7dd625c228aa08b9f7525b5c9bf8993ec9efc6982408d1612b14a239fb5c8981` |
+| `tprs-staar-tested-grade-3-2026.release.json` | `9a30a403189ff15be90fe7935825a581b545677b82204f90df9eb85ea1ef5214` |
+| `tprs-staar-tested-grade-4-2026.release.json` | `23e42224e91c39febf8d5ddf8e28f95620e7e05adb17dff3c792abb76af2a522` |
+| `tprs-staar-tested-grade-5-2026.release.json` | `96817b41940245d1960feed0dc1057d9ce56a8127489444f5e83d43921b4629c` |
+| `tprs-staar-tested-grade-6-2026.release.json` | `75ed439f51045eec1dba5eb60ea5556c2149c5a928d78e53cd6c7e02c2189606` |
+| `tprs-staar-tested-grade-7-2026.release.json` | `3e562a21804f1f05a27561f4c9608a80ab61bb72c20348e75eb7c3294ee9bd2a` |
+| `tprs-staar-tested-grade-8-2026.release.json` | `cd252039981abc10bf7e9f60dc2c06d8c00413cdb2f6bf70040ae9e49b04e372` |
+
+Each manifest exposes the retained publisher column labels, codes, and raw
+tokens. The checks compared original-header CSV exports with 204,281,222
+retained source cells across the 64 tables. Use the catalog's field definitions
+and review the year, population, and disclosure rules before interpreting a
+raw value. The tested-grade manifests can be used for the separately reviewed
+[Texas comparison selectors](querying.md#compare-a-published-measure-with-texas).
+
 ### Exact retained-source parity
 
 Export one exact native table with canonical field names by default. For a

@@ -12,7 +12,7 @@ import pytest
 from teadata.analytical import write_leaf_artifact
 from teadata.column_schema import source_schema_fingerprint
 from teadata.dataset_metadata import ArtifactRef, DatasetMetadata, EditionKey, ResolvedDataset
-from teadata.manifest import BuildRecorder, canonical_json, file_identity
+from teadata.manifest import BuildRecorder, ContractError, canonical_json, file_identity
 from teadata.provenance import ProvenanceStore
 from teadata.release import DataRelease, publish_release
 from teadata.source_parity import validate_source_parity
@@ -175,6 +175,93 @@ def test_typed_exports_preserve_nullable_integers(tmp_path):
     try:
         assert book['Data']['B2'].value == '9007199254740993'
         assert book['Data']['B3'].value is None
+    finally:
+        book.close()
+
+
+def test_lazy_selection_reads_one_leaf_with_filtered_columns(tmp_path, monkeypatch):
+    release, _, key, _ = fixture_release(tmp_path, damage='normalized', schema_version=4)
+    native = release.analytical_dataset
+    scans = []
+
+    class Traced:
+        def __init__(self, dataset):
+            self.dataset = dataset
+
+        def scanner(self, **kwargs):
+            scans.append(kwargs)
+            return self.dataset.scanner(**kwargs)
+
+    monkeypatch.setattr(release, 'analytical_dataset', lambda name: Traced(native(name)))
+    table = release.table(key)
+    count = table['membership']
+    selected = table[(count > 1) | count.is_null()][['membership']].where(table['enrollment'] != '11')
+    assert scans == []
+    result = selected.to_arrow()
+    assert len(scans) == 1
+    assert scans[0]['columns'] == ['district_number', 'membership', 'membership_raw', 'membership_status']
+    assert result.to_pylist() == [
+        {'district_number': '001002', 'membership': None, 'membership_raw': '-999', 'membership_status': 'suppressed'},
+        {'district_number': '001003', 'membership': 17, 'membership_raw': '17', 'membership_status': 'observed'},
+    ]
+    with pytest.raises(ContractError, match='field unavailable'):
+        table.select('unknown').to_arrow()
+    with pytest.raises(pa.ArrowInvalid, match='unknown'):
+        table[table['unknown'] == 1].to_arrow()
+
+
+def test_source_query_string_uses_the_same_native_filter(tmp_path):
+    release, _, key, _ = fixture_release(tmp_path, damage='normalized', schema_version=4)
+    table = release.table(key)
+    count = table['membership']
+    inline = table[((count >= 10) & (count < 20)) | count.is_null()].select('membership')
+    query = table.query('@low <= membership < @high or membership is None',
+                        params={'low': 10, 'high': 20}).select('membership')
+    assert query.to_arrow().equals(inline.to_arrow())
+    assert table.query("district_number in @ids and not enrollment == '@literal'",
+                       params={'ids': ['001001', '001002']}).select('membership').to_arrow().num_rows == 2
+
+
+@pytest.mark.parametrize('expression', [
+    "__import__('os').system('echo unsafe')", 'membership.__class__ == 1',
+    'membership + 1 == 2', 'membership > @unknown', 'membership > None',
+    'membership in [x for x in range(10)]', 'membership == @ value',
+])
+def test_source_query_rejects_unsupported_syntax_before_leaf_io(tmp_path, monkeypatch, expression):
+    release, _, key, _ = fixture_release(tmp_path)
+    monkeypatch.setattr(release, 'artifact', lambda *args, **kwargs: pytest.fail('Unexpected data read'))
+    with pytest.raises(ValueError):
+        release.table(key).query(expression)
+
+
+def test_source_query_parameters_cannot_inject_expressions_or_bypass_budget(tmp_path):
+    release, _, key, _ = fixture_release(tmp_path)
+    table = release.table(key)
+    with pytest.raises(ValueError, match='bounded scalar'):
+        table.query('membership == @value', params={'value': table['membership']})
+    with pytest.raises(ValueError, match='parameter uses exceed'):
+        table.query('enrollment == @text or membership == @text', params={'text': 'a' * 5000})
+
+
+def test_filtered_formats_share_original_headers_and_values(tmp_path):
+    from openpyxl import load_workbook
+
+    release, _, key, _ = fixture_release(tmp_path, alias=True, schema_version=4)
+    table = release.table(key)
+    selected = table[table['membership'].isin(['-999', '17'])].select('membership')
+    frame = selected.to_df(restore_original_headers=True)
+    expected = [['District', 'Membership'], ['DISTRICT', 'DPETALLC'], ["'1002.0", '-999'], ['001003', '17']]
+    assert frame.columns.tolist() == list(zip(*expected[:2], strict=True))
+    assert frame.to_numpy().tolist() == expected[2:]
+    assert frame.attrs['teadata']['manifest_sha256'] == release.manifest_sha256
+    assert frame.attrs['teadata']['edition'] == key.to_dict()
+    csv_buffer, xlsx_buffer = BytesIO(), BytesIO()
+    selected.to_csv(csv_buffer, restore_original_headers=True)
+    selected.to_excel(xlsx_buffer, restore_original_headers=True)
+    assert list(csv.reader(StringIO(csv_buffer.getvalue().decode(), newline=''))) == expected
+    book = load_workbook(xlsx_buffer, read_only=True)
+    try:
+        assert [list(row) for row in book['Data'].values] == expected
     finally:
         book.close()
 

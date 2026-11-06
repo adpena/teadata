@@ -37,11 +37,18 @@ def crosswalk_document(input_sha, *, dataset="sample", label="Example Value"):
     }]}
 
 
-def build_bound_catalog(tmp_path, *, edition="2025", profile=None, bind_metric=False):
+def build_bound_catalog(tmp_path, *, edition="2025", profile=None, bind_metric=False, repeated_field=None):
     source = tmp_path / "prepared.csv"
     source.write_text("campus_number,example_value\n001902001,-3\n")
     document = crosswalk_document(sha256(source.read_bytes()).hexdigest())
     document["datasets"][0]["edition"] = edition
+    if repeated_field is not None:
+        tables = document["datasets"][0]["tables"]
+        first = tables[0]
+        field = next(value for value in first["fields"] if value["field"] == repeated_field)
+        tables.append({"table": "staff", "input_sha256": "2" * 64,
+                       "source_schema_sha256": source_schema_fingerprint([field["label"]], [field["code"]]),
+                       "fields": [{**field, "position": 1}]})
     schema = tmp_path / "schemas/crosswalk.json"
     schema.parent.mkdir()
     schema.write_text(canonical_json(document) + "\n")
@@ -142,6 +149,16 @@ def test_query_dataframe_restores_only_bound_headers(tmp_path):
     district._repo = None
     with pytest.raises(ContractError, match="entities bound to the snapshot"):
         query.to_df(restore_original_headers=True)
+
+
+@pytest.mark.parametrize("repeated", ["campus_number", "example_value"])
+def test_snapshot_header_ambiguity_is_scoped_to_requested_field(tmp_path, repeated):
+    catalog, *_ = build_bound_catalog(tmp_path, bind_metric=True, repeated_field=repeated)
+    if repeated == "example_value":
+        with pytest.raises(ContractError, match="ambiguous for 'example_value'"):
+            catalog.bound_field_headers(["example_value"], scope="district")
+    else:
+        assert catalog.bound_field_headers(["example_value"], scope="district")["example_value"]["code"] == "VALUE"
 
 
 def test_selected_edition_and_unknown_table_are_explicit(bound_catalog):
