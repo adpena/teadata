@@ -1,23 +1,28 @@
-"""Admission of the exact district roster and direct Texas TPRS report."""
+"""Admission of roster-bound 2026 TPRS student reports."""
 
 from __future__ import annotations
 
 from collections.abc import Iterator, Mapping
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 import gzip
 
 from hashlib import sha256
 from io import BytesIO
 
 import json
+from stat import S_ISREG
 from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qsl, urlsplit
 
 from .column_schema import _unique_object
 from .dataset_metadata import ArtifactRef, ColumnSchemaRef, EditionKey
+from .manifest import canonical_json
 
 from .provenance import ProvenanceStore
-from .tprs_students import BROKER, DATASET, EDITION, _DIGEST, _identifier, _need, _validate_report_acquisition, semantic_fields
+from .tprs_students import (
+    BROKER, DATASET, EDITION, _DIGEST, _STATEWIDE_ROW_GROUP_ROWS, _identifier, _need,
+    _validate_report_acquisition, semantic_fields,
+)
 from .values import ValueStatus
 
 if TYPE_CHECKING:
@@ -27,7 +32,10 @@ if TYPE_CHECKING:
 REGIONS = tuple(f"{number:02}" for number in range(1, 21))
 DISTRICT_COUNT = 1202
 CAMPUS_INTAKE_VERSION = 3
+CAMPUS_COHORT_VERSION = 4
 MAX_ROSTER_BYTES = 256 * 1024
+MAX_CAMPUS_ROSTER_BYTES = 512 * 1024
+MAX_CAMPUS_COHORT_REPORTS = 1500
 MAX_STATEWIDE_HTML_BYTES = 160 * 1024**2
 # Reviewed 128-row-group district/Texas candidate. A new revision needs its own review.
 REVIEWED_DISTRICT_STATE_MANIFEST = "373041dfb0eb994ccde4a88f1e7e630e7b395bf9f7a51199655d843788a2b5f6"
@@ -42,7 +50,7 @@ class ReportSelection:
 
 
 @dataclass(frozen=True, slots=True)
-class StatewideSelection:
+class RosterSelection:
     reports: tuple[ReportSelection, ...]
     roster: dict[str, dict[str, str]]
 
@@ -89,7 +97,7 @@ def campus_roster(store: ProvenanceStore, region: str, receipt: str) -> tuple[st
     record = store.read_record(receipt)
     _need(record["kind"] == "acquisition", "Campus roster receipt must identify an acquisition")
     size = record["artifact"]["size_bytes"]
-    limit = 512 * 1024
+    limit = MAX_CAMPUS_ROSTER_BYTES
     _need(type(size) is int and 0 < size <= limit, "Campus roster exceeds its byte budget")
     # Bound the publisher JSON before asking the general provenance reader to hash it.
     digest = record["artifact"]["sha256"]
@@ -142,7 +150,8 @@ def _reviewed_leaves(release: DataRelease) -> tuple[_ReplayLeaf, ...]:
         _need(key.dataset == DATASET and key.edition == str(EDITION), "Unexpected reviewed TPRS edition")
         refs = _student_attachments(release.catalog, artifact)
         _need(bool(refs), "Reviewed statewide TPRS lacks its report ledger")
-        reports, cohort = release._statewide_student_ledger(artifact, refs)
+        reports, cohort = release._student_report_ledger(artifact, refs)
+        _need(cohort is not None, "Reviewed statewide TPRS requires a district and Texas cohort")
         cohorts.add(cohort)
         leaves.append(_ReplayLeaf(artifact, refs["raw_audit"], reports))
     _need(len(cohorts) == 1 and {leaf.artifact.edition.scope for leaf in leaves} == {"state", "district"},
@@ -186,32 +195,48 @@ def qualify_statewide_tprs(release: DataRelease, store: ProvenanceStore) -> dict
             "scope": "Reviewed 2025–26 district and Texas student projection, with explicit raw field holds"}
 
 
-def roster_membership(roster: Mapping[str, Any], records: Mapping[str, Any]) -> dict[str, str]:
-    """Return publisher district → roster receipt, verified from exact JSON bytes."""
-    _need(set(roster) == set(REGIONS), "Statewide selection requires all 20 regional rosters")
+def _check_roster_regions(roster: Mapping[str, Any], scope: str) -> None:
+    if scope == "campus":
+        _need(bool(roster) and set(roster) <= set(REGIONS), "Campus cohort requires explicit valid regions")
+    else:
+        _need(set(roster) == set(REGIONS), "Statewide selection requires all 20 regional rosters")
+
+
+def roster_membership(roster: Mapping[str, Any], records: Mapping[str, Any], *,
+                      scope: str = "district") -> dict[str, str]:
+    """Return publisher identifiers and exact regional roster receipts."""
+    _check_roster_regions(roster, scope)
+    limit = MAX_CAMPUS_ROSTER_BYTES if scope == "campus" else MAX_ROSTER_BYTES
     members: dict[str, str] = {}
-    for region in REGIONS:
-        entry = roster[region]
+    for region, entry in sorted(roster.items()):
         _need(isinstance(entry, dict) and set(entry) == {"receipt", "response"}
               and isinstance(entry["receipt"], str) and isinstance(entry["response"], str),
               "Invalid roster entry")
         receipt = entry["receipt"]
         record = records[receipt]
         response = entry["response"].encode("utf-8")
-        for identifier in _regional_roster(response, record, region, "district", MAX_ROSTER_BYTES):
-            _need(identifier not in members, "Duplicate district across regional rosters")
+        for identifier in _regional_roster(response, record, region, scope, limit):
+            _need(identifier not in members, f"Duplicate {scope} across regional rosters")
             members[identifier] = receipt
-    _need(len(members) == DISTRICT_COUNT, "Statewide roster size differs from the reviewed edition")
+    if scope == "campus":
+        _need(len(members) <= MAX_CAMPUS_COHORT_REPORTS, "Campus cohort exceeds its report count budget")
+    else:
+        _need(len(members) == DISTRICT_COUNT, "Statewide roster size differs from the reviewed edition")
     return members
 
 
 def validate_report_ledger(reports: tuple[ReportSelection, ...], members: Mapping[str, str],
                            records: Mapping[str, Any], *, scope: str | None = None) -> None:
-    districts = [entry.identifier for entry in reports if entry.scope == "district"]
-    state = [entry for entry in reports if entry.scope == "state"]
-    _need(districts == ([] if scope == "state" else sorted(members))
-          and [entry.identifier for entry in state] == ([] if scope == "district" else ["S"])
-          and len(reports) == len(districts) + len(state), "Report ledger does not cover the exact roster and Texas singleton")
+    if scope == "campus":
+        _need(all(entry.scope == "campus" for entry in reports)
+              and [entry.identifier for entry in reports] == sorted(members),
+              "Campus report ledger differs from the exact ordered regional roster union")
+    else:
+        districts = [entry.identifier for entry in reports if entry.scope == "district"]
+        state = [entry for entry in reports if entry.scope == "state"]
+        _need(districts == ([] if scope == "state" else sorted(members))
+              and [entry.identifier for entry in state] == ([] if scope == "district" else ["S"])
+              and len(reports) == len(districts) + len(state), "Report ledger does not cover the exact roster and Texas singleton")
     _need(len({entry.receipt for entry in reports}) == len({entry.sha256 for entry in reports}) == len(reports),
           "Report ledger repeats a receipt or source body")
     total = 0
@@ -224,31 +249,41 @@ def validate_report_ledger(reports: tuple[ReportSelection, ...], members: Mappin
         if entry.scope == "district":
             _need(members[entry.identifier] in metadata.get("provenance_ids", ()),
                   "District report receipt lacks its exact regional roster parent")
+        elif entry.scope == "campus":
+            _need(metadata.get("provenance_ids") == [members[entry.identifier]],
+                  "Campus report receipt lacks its sole exact regional roster parent")
         total += record["artifact"]["size_bytes"]
-    _need(total <= MAX_STATEWIDE_HTML_BYTES, "Statewide report ledger exceeds the aggregate source byte budget")
+    _need(total <= MAX_STATEWIDE_HTML_BYTES, "Roster report ledger exceeds the aggregate source byte budget")
 
 
-def admit_statewide_selection(store: ProvenanceStore, document: dict[str, Any]) -> StatewideSelection:
-    """Read pinned roster bodies and validate selected report identities before parsing reports."""
+def _admit_roster_selection(store: ProvenanceStore, document: dict[str, Any], *, scope: str) -> RosterSelection:
+    campus = scope == "campus"
+    version = CAMPUS_COHORT_VERSION if campus else 2
     _need(set(document) == {"schema_version", "dataset", "edition", "rosters", "reports"}
-          and type(document["schema_version"]) is int and document["schema_version"] == 2
-          and document["dataset"] == DATASET and document["edition"] == str(EDITION), "Invalid statewide student intake")
+          and type(document["schema_version"]) is int and document["schema_version"] == version
+          and document["dataset"] == DATASET and document["edition"] == str(EDITION), "Invalid roster-bound student intake")
     rosters = document["rosters"]
-    _need(isinstance(rosters, dict) and set(rosters) == set(REGIONS)
+    _need(isinstance(rosters, dict)
           and all(isinstance(value, str) and _DIGEST.fullmatch(value) for value in rosters.values()), "Invalid roster receipt pins")
+    _check_roster_regions(rosters, scope)
     roster = {}
+    limit = MAX_CAMPUS_ROSTER_BYTES if campus else MAX_ROSTER_BYTES
     for region, receipt in sorted(rosters.items()):
         record = store.read_record(receipt)
+        _need(record["kind"] == "acquisition", "Roster receipt must identify an acquisition")
         digest = record["artifact"]["sha256"]
         size = record["artifact"]["size_bytes"]
-        _need(type(size) is int and 0 < size <= MAX_ROSTER_BYTES, "Roster response exceeds its byte budget")
+        _need(type(size) is int and 0 < size <= limit, "Roster response exceeds its byte budget")
+        path = store.root / "objects" / digest
+        _need(path.is_file() and path.stat().st_size == size, "Roster response differs from its declared size")
         with store.verify_artifact(digest).open("rb") as stream:
             response = stream.read(size + 1)
         roster[region] = {"receipt": receipt, "response": response.decode("utf-8")}
     records = {receipt: store.read_record(receipt) for receipt in rosters.values()}
-    members = roster_membership(roster, records)
+    members = roster_membership(roster, records, scope=scope)
     rows = document["reports"]
-    _need(isinstance(rows, list) and len(rows) == len(members) + 1, "Incomplete statewide report selection")
+    _need(isinstance(rows, list) and len(rows) == len(members) + (0 if campus else 1),
+          "Incomplete campus cohort report selection" if campus else "Incomplete statewide report selection")
     reports = []
     for row in rows:
         _need(isinstance(row, dict) and set(row) == {"scope", "identifier", "receipt", "sha256"}
@@ -256,30 +291,60 @@ def admit_statewide_selection(store: ProvenanceStore, document: dict[str, Any]) 
               and _DIGEST.fullmatch(row["receipt"]) is not None and _DIGEST.fullmatch(row["sha256"]) is not None,
               "Invalid report receipt pins")
         reports.append(ReportSelection(**row))
-    selected = tuple(sorted(reports, key=lambda item: (item.scope, item.identifier)))
-    validate_report_ledger(selected, members, {entry.receipt: store.read_record(entry.receipt) for entry in selected})
-    return StatewideSelection(selected, roster)
+    selected = tuple(reports if campus else sorted(reports, key=lambda item: (item.scope, item.identifier)))
+    report_records = {entry.receipt: store.read_record(entry.receipt) for entry in selected}
+    validate_report_ledger(selected, members, report_records, scope="campus" if campus else None)
+    if campus:
+        # The declared aggregate alone cannot bound a corrupt retained object.
+        # Reject nonregular or expanded bodies before the provenance copier reads them.
+        for entry in selected:
+            state = (store.root / "objects" / entry.sha256).stat(follow_symlinks=False)
+            _need(S_ISREG(state.st_mode) and state.st_size == report_records[entry.receipt]["artifact"]["size_bytes"],
+                  "Retained campus report differs from its declared regular file size")
+    return RosterSelection(selected, roster)
+
+
+def admit_statewide_selection(store: ProvenanceStore, document: dict[str, Any]) -> RosterSelection:
+    """Admit the complete district and direct Texas selection."""
+    return _admit_roster_selection(store, document, scope="district")
+
+
+def admit_campus_cohort(store: ProvenanceStore, document: dict[str, Any]) -> RosterSelection:
+    """Admit the full campus roster for every selected region."""
+    return _admit_roster_selection(store, document, scope="campus")
 
 
 STATEWIDE_OPERATION = "statewide_tprs_student_membership_enrollment"
+CAMPUS_COHORT_OPERATION = "regional_cohort_tprs_student_membership_enrollment"
+CAMPUS_COHORT_LEDGER_VERSION = 3
 MAX_AUDIT_LINE_BYTES = 4096
 MAX_AUDIT_BYTES = 128 * 1024**2
 MAX_AUDIT_ROWS = 1_000_000
 
 
-def statewide_resources(record: Mapping[str, Any]) -> dict[str, ColumnSchemaRef]:
+def student_report_resources(record: Mapping[str, Any]) -> dict[str, ColumnSchemaRef]:
     """Route reviewed attachments by their processing output, never by a path in the intake."""
     recipe = record.get("parameters", {}).get("recipe", {})
-    if recipe.get("operation") != STATEWIDE_OPERATION:
+    operation = recipe.get("operation")
+    if operation not in (STATEWIDE_OPERATION, CAMPUS_COHORT_OPERATION):
         _need("report_ledger_version" not in recipe, "Unsupported statewide student ledger operation")
         return {}
-    _need(type(recipe.get("report_ledger_version")) is int and recipe["report_ledger_version"] == 2
+    campus = operation == CAMPUS_COHORT_OPERATION
+    version = CAMPUS_COHORT_LEDGER_VERSION if campus else 2
+    _need(type(recipe.get("report_ledger_version")) is int and recipe["report_ledger_version"] == version
           and record.get("processor") == "teadata.tprs_students"
-          and set(record["outputs"]) == {"leaf", "roster", "raw_audit", "grid"}, "Invalid statewide student output contract")
-    pair = recipe.get("cohort")
-    _need(isinstance(pair, dict) and set(pair) == {"district", "state"}
-          and all(isinstance(item, str) and _DIGEST.fullmatch(item) for item in pair.values())
-          and pair["district"] != pair["state"], "Statewide student recipe requires exact district and Texas editions")
+          and set(record["outputs"]) == {"leaf", "roster", "raw_audit", "grid"}, "Invalid roster-bound student output contract")
+    if campus:
+        regions = recipe.get("campus_regions")
+        _need(isinstance(regions, list) and bool(regions) and all(isinstance(region, str) and region in REGIONS for region in regions)
+              and sorted(set(regions)) == regions and "cohort" not in recipe
+              and type(recipe.get("parquet_row_group_max_rows")) is int
+              and recipe["parquet_row_group_max_rows"] == _STATEWIDE_ROW_GROUP_ROWS, "Invalid campus cohort recipe")
+    else:
+        pair = recipe.get("cohort")
+        _need(isinstance(pair, dict) and set(pair) == {"district", "state"}
+              and all(isinstance(item, str) and _DIGEST.fullmatch(item) for item in pair.values())
+              and pair["district"] != pair["state"], "Statewide student recipe requires exact district and Texas editions")
     refs = {}
     for role, suffix in (("roster", "json"), ("raw_audit", "jsonl.gz"), ("grid", "json")):
         artifact = record["outputs"][role]
@@ -290,21 +355,23 @@ def statewide_resources(record: Mapping[str, Any]) -> dict[str, ColumnSchemaRef]
     return refs
 
 
-def statewide_ledger(document: Mapping[str, Any], key: EditionKey, roster: bytes,
-                     processing: Mapping[str, Any]) -> tuple[ReportSelection, ...]:
+def student_report_ledger(document: Mapping[str, Any], key: EditionKey, roster: bytes,
+                          processing: Mapping[str, Any]) -> tuple[ReportSelection, ...]:
     records = document["provenance"]
     inputs = processing["inputs"]
     intakes = [records[identifier] for identifier in inputs
                if records[identifier]["dataset"] == "reference:tprs_student_intake"]
-    pin = processing["parameters"]["recipe"].get("intake_sha256")
+    recipe = processing["parameters"]["recipe"]
+    pin = recipe.get("intake_sha256")
     _need(isinstance(pin, str) and _DIGEST.fullmatch(pin) is not None and len(intakes) == 1
           and intakes[0]["kind"] == "acquisition" and intakes[0]["method"] == "local_observation"
           and intakes[0]["requested_year"] == intakes[0]["resolved_year"] == EDITION
           and intakes[0]["source_metadata"].get("version") == str(EDITION)
           and intakes[0]["artifact"]["sha256"] == pin, "Student ledger differs from its direct exact intake receipt")
     body = json.loads(roster, object_pairs_hook=_unique_object)
-    _need(isinstance(body, dict), "Invalid statewide roster attachment")
-    members = roster_membership(body, records)
+    _need(isinstance(body, dict), "Invalid student roster attachment")
+    campus = recipe["operation"] == CAMPUS_COHORT_OPERATION
+    members = roster_membership(body, records, scope="campus" if campus else "district")
     _need({entry["receipt"] for entry in body.values()} <= set(inputs),
           "Roster receipts are not direct processing inputs")
     receipts = document["edition"]["acquisition_ids"]
@@ -313,6 +380,14 @@ def statewide_ledger(document: Mapping[str, Any], key: EditionKey, roster: bytes
         dict(parse_qsl(urlsplit(records[receipt]["requested_url"]).query))["id"],
         receipt, records[receipt]["artifact"]["sha256"]) for receipt in receipts)
     validate_report_ledger(reports, members, records, scope=key.scope)
+    if campus:
+        _need(sorted(body) == recipe["campus_regions"], "Campus cohort recipe differs from the exact roster regions")
+        intake = {"schema_version": CAMPUS_COHORT_VERSION, "dataset": DATASET, "edition": str(EDITION),
+                  "rosters": {region: entry["receipt"] for region, entry in body.items()},
+                  "reports": [asdict(report) for report in reports]}
+        raw = (canonical_json(intake) + "\n").encode()
+        _need(sha256(raw).hexdigest() == pin and len(raw) == intakes[0]["artifact"]["size_bytes"],
+              "Campus cohort ledger does not reproduce its exact canonical intake")
     return reports
 
 

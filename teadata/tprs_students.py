@@ -494,7 +494,8 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
     from .analytical import write_leaf_artifact
     from .release import _install_candidate, _schema_publication_destinations, publish_release
     from .tprs_statewide_intake import (
-        CAMPUS_INTAKE_VERSION, STATEWIDE_OPERATION, ReportSelection, admit_statewide_selection, validate_campus_selection,
+        CAMPUS_COHORT_LEDGER_VERSION, CAMPUS_COHORT_OPERATION, CAMPUS_COHORT_VERSION, CAMPUS_INTAKE_VERSION,
+        STATEWIDE_OPERATION, ReportSelection, admit_campus_cohort, admit_statewide_selection, validate_campus_selection,
     )
 
     _need(not output.exists() and not output.is_symlink(), "Student candidate requires a new output directory")
@@ -521,10 +522,16 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
         body = stream.read(4 * 1024**2 + 1)
     _need(0 < len(body) <= 4 * 1024**2 and sha256(body).hexdigest() == intake_sha256, "Student intake pin differs")
     selection = json.loads(body, object_pairs_hook=_unique_object)
-    statewide = (admit_statewide_selection(store, selection)
-                 if isinstance(selection, dict) and selection.get("schema_version") == 2 else None)
+    version = selection.get("schema_version") if isinstance(selection, dict) else None
+    campus_cohort = version == CAMPUS_COHORT_VERSION
+    roster_selection = None
+    if campus_cohort:
+        _need(body == (canonical_json(selection) + "\n").encode(), "Campus cohort requires a canonical JSON intake")
+        roster_selection = admit_campus_cohort(store, selection)
+    elif version == 2:
+        roster_selection = admit_statewide_selection(store, selection)
     campus_receipt = None
-    if statewide is None:
+    if roster_selection is None:
         _need(isinstance(selection, dict) and type(selection.get("schema_version")) is int
               and selection["schema_version"] in {1, CAMPUS_INTAKE_VERSION}
               and set(selection) == ({"schema_version", "dataset", "edition", "reports", "region", "roster_receipt"}
@@ -537,7 +544,7 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
             campus_receipt = validate_campus_selection(store, selection)
     groups: dict[str, list[StudentReport]] = {}
     selected_bytes = 0
-    for item in (() if statewide else selection["reports"]):
+    for item in (() if roster_selection else selection["reports"]):
         _need(isinstance(item, dict) and set(item) == {"receipt", "sha256", "scope", "identifier"}, "Invalid report selection")
         _need(all(isinstance(value, str) for value in item.values())
               and _DIGEST.fullmatch(item["receipt"]) is not None and _DIGEST.fullmatch(item["sha256"]) is not None,
@@ -550,19 +557,20 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
         report = read_student_report(store, item["receipt"], scope=item["scope"], identifier=item["identifier"],
                                      expected_sha256=item["sha256"])
         groups.setdefault(report.scope, []).append(report)
-    # Legacy selections fit in memory. Statewide projection validates in a
+    # Legacy selections fit in memory. Roster-bound projection validates in a
     # private stage and installs nothing until the complete readback passes.
     projections = {scope: projection(reports, policy) for scope, reports in groups.items()}
-    if statewide:
-        source_groups = {scope: tuple(item for item in statewide.reports if item.scope == scope)
-                         for scope in ("district", "state")}
+    if roster_selection:
+        scopes = ("campus",) if campus_cohort else ("district", "state")
+        source_groups = {scope: tuple(item for item in roster_selection.reports if item.scope == scope)
+                         for scope in scopes}
     else:
         source_groups = {scope: tuple(ReportSelection(r.scope, r.identifier, r.receipt, r.sha256) for r in reports)
                          for scope, reports in groups.items()}
     witnesses = verify_workbook_witnesses(store)
     crosswalk = _crosswalk({scope: [r.sha256 for r in reports] for scope, reports in source_groups.items()})
     roots = [r.receipt for reports in source_groups.values() for r in reports]
-    roster_receipts = [entry["receipt"] for entry in statewide.roster.values()] if statewide else []
+    roster_receipts = [entry["receipt"] for entry in roster_selection.roster.values()] if roster_selection else []
     if campus_receipt is not None:
         roster_receipts.append(campus_receipt)
     roots.extend(roster_receipts)
@@ -576,8 +584,8 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
         roster_path = grid_path = None
         grid_bytes = files("teadata").joinpath(RESOURCE).read_bytes()
         grid_digest = sha256(grid_bytes).hexdigest()
-        if statewide:
-            roster_bytes = (canonical_json(statewide.roster) + "\n").encode()
+        if roster_selection:
+            roster_bytes = (canonical_json(roster_selection.roster) + "\n").encode()
             roster_path = stage / f"tprs-roster-{sha256(roster_bytes).hexdigest()}.json"
             roster_path.write_bytes(roster_bytes)
             grid_path = stage / f"tprs-grid-{grid_digest}.json"
@@ -619,7 +627,7 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
             for scope, entries in source_groups.items()
         }
         for scope, reports in source_groups.items():
-            if statewide:
+            if roster_selection:
                 chunks = _statewide_batches(target, reports, policy)
                 first = next(chunks)
                 table, support, _ = first
@@ -632,7 +640,12 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
                 "definition_sha256": grid_digest, "intake_sha256": intake_sha256,
                 "source_locators": "one-based parsed HTML row and column", "projection_qualified": True,
                 "whole_report_semantics_qualified": False}
-            if statewide:
+            if campus_cohort:
+                assert roster_selection is not None
+                recipe.update(operation=CAMPUS_COHORT_OPERATION, report_ledger_version=CAMPUS_COHORT_LEDGER_VERSION,
+                              parquet_row_group_max_rows=_STATEWIDE_ROW_GROUP_ROWS,
+                              campus_regions=sorted(roster_selection.roster))
+            elif roster_selection:
                 recipe.update(operation=STATEWIDE_OPERATION, report_ledger_version=2,
                               parquet_row_group_max_rows=_STATEWIDE_ROW_GROUP_ROWS,
                               cohort={name: edition.identity for name, edition in edition_keys.items()})
@@ -643,8 +656,8 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
             identity = sha256(canonical_json(contract).encode()).hexdigest()
             path = stage / (identity + ".parquet")
             outputs = {"leaf": path}
-            observations = [r.receipt for r in reports] if statewide else []
-            if statewide:
+            observations = [r.receipt for r in reports] if roster_selection else []
+            if roster_selection:
                 assert roster_path is not None and grid_path is not None
                 audit_tmp = stage / f"{scope}-raw-audit.tmp"
                 audit = {"qualified_fields": len(support["fields"]), "selected_reports": len(reports),
@@ -692,9 +705,12 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
         publish_release(stage, catalog, schema_version=4)
         result = {"status": "PASS_REVIEWED_PROJECTION_WITH_EXPLICIT_RAW_HOLDS", "release_activation": False,
                   "whole_report_semantics_qualified": False, "publisher_witnesses": witnesses, "editions": results}
-        if statewide:
+        if roster_selection:
             _, locations = _schema_publication_destinations(catalog)
             result["release_assets"] = ["release.json", *locations]
+        if campus_cohort:
+            assert roster_selection is not None
+            result["campus_regions"] = sorted(roster_selection.roster)
         (stage / "MATERIALIZATION.json").write_text(canonical_json(result) + "\n", encoding="utf-8")
         _install_candidate(stage, output)
         return result

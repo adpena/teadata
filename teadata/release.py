@@ -173,9 +173,9 @@ def _schema_publication_destinations(
 def _student_attachments(catalog: DatasetCatalog, artifact: ArtifactRef) -> dict[str, ColumnSchemaRef]:
     if artifact.edition.dataset != "tprs_student_membership_enrollment_reports":
         return {}
-    from .tprs_statewide_intake import statewide_resources
+    from .tprs_statewide_intake import student_report_resources
 
-    refs = statewide_resources(catalog._processing_record(artifact))
+    refs = student_report_resources(catalog._processing_record(artifact))
     if refs and not getattr(catalog, "_v4", False):
         raise ContractError("Statewide student attachments require a schema4 release")
     return refs
@@ -445,7 +445,9 @@ class DataRelease:
             refs = _student_attachments(self.catalog, artifact)
             if not refs:
                 continue
-            cohort = self._verify_statewide_student_leaf(artifact, paths[identifier], refs)
+            cohort = self._verify_student_report_leaf(artifact, paths[identifier], refs)
+            if cohort is None:
+                continue
             scope = artifact.edition.scope
             seen = cohorts.setdefault(cohort, set())
             if scope in seen:
@@ -454,44 +456,58 @@ class DataRelease:
         if any(scopes != {"district", "state"} for scopes in cohorts.values()):
             raise ContractError("A statewide student cohort requires matching district and Texas leaves")
 
-    def _statewide_student_ledger(
+    def _student_report_ledger(
         self, artifact: ArtifactRef, refs: dict[str, ColumnSchemaRef],
-    ) -> tuple[tuple[ReportSelection, ...], _StudentCohort]:
-        from .tprs_statewide_intake import statewide_ledger
+    ) -> tuple[tuple[ReportSelection, ...], _StudentCohort | None]:
+        from .tprs_statewide_intake import CAMPUS_COHORT_OPERATION, student_report_ledger
         record = self.catalog._processing_record(artifact)
         key = artifact.edition
         try:
             recipe = record["parameters"]["recipe"]
-            if recipe["cohort"].get(key.scope) != key.identity:
+            campus = recipe["operation"] == CAMPUS_COHORT_OPERATION
+            if campus:
+                if (key.edition != "2026" or key.scope != "campus" or key.table != "campus"
+                        or key.grain != "one row per campus_number" or artifact.contract["key_columns"] != ["campus_number"]):
+                    raise ContractError("Campus cohort requires the exact campus edition key and grain")
+            elif recipe["cohort"].get(key.scope) != key.identity:
                 raise ContractError("Statewide student leaf does not belong to its cohort")
             document = json.loads(self.catalog.edition_metadata_bytes(key.identity))
-            reports = statewide_ledger(document, key, self._column_schema_bytes(refs["roster"]), record)
+            reports = student_report_ledger(document, key, self._column_schema_bytes(refs["roster"]), record)
             hashes = [item.sha256 for item in reports]
             if (artifact.contract["inputs"] != hashes or artifact.contract["rows"] != len(reports)
                     or key.revision_sha256 != EditionKey.source_revision(tuple(hashes))):
-                raise ContractError("Statewide student leaf differs from its ordered publisher receipts")
+                raise ContractError("Student leaf differs from its ordered publisher receipts")
+            if campus:
+                return reports, None
             return reports, (recipe["cohort"]["district"], recipe["cohort"]["state"],
                              recipe["intake_sha256"], refs["roster"].sha256)
         except (KeyError, OSError, EOFError, TypeError, ValueError) as error:
-            raise ContractError("Invalid statewide student ledger") from error
+            raise ContractError("Invalid roster-bound student ledger") from error
 
-    def _verify_statewide_student_leaf(
+    def _verify_student_report_leaf(
         self, artifact: ArtifactRef, path: Path, refs: dict[str, ColumnSchemaRef],
-    ) -> _StudentCohort:
+    ) -> _StudentCohort | None:
         import pyarrow.parquet as pq
 
         from .tprs_statewide_intake import verify_audit_coverage
+        from .tprs_students import _STATEWIDE_ROW_GROUP_ROWS
 
-        reports, cohort = self._statewide_student_ledger(artifact, refs)
+        reports, cohort = self._student_report_ledger(artifact, refs)
         try:
-            columns = (["district_number"] if artifact.edition.scope == "district" else []) + ["tprs_report_receipt", "tprs_report_sha256"]
+            scope = artifact.edition.scope
+            identifier_column = f"{scope}_number"
+            columns = ([] if scope == "state" else [identifier_column]) + ["tprs_report_receipt", "tprs_report_sha256"]
+            parquet = pq.ParquetFile(path)
+            if scope == "campus" and any(parquet.metadata.row_group(index).num_rows > _STATEWIDE_ROW_GROUP_ROWS
+                                         for index in range(parquet.num_row_groups)):
+                raise ContractError("Campus student leaf exceeds its row-group bound")
             expected = iter(reports)
-            for batch in pq.ParquetFile(path).iter_batches(columns=columns, batch_size=256):
+            for batch in parquet.iter_batches(columns=columns, batch_size=256):
                 for row in batch.to_pylist():
                     item = next(expected, None)
-                    if (item is None or (row.get("district_number", "S"), row["tprs_report_receipt"], row["tprs_report_sha256"])
+                    if (item is None or (row.get(identifier_column, "S"), row["tprs_report_receipt"], row["tprs_report_sha256"])
                             != (item.identifier, item.receipt, item.sha256)):
-                        raise ContractError("Statewide student row identity differs from its report ledger")
+                        raise ContractError("Student row identity differs from its report ledger")
             if next(expected, None) is not None:
                 raise ContractError("Statewide student leaf omits report rows")
             metadata = self.catalog.metadata(artifact.edition.dataset, edition=artifact.edition)

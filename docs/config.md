@@ -1534,6 +1534,26 @@ same broker lock as acquisition. Counts reflect admitted report receipts.
 Field qualification and intake sealing remain separate steps. Use `--prefer`
 to choose among conflicting retained bodies after review.
 
+For several complete regions, `refresh_tprs_students` accepts a schema-4
+campus intake. Use the same dataset, edition and report fields as the example
+below, with `"schema_version": 4` and a `rosters` object mapping each included
+region to its exact selector receipt. Put the reports in ascending literal
+campus-ID order across all included regions. Write the intake with
+`canonical_json(document) + "\n"` from `teadata.manifest` before computing its
+SHA-256. Every included roster must be complete, every campus must be unique,
+and each report must name its own region's selector as its sole original
+acquisition parent. This intake has a 1,500-report and 160 MiB source-body
+budget. Existing release metadata and attachment limits also apply.
+
+The build writes one campus edition in bounded Parquet row groups and streams
+the held raw cells to a compressed audit. The release verifier reconstructs
+the intake from the packaged rosters and report ledger, verifies its digest,
+and checks the native row identities and audit coverage. The candidate
+records the included regions. Open the local `release.json` with `DataRelease`
+and select the exact campus `EditionKey` for queries. Partial geographic
+coverage has an explicit region list, and the existing district and direct
+Texas editions keep their own identities.
+
 The sole reviewed field contract is
 `teadata/methodologies/tprs-students-2026.json`. It defines 42 current row labels
 across Membership and Enrollment, with count and percent measures: 168 native

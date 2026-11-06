@@ -9,15 +9,17 @@ from urllib.parse import urlencode
 from zipfile import ZipFile
 
 import pyarrow as pa
+import pyarrow.dataset as ds
 import pytest
 import yaml
 
 from teadata import tprs_statewide_intake, tprs_students as students
 from teadata.column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
-from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
+from teadata.dataset_metadata import DatasetMetadata, EditionKey, ResolvedDataset
 from teadata.manifest import ContractError, canonical_json
 from teadata.provenance import ProvenanceStore
-from teadata.teadata_config import load_config
+from teadata.release import DataRelease
+from teadata.teadata_config import load_config, load_config_bytes
 from teadata.values import ValueStatus
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -63,7 +65,7 @@ def parse(grid, **kwargs):
                                          scope=scope, identifier=identifier)
 
 
-def receipt(store, tmp_path, raw, *, identifier="001902", scope="district", overrides=None, legacy=False):
+def receipt(store, tmp_path, raw, *, identifier="001902", scope="district", overrides=None, legacy=False, parents=()):
     controls = {"_service": "marykay", "_program": "perfrept.perfmast.sas", "_debug": "0", "ccyy": "2026",
                 "id": identifier, "lev": students.SCOPES[scope], "prgopt": "reports/tapr/student.sas"}
     url = students.BROKER + "?" + urlencode(controls)
@@ -75,7 +77,7 @@ def receipt(store, tmp_path, raw, *, identifier="001902", scope="district", over
     source.write_bytes(raw)
     return store.record_acquisition(source, ResolvedDataset("reference:synthetic-student", "reference",
         None if legacy else 2026, None if legacy else 2026, "",
-        DatasetMetadata(title="Synthetic student report", version=None if legacy else "2026")), **options)
+        DatasetMetadata(title="Synthetic student report", version=None if legacy else "2026", provenance_ids=parents)), **options)
 
 
 def test_packaged_student_contract_is_explicit_and_source_only(grid):
@@ -428,20 +430,24 @@ def test_selected_aggregate_size_refuses_before_parsing_or_staging(tmp_path, gri
     assert not output.exists()
 
 
-def test_statewide_intake_requires_complete_roster_and_original_report_parent(tmp_path, grid, monkeypatch):
-    monkeypatch.setattr(tprs_statewide_intake, "REGIONS", ("19",))
-    monkeypatch.setattr(tprs_statewide_intake, "DISTRICT_COUNT", 1)
-    store = ProvenanceStore(tmp_path / "store")
+def _roster_receipt(store, tmp_path, region, rows, *, scope):
     roster = tmp_path / "roster.json"
-    roster.write_text('[{"DISTRICT":"071901","REGION":"19"}]')
+    roster.write_text(canonical_json(rows))
     controls = [("_service", "marykay"), ("_debug", "0"), ("_program", "perfrept.acct_json_response.sas"),
-                ("prmv_level", "D"), ("ccyy", "2026"), ("prmv_var", "region"), ("prmv_text", "19")]
+                ("prmv_level", students.SCOPES[scope]), ("ccyy", "2026"), ("prmv_var", "region"), ("prmv_text", region)]
     url = students.BROKER + "?" + urlencode(controls)
-    roster_id = store.record_acquisition(roster, ResolvedDataset("reference:roster", "reference", 2026, 2026, "",
+    return store.record_acquisition(roster, ResolvedDataset("reference:roster", "reference", 2026, 2026, "",
         DatasetMetadata(version="2026")), downloaded_at=datetime(2026, 11, 4, tzinfo=timezone.utc),
         requested_url=url, resolved_url=url, response_headers={"content-type": "application/json"},
         parameters={"form_url": students.BROKER, "http_method": "GET", "http_status": 200,
                     "form_controls": [list(pair) for pair in controls]})
+
+
+def test_statewide_intake_requires_complete_roster_and_original_report_parent(tmp_path, grid, monkeypatch):
+    monkeypatch.setattr(tprs_statewide_intake, "REGIONS", ("19",))
+    monkeypatch.setattr(tprs_statewide_intake, "DISTRICT_COUNT", 1)
+    store = ProvenanceStore(tmp_path / "store")
+    roster_id = _roster_receipt(store, tmp_path, "19", [{"DISTRICT": "071901", "REGION": "19"}], scope="district")
     state = html(report_rows(grid, "state", "S"))
     district = html(report_rows(grid, "district", "071901"))
     state_id = receipt(store, tmp_path, state, scope="state", identifier="S")
@@ -453,6 +459,134 @@ def test_statewide_intake_requires_complete_roster_and_original_report_parent(tm
         tprs_statewide_intake.admit_statewide_selection(store, {**intake, "reports": reports[:1]})
     with pytest.raises(ContractError, match="exact regional roster parent"):
         tprs_statewide_intake.admit_statewide_selection(store, {**intake, "reports": reports})
+
+
+@pytest.fixture
+def campus_cohort(tmp_path, grid):
+    store = ProvenanceStore(tmp_path / "store")
+    rosters, reports = {}, []
+    # Region order differs from campus order.
+    for region, identifier in [("02", "001901001"), ("01", "002901001")]:
+        pin = _roster_receipt(store, tmp_path, region,
+            [{"DISTRICT": identifier[:6], "CAMPUS": identifier, "REGION": region}], scope="campus")
+        rosters[region] = pin
+        raw = html(report_rows(grid, "campus", identifier))
+        reports.append({"receipt": receipt(store, tmp_path, raw, identifier=identifier, scope="campus", parents=(pin,)),
+                        "sha256": sha256(raw).hexdigest(), "scope": "campus", "identifier": identifier})
+    return store, {"schema_version": 4, "dataset": students.DATASET, "edition": "2026", "rosters": rosters, "reports": reports}
+
+
+def test_campus_cohort_requires_complete_sorted_unique_rosters(campus_cohort, tmp_path):
+    store, intake = campus_cohort
+    admitted = tprs_statewide_intake.admit_campus_cohort(store, intake)
+    assert [report.identifier for report in admitted.reports] == ["001901001", "002901001"]
+    with pytest.raises(ContractError, match="Incomplete campus cohort"):
+        tprs_statewide_intake.admit_campus_cohort(store, {**intake, "reports": intake["reports"][:1]})
+    with pytest.raises(ContractError, match="exact ordered regional roster union"):
+        tprs_statewide_intake.admit_campus_cohort(store, {**intake, "reports": intake["reports"][::-1]})
+    repeated = _roster_receipt(store, tmp_path, "02",
+        [{"DISTRICT": "002901", "CAMPUS": "002901001", "REGION": "02"}], scope="campus")
+    with pytest.raises(ContractError, match="Duplicate campus across regional rosters"):
+        tprs_statewide_intake.admit_campus_cohort(store, {**intake, "rosters": {**intake["rosters"], "02": repeated}})
+
+
+def test_campus_cohort_requires_exact_report_parent_and_budget(campus_cohort, tmp_path, grid, monkeypatch):
+    store, intake = campus_cohort
+    first, second = intake["reports"]
+    raw = html(report_rows(grid, "campus", first["identifier"]))
+    wrong = receipt(store, tmp_path, raw, identifier=first["identifier"], scope="campus", parents=(intake["rosters"]["01"],))
+    with pytest.raises(ContractError, match="sole exact regional roster parent"):
+        tprs_statewide_intake.admit_campus_cohort(store, {**intake, "reports": [{**first, "receipt": wrong}, second]})
+    monkeypatch.setattr(tprs_statewide_intake, "MAX_STATEWIDE_HTML_BYTES", len(raw))
+    with pytest.raises(ContractError, match="aggregate source byte budget"):
+        tprs_statewide_intake.admit_campus_cohort(store, intake)
+
+
+def test_campus_release_ledger_reconstructs_canonical_intake(campus_cohort, tmp_path):
+    store, intake = campus_cohort
+    admitted = tprs_statewide_intake.admit_campus_cohort(store, intake)
+    roster = canonical_json(admitted.roster).encode()
+    path = tmp_path / "intake.json"
+    source = ResolvedDataset("reference:tprs_student_intake", "reference", 2026, 2026, "", DatasetMetadata(version="2026"))
+    receipts = [report.receipt for report in admitted.reports]
+    key = EditionKey(students.DATASET, "2026", EditionKey.source_revision(tuple(r.sha256 for r in admitted.reports)),
+                     "campus", "campus", "one row per campus_number")
+    for suffix in ("\n", " \n"):
+        raw = (canonical_json(intake) + suffix).encode()
+        path.write_bytes(raw)
+        pin = store.record_acquisition(path, source)
+        inputs = [*intake["rosters"].values(), *receipts, pin]
+        recipe = {"operation": tprs_statewide_intake.CAMPUS_COHORT_OPERATION, "campus_regions": ["01", "02"],
+                  "intake_sha256": sha256(raw).hexdigest()}
+        processing = {"inputs": inputs, "parameters": {"recipe": recipe}}
+        document = {"provenance": store.verify_record_closure(inputs), "edition": {"acquisition_ids": receipts}}
+        if suffix == "\n":
+            assert tprs_statewide_intake.student_report_ledger(document, key, roster, processing) == admitted.reports
+        else:
+            with pytest.raises(ContractError, match="exact canonical intake"):
+                tprs_statewide_intake.student_report_ledger(document, key, roster, processing)
+
+
+def test_campus_cohort_rejects_expanded_and_linked_report_objects(campus_cohort, tmp_path):
+    store, intake = campus_cohort
+    path = store.root / "objects" / intake["reports"][0]["sha256"]
+    raw = path.read_bytes()
+    path.write_bytes(raw + b"more than the receipt declared")
+    with pytest.raises(ContractError, match="declared regular file size"):
+        tprs_statewide_intake.admit_campus_cohort(store, intake)
+    alternate = tmp_path / "alternate.html"
+    alternate.write_bytes(raw)
+    path.unlink()
+    path.symlink_to(alternate)
+    with pytest.raises(ContractError, match="declared regular file size"):
+        tprs_statewide_intake.admit_campus_cohort(store, intake)
+
+
+def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(campus_cohort, tmp_path, grid, monkeypatch):
+    store, intake = campus_cohort
+    packaged = ROOT / "teadata"
+    document = yaml.safe_load((packaged / "teadata_sources.yaml").read_bytes())
+    references = document["data_sources"][students.DATASET][2026]["metadata"]["references"]
+    for reference in references:
+        local = reference.get("path")
+        if local:
+            path = tmp_path / local
+            path.parent.mkdir(parents=True, exist_ok=True)
+            raw = (packaged / local).read_bytes()
+        else:
+            path = tmp_path / f"{reference['reference_id']}.txt"
+            raw = f"Synthetic {reference['reference_id']} reference".encode()
+        path.write_bytes(raw)
+        pin = store.record_acquisition(path, ResolvedDataset("reference:synthetic", "reference", 2026, 2026, "",
+                                                            DatasetMetadata(version="2026")))
+        reference.update(path=path.relative_to(tmp_path).as_posix(), url=None,
+                         reviewed_sha256=sha256(raw).hexdigest(), provenance_ids=[pin])
+    config_path = tmp_path / "config.yaml"
+    config = yaml.safe_dump(document).encode()
+    config_path.write_bytes(config)
+    monkeypatch.setattr(students, "load_config", lambda: load_config_bytes(config, path=config_path))
+    monkeypatch.setattr(students, "definition", lambda: {**grid, "witnesses": {}})
+    raw = (canonical_json(intake) + "\n").encode()
+    intake_path = tmp_path / "intake.json"
+    intake_path.write_bytes(raw)
+    output = tmp_path / "candidate"
+    built = students.materialize_students(store, config=config_path, config_sha256=sha256(config).hexdigest(),
+        intake=intake_path, intake_sha256=sha256(raw).hexdigest(), output=output)
+    entry, = built["editions"]
+    assert built["campus_regions"] == ["01", "02"] and built["release_activation"] is False
+    assert entry["rows"] == 2 and entry["raw_field_hold_count"] == 72
+    release = DataRelease(output / "release.json", offline=True)
+    release.verify()
+    key = EditionKey.from_dict(entry["edition"])
+    table = release.table(key).select("membership_total_students_count")
+    included = table.where(ds.field("campus_number") == "001901001").to_arrow().to_pylist()
+    assert len(included) == 1 and included[0]["membership_total_students_count"] == 1
+    assert included[0]["tprs_report_receipt"] == intake["reports"][0]["receipt"]
+    assert table.where(ds.field("campus_number") == "003901001").to_arrow().num_rows == 0
+    audit, = output.glob("tprs-raw_audit-*.jsonl.gz")
+    audit.write_bytes(b"tampered")
+    with pytest.raises(ContractError):
+        DataRelease(output / "release.json", offline=True).verify()
 
 
 def test_statewide_audit_rejects_missing_held_cell_despite_valid_gzip(grid, policy):

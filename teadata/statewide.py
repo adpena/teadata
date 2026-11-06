@@ -185,7 +185,7 @@ def _reviewed_students(release: DataRelease, key: EditionKey) -> tuple[str, str,
     cohort = None
     attachments = _student_attachments(release.catalog, artifact)
     if attachments:
-        reports, cohort = release._statewide_student_ledger(artifact, attachments)
+        reports, cohort = release._student_report_ledger(artifact, attachments)
         sources = {item.identifier: (item.receipt, item.sha256) for item in reports}
     else:
         sources = _selected_student_sources(release, key)
