@@ -159,9 +159,8 @@ def _inventory_receipts(path: Path) -> dict[str, str]:
     return receipts
 
 
-def retained_inventory(store: ProvenanceStore, roster_receipts: Mapping[str, str], *,
-                       preferred: Mapping[str, str] | None = None) -> dict[str, Any]:
-    """Inventory exact regional cohorts against one snapshot of retained reports."""
+def statewide_rosters(store: ProvenanceStore, roster_receipts: Mapping[str, str]) -> dict[str, set[str]]:
+    """Read and reconcile the exact publisher campus roster for each region."""
     if set(roster_receipts) != set(REGIONS):
         raise ContractError("Campus roster inventory must include each TPRS region exactly once")
     rosters: dict[str, set[str]] = {}
@@ -172,6 +171,14 @@ def retained_inventory(store: ProvenanceStore, roster_receipts: Mapping[str, str
             raise ContractError(f"Campus assigned to multiple TPRS regions through region {region}")
         rosters[region] = ids
         eligible.update(ids)
+    return rosters
+
+
+def retained_inventory(store: ProvenanceStore, roster_receipts: Mapping[str, str], *,
+                       preferred: Mapping[str, str] | None = None) -> dict[str, Any]:
+    """Inventory exact regional cohorts against one snapshot of retained reports."""
+    rosters = statewide_rosters(store, roster_receipts)
+    eligible = set().union(*rosters.values())
     choices = preferred or {}
     if not choices.keys() <= eligible:
         raise ContractError("Preferred receipts include campuses outside the retained statewide roster")

@@ -19,6 +19,7 @@ from teadata.dataset_metadata import DatasetMetadata, EditionKey, ResolvedDatase
 from teadata.manifest import ContractError, canonical_json
 from teadata.provenance import ProvenanceStore
 from teadata.release import DataRelease
+from teadata.scripts import verify_tprs_campus_coverage as campus_coverage
 from teadata.teadata_config import load_config, load_config_bytes
 from teadata.values import ValueStatus
 
@@ -649,6 +650,22 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(partit
     assert included[0]["tprs_report_receipt"] == intake["reports"][0]["receipt"]
     excluded = earlier[0]["identifier"] if partitioned else "003901001"
     assert table.where(ds.field("campus_number") == excluded).to_arrow().num_rows == 0
+    roster_pins = {region: intake["rosters"].get(region, "f" * 64) for region in tprs_statewide_intake.REGIONS}
+    roster_ids = {region: {f"{region}0901001"} for region in roster_pins}
+    for region, pin in intake["rosters"].items():
+        roster_ids[region] = set(tprs_statewide_intake.campus_roster(store, region, pin))
+    monkeypatch.setattr(campus_coverage, "statewide_rosters", lambda *_: roster_ids)
+    if partitioned:
+        monkeypatch.setattr(campus_coverage, "CAMPUS_PARTITION_REPORTS", 2)
+    path, pin = output / "release.json", release.manifest_sha256
+    coverage = campus_coverage.verify_campus_coverage(store, roster_pins, [(path, pin)])
+    assert coverage["verified"] == entry["rows"] and not coverage["complete"]
+    assert coverage["regions"]["01"]["complete"] is not partitioned
+    assert coverage["regions"]["01"]["missing_ordinals"] == ([0] if partitioned else [])
+    with pytest.raises(ContractError, match="Duplicate campus release manifest"):
+        campus_coverage.verify_campus_coverage(store, roster_pins, [(path, pin), (path, pin)])
+    with pytest.raises(ContractError, match="roster receipts differ"):
+        campus_coverage.verify_campus_coverage(store, {**roster_pins, "01": "e" * 64}, [(path, pin)])
     if partitioned:
         artifact_id, = release.catalog.to_dict()["artifacts"]
         artifact = release.catalog.artifact_ref(artifact_id)
@@ -685,6 +702,8 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(partit
     audit.write_bytes(b"tampered")
     with pytest.raises(ContractError):
         DataRelease(output / "release.json", offline=True).verify()
+    with pytest.raises(ContractError):
+        campus_coverage.verify_campus_coverage(store, roster_pins, [(path, pin)])
 
 
 def test_statewide_audit_rejects_missing_held_cell_despite_valid_gzip(grid, policy):

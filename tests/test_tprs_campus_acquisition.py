@@ -8,7 +8,37 @@ import pytest
 from teadata.manifest import ContractError
 from teadata.provenance import ProvenanceStore
 from teadata.scripts import acquire_tprs_campuses as campus
+from teadata.scripts import verify_tprs_campus_coverage as coverage
 from teadata.tprs_statewide_intake import validate_campus_selection
+
+
+def test_coverage_union_requires_all_ordinals_and_checks_overlap_before_leaf_reads(tmp_path, monkeypatch):
+    store = ProvenanceStore(tmp_path)
+    ids = {f"001901{number:03d}" for number in range(1, 514)}
+    roster_pins = {"01": "f" * 64}
+    verified = []
+    monkeypatch.setattr(coverage, "statewide_rosters", lambda *_: {"01": ids})
+    monkeypatch.setattr(coverage, "DataRelease", lambda path, **_: SimpleNamespace(
+        path=path, verify=lambda: verified.append(path),
+    ))
+    def selection(release, _, rosters):
+        ordinal = int(release.path.name == "second")
+        return release.path.name, {"01": set(coverage.campus_partition_ids(rosters["01"], ordinal))}, ordinal
+
+    monkeypatch.setattr(coverage, "_selection", selection)
+    first = (tmp_path / "first", "a" * 64)
+    second = (tmp_path / "second", "b" * 64)
+    result = coverage.verify_campus_coverage(store, roster_pins, [second, first])
+    assert result["complete"] and result["verified"] == 513
+    assert result["regions"]["01"]["missing_ordinals"] == []
+    assert verified == [second[0], first[0]]
+    verified.clear()
+    overlap = (tmp_path / "overlap", "c" * 64)
+    with pytest.raises(ContractError, match="overlap in region 01"):
+        coverage.verify_campus_coverage(store, roster_pins, [first, overlap])
+    with pytest.raises(ContractError, match="requires an exact manifest SHA-256"):
+        coverage.verify_campus_coverage(store, roster_pins, [(first[0], None)])
+    assert verified == []
 
 
 def test_rate_limit_persists_across_region_and_process_boundaries(tmp_path, monkeypatch):

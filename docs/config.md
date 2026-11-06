@@ -1580,6 +1580,22 @@ build can have the same report-byte revision. The materialization receipt
 describes `campus_partition` rather than complete region coverage. Combining
 partitions into a region or Texas requires a separate exact union check.
 
+Run the offline coverage verifier with the same 20-region roster receipt
+inventory and exact local release pins. Include one `--release` pair for
+each schema-4 campus cohort or partition you want to count.
+
+```sh
+uv run python -m teadata.scripts.verify_tprs_campus_coverage \
+  --store /path/to/provenance --inventory /path/to/roster-receipts.json \
+  --release /path/to/campus-cohort/release.json MANIFEST_SHA256
+```
+
+The report counts verified leaf coverage and lists missing ordinals for
+each region. A partial selection is valid and reports `complete: false`.
+Overlapping selections, different roster receipts and invalid manifest pins
+fail the command. The checks cover roster and leaf integrity. Field
+semantics, query routing and release activation are separate.
+
 The sole reviewed field contract is
 `teadata/methodologies/tprs-students-2026.json`. It defines 42 current row labels
 across Membership and Enrollment, with count and percent measures: 168 native
