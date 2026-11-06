@@ -21,9 +21,12 @@ a distinct JSON filename adjacent to the entity manifest. Stage the complete
 native bundle before building. The builder verifies it offline and includes the
 pins in the entity build ID and processing receipt.
 
-Composed builds are available for local research. Bundle verification checks
-the pinned child artifacts and their structure. The release gate holds these
-builds until it can verify semantic qualification for each attached source.
+The release gate can qualify the exact reviewed 2025–26 district and Texas
+TPRS attachment. Keep its retained `provenance` store next to the attached
+manifest. The gate replays the published reports and raw audit, checks the
+independent workbook witnesses, and records the source evidence in its local
+verification receipt. Other attachments remain on hold until they have a
+reviewed qualification path.
 
 The observation planner resolves selected fields by measurement period before
 opening a data file. Execution retains the native row keys, raw values and

@@ -1494,6 +1494,29 @@ are not HTML source line numbers.
 Each HTML report is limited to 2 MiB and an explicit selected intake to 64 MiB
 of original HTML; oversize selections refuse without a partial publication.
 
+For campus acquisition, use the official TPRS campus region selector's
+receipt and the shared retained publisher store.
+
+```sh
+uv run --locked python -m teadata.scripts.acquire_tprs_campuses \
+  --store /path/to/retained-provenance --region 09 \
+  --roster-receipt <exact-regional-roster-receipt> --limit 25 --interval 12 \
+  --intake /path/to/complete-region-intake.json
+```
+
+The command validates the exact region request and campus identifiers,
+reuses validated reports, and returns the remaining IDs after each pass.
+`--limit 0` performs an offline inventory. Use `--prefer CAMPUS=RECEIPT`
+when retained publisher bodies differ and the desired revision has been
+reviewed. Use one shared store to enforce one campus requester across all
+regions. The command waits at least eight seconds between requests, stops on
+rate limits, and persists the larger of a five-minute cooldown and TEA's
+valid `Retry-After` before a later invocation can resume. It seals an intake
+only when every roster campus is admitted and the native materializer can
+process the selection within its byte budget. Materialization rechecks the
+sealed intake against its roster receipt and retains that receipt in the
+processing provenance, including when the reports came from older captures.
+
 The sole reviewed field contract is
 `teadata/methodologies/tprs-students-2026.json`. It defines 42 current row labels
 across Membership and Enrollment, with count and percent measures: 168 native

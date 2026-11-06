@@ -212,11 +212,17 @@ def _input_identity(root: Path, *, kind: str, paired_library: Path | None, relea
         if document.get("catalog", {}).get("native_sources"):
             from teadata.manifest import ContractError
             from teadata.release import DataRelease
+            from teadata.tprs_statewide_intake import REVIEWED_DISTRICT_STATE_MANIFEST, retained_tprs_evidence
 
             try:
-                sources = DataRelease(path, expected_sha256=result["release_manifest_sha256"], offline=True).verify_native_sources()
+                parent = DataRelease(path, expected_sha256=result["release_manifest_sha256"], offline=True)
+                sources = parent.verify_native_sources()
                 result["native_sources"] = {pin: {name: _digest(asset) for name, asset in files.items()}
                                             for pin, files in sources.items()}
+                for ref in parent.catalog.native_sources:
+                    if ref.manifest_sha256 == REVIEWED_DISTRICT_STATE_MANIFEST:
+                        child, store = _open_reviewed_tprs_evidence(parent, ref)
+                        result["native_tprs_evidence"] = retained_tprs_evidence(child, store)
             except (ContractError, OSError, ValueError) as error:
                 raise ReceiptError(f"A release check requires verified retained native sources: {error}") from error
     return result
@@ -744,6 +750,7 @@ def _validate_tefa_cases(release: DataRelease) -> dict[str, Any]:
 
 def _validate_release(path: str, kind: str) -> None:
     from teadata.release import DataRelease
+    from teadata.tprs_statewide_intake import REVIEWED_DISTRICT_STATE_MANIFEST, qualify_statewide_tprs
     release = DataRelease(Path(path).expanduser(), offline=True)
     if release.catalog.to_dict()["schema_version"] != 2:
         raise ReceiptError("Edition catalogs require --native-release with an exact pin and retained source store")
@@ -755,10 +762,16 @@ def _validate_release(path: str, kind: str) -> None:
         from teadata.manifest import processor_identity
         if release.catalog.to_dict()["processor_sha256"] != processor_identity():
             raise ReceiptError("Release was built from different processing code or lockfile; rebuild it")
-    if release.catalog.native_sources:
-        pins = ", ".join(ref.manifest_sha256 for ref in release.catalog.native_sources)
+    unsupported = [ref.manifest_sha256 for ref in release.catalog.native_sources
+                   if ref.manifest_sha256 != REVIEWED_DISTRICT_STATE_MANIFEST]
+    if unsupported:
+        pins = ", ".join(unsupported)
         raise ReceiptError(f"Attached native sources passed structural verification only. "
                            f"Release qualification requires reviewed source evidence for {pins}")
+    for ref in release.catalog.native_sources:
+        child, store = _open_reviewed_tprs_evidence(release, ref)
+        report = qualify_statewide_tprs(child, store)
+        print("Attached TPRS qualification: " + json.dumps(report, sort_keys=True))
     print(f"Verified data release {release.build_id}")
     print(f"Verified provenance record graph: {provenance_records} records")
     print("Publisher example coverage: " + json.dumps(publisher_checks, sort_keys=True))
@@ -771,6 +784,15 @@ def _retained_store(path: Path):
     if not (path / "records").is_dir() or not (path / "objects").is_dir():
         raise ReceiptError("An existing retained provenance store is required")
     return ProvenanceStore(path)
+
+
+def _open_reviewed_tprs_evidence(release, ref):
+    from teadata.release import _open_native_source
+
+    child = _open_native_source(ref, release.path, offline=True)
+    if child.remote:
+        raise ReceiptError("Stage the exact reviewed TPRS attachment locally with its adjacent provenance store for qualification")
+    return child, _retained_store(child.path.parent / "provenance")
 
 
 def _validate_native_release(path: Path, pin: str, source_store: Path) -> dict[str, Any]:
@@ -787,9 +809,12 @@ def _validate_native_release(path: Path, pin: str, source_store: Path) -> dict[s
     )
     from teadata.release import DataRelease
     from teadata.source_parity import validate_source_parity
+    from teadata.tprs_statewide_intake import REVIEWED_DISTRICT_STATE_MANIFEST, qualify_statewide_tprs
 
     try:
         release = DataRelease(path, expected_sha256=pin, offline=True)
+        if release.manifest_sha256 == REVIEWED_DISTRICT_STATE_MANIFEST:
+            return qualify_statewide_tprs(release, _retained_store(source_store))
         if is_reviewed_budget(release.manifest_sha256):
             return qualify_budget(release, _retained_store(release.path.parent / "provenance"),
                                   _retained_store(source_store))

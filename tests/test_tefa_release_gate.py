@@ -290,3 +290,30 @@ def test_composed_release_holds_until_attached_sources_are_qualified(monkeypatch
         monkeypatch.setattr(verification, name, lambda value: None)
     with pytest.raises(verification.ReceiptError, match="structural verification only.*" + pin):
         verification._validate_release("candidate.json", "app")
+
+
+def test_composed_release_replays_exact_tprs_attachment(monkeypatch, tmp_path, capsys):
+    from teadata.tprs_statewide_intake import REVIEWED_DISTRICT_STATE_MANIFEST
+
+    ref = SimpleNamespace(manifest_sha256=REVIEWED_DISTRICT_STATE_MANIFEST)
+    catalog = SimpleNamespace(to_dict=lambda: {"schema_version": 2}, native_sources=[ref])
+    parent = SimpleNamespace(catalog=catalog, verify=lambda: None, path=tmp_path / "parent.json", build_id="parent")
+    child = SimpleNamespace(path=tmp_path / "child" / "release.json", remote=False)
+    monkeypatch.setattr("teadata.release.DataRelease", lambda path, *, offline: parent)
+    monkeypatch.setattr("teadata.release._open_native_source", lambda *args, **kwargs: child)
+    for name in ("_validate_release_provenance", "_validate_publisher_cases", "_validate_tefa_cases"):
+        monkeypatch.setattr(verification, name, lambda value: None)
+    seen = []
+    monkeypatch.setattr(verification, "_retained_store", lambda path: path)
+
+    def replay(release, store):
+        seen.append((release, store))
+        return {"status": "PASS_REVIEWED_NATIVE"}
+
+    monkeypatch.setattr("teadata.tprs_statewide_intake.qualify_statewide_tprs", replay)
+    verification._validate_release("candidate.json", "app")
+    assert seen == [(child, child.path.parent / "provenance")]
+    assert "PASS_REVIEWED_NATIVE" in capsys.readouterr().out
+    child.remote = True
+    with pytest.raises(verification.ReceiptError, match="Stage the exact reviewed TPRS attachment locally"):
+        verification._validate_release("candidate.json", "app")

@@ -493,7 +493,9 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
     """Build a new, explicit receipt-selected native projection entirely offline."""
     from .analytical import write_leaf_artifact
     from .release import _install_candidate, _schema_publication_destinations, publish_release
-    from .tprs_statewide_intake import STATEWIDE_OPERATION, ReportSelection, admit_statewide_selection
+    from .tprs_statewide_intake import (
+        CAMPUS_INTAKE_VERSION, STATEWIDE_OPERATION, ReportSelection, admit_statewide_selection, validate_campus_selection,
+    )
 
     _need(not output.exists() and not output.is_symlink(), "Student candidate requires a new output directory")
     with config.open("rb") as stream:
@@ -521,12 +523,18 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
     selection = json.loads(body, object_pairs_hook=_unique_object)
     statewide = (admit_statewide_selection(store, selection)
                  if isinstance(selection, dict) and selection.get("schema_version") == 2 else None)
+    campus_receipt = None
     if statewide is None:
-        _need(isinstance(selection, dict) and set(selection) == {"schema_version", "dataset", "edition", "reports"}
-              and type(selection["schema_version"]) is int and selection["schema_version"] == 1
+        _need(isinstance(selection, dict) and type(selection.get("schema_version")) is int
+              and selection["schema_version"] in {1, CAMPUS_INTAKE_VERSION}
+              and set(selection) == ({"schema_version", "dataset", "edition", "reports", "region", "roster_receipt"}
+                                     if selection["schema_version"] == CAMPUS_INTAKE_VERSION
+                                     else {"schema_version", "dataset", "edition", "reports"})
               and selection["dataset"] == DATASET and selection["edition"] == "2026"
               and isinstance(selection["reports"], list) and 0 < len(selection["reports"]) <= 20000,
               "Invalid selected-report intake")
+        if selection["schema_version"] == CAMPUS_INTAKE_VERSION:
+            campus_receipt = validate_campus_selection(store, selection)
     groups: dict[str, list[StudentReport]] = {}
     selected_bytes = 0
     for item in (() if statewide else selection["reports"]):
@@ -555,6 +563,8 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
     crosswalk = _crosswalk({scope: [r.sha256 for r in reports] for scope, reports in source_groups.items()})
     roots = [r.receipt for reports in source_groups.values() for r in reports]
     roster_receipts = [entry["receipt"] for entry in statewide.roster.values()] if statewide else []
+    if campus_receipt is not None:
+        roster_receipts.append(campus_receipt)
     roots.extend(roster_receipts)
     roots.extend(rid for ref in source.metadata.references for rid in ref.provenance_ids)
     roots.extend(w[role] for w in definition()["witnesses"].values() for role in ("html_receipt", "xlsx_receipt"))
