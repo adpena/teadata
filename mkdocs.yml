@@ -37,7 +37,6 @@ nav:
     - Dataset Contracts and Releases: data-releases.md
     - Versioning: versioning.md
   - Source Audits:
-    - 2025 Student Enrollment Mapping: 2025-student-enrollment-source-notes.md
     - Transfer Preparation: transfer-sources.md
     - Spatial Sources (2026-11): spatial-source-quality-2026-11.md
   - Reference: reference.md

@@ -228,6 +228,11 @@ class DatasetCatalog:
                 != identifier
             ):
                 raise ContractError("Provenance receipt identity mismatch")
+        prepared = [identifier for identifier, record in records.items() if "derived_from" in record]
+        try:
+            validate_record_graph(records.__getitem__, prepared)
+        except (KeyError, TypeError, ValueError) as error:
+            raise ContractError(f"Invalid prepared-source provenance: {error}") from error
         self._metadata = {}
         self._origin_cache: dict[tuple[str, str, str, str], str] = {}
         for key, value in sources.items():
@@ -1762,6 +1767,8 @@ def verify_source_receipts(
         record = store.read_record(record_id)
         _verify_input_receipt(record, dataset=source.dataset, section=source.section, artifact=identity)
         metadata_matched |= _metadata_content(source.metadata) == _metadata_content(DatasetMetadata.from_dict(record["source_metadata"]))
+        if "derived_from" in record:
+            store.verify_record_closure([record_id])
     store.verify_artifact(identity["sha256"])
     if not metadata_matched:
         raise ContractError(f"Source metadata differs from its receipt: {source.dataset}")

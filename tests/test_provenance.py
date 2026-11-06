@@ -88,6 +88,30 @@ def source_definition(path: Path) -> ResolvedDataset:
     )
 
 
+def test_prepared_observation_requires_and_retains_its_exact_producer(tmp_path):
+    from teadata.provenance import validate_record_graph
+
+    raw = tmp_path / "raw.csv"
+    raw.write_text("code\n42\n")
+    prepared = tmp_path / "prepared.csv"
+    prepared.write_text("value\n42\n")
+    store = ProvenanceStore(tmp_path / "store")
+    raw_id = store.record_acquisition(raw, source_definition(raw), recorded_at=NOW)
+    producer = store.record_processing(dataset="example", inputs=[raw_id],
+        outputs={"prepared": prepared}, processor="test", code_version="test", recorded_at=NOW)
+    prepared_id = store.record_acquisition(prepared, source_definition(prepared),
+        derived_from=producer, recorded_at=NOW)
+    closure = store.verify_record_closure([prepared_id])
+    assert set(closure) == {prepared_id, producer, raw_id}
+    assert closure[prepared_id]["derived_from"] == producer
+    with pytest.raises(KeyError):
+        validate_record_graph({prepared_id: closure[prepared_id]}.__getitem__, [prepared_id])
+    for invalid_source, invalid_producer in ((raw, producer), (prepared, raw_id)):
+        with pytest.raises(ValueError, match="must match an output"):
+            store.record_acquisition(invalid_source, source_definition(invalid_source),
+                derived_from=invalid_producer, recorded_at=NOW)
+
+
 def test_processing_diagnostics_are_explicit_per_run_receipt_evidence(tmp_path):
     source = tmp_path / "source.csv"
     source.write_text("value\n42\n")

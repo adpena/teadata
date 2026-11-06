@@ -1327,7 +1327,7 @@ data_sources:
               estimation: null
               field_year: null
     2025:
-      path: data/tapr/CAMPPROF_2024-2025_FINAL.xlsx
+      path: data/tapr/campus-PROF-2025-canonical.xlsx
       metadata:
         title: 2024-2025 TAPR Campus Profile
         publisher: Texas Education Agency
@@ -1338,41 +1338,26 @@ data_sources:
           end_year: 2025
         source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html
         identifiers: []
-        notes: Migrated local input. Original download timestamp and acquisition URL
-          are unknown; local observation must not be presented as an original download.
-          Canonical enrollment race names distinguish American Indian from Asian through
-          the explicit IND/ASI field correction; literal publisher labels and dictionary
-          descriptions remain unchanged. See docs/2025-student-enrollment-source-notes.md.
-          Independent official campus/district report bytes and selected original/prepared/released
-          observations are retained. The reviewed race/population metrics use explicit
-          2024–25 periods and report count/percent units. Golden regression execution
-          and replacement artifact qualification remain separate; metadata edits do
-          not activate a release. Bounded teacher-field review uses the existing 2024-25
-          TAPR Glossary, Staff Information pages 34-37. Only the explicitly named
-          teacher fields below receive reviewed 2024-25 school-year units and reference
-          periods; this is source context, not an annual cumulative measure or an
-          invented exact observation date. Teacher totals are FTE, not headcounts.
-          Average professional experience is completed years weighted by teacher FTE,
-          regardless of district; it is distinct from years with the district. Average
-          teacher salary includes regular duties only, excludes supplemental pay and
-          divides regular-duty teacher salary by teacher FTE. The reported students-per-teacher
-          ratio divides total students by teacher FTE; it is retained as reported
-          rather than recomputed from another enrollment source. No campus teacher-turnover
-          metric is inferred; the glossary identifies teacher turnover as district-only.
-          No strict under-five-years measure is inferred from the zero-years and inclusive
-          1-5-years bands.
+        notes: Prepared 2024–25 Profile with canonical enrollment race headers. All data cells match the previous
+          prepared reader output, and affected fields match the corrected TEA STUD values by ID. The original
+          composite workbook's download history is unknown. Bounded teacher-field review uses the existing 2024-25
+          TAPR Glossary, Staff Information pages 34-37. Only the explicitly named teacher fields below receive
+          reviewed 2024-25 school-year units and reference periods; this is source context, not an annual cumulative
+          measure or an invented exact observation date. Teacher totals are FTE, not headcounts. Average professional
+          experience is completed years weighted by teacher FTE, regardless of district; it is distinct from
+          years with the district. Average teacher salary includes regular duties only, excludes supplemental
+          pay and divides regular-duty teacher salary by teacher FTE. The reported students-per-teacher ratio
+          divides total students by teacher FTE; it is retained as reported rather than recomputed from another
+          enrollment source. No campus teacher-turnover metric is inferred; the glossary identifies teacher
+          turnover as district-only. No strict under-five-years measure is inferred from the zero-years and
+          inclusive 1-5-years bands.
         provenance_ids:
-        - e372be5cf18af4f445c6e39bdf14a1cb01a14052509ba5f33dd8b98892c1b6ee
-        - 32986a342b0c30566defbbccc99e5e22c36a179c21f049431630e83c6680751c
-        - a4fd3db96bc747077ec46c3b6a3b90596606cbfa71aeaaf540cc82c29d2a0639
-        - e77ff0d6199851f80d2d914f63ccf7e0ec42e8dd0a4e1516303db065fe459155
-        - 61a390d74f2312dc540237dafff839fb73ead2ad6a6756e086c5bd0790200464
+        - 6b463ad3d47136f7db6f085dc0b8843ed6904c5dfeb379cb06ff6513d12937cb
         references:
-        - reference_id: student_enrollment_race_label_correction
+        - reference_id: student_information_report
           role: source_notes
           url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=227901119&lev=C&prgopt=reports/tapr/student.sas
-          title: 'Official 2024–25 Student Information report: independent race/population
-            comparison'
+          title: Official 2024–25 Student Information report
           status: available
           provenance_ids:
           - b7405cf94a0fc80f3b9f5faa44610870acfcc4ff1e18a68d8bddfac08e254176
@@ -1399,12 +1384,12 @@ data_sources:
         - reference_id: columns_default
           role: schema
           path: schemas/tapr--2025--header-crosswalk.json
-          title: TEA Data 2025 TAPR audited source-code, human-label and canonical-field
-            crosswalk; not a publisher dictionary or historical processing receipt
+          title: TEA Data 2025 TAPR audited source-code, human-label and canonical-field crosswalk; not a publisher
+            dictionary or historical processing receipt
           status: available
           provenance_ids:
-          - 8873566e00ba3a34083b382c5f9c1e4a1afea99ab68f22e3c1bd4df055a67ad8
-          reviewed_sha256: 1a4617fd41e504b1791f21926c5f9a648ca684cebbabd9a80ce2b833934dced9
+          - 8bbf7df78a900d4ae50aa70ced4d2b84d1afc337807ce16e89f1754f4e8b120e
+          reviewed_sha256: 9304bb790dbb7322602e35c4d119081a8b7d375c2ab968cc33753aa429a9be4b
         field_year: 2025
         value_policy: tapr_profile
         metrics:
@@ -1831,33 +1816,27 @@ data_sources:
       reader:
         dtype: str
         keep_default_na: false
-        columns:
-          campus_2025_student_enrollment_american_indian_count: campus_2025_student_enrollment_asian_count
-          campus_2025_student_enrollment_american_indian_percent: campus_2025_student_enrollment_asian_percent
-          campus_2025_student_enrollment_asian_count: campus_2024_25_asian_students_count
-          campus_2025_student_enrollment_asian_percent: campus_2024_25_asian_students_percent
         column_schema: schemas/tapr--2025--header-crosswalk.json
         profiles:
           source:
-            columns: {}
             tapr_source:
               scope: campus
               tables:
-                student: data/tapr/raw/2025 Campus Student Information.csv
+                student: data/tapr/raw/campus-STUD-2025-canonical.csv
                 staff: data/tapr/raw/2025 Campus Staff Information.csv
             references:
             - reference_id: dictionary_student
               role: data_dictionary
-              url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=C&dsname=STUD&dd=student&asvab=&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_dictionary.sas
-              title: 2025 Campus Student Information publisher dictionary; current
-                reference link
-              status: unreviewed
-              provenance_ids: []
+              url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=C&dsname=STUD&dd=student&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+              title: 2025 Campus Student Information publisher dictionary; current reference link
+              status: available
+              provenance_ids:
+              - 94ac03b1c76592ecf80a8c7f645316da01d2b2bb5c3c476ccfd3b1288287d50a
+              reviewed_sha256: d8a2f7228951f5ca4c01d780ba1bfe926131e83947f705681abe2cc12abc5e4e
             - reference_id: dictionary_staff
               role: data_dictionary
               url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=C&dsname=STAF&dd=staff&asvab=&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_dictionary.sas
-              title: 2025 Campus Staff Information publisher dictionary; current reference
-                link
+              title: 2025 Campus Staff Information publisher dictionary; current reference link
               status: unreviewed
               provenance_ids: []
   campus_tapr_student_profile:
@@ -1987,7 +1966,7 @@ data_sources:
               provenance_ids: []
               reviewed_sha256: abb6196de760d6156af23d31f32b91ce3599350d8b53259feb60cb96b37792cd
     2025:
-      path: data/tapr/raw/2025-campus-STUD-all-checked.csv
+      path: data/tapr/raw/campus-STUD-2025-canonical.csv
       metadata:
         title: 2025 TAPR Campus Student Information; selected observed revision
         publisher: Texas Education Agency
@@ -1997,30 +1976,12 @@ data_sources:
         source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html
         download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
         provenance_ids: []
-        notes: Independent source-only observation of publisher edition 2025. Table
-          and field periods, units and scientific token policy remain unknown unless
-          separately reviewed; no 2024 policy or historical composite metadata is
-          inherited. Every source column, identity/history attribute and ordered dictionary
-          occurrence is retained. Original HTTP dates and controls remain in their
-          genuine receipts; old local-download dates remain unknown. The historical
-          2025 composite is a separate prior revision, not a fallback or current alias.
-          No released default, semantic binding, entity enrichment or app data is
-          activated. Original STUD acquisition logical-label typos are preserved;
-          the explicit correction remains an independent processing receipt, not an
-          acquisition ID or automatic alias. Config does not express a typed processing-input
-          edge for that correction. Canonical enrollment race names distinguish American
-          Indian from Asian through the explicit IND/ASI field correction; literal
-          publisher labels and dictionary descriptions remain unchanged. See docs/2025-student-enrollment-source-notes.md.
-          Independent official campus/district report bytes and selected original/prepared/released
-          observations are retained. The reviewed race/population metrics use explicit
-          2024–25 periods and report count/percent units. Golden regression execution
-          and replacement artifact qualification remain separate; metadata edits do
-          not activate a release.
+        notes: TEA's corrected 2024–25 STUD CSV and ordered dictionary are retained. The code vectors and all
+          data cells match the prior original. Selected measurement periods remain as reviewed for their fields.
         references:
-        - reference_id: student_enrollment_race_label_correction
+        - reference_id: student_information_report
           role: source_notes
-          title: 'Official 2024–25 Student Information report: independent race/population
-            comparison'
+          title: Official 2024–25 Student Information report
           status: available
           provenance_ids:
           - b7405cf94a0fc80f3b9f5faa44610870acfcc4ff1e18a68d8bddfac08e254176
@@ -2029,12 +1990,11 @@ data_sources:
         - reference_id: csv_headers
           role: source_notes
           url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
-          title: Genuine 2025 campus student_profile CSV; original observation and
-            ordered controls preserved
+          title: Genuine 2025 campus student_profile CSV; original observation and ordered controls preserved
           status: available
           provenance_ids:
-          - 3dec9c6e933d9f88c6efacc6f00f8669f8dda0e9d3c51ee9c176f910011e7b35
-          reviewed_sha256: 7e0e762a8f2ba50687fd8c6a59e8052d5740ba57abbedecddfca064bbd77548e
+          - 92b4adbd56d16f2626c6581b9f3c756c728b6d91708c4db0e6af5cc37459516b
+          reviewed_sha256: 27947f7ace1dba61aa81336302ebc39ca78d453b129a1f87d8448de1a21024fa
         - provenance_ids:
           - 5b4dae43db23a6a52ae258d48f85224709560d56ea77e17c1772d5d08f168175
           reference_id: exact_selection_form
@@ -2044,13 +2004,12 @@ data_sources:
           title: Retained actual form, ordered repeated controls and literal action
           url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
         - provenance_ids:
-          - 114edf213e7dd527c3167b5e6400feeeeae37ab272bcd9541e771d21c8171bd4
+          - 94ac03b1c76592ecf80a8c7f645316da01d2b2bb5c3c476ccfd3b1288287d50a
           reference_id: actual2025_dictionary
-          reviewed_sha256: 01b60e8eec23e5c158206d796c0ce82c713417e5f822f1ab81354199814ef209
+          reviewed_sha256: d8a2f7228951f5ca4c01d780ba1bfe926131e83947f705681abe2cc12abc5e4e
           role: data_dictionary
           status: available
-          title: Actual 2025 STUD dictionary metadata; code-only unknowns remain explicit
-            in audit
+          title: Actual 2025 STUD dictionary metadata; code-only unknowns remain explicit in audit
           url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=C&dsname=STUD&dd=student&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
         - reference_id: glossary
           role: glossary
@@ -2074,8 +2033,8 @@ data_sources:
           title: Reviewed 2025 Student Information raw source crosswalk
           status: available
           provenance_ids:
-          - 9ab6b41f80eaaf1aae1c5f33121d84e84421563770353a2f7081b06c0465e4d8
-          reviewed_sha256: 43bc586c00425e9a16c37dadf400c1510c0bb639bbc1d366d73a79486beaf1c7
+          - a71ec45cb4699728ab0e798ea187c339d965d3aabba06d0f4774dc551b38093f
+          reviewed_sha256: 70d10c3cf42ef9546ee0dca70db09d856bb9aa92f3f13cead9ae9e222c595b50
         metrics:
           student_membership_special_ed_count:
             field: campus_2025_student_membership_special_ed_count
@@ -2556,7 +2515,7 @@ data_sources:
             tapr_source:
               scope: campus
               tables:
-                student_profile: data/tapr/raw/2025-campus-STUD-all-checked.csv
+                student_profile: data/tapr/raw/campus-STUD-2025-canonical.csv
   campus_tapr_staff_profile:
     2024:
       path: data/tapr/raw/2024 Campus Staff Information.csv
@@ -2875,7 +2834,7 @@ data_sources:
               provenance_ids: []
               reviewed_sha256: abb6196de760d6156af23d31f32b91ce3599350d8b53259feb60cb96b37792cd
     2025:
-      path: data/tapr/raw/2025-district-STUD-all-checked.csv
+      path: data/tapr/raw/district-STUD-2025-canonical.csv
       metadata:
         title: 2025 TAPR District Student Information; selected observed revision
         publisher: Texas Education Agency
@@ -2885,30 +2844,12 @@ data_sources:
         source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html
         download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
         provenance_ids: []
-        notes: Independent source-only observation of publisher edition 2025. Table
-          and field periods, units and scientific token policy remain unknown unless
-          separately reviewed; no 2024 policy or historical composite metadata is
-          inherited. Every source column, identity/history attribute and ordered dictionary
-          occurrence is retained. Original HTTP dates and controls remain in their
-          genuine receipts; old local-download dates remain unknown. The historical
-          2025 composite is a separate prior revision, not a fallback or current alias.
-          No released default, semantic binding, entity enrichment or app data is
-          activated. Original STUD acquisition logical-label typos are preserved;
-          the explicit correction remains an independent processing receipt, not an
-          acquisition ID or automatic alias. Config does not express a typed processing-input
-          edge for that correction. Canonical enrollment race names distinguish American
-          Indian from Asian through the explicit IND/ASI field correction; literal
-          publisher labels and dictionary descriptions remain unchanged. See docs/2025-student-enrollment-source-notes.md.
-          Independent official campus/district report bytes and selected original/prepared/released
-          observations are retained. The reviewed race/population metrics use explicit
-          2024–25 periods and report count/percent units. Golden regression execution
-          and replacement artifact qualification remain separate; metadata edits do
-          not activate a release.
+        notes: TEA's corrected 2024–25 STUD CSV and ordered dictionary are retained. The code vectors and all
+          data cells match the prior original. Selected measurement periods remain as reviewed for their fields.
         references:
-        - reference_id: student_enrollment_race_label_correction
+        - reference_id: student_information_report
           role: source_notes
-          title: 'Official 2024–25 Student Information report: independent race/population
-            comparison'
+          title: Official 2024–25 Student Information report
           url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=227901&lev=D&prgopt=reports/tapr/student.sas
           status: available
           provenance_ids:
@@ -2917,12 +2858,11 @@ data_sources:
         - reference_id: csv_headers
           role: source_notes
           url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
-          title: Genuine 2025 district student_profile CSV; original observation and
-            ordered controls preserved
+          title: Genuine 2025 district student_profile CSV; original observation and ordered controls preserved
           status: available
           provenance_ids:
-          - cdef4db2551805ed9aa901243df73d91843d158d14426592607e842ce7036231
-          reviewed_sha256: 8ccd14fb2eaff8c73d94960950cc359d44bf4b81edb721975edf6795b8995811
+          - 33adbe96b5c22986f6cd554f8978c3e2a75f5939641ce366d0b1b42e6f956eca
+          reviewed_sha256: 43a93020158c4f7f5bc2069b04f301da2b70b40940c42c810ae0dd163c7a0a77
         - provenance_ids:
           - a3c2c2022cb5342750c9b0dd80364b2beb3f88c2f842e854d2dbcf3d7f11d708
           reference_id: exact_selection_form
@@ -2932,13 +2872,12 @@ data_sources:
           title: Retained actual form, ordered repeated controls and literal action
           url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
         - provenance_ids:
-          - 237fa1b42ce2d30f53bb56c7079a147c41b11e94aefb68927fca27e783cd9208
+          - ae98c437ee5554393dd0b8213b7910a02a6d96e4353206e24b1eb4b78bd46c75
           reference_id: actual2025_dictionary
-          reviewed_sha256: 693d84e0fa2285918c0f0d437a8fbfdefa72b66c1a7acd8ddac94165b536568d
+          reviewed_sha256: 9920ff82752677de136418ee00f4758147be6e966f53b00df03ec052ddda0c8b
           role: data_dictionary
           status: available
-          title: Actual 2025 STUD dictionary metadata; code-only unknowns remain explicit
-            in audit
+          title: Actual 2025 STUD dictionary metadata; code-only unknowns remain explicit in audit
           url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=D&dsname=STUD&dd=student&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
         - reference_id: glossary
           role: glossary
@@ -2962,8 +2901,8 @@ data_sources:
           title: Reviewed 2025 Student Information raw source crosswalk
           status: available
           provenance_ids:
-          - 931c2c826727d467a8d3cd655127904b2185ed77bad471f5af98299513cdb081
-          reviewed_sha256: 43bc586c00425e9a16c37dadf400c1510c0bb639bbc1d366d73a79486beaf1c7
+          - a71ec45cb4699728ab0e798ea187c339d965d3aabba06d0f4774dc551b38093f
+          reviewed_sha256: 70d10c3cf42ef9546ee0dca70db09d856bb9aa92f3f13cead9ae9e222c595b50
         metrics:
           student_membership_special_ed_count:
             field: district_2025_student_membership_special_ed_count
@@ -3444,7 +3383,7 @@ data_sources:
             tapr_source:
               scope: district
               tables:
-                student_profile: data/tapr/raw/2025-district-STUD-all-checked.csv
+                student_profile: data/tapr/raw/district-STUD-2025-canonical.csv
   district_tapr_staff_profile:
     2024:
       path: data/tapr/raw/2024 District Staff Information.csv
@@ -6679,7 +6618,7 @@ data_sources:
               estimation: null
               field_year: null
     2025:
-      path: data/tapr/DISTPROF_2024-2025_FINAL.xlsx
+      path: data/tapr/district-PROF-2025-canonical.xlsx
       metadata:
         title: 2024-2025 TAPR District Profile
         publisher: Texas Education Agency
@@ -6690,45 +6629,29 @@ data_sources:
           end_year: 2025
         source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html
         identifiers: []
-        notes: Migrated local input. Original download timestamp and acquisition URL
-          are unknown; local observation must not be presented as an original download.
-          Canonical enrollment race names distinguish American Indian from Asian through
-          the explicit IND/ASI field correction; literal publisher labels and dictionary
-          descriptions remain unchanged. See docs/2025-student-enrollment-source-notes.md.
-          Independent official campus/district report bytes and selected original/prepared/released
-          observations are retained. The reviewed race/population metrics use explicit
-          2024–25 periods and report count/percent units. Golden regression execution
-          and replacement artifact qualification remain separate; metadata edits do
-          not activate a release. Bounded teacher-field review uses the existing 2024-25
-          TAPR Glossary, Staff Information pages 34-37. Only the explicitly named
-          teacher fields below receive reviewed 2024-25 school-year units and reference
-          periods; this is source context, not an annual cumulative measure or an
-          invented exact observation date. Teacher totals are FTE, not headcounts.
-          Average professional experience is completed years weighted by teacher FTE,
-          regardless of district; it is distinct from years with the district. Average
-          teacher salary includes regular duties only, excludes supplemental pay and
-          divides regular-duty teacher salary by teacher FTE. The reported students-per-teacher
-          ratio divides total students by teacher FTE; it is retained as reported
-          rather than recomputed from another enrollment source. The retained field
-          name Teacher Turnover Ratio denotes a percent; fall 2023-24 teachers not
-          employed as teachers in the district in fall 2024-25, divided by fall 2023-24
-          teacher FTE. It includes roles 087 and 047 and teachers remaining employed
-          in another role. The 2024-25 reference period identifies the report's destination
-          school year; the prior-fall denominator and two-fall comparison are preserved
-          explicitly here. This metric is district-only. No strict under-five-years
-          measure is inferred from the zero-years and inclusive 1-5-years bands.
+        notes: Prepared 2024–25 Profile with canonical enrollment race headers. All data cells match the previous
+          prepared reader output, and affected fields match the corrected TEA STUD values by ID. The original
+          composite workbook's download history is unknown. Bounded teacher-field review uses the existing 2024-25
+          TAPR Glossary, Staff Information pages 34-37. Only the explicitly named teacher fields below receive
+          reviewed 2024-25 school-year units and reference periods; this is source context, not an annual cumulative
+          measure or an invented exact observation date. Teacher totals are FTE, not headcounts. Average professional
+          experience is completed years weighted by teacher FTE, regardless of district; it is distinct from
+          years with the district. Average teacher salary includes regular duties only, excludes supplemental
+          pay and divides regular-duty teacher salary by teacher FTE. The reported students-per-teacher ratio
+          divides total students by teacher FTE; it is retained as reported rather than recomputed from another
+          enrollment source. The retained field name Teacher Turnover Ratio denotes a percent; fall 2023-24
+          teachers not employed as teachers in the district in fall 2024-25, divided by fall 2023-24 teacher
+          FTE. It includes roles 087 and 047 and teachers remaining employed in another role. The 2024-25 reference
+          period identifies the report's destination school year; the prior-fall denominator and two-fall comparison
+          are preserved explicitly here. This metric is district-only. No strict under-five-years measure is
+          inferred from the zero-years and inclusive 1-5-years bands.
         provenance_ids:
-        - 15f0551abeda2ffc4c4e6f26c2ab3a4d7092516cdffb383d363068a56cedec2d
-        - 10cd059048171993c80e9b81fe42870f43b18e8bd5ae1fd8cc015b81a48db69d
-        - 819e8d1701c1e74b9419a62b9ae1b37fc9957eaadcc3ac936d49180bddac5ba6
-        - 666a5499334e2ac7fe2f5ec20bc5e6ba73a1554acf87994ce241d9404d9822ed
-        - db69d016fe614e357e9b7a0f0318bdf29556a625d47359918510397de895b775
+        - eb6a94ee2f261abec560c1066b840b15476ec1424754330414b339e5ef6c52fb
         references:
-        - reference_id: student_enrollment_race_label_correction
+        - reference_id: student_information_report
           role: source_notes
           url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=227901&lev=D&prgopt=reports/tapr/student.sas
-          title: 'Official 2024–25 Student Information report: independent race/population
-            comparison'
+          title: Official 2024–25 Student Information report
           status: available
           provenance_ids:
           - a83c507d701b9b77a9128ca7c8d62d1d229cdfabe8bb0f1cdcdbf8a6090a5202
@@ -6755,12 +6678,12 @@ data_sources:
         - reference_id: columns_default
           role: schema
           path: schemas/tapr--2025--header-crosswalk.json
-          title: TEA Data 2025 TAPR audited source-code, human-label and canonical-field
-            crosswalk; not a publisher dictionary or historical processing receipt
+          title: TEA Data 2025 TAPR audited source-code, human-label and canonical-field crosswalk; not a publisher
+            dictionary or historical processing receipt
           status: available
           provenance_ids:
-          - dd45225927639d86d4cb532bdd070c1617156c5d6ceef9ffa1fdaba2797fbb94
-          reviewed_sha256: 1a4617fd41e504b1791f21926c5f9a648ca684cebbabd9a80ce2b833934dced9
+          - 8bbf7df78a900d4ae50aa70ced4d2b84d1afc337807ce16e89f1754f4e8b120e
+          reviewed_sha256: 9304bb790dbb7322602e35c4d119081a8b7d375c2ab968cc33753aa429a9be4b
         field_year: 2025
         value_policy: tapr_profile
         metrics:
@@ -7194,33 +7117,27 @@ data_sources:
       reader:
         dtype: str
         keep_default_na: false
-        columns:
-          district_2025_student_enrollment_american_indian_count: district_2025_student_enrollment_asian_count
-          district_2025_student_enrollment_american_indian_percent: district_2025_student_enrollment_asian_percent
-          district_2025_student_enrollment_asian_count: district_2024_25_asian_students_count
-          district_2025_student_enrollment_asian_percent: district_2024_25_asian_students_percent
         column_schema: schemas/tapr--2025--header-crosswalk.json
         profiles:
           source:
-            columns: {}
             tapr_source:
               scope: district
               tables:
-                student: data/tapr/raw/2025 District Student Information.csv
+                student: data/tapr/raw/district-STUD-2025-canonical.csv
                 staff: data/tapr/raw/2025 District Staff Information.csv
             references:
             - reference_id: dictionary_student
               role: data_dictionary
-              url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=D&dsname=STUD&dd=student&asvab=&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_dictionary.sas
-              title: 2025 District Student Information publisher dictionary; current
-                reference link
-              status: unreviewed
-              provenance_ids: []
+              url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=D&dsname=STUD&dd=student&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+              title: 2025 District Student Information publisher dictionary; current reference link
+              status: available
+              provenance_ids:
+              - ae98c437ee5554393dd0b8213b7910a02a6d96e4353206e24b1eb4b78bd46c75
+              reviewed_sha256: 9920ff82752677de136418ee00f4758147be6e966f53b00df03ec052ddda0c8b
             - reference_id: dictionary_staff
               role: data_dictionary
               url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=D&dsname=STAF&dd=staff&asvab=&prgopt=reports%2Ftapr%2Fdd%2Fdd_tapr_dictionary.sas
-              title: 2025 District Staff Information publisher dictionary; current
-                reference link
+              title: 2025 District Staff Information publisher dictionary; current reference link
               status: unreviewed
               provenance_ids: []
   campus_planned_closures:
@@ -14517,12 +14434,12 @@ data_sources:
                 staar_bilingual_esl_growth: *tapr_2026_staar_bilingual_esl_growth_region_csv
   state_tapr_student_profile:
     2025:
-      path: "data/tapr/raw/2025-s-STUD-all_except_class_size.csv"
+      path: data/tapr/raw/state-STUD-2025-canonical.csv
       metadata:
-        title: "2024–25 TAPR State Student Information selection (STUD)"
-        publisher: "Texas Education Agency"
-        version: "2025"
-        source_url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
+        title: 2024–25 TAPR State Student Information selection (STUD)
+        publisher: Texas Education Agency
+        version: '2025'
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
         metrics:
           daep_count:
             field: state_2024_daep_count
@@ -14545,11 +14462,11 @@ data_sources:
             unit: count
             period: {kind: school_year, start_year: 2024, end_year: 2025}
           student_enrollment_asian_count:
-            field: state_2024_25_asian_students_count
+            field: state_2025_student_enrollment_asian_count
             unit: count
             period: {kind: school_year, start_year: 2024, end_year: 2025}
           student_enrollment_asian_percent:
-            field: state_2024_25_asian_students_percent
+            field: state_2025_student_enrollment_asian_percent
             unit: percent
             period: {kind: school_year, start_year: 2024, end_year: 2025}
           student_enrollment_dyslexia_count:
@@ -14812,79 +14729,81 @@ data_sources:
             field: state_2025_student_membership_white_percent
             unit: percent
             period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_american_indian_count:
+            field: state_2025_student_enrollment_american_indian_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_american_indian_percent:
+            field: state_2025_student_enrollment_american_indian_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
         references:
-          - reference_id: "csv_headers"
-            role: "source_notes"
-            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker/"
-            title: "Published statewide STUD CSV selection without class size"
-            status: "available"
-            provenance_ids:
-              - "ba756c3da078c35f33eb1b23aac5f378ba91fdfc7f9f1cccd37945c7da776609"
-            reviewed_sha256: "a7877feaf77183af290733ce480a4098ea59c8e856c0315f815db7885670e964"
-          - reference_id: "selection"
-            role: "source_notes"
-            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker"
-            title: "Published statewide STUD download controls"
-            status: "available"
-            provenance_ids:
-              - "12e139fd84383d549dd4a7460e38aa6d18a00d279a0b0852ba6169c2d147e968"
-            reviewed_sha256: "4ac2c98acdaaab3463ad36de29cc1c8d20feedba6fe8c7c74d6c69ba168118d7"
-          - reference_id: "dictionary"
-            role: "data_dictionary"
-            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=S&dsname=STUD&dd=student&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas"
-            title: "Published statewide STUD data dictionary"
-            status: "available"
-            provenance_ids:
-              - "36fdf16397e4bacfe213a182b7c003690ff4d3a3e6b731fe04f24d6bcba323aa"
-            reviewed_sha256: "90da908c9ae39e2297f3eaff617eefbc0a6cf400c6e0467fee4f058059015b88"
-          - reference_id: "state_student_report"
-            role: "source_notes"
-            url: "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=S&lev=S&prgopt=reports%2Ftapr%2Fstudent.sas"
-            title: "Independent 2024–25 statewide TPRS Student Information report"
-            status: "available"
-            provenance_ids:
-              - "05d8b500dfdbab97e6b5e0dfe13f8458f9d6b7b45df9c4630db79f6498e23606"
-            reviewed_sha256: "a4fa6bb001446cd39a43c2a86e1eb39eaa451803457b0cf2d8816ae96c239d5c"
-          - reference_id: "glossary"
-            role: "glossary"
-            url: "https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf"
-            title: "2024–25 TAPR glossary"
-            status: "available"
-            provenance_ids:
-              - "e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db"
-            reviewed_sha256: "846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416"
-          - reference_id: "masking"
-            role: "masking_methodology"
-            url: "https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html"
-            title: "2024–25 TAPR masking methodology"
-            status: "available"
-            provenance_ids:
-              - "6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554"
-            reviewed_sha256: "7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8"
-          - reference_id: "columns_source"
-            role: "schema"
-            path: "schemas/tapr--2025--state-student-profile-crosswalk.json"
-            title: "TEA Data statewide STUD crosswalk"
-            status: "available"
-            provenance_ids:
-              - "962ca4883616b7eafab4136024c58b51a423b02f6e5083b2f24c914fcd3d0da6"
-            reviewed_sha256: "51ddeb2bb627d58a17ee2492392f8462041f2bb1e23ac09daaa620db6ccad3cf"
-        notes: >-
-          This successful statewide selection retains the 228 publisher fields
-          offered outside class size. Membership and Enrollment remain distinct.
-          Mobility and disciplinary placements use the 2023–24 reference year.
-          Attrition is retained raw while its glossary cohort discrepancy is open.
-          SPNTINDC and SPNTINDP retain the publisher's disputed Asian labels and
-          remain unbound. SPNTASIC and SPNTASIP match the published Asian enrollment
-          row. All other raw fields require separate semantic qualification.
+        - reference_id: csv_headers
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+          title: Published statewide STUD CSV selection without class size
+          status: available
+          provenance_ids:
+          - 8a16ea2c221f12d20a800d6eed5451a54c9833de5fd0ea5cdbafcb14ffbbda08
+          reviewed_sha256: 90c0f40a0e69bb4d76430e3473823b8fa6d1cf52553679e9b8fcc42e5381b99d
+        - reference_id: selection
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+          title: Published statewide STUD download controls
+          status: available
+          provenance_ids:
+          - 12e139fd84383d549dd4a7460e38aa6d18a00d279a0b0852ba6169c2d147e968
+          reviewed_sha256: 4ac2c98acdaaab3463ad36de29cc1c8d20feedba6fe8c7c74d6c69ba168118d7
+        - reference_id: dictionary
+          role: data_dictionary
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=S&dsname=STUD&dd=student&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          title: Published statewide STUD data dictionary
+          status: available
+          provenance_ids:
+          - 726d0ab3ba9b3de0a98d12e5ba0664cee459a3c4497f29c43874d746e1482188
+          reviewed_sha256: e15f930f10d3d3e14ab15c0e16cb1b57b16d822390868a1adefffdb6b30d279a
+        - reference_id: state_student_report
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=S&lev=S&prgopt=reports%2Ftapr%2Fstudent.sas
+          title: Independent 2024–25 statewide TPRS Student Information report
+          status: available
+          provenance_ids:
+          - 05d8b500dfdbab97e6b5e0dfe13f8458f9d6b7b45df9c4630db79f6498e23606
+          reviewed_sha256: a4fa6bb001446cd39a43c2a86e1eb39eaa451803457b0cf2d8816ae96c239d5c
+        - reference_id: glossary
+          role: glossary
+          url: https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf
+          title: 2024–25 TAPR glossary
+          status: available
+          provenance_ids:
+          - e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db
+          reviewed_sha256: 846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416
+        - reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html
+          title: 2024–25 TAPR masking methodology
+          status: available
+          provenance_ids:
+          - 6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554
+          reviewed_sha256: 7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2025--state-student-profile-crosswalk.json
+          title: TEA Data statewide STUD crosswalk
+          status: available
+          provenance_ids:
+          - fc9a3e917bee914c1942c226e2e6e9aa6ad628622ba57e84ae2e1ecd11728f1d
+          reviewed_sha256: c1ee7d733464d706fe3521ed895bb20bf278bf38a9afa1d9c93c1ef120acfaab
+        notes: TEA's corrected 2024–25 STUD CSV and ordered dictionary are retained. The code vectors and all
+          data cells match the prior original. Selected measurement periods remain as reviewed for their fields.
       reader:
         profiles:
           source:
-            column_schema: "schemas/tapr--2025--state-student-profile-crosswalk.json"
+            column_schema: schemas/tapr--2025--state-student-profile-crosswalk.json
             tapr_source:
-              scope: "state"
+              scope: state
               tables:
-                student_profile: "data/tapr/raw/2025-s-STUD-all_except_class_size.csv"
+                student_profile: data/tapr/raw/state-STUD-2025-canonical.csv
   state_tapr_four_year_longitudinal_rate:
     2025:
       path: "data/tapr/raw/2025-s-COMP4-csv.csv"

@@ -91,7 +91,7 @@ entry. The same structure works in YAML and TOML:
 data_sources:
   campus_tapr_student_staff_profile:
     2025:
-      path: data/tapr/CAMPPROF_2024-2025_FINAL.xlsx
+      path: data/tapr/campus-PROF-2025-canonical.xlsx
       metadata:
         title: TAPR campus student and staff profile
         publisher: Texas Education Agency
@@ -104,7 +104,7 @@ data_sources:
 
 ```toml
 [data_sources.campus_tapr_student_staff_profile.2025]
-path = "data/tapr/CAMPPROF_2024-2025_FINAL.xlsx"
+path = "data/tapr/campus-PROF-2025-canonical.xlsx"
 [data_sources.campus_tapr_student_staff_profile.2025.metadata]
 title = "TAPR campus student and staff profile"
 publisher = "Texas Education Agency"
@@ -784,7 +784,7 @@ source revisions explicitly before comparing. These native leaves are opt-in.
 
 The 2024–25 STUD state selection retains 228 columns outside class size and
 241 ordered dictionary entries. The full-state selection returned a SAS error.
-The independent statewide report corroborates 72 comparison fields covering
+The independent statewide report corroborates 74 comparison fields covering
 Membership, Enrollment, mobility and disciplinary placements. The latter two
 carry 2023–24 periods, and a wildcard comparison retains each field's period.
 Special education, gifted and talented, dyslexia, emergent bilingual and
@@ -794,11 +794,10 @@ The `daep_count` and `daep_percent` selectors follow the bulk shorthand.
 The glossary's disciplinary placements measure includes both disciplinary
 alternative education and juvenile justice alternative education programs.
 
-The state CSV and dictionary label `SPNTINDC/P` as Asian, while the independent
-report places those values in American Indian Enrollment. Both fields retain
-their original labels and codes and stay outside the comparison contract.
-Attrition remains raw in the state edition while the glossary's cohort conflict
-is open. The separate `SPNTASIC/P` pair matches published Asian Enrollment.
+The state CSV and dictionary identify `SPNTINDC/P` as American Indian Enrollment
+and `SPNTASIC/P` as Asian Enrollment. Both pairs match the independent statewide
+report. Attrition remains raw in the state edition while the glossary's cohort
+conflict is open.
 [TEA statewide Student Information](https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=S&lev=S&prgopt=reports%2Ftapr%2Fstudent.sas)
 
 ```sh
@@ -1037,36 +1036,31 @@ command. Student retains 243/242 campus/district columns and the exact pinned
 raw revision; Staff retains the fresh 106/118-column observations, including all
 15/17 additional columns. The reviewed Staff proposal moved unchanged to
 `schemas/tapr--2025--staff-profile-crosswalk.json`; its proposal path was removed.
-The Student contract derives its code/label/canonical-field mapping from the
-unchanged historical crosswalk and adds the actual ordered 2025 dictionary
-observations. Neither branch inherits 2024 periods, policies or metric bindings:
-table/field periods and scientific units remain unknown. Identity/history
-attributes stay lossless without creating extra entity metadata keys.
+The Student contract uses TEA's corrected 2024–25 CSV labels and ordered
+dictionary observations. The code order and data values match the earlier
+publisher revision across campus, district, and state. Table periods remain
+unknown where the report mixes periods. Explicitly reviewed fields carry their
+own periods and units. Identity and history attributes remain lossless.
 
 Use `--edition 2025 --family student_profile` or `--family staff_profile` with
 the existing producer. Raw paths remain portable and `--input-dir` selects a
 local retained-input directory; provenance stores remain explicit local inputs.
 These Config declarations do not qualify a real preparation run, new data
-release, released defaults, app activation or schema3. The historical 2025
-composite and its older Staff revision remain independent reproducible evidence,
-without fallback, replacement or a current-source alias. An unavailable route
+release, released defaults, app activation or schema3. The campus and district
+composite workbook inputs carry canonical headers. Their data cells match the
+previous reader, and the affected values match the corrected STUD files by
+publisher ID. An unavailable route
 for 2025 PROF does not establish that the source never existed.
 
 The selected raw, form, annual dictionary, glossary and masking references bind
 genuine immutable acquisition receipts. Fresh HTTP dates remain known; earlier
-local-download dates remain unknown. The original STUD logical-label typo is
-preserved alongside its explicit correction processing receipt; it is not an
-automatic alias or replacement acquisition. Config's acquisition-only fields do
-not express a processing-input edge. Pass a reviewed dependency explicitly with
+local-download dates remain unknown. Pass a reviewed processing dependency explicitly with
 repeatable `--processing-input DATASET RECORD_ID` to the existing producer; each
 dataset must be selected by that invocation's family/scopes. The producer verifies
 that each root is a processing receipt with a complete closure before reading
 source rows, then copies that closure and includes the typed ID in that dataset's
-new processing inputs. It neither infers applicability nor converts processing
-records into acquisitions. The same STUD correction can be explicitly selected
-for each affected scope; its complete original graph remains intact. Real
-producer qualification still requires separately reviewed selected inputs and
-execution evidence; these declarations and synthetic tests do not supply it.
+new processing inputs. Real producer qualification requires separately reviewed
+selected inputs and execution evidence.
 
 Preparation accepts canonical annual integer editions exactly registered in
 Config, rather than a fixed year allowlist. The existing reader requires the

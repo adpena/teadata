@@ -9,7 +9,7 @@ if str(ROOT) not in sys.path:
 import pytest  # noqa: E402
 
 from teadata.manifest import DatasetCatalog  # noqa: E402
-from teadata.provenance import ProvenanceStore  # noqa: E402
+from teadata.provenance import ProvenanceStore, validate_record_graph  # noqa: E402
 from teadata.teadata_config import load_config  # noqa: E402
 
 
@@ -26,11 +26,10 @@ def _catalog_document():
             # not datasets loaded into this retained-format catalog fixture.
             if cfg.is_source_only(name, section=section):
                 continue
-            for identifier in source.metadata.provenance_ids:
-                records[identifier] = store.read_record(identifier)
-            for reference in source.metadata.references:
-                for identifier in reference.provenance_ids:
-                    records[identifier] = store.read_record(identifier)
+            roots = [*source.metadata.provenance_ids,
+                     *(identifier for reference in source.metadata.references
+                       for identifier in reference.provenance_ids)]
+            records.update(validate_record_graph(store.read_record, roots))
             datasets[name] = {
                 "section": section,
                 "metadata": source.metadata.to_dict(),

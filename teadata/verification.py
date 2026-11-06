@@ -549,7 +549,18 @@ def _publisher_reference_for_release(datasets: Mapping[str, Any]) -> dict[str, A
     from importlib.resources import files
 
     reference = _publisher_reference()
-    edition = json.loads(files("teadata").joinpath("reference_cases/publisher_2026.json").read_text())
+    resources = files("teadata").joinpath("reference_cases")
+    canonical = json.loads(resources.joinpath("publisher_2025_canonical_stud.json").read_text())
+    if all(datasets.get(source["release_input"]["dataset"], {}).get("artifact", {}).get("sha256")
+           == source["release_input"]["sha256"] for source in canonical["sources"].values()):
+        reference["sources"].update(canonical["sources"])
+        for case in reference["cases"]:
+            for fact in case.get("facts", []):
+                locator = fact["source"]
+                labels = canonical["labels"].get(locator["source_id"], {})
+                if locator.get("code") in labels:
+                    locator["header_row1"] = labels[locator["code"]]
+    edition = json.loads(resources.joinpath("publisher_2026.json").read_text())
     workbook = edition["accountability"]
     if datasets.get("accountability", {}).get("artifact", {}).get("sha256") != workbook["sha256"]:
         return reference

@@ -83,6 +83,19 @@ def validate_reference_records(source: ResolvedDataset, read_record: Callable[[s
                 raise ContractError("Reference receipt belongs to a different URL")
 
 
+def _validate_acquisition_producer(
+    acquisition: Mapping[str, Any], producer: Mapping[str, Any]
+) -> None:
+    artifact = acquisition["artifact"]
+    if (acquisition.get("method") != "local_observation"
+            or producer.get("kind") != "processing"
+            or producer.get("dataset") != acquisition["dataset"]
+            or not any(output["sha256"] == artifact["sha256"]
+                       and output["size_bytes"] == artifact["size_bytes"]
+                       for output in producer["outputs"].values())):
+        raise ValueError("Prepared acquisition must match an output of its processing receipt")
+
+
 def validate_record_graph(read_record: Callable[[str], Mapping[str, Any]],
                           record_ids: Sequence[str]) -> dict[str, dict[str, Any]]:
     """Canonical pure receipt/typed-reference closure, shared by store and catalog."""
@@ -106,6 +119,8 @@ def validate_record_graph(read_record: Callable[[str], Mapping[str, Any]],
             metadata = DatasetMetadata.from_dict(record["source_metadata"])
             dependencies = [*metadata.provenance_ids,
                             *(value for ref in metadata.references for value in ref.provenance_ids)]
+            if "derived_from" in record:
+                dependencies.append(record["derived_from"])
         else:
             artifacts = list(record["outputs"].values())
             metadata = None
@@ -119,6 +134,8 @@ def validate_record_graph(read_record: Callable[[str], Mapping[str, Any]],
             if type(artifact.get("size_bytes")) is not int or artifact["size_bytes"] < 0:
                 raise ValueError("Invalid provenance artifact size")
         if metadata is not None:
+            if "derived_from" in record:
+                _validate_acquisition_producer(record, records[record["derived_from"]])
             validate_reference_records(ResolvedDataset(record["dataset"], record["section"],
                 record["requested_year"], record["resolved_year"], "", metadata), read_record,
                 verify_all_claimed=True)
@@ -191,12 +208,14 @@ class ProvenanceStore:
         resolved_url: str | None = None,
         response_headers: Mapping[str, str] | None = None,
         parameters: Mapping[str, Any] | None = None,
+        derived_from: str | None = None,
     ) -> str:
         """Archive exact bytes and record one successful download or local observation.
 
         downloaded_at is supplied only when known from the acquisition itself.
         Repeated downloads remain separate receipts, even for identical bytes.
         Header capture excludes cookies, authorization, and unrelated headers.
+        Prepared local inputs may link to the processing receipt that emitted them.
         """
         observed = _timestamp(recorded_at)
         validate_http_url(requested_url)
@@ -222,24 +241,26 @@ class ProvenanceStore:
                 "content-disposition",
             }
         }
-        return self._record(
-            {
-                "kind": "acquisition",
-                "dataset": dataset.dataset,
-                "section": dataset.section,
-                "requested_year": dataset.requested_year,
-                "resolved_year": dataset.resolved_year,
-                "source_metadata": dataset.metadata.to_dict(),
-                "method": "download" if downloaded is not None else "local_observation",
-                "recorded_at": observed,
-                "downloaded_at": downloaded,
-                "requested_url": requested_url,
-                "resolved_url": resolved_url,
-                "response_headers": headers,
-                "parameters": dict(parameters or {}),
-                "artifact": self._archive(source),
-            }
-        )
+        payload = {
+            "kind": "acquisition",
+            "dataset": dataset.dataset,
+            "section": dataset.section,
+            "requested_year": dataset.requested_year,
+            "resolved_year": dataset.resolved_year,
+            "source_metadata": dataset.metadata.to_dict(),
+            "method": "download" if downloaded is not None else "local_observation",
+            "recorded_at": observed,
+            "downloaded_at": downloaded,
+            "requested_url": requested_url,
+            "resolved_url": resolved_url,
+            "response_headers": headers,
+            "parameters": dict(parameters or {}),
+            "artifact": self._archive(source),
+        }
+        if derived_from is not None:
+            _validate_acquisition_producer(payload, self.read_record(derived_from))
+            payload["derived_from"] = derived_from
+        return self._record(payload)
 
     def record_processing(
         self,

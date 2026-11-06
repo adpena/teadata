@@ -303,7 +303,7 @@ def test_literal_class_and_annual_graduate_contexts_do_not_become_other_populati
         assert 'Annual-graduate' in metadata.notes and 'Bonus' in metadata.notes and 'ERC' in metadata.notes
 
 
-def test_state_student_profile_preserves_conflicts_and_explicit_population_periods():
+def test_state_student_profile_binds_corrected_race_labels_and_explicit_population_periods():
     cfg = load_config()
     dataset = 'state_tapr_student_profile'
     table = source_table(cfg, 'student_profile', 'state')
@@ -311,9 +311,9 @@ def test_state_student_profile_preserves_conflicts_and_explicit_population_perio
     fields = {row['code']: row for row in table['fields']}
     assert len(fields) == 228 and len(table['dictionary_records']) == 241
     assert table['metric_period'] == metadata.period.to_dict() == UNKNOWN
-    assert len(metadata.metrics) == 72
-    assert 'Asian' in fields['SPNTINDC']['label'] and fields['SPNTINDC']['field'].endswith('_spntindc')
-    held = {'SPNTINDC', 'SPNTINDP', 'SPETATTC', 'SPETATTP'}
+    assert len(metadata.metrics) == 74
+    assert fields['SPNTINDC']['label'] == 'State 2025 Student Enrollment: American Indian Count'
+    held = {'SPETATTC', 'SPETATTP'}
     assert {fields[code]['field'] for code in held}.isdisjoint(metric.field for metric in metadata.metrics.values())
     state_codes = {row['field']: code for code, row in fields.items()}
     for scope in ('district', 'campus'):
@@ -328,6 +328,7 @@ def test_state_student_profile_preserves_conflicts_and_explicit_population_perio
         ('student_membership_special_ed_count', 'SPETSPEC', 'count', 2025),
         ('student_enrollment_special_ed_percent', 'SPNTSPEP', 'percent', 2025),
         ('student_enrollment_asian_count', 'SPNTASIC', 'count', 2025),
+        ('student_enrollment_american_indian_count', 'SPNTINDC', 'count', 2025),
         ('student_membership_mobility_all_students_percent', 'SPEMALLP', 'percent', 2024),
         ('daep_count', 'SPETDISC', 'count', 2024),
     ):

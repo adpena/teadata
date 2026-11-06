@@ -319,14 +319,12 @@ def test_source_only_metadata_period_mismatch_fails_before_reading_rows(tmp_path
 
 def test_existing_default_contracts_and_public_metric_bindings_remain_pinned(catalog):
     cfg = yaml.safe_load((ROOT / 'teadata/teadata_sources.yaml').read_bytes())
-    # Historical 2024 defaults remain fixed. The reviewed 127 correction updates
-    # 2025 demographic/lagged bindings, schema references, teacher units and
-    # honest local observations (unknown original download dates);
-    # named graduation opt-ins remain separate and unchanged.
+    # Historical 2024 defaults and named graduation sources retain their pins.
+    # The 2025 Profile pins select the workbooks with canonical publisher labels.
     expected = {('campus', 2024): '6a0893a78bd67167d596a8bb135f712d8ce07e358d4408c82e0b7736c5c7edbe',
-        ('campus', 2025): 'a8859d9d463f04be5b4eeab20911f9a4c8ad3dea008a02d1eb9e07fc8712792d',
+        ('campus', 2025): 'b9e0a3c84c5ffce6c7634bfd8a2aca1b5b1ae5e5ff2640e6a7de915ffc4bf6ab',
         ('district', 2024): '0c43e0e72f3cb7483b26977ab4e90cb5c1dbdabd3d988f4cb61d640db4f1d438',
-        ('district', 2025): 'a89e56ec5fc8b6c6f8cc5f8bec874bf45c0668f2d4822cdd0307418422397a86'}
+        ('district', 2025): 'f87fd026861ad33abb2a1eadd00f07a18f45855504a1ee4728dbb0066d85e8af'}
     for (scope, year), digest in expected.items():
         entry = cfg['data_sources'][scope + '_tapr_student_staff_profile'][year]
         default_entry = {**entry, 'reader': reader_options(entry.get('reader', {}), None)}

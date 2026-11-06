@@ -38,7 +38,7 @@ def stored_publisher_cases(tmp_path, catalog, monkeypatch):
         metric_bindings=document["metric_bindings"], environment=document["build_environment"],
         column_schemas=schemas,
     )
-    reference = verification._publisher_reference()
+    reference = verification._publisher_reference_for_release(catalog.datasets)
     coverage = reference["release_validation"]
     cases = [case for case in reference["cases"] if case["case_id"] in coverage["case_ids"]]
     # This controlled unit database uses the ordinary catalog fixture's source
@@ -77,7 +77,7 @@ def stored_publisher_cases(tmp_path, catalog, monkeypatch):
             export_dataengine(repo, session, include_meta_entries=False)
     finally:
         engine.dispose()
-    monkeypatch.setattr(verification, "_publisher_reference", lambda: reference)
+    monkeypatch.setattr(verification, "_publisher_reference_for_release", lambda _: reference)
     return SimpleNamespace(catalog=catalog, artifact=lambda role: path), reference, path
 
 

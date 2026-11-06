@@ -75,6 +75,13 @@ with a leading apostrophe. The reader keeps that spelling in source tables
 and CSV exports. It uses the two-digit code when validating keys and rejects
 duplicate codes even when their source spellings differ.
 
+In the 2024–25 Student Information report, mobility, student attrition, and
+disciplinary placements describe 2023–24. Campus and district metadata record
+that period for the reviewed count and percent fields. The statewide attrition
+fields remain raw because the glossary's description and formula disagree on
+the fall-to-fall cohort. Staff retention and turnover need their own cohort
+review.
+
 ## Published 2026 entity snapshot
 
 The explicit [v0.0.136 entity snapshot](data-releases.md#2026-entity-snapshot-and-tprs-student-data)

@@ -265,32 +265,23 @@ def test_embedded_crosswalk_is_bound_to_source_and_schema(bound_catalog, change)
 
 def test_packaged_crosswalk_preserves_qualified_publisher_headers_and_current_fields():
     data = files("teadata").joinpath(RESOURCE).read_bytes()
-    assert sha256(data).hexdigest() == "1a4617fd41e504b1791f21926c5f9a648ca684cebbabd9a80ce2b833934dced9"
+    assert sha256(data).hexdigest() == "9304bb790dbb7322602e35c4d119081a8b7d375c2ab968cc33753aa429a9be4b"
     document = parse_column_schema(data)
-    assert document["mapping_version"] == 2
+    assert document["mapping_version"] == 3
     campus = header_records(document, dataset="campus_tapr_student_staff_profile", edition="2025", table="student")
     assert campus[0]["code"] == "CAMPUS" and campus[0]["label"] == "9 Digit Campus Number"
     assert campus[0]["field"] == "campus_number" and campus[0]["position"] == 1
-    assert campus[0]["input_sha256"] == "7e0e762a8f2ba50687fd8c6a59e8052d5740ba57abbedecddfca064bbd77548e"
+    assert campus[0]["input_sha256"] == "27947f7ace1dba61aa81336302ebc39ca78d453b129a1f87d8448de1a21024fa"
     assert next(r for r in campus if r["code"] == "CPNTALLC")["field"] == "campus_2025_student_enrollment_all_students_count"
-    for dataset, size, legacy_schema_sha in (
-        ("campus_tapr_student_staff_profile", 330, "24be6c5ea593c030744987b9ee9651d9f9cb1aaab593e6652d592eaccf1c46a5"),
-        ("district_tapr_student_staff_profile", 341, "24942c016ba6559a67761248c35b3da56dde23daca0cb83a19f301ebecfb72a9"),
-    ):
-        columns = schema_columns(document, dataset=dataset, edition="2025")
-        assert len(columns) == size
-        # Preserve every previous name/order except the four reviewed IND/ASI
-        # destinations. Literal source headers are unchanged by the correction.
-        scope = dataset.split("_", 1)[0]
-        prior_destinations = {
-            f"{scope}_2025_student_enrollment_american_indian_count": f"{scope}_2025_student_enrollment_asian_count",
-            f"{scope}_2025_student_enrollment_american_indian_percent": f"{scope}_2025_student_enrollment_asian_percent",
-            f"{scope}_2025_student_enrollment_asian_count": f"{scope}_2024_25_asian_students_count",
-            f"{scope}_2025_student_enrollment_asian_percent": f"{scope}_2024_25_asian_students_percent",
-        }
-        assert set(prior_destinations) <= set(columns)
-        prior_columns = [prior_destinations.get(column, column) for column in columns]
-        assert sha256((canonical_json({"schema_version": 1, "columns": prior_columns}) + "\n").encode()).hexdigest() == legacy_schema_sha
+    for scope, size in (("campus", 330), ("district", 341)):
+        dataset = scope + "_tapr_student_staff_profile"
+        assert len(schema_columns(document, dataset=dataset, edition="2025")) == size
+        fields = {row["code"]: row for row in header_records(document, dataset=dataset, edition="2025", table="student")}
+        for code, name in (("IND", "American Indian"), ("ASI", "Asian")):
+            for suffix, unit in (("C", "Count"), ("P", "Percent")):
+                field = fields[scope[0].upper() + "PNT" + code + suffix]
+                assert field["label"] == f"{scope.title()} 2025 Student Enrollment: {name} {unit}"
+                assert field["field"] == f"{scope}_2025_student_enrollment_{name.lower().replace(' ', '_')}_{unit.lower()}"
     with pytest.raises(ValueError, match="unavailable"):
         header_records(document, dataset="campus_tapr_student_staff_profile", edition="2024")
 

@@ -50,7 +50,7 @@ def test_staff_crosswalk_retains_every_actual_column_without_default_activation(
     assert all(type(r['source_line']) is int and r['source_line'] > 0
                and type(r['source_column']) is int and r['source_column'] >= 0 for r in table['dictionary_records'])
     historical_path = ROOT / 'teadata/schemas/tapr--2025--header-crosswalk.json'
-    assert sha256(historical_path.read_bytes()).hexdigest() == '1a4617fd41e504b1791f21926c5f9a648ca684cebbabd9a80ce2b833934dced9'
+    assert sha256(historical_path.read_bytes()).hexdigest() == '9304bb790dbb7322602e35c4d119081a8b7d375c2ab968cc33753aa429a9be4b'
     old_dataset = next(d for d in parse_column_schema(historical_path.read_bytes())['datasets'] if d['dataset'].startswith(scope + '_'))
     old_codes = {f['code'] for t in old_dataset['tables'] if t['table'] == 'staff' for f in t['fields']}
     assert old_codes < {r['code'] for r in records}
@@ -91,12 +91,12 @@ def test_code_only_and_dictionary_only_codes_do_not_become_input_fields_or_alias
 
 
 @pytest.mark.parametrize('scope,width,rows,raw_sha,dictionary_sha,raw_id', [
-    ('campus', 243, 9084, '7e0e762a8f2ba50687fd8c6a59e8052d5740ba57abbedecddfca064bbd77548e',
-     '01b60e8eec23e5c158206d796c0ce82c713417e5f822f1ab81354199814ef209',
-     '3dec9c6e933d9f88c6efacc6f00f8669f8dda0e9d3c51ee9c176f910011e7b35'),
-    ('district', 242, 1208, '8ccd14fb2eaff8c73d94960950cc359d44bf4b81edb721975edf6795b8995811',
-     '693d84e0fa2285918c0f0d437a8fbfdefa72b66c1a7acd8ddac94165b536568d',
-     'cdef4db2551805ed9aa901243df73d91843d158d14426592607e842ce7036231'),
+    ('campus', 243, 9084, '27947f7ace1dba61aa81336302ebc39ca78d453b129a1f87d8448de1a21024fa',
+     'd8a2f7228951f5ca4c01d780ba1bfe926131e83947f705681abe2cc12abc5e4e',
+     '92b4adbd56d16f2626c6581b9f3c756c728b6d91708c4db0e6af5cc37459516b'),
+    ('district', 242, 1208, '43a93020158c4f7f5bc2069b04f301da2b70b40940c42c810ae0dd163c7a0a77',
+     '9920ff82752677de136418ee00f4758147be6e966f53b00df03ec052ddda0c8b',
+     '33adbe96b5c22986f6cd554f8978c3e2a75f5939641ce366d0b1b42e6f956eca'),
 ])
 def test_student_source_contract_preserves_observed_headers_and_historical_names_without_period_inference(
         scope, width, rows, raw_sha, dictionary_sha, raw_id):
@@ -124,8 +124,8 @@ def test_student_source_contract_preserves_observed_headers_and_historical_names
     assert not source.metadata.provenance_ids
     raw_reference = next(r for r in source.metadata.references if r.reference_id == 'csv_headers')
     assert raw_reference.provenance_ids == (raw_id,) and raw_reference.reviewed_sha256 == raw_sha
-    assert source.metadata.notes and 'independent processing receipt' in source.metadata.notes
-    assert source.path.endswith(f'/data/tapr/raw/2025-{scope}-STUD-all-checked.csv')
+    assert source.metadata.notes and 'corrected 2024–25 STUD CSV' in source.metadata.notes
+    assert source.path.endswith(f'/data/tapr/raw/{scope}-STUD-2025-canonical.csv')
     for role in ['data_dictionary', 'glossary', 'masking_methodology']:
         ref, = [r for r in source.metadata.references if r.role == role]
         assert ref.status == 'available' and ref.provenance_ids and ref.reviewed_sha256

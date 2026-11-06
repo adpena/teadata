@@ -1,7 +1,7 @@
 """Publisher CSV -> preparation -> enrichment -> persisted demographic measures.
 
 Expected values come only from the independently reviewed publisher reference.
-The small input files retain original bytes, including the misleading IND labels.
+The small input files retain exact records from the corrected publisher revision.
 All receipts created here describe local fixtures, never original HTTP events.
 """
 
@@ -29,14 +29,27 @@ from teadata.persistence import create_engine, create_sessionmaker, ensure_schem
 from teadata.provenance import ProvenanceStore
 from teadata.scripts.build_tapr_profiles import prepare_profiles
 from teadata.teadata_config import Config, load_config
+from teadata.verification import _publisher_reference_for_release
 
 
 ROOT = Path(__file__).resolve().parents[1]
-REFERENCE = json.loads(files("teadata").joinpath("reference_cases/publisher_2025.json").read_text())
+CANONICAL = json.loads(files("teadata").joinpath("reference_cases/publisher_2025_canonical_stud.json").read_text())
+CANONICAL_RELEASE_INPUTS = {
+    entry["release_input"]["dataset"]: {"artifact": {"sha256": entry["release_input"]["sha256"]}}
+    for entry in CANONICAL["sources"].values()
+}
+REFERENCE = _publisher_reference_for_release(CANONICAL_RELEASE_INPUTS)
 CASES = {
     "district": next(c for c in REFERENCE["cases"] if c["case_id"] == "austin-isd-2025"),
     "campus": next(c for c in REFERENCE["cases"] if c["case_id"] == "highland-park-race-populations-2025"),
 }
+
+
+def test_canonical_goldens_require_both_exact_prepared_inputs():
+    historical = json.loads(files("teadata").joinpath("reference_cases/publisher_2025.json").read_text())
+    for missing in CANONICAL_RELEASE_INPUTS:
+        mixed = {key: value for key, value in CANONICAL_RELEASE_INPUTS.items() if key != missing}
+        assert _publisher_reference_for_release(mixed) == historical
 
 
 def demographic_facts(scope):
@@ -210,36 +223,26 @@ def test_public_demographics_survive_preparation_enrichment_and_entity_store(tmp
 
 
 @pytest.mark.parametrize("scope", CASES)
-def test_legacy_prepared_reader_applies_all_four_renames_to_real_xlsx(tmp_path, scope):
+def test_canonical_prepared_reader_needs_no_renames_for_real_xlsx(tmp_path, scope):
     configured = load_config()
     dataset = f"{scope}_tapr_student_staff_profile"
     source = configured.resolve_dataset(dataset, 2025)
-    renames = source.reader["columns"]
-    assert len(renames) == 4
+    assert "columns" not in source.reader
     raw, rows = fixture_rows(scope)
     resource = json.loads((ROOT / "teadata/schemas/tapr--2025--student-profile-crosswalk.json").read_text())
     selected = deepcopy(next(d for d in resource["datasets"] if d["dataset"] == f"{scope}_tapr_student_profile"))
     table, = selected["tables"]
     canonical = [field["field"] for field in table["fields"]]
-    # Literal old prepared headers, independent of the rename map under test.
-    legacy_columns = {
-        f"{scope}_2025_student_enrollment_american_indian_count": f"{scope}_2025_student_enrollment_asian_count",
-        f"{scope}_2025_student_enrollment_american_indian_percent": f"{scope}_2025_student_enrollment_asian_percent",
-        f"{scope}_2025_student_enrollment_asian_count": f"{scope}_2024_25_asian_students_count",
-        f"{scope}_2025_student_enrollment_asian_percent": f"{scope}_2024_25_asian_students_percent",
-    }
-    legacy = [legacy_columns.get(field, field) for field in canonical]
-    assert len(set(legacy)) == len(legacy)
-    path = tmp_path / "legacy-prepared.xlsx"
-    pd.DataFrame([rows[2]], columns=legacy).to_excel(path, index=False)
+    path = tmp_path / "canonical-prepared.xlsx"
+    pd.DataFrame([rows[2]], columns=canonical).to_excel(path, index=False)
     selected = {"dataset": dataset, "edition": "2025", "tables": [table],
                 "prepared_input_sha256": sha256(path.read_bytes()).hexdigest()}
     table["input_sha256"] = sha256(raw).hexdigest()
     table["layout"]["last_data_record"] = 3
     document = {**resource, "datasets": [selected]}
-    schema = local_schema(ProvenanceStore(tmp_path / "legacy-history"), tmp_path, document, "legacy-schema.json")
+    schema = local_schema(ProvenanceStore(tmp_path / "canonical-history"), tmp_path, document, "canonical-schema.json")
     cfg = Config.from_dict({"data_sources": {dataset: {2025: {"path": str(path),
-        "reader": {"dtype": "str", "keep_default_na": False, "columns": renames, "column_schema": schema["path"]},
+        "reader": {"dtype": "str", "keep_default_na": False, "column_schema": schema["path"]},
         "metadata": {"version": "2025", "references": [schema]}}}}})
     cfg.base_dir = tmp_path
     year, frame = cfg.load_df(dataset, 2025)

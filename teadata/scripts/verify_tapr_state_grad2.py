@@ -201,7 +201,7 @@ def verify_state_student_profile(store: ProvenanceStore) -> dict[str, int]:
         for code, displayed in expected.items():
             if Decimal(values[code]) != Decimal(displayed.removesuffix("%").replace(",", "")):
                 raise ValueError(f"Statewide student report differs for {code}")
-        held = {"SPNTINDC", "SPNTINDP", "SPETATTC", "SPETATTP"}
+        held = {"SPETATTC", "SPETATTP"}
         if bound_codes != expected.keys() - held:
             raise ValueError("Statewide student bindings differ from the independently reviewed report fields")
         return {"displayed_comparable_cells": len(bound_codes), "displayed_held_cells": len(held)}
