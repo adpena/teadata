@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import argparse
-from collections import defaultdict
+from collections import defaultdict, deque
 from collections.abc import Generator, Mapping
-from contextlib import contextmanager
-from dataclasses import asdict
+from concurrent.futures import FIRST_COMPLETED, CancelledError, Future, ThreadPoolExecutor, wait
+from contextlib import ExitStack, contextmanager
+from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from hashlib import sha256
@@ -16,13 +17,17 @@ import os
 from pathlib import Path
 import sqlite3
 from tempfile import NamedTemporaryFile
+from threading import Event, Lock
 import time
+from time import monotonic
 from typing import Any
 from urllib.error import HTTPError
 from urllib.parse import parse_qsl, urlsplit
 from urllib.request import build_opener
 
-from teadata.acquisition import AcquisitionClient, AcquisitionError, NoRedirect, acquire_form
+from teadata.acquisition import (
+    AcquiredSource, AcquisitionClient, AcquisitionError, NoRedirect, acquire_form, is_transient_transport_failure,
+)
 from teadata.column_schema import _unique_object
 from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
 from teadata.manifest import ContractError, canonical_json
@@ -35,6 +40,9 @@ from teadata.tprs_students import BROKER, DATASET, EDITION, MAX_REPORT_BYTES, MA
 
 MIN_INTERVAL = 8.0
 RATE_LIMIT_COOLDOWN = 300.0
+MAX_ATTEMPTS = 3
+MAX_JOBS = 2
+_THROTTLED = frozenset({429, 503})
 RECIPE = "tprs-student-campus-2026"
 
 
@@ -64,6 +72,12 @@ def _save(path: Path, document: dict, *, replace: bool = False) -> str:
             stream.close()
             if replace:
                 temporary.replace(path)
+                if os.name != "nt":
+                    descriptor = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+                    try:
+                        os.fsync(descriptor)
+                    finally:
+                        os.close(descriptor)
             else:
                 _publish_once(temporary, path)
         finally:
@@ -71,9 +85,9 @@ def _save(path: Path, document: dict, *, replace: bool = False) -> str:
     return sha256(raw).hexdigest()
 
 
-def _cooldown(retry_after: str | None, now: float) -> float:
-    if not retry_after:
-        return now + RATE_LIMIT_COOLDOWN
+def _cooldown(retry_after: str | None, now: float, *, minimum_wait: float = RATE_LIMIT_COOLDOWN) -> float:
+    if retry_after is None:
+        return now + minimum_wait
     try:
         if retry_after.strip().isascii() and retry_after.strip().isdigit():
             advertised = now + float(retry_after)
@@ -87,7 +101,7 @@ def _cooldown(retry_after: str | None, now: float) -> float:
         datetime.fromtimestamp(advertised, timezone.utc)
     except (OSError, ValueError, TypeError, OverflowError) as error:
         raise ContractError("Invalid Retry-After; campus acquisition requires review") from error
-    return max(now + RATE_LIMIT_COOLDOWN, advertised)
+    return max(now + minimum_wait, advertised)
 
 
 def _controls(identifier: str) -> dict[str, str]:
@@ -201,19 +215,198 @@ def retained_inventory(store: ProvenanceStore, roster_receipts: Mapping[str, str
     }
 
 
+def _retry_policy(error: Exception, pace: Path, not_before: float) -> tuple[str, bool, float]:
+    status = type(error).__name__
+    retryable = is_transient_transport_failure(error)
+    if not isinstance(error, HTTPError):
+        return status, retryable, not_before
+    with error:
+        status = f"HTTP {error.code}"
+        retry_after = error.headers.get("Retry-After") if error.headers else None
+    throttled = error.code in _THROTTLED
+    if throttled or (retryable and retry_after is not None):
+        now = time.time()
+        fallback = max(not_before, now + RATE_LIMIT_COOLDOWN)
+        _save(pace, {"not_before": fallback}, replace=True)
+        try:
+            minimum_wait = RATE_LIMIT_COOLDOWN if throttled else 0.0
+            not_before = max(not_before, _cooldown(retry_after, now, minimum_wait=minimum_wait))
+        except ContractError:
+            return "invalid_retry_after", False, fallback
+        if not_before > fallback:
+            _save(pace, {"not_before": not_before}, replace=True)
+        return status if throttled else "retry_after", False, not_before
+    return status, retryable, not_before
+
+
+@dataclass
+class _Launch:
+    ready: Event = field(default_factory=Event)
+    at: float | None = None
+    backpressure: tuple[str, bool, float] | None = None
+
+
+def _download_reports(store: ProvenanceStore, pace: Path, roster_receipt: str, identifiers: list[str],
+                      reports: dict[str, ReportSelection], holds: dict[str, str], *, limit: int,
+                      interval: float, jobs: int, not_before: float) -> dict[str, Any]:
+    stopped, start_gate = Event(), Lock()
+    latest_floor = publisher_deadline = not_before
+
+    def stop_launches() -> None:
+        with start_gate:
+            stopped.set()
+
+    def download(identifier: str, launch: _Launch) -> AcquiredSource | None:
+        nonlocal publisher_deadline
+
+        def admit() -> None:
+            nonlocal latest_floor
+            with start_gate:
+                if stopped.is_set():
+                    raise CancelledError()
+                now = time.time()
+                # Keep a conservative deadline if the process exits with parallel work unresolved.
+                reservation = max(interval, RATE_LIMIT_COOLDOWN) if jobs > 1 else interval
+                _save(pace, {"not_before": now + reservation}, replace=True)
+                launch.at = time.time()
+                latest_floor = launch.at + interval
+                launch.ready.set()
+
+        try:
+            source = ResolvedDataset(f"reference:{RECIPE}:{identifier}", "reference", EDITION, EDITION, "",
+                DatasetMetadata(title=f"TPRS campus {identifier} Student Information", version=str(EDITION),
+                                publisher="Texas Education Agency", source_url=BROKER, provenance_ids=(roster_receipt,)))
+            client = AcquisitionClient(store, opener=build_opener(NoRedirect()), timeout=60, attempts=1,
+                                       max_bytes=MAX_REPORT_BYTES, before_open=admit)
+            return acquire_form(client, BROKER, source, filename=f"2026-C-{identifier}-STUD.html",
+                                method="GET", fields=tuple(_controls(identifier).items()))
+        except CancelledError:
+            return None
+        except HTTPError as error:
+            if error.code in _THROTTLED or (
+                is_transient_transport_failure(error) and error.headers and "Retry-After" in error.headers
+            ):
+                with start_gate:
+                    stopped.set()
+                    launch.backpressure = _retry_policy(error, pace, max(latest_floor, publisher_deadline))
+                    publisher_deadline = launch.backpressure[2]
+            raise
+        finally:
+            launch.ready.set()
+
+    pending = deque(identifiers)
+    active: dict[Future[AcquiredSource | None], tuple[str, _Launch]] = {}
+    outcomes: dict[str, dict[str, Any]] = {}
+    submitted = requests = 0
+    stop: str | None = None
+    unexpected: Exception | None = None
+    started = monotonic()
+    with ThreadPoolExecutor(max_workers=jobs) as pool, ExitStack() as on_exit:
+        on_exit.callback(stop_launches)
+        while active or (pending and submitted < limit and stop is None):
+            done = [future for future in active if future.done()]
+            if not done:
+                if stopped.is_set() or stop is not None or not pending or submitted == limit or len(active) == jobs:
+                    if not active:
+                        break
+                    wait(active, return_when=FIRST_COMPLETED)
+                    continue
+                now = time.time()
+                if not_before > now:
+                    if submitted == 0:
+                        stop = "cooldown"
+                        break
+                    if active:
+                        wait(active, timeout=not_before - now, return_when=FIRST_COMPLETED)
+                    else:
+                        time.sleep(not_before - now)
+                    continue
+                if any(future.done() for future in active) or stopped.is_set():
+                    continue
+                identifier = pending.popleft()
+                launch = _Launch()
+                active[pool.submit(download, identifier, launch)] = identifier, launch
+                submitted += 1
+                launch.ready.wait()
+                if launch.at is not None:
+                    not_before = launch.at + interval
+                continue
+            for future in done:
+                identifier, launch = active.pop(future)
+                count = int(launch.at is not None)
+                requests += count
+                try:
+                    acquired = future.result()
+                except (AcquisitionError, OSError) as error:
+                    outcome = outcomes.setdefault(identifier, {"attempts": 0, "failures": []})
+                    outcome["attempts"] += count
+                    status, retryable, deadline = launch.backpressure or _retry_policy(error, pace, not_before)
+                    not_before = max(not_before, deadline)
+                    outcome["failures"].append(status)
+                    if (retryable and count and outcome["attempts"] < MAX_ATTEMPTS and submitted < limit
+                            and not stopped.is_set()):
+                        pending.appendleft(identifier)
+                        outcome["status"] = "retry_pending"
+                        continue
+                    if retryable:
+                        status = "retry_exhausted" if outcome["attempts"] == MAX_ATTEMPTS else "retry_deferred"
+                    outcome["status"] = status
+                    stop = stop or status
+                    stop_launches()
+                    continue
+                except Exception as error:
+                    unexpected = unexpected or error
+                    stop = stop or "acquisition_failure"
+                    stop_launches()
+                    continue
+                if acquired is None:
+                    continue
+                outcome = outcomes.setdefault(identifier, {"attempts": 0, "failures": []})
+                outcome["attempts"] += count
+                outcome["receipt"] = acquired.record_id
+                try:
+                    digest = store.read_record(acquired.record_id)["artifact"]["sha256"]
+                    read_student_report(store, acquired.record_id, scope="campus", identifier=identifier,
+                                        expected_sha256=digest)
+                except (ContractError, OSError, ValueError, KeyError) as error:
+                    holds[identifier] = f"{acquired.record_id}: {error}"
+                    outcome["status"] = "report_hold"
+                    stop = stop or "report_hold"
+                    stop_launches()
+                except Exception as error:
+                    unexpected = unexpected or error
+                    stop = stop or "report_validation_failure"
+                    stop_launches()
+                else:
+                    reports[identifier] = ReportSelection("campus", identifier, acquired.record_id, digest)
+                    outcome["status"] = "admitted"
+    if requests:
+        _save(pace, {"not_before": not_before}, replace=True)
+    if unexpected is not None:
+        raise unexpected
+    for outcome in outcomes.values():
+        if outcome["status"] == "retry_pending":
+            outcome["status"] = "retry_deferred"
+    return {"requested": requests, "stop": stop, "attempts": outcomes, "jobs": jobs,
+            "elapsed_seconds": round(monotonic() - started, 3) if requests else 0.0,
+            "next_request_at": datetime.fromtimestamp(not_before, timezone.utc).isoformat()}
+
+
 def acquire_region(store: ProvenanceStore, region: str, roster_receipt: str, *, limit: int = 25,
                    interval: float = MIN_INTERVAL, intake: Path | None = None,
-                   preferred: Mapping[str, str] | None = None, partition: int | None = None) -> dict[str, Any]:
+                   preferred: Mapping[str, str] | None = None, partition: int | None = None,
+                   jobs: int = 1) -> dict[str, Any]:
     """Use verified retained reports first and persist pacing before each request."""
     if type(limit) is not int or not 0 <= limit <= 50 or not MIN_INTERVAL <= interval <= 3600:
         raise ValueError("Use zero to 50 requests per pass and an interval between eight seconds and one hour")
+    if type(jobs) is not int or not 1 <= jobs <= MAX_JOBS:
+        raise ValueError("Use one or two in-flight requests")
     roster = campus_roster(store, region, roster_receipt)
     ids = set(roster if partition is None else campus_partition_ids(roster, partition))
     choices = preferred or {}
     if not choices.keys() <= ids:
         scope = "region" if partition is None else "campus scope"
         raise ContractError(f"Preferred receipts include campuses outside this exact {scope}")
-    client = AcquisitionClient(store, opener=build_opener(NoRedirect()), timeout=60, attempts=1, max_bytes=MAX_REPORT_BYTES)
     with _broker_lock(store) as pace:
         if partition is None:
             reports, holds = _retained(store, ids, choices)
@@ -224,49 +417,10 @@ def acquire_region(store: ProvenanceStore, region: str, roster_receipt: str, *, 
         not_before = state["not_before"]
         if type(not_before) not in {int, float} or not isfinite(not_before) or not_before < 0:
             raise ContractError("Invalid retained TPRS broker pace")
-        requests = 0
-        stop = None
-        for identifier in sorted(ids - reports.keys() - holds.keys())[:limit]:
-            now = time.time()
-            if not_before > now and requests == 0:
-                stop = "cooldown"
-                break
-            if not_before > now:
-                time.sleep(not_before - now)
-            not_before = time.time() + interval
-            _save(pace, {"not_before": not_before}, replace=True)
-            source = ResolvedDataset(f"reference:{RECIPE}:{identifier}", "reference", EDITION, EDITION, "",
-                DatasetMetadata(title=f"TPRS campus {identifier} Student Information", version=str(EDITION),
-                                publisher="Texas Education Agency", source_url=BROKER, provenance_ids=(roster_receipt,)))
-            requests += 1
-            try:
-                acquired = acquire_form(client, BROKER, source, filename=f"2026-C-{identifier}-STUD.html",
-                                        method="GET", fields=tuple(_controls(identifier).items()))
-            except HTTPError as error:
-                with error:
-                    stop = f"HTTP {error.code}"
-                    if error.code in {429, 503}:
-                        now = time.time()
-                        # Persist a conservative stop before inspecting an untrusted header.
-                        _save(pace, {"not_before": now + RATE_LIMIT_COOLDOWN}, replace=True)
-                        not_before = _cooldown(error.headers.get("Retry-After") if error.headers else None, now)
-                        _save(pace, {"not_before": not_before}, replace=True)
-                break
-            except (AcquisitionError, OSError) as error:
-                stop = type(error).__name__
-                break
-            digest = store.read_record(acquired.record_id)["artifact"]["sha256"]
-            try:
-                read_student_report(store, acquired.record_id, scope="campus", identifier=identifier, expected_sha256=digest)
-            except (ContractError, OSError, ValueError) as error:
-                holds[identifier] = f"{acquired.record_id}: {error}"
-                stop = "report_hold"
-                break
-            reports[identifier] = ReportSelection("campus", identifier, acquired.record_id, digest)
+        download = _download_reports(store, pace, roster_receipt, sorted(ids - reports.keys() - holds.keys()),
+                                     reports, holds, limit=limit, interval=interval, jobs=jobs, not_before=not_before)
         result = {"region": region, "roster_receipt": roster_receipt, "eligible": len(ids), "reused": reused,
-                  "admitted": len(reports), "requested": requests, "holds": holds, "stop": stop,
-                  "remaining": sorted(ids - reports.keys()),
-                  "next_request_at": datetime.fromtimestamp(not_before, timezone.utc).isoformat()}
+                  "admitted": len(reports), "holds": holds, "remaining": sorted(ids - reports.keys()), **download}
         if partition is not None:
             result.update(partition=partition, region_roster_size=len(roster))
         if intake is not None and ids == reports.keys():
@@ -301,6 +455,7 @@ def main() -> None:
     parser.add_argument("--partition", type=int, help="Select a zero-based 512-campus slice of the pinned region")
     parser.add_argument("--limit", type=int, help="Maximum regional requests, including zero for offline coverage")
     parser.add_argument("--interval", type=float)
+    parser.add_argument("--jobs", choices=(1, 2), type=int, help="Maximum requests in flight, with shared pacing")
     parser.add_argument("--intake", type=Path, help="Seal a compatible intake only when the exact roster is complete")
     parser.add_argument("--prefer", action="append", default=[], metavar="CAMPUS=RECEIPT")
     args = parser.parse_args()
@@ -312,15 +467,18 @@ def main() -> None:
             raise ValueError("Select the existing retained publisher store")
         store = ProvenanceStore(args.store)
         if args.inventory is not None:
-            if any(value is not None for value in (args.roster_receipt, args.limit, args.interval, args.intake, args.partition)):
+            if any(value is not None for value in (
+                args.roster_receipt, args.limit, args.interval, args.intake, args.partition, args.jobs,
+            )):
                 raise ValueError("--inventory does not take regional acquisition options")
             result = retained_inventory(store, _inventory_receipts(args.inventory), preferred=preferred)
         else:
             if args.roster_receipt is None:
                 parser.error("--region requires --roster-receipt")
             result = acquire_region(store, args.region, args.roster_receipt, intake=args.intake, preferred=preferred,
-                                    limit=25 if args.limit is None else args.limit,
-                                    interval=MIN_INTERVAL if args.interval is None else args.interval, partition=args.partition)
+                                    limit=25 if args.limit is None else args.limit, partition=args.partition,
+                                    interval=MIN_INTERVAL if args.interval is None else args.interval,
+                                    jobs=1 if args.jobs is None else args.jobs)
         print(json.dumps(result, sort_keys=True))
     except (ContractError, OSError, ValueError) as error:
         parser.exit(1, f"TPRS campus acquisition failed: {error}\n")

@@ -8,7 +8,7 @@ from urllib.error import HTTPError, URLError
 
 import pytest
 
-from teadata.acquisition import AcquisitionClient, AcquisitionError
+from teadata.acquisition import AcquisitionClient, AcquisitionError, TransportInterruption, is_transient_transport_failure
 from teadata.dataset_metadata import ResolvedDataset
 from teadata.provenance import ProvenanceStore
 from teadata.scripts.download_askted import (
@@ -127,6 +127,29 @@ def test_validation_timeout_is_not_a_transport_retry(tmp_path, validation):
     assert not (selected.store.root / "records").exists()
 
 
+def test_paced_request_distinguishes_network_and_local_io_timeouts(tmp_path, monkeypatch):
+    class Interrupted(Response):
+        def read(self, size=-1):
+            raise TimeoutError("socket read timed out")
+
+    started = []
+    selected = client(tmp_path, Interrupted(), attempts=1, before_open=lambda: started.append(True))
+    with pytest.raises(TransportInterruption) as error:
+        selected.fetch("https://example.org/source.csv", source(), filename="source.csv")
+    assert started == [True]
+    assert is_transient_transport_failure(error.value)
+
+    def archive(*args, **kwargs):
+        raise TimeoutError("archive disk timed out")
+
+    selected = client(tmp_path, Response(), attempts=1, before_open=lambda: started.append(True))
+    monkeypatch.setattr(selected.store, "record_acquisition", archive)
+    with pytest.raises(TimeoutError) as error:
+        selected.fetch("https://example.org/source.csv", source(), filename="source.csv")
+    assert started == [True, True]
+    assert not is_transient_transport_failure(error.value)
+
+
 @pytest.mark.parametrize("reason", [SSLCertVerificationError("Bad certificate"), gaierror(EAI_NONAME, "Unknown host")])
 def test_permanent_url_failures_are_not_retried(tmp_path, monkeypatch, reason):
     def opened(*args, **kwargs):
@@ -137,6 +160,7 @@ def test_permanent_url_failures_are_not_retried(tmp_path, monkeypatch, reason):
     with pytest.raises(URLError) as error:
         selected.fetch("https://example.org/source.csv", source(), filename="source.csv")
     assert error.value.reason is reason
+    assert not is_transient_transport_failure(error.value)
     assert not (selected.store.root / "records").exists()
 
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
+from errno import EHOSTUNREACH, ENETUNREACH, ETIMEDOUT
 from hashlib import sha256
 from http.client import IncompleteRead
 import logging
@@ -23,14 +24,36 @@ from .dataset_metadata import ResolvedDataset, validate_http_url
 from .provenance import ProvenanceStore
 
 logger = logging.getLogger(__name__)
+_RETRYABLE_HTTP_STATUS = frozenset({408, 429, 500, 502, 503, 504})
 
 
 class AcquisitionError(RuntimeError):
     """A source could not be acquired without violating its transport contract."""
 
 
-class _IncompleteTransfer(AcquisitionError):
+class IncompleteTransfer(AcquisitionError):
     """The response ended before a complete source arrived."""
+
+
+class TransportInterruption(AcquisitionError):
+    """A direct network timeout or connection failure during open or read."""
+
+
+def is_transient_transport_failure(error: Exception) -> bool:
+    """Classify failures for callers that pace each acquisition attempt."""
+    if isinstance(error, HTTPError):
+        return error.code in _RETRYABLE_HTTP_STATUS
+    reason = error.reason if isinstance(error, URLError) else error
+    if isinstance(reason, gaierror):
+        return reason.errno == EAI_AGAIN
+    if isinstance(error, (IncompleteTransfer, TransportInterruption)):
+        return True
+    if isinstance(error, URLError) and isinstance(reason, (TimeoutError, ConnectionError)):
+        return True
+    return (
+        isinstance(error, URLError) and isinstance(reason, OSError)
+        and reason.errno in {EHOSTUNREACH, ENETUNREACH, ETIMEDOUT}
+    )
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -56,6 +79,7 @@ class AcquisitionClient:
         attempts: int = 3,
         max_bytes: int = 512 * 1024 * 1024,
         max_retry_wait: float = 30,
+        before_open: Callable[[], None] | None = None,
     ):
         if type(attempts) is not int or attempts < 1 or type(max_bytes) is not int or max_bytes < 1:
             raise ValueError("Acquisition attempts and byte limit must be positive integers")
@@ -67,6 +91,15 @@ class AcquisitionClient:
         self.attempts = attempts
         self.max_bytes = max_bytes
         self.max_retry_wait = max_retry_wait
+        self.before_open = before_open
+
+    def _network_call(self, operation, *args, **kwargs):
+        try:
+            return operation(*args, **kwargs)
+        except (TimeoutError, ConnectionError) as error:
+            if self.before_open is None:
+                raise
+            raise TransportInterruption(type(error).__name__) from error
 
     def fetch(
         self,
@@ -100,8 +133,10 @@ class AcquisitionClient:
             target = Path(directory) / filename
             for attempt in range(self.attempts):
                 validating_headers = False
+                if self.before_open is not None:
+                    self.before_open()
                 try:
-                    with self.opener.open(request, timeout=self.timeout) as response:
+                    with self._network_call(self.opener.open, request, timeout=self.timeout) as response:
                         validate_http_url(response.url)
                         status = getattr(response, "status", 200)
                         if status != 200:
@@ -120,29 +155,30 @@ class AcquisitionClient:
                                 raise AcquisitionError("Source exceeds the acquisition size limit")
                         size = 0
                         with target.open("wb") as stream:
-                            while block := response.read(1024 * 1024):
+                            while block := self._network_call(response.read, 1024 * 1024):
                                 size += len(block)
                                 if size > self.max_bytes:
                                     raise AcquisitionError("Source exceeds the acquisition size limit")
                                 stream.write(block)
                         if size == 0 or (declared is not None and size < declared):
-                            raise _IncompleteTransfer("Empty or incomplete source transfer")
+                            raise IncompleteTransfer("Empty or incomplete source transfer")
                         if declared is not None and size > declared:
                             raise AcquisitionError("Source exceeds its declared Content-Length")
                         resolved_url = response.url
                         response_headers = dict(response.headers)
                         downloaded_at = datetime.now(timezone.utc)
                     break
-                except (URLError, TimeoutError, ConnectionError, IncompleteRead, _IncompleteTransfer) as error:
+                except (URLError, TimeoutError, ConnectionError, IncompleteRead, IncompleteTransfer,
+                        TransportInterruption) as error:
                     if validating_headers:
                         raise
                     if attempt + 1 == self.attempts:
                         if isinstance(error, IncompleteRead):
-                            raise AcquisitionError("Incomplete source transfer") from error
+                            raise IncompleteTransfer("Incomplete source transfer") from error
                         raise
                     retry_after = None
                     if isinstance(error, HTTPError):
-                        if error.code not in {408, 429, 500, 502, 503, 504}:
+                        if error.code not in _RETRYABLE_HTTP_STATUS:
                             raise
                         with error:
                             retry_after = error.headers.get("Retry-After") if error.headers else None

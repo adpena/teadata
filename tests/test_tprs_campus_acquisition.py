@@ -1,15 +1,26 @@
 import json
+from threading import Event
+import time
 from types import SimpleNamespace
 from urllib.error import HTTPError
 from urllib.parse import urlencode
 
 import pytest
 
+from teadata.acquisition import IncompleteTransfer, TransportInterruption
 from teadata.manifest import ContractError
 from teadata.provenance import ProvenanceStore
 from teadata.scripts import acquire_tprs_campuses as campus
 from teadata.scripts import verify_tprs_campus_coverage as coverage
 from teadata.tprs_statewide_intake import validate_campus_selection
+
+
+def _mock_request(monkeypatch, request):
+    def acquire(client, *args, **kwargs):
+        client.before_open()
+        return request(client, *args, **kwargs)
+
+    monkeypatch.setattr(campus, "acquire_form", acquire)
 
 
 def test_coverage_union_requires_all_ordinals_and_checks_overlap_before_leaf_reads(tmp_path, monkeypatch):
@@ -53,7 +64,7 @@ def test_rate_limit_persists_across_region_and_process_boundaries(tmp_path, monk
         calls.append(1)
         raise HTTPError(campus.BROKER, 429, "Too Many Requests", {"Retry-After": "900"}, None)
 
-    monkeypatch.setattr(campus, "acquire_form", rate_limit)
+    _mock_request(monkeypatch, rate_limit)
     first = campus.acquire_region(store, "01", "a" * 64)
     later = campus.acquire_region(store, "02", "b" * 64)
     assert first["stop"] == "HTTP 429" and first["requested"] == 1
@@ -105,7 +116,7 @@ def test_malformed_retained_report_does_not_block_other_campuses(tmp_path, monke
         return SimpleNamespace(record_id="c" * 64)
 
     monkeypatch.setattr(campus, "read_student_report", parse)
-    monkeypatch.setattr(campus, "acquire_form", acquire)
+    _mock_request(monkeypatch, acquire)
     record_path = store.root / "records" / (receipt + ".json")
     record_path.parent.mkdir()
     record_path.touch()
@@ -130,12 +141,130 @@ def test_fresh_failure_returns_structured_stop(tmp_path, monkeypatch, transport)
     def parse(*args, **kwargs):
         raise ContractError("unexpected publisher page")
 
-    monkeypatch.setattr(campus, "acquire_form", acquire)
+    _mock_request(monkeypatch, acquire)
     monkeypatch.setattr(campus, "read_student_report", parse)
     result = campus.acquire_region(store, "01", "c" * 64)
     assert result["requested"] == 1 and result["admitted"] == 0
     assert result["stop"] == ("AcquisitionError" if transport else "report_hold")
     assert result["holds"] == ({} if transport else {key: f"{receipt}: unexpected publisher page"})
+
+
+@pytest.mark.parametrize(("limit", "succeeds", "status"), [
+    (3, True, "admitted"),
+    (3, False, "retry_exhausted"),
+    (2, False, "retry_deferred"),
+])
+def test_transient_attempts_use_one_pace_and_request_budget(tmp_path, monkeypatch, limit, succeeds, status):
+    store = ProvenanceStore(tmp_path)
+    key, next_key = "001901001", "001901002"
+    monkeypatch.setattr(campus, "campus_roster", lambda *args: (key, next_key))
+    clock = SimpleNamespace(now=1000.0)
+    monkeypatch.setattr(campus, "time", SimpleNamespace(
+        time=lambda: clock.now, sleep=lambda seconds: setattr(clock, "now", clock.now + seconds),
+    ))
+    monkeypatch.setattr(store, "read_record", lambda *args: {"artifact": {"sha256": "b" * 64}})
+    monkeypatch.setattr(campus, "read_student_report", lambda *a, **k: None)
+    calls = []
+
+    def acquire(*args, **kwargs):
+        assert dict(kwargs["fields"])["id"] == key
+        pace = json.loads((tmp_path / "tprs-campus-broker-pace.json").read_bytes())
+        assert pace["not_before"] == clock.now + 8
+        calls.append(clock.now)
+        if succeeds and len(calls) == 3:
+            return SimpleNamespace(record_id="a" * 64)
+        if len(calls) == 1:
+            raise TransportInterruption("network timeout")
+        raise IncompleteTransfer("short response")
+
+    _mock_request(monkeypatch, acquire)
+    result = campus.acquire_region(store, "01", "c" * 64, limit=limit)
+    assert calls == [1000 + 8 * index for index in range(limit)]
+    assert result["requested"] == limit and result["admitted"] == int(succeeds)
+    assert result["attempts"][key]["attempts"] == limit
+    assert result["attempts"][key]["status"] == status
+    assert result["attempts"][key]["failures"][0] == "TransportInterruption"
+    assert result["stop"] == (None if succeeds else status)
+
+
+@pytest.mark.parametrize("corrupt_receipt", [False, True])
+def test_two_in_flight_drain_throttles_and_keep_the_later_deadline(tmp_path, monkeypatch, corrupt_receipt):
+    store = ProvenanceStore(tmp_path)
+    first, second, third = ("001901001", "001901002", "001901003")
+    monkeypatch.setattr(campus, "campus_roster", lambda *args: (first, second, third))
+    monkeypatch.setattr(campus, "MIN_INTERVAL", 0.01)
+    second_started = Event()
+    first_handled = Event()
+    original_policy = campus._retry_policy
+    calls = []
+    longer_deadline = []
+
+    def acquire(client, *args, **kwargs):
+        identifier = dict(kwargs["fields"])["id"]
+        if identifier == first:
+            time.sleep(0.04)  # Setup takes longer than the launch interval.
+        client.before_open()
+        calls.append((identifier, time.monotonic()))
+        if identifier == first:
+            assert second_started.wait(3)
+            if corrupt_receipt:
+                return SimpleNamespace(record_id="a" * 64)
+            raise HTTPError(campus.BROKER, 429, "Limited", {"Retry-After": "invalid"}, None)
+        assert identifier == second
+        second_started.set()
+        assert first_handled.wait(3)
+        longer_deadline.append(time.time() + 900)
+        raise HTTPError(campus.BROKER, 503, "Limited", {"Retry-After": "900"}, None)
+
+    def apply_policy(*args):
+        result = original_policy(*args)
+        if result[0] == "invalid_retry_after":
+            first_handled.set()
+        return result
+
+    def read_record(_):
+        first_handled.set()
+        raise ValueError("invalid source receipt")
+
+    monkeypatch.setattr(campus, "acquire_form", acquire)
+    monkeypatch.setattr(campus, "_retry_policy", apply_policy)
+    monkeypatch.setattr(store, "read_record", read_record)
+    result = campus.acquire_region(store, "01", "c" * 64, jobs=2, limit=3, interval=0.01)
+    assert [identifier for identifier, _ in calls] == [first, second]
+    assert calls[1][1] - calls[0][1] >= 0.009
+    assert result["requested"] == 2 and result["stop"] == ("report_hold" if corrupt_receipt else "invalid_retry_after")
+    assert result["attempts"][second]["status"] == "HTTP 503"
+    pace = json.loads((tmp_path / "tprs-campus-broker-pace.json").read_bytes())
+    assert pace["not_before"] >= longer_deadline[0]
+    later = campus.acquire_region(store, "01", "c" * 64, jobs=2)
+    assert later["stop"] == "cooldown" and later["requested"] == 0
+
+
+def test_interrupt_drains_started_request_and_persists_its_throttle(tmp_path, monkeypatch):
+    store = ProvenanceStore(tmp_path)
+    first, second = "001901001", "001901002"
+    monkeypatch.setattr(campus, "campus_roster", lambda *args: (first, second))
+    interrupt = Event()
+    calls = []
+    deadline = []
+
+    def acquire(*args, **kwargs):
+        calls.append(dict(kwargs["fields"])["id"])
+        assert interrupt.wait(3)
+        deadline.append(time.time() + 900)
+        raise HTTPError(campus.BROKER, 429, "Limited", {"Retry-After": "900"}, None)
+
+    def wait_for_result(*args, **kwargs):
+        interrupt.set()
+        raise KeyboardInterrupt
+
+    _mock_request(monkeypatch, acquire)
+    monkeypatch.setattr(campus, "wait", wait_for_result)
+    with pytest.raises(KeyboardInterrupt):
+        campus.acquire_region(store, "01", "c" * 64, jobs=2, limit=2)
+    assert calls == [first]
+    pace = json.loads((tmp_path / "tprs-campus-broker-pace.json").read_bytes())
+    assert pace["not_before"] >= deadline[0]
 
 
 def test_inventory_uses_one_retained_scan_and_exact_rosters(tmp_path, monkeypatch):
@@ -204,7 +333,7 @@ def test_inventory_cli_is_offline_and_rejects_regional_controls(tmp_path, monkey
     assert result["eligible"] == 1 and result["remaining"] == ["001901001"]
     assert not (tmp_path / "tprs-campus-broker-pace.json").exists()
     for flags in (("--limit", "25"), ("--interval", "8"), ("--roster-receipt", receipts["01"]),
-                  ("--intake", str(tmp_path / "intake.json")), ("--partition", "0")):
+                  ("--intake", str(tmp_path / "intake.json")), ("--partition", "0"), ("--jobs", "2")):
         monkeypatch.setattr("sys.argv", [*cli, *flags])
         with pytest.raises(SystemExit, match="1"):
             campus.main()

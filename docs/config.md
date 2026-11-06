@@ -1509,9 +1509,19 @@ reuses validated reports, and returns the remaining IDs after each pass.
 `--limit 0` performs an offline inventory. Use `--prefer CAMPUS=RECEIPT`
 when retained publisher bodies differ and the desired revision has been
 reviewed. Use one shared store to enforce one campus requester across all
-regions. The command waits at least eight seconds between requests, stops on
-rate limits, and persists the larger of a five-minute cooldown and TEA's
-valid `Retry-After` before a later invocation can resume. It seals an intake
+regions. The default allows one in-flight request. Use `--jobs 2` to
+overlap slow responses. Both modes share a minimum eight-second interval
+between launches and a request budget. Each classified transient failure
+can be retried twice within that budget. The result lists attempts and
+receipts by campus, including exhausted attempts and requests deferred by
+the budget.
+
+On HTTP 429 or 503 the coordinator stops new launches, drains in-flight
+requests, and persists the later of the five-minute cooldown and each
+valid `Retry-After` deadline. Other retryable HTTP responses with a
+`Retry-After` defer the run to the advertised deadline. Invalid headers
+leave a conservative cooldown. Content and identity errors require
+review. The command seals an intake
 only when every roster campus is admitted and the native materializer can
 process the selection within its byte budget. Materialization rechecks the
 sealed intake against its roster receipt and retains that receipt in the
