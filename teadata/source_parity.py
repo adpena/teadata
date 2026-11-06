@@ -5,9 +5,12 @@ authenticity. Unsupported transformations and unavailable lineage remain HOLD.
 """
 from __future__ import annotations
 
+import csv
 from dataclasses import dataclass
 from hashlib import sha256
+from io import TextIOWrapper
 from pathlib import Path
+from tempfile import TemporaryFile
 from typing import TYPE_CHECKING, Any, NotRequired, Sequence, TypedDict
 
 from .column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
@@ -15,7 +18,8 @@ from .dataset_metadata import COLUMN_SCHEMA_MAX_BYTES, STATEWIDE_SINGLETON_GRAIN
 from .manifest import ContractError, canonical_json
 from .peims_leaves import DATASETS as PEIMS_DATASETS
 from .provenance import validate_record_graph
-from .tapr import TAPR_KEY_WIDTHS, TAPR_SOURCE_KEYS, TaprReadBudget, TaprSourceRequest, qualified_tapr_family, tapr_source_identifiers
+from .source_csv import SourceLines
+from .tapr import TAPR_KEY_WIDTHS, TAPR_SOURCE_KEYS, TaprReadBudget, TaprSourceRequest, qualified_tapr_family, reviewed_tapr_data_record_count, tapr_source_identifiers
 
 if TYPE_CHECKING:
     from .provenance import ProvenanceStore
@@ -268,8 +272,38 @@ def _compare(selection: _Selection, *, max_examples: int, working_bytes: int) ->
         'working_bytes': working_bytes, 'working_budget_scope': 'Retained Arrow tables and alignment/comparison buffers; canonical source decoding separately uses recorded batch/key budgets, not a process RSS guarantee'}
 
 
+def _compare_csv_export(release: DataRelease, selection: _Selection) -> dict[str, Any]:
+    layout = selection.mapping["layout"]
+    fields = selection.mapping["fields"]
+    rows = 0
+    with TemporaryFile(mode="w+b") as output, selection.raw.open("rb") as source:
+        release.to_csv(selection.key, output, restore_original_headers=True)
+        output.seek(0)
+        with TextIOWrapper(output, encoding="utf-8", newline="") as text:
+            exported = csv.reader(text, strict=True)
+            for kind in ("label", "code"):
+                if next(exported, None) != [field[kind] for field in fields]:
+                    raise ValueError(f"CSV export differs from the reviewed {kind} header")
+            lines = SourceLines(source, selection.budget.record_bytes, "CSV parity source record exceeds its reviewed budget")
+            for number, row in enumerate(csv.reader(lines, strict=True), 1):
+                lines.record.clear()
+                if not layout["first_data_record"] <= number <= layout["last_data_record"]:
+                    continue
+                if any(note["first_record"] <= number <= note["last_record"] for note in layout["annotations"]):
+                    continue
+                if next(exported, None) != row:
+                    raise ValueError(f"CSV export differs at original logical record {number}")
+                rows += 1
+            if next(exported, None) is not None or rows != reviewed_tapr_data_record_count(selection.mapping):
+                raise ValueError("CSV export and source row counts differ")
+            if lines.digest.hexdigest() != selection.mapping["input_sha256"]:
+                raise ValueError("Original CSV bytes changed during export comparison")
+    return {"status": "PASS_EXACT_CSV_EXPORT", "rows": rows, "cells": rows * len(fields), "header_records": 2}
+
+
 def validate_source_parity(release: DataRelease, store: ProvenanceStore, *, edition_ids: Sequence[str],
-                           max_examples: int = 5, working_bytes: int = 128 * 1024**2) -> dict[str, Any]:
+                           max_examples: int = 5, working_bytes: int = 128 * 1024**2,
+                           verify_export: bool = False) -> dict[str, Any]:
     """Check every raw cell of each explicit supported edition; no waivers.
 
     Metadata/integrity-only checks and raw fidelity do not establish mapping,
@@ -277,7 +311,8 @@ def validate_source_parity(release: DataRelease, store: ProvenanceStore, *, edit
     """
     if (not edition_ids or len(set(edition_ids)) != len(edition_ids)
             or type(max_examples) is not int or not 0 <= max_examples <= 20
-            or type(working_bytes) is not int or not 0 < working_bytes <= 1024**3):
+            or type(working_bytes) is not int or not 0 < working_bytes <= 1024**3
+            or type(verify_export) is not bool):
         raise ValueError('Explicit unique edition IDs and bounded example/working-byte budgets are required')
     output: dict[str, Any] = {'scope': 'admitted lossless TAPR, typed PEIMS and typed district transfer leaves', 'status': 'HOLD', 'editions': [],
         'working_bytes': working_bytes,
@@ -297,12 +332,21 @@ def validate_source_parity(release: DataRelease, store: ProvenanceStore, *, edit
             key = choices[identifier]
             item['edition'] = key.to_dict()
             if key.dataset in (*PEIMS_DATASETS, "district_transfer_reports"):
+                if verify_export:
+                    raise _Uncovered("Original-header export comparison requires a complete raw TAPR edition")
                 from .source_parity_typed import compare_typed
 
                 result = compare_typed(release, store, key, max_examples=max_examples, working_bytes=working_bytes)
             else:
-                result = _compare(_selection(release, store, key), max_examples=max_examples, working_bytes=working_bytes)
+                selection = _selection(release, store, key)
+                result = _compare(selection, max_examples=max_examples, working_bytes=working_bytes)
             item.update(result)
+            if verify_export and item['status'] == 'PASS_RAW_PARITY':
+                try:
+                    item['csv_export'] = _compare_csv_export(release, selection)
+                except (ContractError, OSError, ValueError, KeyError, TypeError, csv.Error) as error:
+                    item.update(status='FAIL_MISMATCH', raw_parity_status='PASS_RAW_PARITY',
+                                csv_export={'status': 'FAIL_MISMATCH', 'diagnostic': str(error)})
         except (_Uncovered, FileNotFoundError) as error:
             item.update(status='HOLD_UNCOVERED', diagnostic=str(error))
         except (ContractError, OSError, ValueError, KeyError, TypeError) as error:

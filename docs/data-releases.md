@@ -79,6 +79,32 @@ snapshot.
 
 ### Exact retained-source parity
 
+Export one exact native table with canonical field names by default. For a
+complete raw TAPR table, all three formats can use the original TEA label
+and code headers.
+
+```python
+release.to_csv(edition_key, "source.csv", restore_original_headers=True)
+release.to_excel(edition_key, "source.xlsx", restore_original_headers=True)
+frame = release.to_df(edition_key, restore_original_headers=True)
+```
+
+CSV and Excel stream to a new file or a caller-owned binary buffer. File paths
+must be unused, and the result appears only after the export succeeds. The DataFrame materializes
+the table with Arrow-backed dtypes and uses a two-level column index for the
+restored label and code. Excel writes decimals and values requiring more than
+15 digits of precision as text. Raw
+exports retain source column order, leading zeroes and masking tokens. CSV
+and DataFrame exports distinguish empty strings from nulls; spreadsheet
+readers can represent empty Excel cells as missing. CSV quoting and line
+endings follow the export writer.
+When the original labels were split across records, the crosswalk supplies
+their reviewed logical label row. Publisher annotations remain in the
+retained source. Original-header export requires the complete raw table
+because normalized or projected tables cannot reproduce its source layout.
+For typed tables, exports contain public fields. Use `SourceFields.select()`
+to include available raw tokens and statuses for a district or campus.
+
 An offline check compares every raw cell in explicitly selected complete TAPR,
 PEIMS student Enrollment, program and primary-disability, and district-transfer native leaves
 against retained publisher CSV. It also compares the retained TAPR and transfer
@@ -92,6 +118,10 @@ uv run --locked python -m teadata.verification --kind library \
   --source-parity /path/to/release.json --source-store /path/to/provenance \
   --source-edition EXACT_EDITION_ID
 ```
+
+Add `--verify-export` to compare the restored-header CSV with the complete
+retained raw TAPR table in source row order. This also checks both logical
+header rows and reports any discrepancy separately from preparation parity.
 
 The catalog, reviewed crosswalk and historical recipes bind the exact source
 receipts, order, layout, field names and interpretation policy. The checker

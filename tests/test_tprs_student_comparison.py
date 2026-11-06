@@ -1,6 +1,7 @@
 from copy import deepcopy
 from dataclasses import replace
 from hashlib import sha256
+from io import BytesIO
 from types import SimpleNamespace
 from typing import Any
 from uuid import uuid4
@@ -108,6 +109,29 @@ def district(identifier="001902"):
 
 def campus():
     return Campus(uuid4(), None, "Synthetic campus", "", False, campus_number="001902001")
+
+
+def test_entity_sources_discover_without_leaf_io_and_keep_entity_values_separate(comparison, monkeypatch):
+    release, editions = comparison
+    entity = district()
+    entity.meta['membership_total_students_count'] = 999
+    with monkeypatch.context() as guard:
+        guard.setattr(release, 'artifact', lambda *a, **k: pytest.fail('Discovery opened a native table'))
+        sources = release.for_entity(entity, edition='2026')
+        assert sources.datasets() == (editions['district'],)
+        fields = sources.tprs_student_membership_enrollment_reports
+        variables = fields.variables(r'^membership_total_students_(?:count|percent)$')
+        assert {value['field'] for value in variables} == {'membership_total_students_count', 'membership_total_students_percent'}
+        with pytest.raises(ContractError, match='complete raw TAPR table'):
+            release.to_csv(editions['district'], BytesIO(), restore_original_headers=True)
+    assert fields.membership_total_students_count == 0
+    assert entity.membership_total_students_count == 999
+    selected = fields.select(*(row['field'] for row in variables)).to_pylist()
+    assert selected[0]['tprs_raw_membership_total_students_count'] == '0'
+    with pytest.raises(AttributeError):
+        _ = fields.unpublished
+    with pytest.raises(ContractError, match='exactly one published row'):
+        release.for_entity(district('001903'), edition='2026')[students.DATASET]['membership_total_students_count']
 
 
 def test_all_168_fields_use_the_direct_texas_leaf_and_exact_population(comparison):

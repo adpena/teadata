@@ -312,6 +312,7 @@ class Query:
         column_order: Sequence[str] | None = None,
         rename: Dict[str, str] | None = None,
         preset: str | None = None,
+        restore_original_headers: bool = False,
     ):
         """Materialize the current query items as a pandas DataFrame.
 
@@ -326,6 +327,9 @@ class Query:
         preset : str | None
             Named preset (e.g., 'nearest_charter_same_type', 'transfers_out') providing
             a default ordering/rename configuration for common tuple outputs.
+        restore_original_headers : bool
+            Use reviewed publisher labels for snapshot-bound source fields. Other
+            columns keep their canonical names. Requires a single entity scope.
         """
 
         try:
@@ -335,6 +339,10 @@ class Query:
                 "pandas is required for .to_df(); install pandas to use this feature"
             ) from exc
 
+        if type(restore_original_headers) is not bool:
+            raise ValueError("Original headers must be explicitly enabled or disabled")
+        if restore_original_headers and (rename or preset is not None):
+            raise ValueError("Original headers cannot be combined with rename or preset")
         data = self.to_dicts(
             include_meta=include_meta,
             include_geometry=include_geometry,
@@ -374,6 +382,26 @@ class Query:
             cols = [c for c in order if c in df.columns]
             cols += [c for c in df.columns if c not in cols]
             df = df[cols]
+        if restore_original_headers:
+            from .manifest import ContractError
+
+            catalog = getattr(self._repo, "catalog", None)
+            if catalog is None:
+                raise ContractError("Original headers require a bound snapshot catalog")
+            if all(isinstance(item, District) for item in self._items):
+                scope = "district"
+            elif all(isinstance(item, Campus) for item in self._items):
+                scope = "campus"
+            else:
+                raise ContractError("Original headers require a single district or campus scope")
+            if any(catalog._entity_build_id(item) != catalog.build_id for item in self._items):
+                raise ContractError("Original headers require entities bound to the snapshot")
+            headers = catalog.bound_field_headers(df.columns, scope=scope)
+            labels = [headers[col]["label"] if col in headers else col for col in df.columns]
+            if len(set(labels)) != len(labels):
+                raise ContractError("Original labels are ambiguous in this selection")
+            df.columns = labels
+            df.attrs["teadata"] = {"build_id": catalog.build_id, "publisher_headers": headers}
         return df
 
     # ------------------------------------------------------------------

@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 import subprocess
 import sys
+from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
@@ -13,8 +15,10 @@ from teadata.column_schema import (
     source_schema_fingerprint, validate_selected_crosswalk,
 )
 from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
+from teadata.entities import District
 from teadata.manifest import BuildRecorder, ContractError, DatasetCatalog, canonical_json
 from teadata.provenance import ProvenanceStore
+from teadata.query import Query
 from teadata.teadata_config import Config
 
 
@@ -33,7 +37,7 @@ def crosswalk_document(input_sha, *, dataset="sample", label="Example Value"):
     }]}
 
 
-def build_bound_catalog(tmp_path, *, edition="2025", profile=None):
+def build_bound_catalog(tmp_path, *, edition="2025", profile=None, bind_metric=False):
     source = tmp_path / "prepared.csv"
     source.write_text("campus_number,example_value\n001902001,-3\n")
     document = crosswalk_document(sha256(source.read_bytes()).hexdigest())
@@ -53,6 +57,10 @@ def build_bound_catalog(tmp_path, *, edition="2025", profile=None):
             "provenance_ids": [reference_id],
         }]}, "reader": {"column_schema": "schemas/crosswalk.json", "dtype": "str", "keep_default_na": False},
     }}}}
+    if bind_metric:
+        raw["data_sources"]["sample"][2025]["metadata"]["value_policy"] = "numeric"
+        raw["value_policies"] = {"numeric": {"tokens": {}}}
+        raw["metric_bindings"] = {"sample_value": {"dataset": "sample", "field": "example_value", "scopes": ["district"]}}
     if profile is not None:
         definition = raw["data_sources"]["sample"][2025]
         definition["reader"] = {"profiles": {profile: definition["reader"]}}
@@ -114,6 +122,26 @@ def test_query_uses_only_catalog_bound_bytes_after_files_are_gone(bound_catalog,
     assert loaded.header_mapping("sample", edition="2025", table="student", from_="field", to="code") == {
         "campus_number": "CAMPUS", "example_value": "VALUE",
     }
+
+
+def test_query_dataframe_restores_only_bound_headers(tmp_path):
+    catalog, *_ = build_bound_catalog(tmp_path, bind_metric=True)
+    repo = SimpleNamespace(catalog=catalog)
+    district = District(uuid4(), "Test District", district_number="001902", _repo=repo)
+    district.meta.update(example_value="-3", custom="literal")
+    query = Query([district], repo=repo)
+    frame = query.to_df(columns=["custom", "example_value"], restore_original_headers=True)
+    assert frame.columns.to_list() == ["custom", "Example Value"]
+    assert frame.to_numpy().tolist() == [["literal", "-3"]]
+    assert frame.attrs["teadata"] == {"build_id": catalog.build_id, "publisher_headers": {
+        "example_value": {"dataset": "sample", "edition": "2025", "table": "student",
+                          "label": "Example Value", "code": "VALUE"}}}
+    district.meta["Example Value"] = "collision"
+    with pytest.raises(ContractError, match="ambiguous"):
+        query.to_df(columns=["example_value", "Example Value"], restore_original_headers=True)
+    district._repo = None
+    with pytest.raises(ContractError, match="entities bound to the snapshot"):
+        query.to_df(restore_original_headers=True)
 
 
 def test_selected_edition_and_unknown_table_are_explicit(bound_catalog):

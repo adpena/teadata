@@ -1,6 +1,8 @@
 """Genuine local source/preparation/leaf receipts; no publisher science claims."""
+import csv
 from dataclasses import replace
 from hashlib import sha256
+from io import BytesIO, StringIO
 import sys
 
 import pyarrow as pa
@@ -18,22 +20,32 @@ from teadata.tapr import TaprReadBudget
 from teadata.teadata_config import Config
 
 
-def fixture_release(tmp_path, *, damage=None, schema_version=3, batch_bytes=1024, scope='district'):
+def fixture_release(tmp_path, *, damage=None, schema_version=3, batch_bytes=1024, scope='district',
+                    annotation=False, alias=False, last_enrollment=''):
     store = ProvenanceStore(tmp_path / 'history')
     dataset = f'{scope}_tapr_student_profile'
     names = [f'{scope}_number', 'membership', 'enrollment']
     prefix = scope[0].upper()
     labels, codes = [scope.title(), 'Membership', 'Enrollment'], [scope.upper(), prefix + 'PETALLC', prefix + 'PNTALLC']
     keys = ['01', '13', '20'] if scope == 'region' else ['001001', '001002', '001003']
+    if alias:
+        keys[1] = "'1002.0"
+    membership = ['9007199254740993' if damage == 'normalized' else '0', '-999', '17']
+    enrollment = ['11', '.', last_enrollment]
     raw = tmp_path / 'source.csv'
-    raw.write_text('\n'.join([','.join(labels), ','.join(codes), f'{keys[0]},0,11',
-                             f'{keys[1]},-999,.', f'{keys[2]},17,', '']))
+    data = [f'{key},{count},{other}' for key, count, other in zip(keys, membership, enrollment, strict=True)]
+    notes = []
+    if annotation:
+        note = 'Source note'
+        data.insert(1, note)
+        notes.append({'kind': 'note', 'first_record': 4, 'last_record': 4, 'sha256': sha256((note + '\n').encode()).hexdigest()})
+    raw.write_text('\n'.join([','.join(labels), ','.join(codes), *data, '']))
     source = ResolvedDataset(dataset, 'data_sources', 2025, 2025, str(raw), DatasetMetadata(version='2025'))
     acquisition = store.record_acquisition(raw, source)
     raw_sha = file_identity(raw)['sha256']
     table = {'table': 'STUD', 'input_sha256': raw_sha,
         'source_schema_sha256': source_schema_fingerprint(labels, codes), 'metric_period': {'kind': 'unknown'},
-        'layout': {'label_record': 1, 'code_record': 2, 'first_data_record': 3, 'last_data_record': 5, 'annotations': []},
+        'layout': {'label_record': 1, 'code_record': 2, 'first_data_record': 3, 'last_data_record': 2 + len(data), 'annotations': notes},
         'fields': [{'position': i, 'code': code, 'label': label, 'field': name,
             'disposition': 'identity' if i == 1 else 'fact', 'publisher_type': None, 'publisher_description': None,
             'dictionary_status': 'not_applicable' if i == 1 else 'not_documented'}
@@ -50,7 +62,7 @@ def fixture_release(tmp_path, *, damage=None, schema_version=3, batch_bytes=1024
              'reviewed_sha256': schema_sha, 'provenance_ids': [schema_observation]}]}}}}})
     cfg.base_dir = tmp_path
     source = cfg.resolve_dataset(dataset, 2025, reader_profile='source')
-    actual = pa.table(dict(zip(names, [keys, ['0', '-999', '17'], ['11', '.', '']], strict=True)))
+    actual = pa.table(dict(zip(names, [keys, membership, enrollment], strict=True)))
     if damage == 'prepared_wrong':
         actual = actual.set_column(1, 'membership', pa.array(['0', '-999', '18']))
     prepared = tmp_path / 'prepared.parquet'
@@ -81,8 +93,8 @@ def fixture_release(tmp_path, *, damage=None, schema_version=3, batch_bytes=1024
         actual = actual.set_column(2, 'enrollment', pa.array(['11', '.', None], type=pa.string()))
     support = None
     if damage == 'normalized':
-        actual = actual.set_column(1, 'membership', pa.array([0, None, 17], type=pa.int64()))
-        actual = actual.append_column('membership_raw', pa.array(['0', '-999', '17']))
+        actual = actual.set_column(1, 'membership', pa.array([int(membership[0]), None, 17], type=pa.int64()))
+        actual = actual.append_column('membership_raw', pa.array(membership))
         actual = actual.append_column('membership_status', pa.array(['observed', 'suppressed', 'observed']))
         support = {'fields': {'membership': {'raw': 'membership_raw', 'status': 'membership_status'}}, 'context': []}
     recorder = BuildRecorder(cfg, store)
@@ -111,6 +123,103 @@ def fixture_release(tmp_path, *, damage=None, schema_version=3, batch_bytes=1024
     catalog = recorder.catalog(schema_version=schema_version)
     manifest = publish_release(tmp_path, catalog, schema_version=schema_version)
     return DataRelease(manifest), store, key, raw
+
+
+@pytest.mark.parametrize('restore', [False, True])
+def test_native_csv_export_matches_every_original_cell(tmp_path, restore):
+    release, _, key, raw = fixture_release(tmp_path, schema_version=4)
+    destination = BytesIO()
+    release.to_csv(key, destination, restore_original_headers=restore)
+    with raw.open(newline='') as source:
+        expected = list(csv.reader(source))
+    if not restore:
+        expected[:2] = [['district_number', 'membership', 'enrollment']]
+    assert list(csv.reader(StringIO(destination.getvalue().decode(), newline=''))) == expected
+
+
+@pytest.mark.parametrize('restore', [False, True])
+def test_excel_and_dataframe_export_share_reviewed_headers(tmp_path, restore):
+    from openpyxl import load_workbook
+
+    release, _, key, raw = fixture_release(tmp_path, schema_version=4, alias=True, last_enrollment='=1+1')
+    workbook_path = tmp_path / 'table.xlsx'
+    release.to_excel(key, workbook_path, restore_original_headers=restore)
+    frame = release.to_df(key, restore_original_headers=restore)
+    with raw.open(newline='') as source:
+        expected = list(csv.reader(source))
+    labels, codes, *data = expected
+    assert frame.columns.to_list() == (list(zip(labels, codes, strict=True)) if restore else
+                                       ['district_number', 'membership', 'enrollment'])
+    assert frame.to_numpy().tolist() == data
+    book = load_workbook(workbook_path, read_only=True)
+    try:
+        rows = list(book['Data'].iter_rows())
+        headers = [labels, codes] if restore else [frame.columns.to_list()]
+        assert [[cell.value for cell in row] for row in rows] == headers + data
+        assert rows[-1][-1].data_type == 's'
+    finally:
+        book.close()
+
+
+def test_typed_exports_preserve_nullable_integers(tmp_path):
+    import pandas as pd
+    from openpyxl import load_workbook
+
+    release, _, key, _ = fixture_release(tmp_path, damage='normalized')
+    frame = release.to_df(key)
+    assert frame['membership'].iloc[0] == 9007199254740993
+    assert pd.isna(frame['membership'].iloc[1])
+    stream = BytesIO()
+    release.to_excel(key, stream)
+    book = load_workbook(stream, read_only=True)
+    try:
+        assert book['Data']['B2'].value == '9007199254740993'
+        assert book['Data']['B3'].value is None
+    finally:
+        book.close()
+
+
+def test_export_preserves_existing_paths_and_cleans_up_after_failure(tmp_path):
+    from openpyxl.worksheet._writer import ALL_TEMP_FILES
+
+    release, _, key, raw = fixture_release(tmp_path, last_enrollment='x' * 32_768)
+    original = raw.read_bytes()
+    for export in (release.to_csv, release.to_excel):
+        with pytest.raises(FileExistsError):
+            export(key, raw)
+        assert raw.read_bytes() == original
+    existing_scratch = set(ALL_TEMP_FILES)
+    failed = tmp_path / 'failed.xlsx'
+    with pytest.raises(ValueError, match='Excel cell limits'):
+        release.to_excel(key, failed)
+    assert not failed.exists()
+    assert set(ALL_TEMP_FILES) == existing_scratch
+    assert not list(tmp_path.glob('.teadata-export-*'))
+
+
+def test_source_projection_keeps_raw_alias_and_resolves_exact_edition(tmp_path):
+    from uuid import uuid4
+
+    from teadata.entities import District
+
+    release, _, key, _ = fixture_release(tmp_path, schema_version=4, alias=True)
+    sources = release.for_entity(District(uuid4(), 'Fixture', district_number='001002'), edition='2025')
+    assert sources.datasets() == (key,)
+    result = sources.dataset(key).select('membership')
+    assert result.to_pylist() == [{'district_number': "'1002.0", 'membership': '-999'}]
+
+
+@pytest.mark.parametrize(('damage', 'annotation'), [(None, False), (None, True), ('reordered', False)])
+def test_optional_export_golden_checks_original_order(tmp_path, damage, annotation):
+    release, store, key, _ = fixture_release(tmp_path, damage=damage, schema_version=4, annotation=annotation)
+    checked = validate_source_parity(release, store, edition_ids=[key.identity], verify_export=True)['editions'][0]
+    if damage is None:
+        assert checked['csv_export'] == {'status': 'PASS_EXACT_CSV_EXPORT', 'rows': 3, 'cells': 9, 'header_records': 2}
+    else:
+        assert checked['status'] == 'FAIL_MISMATCH'
+        assert checked['raw_parity_status'] == 'PASS_RAW_PARITY'
+        assert checked['raw_cells'] == 9
+        assert checked['csv_export'] == {'status': 'FAIL_MISMATCH', 'diagnostic': 'CSV export differs at original logical record 3'}
 
 
 @pytest.mark.parametrize('schema_version', [3, 4])

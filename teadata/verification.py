@@ -872,6 +872,7 @@ def main() -> None:
                           help="Replay exact unpublished PEIMS course leaves, retaining unresolved campus geography holds")
     parser.add_argument("--source-store", type=Path, help="Existing retained ProvenanceStore for source or native checks")
     parser.add_argument("--source-edition", action="append", default=[], help="Exact edition ID for --source-parity; repeat explicitly")
+    parser.add_argument("--verify-export", action="store_true", help="Also compare every restored-header TAPR CSV export cell in source order")
     args = parser.parse_args()
     try:
         args.timeout = _resolved_timeout(args.kind, args.timeout)
@@ -885,6 +886,8 @@ def main() -> None:
         parser.error("Actual PWR controls require --native-release and run separately from source parity")
     if args.course_controls and (args.native_release is None or args.source_parity is not None):
         parser.error("Course controls require --native-release and run separately from source parity")
+    if args.verify_export and args.source_parity is None:
+        parser.error("Export comparison requires --source-parity")
     if args.install_hook and (args.verify or args.verify_latest or args.release):
         parser.error("Install the hook separately from verification or release checks")
     if args.source_parity or args.native_release:
@@ -903,7 +906,7 @@ def main() -> None:
             from teadata.source_parity import validate_source_parity
 
             report = validate_source_parity(DataRelease(args.source_parity, offline=True),
-                _retained_store(args.source_store), edition_ids=args.source_edition)
+                _retained_store(args.source_store), edition_ids=args.source_edition, verify_export=args.verify_export)
             print(json.dumps(report, sort_keys=True, ensure_ascii=False, allow_nan=False))
             if report["status"] != "PASS_RAW_PARITY":
                 raise SystemExit(2)

@@ -38,6 +38,67 @@ print(top5)  # list[(name, enrollment)]
     engine >> ("within", d, "campuses") >> (lambda c: c.rating in {"A","B"})
     ```
 
+## Select an entity's published source fields
+
+An explicit native release can expose fields in dataset namespaces. Start
+with a public district or campus from the engine and an exact release edition.
+
+```python
+sources = release.for_entity(district, edition="2026")
+student = sources.tprs_student_membership_enrollment_reports
+count = student.membership_total_students_count
+fields = student.variables(r"^membership_total_students_")
+table = student.select(*(entry["field"] for entry in fields))
+```
+
+`sources.datasets()` lists exact source identities without opening data files.
+`variables()` reads the chosen source's catalog metadata. `select()` reads a
+single native table and retains its keys and available raw and status columns.
+Use `student["field_name"]` when a field name conflicts with a method.
+Pass an exact key from `sources.datasets()` to `sources.dataset(key)` when a
+name resolves to more than one table or revision. Scalar access requires one published row for
+the entity. For a table with more than one row per entity, pass a PyArrow
+expression to `select(..., where=...)` to narrow its grain.
+
+These views leave existing entity properties and `meta` keys in place. A raw
+source field returns its published token. A typed field returns its published
+projection, with missing or masked values represented by `None`. Select its
+source support to distinguish those cases.
+
+`Query.to_df(restore_original_headers=True)` uses reviewed publisher labels
+where the bound snapshot supplies them. Unmapped fields keep their canonical
+names. The DataFrame's `attrs["teadata"]` records the build and restored
+label/code pairs. These describe the columns, including when callers have
+edited entity values. Use this mode with queries of a single bound entity
+scope. Duplicate output labels raise an error. To export both header rows for an
+entire source table, use the [native export methods](data-releases.md#exact-retained-source-parity).
+
+## Roadmap: pandas-style selection and filtering
+
+The first milestone is a chainable view over one exact catalog edition. It
+will support selecting columns by name and filtering inline with composable
+boolean predicates, following [pandas indexing](https://pandas.pydata.org/docs/user_guide/indexing.html).
+Column names resolve against the selected dataset, table and revision. The
+view will push projection and predicates into the existing native scan, keep
+source keys and relevant value statuses, and materialize a pandas DataFrame
+when the caller asks for one. Filters on typed values will distinguish an
+observed zero from suppression and missingness.
+
+A later milestone will add a limited string `.query()` syntax for comparisons,
+membership tests, boolean combinations and explicit parameters. It will compile
+to the same predicates as inline filtering. The parser will reject unsupported
+expressions and ambiguous fields. The [pandas query API](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.query.html)
+can execute arbitrary code, so it cannot be the evaluator for this interface.
+Once materialized, the result is an ordinary DataFrame with pandas `.loc`,
+boolean indexing and `.query()` available for trusted local analysis.
+
+Before either interface ships, verify both against equivalent Arrow filters
+and pandas results for observed rows, plus fixtures for masks, nulls, quoted
+identifiers, multi-row grains and fields that recur across editions. Check that
+the native scan reads only the selected leaf and required columns and that
+filtered results retain the same source lineage in DataFrame, CSV and Excel
+outputs.
+
 ## Compare a published measure with Texas
 
 `Query.compare_statewide()` selects the publisher's statewide observation for

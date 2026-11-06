@@ -12,6 +12,7 @@ import os
 from pathlib import Path
 import stat
 import tempfile
+from typing import TYPE_CHECKING, BinaryIO
 import unicodedata
 from urllib.parse import urljoin
 from urllib.request import urlopen
@@ -19,7 +20,7 @@ from urllib.request import urlopen
 from platformdirs import user_cache_path
 
 from .analytical import ANALYTICAL_DATASETS, ANALYTICAL_ROLES, analytical_dataset, validate_artifact, validate_leaf_artifact
-from .dataset_metadata import COLUMN_SCHEMA_MAX_BYTES, ColumnSchemaRef, EditionMetadataRef, validate_http_url
+from .dataset_metadata import COLUMN_SCHEMA_MAX_BYTES, ColumnSchemaRef, EditionKey, EditionMetadataRef, validate_http_url
 from .manifest import (
     ContractError,
     DatasetCatalog,
@@ -27,6 +28,10 @@ from .manifest import (
     file_identity,
     read_sqlite_catalog,
 )
+
+if TYPE_CHECKING:
+    from .entities import Campus, District
+    from .source_views import EntitySources
 
 
 ROLES = frozenset({"snapshot", "entities", "maps", "boundaries"})
@@ -339,6 +344,51 @@ class DataRelease:
             raise ContractError(f"Unknown analytical dataset: {name}") from error
         return analytical_dataset(self.artifact(role), self.catalog, role,
                                   entities_sha256=self._artifacts["entities"]["sha256"])
+
+    def for_entity(self, entity: District | Campus, *, edition: str) -> EntitySources:
+        """Bind a public district or campus to exact native dataset namespaces."""
+        from .entities import Campus, District
+        from .source_views import EntitySources
+
+        if isinstance(entity, District):
+            scope, identifier = "district", entity.district_number_canon
+        elif isinstance(entity, Campus) and not entity.is_private:
+            scope, identifier = "campus", entity.lookup_key
+        else:
+            raise ValueError("Native source access requires a public district or campus")
+        if not identifier or not isinstance(edition, str) or not edition:
+            raise ValueError("Native source access requires an entity number and explicit edition")
+        return EntitySources(self, scope, identifier, edition)
+
+    def to_csv(self, edition: EditionKey, path_or_buf: str | Path | BinaryIO, *,
+               restore_original_headers: bool = False) -> None:
+        """Stream one native table to a CSV path or writable binary stream."""
+        from .source_views import prepare_export, write_csv
+
+        table = prepare_export(self, edition, restore_original_headers=restore_original_headers)
+        write_csv(table, path_or_buf)
+
+    def to_excel(self, edition: EditionKey, path_or_buf: str | Path | BinaryIO, *,
+                 restore_original_headers: bool = False) -> None:
+        """Stream one native table to an XLSX path or writable binary stream."""
+        from .source_views import prepare_export, write_excel
+
+        table = prepare_export(self, edition, restore_original_headers=restore_original_headers)
+        write_excel(table, path_or_buf)
+
+    def to_df(self, edition: EditionKey, *, restore_original_headers: bool = False):
+        """Materialize one native table as a pandas DataFrame."""
+        import pandas as pd
+        import pyarrow as pa
+
+        from .source_views import prepare_export
+
+        table = prepare_export(self, edition, restore_original_headers=restore_original_headers)
+        frame = pa.Table.from_batches(table.batches(), schema=table.schema).to_pandas(types_mapper=pd.ArrowDtype)
+        if restore_original_headers:
+            frame.columns = pd.MultiIndex.from_arrays(table.headers)
+        frame.attrs["teadata"] = {"build_id": self.build_id, "edition": edition.to_dict()}
+        return frame
 
 
 @lru_cache(maxsize=4)

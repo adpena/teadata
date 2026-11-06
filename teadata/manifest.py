@@ -1049,6 +1049,30 @@ class DatasetCatalog:
         except ValueError as error:
             raise ContractError(str(error)) from error
 
+    def bound_field_headers(self, fields: Iterable[str], *, scope: str) -> dict[str, dict[str, str]]:
+        """Return reviewed publisher headers for exact snapshot field bindings."""
+        self._require_scalar_interpretation()
+        tables: dict[str, dict[str, dict[str, str]]] = {}
+        headers = {}
+        for field in fields:
+            binding = self._resolve_field(field, scope)
+            if binding is None:
+                continue
+            _, dataset, source_field, _ = binding
+            if not self._sources[dataset].get("column_schema_sha256"):
+                continue
+            if dataset not in tables:
+                by_field: dict[str, dict[str, str]] = {}
+                for record in self.header_records(dataset):
+                    name = record["field"]
+                    if name in by_field:
+                        raise ContractError(f"Publisher header is ambiguous for {name!r} in {dataset!r}")
+                    by_field[name] = {key: record[key] for key in ("dataset", "edition", "table", "label", "code")}
+                tables[dataset] = by_field
+            if source_field in tables[dataset]:
+                headers[field] = tables[dataset][source_field]
+        return headers
+
     def acquisitions(self, dataset: str, *, edition: EditionKey | None = None) -> list[dict[str, Any]]:
         """Return immutable acquisition observations, including unknown download dates."""
         if getattr(self, "_v4", False):
