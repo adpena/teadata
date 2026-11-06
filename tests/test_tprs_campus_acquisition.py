@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+from email.message import Message
 import json
 from threading import Event
 import time
@@ -52,7 +54,17 @@ def test_coverage_union_requires_all_ordinals_and_checks_overlap_before_leaf_rea
     assert verified == []
 
 
-def test_rate_limit_persists_across_region_and_process_boundaries(tmp_path, monkeypatch):
+@pytest.mark.parametrize(("header", "wait_source", "expected"), [
+    ("900", "publisher", 1900),
+    ("15", "publisher", 1015),
+    ("0", "publisher", 1008),
+    ("Thu Jan  1 00:17:10 1970", "publisher", 1030),
+    ("Thursday, 01-Jan-70 00:17:10 GMT", "publisher", 1030),
+    ("Thu, 01 Jan 1970 00:00:00 GMT", "publisher", 1008),
+    ("Thu, 01 Jan 1970 00:17:10 +0000", "invalid_publisher_header", 1040),
+    (None, "local_fallback", 1040),
+])
+def test_rate_limit_persists_across_region_and_process_boundaries(tmp_path, monkeypatch, header, wait_source, expected):
     store = ProvenanceStore(tmp_path)
     monkeypatch.setattr(campus, "campus_roster", lambda *args: ("001901001",))
     monkeypatch.setattr(campus, "time", type("Clock", (), {"time": staticmethod(lambda: 1000.0)}))
@@ -62,14 +74,68 @@ def test_rate_limit_persists_across_region_and_process_boundaries(tmp_path, monk
         pace = json.loads((tmp_path / "tprs-campus-broker-pace.json").read_bytes())
         assert pace == {"not_before": 1008}
         calls.append(1)
-        raise HTTPError(campus.BROKER, 429, "Too Many Requests", {"Retry-After": "900"}, None)
+        raise HTTPError(campus.BROKER, 429, "Too Many Requests", {} if header is None else {"Retry-After": header}, None)
 
     _mock_request(monkeypatch, rate_limit)
-    first = campus.acquire_region(store, "01", "a" * 64)
+    first = campus.acquire_region(store, "01", "a" * 64, fallback_wait=40)
     later = campus.acquire_region(store, "02", "b" * 64)
-    assert first["stop"] == "HTTP 429" and first["requested"] == 1
-    assert json.loads((tmp_path / "tprs-campus-broker-pace.json").read_bytes()) == {"not_before": 1900}
+    expected_status = "invalid_retry_after" if wait_source == "invalid_publisher_header" else "HTTP 429"
+    assert first["stop"] == expected_status and first["requested"] == 1
+    assert first["attempts"]["001901001"]["backpressure"] == {
+        "source": wait_source, "retry_after": header if wait_source == "publisher" else None,
+        **({"rejected_headers": [header]} if wait_source == "invalid_publisher_header" else {}),
+    }
+    assert json.loads((tmp_path / "tprs-campus-broker-pace.json").read_bytes()) == {"not_before": expected}
     assert later["stop"] == "cooldown" and later["requested"] == 0 and calls == [1]
+
+
+def test_duplicate_retry_after_uses_local_fallback(monkeypatch):
+    monkeypatch.setattr(campus.time, "time", lambda: 1000.0)
+    headers = Message()
+    headers["Retry-After"] = "30"
+    headers["Retry-After"] = "900"
+    error = HTTPError(campus.BROKER, 429, "Too Many Requests", headers, None)
+    decision = campus._retry_policy(error, 1008, 40)
+    assert decision.status == "invalid_retry_after"
+    assert decision.deadline == 1040
+    assert decision.wait_source == "invalid_publisher_header"
+    assert decision.rejected_headers == ("30", "900")
+
+
+def test_obsolete_http_date_uses_full_fifty_year_cutoff():
+    now = datetime(2026, 11, 6, tzinfo=timezone.utc).timestamp()
+    assert campus._cooldown("Monday, 06-Dec-76 08:49:37 GMT", now, minimum_wait=0) == now
+    now = datetime(2050, 1, 1, tzinfo=timezone.utc).timestamp()
+    assert campus._cooldown("Tuesday, 29-Feb-00 00:00:00 GMT", now, minimum_wait=0) == now
+
+
+@pytest.mark.parametrize("failure_phase", ["admission", "response"])
+def test_pace_write_failure_stops_transport_and_preserves_deadline(tmp_path, monkeypatch, failure_phase):
+    store = ProvenanceStore(tmp_path)
+    monkeypatch.setattr(campus, "campus_roster", lambda *args: ("001901001", "001901002"))
+    monkeypatch.setattr(campus.time, "time", lambda: 1000.0)
+    original = campus._save
+    writes = []
+    calls = []
+
+    def fail_once(path, payload, **kwargs):
+        writes.append(payload["not_before"])
+        if len(writes) == (1 if failure_phase == "admission" else 2):
+            raise OSError("transient disk error")
+        return original(path, payload, **kwargs)
+
+    def throttle(client, *args, **kwargs):
+        calls.append(1)
+        raise HTTPError(campus.BROKER, 429, "Limited", {"Retry-After": "900"}, None)
+
+    monkeypatch.setattr(campus, "_save", fail_once)
+    _mock_request(monkeypatch, throttle)
+    with pytest.raises(ContractError, match="Could not persist"):
+        campus.acquire_region(store, "01", "a" * 64, jobs=2)
+    assert calls == ([] if failure_phase == "admission" else [1])
+    assert writes == ([1300] if failure_phase == "admission" else [1300, 1900, 1900])
+    if calls:
+        assert json.loads((tmp_path / "tprs-campus-broker-pace.json").read_bytes()) == {"not_before": 1900}
 
 
 def test_retained_complete_region_seals_same_intake_without_requests(tmp_path, monkeypatch):
@@ -218,7 +284,7 @@ def test_two_in_flight_drain_throttles_and_keep_the_later_deadline(tmp_path, mon
 
     def apply_policy(*args):
         result = original_policy(*args)
-        if result[0] == "invalid_retry_after":
+        if result.status == "invalid_retry_after":
             first_handled.set()
         return result
 
@@ -240,7 +306,50 @@ def test_two_in_flight_drain_throttles_and_keep_the_later_deadline(tmp_path, mon
     assert later["stop"] == "cooldown" and later["requested"] == 0
 
 
-def test_interrupt_drains_started_request_and_persists_its_throttle(tmp_path, monkeypatch):
+def test_short_retry_after_preserves_parallel_reservation_until_drain(tmp_path, monkeypatch):
+    store = ProvenanceStore(tmp_path)
+    first, second = "001901001", "001901002"
+    monkeypatch.setattr(campus, "campus_roster", lambda *args: (first, second))
+    monkeypatch.setattr(campus, "MIN_INTERVAL", 0.01)
+    monkeypatch.setattr(campus, "PARALLEL_DRAIN_RESERVATION", 60)
+    second_started, deadline_computed, deadline_persisted = Event(), Event(), Event()
+    original_policy, original_persist = campus._retry_policy, campus._persist_pace
+
+    def apply_policy(*args):
+        decision = original_policy(*args)
+        deadline_computed.set()
+        return decision
+
+    def persist(pace, deadline):
+        original_persist(pace, deadline)
+        if deadline_computed.is_set():
+            deadline_persisted.set()
+
+    def acquire(client, *args, **kwargs):
+        identifier = dict(kwargs["fields"])["id"]
+        client.before_open()
+        if identifier == first:
+            assert second_started.wait(3)
+            raise HTTPError(campus.BROKER, 429, "Limited", {"Retry-After": "1"}, None)
+        second_started.set()
+        assert deadline_persisted.wait(3)
+        pace = json.loads((tmp_path / "tprs-campus-broker-pace.json").read_bytes())
+        assert pace["not_before"] > time.time() + 50
+        return SimpleNamespace(record_id="c" * 64)
+
+    monkeypatch.setattr(campus, "_retry_policy", apply_policy)
+    monkeypatch.setattr(campus, "_persist_pace", persist)
+    monkeypatch.setattr(campus, "acquire_form", acquire)
+    monkeypatch.setattr(store, "read_record", lambda _: {"artifact": {"sha256": "d" * 64}})
+    monkeypatch.setattr(campus, "read_student_report", lambda *args, **kwargs: None)
+    result = campus.acquire_region(store, "01", "a" * 64, jobs=2, limit=2, interval=0.01)
+    assert result["stop"] == "HTTP 429" and result["admitted"] == 1
+    pace = json.loads((tmp_path / "tprs-campus-broker-pace.json").read_bytes())
+    assert pace["not_before"] < time.time() + 5
+
+
+@pytest.mark.parametrize("fail_first_response_write", [False, True])
+def test_interrupt_drains_started_request_and_persists_its_throttle(tmp_path, monkeypatch, fail_first_response_write):
     store = ProvenanceStore(tmp_path)
     first, second = "001901001", "001901002"
     monkeypatch.setattr(campus, "campus_roster", lambda *args: (first, second))
@@ -258,13 +367,25 @@ def test_interrupt_drains_started_request_and_persists_its_throttle(tmp_path, mo
         interrupt.set()
         raise KeyboardInterrupt
 
+    save = campus._save
+    response_writes = []
+
+    def save_deadline(path, payload, **kwargs):
+        if deadline:
+            response_writes.append(payload["not_before"])
+            if fail_first_response_write and len(response_writes) == 1:
+                raise OSError("transient response write failure")
+        return save(path, payload, **kwargs)
+
     _mock_request(monkeypatch, acquire)
+    monkeypatch.setattr(campus, "_save", save_deadline)
     monkeypatch.setattr(campus, "wait", wait_for_result)
     with pytest.raises(KeyboardInterrupt):
         campus.acquire_region(store, "01", "c" * 64, jobs=2, limit=2)
     assert calls == [first]
     pace = json.loads((tmp_path / "tprs-campus-broker-pace.json").read_bytes())
     assert pace["not_before"] >= deadline[0]
+    assert len(response_writes) == (2 if fail_first_response_write else 1)
 
 
 def test_inventory_uses_one_retained_scan_and_exact_rosters(tmp_path, monkeypatch):

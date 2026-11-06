@@ -1517,11 +1517,14 @@ receipts by campus, including exhausted attempts and requests deferred by
 the budget.
 
 On HTTP 429 or 503 the coordinator stops new launches, drains in-flight
-requests, and persists the later of the five-minute cooldown and each
-valid `Retry-After` deadline. Other retryable HTTP responses with a
-`Retry-After` defer the run to the advertised deadline. Invalid headers
-leave a conservative cooldown. Content and identity errors require
-review. The command seals an intake
+requests, and respects the latest valid `Retry-After` deadline and the
+normal launch interval. Other retryable HTTP responses with a
+`Retry-After` defer the run the same way. An absent or invalid header
+uses the five-minute local fallback. To test a different local wait,
+set `--throttle-fallback` in seconds. The pass reports whether the
+publisher or the local fallback set the delay. An interrupted parallel
+pass retains its separate on-disk launch reservation. Content and
+identity errors require review. The command seals an intake
 only when every roster campus is admitted and the native materializer can
 process the selection within its byte budget. Materialization rechecks the
 sealed intake against its roster receipt and retains that receipt in the

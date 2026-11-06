@@ -15,6 +15,7 @@ import json
 from math import isfinite
 import os
 from pathlib import Path
+import re
 import sqlite3
 from tempfile import NamedTemporaryFile
 from threading import Event, Lock
@@ -40,10 +41,20 @@ from teadata.tprs_students import BROKER, DATASET, EDITION, MAX_REPORT_BYTES, MA
 
 MIN_INTERVAL = 8.0
 RATE_LIMIT_COOLDOWN = 300.0
+PARALLEL_DRAIN_RESERVATION = 300.0
 MAX_ATTEMPTS = 3
 MAX_JOBS = 2
 _THROTTLED = frozenset({429, 503})
 RECIPE = "tprs-student-campus-2026"
+_WEEKDAY = r"(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)"
+_LONG_WEEKDAY = r"(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)"
+_MONTH = r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)"
+_CLOCK = r"[0-9]{2}:[0-9]{2}:[0-9]{2}"
+_HTTP_DATE = re.compile(
+    rf"(?:{_WEEKDAY}, [0-9]{{2}} {_MONTH} [0-9]{{4}} {_CLOCK} GMT|"
+    rf"{_LONG_WEEKDAY}, [0-9]{{2}}-{_MONTH}-[0-9]{{2}} {_CLOCK} GMT|"
+    rf"{_WEEKDAY} {_MONTH} (?: [0-9]|[0-9]{{2}}) {_CLOCK} [0-9]{{4}})"
+)
 
 
 @contextmanager
@@ -92,9 +103,22 @@ def _cooldown(retry_after: str | None, now: float, *, minimum_wait: float = RATE
         if retry_after.strip().isascii() and retry_after.strip().isdigit():
             advertised = now + float(retry_after)
         else:
-            deadline = parsedate_to_datetime(retry_after)
-            if deadline.tzinfo is None:
-                raise ValueError("Retry-After date must have a timezone")
+            value = retry_after.strip()
+            if _HTTP_DATE.fullmatch(value) is None:
+                raise ValueError("Retry-After requires an HTTP date or delay in seconds")
+            deadline = parsedate_to_datetime(value)
+            if deadline.tzinfo is None:  # The HTTP asctime form is UTC.
+                deadline = deadline.replace(tzinfo=timezone.utc)
+            if "-" in value:
+                today = datetime.fromtimestamp(now, timezone.utc)
+                try:
+                    cutoff = today.replace(year=today.year + 50)
+                except ValueError:  # February 29 in a non-leap target year.
+                    cutoff = today.replace(year=today.year + 50, day=28)
+                year = (cutoff.year // 100) * 100 + deadline.year % 100
+                if (year, *deadline.timetuple()[1:6]) > cutoff.timetuple()[:6]:
+                    year -= 100
+                deadline = deadline.replace(year=year)
             advertised = deadline.timestamp()
         if not isfinite(advertised):
             raise ValueError("Invalid Retry-After value")
@@ -215,42 +239,68 @@ def retained_inventory(store: ProvenanceStore, roster_receipts: Mapping[str, str
     }
 
 
-def _retry_policy(error: Exception, pace: Path, not_before: float) -> tuple[str, bool, float]:
-    status = type(error).__name__
+@dataclass(frozen=True)
+class _RetryDecision:
+    status: str
+    retryable: bool
+    deadline: float
+    wait_source: str | None = None
+    retry_after: str | None = None
+    rejected_headers: tuple[str, ...] = ()
+
+
+def _retry_policy(error: Exception, not_before: float, fallback_wait: float) -> _RetryDecision:
     retryable = is_transient_transport_failure(error)
     if not isinstance(error, HTTPError):
-        return status, retryable, not_before
+        return _RetryDecision(type(error).__name__, retryable, not_before)
     with error:
         status = f"HTTP {error.code}"
-        retry_after = error.headers.get("Retry-After") if error.headers else None
+        headers = error.headers
+        get_all = getattr(headers, "get_all", None)
+        if get_all is not None:
+            values = tuple(get_all("Retry-After", ()))
+        elif headers is not None and "Retry-After" in headers:
+            values = (headers["Retry-After"],)
+        else:
+            values = ()
     throttled = error.code in _THROTTLED
-    if throttled or (retryable and retry_after is not None):
-        now = time.time()
-        fallback = max(not_before, now + RATE_LIMIT_COOLDOWN)
-        _save(pace, {"not_before": fallback}, replace=True)
+    if not throttled and not (retryable and values):
+        return _RetryDecision(status, retryable, not_before)
+    now = time.time()
+    fallback = max(not_before, now + fallback_wait)
+    if not values:
+        return _RetryDecision(status, False, fallback, "local_fallback")
+    if len(values) == 1:
         try:
-            minimum_wait = RATE_LIMIT_COOLDOWN if throttled else 0.0
-            not_before = max(not_before, _cooldown(retry_after, now, minimum_wait=minimum_wait))
+            deadline = max(not_before, _cooldown(values[0], now, minimum_wait=0.0))
         except ContractError:
-            return "invalid_retry_after", False, fallback
-        if not_before > fallback:
-            _save(pace, {"not_before": not_before}, replace=True)
-        return status if throttled else "retry_after", False, not_before
-    return status, retryable, not_before
+            pass
+        else:
+            return _RetryDecision(status if throttled else "retry_after", False,
+                                  deadline, "publisher", values[0].strip())
+    return _RetryDecision("invalid_retry_after", False, fallback, "invalid_publisher_header",
+                          rejected_headers=tuple(value[:128] for value in values[:4]))
+
+
+def _persist_pace(pace: Path, deadline: float) -> None:
+    try:
+        _save(pace, {"not_before": deadline}, replace=True)
+    except OSError as error:
+        raise ContractError("Could not persist the TPRS request deadline") from error
 
 
 @dataclass
 class _Launch:
     ready: Event = field(default_factory=Event)
     at: float | None = None
-    backpressure: tuple[str, bool, float] | None = None
+    backpressure: _RetryDecision | None = None
 
 
 def _download_reports(store: ProvenanceStore, pace: Path, roster_receipt: str, identifiers: list[str],
                       reports: dict[str, ReportSelection], holds: dict[str, str], *, limit: int,
-                      interval: float, jobs: int, not_before: float) -> dict[str, Any]:
+                      interval: float, jobs: int, not_before: float, fallback_wait: float) -> dict[str, Any]:
     stopped, start_gate = Event(), Lock()
-    latest_floor = publisher_deadline = not_before
+    latest_floor = publisher_deadline = reserved_until = not_before
 
     def stop_launches() -> None:
         with start_gate:
@@ -260,14 +310,19 @@ def _download_reports(store: ProvenanceStore, pace: Path, roster_receipt: str, i
         nonlocal publisher_deadline
 
         def admit() -> None:
-            nonlocal latest_floor
+            nonlocal latest_floor, reserved_until
             with start_gate:
                 if stopped.is_set():
                     raise CancelledError()
                 now = time.time()
                 # Keep a conservative deadline if the process exits with parallel work unresolved.
-                reservation = max(interval, RATE_LIMIT_COOLDOWN) if jobs > 1 else interval
-                _save(pace, {"not_before": now + reservation}, replace=True)
+                reservation = max(interval, PARALLEL_DRAIN_RESERVATION) if jobs > 1 else interval
+                reserved_until = max(publisher_deadline, now + reservation)
+                try:
+                    _persist_pace(pace, reserved_until)
+                except ContractError:
+                    stopped.set()
+                    raise
                 launch.at = time.time()
                 latest_floor = launch.at + interval
                 launch.ready.set()
@@ -288,8 +343,15 @@ def _download_reports(store: ProvenanceStore, pace: Path, roster_receipt: str, i
             ):
                 with start_gate:
                     stopped.set()
-                    launch.backpressure = _retry_policy(error, pace, max(latest_floor, publisher_deadline))
-                    publisher_deadline = launch.backpressure[2]
+                    launch.backpressure = _retry_policy(error, max(latest_floor, publisher_deadline), fallback_wait)
+                    publisher_deadline = launch.backpressure.deadline
+                    safe_deadline = max(reserved_until, publisher_deadline)
+                    try:
+                        _persist_pace(pace, safe_deadline)
+                    except ContractError:
+                        # A draining worker must retain the deadline even if its first write failed.
+                        _persist_pace(pace, safe_deadline)
+                        raise
             raise
         finally:
             launch.ready.set()
@@ -340,9 +402,15 @@ def _download_reports(store: ProvenanceStore, pace: Path, roster_receipt: str, i
                 except (AcquisitionError, OSError) as error:
                     outcome = outcomes.setdefault(identifier, {"attempts": 0, "failures": []})
                     outcome["attempts"] += count
-                    status, retryable, deadline = launch.backpressure or _retry_policy(error, pace, not_before)
-                    not_before = max(not_before, deadline)
+                    decision = launch.backpressure or _retry_policy(error, not_before, fallback_wait)
+                    status, retryable = decision.status, decision.retryable
+                    not_before = max(not_before, decision.deadline)
                     outcome["failures"].append(status)
+                    if decision.wait_source is not None:
+                        outcome["backpressure"] = {"source": decision.wait_source,
+                                                   "retry_after": decision.retry_after}
+                        if decision.rejected_headers:
+                            outcome["backpressure"]["rejected_headers"] = list(decision.rejected_headers)
                     if (retryable and count and outcome["attempts"] < MAX_ATTEMPTS and submitted < limit
                             and not stopped.is_set()):
                         pending.appendleft(identifier)
@@ -380,10 +448,11 @@ def _download_reports(store: ProvenanceStore, pace: Path, roster_receipt: str, i
                 else:
                     reports[identifier] = ReportSelection("campus", identifier, acquired.record_id, digest)
                     outcome["status"] = "admitted"
-    if requests:
-        _save(pace, {"not_before": not_before}, replace=True)
     if unexpected is not None:
         raise unexpected
+    if requests:
+        not_before = max(not_before, publisher_deadline)
+        _persist_pace(pace, not_before)
     for outcome in outcomes.values():
         if outcome["status"] == "retry_pending":
             outcome["status"] = "retry_deferred"
@@ -395,12 +464,14 @@ def _download_reports(store: ProvenanceStore, pace: Path, roster_receipt: str, i
 def acquire_region(store: ProvenanceStore, region: str, roster_receipt: str, *, limit: int = 25,
                    interval: float = MIN_INTERVAL, intake: Path | None = None,
                    preferred: Mapping[str, str] | None = None, partition: int | None = None,
-                   jobs: int = 1) -> dict[str, Any]:
+                   jobs: int = 1, fallback_wait: float = RATE_LIMIT_COOLDOWN) -> dict[str, Any]:
     """Use verified retained reports first and persist pacing before each request."""
     if type(limit) is not int or not 0 <= limit <= 50 or not MIN_INTERVAL <= interval <= 3600:
         raise ValueError("Use zero to 50 requests per pass and an interval between eight seconds and one hour")
     if type(jobs) is not int or not 1 <= jobs <= MAX_JOBS:
         raise ValueError("Use one or two in-flight requests")
+    if not isfinite(fallback_wait) or not 0 < fallback_wait <= 3600:
+        raise ValueError("Throttle fallback must be positive and at most one hour")
     roster = campus_roster(store, region, roster_receipt)
     ids = set(roster if partition is None else campus_partition_ids(roster, partition))
     choices = preferred or {}
@@ -418,7 +489,8 @@ def acquire_region(store: ProvenanceStore, region: str, roster_receipt: str, *, 
         if type(not_before) not in {int, float} or not isfinite(not_before) or not_before < 0:
             raise ContractError("Invalid retained TPRS broker pace")
         download = _download_reports(store, pace, roster_receipt, sorted(ids - reports.keys() - holds.keys()),
-                                     reports, holds, limit=limit, interval=interval, jobs=jobs, not_before=not_before)
+                                     reports, holds, limit=limit, interval=interval, jobs=jobs, not_before=not_before,
+                                     fallback_wait=fallback_wait)
         result = {"region": region, "roster_receipt": roster_receipt, "eligible": len(ids), "reused": reused,
                   "admitted": len(reports), "holds": holds, "remaining": sorted(ids - reports.keys()), **download}
         if partition is not None:
@@ -456,6 +528,7 @@ def main() -> None:
     parser.add_argument("--limit", type=int, help="Maximum regional requests, including zero for offline coverage")
     parser.add_argument("--interval", type=float)
     parser.add_argument("--jobs", choices=(1, 2), type=int, help="Maximum requests in flight, with shared pacing")
+    parser.add_argument("--throttle-fallback", type=float, help="Wait after throttling without a valid Retry-After")
     parser.add_argument("--intake", type=Path, help="Seal a compatible intake only when the exact roster is complete")
     parser.add_argument("--prefer", action="append", default=[], metavar="CAMPUS=RECEIPT")
     args = parser.parse_args()
@@ -468,7 +541,7 @@ def main() -> None:
         store = ProvenanceStore(args.store)
         if args.inventory is not None:
             if any(value is not None for value in (
-                args.roster_receipt, args.limit, args.interval, args.intake, args.partition, args.jobs,
+                args.roster_receipt, args.limit, args.interval, args.intake, args.partition, args.jobs, args.throttle_fallback,
             )):
                 raise ValueError("--inventory does not take regional acquisition options")
             result = retained_inventory(store, _inventory_receipts(args.inventory), preferred=preferred)
@@ -478,7 +551,8 @@ def main() -> None:
             result = acquire_region(store, args.region, args.roster_receipt, intake=args.intake, preferred=preferred,
                                     limit=25 if args.limit is None else args.limit, partition=args.partition,
                                     interval=MIN_INTERVAL if args.interval is None else args.interval,
-                                    jobs=1 if args.jobs is None else args.jobs)
+                                    jobs=1 if args.jobs is None else args.jobs,
+                                    fallback_wait=RATE_LIMIT_COOLDOWN if args.throttle_fallback is None else args.throttle_fallback)
         print(json.dumps(result, sort_keys=True))
     except (ContractError, OSError, ValueError) as error:
         parser.exit(1, f"TPRS campus acquisition failed: {error}\n")
