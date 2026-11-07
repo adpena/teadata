@@ -5,7 +5,6 @@ from __future__ import annotations
 import csv
 from hashlib import sha256
 from importlib.metadata import version
-from importlib.resources import files
 from pathlib import Path
 import platform
 import re
@@ -30,14 +29,7 @@ from .teadata_config import load_config_bytes
 NATIVE_DATASET = "rda_special_education_indicator1"
 _YEAR = 2025
 _AREA = "04"
-_CROSSWALK = "rda--2025--sped-indicator1-crosswalk.json"
-_REFERENCE_ROLES = {
-    "data_dictionary": "data_dictionary",
-    "masking_rules": "masking_methodology",
-    "state_report": "source_notes",
-    "technical_appendix": "methodology",
-    "technical_manual": "methodology",
-}
+_CONFIG = Path(__file__).with_name("teadata_sources.yaml")
 _RAW_COLUMNS = {
     "single_year_rate": "single_year_rate_raw",
     "multi_year_rate": "multi_year_rate_raw",
@@ -116,73 +108,36 @@ def _state_projection(text: str, metadata: dict[str, Any]) -> pa.Table:
     return pa.Table.from_pylist(result, schema=schema)
 
 
-def _config(
-    stage: Path, target: ProvenanceStore, mapping_bytes: bytes, metadata: dict[str, Any], tables: list[dict[str, Any]]
-) -> tuple[ResolvedDataset, BuildRecorder, str]:
-    crosswalk = stage / _CROSSWALK
-    crosswalk.write_bytes(mapping_bytes)
-    mapping_receipt = target.record_acquisition(crosswalk, ResolvedDataset(
-        f"reference:{NATIVE_DATASET}:crosswalk", "reference", _YEAR, _YEAR, "",
-        DatasetMetadata(title="Reviewed 2025 special education RDA Indicator 1 header crosswalk", version=str(_YEAR)),
-    ))
-    references = [{
-        "reference_id": name, "role": _REFERENCE_ROLES[name], "url": reference["url"],
-        "reviewed_sha256": reference["sha256"], "provenance_ids": [reference["receipt"]],
-    } for name, reference in metadata["references"].items()]
-    references.append({
-        "reference_id": "rda_crosswalk", "role": "schema", "path": crosswalk.name,
-        "reviewed_sha256": sha256(mapping_bytes).hexdigest(), "provenance_ids": [mapping_receipt],
-    })
-    metrics = {}
-    for table in tables:
-        for field in table["fields"]:
-            if field["disposition"] == "identity":
-                continue
-            name = field["field"]
-            metrics[name] = {"field": name, "unit": "percent" if name.endswith("rate") else "count"}
-            if name.endswith("multi_year_rate"):
-                metrics[name]["period"] = {"kind": "unknown"}
-    document = {"data_sources": {NATIVE_DATASET: {str(_YEAR): {
-        "path": "rda-original-input.csv",
-        "metadata": {
-            "version": str(_YEAR), "title": "2025 RDA Special Education Indicator 1 STAAR grades 3–8",
-            "publisher": "Texas Education Agency", "source_url": metadata["district_csv"]["selector_url"],
-            "period": tables[0]["metric_period"], "references": references, "metrics": metrics,
-            "notes": ("Raw publisher values. District single-year rates and counts use Spring 2025. "
-                      "A district period in a single-year rate may accompany a separately reported pooled rate. "
-                      "The pooled window is not identified at row grain. Texas is the direct state PDF, page 5; "
-                      "commas in printed counts are retained."),
-        },
-        "reader": {"profiles": {"source": {"column_schema": crosswalk.name}}},
-    }}}}
-    raw = (canonical_json(document) + "\n").encode()
-    config = stage / "rda-source-config.json"
-    config.write_bytes(raw)
-    receipt = target.record_acquisition(config, ResolvedDataset(
-        f"reference:{NATIVE_DATASET}:config", "reference", _YEAR, _YEAR, "",
-        DatasetMetadata(title="Exact RDA native source configuration", version=str(_YEAR)),
-    ))
-    cfg = load_config_bytes(raw, path=config)
-    source = cfg.resolve_dataset(NATIVE_DATASET, _YEAR, reader_profile="source", exact=True)
-    validate_reference_records(source, target.read_record)
-    return source, BuildRecorder(cfg, target), receipt
-
-
 def materialize_rda_special_education_indicator1(store: ProvenanceStore, output: Path) -> dict[str, Any]:
     """Build a local candidate in a new directory from retained publisher receipts."""
     if output.exists() or output.is_symlink():
         raise FileExistsError("RDA candidate requires a new exclusive output directory")
     metadata = rda_indicator1_metadata(_YEAR, _AREA)
-    mapping = files("teadata").joinpath("schemas", _CROSSWALK).read_bytes()
-    document = parse_column_schema(mapping)
+    config_bytes = _CONFIG.read_bytes()
+    cfg = load_config_bytes(config_bytes, path=_CONFIG)
+    source = cfg.resolve_dataset(NATIVE_DATASET, _YEAR, reader_profile="source", exact=True)
+    crosswalk = cfg.column_contract(NATIVE_DATASET, _YEAR, reader_profile="source")
+    if crosswalk is None or not cfg.is_source_only(NATIVE_DATASET, _YEAR):
+        raise ContractError("RDA native build requires the packaged source-only crosswalk")
+    document = parse_column_schema(crosswalk["text"].encode())
     mappings = crosswalk_dataset(document, NATIVE_DATASET, str(_YEAR))["tables"]
     table_mappings = {table["table"]: table for table in mappings}
     if set(table_mappings) != set(_KEYS):
         raise ContractError("RDA crosswalk must describe both reviewed source scopes")
     district_source, state_source = metadata["district_csv"], metadata["references"]["state_report"]
     refs = [*metadata["references"].values(), *metadata["district_report_witnesses"].values()]
-    roots = list(dict.fromkeys(reference["receipt"] for reference in [district_source, *refs]))
+    configured_refs = {ref.reference_id: ref for ref in source.metadata.references}
+    for name, ref in metadata["references"].items():
+        selected = configured_refs.get(name)
+        if (selected is None or selected.url != ref["url"] or selected.reviewed_sha256 != ref["sha256"]
+                or selected.provenance_ids != (ref["receipt"],)):
+            raise ContractError("RDA configuration differs from the reviewed publisher references")
+    roots = list(dict.fromkeys([
+        *(reference["receipt"] for reference in [district_source, *refs]),
+        *(identifier for ref in source.metadata.references for identifier in ref.provenance_ids),
+    ]))
     store.verify_record_closure(roots)
+    validate_reference_records(source, store.read_record)
     district_path, state_path = (_checked_source(store, item) for item in (district_source, state_source))
     pdftotext = which("pdftotext")
     if pdftotext is None:
@@ -200,7 +155,13 @@ def materialize_rda_special_education_indicator1(store: ProvenanceStore, output:
         target = ProvenanceStore(stage / "provenance")
         for identifier in roots:
             target.copy_record_from(store, identifier)
-        source, recorder, config_id = _config(Path(directory), target, mapping, metadata, mappings)
+        captured_config = Path(directory) / "teadata_sources.yaml"
+        captured_config.write_bytes(config_bytes)
+        config_id = target.record_acquisition(captured_config, ResolvedDataset(
+            f"reference:{NATIVE_DATASET}:config", "reference", _YEAR, _YEAR, "",
+            DatasetMetadata(title="Exact packaged RDA source configuration", version=str(_YEAR)),
+        ))
+        recorder = BuildRecorder(cfg, target)
         toolchain = {"python": sys.version, "pyarrow": version("pyarrow"), "platform": platform.platform(),
                      "architecture": platform.machine()}
         reviewed_selection = sha256(canonical_json(metadata).encode()).hexdigest()

@@ -15695,6 +15695,129 @@ data_sources:
               district: c2d7f80b8337da467f0adafdd4d03f88cb91f027b0b73e9335cde59999fd3cae
               campus: 08e7c76d93b78de31c3fb2e7b278ee1d70101a01695c1cbba99efb967b74a55b
 
+  rda_special_education_indicator1:
+    2025:
+      metadata:
+        metrics:
+          mathematics_denominator:
+            field: mathematics_denominator
+            unit: count
+          mathematics_multi_year_rate:
+            field: mathematics_multi_year_rate
+            period:
+              kind: unknown
+            unit: percent
+          mathematics_numerator:
+            field: mathematics_numerator
+            unit: count
+          mathematics_single_year_rate:
+            field: mathematics_single_year_rate
+            unit: percent
+          reading_language_arts_denominator:
+            field: reading_language_arts_denominator
+            unit: count
+          reading_language_arts_multi_year_rate:
+            field: reading_language_arts_multi_year_rate
+            period:
+              kind: unknown
+            unit: percent
+          reading_language_arts_numerator:
+            field: reading_language_arts_numerator
+            unit: count
+          reading_language_arts_single_year_rate:
+            field: reading_language_arts_single_year_rate
+            unit: percent
+          science_denominator:
+            field: science_denominator
+            unit: count
+          science_multi_year_rate:
+            field: science_multi_year_rate
+            period:
+              kind: unknown
+            unit: percent
+          science_numerator:
+            field: science_numerator
+            unit: count
+          science_single_year_rate:
+            field: science_single_year_rate
+            unit: percent
+          social_studies_denominator:
+            field: social_studies_denominator
+            unit: count
+          social_studies_multi_year_rate:
+            field: social_studies_multi_year_rate
+            period:
+              kind: unknown
+            unit: percent
+          social_studies_numerator:
+            field: social_studies_numerator
+            unit: count
+          social_studies_single_year_rate:
+            field: social_studies_single_year_rate
+            unit: percent
+          state_denominator:
+            field: state_denominator
+            unit: count
+          state_numerator:
+            field: state_numerator
+            unit: count
+          state_rate:
+            field: state_rate
+            unit: percent
+        notes: Raw publisher values. District single-year rates and counts use Spring 2025. A district period in a
+          single-year rate may accompany a separately reported pooled rate. The pooled window is not identified at
+          row grain. Texas is the direct state PDF, page 5; commas in printed counts are retained.
+        period:
+          end_year: 2025
+          kind: school_year
+          start_year: 2024
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - 6a074712a071df0d29063a31083540aac0c9028fa6f19d9d0eb4bf1e22d4b1a6
+          reference_id: data_dictionary
+          reviewed_sha256: 4ddabd1c3cb7c077ab3334a9636dfe77972914f3d9d831bd43fa5242a1057eb7
+          role: data_dictionary
+          url: https://tea.texas.gov/assessment-and-accountability/monitoring-and-interventions/rda/pbmas-pbm/2025-alpha-dictionary-0.pdf
+        - provenance_ids:
+          - a54d731f339cdb5c551c5c525eb3fef7a46ba6c938beab2d61faa74d33351c41
+          reference_id: masking_rules
+          reviewed_sha256: aec7a3dfacd1b636b972161cdb58b14321b96970efc145a318b206287477e02a
+          role: masking_methodology
+          url: https://tea2.tea.texas.gov/assessment-and-accountability/monitoring-and-interventions/rda/pbmas-pbm/2025-rda-masking-rules-1.pdf
+        - provenance_ids:
+          - 2d10f03448bb4dee344ca68932c7bfed0a4a682f0ba77513ce5c71114cffbc90
+          reference_id: state_report
+          reviewed_sha256: 79c9f7f12a06f54de5d57c31712f2b94bfb40b7829429f008220b105122dc64c
+          role: source_notes
+          url: https://tea.texas.gov/assessment-and-accountability/monitoring-and-interventions/rda/rda-state-reports/2025-rda-state.pdf
+        - provenance_ids:
+          - a867a3503a060d343ae7213fab9471c2251fd6d6bb76bdc1aeac14d4d0c19383
+          reference_id: technical_appendix
+          reviewed_sha256: 70a7b8e9c4f16e5557732f550543ab1a4c1a43fc5bb3cacb2e916c6a17d419f5
+          role: methodology
+          url: https://tea.texas.gov/texas-schools/accountability/academic-accountability/performance-reporting/2025-appendix-k-rda.pdf
+        - provenance_ids:
+          - d2973bcdd9875d460bbe14d9ab7a73a483433e2614c9e2001c101a6a95ff4022
+          reference_id: technical_manual
+          reviewed_sha256: 2c82ce9f303d87785a6ea873d229a204af9920433c0bbb1b5fb97c6bde16488d
+          role: methodology
+          url: https://tea.texas.gov/texas-schools/accountability/academic-accountability/performance-reporting/chapter-12-2025-rda.pdf
+        - path: schemas/rda--2025--sped-indicator1-crosswalk.json
+          provenance_ids:
+          - f49b8e82adbf8c7908c81072682fa14a8d40109c9497d2f584c97a4297625e8f
+          reference_id: rda_crosswalk
+          reviewed_sha256: 2a2f1678e475aecb91990e0f3ac78e049c3af36a8e1d3275bd5dc8cb50727685
+          role: schema
+        source_url: https://rptsvr1.tea.texas.gov/pbm/download.html
+        title: 2025 RDA Special Education Indicator 1 STAAR grades 3–8
+        version: '2025'
+      path: data/rda/2025/district-special-education.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/rda--2025--sped-indicator1-crosswalk.json
+
   peims_teacher_course_enrollment:
     2023:
       metadata:
