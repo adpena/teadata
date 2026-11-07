@@ -126,6 +126,25 @@ and field code remain available. A null raw pooled value indicates an
 omitted column, while a literal period indicates an available column with
 no pooled rate on that row.
 
+Build a local native candidate for the 2025 special-education area from the
+retained provenance store and Poppler's `pdftotext`.
+
+```sh
+uv run --locked python -m teadata.scripts.refresh_rda_indicator1 \
+  --store "$TEADATA_PROVENANCE_DIR" --output "$RDA_CANDIDATE_DIR"
+```
+
+The candidate has a district table with 1,208 publisher rows and a Texas
+table with four subjects. Open its `release.json` using the manifest hash
+in `MATERIALIZATION.json`. Select the exact district or state `EditionKey`
+from `DataRelease.catalog.editions()`. The district leaf contains 18
+selected source columns in the original CSV order, including literal
+district and ESC codes. Its exports accept `restore_original_headers=True`
+for the original CSV code row. The separate Texas leaf retains the printed
+rates and comma-formatted counts from page 5 of the state PDF. The native
+leaves carry raw values. Use `read_rda_indicator1()` for typed values and
+disclosure statuses. Pooled rates have an unresolved measurement window.
+
 [TEA district data and dictionaries](https://rptsvr1.tea.texas.gov/pbm/download.html) ·
 [TEA state reports](https://tea.texas.gov/assessment-and-accountability/monitoring-and-interventions/rda/rda-state-reports/rda-state-reports)
 

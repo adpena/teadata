@@ -295,12 +295,18 @@ def _plan_export(release: DataRelease, edition: EditionKey, *, restore_original_
     requested = fields if selected_fields is None else selected_fields
     artifact, projected = _projection(release, edition, requested, period=period)
     columns = projected if include_support else fields
-    original_error = "Original label and code headers require a complete raw TAPR table"
+    original_error = "Original headers require a complete raw TAPR table or reviewed code-only RDA district table"
+    header_kinds = ()
     if restore_original_headers:
-        try:
-            qualified_tapr_family(edition.dataset, TAPR_SOURCE_KEYS.get(edition.scope))
-        except ValueError as error:
-            raise ContractError(original_error) from error
+        from .rda_native import NATIVE_DATASET as rda_dataset
+
+        header_kinds = release.catalog._source_header_kinds(edition)
+        if not (edition.dataset == rda_dataset and edition.scope == edition.table == "district"
+                and header_kinds == ("code",)):
+            try:
+                qualified_tapr_family(edition.dataset, TAPR_SOURCE_KEYS.get(edition.scope))
+            except ValueError as error:
+                raise ContractError(original_error) from error
         if artifact.column_support is not None or fields != artifact.public_columns:
             raise ContractError(original_error)
         if selected_fields is not None:
@@ -316,7 +322,7 @@ def _plan_export(release: DataRelease, edition: EditionKey, *, restore_original_
                    for name in columns):
             raise ContractError(original_error)
     output_headers = (columns,) if not restore_original_headers else tuple(
-        tuple(row[kind] for row in headers) for kind in release.catalog._source_header_kinds(edition))
+        tuple(row[kind] for row in headers) for kind in header_kinds)
     return _ExportSelection(artifact, requested, columns, output_headers)
 
 

@@ -6,6 +6,7 @@ import pytest
 
 from teadata import rda
 from teadata.manifest import ContractError
+from teadata.rda_native import _district_projection, _state_projection
 
 
 def test_indicator1_registry_preserves_direct_state_and_absent_pooled_field():
@@ -76,3 +77,57 @@ def _fixture_metadata(raw, rows):
             "numerator_code": "N", "denominator_code": "D", "multi_year_rate_code": "PA",
         }],
     }
+
+
+_STATE_PAGE = """
+2025 Results Driven Accountability
+State Report
+Special Education
+Indicator       Rate       Numerator       Denominator
+1. SPED STAAR 3-8 Passing Rate
+   (i) Mathematics  70.0 - 100  44.7  192,262  430,232  2  44.7  44.3  49.3  -4.6
+   (ii) Reading Language Arts  70.0 - 100  48.8  212,721  435,743  2  48.8  47.5  49.3  -0.5
+   (iii) Science  65.0 - 100  41.3  55,572  134,448  1  41.3  36.6  43.8  -2.5
+   (iv) Social Studies  65.0 - 100  31.0  17,056  55,078  3  31.0  31.6  33.8  -2.8
+2. SPED Year-After-Exit (YAE) STAAR 3-8 Passing Rate
+"""
+
+
+def test_rda_state_native_keeps_literal_counts_and_direct_rate():
+    table = _state_projection(_STATE_PAGE, rda.rda_indicator1_metadata(2025, "04"))
+    assert table.num_rows == 4
+    assert table.to_pylist()[0] == {
+        "subject": "Mathematics", "state_rate": "44.7", "state_numerator": "192,262", "state_denominator": "430,232",
+    }
+
+
+@pytest.mark.parametrize(("before", "after", "message"), [
+    ("State Report", "District Report", "reviewed edition, area or table headings"),
+    ("(i) Mathematics", "(i) Science", "subject or report layout"),
+    ("44.7  192,262", "44.6  192,262", "reviewed direct Texas report"),
+    ("192,262", "192262", "reviewed direct Texas report"),
+])
+def test_rda_state_native_refuses_mismatched_page_or_cells(before, after, message):
+    text = _STATE_PAGE.replace(before, after, 1)
+    with pytest.raises(ContractError, match=message):
+        _state_projection(text, rda.rda_indicator1_metadata(2025, "04"))
+
+
+def test_rda_native_binds_csv_order_and_statistic_names(tmp_path, monkeypatch):
+    raw = b"DISTRICT,REGION,P,PA,N,D\n000001,01,.,54,12,26\n"
+    metadata = _fixture_metadata(raw, 1)
+    monkeypatch.setattr(rda, "rda_indicator1_metadata", lambda *_: metadata)
+    path = tmp_path / "source.csv"
+    path.write_bytes(raw)
+    names = ("district_number", "education_service_center", "mathematics_single_year_rate",
+             "mathematics_multi_year_rate", "mathematics_numerator", "mathematics_denominator")
+    mapping = {"fields": [{"code": code, "field": name} for code, name in
+                          zip(("DISTRICT", "REGION", "P", "PA", "N", "D"), names, strict=True)]}
+    table = _district_projection(path, mapping, metadata)
+    assert table.column_names == list(names)
+    assert table["mathematics_single_year_rate"].to_pylist() == ["."]
+    assert table["mathematics_multi_year_rate"].to_pylist() == ["54"]
+    fields = mapping["fields"]
+    fields[2]["field"], fields[3]["field"] = fields[3]["field"], fields[2]["field"]
+    with pytest.raises(ContractError, match="subject or statistic binding"):
+        _district_projection(path, mapping, metadata)
