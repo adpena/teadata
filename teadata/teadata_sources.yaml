@@ -16146,6 +16146,148 @@ data_sources:
             worksheet: Retention by Gender
             column_schema: schemas/edrs--2026--teacher-retention-crosswalk.json
 
+  educator_state_initial_certification_teacher:
+    2026:
+      path: data/educators/2026/newly-certified-by-role.xlsx
+      metadata:
+        title: TEA statewide initial standard teacher certification totals (September 2026 workbook)
+        publisher: Texas Education Agency
+        version: 2026-09
+        period:
+          kind: unknown
+        source_url: https://tea4avcastro.tea.state.tx.us/oess/edrs/newly-certified-by-role-dashboards/downloads/newly-certified-by-role-workbook.xlsx
+        metrics:
+          certification_count:
+            field: certification_count
+            unit: count
+        notes: Initial standard certification counts for the statewide teacher role. Academic year selects certification
+          year. The September 2026 workbook rollup and unique workbook detail totals reconcile to the November 2024
+          report on physical PDF pages 2 and 4 in the admitted years. The archive supplies a separate publisher-edition
+          comparison. Certification counts do not measure employment, hiring or retention. Other role-years require
+          separate qualification.
+        references:
+        - reference_id: certification_workbook
+          role: data_dictionary
+          title: TEA Newly Certified by Role workbook introduction and data dictionary
+          url: https://tea4avcastro.tea.state.tx.us/oess/edrs/newly-certified-by-role-dashboards/downloads/newly-certified-by-role-workbook.xlsx
+          reviewed_sha256: 148a8e20669aba384d0e398d093829f6db9b95a5d2391bd5f38d3051fb0c56bb
+          provenance_ids:
+          - fd872b771d3b8e2e3795172299b1286ef38991a901d0b0e1ca7f6246eb435d66
+        - reference_id: certification_role_archive
+          role: methodology
+          title: TEA Newly Certified Teacher Demographics by Preparation Route 2018–19 through 2023–24 (November 2024,
+            pages 2 and 4)
+          url: https://tea.texas.gov/data-reports/educator-data/newly-certified-teacher-demographics-by-preparation-route-1819-2324.pdf
+          reviewed_sha256: 2896473c95b544b559457e08d59e7ad9f2e00cc43739f4d16b2ea591e91719cf
+          provenance_ids:
+          - c5176d2bbbda687af09b22e92310d26d41d619448ec87bc755d25bb66ec703cd
+        - reference_id: certification_crosswalk
+          role: schema
+          path: schemas/edrs--2026--initial-certification-rollup-crosswalk.json
+          reviewed_sha256: d5040cac707e4b86715642967d39178625c2d45c0ab9b0408063e1b139987ea6
+          provenance_ids:
+          - 996bee4e068bdc6985c8394544acc81a6efaf4495a8e2d0c24769ffbb4b16b25
+      reader:
+        profiles:
+          source:
+            acquisition_id: fd872b771d3b8e2e3795172299b1286ef38991a901d0b0e1ca7f6246eb435d66
+            worksheet: Rolled up Data
+            column_schema: schemas/edrs--2026--initial-certification-rollup-crosswalk.json
+  educator_state_initial_certification_principal:
+    2026:
+      path: data/educators/2026/newly-certified-by-role.xlsx
+      metadata:
+        title: TEA statewide initial standard principal certification totals (September 2026 workbook)
+        publisher: Texas Education Agency
+        version: 2026-09
+        period:
+          kind: unknown
+        source_url: https://tea4avcastro.tea.state.tx.us/oess/edrs/newly-certified-by-role-dashboards/downloads/newly-certified-by-role-workbook.xlsx
+        metrics:
+          certification_count:
+            field: certification_count
+            unit: count
+        notes: Initial standard certification counts for the statewide principal role. Academic year selects certification
+          year. The September 2026 workbook rollup and unique workbook detail totals reconcile to the November 2024
+          report on physical PDF pages 1 and 2 in the admitted years. The archive supplies a separate publisher-edition
+          comparison. Certification counts do not measure employment, hiring or retention. Other role-years require
+          separate qualification.
+        references:
+        - reference_id: certification_workbook
+          role: data_dictionary
+          title: TEA Newly Certified by Role workbook introduction and data dictionary
+          url: https://tea4avcastro.tea.state.tx.us/oess/edrs/newly-certified-by-role-dashboards/downloads/newly-certified-by-role-workbook.xlsx
+          reviewed_sha256: 148a8e20669aba384d0e398d093829f6db9b95a5d2391bd5f38d3051fb0c56bb
+          provenance_ids:
+          - fd872b771d3b8e2e3795172299b1286ef38991a901d0b0e1ca7f6246eb435d66
+        - reference_id: certification_role_archive
+          role: methodology
+          title: TEA Newly Certified Principal Demographics by Preparation Route 2018–19 through 2023–24 (November
+            2024, pages 1 and 2)
+          url: https://tea.texas.gov/data-reports/educator-data/newly-certified-principal-demographics-by-preparation-route-1819-2324.pdf
+          reviewed_sha256: 02c1d85cf150ca34d4a271ad48818e02a151490382dbfce0dd26efd90490eac2
+          provenance_ids:
+          - 29f3f42fb2bad8737e6a8b2b76587367c81e6b2924248c6f685d9822ce8d358c
+        - reference_id: certification_crosswalk
+          role: schema
+          path: schemas/edrs--2026--initial-certification-rollup-crosswalk.json
+          reviewed_sha256: d5040cac707e4b86715642967d39178625c2d45c0ab9b0408063e1b139987ea6
+          provenance_ids:
+          - 996bee4e068bdc6985c8394544acc81a6efaf4495a8e2d0c24769ffbb4b16b25
+      reader:
+        profiles:
+          source:
+            acquisition_id: fd872b771d3b8e2e3795172299b1286ef38991a901d0b0e1ca7f6246eb435d66
+            worksheet: Rolled up Data
+            column_schema: schemas/edrs--2026--initial-certification-rollup-crosswalk.json
+  educator_state_initial_certification_superintendent:
+    2026:
+      path: data/educators/2026/newly-certified-by-role.xlsx
+      metadata:
+        title: TEA statewide initial standard superintendent certification totals (September 2026 workbook)
+        publisher: Texas Education Agency
+        version: 2026-09
+        period:
+          kind: unknown
+        source_url: https://tea4avcastro.tea.state.tx.us/oess/edrs/newly-certified-by-role-dashboards/downloads/newly-certified-by-role-workbook.xlsx
+        metrics:
+          certification_count:
+            field: certification_count
+            unit: count
+        notes: Initial standard certification counts for the statewide superintendent role. Academic year selects
+          certification year. The September 2026 workbook rollup and unique workbook detail totals reconcile to the
+          November 2024 report on physical PDF pages 1 and 2 in the admitted years. The archive supplies a separate
+          publisher-edition comparison. Certification counts do not measure employment, hiring or retention. Other
+          role-years require separate qualification.
+        references:
+        - reference_id: certification_workbook
+          role: data_dictionary
+          title: TEA Newly Certified by Role workbook introduction and data dictionary
+          url: https://tea4avcastro.tea.state.tx.us/oess/edrs/newly-certified-by-role-dashboards/downloads/newly-certified-by-role-workbook.xlsx
+          reviewed_sha256: 148a8e20669aba384d0e398d093829f6db9b95a5d2391bd5f38d3051fb0c56bb
+          provenance_ids:
+          - fd872b771d3b8e2e3795172299b1286ef38991a901d0b0e1ca7f6246eb435d66
+        - reference_id: certification_role_archive
+          role: methodology
+          title: TEA Newly Certified Superintendent Demographics by Preparation Route 2018–19 through 2023–24 (November
+            2024, pages 1 and 2)
+          url: https://tea.texas.gov/data-reports/educator-data/newly-certified-superintendent-demographics-by-preparation-route-1819-2324.pdf
+          reviewed_sha256: 84146d1886518a32ff42f79861c734edf0d691906940fb40e3fff60ead351820
+          provenance_ids:
+          - 1715aede602e8ccb59acd58c795db5a59eb0f38e957d82a5bfeeee074b45fe7c
+        - reference_id: certification_crosswalk
+          role: schema
+          path: schemas/edrs--2026--initial-certification-rollup-crosswalk.json
+          reviewed_sha256: d5040cac707e4b86715642967d39178625c2d45c0ab9b0408063e1b139987ea6
+          provenance_ids:
+          - 996bee4e068bdc6985c8394544acc81a6efaf4495a8e2d0c24769ffbb4b16b25
+      reader:
+        profiles:
+          source:
+            acquisition_id: fd872b771d3b8e2e3795172299b1286ef38991a901d0b0e1ca7f6246eb435d66
+            worksheet: Rolled up Data
+            column_schema: schemas/edrs--2026--initial-certification-rollup-crosswalk.json
+
   peims_teacher_course_enrollment:
     2023:
       metadata:

@@ -441,7 +441,10 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
                              ('educator_district_new_hires_by_epp', '5'),
                              ('educator_state_retention_by_preparation_route', '2026-04'),
                              ('educator_state_retention_by_demographic_group', '2026-04'),
-                             ('educator_state_retention_by_gender', '2026-04')):
+                             ('educator_state_retention_by_gender', '2026-04'),
+                             ('educator_state_initial_certification_teacher', '2026-09'),
+                             ('educator_state_initial_certification_principal', '2026-09'),
+                             ('educator_state_initial_certification_superintendent', '2026-09')):
         educator = current['data_sources'].pop(dataset)
         assert list(educator) == [2026]
         assert list(educator[2026]['reader']['profiles']) == ['source']

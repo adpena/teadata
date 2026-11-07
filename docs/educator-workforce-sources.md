@@ -118,3 +118,46 @@ uv run --locked python -m teadata.scripts.refresh_educator_retention \
 
 Repeat `--cohort-year` to choose explicit first-teaching school-year ending
 years. A 2018 selection builds the demographic and gender editions.
+
+## Initial standard certification by role
+
+The September 2026 TEA workbook and the November 2024 archived reports
+support a scoped statewide candidate of eight role-year totals.
+
+| Dataset | Academic years available in this candidate |
+|---|---|
+| `educator_state_initial_certification_teacher` | 2018–19 and 2019–20 |
+| `educator_state_initial_certification_principal` | 2021–22 through 2023–24 |
+| `educator_state_initial_certification_superintendent` | 2021–22 through 2023–24 |
+
+Each total agrees with the current workbook's direct rollup, its detail at
+unique keys, and both tables in the applicable archived report. The leaf
+preserves the workbook row, academic year, reported role, total dimensions,
+observed status and raw count. Academic year selects the certification
+year, September 1 through August 31. Counts refer to individuals receiving an initial standard certificate
+for the reported role. Employment, hiring, and retention use separate
+sources. The archived reports and current workbook are separate publisher
+editions. Unresolved role-years, including 2025–26 teacher detail, remain
+held. The three roles should be used as separately reported populations.
+
+```python
+view = release.observations(
+    "educator_state_initial_certification_principal",
+    "certification_count", scope="state", school_year=2024,
+)
+print(view.to_df())
+```
+
+Build the scoped candidate offline from the retained store and its exact
+archive readback observation.
+
+```sh
+uv run --locked python -m teadata.scripts.refresh_educator_certification \
+  --store "$TEADATA_PROVENANCE_DIR" --archive-receipt "$CERTIFICATION_ARCHIVE_RECEIPT" \
+  --output "$EDUCATOR_CERTIFICATION_CANDIDATE_DIR"
+```
+
+The crosswalk records the workbook's six dictionary definitions and source
+row numbers. Its published coding labels remain separate from the physical
+rollup types. For example, the dictionary labels gender and ethnicity as
+numeric while the rollup cells use the literal string `All`.
