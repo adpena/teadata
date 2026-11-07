@@ -30,6 +30,7 @@ from .values import ValueStatus
 
 DISTRICT_DATASET = "educator_district_new_hires"
 STATE_DATASET = "educator_state_new_hires"
+EPP_DATASET = "educator_district_new_hires_by_epp"
 YEAR = 2026
 SOURCE_ROW = "publisher_worksheet_row"
 _CONFIG = Path(__file__).with_name("teadata_sources.yaml")
@@ -56,6 +57,13 @@ _STATE_HEADERS = ("Academic Year", "Total New Hires", *(row[0] for row in CATEGO
                   *("Pct " + row[0] for row in CATEGORIES))
 _STATE_FIELDS = ("school_year_label", "total_new_hires_count", *(row[2] + "_count" for row in CATEGORIES),
                  *(row[2] + "_ratio" for row in CATEGORIES))
+_EPP_HEADERS = ("district", "schyr", "region", "distname", "geotype", "region_epp", "total_new_hires",
+                "EPP_assigned", "cert_cat", "region_2", "Year", "region_epp2")
+_EPP_FIELDS = ("district_number", "school_year_end", "education_service_center", "district_name", "district_geotype",
+               "publisher_epp_region", "new_hires_count", "reported_epp_assignment", "certification_at_hire_category",
+               "education_service_center_label", "school_year_label", "publisher_epp_region_label")
+
+
 class HiringSourceSpec(TypedDict):
     receipt: str
     sha256: str
@@ -64,6 +72,9 @@ class HiringSourceSpec(TypedDict):
     worksheet: str
     url: str
     years: tuple[int, ...]
+    headers: tuple[str, ...]
+    fields: tuple[str, ...]
+    key_columns: tuple[str, ...]
 
 
 _SOURCES: dict[str, HiringSourceSpec] = {
@@ -71,25 +82,30 @@ _SOURCES: dict[str, HiringSourceSpec] = {
         "receipt": "bec3aac823d68bc6600033955fc4b27b94124d8724cfb4932e3c13ed93f92e34",
         "sha256": "87ef6bdd10d6045e663f3a7aaa6ba819e4bf67ab9067404ec540011f793ab1af",
         "edition": "5", "scope": "district", "worksheet": "District Counts", "years": tuple(range(2010, YEAR + 1)),
+        "headers": _DISTRICT_HEADERS, "fields": _DISTRICT_FIELDS,
+        "key_columns": ("district_number", "school_year_end", "certification_at_hire_category"),
         "url": "https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/downloads/new-hires-by-school-system-view-3.xlsx",
     },
     STATE_DATASET: {
         "receipt": "792c5aa57758dde8613cc7c4a4a460684b45c5826f6167ad002a069e1bec7a7a",
         "sha256": "fa02256f69a594e95a250b80d32bb3a43ecfe65f493857305ac4e54f0e1d77ee",
         "edition": "2026-04", "scope": "state", "worksheet": "New Hires", "years": tuple(range(2016, YEAR + 1)),
+        "headers": _STATE_HEADERS, "fields": _STATE_FIELDS, "key_columns": (),
         "url": "https://tea4avcastro.tea.state.tx.us/oess/edrs/new-hire-and-attrition-dashboard/downloads/Attrition_New%20Hires_Workbook.xlsx",
+    },
+    EPP_DATASET: {
+        "receipt": "7556f3c4f2e144e7c5a3768b0789494f78fa3db75d29727f63bcf3972260fad8",
+        "sha256": "2ed577abc10c60f32d093228fbc685c9fbc5584dda1a7635e95907256ca7db98",
+        "edition": "5", "scope": "district", "worksheet": "District Counts Long", "years": tuple(range(2010, YEAR + 1)),
+        "headers": _EPP_HEADERS, "fields": _EPP_FIELDS,
+        "key_columns": ("district_number", "school_year_end", "certification_at_hire_category",
+                        "publisher_epp_region", "reported_epp_assignment"),
+        "url": "https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/downloads/new-hires-by-school-system-and-epp-views-4-and-5.xlsx",
     },
 }
 SCHOOL_YEARS = tuple(sorted(set(_SOURCES[DISTRICT_DATASET]["years"]) & set(_SOURCES[STATE_DATASET]["years"])))
 AVAILABLE_SCHOOL_YEARS = tuple(sorted({year for source in _SOURCES.values() for year in source["years"]}))
-_EPP = {
-    "reference_id": "hiring_epp_comparison",
-    "receipt": "7556f3c4f2e144e7c5a3768b0789494f78fa3db75d29727f63bcf3972260fad8",
-    "sha256": "2ed577abc10c60f32d093228fbc685c9fbc5584dda1a7635e95907256ca7db98",
-    "url": "https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/downloads/new-hires-by-school-system-and-epp-views-4-and-5.xlsx",
-}
-_EPP_HEADERS = ("district", "schyr", "region", "distname", "geotype", "region_epp", "total_new_hires",
-                "EPP_assigned", "cert_cat", "region_2", "Year", "region_epp2")
+_EPP_REFERENCE_ID = "hiring_epp_comparison"
 
 
 def _selected_years(school_years: Sequence[int], *, available: Sequence[int] = AVAILABLE_SCHOOL_YEARS) -> tuple[int, ...]:
@@ -107,8 +123,8 @@ def _table_name(dataset: str, school_year: int) -> str:
 def _read_years(path: Path, dataset: str, school_years: Sequence[int]) -> dict[int, tuple[list[tuple], list[int]]]:
     years = _selected_years(school_years, available=_SOURCES[dataset]["years"])
     selection = _SOURCES[dataset]
-    district = dataset == DISTRICT_DATASET
-    expected = _DISTRICT_HEADERS if district else _STATE_HEADERS
+    district = selection["scope"] == "district"
+    expected = selection["headers"]
     selected: dict[int, tuple[list[tuple], list[int]]] = {year: ([], []) for year in years}
     labels = {f"{year - 1}-{year % 100:02d}": year for year in years}
     with path.open("rb") as stream:
@@ -139,13 +155,17 @@ def _read_rows(path: Path, dataset: str, *, school_year: int = YEAR) -> tuple[li
 def _projection(rows: list[tuple], locators: list[int], dataset: str, *,
                 school_year: int = YEAR) -> tuple[pa.Table, dict[str, Any]]:
     _selected_years((school_year,), available=_SOURCES[dataset]["years"])
-    district = dataset == DISTRICT_DATASET
-    names = _DISTRICT_FIELDS if district else _STATE_FIELDS
+    names = _SOURCES[dataset]["fields"]
     columns: dict[str, Any] = {}
     support: dict[str, Any] = {"fields": {}, "context": [SOURCE_ROW]}
     seen = set()
     for row in rows:
-        if district:
+        if dataset == EPP_DATASET:
+            key = _epp_row_key(row, school_year)
+            if key in seen:
+                raise ContractError("Educator hiring EPP key, count or population changed")
+            seen.add(key)
+        elif dataset == DISTRICT_DATASET:
             identifier, year, region, category, count, _, _, _, label = row
             key = identifier, year, category
             if (not isinstance(identifier, str) or re.fullmatch(r"[0-9]{6}", identifier) is None
@@ -199,44 +219,41 @@ def _qualify(district: pa.Table, state: pa.Table) -> dict[str, Any]:
 
 
 def _epp_reference(source: ResolvedDataset, store: ProvenanceStore) -> Path:
-    references = [ref for ref in source.metadata.references if ref.reference_id == _EPP["reference_id"]]
-    if (len(references) != 1 or references[0].role != "source_notes" or references[0].url != _EPP["url"]
-            or references[0].reviewed_sha256 != _EPP["sha256"] or references[0].provenance_ids != (_EPP["receipt"],)):
+    selection = _SOURCES[EPP_DATASET]
+    references = [ref for ref in source.metadata.references if ref.reference_id == _EPP_REFERENCE_ID]
+    if (len(references) != 1 or references[0].role != "source_notes" or references[0].url != selection["url"]
+            or references[0].reviewed_sha256 != selection["sha256"] or references[0].provenance_ids != (selection["receipt"],)):
         raise ContractError("Educator hiring requires the exact reviewed EPP comparison reference")
-    record = store.read_record(_EPP["receipt"])
-    if (record.get("kind") != "acquisition" or record["artifact"]["sha256"] != _EPP["sha256"]
-            or record["source_metadata"].get("version") != "5" or record.get("requested_url") != _EPP["url"]
-            or record.get("resolved_url") != _EPP["url"]):
+    record = store.read_record(selection["receipt"])
+    if (record.get("kind") != "acquisition" or record["artifact"]["sha256"] != selection["sha256"]
+            or record["source_metadata"].get("version") != selection["edition"] or record.get("requested_url") != selection["url"]
+            or record.get("resolved_url") != selection["url"]):
         raise ContractError("Educator hiring EPP acquisition differs from the reviewed publisher product")
-    return store.verify_artifact(_EPP["sha256"])
+    return store.verify_artifact(selection["sha256"])
+
+
+def _epp_row_key(row: tuple, school_year: int) -> tuple[int, str, str, str, str]:
+    district, year, region, _, _, epp_region, count, epp, category, _, label, _ = row
+    if (type(year) is not int or year != school_year or not isinstance(district, str)
+            or re.fullmatch(r"[0-9]{6}", district) is None or district == "000000"
+            or not isinstance(region, str) or re.fullmatch(r"0[1-9]|1[0-9]|20", region) is None
+            or category not in _CATEGORY_LABELS or not isinstance(epp_region, str) or not epp_region
+            or not isinstance(epp, str) or not epp or label != f"{year - 1}-{year}"
+            or type(count) is not int or count < 0):
+        raise ContractError("Educator hiring EPP key, count or population changed")
+    return year, district, category, epp_region, epp
+
+
+def _group_epp(table: pa.Table, counts: Counter[tuple[int, str, str]]) -> None:
+    for row in table.select(["school_year_end", "district_number", "certification_at_hire_category", "new_hires_count"]).to_pylist():
+        counts[row["school_year_end"], row["district_number"], row["certification_at_hire_category"]] += row["new_hires_count"]
 
 
 def _epp_counts(path: Path, years: Sequence[int]) -> Counter[tuple[int, str, str]]:
-    selected = _selected_years(years, available=_SOURCES[DISTRICT_DATASET]["years"])
     counts: Counter[tuple[int, str, str]] = Counter()
-    seen = set()
-    with path.open("rb") as stream:
-        book = load_workbook(stream, read_only=True, data_only=False, keep_links=False)
-        try:
-            rows = iter(book["District Counts Long"].values)
-            if next(rows) != _EPP_HEADERS:
-                raise ContractError("Educator hiring EPP headers differ from the reviewed source")
-            for row in rows:
-                district, year, region, _, _, epp_region, count, epp, category, _, label, _ = row
-                if year not in selected:
-                    continue
-                key = year, district, category, epp_region, epp
-                if (type(year) is not int or not isinstance(district, str)
-                        or re.fullmatch(r"[0-9]{6}", district) is None or district == "000000"
-                        or not isinstance(region, str) or re.fullmatch(r"0[1-9]|1[0-9]|20", region) is None
-                        or category not in _CATEGORY_LABELS or not isinstance(epp_region, str) or not epp_region
-                        or not isinstance(epp, str) or not epp or key in seen or label != f"{year - 1}-{year}"
-                        or type(count) is not int or count < 0):
-                    raise ContractError("Educator hiring EPP key, count or population changed")
-                seen.add(key)
-                counts[year, district, category] += count
-        finally:
-            book.close()
+    for year, (rows, locators) in _read_years(path, EPP_DATASET, years).items():
+        table, _ = _projection(rows, locators, EPP_DATASET, school_year=year)
+        _group_epp(table, counts)
     return counts
 
 
@@ -248,7 +265,7 @@ def _qualify_epp(district: pa.Table, expected: Counter[tuple[int, str, str]], ye
         raise ContractError("District hiring keys or counts differ from the EPP-disaggregated publisher report")
     return {"district_rows": district.num_rows, "districts": len(set(district["district_number"].to_pylist())),
             "epp_comparison_keys": len(observed), "epp_comparison_exact": True,
-            "comparison_reference_id": _EPP["reference_id"], "direct_state_comparison": "unavailable"}
+            "comparison_reference_id": _EPP_REFERENCE_ID, "direct_state_comparison": "unavailable"}
 
 
 def materialize_educator_hiring(store: ProvenanceStore, output: Path, *,
@@ -267,7 +284,7 @@ def materialize_educator_hiring(store: ProvenanceStore, output: Path, *,
             continue
         source = config.resolve_dataset(dataset, YEAR, reader_profile="source", exact=True)
         options = reader_options(source.reader, "source")
-        names = _DISTRICT_FIELDS if dataset == DISTRICT_DATASET else _STATE_FIELDS
+        names = selection["fields"]
         metrics = {name: MetricDefinition(name, unit="ratio" if name.endswith("_ratio") else "count")
                    for name in names if name.endswith(("_count", "_ratio"))}
         if (source.metadata.version != selection["edition"] or source.metadata.period != DataPeriod()
@@ -287,27 +304,34 @@ def materialize_educator_hiring(store: ProvenanceStore, output: Path, *,
         if resource is None:
             raise ContractError("Educator hiring requires its reviewed source crosswalk")
         mappings = crosswalk_dataset(parse_column_schema(resource["text"].encode()), dataset, selection["edition"])["tables"]
-        headers = _DISTRICT_HEADERS if dataset == DISTRICT_DATASET else _STATE_HEADERS
+        headers = selection["headers"]
         if ({mapping["table"] for mapping in mappings} != {_table_name(dataset, year) for year in selection["years"]}
                 or len(mappings) != len(selection["years"])):
             raise ContractError("Educator hiring crosswalk differs from the reviewed measurement years")
         by_table = {mapping["table"]: mapping for mapping in mappings}
+        shared_contract = {name: value for name, value in by_table[_table_name(dataset, YEAR)].items()
+                           if name not in {"table", "metric_period"}}
         if any(mapping["input_sha256"] != selection["sha256"]
                or mapping["metric_period"] != DataPeriod("school_year", year - 1, year).to_dict()
                or [field["field"] for field in mapping["fields"]] != list(names)
                or [field["code"] for field in mapping["fields"]] != list(headers)
+               or {name: value for name, value in mapping.items() if name not in {"table", "metric_period"}} != shared_contract
                for year in selection["years"] for mapping in (by_table[_table_name(dataset, year)],)):
             raise ContractError("Educator hiring crosswalk differs from the reviewed fields and headers")
         for year, (rows, locators) in _read_years(store.verify_artifact(selection["sha256"]), dataset, source_years).items():
             projections[dataset, year] = _projection(rows, locators, dataset, school_year=year)
         sources[dataset] = source
         roots.extend([selection["receipt"], *reference_ids])
-    earlier = tuple(year for year in years if year not in _SOURCES[STATE_DATASET]["years"])
-    expected = _epp_counts(_epp_reference(sources[DISTRICT_DATASET], store), earlier) if earlier else Counter()
-    qualifications = {
-        year: (_qualify_epp(projections[DISTRICT_DATASET, year][0], expected, year) if year in earlier else
-               _qualify(projections[DISTRICT_DATASET, year][0], projections[STATE_DATASET, year][0])) for year in years
-    }
+    _epp_reference(sources[DISTRICT_DATASET], store)
+    qualifications = {}
+    for year in years:
+        expected: Counter[tuple[int, str, str]] = Counter()
+        _group_epp(projections[EPP_DATASET, year][0], expected)
+        comparison = _qualify_epp(projections[DISTRICT_DATASET, year][0], expected, year)
+        if year in _SOURCES[STATE_DATASET]["years"]:
+            comparison.update(_qualify(projections[DISTRICT_DATASET, year][0], projections[STATE_DATASET, year][0]))
+            comparison["direct_state_comparison"] = "exact_category_counts_and_ratios"
+        qualifications[year] = comparison
     output.parent.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory(prefix=".educator-hiring-", dir=output.parent) as directory:
         stage = Path(directory) / "bundle"
@@ -326,7 +350,7 @@ def materialize_educator_hiring(store: ProvenanceStore, output: Path, *,
         for (dataset, year), (table, support) in projections.items():
             selection = _SOURCES[dataset]
             source = sources[dataset]
-            keys = ["district_number", "school_year_end", "certification_at_hire_category"] if dataset == DISTRICT_DATASET else []
+            keys = list(selection["key_columns"])
             grain = "one publisher row per " + " and ".join(keys) if keys else STATEWIDE_SINGLETON_GRAIN
             key = EditionKey(dataset, selection["edition"], EditionKey.source_revision((selection["sha256"],)),
                              selection["scope"], _table_name(dataset, year), grain)
@@ -354,13 +378,18 @@ def materialize_educator_hiring(store: ProvenanceStore, output: Path, *,
                             "rows": table.num_rows, "processing_record_id": processing})
         catalog = recorder.catalog(schema_version=4)
         manifest = publish_release(stage, catalog, schema_version=4)
+        by_dataset = {dataset: [year for year in years if year in selection["years"]] for dataset, selection in _SOURCES.items()}
+        by_scope = {scope: sorted({year for dataset, selection in _SOURCES.items() if selection["scope"] == scope
+                                  for year in by_dataset[dataset]}) for scope in {source["scope"] for source in _SOURCES.values()}}
         result = {"status": "unpublished_native_educator_hiring", "build_id": catalog.build_id,
                   "manifest_sha256": file_identity(manifest)["sha256"],
                   "qualification": {"school_years": list(years), "by_school_year": qualifications},
-                  "school_years_by_scope": {selection["scope"]: [year for year in years if year in selection["years"]]
-                                             for selection in _SOURCES.values()},
-                  "unavailable_school_years_by_scope": {selection["scope"]: [year for year in years if year not in selection["years"]]
-                                                         for selection in _SOURCES.values()},
+                  "school_years_by_dataset": by_dataset,
+                  "unavailable_school_years_by_dataset": {dataset: [year for year in years if year not in available]
+                                                          for dataset, available in by_dataset.items()},
+                  "school_years_by_scope": by_scope,
+                  "unavailable_school_years_by_scope": {scope: [year for year in years if year not in available]
+                                                        for scope, available in by_scope.items()},
                   "editions": results, "release_activation": False}
         (stage / "MATERIALIZATION.json").write_text(canonical_json(result) + "\n", encoding="utf-8")
         _install_candidate(stage, output)

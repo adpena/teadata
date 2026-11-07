@@ -27,7 +27,7 @@ from teadata.teadata_config import Config
 
 def fixture_release(tmp_path, *, damage=None, schema_version=3, batch_bytes=1024, scope='district',
                     annotation=False, alias=False, last_enrollment='', source_headers='labels', periods=False,
-                    http_receipt=False):
+                    http_receipt=False, source_notes=None):
     store = ProvenanceStore(tmp_path / 'history')
     dataset = f'{scope}_tapr_student_profile'
     names = [f'{scope}_number', 'membership', 'enrollment']
@@ -84,7 +84,7 @@ def fixture_release(tmp_path, *, damage=None, schema_version=3, batch_bytes=1024
     schema_observation = store.record_acquisition(schema, replace(source, dataset='reference:local_crosswalk', path=str(schema)))
     cfg = Config.from_dict({'data_sources': {dataset: {2025: {'path': str(raw),
         'reader': {'profiles': {'source': {'column_schema': schema.name}}},
-        'metadata': {'version': '2025', 'provenance_ids': [acquisition], **({
+        'metadata': {'version': '2025', 'provenance_ids': [acquisition], 'notes': source_notes, **({
             'source_url': 'https://example.org/report',
             'download_url': 'https://example.org/download.csv',
         } if http_receipt else {}), **({
@@ -242,6 +242,38 @@ def test_direct_export_provenance_reflects_its_own_physical_columns(tmp_path):
     columns = {column['column']: column for column in release.table(key).select('membership').provenance().to_dict()['columns']}
     assert columns['membership_raw']['support_for'] == [{'field': 'membership', 'role': 'raw'}]
     assert columns['membership_status']['support_for'] == [{'field': 'membership', 'role': 'status'}]
+
+
+@pytest.mark.parametrize('notes', [None, '', '=Retrospective release; older dictionary has edition gaps.'])
+def test_native_export_notes_are_catalog_bound_optional_and_literal(tmp_path, monkeypatch, notes):
+    from openpyxl import load_workbook
+
+    release, _, key, _ = fixture_release(tmp_path, schema_version=4, source_notes=notes)
+
+    def reject_current_config(*args, **kwargs):
+        pytest.fail('Export notes consulted current config or opened a data leaf')
+
+    monkeypatch.setattr('teadata.teadata_config.load_config', reject_current_config)
+    monkeypatch.setattr(release, 'analytical_dataset', reject_current_config)
+    provenance = release.table(key).provenance()
+    document = provenance.to_dict()
+    if notes:
+        assert document['source']['notes'] == notes
+        document['source']['notes'] = 'Mutated caller copy'
+        assert provenance.to_dict()['source']['notes'] == notes
+    else:
+        assert 'notes' not in document['source']
+    stream = BytesIO()
+    provenance.to_excel(stream)
+    assert read_provenance_workbook(stream)[1] == provenance.to_dict()
+    book = load_workbook(stream, read_only=True)
+    try:
+        note_rows = [row for row in book['Provenance'].iter_rows() if row[0].value == 'Source notes']
+        assert len(note_rows) == int(bool(notes))
+        if notes:
+            assert note_rows[0][1].value == notes and note_rows[0][1].data_type == 's'
+    finally:
+        book.close()
 
 
 def test_provenance_workbook_preserves_unsafe_long_metadata_as_chunked_json():

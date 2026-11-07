@@ -15870,15 +15870,76 @@ data_sources:
         - reference_id: educator_hiring_crosswalk
           role: schema
           path: schemas/edrs--2026--new-hires-crosswalk.json
-          reviewed_sha256: d1aa0e56a71730c9aba65bb1d9a26a2a4086090149c107b487cc10c33267fed0
+          reviewed_sha256: 41d91c444b68f8a7963565a3c119fe51560b05517d36fa6b451bfe1c6fda6752
           provenance_ids:
-          - e72922c68bd3af3d2851e45c756f99c1a765f0a162461a785bed6fac0b6e0474
+          - 0d8c7b9b574b5fce159e9f448f625cdd1a166708457ffb222131b4c3ae4468f8
       reader:
         profiles:
           source:
             acquisition_id: bec3aac823d68bc6600033955fc4b27b94124d8724cfb4932e3c13ed93f92e34
             worksheet: District Counts
             column_schema: schemas/edrs--2026--new-hires-crosswalk.json
+  educator_district_new_hires_by_epp:
+    2026:
+      path: data/educators/2026/district-new-hires-by-epp.xlsx
+      metadata:
+        title: TEA district new teacher hires by reported EPP assignment (version 5)
+        publisher: Texas Education Agency
+        version: '5'
+        period:
+          kind: unknown
+        source_url: https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/downloads/new-hires-by-school-system-and-epp-views-4-and-5.xlsx
+        metrics:
+          new_hires_count:
+            field: new_hires_count
+            unit: count
+        notes: Retrospective 2009–10 through 2025–26 district observations. Reported EPP assignments include non-institution
+          placeholders and do not establish institution identity or preparation route. Region and assignment tokens
+          are retained verbatim. Only five v5 headers match the January 2023 dictionary codes literally; its descriptions
+          are dated evidence and may not cover later categories. No direct campus or statewide EPP-disaggregated observations
+          are supplied by this workbook.
+        references:
+        - reference_id: regional_dashboard_index
+          role: source_notes
+          title: TEA regional educator dashboards and version history
+          url: https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/
+          reviewed_sha256: a7750c4c19e348acbf0745c3801dda2d1ef722a019fec069ea3fa3fd72c70adf
+          provenance_ids:
+          - a8ef9adb5ea04c99e9a47d53fdb6a3abefda445a5dda084e5959343c643af924
+        - reference_id: regional_data_documentation
+          role: data_dictionary
+          title: TEA regional data documentation (January 2023; five exact-code matches to the twelve v5 EPP headers)
+          url: https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/downloads/newly-certified-and-new-teacher-hires-data-documentation.xlsx
+          reviewed_sha256: 2d05fc266ef656b03ebba958ac15dd5b8f3438c66cca2a711077a4470036f28c
+          provenance_ids:
+          - 33d7f3141db505a557bcfed8e16adf796131f7e1ecb2b0748b5635cf7f1f136f
+        - reference_id: regional_business_rules
+          role: methodology
+          title: TEA regional business rules (April 2025; predates version 5)
+          url: https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/downloads/newly-certified-and-new-teacher-hires-business-rules.pdf
+          reviewed_sha256: 7125d37e3dd45d9128a698e6084073c9441dca0fae1d349c98b50af67ed6ade5
+          provenance_ids:
+          - 75685e0bd643e8f5ecb607f5028bec3c45e98884f6880cc8d21f3dee7be93ff1
+        - reference_id: hiring_primary_comparison
+          role: source_notes
+          title: TEA version 5 district hiring workbook (comparison at district/year/category grain)
+          url: https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/downloads/new-hires-by-school-system-view-3.xlsx
+          reviewed_sha256: 87ef6bdd10d6045e663f3a7aaa6ba819e4bf67ab9067404ec540011f793ab1af
+          provenance_ids:
+          - bec3aac823d68bc6600033955fc4b27b94124d8724cfb4932e3c13ed93f92e34
+        - reference_id: educator_hiring_crosswalk
+          role: schema
+          path: schemas/edrs--2026--new-hires-crosswalk.json
+          reviewed_sha256: 41d91c444b68f8a7963565a3c119fe51560b05517d36fa6b451bfe1c6fda6752
+          provenance_ids:
+          - 0d8c7b9b574b5fce159e9f448f625cdd1a166708457ffb222131b4c3ae4468f8
+      reader:
+        profiles:
+          source:
+            acquisition_id: 7556f3c4f2e144e7c5a3768b0789494f78fa3db75d29727f63bcf3972260fad8
+            worksheet: District Counts Long
+            column_schema: schemas/edrs--2026--new-hires-crosswalk.json
+
   educator_state_new_hires:
     2026:
       path: data/educators/2026/state-new-hires.xlsx
@@ -15962,9 +16023,9 @@ data_sources:
         - reference_id: educator_hiring_crosswalk
           role: schema
           path: schemas/edrs--2026--new-hires-crosswalk.json
-          reviewed_sha256: d1aa0e56a71730c9aba65bb1d9a26a2a4086090149c107b487cc10c33267fed0
+          reviewed_sha256: 41d91c444b68f8a7963565a3c119fe51560b05517d36fa6b451bfe1c6fda6752
           provenance_ids:
-          - e72922c68bd3af3d2851e45c756f99c1a765f0a162461a785bed6fac0b6e0474
+          - 0d8c7b9b574b5fce159e9f448f625cdd1a166708457ffb222131b4c3ae4468f8
       reader:
         profiles:
           source:

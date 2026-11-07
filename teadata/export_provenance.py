@@ -122,6 +122,8 @@ def describe_export(release: DataRelease, artifact: ArtifactRef, fields: tuple[s
         "columns": projection,
         "edition_acquisitions": receipts,
     }
+    if source.notes:
+        document["source"]["notes"] = source.notes
     description_sha256 = sha256(canonical_json(document).encode()).hexdigest()
     return ExportProvenance(canonical_json({**document, "description_sha256": description_sha256,
                                             "citation": citation(release).text}))
@@ -196,6 +198,8 @@ class ExportProvenance:
         append(("Citation", document["citation"]))
         if source["publisher_citation"]:
             append(("Publisher citation", source["publisher_citation"]))
+        if source.get("notes"):
+            append(("Source notes", source["notes"]))
         if source["published_at"] or source["revised_at"]:
             append(("Published / revised", source["published_at"], source["revised_at"]))
         if source["qualifiers"]:

@@ -1,7 +1,7 @@
 import pytest
 
 from teadata.educator_hiring import (
-    CATEGORIES, DISTRICT_DATASET, STATE_DATASET, _epp_counts, _epp_reference, _projection, _qualify,
+    CATEGORIES, DISTRICT_DATASET, EPP_DATASET, STATE_DATASET, _epp_counts, _epp_reference, _projection, _qualify,
     _qualify_epp, _read_rows, _read_years, _selected_years,
 )
 from teadata.manifest import ContractError
@@ -96,12 +96,12 @@ def test_hiring_source_selection_excludes_historical_rows(tmp_path):
 
 def test_hiring_contract_is_source_only_and_keeps_product_and_measurement_years():
     cfg = load_config()
-    for dataset, edition in ((DISTRICT_DATASET, "5"), (STATE_DATASET, "2026-04")):
+    for dataset, edition in ((DISTRICT_DATASET, "5"), (STATE_DATASET, "2026-04"), (EPP_DATASET, "5")):
         source = cfg.resolve_dataset(dataset, 2026, reader_profile="source", exact=True)
         assert source.metadata.version == edition
         assert source.metadata.period.kind == "unknown"
         records = cfg.header_records(dataset, edition=edition, reader_profile="source")
-        assert {row["period"]["end_year"] for row in records if row["disposition"] == "fact"} == set(range(2010 if dataset == DISTRICT_DATASET else 2016, 2027))
+        assert {row["period"]["end_year"] for row in records if row["disposition"] == "fact"} == set(range(2016 if dataset == STATE_DATASET else 2010, 2027))
         assert cfg.is_source_only(dataset, 2026)
         with pytest.raises(ContractError, match="Reader profile is required"):
             cfg.load_df(dataset, 2026)
@@ -224,6 +224,32 @@ def test_epp_comparison_rejects_unreviewed_tokens_and_population(tmp_path, index
 def test_epp_comparison_rejects_duplicate_source_keys(tmp_path):
     with pytest.raises(ContractError, match="key, count or population"):
         _epp_counts(epp_workbook(tmp_path, [epp_row(), epp_row()]), (2013,))
+
+
+def test_epp_native_rows_keep_region_placeholder_and_blank_name_without_collapse():
+    first = list(epp_row(0))
+    first[3], first[5], first[7], first[11] = '', 'NA', 'Na-Uncertified', 'NA'
+    second = list(first)
+    second[5], second[11] = '07', '07-Kilgore'
+    table, support = _projection([tuple(first), tuple(second)], [8, 9], EPP_DATASET, school_year=2013)
+    assert table['publisher_epp_region'].to_pylist() == ['NA', '07']
+    assert table['reported_epp_assignment'].to_pylist() == ['Na-Uncertified'] * 2
+    assert table['district_name'].to_pylist() == ['', '']
+    assert table['raw_new_hires_count'].to_pylist() == ['0', '0']
+    assert table['status_new_hires_count'].to_pylist() == ['observed', 'observed']
+    assert table['publisher_worksheet_row'].to_pylist() == [8, 9]
+    assert support['fields']['new_hires_count']['raw'] == 'raw_new_hires_count'
+
+
+def test_epp_dictionary_does_not_guess_renamed_codes_or_institution_id():
+    cfg = load_config()
+    records = cfg.header_records(EPP_DATASET, edition='5', table='district_2013', reader_profile='source')
+    documented = {row['code']: row for row in records if row['dictionary_status'] == 'documented'}
+    assert set(documented) == {'schyr', 'region_epp', 'cert_cat', 'EPP_assigned', 'total_new_hires'}
+    assert all(row['code'] == row['label'] for row in records)
+    assert documented['EPP_assigned']['field'] == 'reported_epp_assignment'
+    assert documented['EPP_assigned']['dictionary_occurrences'][0]['source_line'] == 9
+    assert {row['field'] for row in records}.isdisjoint({'epp_id', 'preparation_route'})
 
 
 def test_epp_reference_must_match_exact_publisher_metadata_before_opening_source():
