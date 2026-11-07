@@ -46,7 +46,7 @@ Consult the selected release's catalog for queryable editions and fields.
 | Summary of Finances | Verified [School District State Aid Reports](https://tealprod.tea.state.tx.us/Tea.FspReports.Web/) district and charter downloads for 2012–13 and 2013–14 | These summaries are direct statewide totals for separate sectors. TEA also offers individual district and charter reports. Keep the run-list date, workbook update date, run, status, and any row-level run IDs separately. |
 | Geography | [TEA's ArcGIS archive](https://schoolsdata2-db440-tea-texas.opendata.arcgis.com/) and historical locator layers for [2012–13](https://schoolsdata2-tea-texas.opendata.arcgis.com/datasets/school2012) and [2013–14](https://schoolsdata2-tea-texas.opendata.arcgis.com/datasets/school2013) | Campus points and district polygons have separate vintages. Preserve records with absent coordinates and investigate duplicate campus identifiers before using points for joins. Establish historical polygon coverage independently. |
 | Discipline and transfers | [Discipline summary archive](https://tea.texas.gov/data-reports/student-data/discipline-data-products/discipline-reports) and [district transfer reports](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/district_transfer_report.html) reach the starting years | Discipline offers statewide district, campus, and Texas downloads. TEA documents [statewide campus transfer CSVs](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/about_transfer_reports.html) beginning in 2020–21. |
-| Educator workforce | [TEA educator reports](https://tea.texas.gov/data-reports/educator-data/educator-reports-and-data) and [version 5 hiring workbooks](https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/) | The retained district hiring products cover 2009–10 through 2025–26. The separately published state hiring workbook covers 2015–16 through 2025–26. Retention, employed certification and newly certified supply have their own cohorts and scopes. The local hiring producer selects 2025–26. |
+| Educator workforce | [TEA educator reports](https://tea.texas.gov/data-reports/educator-data/educator-reports-and-data) and [version 5 hiring workbooks](https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/) | The retained district hiring products cover 2009–10 through 2025–26. The local paired district/Texas hiring producer supports every year from 2015–16 through 2025–26. The six earlier district years remain retained sources. Retention, employed certification and newly certified supply have separate qualification gaps, cohorts and scopes. |
 
 For TAPR, use the master reference for file codes, the report dictionary to
 locate printed cells, the glossary for the measure and population, and the
@@ -153,7 +153,9 @@ disclosure statuses. Pooled rates have an unresolved measurement window.
 
 The local native producer registers `educator_district_new_hires` from
 dashboard version `5` and `educator_state_new_hires` from the separate
-`2026-04` workbook. Both selected tables measure school year 2025–26.
+`2026-04` workbook. The paired measurement years are 2015–16 through 2025–26.
+The default producer selection remains 2025–26; `--all-years` includes all
+eleven years, and repeated `--school-year` selects ending years explicitly.
 The district table has one row per district, year and published category.
 It includes charters in the publisher's reporting roster. The state table
 holds one direct Texas observation with nine category counts, their
@@ -163,6 +165,9 @@ district category sum against that independent report.
 ```sh
 uv run --locked python -m teadata.scripts.refresh_educator_hiring \
   --store "$TEADATA_PROVENANCE_DIR" --output "$EDUCATOR_HIRING_CANDIDATE_DIR"
+# Or select the complete paired history in a different, new directory:
+uv run --locked python -m teadata.scripts.refresh_educator_hiring \
+  --store "$TEADATA_PROVENANCE_DIR" --output "$EDUCATOR_HIRING_HISTORY_DIR" --all-years
 ```
 
 Open the candidate's `release.json` as a `DataRelease` and select its
@@ -177,7 +182,33 @@ texas_hires = release.observations(
     "educator_state_new_hires", "total_new_hires_count",
     school_year=2026, scope="state",
 ).to_df()
+available = release.observation_years(
+    "educator_district_new_hires", "new_hires_count", scope="district",
+)
+historical_hires = release.observations(
+    "educator_district_new_hires", "new_hires_count",
+    school_year=2016, scope="district",
+).to_df()
 ```
+
+Available years reflect the selected release, not every year in the original
+workbook. Omitting `school_year` chooses the latest shared measurement year
+for the requested fields and scope. An unavailable year raises an error with
+the available years. Discovery and planning read metadata; materialization
+reads the selected local Parquet leaf. Installation does not fetch this
+history automatically, and this producer performs no network requests.
+
+The report edition is distinct from each table's measurement year. The whole
+workbook has no single measurement period, so that source-level period is
+unknown; each fact's reviewed table period is explicit. Historical tables
+retain their publisher's reporting IDs, names and row coordinates, including
+districts absent from the latest reporting roster. The 2026 table identities
+remain unchanged. This is the retrospective version 5 history; it does not
+reconstruct what the publisher originally reported in each historical year.
+Some historical rows have a valid district ID and count but a literal blank
+district name. Preserve that blank; do not substitute a present-day name.
+CSV and DataFrame outputs retain the empty string; Excel displays an empty
+text cell, which some spreadsheet readers return as `None`.
 
 Counts preserve integer types, source values, disclosure status and Excel
 row coordinates. State ratios retain the publisher's fractions with
@@ -185,6 +216,12 @@ unit `ratio`. For example, 0.10025823404158928 represents approximately
 10.0258 percent. Source-table exports preserve the raw fraction text.
 Excel also writes a fraction as text when its numeric cells would lose
 precision. An absent district/category row remains absent.
+CSV includes selected fields and their raw/status support; retain the separate
+`view.provenance().to_dict()` descriptor with the CSV for its source bindings,
+references and release identity. Excel embeds a Provenance worksheet.
+The original-header export option remains restricted to its explicitly
+supported raw-source families; it is not yet enabled for these typed hiring
+tables.
 
 The categories describe certification or entry pathway at hire. They include
 re-entering teachers and teachers previously working part-time. Preparation

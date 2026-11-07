@@ -15822,13 +15822,11 @@ data_sources:
     2026:
       path: data/educators/2026/district-new-hires.xlsx
       metadata:
-        title: 2025–26 TEA district new teacher hires by entry pathway
+        title: TEA district new teacher hires by entry pathway (version 5)
         publisher: Texas Education Agency
         version: '5'
         period: &educator_hiring_period_2026
-          kind: school_year
-          start_year: 2025
-          end_year: 2026
+          kind: unknown
         source_url: https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/downloads/new-hires-by-school-system-view-3.xlsx
         metrics:
           new_hires_count:
@@ -15836,7 +15834,7 @@ data_sources:
             unit: count
         notes: Raw publisher headcounts, with original cell value and source row support. New
           hires include re-enterers and previously part-time teachers. Entry pathway or certification at hire differs
-          from preparation route and EPP identity. Only the 2025–26 rows are selected. TEA attributes the revised
+          from preparation route and EPP identity. The reviewed paired measurement years are 2015–16 through 2025–26. TEA attributes the revised
           certification date logic, exclusion below 0.5 teacher FTE, and new part-time pathway to version 4 (March
           2025). Version 5 extends the series through 2025–26. The January 2023 documentation and April 2025
           business rules predate that extension and may not describe every current field.
@@ -15865,9 +15863,9 @@ data_sources:
         - reference_id: educator_hiring_crosswalk
           role: schema
           path: schemas/edrs--2026--new-hires-crosswalk.json
-          reviewed_sha256: 28f7e6886771ffd7be073a9e63a1dc70b4c48fa76384e10b2dd0d6f9198f51a7
+          reviewed_sha256: 8f2cf3d89fb45346d1498355d7a97e6ceb8610ecf29c90c8b9a559c7c6f72e7d
           provenance_ids:
-          - 0ab7828dec363f823c4faf0209bbe1f12dba3af3c5047479aa70882d34151263
+          - 9c220dc9ce4741ca8e94d1adcc87d924b21f452184d33823a864bf0fdc0984e5
       reader:
         profiles:
           source:
@@ -15878,7 +15876,7 @@ data_sources:
     2026:
       path: data/educators/2026/state-new-hires.xlsx
       metadata:
-        title: 2025–26 TEA state new teacher hires by entry pathway
+        title: TEA state new teacher hires by entry pathway (2026 workbook)
         publisher: Texas Education Agency
         version: 2026-04
         period: *educator_hiring_period_2026
@@ -15943,7 +15941,7 @@ data_sources:
             unit: ratio
         notes: Raw publisher headcounts and binary64 fractions, with original cell value and source row support. New
           hires include re-enterers and previously part-time teachers. Entry pathway or certification at hire differs
-          from preparation route and EPP identity. Only the 2025–26 row from the statewide New Hires tab is selected.
+          from preparation route and EPP identity. The New Hires tab includes measurement years 2015–16 through 2025–26.
           The workbook introduction gives a February 20, 2026 creation date. The statewide workbook is a separately
           issued product, and the regional dashboard's version history does not apply to this edition.
         references:
@@ -15957,9 +15955,9 @@ data_sources:
         - reference_id: educator_hiring_crosswalk
           role: schema
           path: schemas/edrs--2026--new-hires-crosswalk.json
-          reviewed_sha256: 28f7e6886771ffd7be073a9e63a1dc70b4c48fa76384e10b2dd0d6f9198f51a7
+          reviewed_sha256: 8f2cf3d89fb45346d1498355d7a97e6ceb8610ecf29c90c8b9a559c7c6f72e7d
           provenance_ids:
-          - 0ab7828dec363f823c4faf0209bbe1f12dba3af3c5047479aa70882d34151263
+          - 9c220dc9ce4741ca8e94d1adcc87d924b21f452184d33823a864bf0fdc0984e5
       reader:
         profiles:
           source:

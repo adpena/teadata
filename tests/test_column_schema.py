@@ -17,6 +17,30 @@ from teadata.teadata_config import Config, load_config
 ROOT = Path(__file__).resolve().parents[1]
 
 
+@pytest.mark.parametrize("case", ["unit_only", "explicit_unknown", "known_match", "field_conflict", "source_conflict", "unknown_table"])
+def test_metric_period_uses_reviewed_table_only_without_a_period_override(case):
+    from teadata.dataset_metadata import DataPeriod, DatasetMetadata, MetricDefinition
+
+    table = input_table(input_sha256="a" * 64)
+    table["fields"][0]["disposition"] = "identity"
+    known = DataPeriod("school_year", 2015, 2016)
+    table["metric_period"] = known.to_dict() if case != "unknown_table" else DataPeriod().to_dict()
+    period = (DataPeriod() if case == "explicit_unknown" else
+              known if case == "known_match" else
+              DataPeriod("school_year", 2024, 2025) if case == "field_conflict" else None)
+    metadata = DatasetMetadata(period=DataPeriod("school_year", 2024, 2025) if case == "source_conflict" else DataPeriod(),
+                               metrics={"amount": MetricDefinition("value", unit="count", period=period)})
+    document = {"schema_version": 2, "mapping_version": 1, "datasets": [
+        {"dataset": "sample", "edition": "5", "source_only": True, "tables": [table]}]}
+    if case in {"field_conflict", "source_conflict"}:
+        with pytest.raises(ValueError, match="period"):
+            header_records(document, dataset="sample", edition="5", metadata=metadata)
+    else:
+        identity, measure = header_records(document, dataset="sample", edition="5", metadata=metadata)
+        assert identity["period"] == DataPeriod().to_dict()
+        assert measure["period"] == (DataPeriod() if case in {"explicit_unknown", "unknown_table"} else known).to_dict()
+
+
 def input_table(**inputs):
     labels, codes = ["Identifier", "Value"], ["ID", "VALUE"]
     return {"table": "statewide", **inputs,

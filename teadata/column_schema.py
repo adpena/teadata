@@ -393,8 +393,9 @@ def header_records(document: Mapping[str, Any], *, dataset: str, edition: str,
     """Project reviewed field periods from this selected metadata, never report years.
 
     Exact MetricDefinition fields use their explicit period, or the selected
-    dataset period when omitted, as catalog metric resolution does. Undeclared
-    names never acquire a period from a field prefix or report year.
+    dataset period when omitted. When neither is declared, the reviewed table
+    period applies. Undeclared names never acquire a period from a field prefix
+    or report year.
     """
     from .dataset_metadata import DataPeriod
 
@@ -405,6 +406,8 @@ def header_records(document: Mapping[str, Any], *, dataset: str, edition: str,
     periods: dict[str, DataPeriod] = {}
     if metadata is not None:
         for definition in metadata.metrics.values():
+            if definition.period is None and metadata.period.kind == "unknown":
+                continue
             period = definition.period if definition.period is not None else metadata.period
             if periods.setdefault(definition.field, period) != period:
                 raise ValueError(f"Conflicting reviewed field periods for {definition.field!r}")
