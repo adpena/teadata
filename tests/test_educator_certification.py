@@ -18,3 +18,13 @@ def test_certification_admits_only_the_three_way_witness():
         _selected_rows([ROLLUP_HEADERS, direct], [DETAIL_HEADERS, first, first, second], {key: (2, 10)})
     with pytest.raises(ContractError, match="detail and rollup totals"):
         _selected_rows([ROLLUP_HEADERS, direct], [DETAIL_HEADERS, first], {key: (2, 10)})
+
+
+def test_certification_revisions_use_direct_rollups_without_selecting_repeated_detail():
+    key = ("Teacher", "2020-21")
+    direct = ("2020-21", "All", "Teacher", "All", "All", 26086)
+    repeated = ("2020-21", "University", "Teacher", "Female", "Hispanic/Latino", 6)
+    assert _selected_rows([ROLLUP_HEADERS, direct], [DETAIL_HEADERS, repeated, repeated],
+                          {key: (2, 26086)}) == {key: (2, direct)}
+    with pytest.raises(ContractError, match="archive witness"):
+        _selected_rows([ROLLUP_HEADERS, direct], [DETAIL_HEADERS, repeated], {key: (2, 26085)})

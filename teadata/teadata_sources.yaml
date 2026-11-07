@@ -16160,11 +16160,14 @@ data_sources:
           certification_count:
             field: certification_count
             unit: count
-        notes: Initial standard certification counts for the statewide teacher role. Academic year selects certification
-          year. The September 2026 workbook rollup and unique workbook detail totals reconcile to the November 2024
-          report on physical PDF pages 2 and 4 in the admitted years. The archive supplies a separate publisher-edition
-          comparison. Certification counts do not measure employment, hiring or retention. Other role-years require
-          separate qualification.
+        notes: >-
+          Initial standard certification counts for the statewide teacher role. Academic year selects certification year.
+          Publisher edition differences (errata): the September 2026 TEA workbook's direct statewide totals are
+          26,086 for 2020–21 and 17,801 for 2023–24. The November 2024 TEA report on pages 2 and 4 gives
+          26,085 and 17,797, respectively. This release uses the later published workbook totals.
+          The reason for these revisions is unknown. Workbook preparation-route and demographic detail for these
+          years remains unqualified because rows repeat at the published grain. Certification counts do not
+          measure employment, hiring or retention. Other role-years require separate qualification.
         references:
         - reference_id: certification_workbook
           role: data_dictionary
@@ -16184,9 +16187,9 @@ data_sources:
         - reference_id: certification_crosswalk
           role: schema
           path: schemas/edrs--2026--initial-certification-rollup-crosswalk.json
-          reviewed_sha256: d5040cac707e4b86715642967d39178625c2d45c0ab9b0408063e1b139987ea6
+          reviewed_sha256: fc06a4dbffbe26862248f3ebb5b07366eef9872ff463239fda5c9395c733dbc8
           provenance_ids:
-          - 996bee4e068bdc6985c8394544acc81a6efaf4495a8e2d0c24769ffbb4b16b25
+          - 0964d8ea9f815e7879c422745beb07234d5081a9fafdb0c3235481cbf4fd826d
       reader:
         profiles:
           source:
@@ -16231,9 +16234,9 @@ data_sources:
         - reference_id: certification_crosswalk
           role: schema
           path: schemas/edrs--2026--initial-certification-rollup-crosswalk.json
-          reviewed_sha256: d5040cac707e4b86715642967d39178625c2d45c0ab9b0408063e1b139987ea6
+          reviewed_sha256: fc06a4dbffbe26862248f3ebb5b07366eef9872ff463239fda5c9395c733dbc8
           provenance_ids:
-          - 996bee4e068bdc6985c8394544acc81a6efaf4495a8e2d0c24769ffbb4b16b25
+          - 0964d8ea9f815e7879c422745beb07234d5081a9fafdb0c3235481cbf4fd826d
       reader:
         profiles:
           source:
@@ -16278,9 +16281,9 @@ data_sources:
         - reference_id: certification_crosswalk
           role: schema
           path: schemas/edrs--2026--initial-certification-rollup-crosswalk.json
-          reviewed_sha256: d5040cac707e4b86715642967d39178625c2d45c0ab9b0408063e1b139987ea6
+          reviewed_sha256: fc06a4dbffbe26862248f3ebb5b07366eef9872ff463239fda5c9395c733dbc8
           provenance_ids:
-          - 996bee4e068bdc6985c8394544acc81a6efaf4495a8e2d0c24769ffbb4b16b25
+          - 0964d8ea9f815e7879c422745beb07234d5081a9fafdb0c3235481cbf4fd826d
       reader:
         profiles:
           source:

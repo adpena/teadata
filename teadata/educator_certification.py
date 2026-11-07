@@ -1,4 +1,4 @@
-"""Materialize eight independently reconciled state initial certification totals."""
+"""Materialize qualified statewide initial certification totals."""
 
 from __future__ import annotations
 
@@ -41,7 +41,10 @@ WORKBOOK_RECEIPT = "fd872b771d3b8e2e3795172299b1286ef38991a901d0b0e1ca7f6246eb43
 WORKBOOK_SHA = "148a8e20669aba384d0e398d093829f6db9b95a5d2391bd5f38d3051fb0c56bb"
 WORKBOOK_URL = "https://tea4avcastro.tea.state.tx.us/oess/edrs/newly-certified-by-role-dashboards/downloads/newly-certified-by-role-workbook.xlsx"
 ARCHIVE_PROOF_SHA = "17334b2305831e6aedf727e030530a7c4b7b8af88b54322a033a92cf7161f793"
-ADMITTED = {"Teacher": (2019, 2020), "Principal": (2022, 2023, 2024), "Superintendent": (2022, 2023, 2024)}
+ADMITTED = {"Teacher": (2019, 2020, 2021, 2024), "Principal": (2022, 2023, 2024), "Superintendent": (2022, 2023, 2024)}
+# These are revisions between two direct statewide totals. Their detailed
+# publisher rows still have ambiguous repeated keys.
+PUBLISHER_REVISIONS = {("Teacher", "2020-21"): (26085, 26086), ("Teacher", "2023-24"): (17797, 17801)}
 ROLLUP_SHEET = "Rolled up Data"
 ROLLUP_HEADERS = ("Academic Year", "Preparation Route", "Role", "Gender", "Ethnicity", "Count Certified")
 DETAIL_HEADERS = ("Academic Year", "Preparation Route", "Role", "Gender", "Race/Ethnicity", "Count Certified")
@@ -85,11 +88,12 @@ def _selected_rows(rollups: Iterable[tuple], details: Iterable[tuple],
                 or type(count) is not int or count < 0 or witnesses[key] != (physical_row, count)):
             raise ContractError(f"Certification rollup differs from the exact archive witness for {key}")
         direct[key] = physical_row, row
+    detail_required = witnesses.keys() - PUBLISHER_REVISIONS.keys()
     totals: dict[tuple[str, str], int] = defaultdict(int)
     keys = set()
     for year, route, role, gender, ethnicity, count in detail_iter:
         key = role, year
-        if key not in witnesses:
+        if key not in detail_required:
             continue
         detail_key = role, year, route, gender, ethnicity
         if (detail_key in keys or any(not isinstance(value, str) or not value or value == "All"
@@ -98,8 +102,8 @@ def _selected_rows(rollups: Iterable[tuple], details: Iterable[tuple],
             raise ContractError(f"Certification detail keys or values differ for {key}")
         keys.add(detail_key)
         totals[key] += count
-    if direct.keys() != witnesses.keys() or totals.keys() != witnesses.keys() or any(
-        direct[key][1][-1] != totals[key] for key in witnesses
+    if direct.keys() != witnesses.keys() or totals.keys() != detail_required or any(
+        direct[key][1][-1] != totals[key] for key in detail_required
     ):
         raise ContractError("Certification scoped detail and rollup totals do not reconcile")
     return direct
@@ -174,10 +178,14 @@ def materialize_educator_certification(store: ProvenanceStore, output: Path, *,
                 raise ContractError(f"Certification crosswalk fields or period differ for {role} {year}")
             label = _year_label(year)
             matches = [item for item in report["comparisons"] if item["year"] == label]
-            if len(matches) != 1 or matches[0]["archive_total"] != matches[0]["workbook_total"]:
-                raise ContractError(f"Certification archive count does not reconcile for {role} {year}")
+            if len(matches) != 1:
+                raise ContractError(f"Certification archive witness is missing or repeated for {role} {year}")
             witness = matches[0]
-            witnesses[role, label] = witness["workbook_row"], witness["archive_total"]
+            archive_count, workbook_count = witness["archive_total"], witness["workbook_total"]
+            expected = PUBLISHER_REVISIONS.get((role, label), (archive_count, archive_count))
+            if (archive_count, workbook_count) != expected:
+                raise ContractError(f"Certification archive count does not reconcile for {role} {year}")
+            witnesses[role, label] = witness["workbook_row"], workbook_count
         sources[role] = source
     store.verify_record_closure(sorted(roots))
     with store.verify_artifact(WORKBOOK_SHA).open("rb") as file, closing(
@@ -217,7 +225,18 @@ def materialize_educator_certification(store: ProvenanceStore, output: Path, *,
             source = sources[role]
             dataset = _dataset(role)
             for year in years:
-                number, row = records[role, _year_label(year)]
+                label = _year_label(year)
+                number, row = records[role, label]
+                revision = PUBLISHER_REVISIONS.get((role, label))
+                comparison: dict[str, Any] = {
+                    "archive_total_matches": revision is None,
+                    "unique_workbook_detail_matches": True if revision is None else None,
+                }
+                if revision is not None:
+                    comparison["publisher_edition_difference"] = {
+                        "november_2024_archive_total": revision[0],
+                        "september_2026_workbook_total": revision[1],
+                    }
                 values = (*row, str(row[-1]), ValueStatus.OBSERVED.value, number)
                 table = pa.Table.from_arrays(
                     [pa.array([value], type=field.type) for value, field in zip(values, _SCHEMA, strict=True)], schema=_SCHEMA)
@@ -237,8 +256,8 @@ def materialize_educator_certification(store: ProvenanceStore, output: Path, *,
                 processing = target.record_processing(dataset=dataset, inputs=[*sorted(local_refs | {WORKBOOK_RECEIPT, archive_receipt}), config_id],
                     outputs={"leaf": leaf}, processor="teadata.educator_certification", code_version=recorder.processor_sha256,
                     parameters={"leaf_contract_sha256": leaf.stem, "recipe": recipe, "toolchain": toolchain},
-                    validation={"archive_and_unique_detail_match": True, "publisher_worksheet_row": number,
-                                "exact_native_projection": True, "rows": 1, "release_activation": False})
+                    validation={**comparison, "publisher_worksheet_row": number, "exact_native_projection": True,
+                                "rows": 1, "release_activation": False})
                 artifact = ArtifactRef(key, physical["sha256"], physical["size_bytes"], leaf.name,
                                        contract_json, processing, "leaf")
                 recorder.record_edition(key, source, artifacts=[artifact], acquisition_ids=[WORKBOOK_RECEIPT])

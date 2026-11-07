@@ -407,10 +407,12 @@ def _download_reports(store: ProvenanceStore, pace: Path, roster_receipt: str, i
                     not_before = max(not_before, decision.deadline)
                     outcome["failures"].append(status)
                     if decision.wait_source is not None:
-                        outcome["backpressure"] = {"source": decision.wait_source,
-                                                   "retry_after": decision.retry_after}
+                        backpressure: dict[str, str | list[str] | None] = {
+                            "source": decision.wait_source, "retry_after": decision.retry_after,
+                        }
                         if decision.rejected_headers:
-                            outcome["backpressure"]["rejected_headers"] = list(decision.rejected_headers)
+                            backpressure["rejected_headers"] = list(decision.rejected_headers)
+                        outcome["backpressure"] = backpressure
                     if (retryable and count and outcome["attempts"] < MAX_ATTEMPTS and submitted < limit
                             and not stopped.is_set()):
                         pending.appendleft(identifier)
@@ -466,6 +468,17 @@ def acquire_region(store: ProvenanceStore, region: str, roster_receipt: str, *, 
                    preferred: Mapping[str, str] | None = None, partition: int | None = None,
                    jobs: int = 1, fallback_wait: float = RATE_LIMIT_COOLDOWN) -> dict[str, Any]:
     """Use verified retained reports first and persist pacing before each request."""
+    with _broker_lock(store) as pace:
+        return _acquire_region_locked(store, pace, region, roster_receipt, limit=limit, interval=interval,
+                                      intake=intake, preferred=preferred, partition=partition, jobs=jobs,
+                                      fallback_wait=fallback_wait)
+
+
+def _acquire_region_locked(store: ProvenanceStore, pace: Path, region: str, roster_receipt: str, *,
+                           limit: int, interval: float, intake: Path | None, preferred: Mapping[str, str] | None,
+                           partition: int | None, jobs: int, fallback_wait: float,
+                           expected_remaining: frozenset[str] | None = None) -> dict[str, Any]:
+    """Run one pass while the caller owns the store broker lock."""
     if type(limit) is not int or not 0 <= limit <= 50 or not MIN_INTERVAL <= interval <= 3600:
         raise ValueError("Use zero to 50 requests per pass and an interval between eight seconds and one hour")
     if type(jobs) is not int or not 1 <= jobs <= MAX_JOBS:
@@ -478,43 +491,44 @@ def acquire_region(store: ProvenanceStore, region: str, roster_receipt: str, *, 
     if not choices.keys() <= ids:
         scope = "region" if partition is None else "campus scope"
         raise ContractError(f"Preferred receipts include campuses outside this exact {scope}")
-    with _broker_lock(store) as pace:
+    if partition is None:
+        reports, holds = _retained(store, ids, choices)
+    else:
+        reports, holds = _retained(store, ids, choices, roster_receipt=roster_receipt)
+    reused = len(reports)
+    if expected_remaining is not None and (holds or ids - reports.keys() != expected_remaining):
+        raise ContractError("Retained campus coverage changed before the next request")
+    state = json.loads(pace.read_bytes()) if pace.exists() else {"not_before": 0}
+    not_before = state["not_before"]
+    if type(not_before) not in {int, float} or not isfinite(not_before) or not_before < 0:
+        raise ContractError("Invalid retained TPRS broker pace")
+    download = _download_reports(store, pace, roster_receipt, sorted(ids - reports.keys() - holds.keys()),
+                                 reports, holds, limit=limit, interval=interval, jobs=jobs, not_before=not_before,
+                                 fallback_wait=fallback_wait)
+    result = {"region": region, "roster_receipt": roster_receipt, "eligible": len(ids), "reused": reused,
+              "admitted": len(reports), "holds": holds, "remaining": sorted(ids - reports.keys()), **download}
+    if partition is not None:
+        result.update(partition=partition, region_roster_size=len(roster))
+    if intake is not None and ids == reports.keys():
+        size = sum(store.read_record(report.receipt)["artifact"]["size_bytes"] for report in reports.values())
+        budget = MAX_SELECTION_BYTES if partition is None else MAX_STATEWIDE_HTML_BYTES
+        if size > budget:
+            scope = "region" if partition is None else "partition"
+            result["intake_hold"] = f"Complete {scope} exceeds the current bounded native materializer"
+            return result
+        document = {"dataset": DATASET, "edition": str(EDITION),
+                    "reports": [asdict(reports[key]) for key in sorted(reports)]}
         if partition is None:
-            reports, holds = _retained(store, ids, choices)
+            document.update(schema_version=CAMPUS_INTAKE_VERSION, region=region, roster_receipt=roster_receipt)
         else:
-            reports, holds = _retained(store, ids, choices, roster_receipt=roster_receipt)
-        reused = len(reports)
-        state = json.loads(pace.read_bytes()) if pace.exists() else {"not_before": 0}
-        not_before = state["not_before"]
-        if type(not_before) not in {int, float} or not isfinite(not_before) or not_before < 0:
-            raise ContractError("Invalid retained TPRS broker pace")
-        download = _download_reports(store, pace, roster_receipt, sorted(ids - reports.keys() - holds.keys()),
-                                     reports, holds, limit=limit, interval=interval, jobs=jobs, not_before=not_before,
-                                     fallback_wait=fallback_wait)
-        result = {"region": region, "roster_receipt": roster_receipt, "eligible": len(ids), "reused": reused,
-                  "admitted": len(reports), "holds": holds, "remaining": sorted(ids - reports.keys()), **download}
-        if partition is not None:
-            result.update(partition=partition, region_roster_size=len(roster))
-        if intake is not None and ids == reports.keys():
-            size = sum(store.read_record(report.receipt)["artifact"]["size_bytes"] for report in reports.values())
-            budget = MAX_SELECTION_BYTES if partition is None else MAX_STATEWIDE_HTML_BYTES
-            if size > budget:
-                scope = "region" if partition is None else "partition"
-                result["intake_hold"] = f"Complete {scope} exceeds the current bounded native materializer"
+            document.update(schema_version=CAMPUS_PARTITION_VERSION, partition=partition, rosters={region: roster_receipt})
+            try:
+                admit_campus_cohort(store, document)
+            except (ContractError, OSError, ValueError) as error:
+                result["intake_hold"] = str(error)
                 return result
-            document = {"dataset": DATASET, "edition": str(EDITION),
-                        "reports": [asdict(reports[key]) for key in sorted(reports)]}
-            if partition is None:
-                document.update(schema_version=CAMPUS_INTAKE_VERSION, region=region, roster_receipt=roster_receipt)
-            else:
-                document.update(schema_version=CAMPUS_PARTITION_VERSION, partition=partition, rosters={region: roster_receipt})
-                try:
-                    admit_campus_cohort(store, document)
-                except (ContractError, OSError, ValueError) as error:
-                    result["intake_hold"] = str(error)
-                    return result
-            result["intake_sha256"] = _save(intake, document)
-        return result
+        result["intake_sha256"] = _save(intake, document)
+    return result
 
 
 def main() -> None:

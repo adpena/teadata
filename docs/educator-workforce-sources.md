@@ -122,20 +122,21 @@ years. A 2018 selection builds the demographic and gender editions.
 ## Initial standard certification by role
 
 The September 2026 TEA workbook and the November 2024 archived reports
-support a scoped statewide candidate of eight role-year totals.
+support a scoped statewide candidate of ten role-year totals.
 
 | Dataset | Academic years available in this candidate |
 |---|---|
-| `educator_state_initial_certification_teacher` | 2018–19 and 2019–20 |
+| `educator_state_initial_certification_teacher` | 2018–19, 2019–20, 2020–21, and 2023–24 |
 | `educator_state_initial_certification_principal` | 2021–22 through 2023–24 |
 | `educator_state_initial_certification_superintendent` | 2021–22 through 2023–24 |
 
-Each total agrees with the current workbook's direct rollup, its detail at
-unique keys, and both tables in the applicable archived report. The leaf
+Eight totals agree with the current workbook's direct rollup, its detail at
+unique keys, and both tables in the applicable archived report. The two
+teacher totals in the errata use the latest workbook rollup. Each leaf
 preserves the workbook row, academic year, reported role, total dimensions,
 observed status and raw count. Academic year selects the certification
-year, September 1 through August 31. Counts refer to individuals receiving an initial standard certificate
-for the reported role. Employment, hiring, and retention use separate
+year, September 1 through August 31. Counts refer to individuals receiving
+an initial standard certificate for the reported role. Employment, hiring, and retention use separate
 sources. The archived reports and current workbook are separate publisher
 editions. Unresolved role-years, including 2025–26 teacher detail, remain
 held. The three roles should be used as separately reported populations.
@@ -161,3 +162,22 @@ The crosswalk records the workbook's six dictionary definitions and source
 row numbers. Its published coding labels remain separate from the physical
 rollup types. For example, the dictionary labels gender and ethnicity as
 numeric while the rollup cells use the literal string `All`.
+
+### Errata and publisher edition differences
+
+| Teacher certification year | November 2024 TEA report, pages 2 and 4 | September 2026 TEA workbook | Workbook row |
+|---|---:|---:|---:|
+| 2020–21 | 26,085 | 26,086 | 17 |
+| 2023–24 | 17,797 | 17,801 | 26 |
+
+Both editions report a statewide all-route total directly. TEA Data uses
+the newer published workbook totals and preserves the older report in
+provenance. The November 2024 methodology explains that TEA sometimes
+updates counts when it corrects records or changes how it identifies the
+eligible population. The reason for these two revisions remains unknown.
+The workbook repeats detail keys in these years, so preparation-route and
+demographic breakdowns remain unqualified. XLSX provenance worksheets
+and machine-readable export descriptions carry the edition differences.
+
+Sources: [TEA's September 2026 workbook](https://tea4avcastro.tea.state.tx.us/oess/edrs/newly-certified-by-role-dashboards/downloads/newly-certified-by-role-workbook.xlsx)
+and [November 2024 teacher report](https://tea.texas.gov/data-reports/educator-data/newly-certified-teacher-demographics-by-preparation-route-1819-2324.pdf).
