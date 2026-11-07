@@ -33,6 +33,7 @@ from .manifest import (
 )
 
 if TYPE_CHECKING:
+    from .export_provenance import ExportProvenance
     from .entities import Campus, District
     from .source_views import EntitySources, SourceTable
     from .tprs_statewide_intake import ReportSelection
@@ -688,6 +689,14 @@ class DataRelease:
 
         table = prepare_export(self, edition, restore_original_headers=restore_original_headers)
         write_csv(table, path_or_buf)
+
+    def provenance(self, edition: EditionKey, *, restore_original_headers: bool = False) -> ExportProvenance:
+        """Describe the direct table export without opening the data leaf."""
+        from .source_views import _plan_export
+
+        selection = _plan_export(self, edition, restore_original_headers=restore_original_headers,
+                                 selected_fields=None, include_support=False, period=None)
+        return selection.provenance(self, period=None, entity_build=None, entity_ids=None, opaque_filter=False)
 
     def to_excel(self, edition: EditionKey, path_or_buf: str | Path | BinaryIO, *,
                  restore_original_headers: bool = False) -> None:

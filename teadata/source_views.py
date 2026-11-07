@@ -22,8 +22,10 @@ from .manifest import ContractError
 if TYPE_CHECKING:
     import pandas as pd
     import pyarrow as pa
+    from openpyxl import Workbook
     from pyarrow.dataset import Dataset, Expression, Scanner
 
+    from .export_provenance import ExportProvenance
     from .release import DataRelease
 
 
@@ -132,6 +134,13 @@ class SourceTable:
         """Materialize the selected rows as an ordinary pandas DataFrame."""
         return self._prepare(restore_original_headers=restore_original_headers).to_df()
 
+    def provenance(self, *, restore_original_headers: bool = False) -> ExportProvenance:
+        """Describe this exact export selection without opening its data leaf."""
+        selection = _plan_export(self.release, self.edition, restore_original_headers=restore_original_headers,
+                                 selected_fields=self._fields, include_support=True, period=self._period)
+        return selection.provenance(self.release, period=self._period, entity_build=self._entity_build,
+                                    entity_ids=self._entity_ids, opaque_filter=bool(self._queries) or self._predicate is not None)
+
     def to_csv(self, path_or_buf: str | Path | BinaryIO, *, restore_original_headers: bool = False) -> None:
         """Stream the selected rows to CSV."""
         write_csv(self._prepare(restore_original_headers=restore_original_headers), path_or_buf)
@@ -219,8 +228,9 @@ class _TableExport:
     scanner: Scanner
     headers: tuple[tuple[str, ...], ...]
     restore_original_headers: bool
-    rows: int
+    rows_hint: int | None
     lineage: dict[str, Any]
+    provenance: Callable[[], ExportProvenance]
 
     @property
     def schema(self) -> pa.Schema:
@@ -244,16 +254,36 @@ class _TableExport:
         if self.restore_original_headers:
             frame.columns = pd.Index(self.headers[0]) if len(self.headers) == 1 else pd.MultiIndex.from_arrays(self.headers)
         frame.attrs["teadata"] = self.lineage
+        frame.attrs["teadata_provenance"] = self.provenance().to_dict()
+        frame.attrs["teadata_export"] = {"rows": len(frame)}
         return frame
 
 
-def prepare_export(release: DataRelease, edition: EditionKey, *, restore_original_headers: bool,
-                   selected_fields: tuple[str, ...] | None = None, predicate: Expression | None = None,
-                   queries: tuple[Callable[[pa.Schema], Expression], ...] = (),
-                   include_support: bool = False, period: DataPeriod | None = None,
-                   entity_build: tuple[str, str] | None = None,
-                   entity_ids: tuple[str, ...] | None = None) -> _TableExport:
+@dataclass(frozen=True, slots=True)
+class _ExportSelection:
+    artifact: ArtifactRef
+    fields: tuple[str, ...]
+    columns: tuple[str, ...]
+    headers: tuple[tuple[str, ...], ...]
+
+    def provenance(self, release: DataRelease, *, period: DataPeriod | None,
+                   entity_build: tuple[str, str] | None, entity_ids: tuple[str, ...] | None,
+                   opaque_filter: bool) -> ExportProvenance:
+        from .export_provenance import describe_export
+
+        if entity_ids is not None:
+            _entity_key(self.artifact)
+        return describe_export(release, self.artifact, self.fields, self.columns, self.headers,
+                               period=period, entity_build=entity_build, entity_ids=entity_ids,
+                               opaque_filter=opaque_filter)
+
+
+def _plan_export(release: DataRelease, edition: EditionKey, *, restore_original_headers: bool,
+                 selected_fields: tuple[str, ...] | None, include_support: bool,
+                 period: DataPeriod | None) -> _ExportSelection:
     import pyarrow as pa
+
+    from .analytical import _leaf_schema
     from .tapr import TAPR_SOURCE_KEYS, qualified_tapr_family
 
     if type(restore_original_headers) is not bool:
@@ -262,7 +292,8 @@ def prepare_export(release: DataRelease, edition: EditionKey, *, restore_origina
     headers = release.catalog.header_records(edition.dataset, edition_key=edition) if (
         selected_fields is None or restore_original_headers) else []
     fields = tuple(row["field"] for row in headers) if headers else selected_fields or ()
-    artifact, projected = _projection(release, edition, fields if selected_fields is None else selected_fields, period=period)
+    requested = fields if selected_fields is None else selected_fields
+    artifact, projected = _projection(release, edition, requested, period=period)
     columns = projected if include_support else fields
     original_error = "Original label and code headers require a complete raw TAPR table"
     if restore_original_headers:
@@ -280,6 +311,25 @@ def prepare_export(release: DataRelease, edition: EditionKey, *, restore_origina
                 raise ContractError(original_error)
         else:
             columns = fields
+        schema = _leaf_schema(artifact.contract)
+        if not all(pa.types.is_string(schema.field(name).type) or pa.types.is_large_string(schema.field(name).type)
+                   for name in columns):
+            raise ContractError(original_error)
+    output_headers = (columns,) if not restore_original_headers else tuple(
+        tuple(row[kind] for row in headers) for kind in release.catalog._source_header_kinds(edition))
+    return _ExportSelection(artifact, requested, columns, output_headers)
+
+
+def prepare_export(release: DataRelease, edition: EditionKey, *, restore_original_headers: bool,
+                   selected_fields: tuple[str, ...] | None = None, predicate: Expression | None = None,
+                   queries: tuple[Callable[[pa.Schema], Expression], ...] = (),
+                   include_support: bool = False, period: DataPeriod | None = None,
+                   entity_build: tuple[str, str] | None = None,
+                   entity_ids: tuple[str, ...] | None = None) -> _TableExport:
+    selection = _plan_export(release, edition, restore_original_headers=restore_original_headers,
+                             selected_fields=selected_fields, include_support=include_support, period=period)
+    artifact = selection.artifact
+    opaque_filter = bool(queries) or predicate is not None
     entity_key = _entity_key(artifact) if entity_ids is not None else None
     native = release.analytical_dataset(artifact.identity)
     if entity_key is not None and entity_ids is not None:
@@ -288,19 +338,20 @@ def prepare_export(release: DataRelease, edition: EditionKey, *, restore_origina
     for query in queries:
         expression = query(native.schema)
         predicate = expression if predicate is None else predicate & expression
-    scanner = native.scanner(columns=list(columns), filter=predicate, batch_size=256, use_threads=False)
-    rows = (columns,)
-    if restore_original_headers:
-        if not all(pa.types.is_string(field.type) or pa.types.is_large_string(field.type) for field in scanner.projected_schema):
-            raise ContractError(original_error)
-        rows = tuple(tuple(row[kind] for row in headers) for kind in release.catalog._source_header_kinds(edition))
+    rows_hint = artifact.contract["rows"] if predicate is None else None
+    scanner = native.scanner(columns=list(selection.columns), filter=predicate, batch_size=256, use_threads=False)
     lineage: dict[str, Any] = {"build_id": release.build_id, "edition": edition.to_dict(), "artifact_sha256": artifact.sha256,
                                "manifest_sha256": release.manifest_sha256}
     if period is not None:
         lineage["measurement_period"] = period.to_dict()
     if entity_build is not None:
         lineage.update(entity_build_id=entity_build[0], entity_manifest_sha256=entity_build[1])
-    return _TableExport(scanner, rows, restore_original_headers, artifact.contract["rows"], lineage)
+
+    def provenance() -> ExportProvenance:
+        return selection.provenance(release, period=period, entity_build=entity_build,
+                                    entity_ids=entity_ids, opaque_filter=opaque_filter)
+
+    return _TableExport(scanner, selection.headers, restore_original_headers, rows_hint, lineage, provenance)
 
 
 def write_csv(table: _TableExport, path_or_buf: str | Path | BinaryIO) -> None:
@@ -343,15 +394,49 @@ def validate_excel_text(value: str) -> None:
         raise ValueError("Source text contains characters the Excel writer cannot preserve")
 
 
-def write_excel(table: _TableExport, path_or_buf: str | Path | BinaryIO) -> None:
+@contextmanager
+def _excel_workbook(path_or_buf: str | Path | BinaryIO) -> Generator[Workbook, None, None]:
     from openpyxl import Workbook
+
+    with _export_stream(path_or_buf) as stream:
+        workbook = Workbook(write_only=True)
+        try:
+            yield workbook
+            workbook.save(stream)
+        except BaseException as error:
+            for sheet in workbook.worksheets:
+                # Closing the workbook alone leaves unsaved worksheet XML.
+                writer = getattr(sheet, "_writer", None)
+                if writer is None:
+                    continue
+                try:
+                    if not sheet.closed:
+                        sheet.close()
+                except Exception as cleanup_error:
+                    error.add_note(f"Closing the Excel worksheet failed: {cleanup_error}")
+                finally:
+                    try:
+                        try:
+                            writer.close()
+                        finally:
+                            if os.path.exists(writer.out):
+                                writer.cleanup()
+                    except Exception as cleanup_error:
+                        error.add_note(f"Removing the Excel scratch file failed: {cleanup_error}")
+            raise
+        finally:
+            workbook.close()
+
+
+def write_excel(table: _TableExport, path_or_buf: str | Path | BinaryIO) -> None:
     from openpyxl.cell import WriteOnlyCell
 
     max_rows = 1_048_576 - len(table.headers)
-    if len(table.schema) > 16_384 or (table.rows > max_rows and table.scanner.count_rows() > max_rows):
-        raise ValueError("Source exceeds Excel worksheet limits; use CSV for this table")
-    with _export_stream(path_or_buf) as stream:
-        workbook = Workbook(write_only=True)
+    row_limit_error = "Source exceeds Excel worksheet limits; use CSV for this table"
+    if len(table.schema) > 16_384 or (table.rows_hint is not None and table.rows_hint > max_rows):
+        raise ValueError(row_limit_error)
+    provenance = table.provenance()
+    with _excel_workbook(path_or_buf) as workbook:
         sheet = workbook.create_sheet("Data")
 
         def cells(values):
@@ -370,31 +455,13 @@ def write_excel(table: _TableExport, path_or_buf: str | Path | BinaryIO) -> None
                 else:
                     yield value
 
-        try:
-            for row in table.headers:
+        for row in table.headers:
+            sheet.append(list(cells(row)))
+        rows = 0
+        for batch in table.batches():
+            rows += batch.num_rows
+            if rows > max_rows:
+                raise ValueError(row_limit_error)
+            for row in zip(*(column.to_pylist() for column in batch.columns), strict=True):
                 sheet.append(list(cells(row)))
-            for batch in table.batches():
-                for row in zip(*(column.to_pylist() for column in batch.columns), strict=True):
-                    sheet.append(list(cells(row)))
-            workbook.save(stream)
-        except BaseException as error:
-            # Closing the workbook alone does not remove an unsaved sheet's XML.
-            writer = getattr(sheet, "_writer", None)
-            if writer is not None:
-                try:
-                    if not sheet.closed:
-                        sheet.close()
-                except Exception as cleanup_error:
-                    error.add_note(f"Closing the Excel worksheet failed: {cleanup_error}")
-                finally:
-                    try:
-                        try:
-                            writer.close()
-                        finally:
-                            if os.path.exists(writer.out):
-                                writer.cleanup()
-                    except Exception as cleanup_error:
-                        error.add_note(f"Removing the Excel scratch file failed: {cleanup_error}")
-            raise
-        finally:
-            workbook.close()
+        provenance._append_sheet(workbook, rows=rows)

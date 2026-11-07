@@ -143,11 +143,32 @@ selection and filtering. Each call returns a new view. `to_arrow()`, `to_df()`,
 `to_csv()` and `to_excel()` execute the scan and read only the selected leaf.
 
 The DataFrame records its manifest, edition and artifact identity in
-`attrs["teadata"]`. For raw TAPR tables, `restore_original_headers=True`
-restores the reviewed headers in publisher order, including single-row code
-headers where the crosswalk specifies that layout. CSV and Excel
-contain the selected rows and columns. Keep the manifest and filter with a
-file export to reproduce the subset.
+`attrs["teadata"]`. Its `attrs["teadata_provenance"]` and the Excel
+`Provenance` worksheet describe the exported columns, publisher codes and
+definitions, measurement periods, report edition, value policy, and available
+source references. The acquisition entries describe the edition and the
+processing receipt identifies the exported artifact. Excel reports the
+observed row count separately from the source description. The DataFrame
+reports it in `attrs["teadata_export"]["rows"]`.
+
+For raw TAPR tables, `restore_original_headers=True` restores the reviewed
+headers in publisher order, including single-row codes where the crosswalk
+specifies that layout. CSV retains its ordinary tabular layout. Write a
+companion workbook using the same header mode as the data export.
+
+```python
+selected.to_csv("membership.csv")
+selected.provenance().to_excel("membership-provenance.xlsx")
+record = selected.provenance().to_dict()
+```
+
+`provenance()` can read release catalog resources but leaves the data leaf
+unopened. Use `release.provenance(edition)` with a direct `release.to_csv()`
+export. The worksheet's numbered canonical record rows contain the same
+JSON in base64-encoded UTF-8 for machine readback. The description checksum
+covers the structured record excluding the runtime citation and checksum.
+Keep filter expressions and parameters with a file export if you need to
+replay them. The record marks these filters as opaque and omits their values.
 
 ## Write a query string
 

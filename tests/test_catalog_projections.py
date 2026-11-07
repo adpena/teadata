@@ -370,10 +370,19 @@ def test_source_qualifiers_keep_mixed_row_runs_in_one_selected_native_projection
     plan, = catalog.resolve_artifacts([(key, "amount")])
     assert plan["columns"] == ("source_record", "amount", "VALUE", "amount_status", "row_kind", "sof_run_id")
     assert ref.contract["key_columns"] == ["source_record"]  # No artificial run key or copied cell.
-    projected = DataRelease(root).analytical_dataset(ref.identity).to_table(columns=list(plan["columns"]))
+    release = DataRelease(root)
+    projected = release.analytical_dataset(ref.identity).to_table(columns=list(plan["columns"]))
     assert projected["sof_run_id"].to_pylist() == list(runs)
     assert projected["amount"].to_pylist() == [0, None, None, 5]
     assert projected.column_names.count("sof_run_id") == 1 and "SOF_RUN_ID" not in projected.column_names
+    provenance = release.table(key).select("amount").provenance().to_dict()
+    columns = {column["column"]: column for column in provenance["columns"]}
+    assert provenance["source"]["qualifiers"] == qualifiers
+    assert columns["source_record"]["role"] == "key"
+    assert columns["row_kind"]["role"] == "context"
+    assert columns["row_kind"]["support_for"] == [{"field": None, "role": "context"}]
+    assert columns["sof_run_id"]["fields"][0]["selected"] is False
+    assert columns["sof_run_id"]["support_for"] == [{"field": None, "role": "row_run_column"}]
     run_field = next(row for row in catalog.variables(edition=key) if row["field"] == "sof_run_id")
     assert run_field["code"] == "SOF_RUN_ID"
     run_plan, = catalog.resolve_artifacts([(key, "sof_run_id")])

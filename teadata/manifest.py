@@ -744,7 +744,9 @@ class DatasetCatalog:
                     _validate_leaf_support(ref.contract, rows, metadata)
             units = {metric.field: metric.unit for metric in metadata.metrics.values() if metric.unit is not None}
             headers = {(identifier, row["field"]): {
-                **{name: row[name] for name in ("code", "label", "period")}, "unit": units.get(row["field"])} for row in rows}
+                **{name: row[name] for name in ("code", "label", "period")},
+                "unit": units.get(row["field"]), "publisher_description": row.get("publisher_description"),
+            } for row in rows}
             self._field_headers.update(headers)
             self._validated_editions.add(identifier)
         except (KeyError, TypeError, ValueError) as error:
@@ -836,6 +838,22 @@ class DatasetCatalog:
         qualifiers = self._edition_metadata[qualified[0]].source_qualifiers
         if qualifiers is not None and qualifiers.row_run_column is not None:
             result.setdefault("support", {})["row_run_column"] = qualifiers.row_run_column
+        return result
+
+    def _export_field_headers(self, artifact: ArtifactRef, columns: tuple[str, ...]) -> dict[str, dict[str, Any]]:
+        """Project only the output columns owned by an exact admitted leaf."""
+        identifier = artifact.edition.identity
+        catalog = self._edition_view(identifier) if getattr(self, "_v4", False) else self
+        artifact_id = artifact.identity
+        if catalog._artifact_refs.get(artifact_id) != artifact:
+            raise ContractError("Export headers require the exact registered artifact")
+        catalog._ensure_edition(identifier)
+        result = {}
+        for column in columns:
+            qualified = (identifier, column)
+            binding = catalog._field_bindings.get(qualified)
+            if binding is not None and binding.artifact_id == artifact_id:
+                result[column] = deepcopy(catalog._field_headers[qualified])
         return result
 
     def artifact_ref(self, identifier: str) -> ArtifactRef:

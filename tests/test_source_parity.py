@@ -1,9 +1,13 @@
-"""Genuine local source/preparation/leaf receipts; no publisher science claims."""
+"""Genuine local source/preparation/leaf receipts."""
+from base64 import b64decode
 import csv
 from dataclasses import replace
+from datetime import datetime, timezone
 from decimal import Decimal, Inexact, localcontext
 from hashlib import sha256
 from io import BytesIO, StringIO
+import json
+from pathlib import Path
 import sys
 
 import pyarrow as pa
@@ -22,7 +26,8 @@ from teadata.teadata_config import Config
 
 
 def fixture_release(tmp_path, *, damage=None, schema_version=3, batch_bytes=1024, scope='district',
-                    annotation=False, alias=False, last_enrollment='', source_headers='labels'):
+                    annotation=False, alias=False, last_enrollment='', source_headers='labels', periods=False,
+                    http_receipt=False):
     store = ProvenanceStore(tmp_path / 'history')
     dataset = f'{scope}_tapr_student_profile'
     names = [f'{scope}_number', 'membership', 'enrollment']
@@ -57,7 +62,11 @@ def fixture_release(tmp_path, *, damage=None, schema_version=3, batch_bytes=1024
         records = [*prefix_rows, ','.join(codes), *data]
     raw.write_text('\n'.join([*records, '']), encoding='utf-8', newline='\n')
     source = ResolvedDataset(dataset, 'data_sources', 2025, 2025, str(raw), DatasetMetadata(version='2025'))
-    acquisition = store.record_acquisition(raw, source)
+    acquisition = store.record_acquisition(raw, source, **({
+        'downloaded_at': datetime(2025, 8, 1, tzinfo=timezone.utc),
+        'requested_url': 'https://example.org/requested.csv',
+        'resolved_url': 'https://example.org/resolved.csv',
+    } if http_receipt else {}))
     raw_sha = file_identity(raw)['sha256']
     table = {'table': 'STUD', 'input_sha256': raw_sha,
         'source_schema_sha256': source_schema_fingerprint(labels, codes), 'metric_period': {'kind': 'unknown'},
@@ -75,7 +84,18 @@ def fixture_release(tmp_path, *, damage=None, schema_version=3, batch_bytes=1024
     schema_observation = store.record_acquisition(schema, replace(source, dataset='reference:local_crosswalk', path=str(schema)))
     cfg = Config.from_dict({'data_sources': {dataset: {2025: {'path': str(raw),
         'reader': {'profiles': {'source': {'column_schema': schema.name}}},
-        'metadata': {'version': '2025', 'provenance_ids': [acquisition], 'references': [
+        'metadata': {'version': '2025', 'provenance_ids': [acquisition], **({
+            'source_url': 'https://example.org/report',
+            'download_url': 'https://example.org/download.csv',
+        } if http_receipt else {}), **({
+            'title': '=Untrusted publisher title',
+            'period': {'kind': 'school_year', 'start_year': 2024, 'end_year': 2025},
+            'metrics': {
+                'membership': {'field': 'membership', 'unit': 'count',
+                               'period': {'kind': 'school_year', 'start_year': 2023, 'end_year': 2024}},
+                'enrollment': {'field': 'enrollment', 'unit': 'count'},
+            },
+        } if periods else {}), 'references': [
             {'reference_id': 'schema', 'role': 'schema', 'path': schema.name, 'status': 'available',
              'reviewed_sha256': schema_sha, 'provenance_ids': [schema_observation]}]}}}}})
     cfg.base_dir = tmp_path
@@ -141,6 +161,135 @@ def fixture_release(tmp_path, *, damage=None, schema_version=3, batch_bytes=1024
     catalog = recorder.catalog(schema_version=schema_version)
     manifest = publish_release(tmp_path, catalog, schema_version=schema_version)
     return DataRelease(manifest), store, key, raw
+
+
+def read_provenance_workbook(source):
+    from openpyxl import load_workbook
+
+    workbook = load_workbook(source, read_only=True)
+    try:
+        rows = list(workbook['Provenance'].values)
+        chunks = [row for row in rows if row[0] == 'Canonical record' and isinstance(row[1], int)]
+        assert [row[1] for row in chunks] == list(range(1, len(chunks) + 1))
+        assert all(row[2] == len(chunks) for row in chunks)
+        return workbook.sheetnames, json.loads(b64decode(''.join(row[3] for row in chunks)))
+    finally:
+        workbook.close()
+
+
+def test_export_provenance_is_shared_and_catalog_only(tmp_path, monkeypatch):
+    from openpyxl import load_workbook
+
+    release, _, key, _ = fixture_release(tmp_path, schema_version=4, periods=True)
+    view = release.table(key).select('enrollment', 'membership').query('membership != @token', params={'token': '-999'})
+    with monkeypatch.context() as isolated:
+        def reject_leaf(*args):
+            pytest.fail(f'Provenance attempted to open a data leaf: {args!r}')
+
+        isolated.setattr(release, 'analytical_dataset', reject_leaf)
+        provenance = view.provenance(restore_original_headers=True)
+        companion = BytesIO()
+        provenance.to_excel(companion)
+    book_sheets, document = read_provenance_workbook(companion)
+    assert book_sheets == ['Provenance']
+    assert document == provenance.to_dict()
+    assert document['source']['report_period']['end_year'] == 2025
+    assert document['columns'][1]['fields'][0]['period']['end_year'] == 2024
+    assert document['columns'][2]['fields'][0]['period']['end_year'] == 2025
+    assert document['columns'][1]['headers'] == ['Membership', 'DPETALLC']
+    assert document['columns'][0]['role'] == 'key'
+    assert document['selector']['opaque_filter'] is True
+    assert '-999' not in json.dumps(document)
+    assert document['edition_acquisitions'][0]['downloaded_at'] is None
+    assert 'path' not in document['source']['references'][0]
+    assert document['release']['manifest_sha256'] == release.manifest_sha256
+    frame = view.to_df(restore_original_headers=True)
+    assert frame.to_numpy().tolist() == [['001001', '0', '11'], ['001003', '17', '']]
+    assert frame.attrs['teadata']['edition'] == key.to_dict()
+    assert frame.attrs['teadata_provenance'] == document
+    assert frame.attrs['teadata_export']['rows'] == 2
+    workbook = BytesIO()
+    view.to_excel(workbook, restore_original_headers=True)
+    assert read_provenance_workbook(workbook) == (['Data', 'Provenance'], document)
+    book = load_workbook(workbook, read_only=True)
+    try:
+        sheet = book['Provenance']
+        assert sheet['B2'].data_type == 's'
+        assert sheet['B2'].value == '=Untrusted publisher title'
+        assert any(row[:2] == ('Rows exported', 2) for row in sheet.values)
+    finally:
+        book.close()
+    csv_file = BytesIO()
+    view.to_csv(csv_file, restore_original_headers=True)
+    assert csv_file.getvalue() == (
+        b'District,Membership,Enrollment\r\nDISTRICT,DPETALLC,DPNTALLC\r\n'
+        b'"001001","0","11"\n"001003","17",""\n'
+    )
+
+
+def test_direct_export_provenance_reflects_its_own_physical_columns(tmp_path):
+    release, _, key, _ = fixture_release(tmp_path, damage='normalized', schema_version=4, http_receipt=True)
+    direct = release.provenance(key).to_dict()
+    assert [column['column'] for column in direct['columns']] == ['district_number', 'membership', 'enrollment']
+    assert release.to_df(key).attrs['teadata_provenance'] == direct
+    assert direct['source']['url'] == 'https://example.org/report'
+    assert direct['source']['download_url'] == 'https://example.org/download.csv'
+    acquisition, = direct['edition_acquisitions']
+    assert acquisition['requested_url'] == 'https://example.org/requested.csv'
+    assert acquisition['resolved_url'] == 'https://example.org/resolved.csv'
+    assert acquisition['downloaded_at'] == '2025-08-01T00:00:00+00:00'
+    assert acquisition['recorded_at'] >= acquisition['downloaded_at']
+    columns = {column['column']: column for column in release.table(key).select('membership').provenance().to_dict()['columns']}
+    assert columns['membership_raw']['support_for'] == [{'field': 'membership', 'role': 'raw'}]
+    assert columns['membership_status']['support_for'] == [{'field': 'membership', 'role': 'status'}]
+
+
+def test_provenance_workbook_preserves_unsafe_long_metadata_as_chunked_json():
+    from openpyxl import load_workbook
+    from teadata.export_provenance import ExportProvenance
+
+    title = "=1+1\x00" + "Å" * 33_000
+    record = {
+        'source': {'title': title, 'publisher': None, 'url': None, 'download_url': None,
+                   'report_period': {'kind': 'unknown'}, 'published_at': None, 'revised_at': None,
+                   'publisher_citation': None, 'qualifiers': None, 'policy': None, 'references': []},
+        'edition': {'dataset': 'test', 'edition': '2025', 'scope': 'state', 'grain': 'test'},
+        'release': {'build_id': '0' * 64, 'manifest_sha256': '1' * 64},
+        'artifact': {'sha256': '2' * 64, 'processing_receipt': '3' * 64},
+        'description_sha256': '4' * 64, 'citation': 'test', 'selector': {'opaque_filter': False},
+        'columns': [], 'edition_acquisitions': [],
+    }
+    stream = BytesIO()
+    ExportProvenance(canonical_json(record)).to_excel(stream)
+    assert read_provenance_workbook(stream) == (['Provenance'], record)
+    workbook = load_workbook(stream, read_only=True)
+    try:
+        assert workbook['Provenance']['B2'].value == 'See canonical record below'
+        assert sum(row[0] == 'Canonical record' for row in workbook['Provenance'].values) > 2
+    finally:
+        workbook.close()
+
+
+def test_export_failure_cleans_both_worksheets(tmp_path, monkeypatch):
+    from openpyxl.workbook.workbook import Workbook
+
+    release, _, key, _ = fixture_release(tmp_path, schema_version=4)
+    scratch = []
+
+    def fail_save(workbook, stream):
+        scratch.extend(sheet._writer.out for sheet in workbook.worksheets)
+        workbook.worksheets[0].close()
+        workbook.worksheets[0]._writer.cleanup()
+        raise OSError('write interrupted')
+
+    monkeypatch.setattr(Workbook, 'save', fail_save)
+    path = tmp_path / 'report.xlsx'
+    with pytest.raises(OSError, match='write interrupted'):
+        release.to_excel(key, path)
+    assert len(scratch) == 2
+    assert all(not Path(name).exists() for name in scratch)
+    assert not path.exists()
+    assert not list(tmp_path.glob('.teadata-export-*'))
 
 
 @pytest.mark.parametrize('restore', [False, True])
