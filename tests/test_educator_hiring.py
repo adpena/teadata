@@ -1,8 +1,8 @@
 import pytest
 
 from teadata.educator_hiring import (
-    CATEGORIES, DISTRICT_DATASET, SCHOOL_YEARS, STATE_DATASET, _projection, _qualify, _read_rows,
-    _read_years, _selected_years,
+    CATEGORIES, DISTRICT_DATASET, STATE_DATASET, _epp_counts, _epp_reference, _projection, _qualify,
+    _qualify_epp, _read_rows, _read_years, _selected_years,
 )
 from teadata.manifest import ContractError
 from teadata.teadata_config import load_config
@@ -101,7 +101,7 @@ def test_hiring_contract_is_source_only_and_keeps_product_and_measurement_years(
         assert source.metadata.version == edition
         assert source.metadata.period.kind == "unknown"
         records = cfg.header_records(dataset, edition=edition, reader_profile="source")
-        assert {row["period"]["end_year"] for row in records if row["disposition"] == "fact"} == set(SCHOOL_YEARS)
+        assert {row["period"]["end_year"] for row in records if row["disposition"] == "fact"} == set(range(2010 if dataset == DISTRICT_DATASET else 2016, 2027))
         assert cfg.is_source_only(dataset, 2026)
         with pytest.raises(ContractError, match="Reader profile is required"):
             cfg.load_df(dataset, 2026)
@@ -109,7 +109,7 @@ def test_hiring_contract_is_source_only_and_keeps_product_and_measurement_years(
     assert state.metadata.metrics["intern_certified_ratio"].unit == "ratio"
 
 
-@pytest.mark.parametrize("years", [(), (2015,), (2027,), (True,), (2026, 2026), (2025, "2026")])
+@pytest.mark.parametrize("years", [(), (2009,), (2027,), (True,), (2026, 2026), (2025, "2026")])
 def test_hiring_rejects_unsupported_or_ambiguous_measurement_years(years):
     with pytest.raises(ContractError, match="supported school-year"):
         _selected_years(years)
@@ -162,3 +162,78 @@ def test_hiring_missing_selected_year_raises_instead_of_returning_current_rows(t
     book.close()
     with pytest.raises(ContractError, match="exact selected school-year"):
         _read_years(path, DISTRICT_DATASET, (2016, 2026))
+
+
+def test_earlier_district_year_is_supported_but_state_year_is_not():
+    row = list(district_row(2))
+    row[1], row[-1] = 2013, "2012-2013"
+    assert _projection([tuple(row)], [45], DISTRICT_DATASET, school_year=2013)[0].num_rows == 1
+    with pytest.raises(ContractError, match="supported school-year"):
+        _projection([], [], STATE_DATASET, school_year=2013)
+
+
+def epp_row(count=2):
+    return ("001902", 2013, "07", "Cayuga ISD", "Rural", "07", count, "Example EPP",
+            "Intern Certified", "07-Kilgore", "2012-2013", "07")
+
+
+def epp_workbook(tmp_path, rows):
+    from openpyxl import Workbook
+    from teadata.educator_hiring import _EPP_HEADERS
+
+    path = tmp_path / "epp.xlsx"
+    book = Workbook()
+    sheet = book.active
+    sheet.title = "District Counts Long"
+    sheet.append(_EPP_HEADERS)
+    for row in rows:
+        sheet.append(row)
+    book.save(path)
+    book.close()
+    return path
+
+
+def test_epp_comparison_aggregates_only_distinct_publisher_keys_and_requires_exact_key_sets(tmp_path):
+    from collections import Counter
+
+    second = list(epp_row(3))
+    second[7] = "Another EPP"
+    counts = _epp_counts(epp_workbook(tmp_path, [epp_row(), second]), (2013,))
+    row = list(district_row(5))
+    row[1], row[-1] = 2013, "2012-2013"
+    district, _ = _projection([tuple(row)], [45], DISTRICT_DATASET, school_year=2013)
+    assert _qualify_epp(district, counts, 2013)["epp_comparison_keys"] == 1
+    assert _qualify_epp(district, counts, 2013)["direct_state_comparison"] == "unavailable"
+    extra_zero = Counter(counts)
+    extra_zero[2013, "001903", "Intern Certified"] = 0
+    assert extra_zero == counts  # Counter equality alone would hide this unmatched publisher key.
+    for invalid in (extra_zero, Counter(), Counter({(2013, "001902", "Intern Certified"): 6})):
+        with pytest.raises(ContractError, match="keys or counts"):
+            _qualify_epp(district, invalid, 2013)
+
+
+@pytest.mark.parametrize(("index", "value"), [(0, "1902"), (2, "7"), (5, ""), (7, ""), (6, -1),
+                                            (6, True), (6, None), (8, "Alternative"), (10, "2013-2014")])
+def test_epp_comparison_rejects_unreviewed_tokens_and_population(tmp_path, index, value):
+    row = list(epp_row())
+    row[index] = value
+    with pytest.raises(ContractError, match="key, count or population"):
+        _epp_counts(epp_workbook(tmp_path, [row]), (2013,))
+
+
+def test_epp_comparison_rejects_duplicate_source_keys(tmp_path):
+    with pytest.raises(ContractError, match="key, count or population"):
+        _epp_counts(epp_workbook(tmp_path, [epp_row(), epp_row()]), (2013,))
+
+
+def test_epp_reference_must_match_exact_publisher_metadata_before_opening_source():
+    from dataclasses import replace
+    from types import SimpleNamespace
+
+    source = load_config().resolve_dataset(DISTRICT_DATASET, 2026, reader_profile="source", exact=True)
+    ref, = [ref for ref in source.metadata.references if ref.reference_id == "hiring_epp_comparison"]
+    for changed in (replace(ref, url="https://example.invalid/wrong.xlsx"), replace(ref, reviewed_sha256="f" * 64),
+                    replace(ref, provenance_ids=("f" * 64,))):
+        bad = replace(source, metadata=replace(source.metadata, references=(changed,)))
+        with pytest.raises(ContractError, match="exact reviewed EPP"):
+            _epp_reference(bad, SimpleNamespace())

@@ -7,7 +7,7 @@ from pathlib import Path
 
 
 def main(argv: list[str] | None = None) -> None:
-    from teadata.educator_hiring import SCHOOL_YEARS, YEAR, materialize_educator_hiring
+    from teadata.educator_hiring import AVAILABLE_SCHOOL_YEARS, YEAR, materialize_educator_hiring
     from teadata.manifest import ContractError, canonical_json
     from teadata.provenance import ProvenanceStore
 
@@ -16,12 +16,12 @@ def main(argv: list[str] | None = None) -> None:
     parser.add_argument("--output", type=Path, required=True)
     selection = parser.add_mutually_exclusive_group()
     selection.add_argument("--school-year", type=int, action="append", help="School-year ending year; repeat to select several")
-    selection.add_argument("--all-years", action="store_true", help="Select all eleven reviewed paired source years")
+    selection.add_argument("--all-years", action="store_true", help="Select all reviewed source years; Texas and district availability differ")
     args = parser.parse_args(argv)
     try:
         if not (args.store / "records").is_dir() or not (args.store / "objects").is_dir():
             raise ContractError("An existing retained source store is required")
-        years = SCHOOL_YEARS if args.all_years else args.school_year or (YEAR,)
+        years = AVAILABLE_SCHOOL_YEARS if args.all_years else args.school_year or (YEAR,)
         result = materialize_educator_hiring(ProvenanceStore(args.store), args.output, school_years=years)
     except (ContractError, OSError, ValueError) as error:
         parser.exit(2, f"Educator hiring build failed: {error}\n")

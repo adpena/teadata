@@ -46,7 +46,7 @@ Consult the selected release's catalog for queryable editions and fields.
 | Summary of Finances | Verified [School District State Aid Reports](https://tealprod.tea.state.tx.us/Tea.FspReports.Web/) district and charter downloads for 2012–13 and 2013–14 | These summaries are direct statewide totals for separate sectors. TEA also offers individual district and charter reports. Keep the run-list date, workbook update date, run, status, and any row-level run IDs separately. |
 | Geography | [TEA's ArcGIS archive](https://schoolsdata2-db440-tea-texas.opendata.arcgis.com/) and historical locator layers for [2012–13](https://schoolsdata2-tea-texas.opendata.arcgis.com/datasets/school2012) and [2013–14](https://schoolsdata2-tea-texas.opendata.arcgis.com/datasets/school2013) | Campus points and district polygons have separate vintages. Preserve records with absent coordinates and investigate duplicate campus identifiers before using points for joins. Establish historical polygon coverage independently. |
 | Discipline and transfers | [Discipline summary archive](https://tea.texas.gov/data-reports/student-data/discipline-data-products/discipline-reports) and [district transfer reports](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/district_transfer_report.html) reach the starting years | Discipline offers statewide district, campus, and Texas downloads. TEA documents [statewide campus transfer CSVs](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/about_transfer_reports.html) beginning in 2020–21. |
-| Educator workforce | [TEA educator reports](https://tea.texas.gov/data-reports/educator-data/educator-reports-and-data) and [version 5 hiring workbooks](https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/) | The retained district hiring products cover 2009–10 through 2025–26. The local paired district/Texas hiring producer supports every year from 2015–16 through 2025–26. The six earlier district years remain retained sources. Retention, employed certification and newly certified supply have separate qualification gaps, cohorts and scopes. |
+| Educator workforce | [TEA educator reports](https://tea.texas.gov/data-reports/educator-data/educator-reports-and-data) and [version 5 hiring workbooks](https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/) | The local hiring producer supports every district year from 2009–10 through 2025–26, and direct Texas observations from 2015–16 through 2025–26. Earlier district counts are checked against TEA's EPP-disaggregated product. Retention, employed certification and newly certified supply have separate qualification gaps, cohorts and scopes. |
 
 For TAPR, use the master reference for file codes, the report dictionary to
 locate printed cells, the glossary for the measure and population, and the
@@ -153,19 +153,22 @@ disclosure statuses. Pooled rates have an unresolved measurement window.
 
 The local native producer registers `educator_district_new_hires` from
 dashboard version `5` and `educator_state_new_hires` from the separate
-`2026-04` workbook. The paired measurement years are 2015–16 through 2025–26.
-The default producer selection remains 2025–26; `--all-years` includes all
-eleven years, and repeated `--school-year` selects ending years explicitly.
+`2026-04` workbook. District measurement years run from 2009–10 through 2025–26;
+direct Texas observations begin in 2015–16. The default producer selection
+remains 2025–26. `--all-years` includes every available year for each scope,
+and repeated `--school-year` selects ending years explicitly. An earlier
+selection builds district tables and records Texas as unavailable for those
+years; it does not fabricate or backfill a state observation.
 The district table has one row per district, year and published category.
 It includes charters in the publisher's reporting roster. The state table
 holds one direct Texas observation with nine category counts, their
 fractional ratios and the statewide total. The producer checks every
-district category sum against that independent report.
+district category sum against that report where it is available.
 
 ```sh
 uv run --locked python -m teadata.scripts.refresh_educator_hiring \
   --store "$TEADATA_PROVENANCE_DIR" --output "$EDUCATOR_HIRING_CANDIDATE_DIR"
-# Or select the complete paired history in a different, new directory:
+# Or select all available history in a different, new directory:
 uv run --locked python -m teadata.scripts.refresh_educator_hiring \
   --store "$TEADATA_PROVENANCE_DIR" --output "$EDUCATOR_HIRING_HISTORY_DIR" --all-years
 ```
@@ -187,7 +190,7 @@ available = release.observation_years(
 )
 historical_hires = release.observations(
     "educator_district_new_hires", "new_hires_count",
-    school_year=2016, scope="district",
+    school_year=2013, scope="district",
 ).to_df()
 ```
 
@@ -197,6 +200,15 @@ for the requested fields and scope. An unavailable year raises an error with
 the available years. Discovery and planning read metadata; materialization
 reads the selected local Parquet leaf. Installation does not fetch this
 history automatically, and this producer performs no network requests.
+
+For 2015–16 onward, every district category sum is compared with its direct
+Texas count and published fraction. For earlier years, the separate
+EPP-disaggregated workbook must have exactly the same district/year/category
+keys and grouped counts, including explicit zero keys. This establishes
+cross-product consistency; both products may share upstream processing.
+Neither that check nor a sum of district counts establishes an independently
+published Texas observation for an unavailable year. The EPP workbook is a
+retained comparison reference, not a separately qualified queryable dataset.
 
 The report edition is distinct from each table's measurement year. The whole
 workbook has no single measurement period, so that source-level period is
