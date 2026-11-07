@@ -579,6 +579,12 @@ value_policies:
       ? ''
       : status: missing
         reason: blank_source_cell
+  edrs_retention_2026:
+    reference_id: retention_workbook
+    tokens:
+      '':
+        status: missing
+        reason: unreported_follow_up_horizon
   frc_ppe_published:
     reference_id: frc_ppe_blank_note
     tokens:
@@ -16032,6 +16038,113 @@ data_sources:
             acquisition_id: 792c5aa57758dde8613cc7c4a4a460684b45c5826f6167ad002a069e1bec7a7a
             worksheet: New Hires
             column_schema: schemas/edrs--2026--new-hires-crosswalk.json
+
+  educator_state_retention_by_preparation_route:
+    2026:
+      path: data/educators/2026/teacher-retention.xlsx
+      metadata:
+        title: TEA statewide teacher retention by preparation route (April 2026 workbook)
+        publisher: Texas Education Agency
+        version: 2026-04
+        period: {kind: unknown}
+        source_url: https://tea4avcastro.tea.state.tx.us/oess/edrs/teacher-retention-dashboard/downloads/Teacher_Retention_Workbook.xlsx
+        value_policy: edrs_retention_2026
+        metrics: &educator_retention_metrics
+          first_year_teacher_count: {field: first_year_teacher_count, unit: count}
+          retained_year_1_count: {field: retained_year_1_count, unit: count}
+          retained_year_1_ratio: {field: retained_year_1_ratio, unit: ratio}
+          retained_year_2_count: {field: retained_year_2_count, unit: count}
+          retained_year_2_ratio: {field: retained_year_2_ratio, unit: ratio}
+          retained_year_3_count: {field: retained_year_3_count, unit: count}
+          retained_year_3_ratio: {field: retained_year_3_ratio, unit: ratio}
+          retained_year_4_count: {field: retained_year_4_count, unit: count}
+          retained_year_4_ratio: {field: retained_year_4_ratio, unit: ratio}
+          retained_year_5_count: {field: retained_year_5_count, unit: count}
+          retained_year_5_ratio: {field: retained_year_5_ratio, unit: ratio}
+        notes: >-
+          School year selects the first-teaching cohort. Year n is continuous employment through the nth
+          school year after that cohort. The published denominator covers teachers of record who received
+          their initial standard certificate in the preceding academic year and taught in Texas public
+          schools at 0.5 or greater cumulative FTE. An interruption ends continuous retention even when
+          a teacher returns. A blank is an unreported follow-up horizon. The three views share statewide
+          totals and have overlapping populations. They are separate from pathway at entry and TAPR turnover.
+          The 2017–18 preparation-route cohort is held after a publisher example failed to reconcile.
+        references: &educator_retention_references
+        - reference_id: retention_workbook
+          role: data_dictionary
+          title: TEA Teacher Retention Workbook introduction and data dictionary (created February 24, 2026)
+          url: https://tea4avcastro.tea.state.tx.us/oess/edrs/teacher-retention-dashboard/downloads/Teacher_Retention_Workbook.xlsx
+          reviewed_sha256: 893883bcf8960da35a06d8dcf01016b4bf7816fab093da60b6f29e1c83bd17ac
+          provenance_ids: [4b225a3078c31dab9a072742d390be2af2dbb13af3347f81248b96bf5748c928]
+        - reference_id: retention_business_rules
+          role: methodology
+          title: TEA Teacher Retention Dashboard business rules (March 31, 2026)
+          url: https://tea4avcastro.tea.state.tx.us/oess/edrs/teacher-retention-dashboard/downloads/Business_Rules_Document_Retention.pdf
+          reviewed_sha256: 26a4bebd511f01d15739dc2f616e13cc805a068554400a7d64f7b3fe6506e315
+          provenance_ids: [7c538cb7ecc13e94a2fa3c91443979d2e8a1ff62b0960c70d3ad0cce3d287ce4]
+        - reference_id: retention_crosswalk
+          role: schema
+          path: schemas/edrs--2026--teacher-retention-crosswalk.json
+          reviewed_sha256: 00af57f96e2177343c092e1d098ed5fd2c2ecc5b6eb6197a51ca0e9e36515b78
+          provenance_ids: [38886d9ff62b7b8eb47a354385a55718d04fe338e7ddfdca60de946ada8ffc1d]
+      reader:
+        profiles:
+          source:
+            acquisition_id: 4b225a3078c31dab9a072742d390be2af2dbb13af3347f81248b96bf5748c928
+            worksheet: Retention by Preparation Route
+            column_schema: schemas/edrs--2026--teacher-retention-crosswalk.json
+
+  educator_state_retention_by_demographic_group:
+    2026:
+      path: data/educators/2026/teacher-retention.xlsx
+      metadata:
+        title: TEA statewide teacher retention by demographic group (April 2026 workbook)
+        publisher: Texas Education Agency
+        version: 2026-04
+        period: {kind: unknown}
+        source_url: https://tea4avcastro.tea.state.tx.us/oess/edrs/teacher-retention-dashboard/downloads/Teacher_Retention_Workbook.xlsx
+        value_policy: edrs_retention_2026
+        metrics: *educator_retention_metrics
+        notes: >-
+          School year selects the first-teaching cohort. Year n is continuous employment through the nth
+          school year after that cohort. The published denominator covers teachers of record who received
+          their initial standard certificate in the preceding academic year and taught in Texas public
+          schools at 0.5 or greater cumulative FTE. An interruption ends continuous retention even when
+          a teacher returns. A blank is an unreported follow-up horizon. The three views share statewide
+          totals and have overlapping populations. They are separate from pathway at entry and TAPR turnover.
+        references: *educator_retention_references
+      reader:
+        profiles:
+          source:
+            acquisition_id: 4b225a3078c31dab9a072742d390be2af2dbb13af3347f81248b96bf5748c928
+            worksheet: Retention by Demographic Group
+            column_schema: schemas/edrs--2026--teacher-retention-crosswalk.json
+
+  educator_state_retention_by_gender:
+    2026:
+      path: data/educators/2026/teacher-retention.xlsx
+      metadata:
+        title: TEA statewide teacher retention by gender (April 2026 workbook)
+        publisher: Texas Education Agency
+        version: 2026-04
+        period: {kind: unknown}
+        source_url: https://tea4avcastro.tea.state.tx.us/oess/edrs/teacher-retention-dashboard/downloads/Teacher_Retention_Workbook.xlsx
+        value_policy: edrs_retention_2026
+        metrics: *educator_retention_metrics
+        notes: >-
+          School year selects the first-teaching cohort. Year n is continuous employment through the nth
+          school year after that cohort. The published denominator covers teachers of record who received
+          their initial standard certificate in the preceding academic year and taught in Texas public
+          schools at 0.5 or greater cumulative FTE. An interruption ends continuous retention even when
+          a teacher returns. A blank is an unreported follow-up horizon. The three views share statewide
+          totals and have overlapping populations. They are separate from pathway at entry and TAPR turnover.
+        references: *educator_retention_references
+      reader:
+        profiles:
+          source:
+            acquisition_id: 4b225a3078c31dab9a072742d390be2af2dbb13af3347f81248b96bf5748c928
+            worksheet: Retention by Gender
+            column_schema: schemas/edrs--2026--teacher-retention-crosswalk.json
 
   peims_teacher_course_enrollment:
     2023:

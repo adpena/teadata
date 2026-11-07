@@ -438,11 +438,15 @@ def test_historical_progress_participation_bind_logical_records_and_source_witne
 def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     current = yaml.safe_load((ROOT / 'teadata/teadata_sources.yaml').read_text())
     for dataset, edition in (('educator_district_new_hires', '5'), ('educator_state_new_hires', '2026-04'),
-                             ('educator_district_new_hires_by_epp', '5')):
+                             ('educator_district_new_hires_by_epp', '5'),
+                             ('educator_state_retention_by_preparation_route', '2026-04'),
+                             ('educator_state_retention_by_demographic_group', '2026-04'),
+                             ('educator_state_retention_by_gender', '2026-04')):
         educator = current['data_sources'].pop(dataset)
         assert list(educator) == [2026]
         assert list(educator[2026]['reader']['profiles']) == ['source']
         assert educator[2026]['metadata']['version'] == edition
+    assert current['value_policies'].pop('edrs_retention_2026')['reference_id'] == 'retention_workbook'
     rda = current['data_sources'].pop('rda_special_education_indicator1')
     assert list(rda) == [2025]
     assert list(rda[2025]['reader']['profiles']) == ['source']
