@@ -100,6 +100,35 @@ and one direct Texas report. It has no campus edition. Query its fields by
 [school year](querying.md#school-years-and-source-editions). The attachment
 leaves the entity snapshot's TAPR fields at their original periods.
 
+## Results Driven Accountability
+
+The explicit `teadata.rda` reader covers the 2024 and 2025 Results Driven
+Accountability Indicator 1 STAAR passing-rate files for bilingual education,
+other special populations, and special education. The reader requires the
+matching original district CSV. It checks the publisher bytes before reading
+and returns one Arrow row per district and subject.
+
+```python
+from teadata.rda import rda_indicator1_metadata, read_rda_indicator1
+
+source = rda_indicator1_metadata(2025, "04")
+district_rates = read_rda_indicator1("2025-D-04-original.csv", edition=2025, area="04")
+texas_mathematics = source["fields"][0]["direct_texas"]
+```
+
+The metadata supplies the district download controls, data dictionary,
+technical appendix, masking rules, and direct Texas report. Texas values
+come from the matching state report. District single-year rates and pooled
+multi-year rates occupy separate columns. Where TEA reports only a pooled
+rate, the single-year value remains absent even when the current numerator
+and denominator are visible. The raw publisher token, disclosure status,
+and field code remain available. A null raw pooled value indicates an
+omitted column, while a literal period indicates an available column with
+no pooled rate on that row.
+
+[TEA district data and dictionaries](https://rptsvr1.tea.texas.gov/pbm/download.html) ·
+[TEA state reports](https://tea.texas.gov/assessment-and-accountability/monitoring-and-interventions/rda/rda-state-reports/rda-state-reports)
+
 ## Separately published source tables
 
 A native source release holds a verified table with its original row keys, source revision, and field definitions. You can query and export it directly through `DataRelease`. These tables are currently separate from the default entity enrichment build. See [published TAPR and TPRS supplements](data-releases.md#tapr-and-tprs-supplements) and [annual dropout](research-annual-dropout.md) for how to use them.
