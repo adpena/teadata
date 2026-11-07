@@ -437,6 +437,10 @@ def test_historical_progress_participation_bind_logical_records_and_source_witne
 
 def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     current = yaml.safe_load((ROOT / 'teadata/teadata_sources.yaml').read_text())
+    rda = current['data_sources'].pop('rda_special_education_indicator1')
+    assert list(rda) == [2025]
+    assert list(rda[2025]['reader']['profiles']) == ['source']
+    assert rda[2025]['metadata']['version'] == '2025'
     selected_students = 'tprs_student_membership_enrollment_reports'
     selected_entry = current['data_sources'].pop(selected_students)
     assert list(selected_entry) == [2026, 'latest'] and selected_entry['latest'] == 2026
