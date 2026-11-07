@@ -46,6 +46,7 @@ Consult the selected release's catalog for queryable editions and fields.
 | Summary of Finances | Verified [School District State Aid Reports](https://tealprod.tea.state.tx.us/Tea.FspReports.Web/) district and charter downloads for 2012–13 and 2013–14 | These summaries are direct statewide totals for separate sectors. TEA also offers individual district and charter reports. Keep the run-list date, workbook update date, run, status, and any row-level run IDs separately. |
 | Geography | [TEA's ArcGIS archive](https://schoolsdata2-db440-tea-texas.opendata.arcgis.com/) and historical locator layers for [2012–13](https://schoolsdata2-tea-texas.opendata.arcgis.com/datasets/school2012) and [2013–14](https://schoolsdata2-tea-texas.opendata.arcgis.com/datasets/school2013) | Campus points and district polygons have separate vintages. Preserve records with absent coordinates and investigate duplicate campus identifiers before using points for joins. Establish historical polygon coverage independently. |
 | Discipline and transfers | [Discipline summary archive](https://tea.texas.gov/data-reports/student-data/discipline-data-products/discipline-reports) and [district transfer reports](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/district_transfer_report.html) reach the starting years | Discipline offers statewide district, campus, and Texas downloads. TEA documents [statewide campus transfer CSVs](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/about_transfer_reports.html) beginning in 2020–21. |
+| Educator workforce | [TEA educator reports](https://tea.texas.gov/data-reports/educator-data/educator-reports-and-data) and [version 5 hiring workbooks](https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/) | The retained district hiring products cover 2009–10 through 2025–26. The separately published state hiring workbook covers 2015–16 through 2025–26. Retention, employed certification and newly certified supply have their own cohorts and scopes. The local hiring producer selects 2025–26. |
 
 For TAPR, use the master reference for file codes, the report dictionary to
 locate printed cells, the glossary for the measure and population, and the
@@ -147,6 +148,58 @@ disclosure statuses. Pooled rates have an unresolved measurement window.
 
 [TEA district data and dictionaries](https://rptsvr1.tea.texas.gov/pbm/download.html) ·
 [TEA state reports](https://tea.texas.gov/assessment-and-accountability/monitoring-and-interventions/rda/rda-state-reports/rda-state-reports)
+
+## Educator hiring
+
+The local native producer registers `educator_district_new_hires` from
+dashboard version `5` and `educator_state_new_hires` from the separate
+`2026-04` workbook. Both selected tables measure school year 2025–26.
+The district table has one row per district, year and published category.
+It includes charters in the publisher's reporting roster. The state table
+holds one direct Texas observation with nine category counts, their
+fractional ratios and the statewide total. The producer checks every
+district category sum against that independent report.
+
+```sh
+uv run --locked python -m teadata.scripts.refresh_educator_hiring \
+  --store "$TEADATA_PROVENANCE_DIR" --output "$EDUCATOR_HIRING_CANDIDATE_DIR"
+```
+
+Open the candidate's `release.json` as a `DataRelease` and select its
+measurement year explicitly.
+
+```python
+district_hires = release.observations(
+    "educator_district_new_hires", "new_hires_count",
+    school_year=2026, scope="district",
+).to_df()
+texas_hires = release.observations(
+    "educator_state_new_hires", "total_new_hires_count",
+    school_year=2026, scope="state",
+).to_df()
+```
+
+Counts preserve integer types, source values, disclosure status and Excel
+row coordinates. State ratios retain the publisher's fractions with
+unit `ratio`. For example, 0.10025823404158928 represents approximately
+10.0258 percent. Source-table exports preserve the raw fraction text.
+Excel also writes a fraction as text when its numeric cells would lose
+precision. An absent district/category row remains absent.
+
+The categories describe certification or entry pathway at hire. They include
+re-entering teachers and teachers previously working part-time. Preparation
+route, EPP supply and statewide continuous teacher retention have separate
+definitions. TEA's regional dashboard history attributes its changes to
+certification date logic, the 0.5 FTE threshold and the part-time pathway
+to version 4 (March 2025). Version 5 adds 2025–26. This history applies
+to the regional dashboard; the state workbook was issued separately.
+Historical products require their release and revision identities.
+
+The linked regional documentation workbook is dated January 2023 and the
+business-rules PDF April 2025. Their definitions are retained with those
+dates and their documented gaps. A link from the current dashboard does
+not establish that an older document describes every current field.
+[TEA hiring methodology and version history](https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/)
 
 ## Separately published source tables
 

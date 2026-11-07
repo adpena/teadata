@@ -15818,6 +15818,155 @@ data_sources:
           source:
             column_schema: schemas/rda--2025--sped-indicator1-crosswalk.json
 
+  educator_district_new_hires:
+    2026:
+      path: data/educators/2026/district-new-hires.xlsx
+      metadata:
+        title: 2025–26 TEA district new teacher hires by entry pathway
+        publisher: Texas Education Agency
+        version: '5'
+        period: &educator_hiring_period_2026
+          kind: school_year
+          start_year: 2025
+          end_year: 2026
+        source_url: https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/downloads/new-hires-by-school-system-view-3.xlsx
+        metrics:
+          new_hires_count:
+            field: new_hires_count
+            unit: count
+        notes: Raw publisher headcounts, with original cell value and source row support. New
+          hires include re-enterers and previously part-time teachers. Entry pathway or certification at hire differs
+          from preparation route and EPP identity. Only the 2025–26 rows are selected. TEA attributes the revised
+          certification date logic, exclusion below 0.5 teacher FTE, and new part-time pathway to version 4 (March
+          2025). Version 5 extends the series through 2025–26. The January 2023 documentation and April 2025
+          business rules predate that extension and may not describe every current field.
+        references:
+        - reference_id: regional_dashboard_index
+          role: source_notes
+          title: TEA regional educator dashboards and version history
+          url: https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/
+          reviewed_sha256: a7750c4c19e348acbf0745c3801dda2d1ef722a019fec069ea3fa3fd72c70adf
+          provenance_ids:
+          - a8ef9adb5ea04c99e9a47d53fdb6a3abefda445a5dda084e5959343c643af924
+        - reference_id: regional_data_documentation
+          role: data_dictionary
+          title: TEA regional data documentation (January 2023; predates version 5)
+          url: https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/downloads/newly-certified-and-new-teacher-hires-data-documentation.xlsx
+          reviewed_sha256: 2d05fc266ef656b03ebba958ac15dd5b8f3438c66cca2a711077a4470036f28c
+          provenance_ids:
+          - 33d7f3141db505a557bcfed8e16adf796131f7e1ecb2b0748b5635cf7f1f136f
+        - reference_id: regional_business_rules
+          role: methodology
+          title: TEA regional business rules (April 2025; predates version 5)
+          url: https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/downloads/newly-certified-and-new-teacher-hires-business-rules.pdf
+          reviewed_sha256: 7125d37e3dd45d9128a698e6084073c9441dca0fae1d349c98b50af67ed6ade5
+          provenance_ids:
+          - 75685e0bd643e8f5ecb607f5028bec3c45e98884f6880cc8d21f3dee7be93ff1
+        - reference_id: educator_hiring_crosswalk
+          role: schema
+          path: schemas/edrs--2026--new-hires-crosswalk.json
+          reviewed_sha256: 28f7e6886771ffd7be073a9e63a1dc70b4c48fa76384e10b2dd0d6f9198f51a7
+          provenance_ids:
+          - 0ab7828dec363f823c4faf0209bbe1f12dba3af3c5047479aa70882d34151263
+      reader:
+        profiles:
+          source:
+            acquisition_id: bec3aac823d68bc6600033955fc4b27b94124d8724cfb4932e3c13ed93f92e34
+            worksheet: District Counts
+            column_schema: schemas/edrs--2026--new-hires-crosswalk.json
+  educator_state_new_hires:
+    2026:
+      path: data/educators/2026/state-new-hires.xlsx
+      metadata:
+        title: 2025–26 TEA state new teacher hires by entry pathway
+        publisher: Texas Education Agency
+        version: 2026-04
+        period: *educator_hiring_period_2026
+        source_url: https://tea4avcastro.tea.state.tx.us/oess/edrs/new-hire-and-attrition-dashboard/downloads/Attrition_New%20Hires_Workbook.xlsx
+        metrics:
+          total_new_hires_count:
+            field: total_new_hires_count
+            unit: count
+          intern_certified_count:
+            field: intern_certified_count
+            unit: count
+          one_year_out_of_state_certified_count:
+            field: one_year_out_of_state_certified_count
+            unit: count
+          standard_out_of_state_certified_count:
+            field: standard_out_of_state_certified_count
+            unit: count
+          standard_certified_direct_entry_count:
+            field: standard_certified_direct_entry_count
+            unit: count
+          standard_certified_lagged_entry_count:
+            field: standard_certified_lagged_entry_count
+            unit: count
+          no_texas_certification_or_permit_count:
+            field: no_texas_certification_or_permit_count
+            unit: count
+          emergency_permit_count:
+            field: emergency_permit_count
+            unit: count
+          reenterer_count:
+            field: reenterer_count
+            unit: count
+          previously_part_time_count:
+            field: previously_part_time_count
+            unit: count
+          intern_certified_ratio:
+            field: intern_certified_ratio
+            unit: ratio
+          one_year_out_of_state_certified_ratio:
+            field: one_year_out_of_state_certified_ratio
+            unit: ratio
+          standard_out_of_state_certified_ratio:
+            field: standard_out_of_state_certified_ratio
+            unit: ratio
+          standard_certified_direct_entry_ratio:
+            field: standard_certified_direct_entry_ratio
+            unit: ratio
+          standard_certified_lagged_entry_ratio:
+            field: standard_certified_lagged_entry_ratio
+            unit: ratio
+          no_texas_certification_or_permit_ratio:
+            field: no_texas_certification_or_permit_ratio
+            unit: ratio
+          emergency_permit_ratio:
+            field: emergency_permit_ratio
+            unit: ratio
+          reenterer_ratio:
+            field: reenterer_ratio
+            unit: ratio
+          previously_part_time_ratio:
+            field: previously_part_time_ratio
+            unit: ratio
+        notes: Raw publisher headcounts and binary64 fractions, with original cell value and source row support. New
+          hires include re-enterers and previously part-time teachers. Entry pathway or certification at hire differs
+          from preparation route and EPP identity. Only the 2025–26 row from the statewide New Hires tab is selected.
+          The workbook introduction gives a February 20, 2026 creation date. The statewide workbook is a separately
+          issued product, and the regional dashboard's version history does not apply to this edition.
+        references:
+        - reference_id: publisher_workbook_dictionary
+          role: data_dictionary
+          title: Statewide New Hires workbook introduction and dictionary (created February 20, 2026)
+          url: https://tea4avcastro.tea.state.tx.us/oess/edrs/new-hire-and-attrition-dashboard/downloads/Attrition_New%20Hires_Workbook.xlsx
+          reviewed_sha256: fa02256f69a594e95a250b80d32bb3a43ecfe65f493857305ac4e54f0e1d77ee
+          provenance_ids:
+          - 792c5aa57758dde8613cc7c4a4a460684b45c5826f6167ad002a069e1bec7a7a
+        - reference_id: educator_hiring_crosswalk
+          role: schema
+          path: schemas/edrs--2026--new-hires-crosswalk.json
+          reviewed_sha256: 28f7e6886771ffd7be073a9e63a1dc70b4c48fa76384e10b2dd0d6f9198f51a7
+          provenance_ids:
+          - 0ab7828dec363f823c4faf0209bbe1f12dba3af3c5047479aa70882d34151263
+      reader:
+        profiles:
+          source:
+            acquisition_id: 792c5aa57758dde8613cc7c4a4a460684b45c5826f6167ad002a069e1bec7a7a
+            worksheet: New Hires
+            column_schema: schemas/edrs--2026--new-hires-crosswalk.json
+
   peims_teacher_course_enrollment:
     2023:
       metadata:
