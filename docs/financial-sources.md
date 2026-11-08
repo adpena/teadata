@@ -48,9 +48,29 @@ An individual table can explicitly opt into `uninterpreted_fields: [canonical_fa
 
 These uninterpreted facts remain discoverable in `catalog.variables(edition=key)` with `unit: null`, and `catalog.resolve_artifacts([(key, field)])` selects the string plus existing row keys and sheet/row context. There is no normalized raw/status support for that field. Do not treat a null, dot or range as zero, infer a suppression status, or apply numeric comparisons/scaling before reviewing its actual representation. In a schema3 candidate, the exact opt-in is accessible through the selected variable's `artifact_id`: `ref = catalog.artifact_ref(artifact_id)`, then `catalog.to_dict()["provenance"][ref.processing_id]["parameters"]["recipe"]["worksheet"]["uninterpreted_fields"]`. The contract binds that canonical recipe through `ref.contract["recipe_sha256"]`. This uses the existing processing record, not another field registry. The option is omitted from recipes when unused, preserving the default contract shape. Retaining a raw fact does not qualify its unit, period, definition or correctness.
 
+For exact stored numeric tokens, set `cell_text: ooxml_literal` in the
+existing `workbook` profile. This mode preserves the numeric text in the
+original worksheet XML, decodes supported shared and inline text, and
+distinguishes an empty string from an absent cell. It rejects unhandled
+cell types, malformed framing, and workbooks over its resource limits.
+The literal reader caps each dense worksheet at one million cells and
+checks expanded string bytes before allocating Arrow arrays. It uses
+the original stored tokens as inputs to the same financial
+projection and leaves units and display formats to the reviewed source
+contract. The default retains the Calamine string representation. A
+Calamine string may round an original stored numeric token, so exact
+value parity requires a separate source check.
+
 Units must describe the **stored, unformatted values**. An Excel percent format can display a stored fraction as percentage points; currency display formats do not establish a monetary scale. This producer performs no style-based conversion, multiplier, percentage-point conversion, rounding or year-based transformation. Such conversions are unsupported. Keep a stored fraction as a reviewed ratio, or defer the field until its representation is established; do not label an unconverted fraction as percentage points. Literal tax/program header changes do not establish a conversion or equivalence.
 
-The native reader is the optional `fastexcel` dependency, imported only when materialization is requested. Calamine reads complete admitted fact tables into Arrow strings. These are native reader representations, **not original OOXML numeric lexemes**. Original workbook bytes remain in canonical provenance; source sheet, physical row and publisher-column positions locate the originals. The producer inspects bounded OOXML structure, rejects formulas, error cells and merged fact cells, and never recalculates formulas. It does not perform Python Excel-cell value ETL or multiprocessing. Arrow operates on columns; the existing `values.measure` authority interprets at most 4096 distinct tokens per numeric field under the selected policy and unit.
+The default mode uses the optional `fastexcel` dependency. Calamine reads
+admitted worksheets as Arrow strings, which may differ from original
+OOXML numeric tokens. Literal mode reads bounded worksheet XML and
+constructs the Arrow strings directly. Both retain original workbook
+bytes in provenance, reject formulas, error cells and merged fact cells,
+and retain worksheet, row and column positions. Neither mode
+recalculates formulas. Arrow operates on columns, and `values.measure`
+interprets at most 4,096 distinct tokens per reviewed numeric field.
 
 Normalized numeric fields retain explicit raw and status support in the same immutable leaf. Selecting a count through `catalog.resolve_artifacts` automatically includes its raw/status and sheet/row context; SOF's declared run column is included by the existing qualifier projection. Native schema3/4 access does not create scalar `Measurement` APIs. Use canonical `values.measure(raw, policy, unit=...)` when interpreting an explicitly selected raw value. Zero and negative financial values remain distinct from missing, not applicable and suppressed tokens. No protected value is filled from a total or another report.
 
