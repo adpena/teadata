@@ -127,7 +127,8 @@ def _admit_preparation(store: ProvenanceStore, cfg: Config, year: int, identifie
     if len(branch["tables"]) != 1:
         raise ValueError("Statewide district transfers require one logical table per edition")
     table, = branch["tables"]
-    count_field, = [field["field"] for field in table["fields"] if field["code"] == "TRANSFERS_IN_OUT"]
+    count_code = transfer_columns("district", year=year)[-1]
+    count_field, = [field["field"] for field in table["fields"] if field["code"] == count_code]
     if {value.field for value in source.metadata.metrics.values() if value.unit == "count"} != {count_field}:
         raise ValueError("District source must expose its one publisher count field with count units")
     count_header, = [row for row in cfg.header_records(source.dataset, edition=str(year), table=table["table"], reader_profile="source")
@@ -141,7 +142,7 @@ def _admit_preparation(store: ProvenanceStore, cfg: Config, year: int, identifie
     artifact = record["outputs"]["prepared_source"]
     if not 0 < artifact["size_bytes"] <= 16 * 1024 * 1024 or report["rows"] * 12 > 8 * 1024 * 1024:
         raise ValueError("District prepared bytes or compact row-key index exceed admission")
-    names, support, operations = _leaf_projection(report["columns"], table["fields"], grain="district")
+    names, support, operations = _leaf_projection(report["columns"], table["fields"], grain="district", year=year)
     return {"year": year, "processing_id": identifier, "record": record, "report": report,
         "acquisitions": acquisitions, "source": source, "table": table, "artifact": artifact,
         "names": names, "support": support, "operations": operations}
@@ -170,13 +171,14 @@ def materialize_district_transfers(store: ProvenanceStore, *, config: Path, conf
     # Check actual native schemas/row keys before the first candidate writer.
     for item in admitted:
         artifact, report = item["artifact"], item["report"]
+        publisher_columns = transfer_columns("district", year=item["year"])
         prepared = store.verify_artifact(artifact["sha256"])
         with pq.ParquetFile(prepared) as native:
             schema = native.schema_arrow.remove_metadata()
             if (schema.names != report.get("columns") or native.metadata.num_rows != report["rows"]
-                    or schema.names[:len(transfer_columns("district"))] != list(transfer_columns("district"))
+                    or schema.names[:len(publisher_columns)] != list(publisher_columns)
                     or any(not (pa.types.is_string(schema.field(name).type) or pa.types.is_large_string(schema.field(name).type))
-                           for name in transfer_columns("district"))
+                           for name in publisher_columns)
                     or schema.field("transfer_source_input").type != pa.int32()
                     or schema.field("transfer_source_record").type != pa.int64()):
                 raise ValueError("Prepared district schema/rows differ from their accepted source report")

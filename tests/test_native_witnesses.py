@@ -8,6 +8,7 @@ from unittest.mock import Mock
 import pytest
 
 from teadata import native_witnesses, release, source_parity, verification
+from teadata.transfer_sources import transfer_columns
 from teadata.dataset_metadata import ArtifactRef, EditionKey
 from teadata.manifest import ContractError, canonical_json
 from teadata.provenance import ProvenanceStore
@@ -86,7 +87,7 @@ def test_transfer_witness_rejects_a_truncated_data_row_as_a_footer(tmp_path):
     report = tmp_path / "district.csv"
     with report.open("w", newline="") as stream:
         writer = csv.writer(stream)
-        writer.writerows([["District Level Transfer Report"], native_witnesses._TRANSFER_HEADER,
+        writer.writerows([["District Level Transfer Report"], transfer_columns("district", year=2026),
                           ["2025-2026", "13", "REGION", "DISTRICT  -  227901", "", "100", "Transfers In From",
                            "100", "PARTNER", "10"], ["2025-2026"],
                           *[[line] for line in native_witnesses._FOOTNOTES]])
@@ -96,16 +97,21 @@ def test_transfer_witness_rejects_a_truncated_data_row_as_a_footer(tmp_path):
 
 
 @pytest.mark.parametrize("label", ["District (001902)", "District (01902)", "District (001903)"])
-def test_2021_transfer_witness_requires_the_exact_parenthesized_district(tmp_path, label):
+@pytest.mark.parametrize("year", [2020, 2021])
+def test_historical_transfer_witness_requires_the_exact_parenthesized_district(tmp_path, label, year):
     report = tmp_path / "district.csv"
-    row = ["2020-2021", "13", "REGION", label, "", "100", "Transfers In From",
+    headings = transfer_columns("district", year=year)
+    row = [f"{year-1}-{year}", "13", "REGION", label, "", "100", "Transfers In From",
            "100", "Partner (002902)", "-999"]
     with report.open("w", newline="", encoding="utf-8") as stream:
-        csv.writer(stream).writerows([["District Level Transfer Report"], native_witnesses._TRANSFER_HEADER,
+        csv.writer(stream).writerows([["District Level Transfer Report"], headings,
                                      row, [], *[[line] for line in native_witnesses._FOOTNOTES]])
     table = Mock()
-    table.to_table.return_value.to_pylist.return_value = [dict(zip(native_witnesses._TRANSFER_COLUMNS, row, strict=True))]
-    ref = cast(ArtifactRef, SimpleNamespace(edition=SimpleNamespace(edition="2021")))
+    columns = ["school_year", "REPORT_REGION", "reporting_region_name", headings[3],
+               "reporting_charter_status", "report_number", "REPORT_TYPE", "line_group_number",
+               headings[8], "TRANSFERS_IN_OUT"]
+    table.to_table.return_value.to_pylist.return_value = [dict(zip(columns, row, strict=True))]
+    ref = cast(ArtifactRef, SimpleNamespace(edition=SimpleNamespace(edition=str(year))))
     if label == "District (001902)":
         assert native_witnesses._transfer(report, ref, "001902 DISTRICT", table) == 1
     else:

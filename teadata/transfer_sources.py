@@ -347,6 +347,10 @@ _DISTRICT_COLUMNS = (
     "REPORT_CHARTER_STATUS", "REPORT_NUMBER", "REPORT_TYPE", "LINE_GROUP_NUMBER",
     "DISTNAME_NUMBER_RES_ATTEND", "TRANSFERS_IN_OUT",
 )
+_DISTRICT_COLUMNS_2020 = (
+    *_DISTRICT_COLUMNS[:2], "REPORT_REGION_NAME_PROP", "REPORT_DISTNAME_NUMBER_PROPCASE",
+    *_DISTRICT_COLUMNS[4:8], "DISTNAME_NUMBER_RES_ATTEND_PROP", _DISTRICT_COLUMNS[-1],
+)
 _FOOTNOTES = (
     "-999 indicates counts or percentages are not available (i.e. masked) to comply with the Family Educational Rights and Privacy Act (FERPA).",
     "Masked numbers are typically small although larger numbers may be masked to prevent imputation.",
@@ -369,10 +373,16 @@ def _campus_wire_schema(year: int | None, layout: str = "original") -> bytes:
 
 def transfer_columns(grain: str, *, year: int | None = None, layout: str = "original") -> tuple[str, ...]:
     if grain == "district":
-        return _DISTRICT_COLUMNS
+        return _DISTRICT_COLUMNS_2020 if year == 2020 and layout == "original" else _DISTRICT_COLUMNS
     if grain == "campus":
         return tuple(json.loads(_campus_wire_schema(year, layout))["columns"])
     raise ValueError("Transfer grain must be campus or district")
+
+
+def _transfer_titles(grain: str, *, year: int | None, region: str | None) -> list[str]:
+    scope = "Region" if region is not None else grain.title()
+    report = "PEIMS Student Transfers Report" if grain == "district" and year == 2020 else "PEIMS Student Transfer Report"
+    return ["T E X A S E D U C A T I O N A G E N C Y", f"{scope} Level Transfer Report", report]
 
 
 @dataclass(frozen=True)
@@ -388,11 +398,11 @@ class TransferSourceTable:
 
 def transfer_value_columns(grain: str, *, year: int | None = None, layout: str = "original") -> dict[str, str]:
     """The existing projector's publisher inputs and normalized value outputs."""
-    count_column = transfer_columns(grain, year=year, layout=layout)[-1]
+    columns = transfer_columns(grain, year=year, layout=layout)
     return {"REPORT_REGION": "transfer_reporting_region", "REPORT_TYPE": "transfer_direction",
-        "REPORT_CAMPUS" if grain == "campus" else "REPORT_DISTNAME_NUMBER": "transfer_reporting_number",
-        "CAMPUS_RES_OR_ATTEND" if grain == "campus" else "DISTNAME_NUMBER_RES_ATTEND": "transfer_partner_number",
-        count_column: "transfer_count_value"}
+        "REPORT_CAMPUS" if grain == "campus" else columns[3]: "transfer_reporting_number",
+        "CAMPUS_RES_OR_ATTEND" if grain == "campus" else columns[8]: "transfer_partner_number",
+        columns[-1]: "transfer_count_value"}
 
 
 def _transfer_projection(table, *, grain: str, period: DataPeriod, policy: ValuePolicy, region: str | None,
@@ -402,6 +412,9 @@ def _transfer_projection(table, *, grain: str, period: DataPeriod, policy: Value
     import pyarrow.compute as arrow_compute
 
     pc: Any = arrow_compute
+    wire_columns = transfer_columns(grain, year=period.end_year, layout=layout)
+    reporting_column = "REPORT_CAMPUS" if grain == "campus" else wire_columns[3]
+    partner_column = "CAMPUS_RES_OR_ATTEND" if grain == "campus" else wire_columns[8]
 
     def require(condition, message: str) -> None:
         if not pc.all(pc.fill_null(condition, False)).as_py():
@@ -424,7 +437,7 @@ def _transfer_projection(table, *, grain: str, period: DataPeriod, policy: Value
                          pc.and_(pc.equal(report_type, ""), pc.is_in(table["REPORT_NUMBER"], value_set=pa.array(["100", "200"]))))),
             "Transfer report number and direction disagree")
     detail = pc.and_(pc.equal(group, "100"), has_direction)
-    target_label = table["CAMPNAME_RES_OR_ATTEND" if grain == "campus" else "DISTNAME_NUMBER_RES_ATTEND"]
+    target_label = table["CAMPNAME_RES_OR_ATTEND" if grain == "campus" else partner_column]
     expected_total = pc.if_else(incoming, "Total Transfers In", "Total Transfers Out")
     total = pc.and_(pc.and_(pc.equal(group, "200"), has_direction), pc.equal(target_label, expected_total))
     separator = pc.and_(pc.is_in(group, value_set=pa.array(["200", "300"])), pc.equal(target_label, ""))
@@ -438,8 +451,8 @@ def _transfer_projection(table, *, grain: str, period: DataPeriod, policy: Value
         return result
 
     if grain == "campus":
-        reporting = identifiers(table["REPORT_CAMPUS"], 9, required=pa.array([True] * table.num_rows))
-        partner = identifiers(table["CAMPUS_RES_OR_ATTEND"], 9, required=detail)
+        reporting = identifiers(table[reporting_column], 9, required=pa.array([True] * table.num_rows))
+        partner = identifiers(table[partner_column], 9, required=detail)
         reporting_district = identifiers(table["REPORT_DISTRICT"], 6, required=pa.array([True] * table.num_rows))
         partner_district = identifiers(table["DISTRICT_RES_OR_ATTEND"], 6, required=detail)
         for campus, district, required in [(reporting, reporting_district, pc.invert(pc.is_null(reporting))),
@@ -451,8 +464,8 @@ def _transfer_projection(table, *, grain: str, period: DataPeriod, policy: Value
             require(pc.or_(pc.invert(pc.or_(separator, total)), pc.equal(table[name], "")),
                     "Transfer separator/total unexpectedly carries a partner identity")
     else:
-        # The 2020–21 originals end district labels with the full ID in parentheses.
-        if layout == "original" and period.end_year == 2021:
+        # The 2019–20 and 2020–21 originals place the full district ID in parentheses.
+        if layout == "original" and period.end_year in {2020, 2021}:
             pattern = r"^.*\S\s+\((?P<number>[0-9]{6})\)$"
         else:
             pattern = r"^.*\S\s+-\s+(?P<number>[0-9]{6})$"
@@ -463,11 +476,11 @@ def _transfer_projection(table, *, grain: str, period: DataPeriod, policy: Value
             digits = pc.if_else(required, digits, pa.scalar(None, type=pa.string()))
             return identifiers(digits, 6, required=required)
 
-        reporting = label_ids(table["REPORT_DISTNAME_NUMBER"], pa.array([True] * table.num_rows))
-        partner = label_ids(table["DISTNAME_NUMBER_RES_ATTEND"], detail)
+        reporting = label_ids(table[reporting_column], pa.array([True] * table.num_rows))
+        partner = label_ids(table[partner_column], detail)
         reporting_district, partner_district = reporting, partner
 
-    count_column = transfer_columns(grain, year=period.end_year, layout=layout)[-1]
+    count_column = wire_columns[-1]
     unique = pc.unique(table[count_column])
     if len(unique) > 4096:
         raise ValueError("Transfer source exceeds bounded distinct-count-token interpretation")
@@ -484,8 +497,8 @@ def _transfer_projection(table, *, grain: str, period: DataPeriod, policy: Value
         names["REPORT_REGION"]: regions,
         "transfer_row_kind": pc.if_else(detail, "detail", pc.if_else(total, "publisher_total", "separator")),
         names["REPORT_TYPE"]: pc.if_else(incoming, "in", pc.if_else(outgoing, "out", pa.scalar(None, type=pa.string()))),
-        names["REPORT_CAMPUS" if grain == "campus" else "REPORT_DISTNAME_NUMBER"]: reporting,
-        names["CAMPUS_RES_OR_ATTEND" if grain == "campus" else "DISTNAME_NUMBER_RES_ATTEND"]: partner,
+        names[reporting_column]: reporting,
+        names[partner_column]: partner,
         "transfer_reporting_district_number": reporting_district,
         "transfer_partner_district_number": partner_district,
         "transfer_count_status": statuses, names[count_column]: values,
@@ -521,8 +534,7 @@ def read_transfer_table(path: Path, *, grain: str, year: int, policy: ValuePolic
     columns = transfer_columns(grain, year=year, layout=layout)
     if region is not None and grain != "district":
         raise ValueError("Regional report selection is supported only for district-grain originals")
-    report_scope = "Region" if region is not None else grain.title()
-    titles = ["T E X A S E D U C A T I O N A G E N C Y", f"{report_scope} Level Transfer Report", "PEIMS Student Transfer Report"]
+    titles = _transfer_titles(grain, year=year, region=region)
     allows_padded_annotations = layout == "original" and grain == "campus" and year in {2021, 2022}
     annotations: list[dict[str, Any]] = []
     nonblank_titles, nonblank_notes = [], []

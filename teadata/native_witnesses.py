@@ -13,7 +13,7 @@ from urllib.parse import urlencode
 
 from .manifest import ContractError
 from .peims_leaves import PRIMARY_DISABILITY
-from .transfer_sources import _FOOTNOTES
+from .transfer_sources import _FOOTNOTES, transfer_columns
 
 if TYPE_CHECKING:
     from .dataset_metadata import ArtifactRef, EditionKey
@@ -41,12 +41,6 @@ _PROGRAM_FIELDS = {
     "specialeducation": "special_education_program_count",
     "titlei": "title_i_program_count",
 }
-_TRANSFER_HEADER = ("YEAR", "REPORT_REGION", "REPORT_REGION_NAME", "REPORT_DISTNAME_NUMBER",
-                    "REPORT_CHARTER_STATUS", "REPORT_NUMBER", "REPORT_TYPE", "LINE_GROUP_NUMBER",
-                    "DISTNAME_NUMBER_RES_ATTEND", "TRANSFERS_IN_OUT")
-_TRANSFER_COLUMNS = ("school_year", "REPORT_REGION", "reporting_region_name", "REPORT_DISTNAME_NUMBER",
-                     "reporting_charter_status", "report_number", "REPORT_TYPE", "line_group_number",
-                     "DISTNAME_NUMBER_RES_ATTEND", "TRANSFERS_IN_OUT")
 
 
 class _Rows(HTMLParser):
@@ -260,20 +254,25 @@ def _transfer(path: Path, ref: ArtifactRef, district: str, table: Any) -> int:
 
     with path.open(encoding="utf-8", newline="") as stream:
         rows = [tuple(row) for row in csv.reader(stream, strict=True)]
-    header, = (index for index, row in enumerate(rows) if row == _TRANSFER_HEADER)
+    year = int(ref.edition.edition)
+    headings = transfer_columns("district", year=year)
+    header, = (index for index, row in enumerate(rows) if row == headings)
     number = district.split(" ", 1)[0]
-    period = f"{int(ref.edition.edition) - 1}-{ref.edition.edition}"
-    district_suffix = f" ({number})" if ref.edition.edition == "2021" else f"  -  {number}"
+    period = f"{year - 1}-{year}"
+    district_suffix = f" ({number})" if year in {2020, 2021} else f"  -  {number}"
     body = rows[header + 1:]
-    end = next((index for index, row in enumerate(body) if len(row) != len(_TRANSFER_HEADER)), len(body))
+    end = next((index for index, row in enumerate(body) if len(row) != len(headings)), len(body))
     source, footer = body[:end], body[end:]
     if (("District Level Transfer Report",) not in rows[:header] or not source
             or any(row[0] != period or not row[3].endswith(district_suffix) for row in source)
             or any(len(row) > 1 for row in footer)
             or tuple(row[0].strip() for row in footer if row) != _FOOTNOTES):
         raise ContractError("Independent transfer report edition, district or row width differs")
-    selected = table.to_table(columns=list(_TRANSFER_COLUMNS), filter=field("reporting_district_number") == "'" + number)
-    if source != [tuple(row[name] for name in _TRANSFER_COLUMNS) for row in selected.to_pylist()]:
+    columns = ["school_year", "REPORT_REGION", "reporting_region_name", headings[3],
+               "reporting_charter_status", "report_number", "REPORT_TYPE", "line_group_number",
+               headings[8], headings[-1]]
+    selected = table.to_table(columns=columns, filter=field("reporting_district_number") == "'" + number)
+    if source != [tuple(row[name] for name in columns) for row in selected.to_pylist()]:
         raise ContractError("Independent transfer report rows differ")
     return len(source)
 

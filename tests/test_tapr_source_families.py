@@ -495,7 +495,7 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
             assert list(current['data_sources'].pop(dataset)) == years
             assert current['schema']['data_sources'].pop(dataset) == ['csv']
     # District transfers have an independent source contract and native writer.
-    assert list(current['data_sources'].pop('district_transfer_reports')) == [2021, 2023, 2024, 2025, 2026]
+    assert list(current['data_sources'].pop('district_transfer_reports')) == [2020, 2021, 2023, 2024, 2025, 2026]
     assert current['schema']['data_sources'].pop('district_transfer_reports') == ['parquet']
     # Student enrollment and programs have their own exact source contracts.
     for dataset in ('peims_student_enrollment_by_ethnicity', 'peims_student_programs_and_special_populations'):

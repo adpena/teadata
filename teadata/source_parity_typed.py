@@ -50,7 +50,7 @@ from .source_csv import SourceLines
 from .source_parity import _FieldReport, _Uncovered
 from .teadata_config import load_config_bytes
 from .transfer_leaves import _leaf_projection
-from .transfer_sources import _FOOTNOTES, _selected_encoding, _transfer_projection, district_batch_inputs, transfer_columns
+from .transfer_sources import _FOOTNOTES, _selected_encoding, _transfer_projection, _transfer_titles, district_batch_inputs, transfer_columns
 from .values import ValueStatus
 
 if TYPE_CHECKING:
@@ -444,8 +444,8 @@ def _wire(original: _Original, selection: _Typed, *, limit: int) -> Iterator[tup
         digest = sha256()
         if header != [field["label"] for field in selection.fields]:
             raise ValueError("PEIMS reviewed code and label headers differ")
-    report_scope = "Campus" if selection.transfer_grain == "campus" else "Region"
-    titles = ["T E X A S E D U C A T I O N A G E N C Y", f"{report_scope} Level Transfer Report", "PEIMS Student Transfer Report"]
+    titles = (_transfer_titles(selection.transfer_grain, year=selection.period.end_year, region=original.region)
+              if selection.transfer_grain else [])
     preamble: list[str] = []
     notes: list[str] = []
     found_header = footer = False

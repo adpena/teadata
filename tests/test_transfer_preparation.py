@@ -24,6 +24,9 @@ CAMPUS_HEADER = ["YEAR", "REPORT_REGION", "REPORT_DISTRICT", "REPORT_DISTRICT_NA
     "DISTNAME_RES_OR_ATTEND", "CAMPUS_RES_OR_ATTEND", "CAMPNAME_RES_OR_ATTEND", "TRANSFERS_IN_OR_OUT"]
 DISTRICT_HEADER = ["YEAR", "REPORT_REGION", "REPORT_REGION_NAME", "REPORT_DISTNAME_NUMBER", "REPORT_CHARTER_STATUS",
     "REPORT_NUMBER", "REPORT_TYPE", "LINE_GROUP_NUMBER", "DISTNAME_NUMBER_RES_ATTEND", "TRANSFERS_IN_OUT"]
+DISTRICT_HEADER_2020 = ["YEAR", "REPORT_REGION", "REPORT_REGION_NAME_PROP", "REPORT_DISTNAME_NUMBER_PROPCASE",
+    "REPORT_CHARTER_STATUS", "REPORT_NUMBER", "REPORT_TYPE", "LINE_GROUP_NUMBER", "DISTNAME_NUMBER_RES_ATTEND_PROP",
+    "TRANSFERS_IN_OUT"]
 NOTES = [
     " -999 indicates counts or percentages are not available (i.e. masked) to comply with the Family Educational Rights and Privacy Act (FERPA).",
     "Masked numbers are typically small although larger numbers may be masked to prevent imputation.",
@@ -45,14 +48,15 @@ def pair_rows(out="0", incoming=None):
 
 
 def original(tmp_path, rows, *, grain="campus", legacy=False, filename="source.csv", report_scope=None,
-             campus_count_header=CAMPUS_HEADER[-1], padded_annotations=False):
+             campus_count_header=CAMPUS_HEADER[-1], padded_annotations=False,
+             district_header=DISTRICT_HEADER, report_title="PEIMS Student Transfer Report"):
     path = tmp_path / filename
     with path.open("w", encoding="utf-8", newline="") as stream:
         writer = csv.writer(stream)
-        header = [*CAMPUS_HEADER[:-1], campus_count_header] if grain == "campus" else DISTRICT_HEADER
+        header = [*CAMPUS_HEADER[:-1], campus_count_header] if grain == "campus" else district_header
         if not legacy:
             preamble = ["T E X A S  E D U C A T I O N  A G E N C Y", "", f"{report_scope or grain.title()} Level Transfer Report",
-                        "", "PEIMS Student Transfer Report", ""]
+                        "", report_title, ""]
             if padded_annotations:
                 writer.writerows([text, *[""] * (len(header) - 1)] for text in preamble)
             else:
@@ -158,6 +162,25 @@ def test_2021_district_original_reads_only_the_final_parenthesized_id(tmp_path, 
     with pytest.raises(ValueError, match="missing historical source identifier"):
         read(*original(tmp_path, [row], grain="district", report_scope=scope),
              grain="district", year=2021, region=region)
+
+
+def test_2020_district_original_requires_its_literal_heading_and_title(tmp_path):
+    report = ["2019-2020", "04", "REGION IV HOUSTON", "Example ISD (001902)", "Traditional ISD/CSD",
+              "100", "Transfers In From"]
+    rows = [[*report, "100", "Partner ISD (002902)", "-999"],
+            [*report, "200", "Total Transfers In", "8"], [*report, "300", "", ""]]
+    original_options = {"grain": "district", "report_scope": "Region", "report_title": "PEIMS Student Transfers Report"}
+    source = read(*original(tmp_path, rows, district_header=DISTRICT_HEADER_2020, **original_options),
+                  grain="district", year=2020, region="04")
+    assert source.table.column_names[:10] == DISTRICT_HEADER_2020
+    assert source.table["REPORT_DISTNAME_NUMBER_PROPCASE"][0].as_py() == "Example ISD (001902)"
+    assert source.table["transfer_partner_number"].to_pylist() == ["'002902", None, None]
+    assert source.table["transfer_count_status"].to_pylist() == ["suppressed", "observed", "missing"]
+    with pytest.raises(ValueError, match="preamble/header schema"):
+        read(*original(tmp_path, rows, **original_options), grain="district", year=2020, region="04")
+    with pytest.raises(ValueError, match="Unexpected transfer publisher title"):
+        read(*original(tmp_path, rows, grain="district", report_scope="Region", district_header=DISTRICT_HEADER_2020),
+             grain="district", year=2020, region="04")
 
 
 def test_district_published_total_is_retained_independently_of_masked_detail(tmp_path):
