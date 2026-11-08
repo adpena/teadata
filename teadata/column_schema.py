@@ -334,8 +334,11 @@ def parse_column_schema(data: bytes) -> dict[str, Any]:
                     raise ValueError("Duplicate header crosswalk table")
                 tables.add(table["table"])
                 for field in table["fields"]:
-                    old = shared.setdefault(field["field"], (field["code"], field["label"]))
-                    if old != (field["code"], field["label"]):
+                    # Native identities belong to an exact table. Two worksheets may use
+                    # different publisher headings for the same explicitly mapped key.
+                    identity = dataset.get("source_only") is True and field.get("disposition") == "identity"
+                    signature = (True, None, None) if identity else (False, field["code"], field["label"])
+                    if shared.setdefault(field["field"], signature) != signature:
                         raise ValueError("Conflicting shared crosswalk field definitions")
     else:
         raise ValueError("Invalid column schema document")

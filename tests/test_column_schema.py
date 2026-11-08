@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 from teadata.column_schema import (
-    header_records, header_rename_map, portable_schema_path, source_schema_fingerprint,
+    header_records, header_rename_map, parse_column_schema, portable_schema_path, source_schema_fingerprint,
     table_header_identity, table_input_sha256s, validate_header_table,
 )
 from teadata.manifest import ContractError, canonical_json
@@ -47,6 +47,46 @@ def input_table(**inputs):
         "source_schema_sha256": source_schema_fingerprint(labels, codes),
         "fields": [{"position": i, "code": code, "label": label, "field": field}
                    for i, (code, label, field) in enumerate(zip(codes, labels, ["identifier", "value"], strict=True), 1)]}
+
+
+
+@pytest.mark.parametrize("source_only,roles,headings,valid", [
+    (True, ("identity", "identity"), ("DISTRICT_ID", "District ID"), True),
+    (True, ("fact", "fact"), ("DISTRICT_ID", "District ID"), False),
+    (True, ("identity", "fact"), ("DISTRICT_ID", "DISTRICT_ID"), False),
+    (True, ("fact", "identity"), ("DISTRICT_ID", "District ID"), False),
+    (True, ("identity", "identity", "fact"), ("DISTRICT_ID", "District ID", "DISTRICT_ID"), False),
+    (False, ("identity", "identity"), ("DISTRICT_ID", "District ID"), False),
+])
+def test_shared_native_identity_preserves_exact_table_headers(source_only, roles, headings, valid):
+    tables = []
+    for index, (role, heading) in enumerate(zip(roles, headings, strict=True)):
+        table = input_table(input_sha256="a" * 64)
+        table["table"] = f"table_{index}"
+        if index == 1:
+            table["header_identity"] = "position"
+        table["metric_period"] = {"kind": "unknown"}
+        for field, literal, disposition in zip(table["fields"], (heading, "Value"), (role, "fact"), strict=True):
+            field.update(code=literal, label=literal, disposition=disposition, publisher_type=None,
+                         publisher_description=None, dictionary_status="not_applicable"
+                         if disposition == "identity" else "not_documented")
+        assert len(table["fields"]) == 2
+        headers = [heading, "Value"]
+        table["source_schema_sha256"] = source_schema_fingerprint(headers, headers)
+        tables.append(table)
+    branch = {"source_only": True} if source_only else {"prepared_input_sha256": "b" * 64}
+    encoded = canonical_json({"schema_version": 2, "mapping_version": 1, "datasets": [
+        {"dataset": "finance", "edition": "2026", "tables": tables, **branch}]}).encode()
+    if not valid:
+        with pytest.raises(ValueError, match="Conflicting shared crosswalk field definitions"):
+            parse_column_schema(encoded)
+        return
+    contract = parse_column_schema(encoded)
+    for index, heading in enumerate(headings):
+        key = f"table_{index}"
+        identity, _ = header_records(contract, dataset="finance", edition="2026", table=key)
+        assert (identity["table"], identity["position"], identity["field"], identity["code"], identity["label"]) == (
+            key, 1, "identifier", heading, heading)
 
 
 def test_position_identity_retains_literal_occurrences_and_refuses_ambiguous_rename():
