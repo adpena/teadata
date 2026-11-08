@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Iterable, Iterator, Mapping
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 import gzip
 
 from hashlib import sha256
@@ -11,12 +11,13 @@ from io import BytesIO
 
 import json
 from stat import S_ISREG
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 from urllib.parse import parse_qsl, urlsplit
 
 from .column_schema import _unique_object
 from .dataset_metadata import ArtifactRef, ColumnSchemaRef, EditionKey
-from .manifest import canonical_json
+from .manifest import ContractError, canonical_json
 
 from .provenance import ProvenanceStore
 from .tprs_students import (
@@ -44,6 +45,32 @@ MAX_STATEWIDE_HTML_BYTES = 160 * 1024**2
 REVIEWED_DISTRICT_STATE_MANIFEST = "373041dfb0eb994ccde4a88f1e7e630e7b395bf9f7a51199655d843788a2b5f6"
 REVIEWED_CAMPUS_STUDENT_MANIFEST = "c96effc9bcbfd01c7cd969082cf701a2dc4e1900b6d6973b23c0ed2d21559f9e"
 REVIEWED_STATEWIDE_TPRS_MANIFESTS = frozenset({REVIEWED_DISTRICT_STATE_MANIFEST, REVIEWED_CAMPUS_STUDENT_MANIFEST})
+
+
+@dataclass(frozen=True, slots=True)
+class TPRSStudentCampusIndex:
+    """Exact campus routes derived from one immutable release's report ledgers."""
+
+    manifest_sha256: str
+    edition: str
+    _routes: Mapping[str, EditionKey] = field(repr=False)
+
+    def __post_init__(self) -> None:
+        object.__setattr__(self, "_routes", MappingProxyType(dict(self._routes)))
+
+    def __len__(self) -> int:
+        return len(self._routes)
+
+    def edition_for(self, campus_number: str | int) -> EditionKey | None:
+        """Return the exact key, or None if the selected release has no route."""
+        from .identifiers import canonical_source_identifier
+
+        if isinstance(campus_number, bool) or not isinstance(campus_number, (str, int)):
+            raise ValueError("Campus number must be a string or integer")
+        identifier = canonical_source_identifier(campus_number, width=9)
+        if identifier is None:
+            raise ValueError("Campus number must not be blank")
+        return self._routes.get(identifier[1:])
 
 
 @dataclass(frozen=True, slots=True)
@@ -430,10 +457,13 @@ def student_report_resources(record: Mapping[str, Any]) -> dict[str, ColumnSchem
               and pair["district"] != pair["state"], "Statewide student recipe requires exact district and Texas editions")
     refs = {}
     for role, suffix in (("roster", "json"), ("raw_audit", "jsonl.gz"), ("grid", "json")):
-        artifact = record["outputs"][role]
-        digest = artifact["sha256"]
-        _need(isinstance(digest, str) and _DIGEST.fullmatch(digest) is not None, "Invalid student attachment identity")
-        refs[role] = ColumnSchemaRef(digest, artifact["size_bytes"], f"tprs-{role}-{digest}.{suffix}")
+        try:
+            artifact = record["outputs"][role]
+            digest = artifact["sha256"]
+            _need(isinstance(digest, str) and _DIGEST.fullmatch(digest) is not None, "Invalid student attachment identity")
+            refs[role] = ColumnSchemaRef(digest, artifact["size_bytes"], f"tprs-{role}-{digest}.{suffix}")
+        except (KeyError, TypeError, ValueError) as error:
+            raise ContractError(f"Invalid Student {role} attachment descriptor: {error}") from error
     _need(refs["grid"].sha256 == recipe.get("definition_sha256"), "Student audit grid differs from its recipe pin")
     return refs
 

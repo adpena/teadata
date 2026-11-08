@@ -23,7 +23,7 @@ from platformdirs import user_cache_path
 
 from .analytical import ANALYTICAL_DATASETS, ANALYTICAL_ROLES, analytical_dataset, validate_artifact, validate_leaf_artifact
 from .dataset_metadata import ArtifactRef, COLUMN_SCHEMA_MAX_BYTES, ColumnSchemaRef, EditionKey, EditionMetadataRef, validate_http_url
-from .dataset_metadata import DataPeriod, NativeSourceRef, _parse_school_year, _validate_observation_selection
+from .dataset_metadata import DataPeriod, FieldBinding, NativeSourceRef, _parse_school_year, _validate_observation_selection
 from .manifest import (
     ContractError,
     DatasetCatalog,
@@ -37,7 +37,7 @@ if TYPE_CHECKING:
     from .export_provenance import ExportProvenance
     from .entities import Campus, District
     from .source_views import EntitySources, SourceTable
-    from .tprs_statewide_intake import ReportSelection
+    from .tprs_statewide_intake import ReportSelection, TPRSStudentCampusIndex
 
 _StudentCohort = tuple[str, str, str, str]
 _ManifestStamp = tuple[int, int, int, int, int]
@@ -602,6 +602,67 @@ class DataRelease:
         if not isinstance(edition, EditionKey):
             raise TypeError("Native table selection requires an exact EditionKey")
         return SourceTable(self, edition)
+
+    def tprs_student_campus_index(self, *, edition: str) -> TPRSStudentCampusIndex:
+        """Prepare reusable point routes for one literal TPRS Student report edition."""
+        from .tprs_statewide_intake import DATASET, TPRSStudentCampusIndex
+
+        if not isinstance(edition, str) or len(edition) != 4 or not edition.isascii() or not edition.isdigit():
+            raise ValueError("Select a four-digit publisher edition, such as '2026'")
+
+        def matches(key: EditionKey) -> bool:
+            return (key.dataset, key.scope, key.edition) == (DATASET, "campus", edition)
+
+        def sources() -> Iterator[DataRelease]:
+            if self._v3:
+                yield self
+            else:
+                parent = self.source if self.remote else self.path
+                for ref in self.catalog.native_sources:
+                    if any(matches(key) for key in ref.editions):
+                        yield _open_native_source(ref, parent, offline=self.offline,
+                                                  cache_dir=getattr(self, "_cache_dir", None))
+
+        routes: dict[str, EditionKey] = {}
+        for child in sources():
+            keys = [key for key in child.catalog._edition_keys.values() if matches(key)]
+            if not keys:
+                continue
+            if not getattr(child.catalog, "_v4", False):
+                raise ContractError("Campus routing requires schema4 Student report ledgers")
+            artifacts: dict[str, list[str]] = {}
+            for artifact_id, edition_id in child.catalog._artifact_routes.items():
+                artifacts.setdefault(edition_id, []).append(artifact_id)
+            for key in keys:
+                ids = artifacts.get(key.identity, [])
+                if len(ids) != 1:
+                    raise ContractError("Campus routing requires one artifact per Student edition")
+                source = child.source if child.remote else child.path
+                selected = DataRelease(source, expected_sha256=child.manifest_sha256,
+                                       offline=child.offline, cache_dir=getattr(child, "_cache_dir", None))
+                metadata = selected.catalog._edition_child(key.identity)
+                try:
+                    bindings = (FieldBinding.from_dict(value) for value in metadata["field_bindings"])
+                    foreign = any(dependency != key.identity for binding in bindings
+                                  for dependency, _ in binding.dependencies)
+                except (KeyError, TypeError, ValueError) as error:
+                    raise ContractError(f"Invalid Student edition bindings: {error}") from error
+                if foreign:
+                    raise ContractError("Campus routing requires a self-contained Student edition")
+                artifact = selected.catalog.artifact_ref(ids[0])
+                if artifact.output != "leaf":
+                    raise ContractError("Campus Student routing requires the analytical leaf processing output")
+                refs = _student_attachments(selected.catalog, artifact)
+                if not refs:
+                    raise ContractError("Campus routing requires an admitted Student report ledger")
+                reports, cohort = selected._student_report_ledger(artifact, refs)
+                if cohort is not None:
+                    raise ContractError("Campus routing requires a campus Student report ledger")
+                for report in reports:
+                    if report.identifier in routes:
+                        raise ContractError(f"Multiple Student editions contain campus {report.identifier}")
+                    routes[report.identifier] = key
+        return TPRSStudentCampusIndex(self.manifest_sha256, edition, routes)
 
     def _observation_year_options(
         self, dataset: str, fields: tuple[str, ...], scope: str, edition: EditionKey | None,

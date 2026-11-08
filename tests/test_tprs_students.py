@@ -1,4 +1,5 @@
 from copy import deepcopy
+from dataclasses import replace
 from datetime import datetime, timezone
 import gzip
 from hashlib import sha256
@@ -17,7 +18,7 @@ import yaml
 from teadata import tprs_statewide_intake, tprs_students as students
 from teadata.column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
 from teadata.dataset_metadata import DatasetMetadata, EditionKey, ResolvedDataset
-from teadata.manifest import ContractError, canonical_json
+from teadata.manifest import ContractError, DatasetCatalog, canonical_json
 from teadata.provenance import ProvenanceStore
 from teadata.release import DataRelease
 from teadata.scripts import verify_tprs_campus_coverage as campus_coverage
@@ -710,14 +711,81 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(partit
         assert built["campus_regions"] == ["01", "02"]
     assert built["release_activation"] is False
     assert entry["rows"] == len(intake["reports"]) and entry["raw_field_hold_count"] == 36 * entry["rows"]
-    release = DataRelease(output / "release.json", offline=True)
-    release.verify()
     key = EditionKey.from_dict(entry["edition"])
+    excluded = earlier[0]["identifier"] if partitioned else "003901001"
+    with monkeypatch.context() as routing:
+        routing.chdir(tmp_path)
+        release = DataRelease(output.relative_to(tmp_path) / "release.json", offline=True)
+        routing.chdir(output)
+        routing.setattr(DataRelease, "artifact", lambda *_: pytest.fail("routing opened a data artifact"))
+        index = release.tprs_student_campus_index(edition="2026")
+        assert index.manifest_sha256 == release.manifest_sha256 and index.edition == "2026"
+        assert len(index) == entry["rows"]
+        for report in intake["reports"]:
+            identifier = report["identifier"]
+            assert index.edition_for("'" + identifier) == index.edition_for(int(identifier)) == key
+        assert index.edition_for(excluded) is None
+        assert len(release.tprs_student_campus_index(edition="2025")) == 0
+        assert not release.catalog._edition_views and not release.catalog._edition_children
+        for invalid in ("", "000000000", "12x", True, 123.0):
+            with pytest.raises(ValueError):
+                index.edition_for(invalid)
+        with pytest.raises(ValueError, match="four-digit publisher edition"):
+            release.tprs_student_campus_index(edition="25–26")
+    if partitioned:
+        with monkeypatch.context() as routing:
+            routing.setattr(release.catalog, "_v4", False)
+            with pytest.raises(ContractError, match="schema4"):
+                release.tprs_student_campus_index(edition="2026")
+        with monkeypatch.context() as routing:
+            routing.setattr("teadata.release._student_attachments", lambda *_: {})
+            with pytest.raises(ContractError, match="admitted Student report ledger"):
+                release.tprs_student_campus_index(edition="2026")
+        read_artifact_ref = DatasetCatalog.artifact_ref
+
+        def nonleaf(catalog, artifact_id):
+            return replace(read_artifact_ref(catalog, artifact_id), output="grid")
+
+        with monkeypatch.context() as routing:
+            routing.setattr(DatasetCatalog, "artifact_ref", nonleaf)
+            with pytest.raises(ContractError, match="analytical leaf processing output"):
+                release.tprs_student_campus_index(edition="2026")
+        read_ledger = DataRelease._student_report_ledger
+
+        def overlapping(reader, artifact, refs):
+            reports, cohort = read_ledger(reader, artifact, refs)
+            return (*reports, reports[0]), cohort
+
+        with monkeypatch.context() as routing:
+            routing.setattr(DataRelease, "_student_report_ledger", overlapping)
+            with pytest.raises(ContractError, match="Multiple Student editions contain campus"):
+                release.tprs_student_campus_index(edition="2026")
+        read_metadata = DatasetCatalog._edition_child
+
+        def foreign(catalog, edition_id):
+            raw = read_metadata(catalog, edition_id)
+            first, *rest = raw["field_bindings"]
+            return {**raw, "field_bindings": [{**first, "dependencies": [["f" * 64, first["field"]]]}, *rest]}
+
+        with monkeypatch.context() as routing:
+            routing.setattr(DatasetCatalog, "_edition_child", foreign)
+            routing.setattr(DatasetCatalog, "artifact_ref", lambda *_: pytest.fail("routing followed a foreign binding"))
+            with pytest.raises(ContractError, match="self-contained Student edition"):
+                release.tprs_student_campus_index(edition="2026")
+        metadata_ref, = release.catalog.edition_metadata_refs()
+        metadata_path = output / metadata_ref.location
+        original_metadata = metadata_path.read_bytes()
+        try:
+            metadata_path.write_bytes(original_metadata + b" ")
+            with pytest.raises(ContractError):
+                release.tprs_student_campus_index(edition="2026")
+        finally:
+            metadata_path.write_bytes(original_metadata)
+    release.verify()
     table = release.table(key).select("membership_total_students_count")
     included = table.where(ds.field("campus_number") == intake["reports"][0]["identifier"]).to_arrow().to_pylist()
     assert len(included) == 1 and included[0]["membership_total_students_count"] == 1
     assert included[0]["tprs_report_receipt"] == intake["reports"][0]["receipt"]
-    excluded = earlier[0]["identifier"] if partitioned else "003901001"
     assert table.where(ds.field("campus_number") == excluded).to_arrow().num_rows == 0
     roster_pins = {region: intake["rosters"].get(region, "f" * 64) for region in tprs_statewide_intake.REGIONS}
     roster_ids = {region: {f"{region}0901001"} for region in roster_pins}

@@ -550,6 +550,7 @@ class DatasetCatalog:
                                    "provenance", "value_policies"} or type(child["schema_version"]) is not int
                         or child["schema_version"] != 4 or child["edition"]["key"] != self._edition_keys[identifier].to_dict()
                         or set(child["edition"]) != {"key", "metadata", "acquisition_ids", "column_schema_sha256"}
+                        or not isinstance(child["artifacts"], dict)
                         or set(child["artifacts"]) != {key for key, edition in self._artifact_routes.items() if edition == identifier}
                         or any(value["edition_id"] != identifier for value in child["field_bindings"])
                         or any(value["edition"] != child["edition"]["key"] for value in child["artifacts"].values())):

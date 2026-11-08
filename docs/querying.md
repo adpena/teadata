@@ -246,6 +246,35 @@ name resolves to more than one table or revision. Scalar access requires one pub
 the entity. For a table with more than one row per entity, pass a PyArrow
 expression to `select(..., where=...)` to narrow its grain.
 
+For a partitioned TPRS Student release, prepare a campus index once and reuse
+it for lookups. It reads the release's pinned report ledgers without opening
+the underlying data tables.
+
+```python
+import pyarrow.dataset as ds
+
+campus_index = release.tprs_student_campus_index(edition="2026")
+campus_number = "001902103"
+key = campus_index.edition_for(campus_number)
+if key is not None:
+    table = release.observations(
+        "tprs_student_membership_enrollment_reports",
+        "membership_total_students_count",
+        school_year=2026,
+        scope="campus",
+        edition=key,
+    )
+    rows = table.where(ds.field("campus_number") == campus_number).to_arrow()
+```
+
+`edition` is the publisher's four-digit report edition. It does not set the
+measurement year of every field. Pass the returned exact key and the
+measurement year to `release.observations()`. A missing route means the
+selected release did not admit a Student report for that campus in this
+edition; it does not establish that the campus did not exist or that a
+measure was zero. An index belongs to one release hash; rebuild it when
+switching releases.
+
 These views leave existing entity properties and `meta` keys in place. A raw
 source field returns its published token. A typed field returns its published
 projection, with missing or masked values represented by `None`. Select its
