@@ -298,8 +298,8 @@ change the default source configuration, or qualify a release scientifically.
 
 `refresh_transfers materialize` accepts exact annual preparation processing IDs
 and a reviewed, SHA-pinned source Config. The packaged `teadata_sources.yaml`
-includes source discovery for 2012–13 through 2020–21 and 2022–23 through 2025–26 district
-reports. The 2021–22 identity join remains on hold.
+includes source discovery for every district report edition from 2012–13 through
+2025–26.
 The builder requires every offered region from the preparation's captured
 index/form, in source order. Each annual batch contains all 20 regional originals.
 The result contains one statewide district logical table and native leaf per
@@ -343,6 +343,7 @@ uv run --locked --offline python -m teadata.scripts.refresh_transfers materializ
   --prepared-input 2019 bd964fcff77bf0b711aab985f39a7dddbd56baa3684399fbfe9ab78d1895d6ed \
   --prepared-input 2020 731c37240f1561456266a34bdc90234d2ffc5a77468a58a8300ef60a61942318 \
   --prepared-input 2021 1205b8ef77e262ce8102f67ab880d1e121cc550568b3d23aaf4d41c126d3617b \
+  --prepared-input 2022 1d3ee6ff30067d07ecdc3be687f48fc5522773151a467708dd0defe124e80bbc \
   --prepared-input 2023 f884f3ebdd177607d6ac2b417dec9664c19a98349bb775b0ce22fcea06381f37 \
   --prepared-input 2024 20b4640c31a135b55c435725f50f75d8798f769ad2790a20b10447d182cfd1da \
   --prepared-input 2025 a79a1f84b46c02b4929f3ec0dc942fa2adce8d6e3ca9f60539bf6ede31549fb5 \
@@ -378,6 +379,30 @@ parity. The 15,430 reciprocal pairs matched on the original count or
 masking token. Three individual district reports retrieved on November 8,
 2026, independently matched 208 of those rows in source order. The local candidate uses
 the reported district population and remains unpublished.
+
+### Reviewed 2021–22 partner identifiers
+
+The 20 regional CSVs contain 1,076 incomplete partner labels for 34 open
+enrollment charter districts. 699 labels contain a shortened ID and 377
+contain no ID. Each affected label is exactly the first 45 characters of a
+unique fully identified reporting-district label from the same year, after
+trimming trailing whitespace. This describes the observed output pattern.
+TEA has not confirmed the underlying cause. Both same-year AskTED archives
+contain all 34 IDs. The names that differ use a longer spelling or different
+punctuation.
+
+The project owner approved the [edition-specific identity overlay](../teadata/methodologies/district-transfer-2022-partner-ids.json)
+after an independent review. The overlay binds each exact region and original
+SHA-256 to its reviewed labels and occurrence counts. It populates the
+normalized partner ID and exposes `transfer_partner_id_corrected` as
+support for `partner_district_number`. Original labels, counts, masks and
+row coordinates remain unchanged. Reciprocal reports were matched by
+identity and direction before comparing count tokens. All 16,093 statewide
+pairs agree on their literal count or mask token, including all 690 affected
+masked rows. No count is reconstructed from the other direction. The local
+candidate retains the two published directions separately.
+
+### 2022–23 publisher reconciliation
 
 For 2022–23, all 20 regional originals had the same ten ordered headings and
 the same masking notes. The local candidate retained 40,703 source rows,

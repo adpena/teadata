@@ -24,6 +24,14 @@ from urllib.request import build_opener
 
 from .acquisition import AcquisitionClient, NoRedirect, _form_request, acquire_form
 from .dataset_metadata import DataPeriod, DatasetMetadata, ResolvedDataset
+from .district_transfer_identity import (
+    CORRECTED,
+    REVIEW_YEAR,
+    DistrictIdentityReview,
+    PartnerIdentityRepair,
+    load_identity_review,
+    reviewed_repair_receipt,
+)
 from .identifiers import canonical_source_identifiers
 from .provenance import ProvenanceStore, _identifier
 from .source_csv import SourceLines
@@ -463,16 +471,19 @@ def transfer_value_columns(grain: str, *, year: int | None = None, layout: str =
 
 
 def _transfer_projection(table, *, grain: str, period: DataPeriod, policy: ValuePolicy, region: str | None,
-                         layout: str):
+                         layout: str, identity_repair: PartnerIdentityRepair | None = None):
     """Interpret whole Arrow columns; scalar values.py runs only per token."""
     import pyarrow as pa
     import pyarrow.compute as arrow_compute
 
     pc: Any = arrow_compute
+    if identity_repair is not None and (grain, period.end_year, layout) != ("district", REVIEW_YEAR, "original"):
+        raise ValueError("Partner identity repair requires the approved district report edition")
     wire_columns = transfer_columns(grain, year=period.end_year, layout=layout)
     historical = grain == "district" and layout == "original" and period.end_year in _HEADER_FIRST_DISTRICT_YEARS
     reporting_column = "REPORT_CAMPUS" if grain == "campus" else wire_columns[3]
     partner_column = "CAMPUS_RES_OR_ATTEND" if grain == "campus" else wire_columns[-2]
+    corrected = None
 
     def require(condition, message: str) -> None:
         if not pc.all(pc.fill_null(condition, False)).as_py():
@@ -531,14 +542,23 @@ def _transfer_projection(table, *, grain: str, period: DataPeriod, policy: Value
         else:
             pattern = r"^.*\S\s+-\s+(?P<number>[0-9]{6})$"
 
-        def label_ids(values, required):
+        def label_ids(values, required, replacement=None):
             matches = pc.extract_regex(values, pattern=pattern)
             digits = pc.struct_field(matches, "number")
+            if replacement is not None:
+                require(pc.or_(pc.is_null(replacement), pc.is_null(digits)), "District identity repair would replace a complete ID")
+                digits = pc.coalesce(digits, replacement)
             digits = pc.if_else(required, digits, pa.scalar(None, type=pa.string()))
             return identifiers(digits, 6, required=required)
 
         reporting = label_ids(table[reporting_column], pa.array([True] * table.num_rows))
-        partner = label_ids(table[partner_column], detail)
+        replacement = None
+        if identity_repair is not None:
+            replacements = identity_repair.labels
+            indices = pc.index_in(table[partner_column], value_set=pa.array(list(replacements), type=pa.string()))
+            replacement = pc.if_else(detail, pc.take(pa.array(list(replacements.values()), type=pa.string()), indices), None)
+            corrected = pc.is_valid(replacement)
+        partner = label_ids(table[partner_column], detail, replacement)
         reporting_district, partner_district = reporting, partner
 
     count_column = wire_columns[-1]
@@ -579,12 +599,15 @@ def _transfer_projection(table, *, grain: str, period: DataPeriod, policy: Value
     }
     for name, values in columns.items():
         table = table.append_column(name, values)
+    if corrected is not None:
+        table = table.append_column(pa.field(CORRECTED, pa.bool_(), nullable=False), corrected)
     return table
 
 
 def read_transfer_table(path: Path, *, grain: str, year: int, policy: ValuePolicy,
                         expected_sha256: str, encoding: str, region: str | None = None,
-                        layout: str = "original", max_bytes: int = 64 * 1024 * 1024) -> TransferSourceTable:
+                        layout: str = "original", max_bytes: int = 64 * 1024 * 1024,
+                        _identity_review: DistrictIdentityReview | None = None) -> TransferSourceTable:
     """Read exact original columns, notes and row locations before interpretation.
 
     ``legacy_prepared`` explicitly admits the old header-first local CSV; it
@@ -708,7 +731,12 @@ def read_transfer_table(path: Path, *, grain: str, year: int, policy: ValuePolic
     if not batches:
         raise ValueError("Transfer source contains no report rows")
     table = pa.concat_tables(batches)
-    table = _transfer_projection(table, grain=grain, period=period, policy=policy, region=region, layout=layout)
+    repair = ((_identity_review or load_identity_review()).for_original(region, expected_sha256)
+              if grain == "district" and year == REVIEW_YEAR and layout == "original" else None)
+    table = _transfer_projection(table, grain=grain, period=period, policy=policy, region=region,
+                                 layout=layout, identity_repair=repair)
+    if repair is not None:
+        repair.validate_hits(repair.count_hits(table, columns[-2]))
     return TransferSourceTable(table, grain, period, expected_sha256, actual_encoding, layout, tuple(annotations))
 
 
@@ -982,12 +1010,21 @@ def prepare_transfer_sources(
         raise ValueError("Transfer preparation requires distinct explicit source receipts")
     expected_dataset = grain + "_transfer_reports"
     roots = [identifier for identifier, _ in selected]
+    identity_review = None
     if historical:
         source = cfg.resolve_dataset(expected_dataset, year, reader_profile="source", exact=True)
         if source.metadata.value_policy != policy.policy_id or source.metadata.provenance_ids != tuple(roots):
             raise ValueError("Historical district policy and original receipts differ from the exact source edition")
         region_csv, = (identifier for identifier, region in regions.items() if region == "13")
         roots.append(_historical_district_masking_receipt(source, policy, region_csv, store.read_record))
+    if grain == "district" and year == REVIEW_YEAR:
+        if batch_index is None:
+            raise ValueError("Reviewed district identity repair requires the exact statewide regional batch")
+        source = cfg.resolve_dataset(expected_dataset, year, reader_profile="source", exact=True)
+        if source.metadata.provenance_ids != tuple(roots) or source.metadata.value_policy != policy.policy_id:
+            raise ValueError("Reviewed district identity repair differs from the exact source edition")
+        witness, identity_review = reviewed_repair_receipt(source, selected, store.read_record)
+        roots.append(witness)
     if compare_input is not None:
         roots.append(compare_input[0])
     records = store.verify_record_closure(roots)
@@ -1078,7 +1115,7 @@ def prepare_transfer_sources(
         _write_index(output, report, filename="PREPARATION.json")
         try:
             source = read_transfer_table(store.verify_artifact(expected), grain=grain, year=year, policy=policy,
-                expected_sha256=expected, encoding=selected_encoding, region=regions.get(identifier))
+                expected_sha256=expected, encoding=selected_encoding, region=regions.get(identifier), _identity_review=identity_review)
         except Exception as error:
             return retain_failure(error, phase="structural_read", failed_input=attempted)
         table = source.table.append_column("transfer_source_input", pa.array([number] * source.table.num_rows, type=pa.int32()))

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from contextlib import ExitStack
 import csv
 from dataclasses import dataclass
@@ -32,6 +33,7 @@ from .campus_transfer_leaves import (
 )
 from .column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
 from .dataset_metadata import COLUMN_SCHEMA_MAX_BYTES, DataPeriod, ResolvedDataset
+from .district_transfer_identity import REVIEW_YEAR, PartnerIdentityRepair, reviewed_repair_receipt
 from .manifest import canonical_json
 from .district_types import DISTRICT_TYPE_COLUMNS, DISTRICT_TYPE_REFERENCE, reviewed_district_types
 from .peims_leaves import DATASETS as PEIMS_DATASETS, PRIMARY_DISABILITY
@@ -83,6 +85,7 @@ class _Original:
     region: str | None
     rows: int
     annotations: tuple[dict[str, Any], ...] = ()
+    identity_repair: PartnerIdentityRepair | None = None
 
 
 class _FallEndpoint(TypedDict):
@@ -224,6 +227,7 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
     staff = key.dataset == STAFF
     campus = key.dataset == CAMPUS_TRANSFERS
     grain: Literal["campus", "district"] = "campus" if campus else "district"
+    identity_review = None
     if peims:
         pair = ("teadata.scripts.refresh_peims", STAFF_RECIPE if staff else "reviewed_peims_student_csv_projection")
         config_name = "peims_leaf_config"
@@ -390,6 +394,12 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
                 if witness not in preparation["inputs"] or witness not in record["inputs"]:
                     raise ValueError("Historical district replay lacks its exact masking reference input")
                 attached_hashes.append(upstream[witness]["artifact"]["sha256"])
+            if period.end_year == REVIEW_YEAR:
+                source = ResolvedDataset(key.dataset, "data_sources", REVIEW_YEAR, REVIEW_YEAR, "", metadata)
+                witness, identity_review = reviewed_repair_receipt(source, ordered, upstream.__getitem__)
+                if witness not in preparation["inputs"] or witness not in record["inputs"]:
+                    raise ValueError("District replay lacks its exact partner identity review")
+                attached_hashes.append(upstream[witness]["artifact"]["sha256"])
         artifact = preparation["outputs"]["prepared_source"]
         prepared = store.verify_artifact(artifact["sha256"])
         hashes.append(artifact["sha256"])
@@ -433,7 +443,8 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
         if staff:
             assert period.end_year is not None
             validate_staff_request(receipt, period.end_year, key.scope)
-        originals.append(_Original(store.verify_artifact(digest), digest, encoding, region, rows, annotations))
+        repair = identity_review.for_original(region, digest) if identity_review is not None else None
+        originals.append(_Original(store.verify_artifact(digest), digest, encoding, region, rows, annotations, repair))
     return _Typed(names, fields, originals, release.artifact(ref.identity), prepared,
                   mapping.get("layout") if peims else None, projection, period, policy, contract["rows"],
                   {"leaf_processing_id": ref.processing_id, "leaf_sha256": ref.sha256,
@@ -601,8 +612,9 @@ def _batch(selection: _Typed, index: int, rows: list[list[str]], positions: list
     assert grain is not None
     source = pa.Table.from_arrays([*columns, *context],
                                   names=[*transfer_columns(grain, year=selection.period.end_year), *_POSITIONS])
+    original = selection.originals[index]
     source = _transfer_projection(source, grain=grain, period=selection.period, policy=selection.policy,
-                                  region=selection.originals[index].region, layout="original")
+                                  region=original.region, layout="original", identity_repair=original.identity_repair)
     return source.append_column("transfer_source_input", pa.repeat(pa.scalar(index, type=pa.int32()), len(rows)))
 
 
@@ -716,10 +728,13 @@ def compare_typed(release: DataRelease, store: ProvenanceStore, key: EditionKey,
             rows: list[list[str]] = []
             positions: list[tuple[int, int, int]] = []
             size = 0
+            correction_hits: Counter[str] = Counter()
 
             def compare_pending() -> None:
                 nonlocal examples_left, total, size
                 expected = _batch(selection, index, rows, positions)
+                if original.identity_repair is not None:
+                    correction_hits.update(original.identity_repair.count_hits(expected, "DISTNAME_NUMBER_RES_ATTEND"))
                 if expected.nbytes > slot:
                     raise _Uncovered("Projected typed batch exceeds its working-byte slot")
                 records = expected["transfer_source_record" if selection.prepared else "peims_source_record"].chunk(0)
@@ -748,6 +763,8 @@ def compare_typed(release: DataRelease, store: ProvenanceStore, key: EditionKey,
                 size += row_bytes
             if rows:
                 compare_pending()
+            if original.identity_repair is not None:
+                original.identity_repair.validate_hits(correction_hits)
         if selection.campus_history is not None and seen != selection.campus_history.endpoints.keys():
             raise ValueError("Recorded historical endpoint IDs do not all occur in publisher detail rows")
         diagnostics = {stage: target.finish() for stage, target in targets.items()}

@@ -21,6 +21,7 @@ from teadata.scripts.refresh_transfers import main
 from teadata.teadata_config import load_config
 from teadata.transfer_leaves import materialize_district_transfers
 from teadata.transfer_rollups import _compare_details
+from teadata import district_transfer_identity
 from teadata.transfer_sources import _historical_district_masking_receipt, acquire_regional_transfers, prepare_transfer_sources
 from teadata.values import measure
 
@@ -72,7 +73,7 @@ def test_campus_district_rollup_checks_only_fully_observed_cross_district_groups
     assert _compare_details(campus.slice(0, 0), district.slice(0, 0))["status"] == "HOLD"
 
 
-@pytest.mark.parametrize("year", [*range(2013, 2022), *range(2023, 2027)])
+@pytest.mark.parametrize("year", range(2013, 2027))
 def test_packaged_district_transfer_discovery_binds_all_regional_originals(year):
     root = Path(__file__).resolve().parents[1]
     config = load_config(root / "teadata/teadata_sources.yaml")
@@ -126,6 +127,26 @@ def test_historical_masking_reference_requires_exact_publisher_request(damage):
     with pytest.raises(ValueError, match="exact same-year Region 13 HTML"):
         _historical_district_masking_receipt(source, policy, region_csv,
             lambda identifier: html if identifier == receipt else store.read_record(identifier))
+
+
+def test_partner_id_review_uses_the_exact_captured_mapping(tmp_path, monkeypatch):
+    root = Path(__file__).resolve().parents[1]
+    config = load_config(root / "teadata/teadata_sources.yaml")
+    source = config.resolve_dataset("district_transfer_reports", 2022, reader_profile="source", exact=True)
+    store = ProvenanceStore(root / "provenance")
+    originals = [(receipt, store.read_record(receipt)["artifact"]["sha256"]) for receipt in source.metadata.provenance_ids]
+    path = tmp_path / "review.json"
+    path.write_bytes(district_transfer_identity.REVIEW_PATH.read_bytes())
+    monkeypatch.setattr(district_transfer_identity, "REVIEW_PATH", path)
+    _, captured = district_transfer_identity.reviewed_repair_receipt(source, originals, store.read_record)
+    label = "TEXAS COLLEGE PREPARATORY ACADEMIES  -  22180"
+    payload = json.loads(path.read_bytes())
+    other = next(name for name in payload["labels"] if name != label)
+    payload["labels"][other], payload["labels"][label] = payload["labels"][label], payload["labels"][other]
+    path.write_text(json.dumps(payload))
+    assert captured.for_original("04", originals[3][1]).labels[label] == "221801"
+    with pytest.raises(ValueError, match="twenty approved original CSVs"):
+        district_transfer_identity.reviewed_repair_receipt(source, originals, store.read_record)
 
 
 def prepared_fixture(tmp_path, monkeypatch, years=(2024, 2025), *, complete=True, damage=None):

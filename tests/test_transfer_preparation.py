@@ -7,13 +7,15 @@ import json
 from pathlib import Path
 
 import pytest
+import pyarrow as pa
 
 from teadata.dataset_metadata import DataPeriod, DatasetMetadata, ResolvedDataset
+from teadata.district_transfer_identity import CORRECTED, REVIEW_PATH, PartnerIdentityRepair, load_identity_review
 from teadata.manifest import processor_identity
 from teadata.provenance import ProvenanceStore
 from teadata.scripts.refresh_transfers import main
 from teadata.transfer_sources import (
-    TransferValidationError, compare_campus_sources, prepare_transfer_sources,
+    TransferValidationError, _transfer_projection, compare_campus_sources, prepare_transfer_sources,
     read_transfer_table, validate_campus_directions, validate_district_rows,
 )
 from teadata.values import ValuePolicy
@@ -247,6 +249,37 @@ def test_header_first_district_contract_is_exact(tmp_path, year, year_token, mas
     rows[0][-1] = "."
     with pytest.raises(ValueError, match="Unexpected count token"):
         selected([header, *rows, []])
+
+
+def test_reviewed_district_partner_identity_changes_only_derived_columns():
+    raw_label = "TEXAS COLLEGE PREPARATORY ACADEMIES  -  22180"
+    review = json.loads(REVIEW_PATH.read_bytes())
+    region = "04"
+    digest = review["regions"][region]["sha256"]
+    approved = load_identity_review()
+    assert approved.for_original("03", digest) is None
+    assert approved.for_original(region, "0" * 64) is None
+    assert approved.for_original(region, digest).labels[raw_label] == "221801"
+    repair = PartnerIdentityRepair({raw_label: "221801"}, {raw_label: 1})
+    rows = [["2021-2022", region, "REGION", "ALDINE ISD  -  101902", "Traditional ISD/CSD",
+             "200", "Transfers Out To", "100", raw_label, "-999"],
+            ["2021-2022", region, "REGION", "ALDINE ISD  -  101902", "Traditional ISD/CSD",
+             "200", "Transfers Out To", "100", "OTHER ISD  -  101903", "0"]]
+    source = pa.table(dict(zip(DISTRICT_HEADER, zip(*rows, strict=True), strict=True)))
+    options = {"grain": "district", "period": DataPeriod("school_year", 2021, 2022),
+               "policy": ValuePolicy.from_dict(POLICY), "region": region, "layout": "original"}
+    with pytest.raises(ValueError, match="missing historical source identifier"):
+        _transfer_projection(source, **options)
+    actual = _transfer_projection(source, identity_repair=repair, **options)
+    assert actual.select(DISTRICT_HEADER).equals(source)
+    assert actual["transfer_partner_number"].to_pylist() == ["'221801", "'101903"]
+    assert actual["transfer_partner_district_number"].to_pylist() == ["'221801", "'101903"]
+    assert actual["transfer_count_value"].to_pylist() == [None, 0]
+    assert actual["transfer_count_status"].to_pylist() == ["suppressed", "observed"]
+    assert actual[CORRECTED].to_pylist() == [True, False]
+    repair.validate_hits(repair.count_hits(actual, "DISTNAME_NUMBER_RES_ATTEND"))
+    with pytest.raises(ValueError, match="approved original label counts"):
+        repair.validate_hits(repair.count_hits(actual.slice(1), "DISTNAME_NUMBER_RES_ATTEND"))
 
 
 def test_district_published_total_is_retained_independently_of_masked_detail(tmp_path):

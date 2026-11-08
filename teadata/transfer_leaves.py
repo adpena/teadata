@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, Sequence
 
 from .column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
 from .dataset_metadata import ArtifactRef, DataPeriod, DatasetMetadata, EditionKey, ResolvedDataset
+from .district_transfer_identity import CORRECTED, REVIEW_YEAR, reviewed_repair_receipt
 from .manifest import BuildRecorder, canonical_json, file_identity
 from .provenance import ProvenanceStore, _identifier, validate_reference_records
 from .transfer_sources import (
@@ -60,6 +61,8 @@ def _leaf_projection(columns: Sequence[str], fields: Sequence[dict], *, grain: s
             if grain == "district" and prepared_column in {"transfer_reporting_number", "transfer_partner_number"}:
                 entry["auxiliary"] = ["transfer_reporting_district_number" if prepared_column == "transfer_reporting_number"
                                       else "transfer_partner_district_number"]
+                if year == REVIEW_YEAR and prepared_column == "transfer_partner_number":
+                    entry["auxiliary"].append(CORRECTED)
             supported[target] = entry
     names = [renames.get(name, name) for name in columns]
     if len(set(names)) != len(names):
@@ -135,6 +138,11 @@ def _admit_preparation(store: ProvenanceStore, cfg: Config, year: int, identifie
         witness = _historical_district_masking_receipt(source, policy, region_csv, graph.__getitem__)
         if witness not in record["inputs"]:
             raise ValueError("Historical district preparation did not bind its masking reference")
+        witness_sha = graph[witness]["artifact"]["sha256"]
+    if year == REVIEW_YEAR:
+        witness, _ = reviewed_repair_receipt(source, acquisitions, graph.__getitem__)
+        if witness not in record["inputs"]:
+            raise ValueError("District preparation did not bind its approved partner identity review")
         witness_sha = graph[witness]["artifact"]["sha256"]
     resource = cfg.column_contract(source.dataset, year, reader_profile="source")
     if resource is None:

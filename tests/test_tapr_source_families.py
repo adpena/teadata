@@ -495,7 +495,7 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
             assert list(current['data_sources'].pop(dataset)) == years
             assert current['schema']['data_sources'].pop(dataset) == ['csv']
     # District transfers have an independent source contract and native writer.
-    assert list(current['data_sources'].pop('district_transfer_reports')) == [*range(2013, 2022), *range(2023, 2027)]
+    assert list(current['data_sources'].pop('district_transfer_reports')) == list(range(2013, 2027))
     assert current['schema']['data_sources'].pop('district_transfer_reports') == ['parquet']
     assert set(current['value_policies'].pop('historical_district_transfers')['tokens']) == {'-9999999', '.'}
     # Student enrollment and programs have their own exact source contracts.
