@@ -152,6 +152,62 @@ def test_all_168_fields_use_the_direct_texas_leaf_and_exact_population(compariso
             assert masked.local_status == status and masked.local_value is None and masked.difference is None
 
 
+@pytest.mark.parametrize("case", [
+    "matched", "receipt", "bytes", "unbound_state", "unbound_campus", "state_row",
+    "missing_ledger_row", "outside_roster", "district_cohort",
+])
+def test_roster_campus_uses_only_the_reviewed_direct_texas_observation(comparison, monkeypatch, case):
+    release, keys = comparison
+    _, _, _, _, state = _reviewed_students(release, keys["state"])
+    original_receipt, original_sha = state.sources["S"]
+    grid = students.definition()
+    witness_receipt = "a" * 64 if case == "state_row" else original_receipt
+    grid["witnesses"]["state"].update(html_receipt=witness_receipt, html_sha256=original_sha)
+    monkeypatch.setattr(students, "definition", lambda: grid)
+    cohort = (keys["district"].identity, keys["state"].identity, "b" * 64, "c" * 64)
+    absent_id = "001902002"
+
+    def reviewed(bundle, key):
+        revision, mapping, metadata, policy, contract = _reviewed_students(bundle, key)
+        if key.scope == "state" and case != "unbound_state":
+            receipt = "d" * 64 if case == "receipt" else witness_receipt
+            digest = "e" * 64 if case == "bytes" else original_sha
+            contract = replace(contract, roster_bound=True, cohort=cohort, sources={"S": (receipt, digest)})
+        elif key.scope == "campus" and case != "unbound_campus":
+            sources = dict(contract.sources)
+            if case == "missing_ledger_row":
+                sources[absent_id] = sources["001902001"]
+            contract = replace(contract, roster_bound=True, sources=sources)
+        elif key.scope == "district":
+            contract = replace(contract, roster_bound=True, cohort=(*cohort[:3], "f" * 64))
+        return revision, mapping, metadata, policy, contract
+
+    monkeypatch.setattr("teadata.statewide._reviewed_students", reviewed)
+    local, entity = keys["campus"], campus()
+    if case in {"outside_roster", "missing_ledger_row"}:
+        entity = Campus(uuid4(), None, "Absent campus", "", False, campus_number=absent_id)
+    elif case == "district_cohort":
+        local, entity = keys["district"], district()
+    params = dict(release=release, local=local, statewide=keys["state"], metric="membership_total_students_count")
+    errors = {
+        "receipt": "pinned direct Texas report",
+        "bytes": "pinned direct Texas report",
+        "unbound_state": "pinned direct Texas report",
+        "unbound_campus": "same pinned statewide cohort",
+        "state_row": "row differs from its exact source binding",
+        "missing_ledger_row": "omits a requested campus",
+        "district_cohort": "same pinned statewide cohort",
+    }
+    if case in errors:
+        with pytest.raises(ContractError, match=errors[case]):
+            Query([entity], repo=None).compare_statewide(**params)
+    else:
+        row, = Query([entity], repo=None).compare_statewide(**params)
+        assert row.statewide_value == 1000
+        assert (row.identifier, row.local_status, row.difference) == (
+            ("001902001", "observed", -1000) if case == "matched" else (absent_id, "unavailable", None))
+
+
 def test_missing_grade_absent_entity_and_private_population_are_distinct(comparison):
     release, keys = comparison
     row, = Query([campus()], repo=None).compare_statewide(release=release, local=keys["campus"],

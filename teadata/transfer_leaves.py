@@ -27,32 +27,36 @@ if TYPE_CHECKING:
     from .teadata_config import Config
 
 
-def _district_projection(columns: Sequence[str], fields: Sequence[dict]) -> tuple[list[str], dict, list[dict]]:
+def _leaf_projection(columns: Sequence[str], fields: Sequence[dict], *, grain: str,
+                     year: int | None = None, extra_context: Sequence[str] = ()) -> tuple[list[str], dict, list[dict]]:
     """Derive physical renames/support from the reviewed headers and one projector."""
-    if [field["code"] for field in fields] != list(transfer_columns("district")):
-        raise ValueError("District leaf requires every literal publisher header in its original order")
-    values = transfer_value_columns("district")
+    if [field["code"] for field in fields] != list(transfer_columns(grain, year=year)):
+        raise ValueError("Transfer leaf requires every literal publisher header in its original order")
+    values = transfer_value_columns(grain, year=year)
+    if grain == "campus":
+        values.update(REPORT_DISTRICT="transfer_reporting_district_number",
+                      DISTRICT_RES_OR_ATTEND="transfer_partner_district_number")
     renames, supported, operations = {}, {}, []
     for field in fields:
         code, target = field["code"], field["field"]
         prepared_column = values.get(code, code)
         if prepared_column not in columns or field["label"] != code:
-            raise ValueError("District reviewed header differs from its literal source/prepared projection")
+            raise ValueError("Transfer reviewed header differs from its literal source/prepared projection")
         renames[prepared_column] = target
         operations.append({"publisher_code": code, "prepared_column": prepared_column, "field": target})
         if code in values:
             entry: dict[str, Any] = {"raw": code}
             if prepared_column == "transfer_count_value":
                 entry["status"] = "transfer_count_status"
-            if prepared_column in {"transfer_reporting_number", "transfer_partner_number"}:
+            if grain == "district" and prepared_column in {"transfer_reporting_number", "transfer_partner_number"}:
                 entry["auxiliary"] = ["transfer_reporting_district_number" if prepared_column == "transfer_reporting_number"
                                       else "transfer_partner_district_number"]
             supported[target] = entry
     names = [renames.get(name, name) for name in columns]
     if len(set(names)) != len(names):
-        raise ValueError("District canonical projection collides with retained raw/technical columns")
+        raise ValueError("Transfer canonical projection collides with retained raw/technical columns")
     support = {"fields": supported, "context": ["transfer_source_input", "transfer_source_record",
-        "transfer_first_line", "transfer_last_line", "transfer_row_kind"]}
+        "transfer_first_line", "transfer_last_line", "transfer_row_kind", *extra_context]}
     return names, support, operations
 
 
@@ -137,7 +141,7 @@ def _admit_preparation(store: ProvenanceStore, cfg: Config, year: int, identifie
     artifact = record["outputs"]["prepared_source"]
     if not 0 < artifact["size_bytes"] <= 16 * 1024 * 1024 or report["rows"] * 12 > 8 * 1024 * 1024:
         raise ValueError("District prepared bytes or compact row-key index exceed admission")
-    names, support, operations = _district_projection(report["columns"], table["fields"])
+    names, support, operations = _leaf_projection(report["columns"], table["fields"], grain="district")
     return {"year": year, "processing_id": identifier, "record": record, "report": report,
         "acquisitions": acquisitions, "source": source, "table": table, "artifact": artifact,
         "names": names, "support": support, "operations": operations}

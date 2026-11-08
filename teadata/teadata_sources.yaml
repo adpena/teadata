@@ -1111,6 +1111,60 @@ data_sources:
         - TRANSFERS_IN_OR_OUT
         - REPORT_TYPE
         column_schema: schemas/data_sources--campus_transfer_reports--2025--default.json
+        profiles:
+          source:
+            column_schema: schemas/campus-transfer-reports--2025--crosswalk.json
+            metadata:
+              title: 2024-2025 statewide campus transfer report
+              publisher: Texas Education Agency
+              version: '2025'
+              period:
+                kind: school_year
+                start_year: 2024
+                end_year: 2025
+              source_url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/campus_transfer_report.html
+              provenance_ids:
+              - 785606f825deb15011a31afaa03bcdb17683021f9be062ef28b93fe0392ea8ee
+              value_policy: campus_transfers
+              metrics:
+                count:
+                  field: student_transfer_count
+                  unit: count
+              references:
+              - reference_id: methodology
+                role: methodology
+                url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/about_transfer_reports.html
+                title: About Transfer Reports
+                provenance_ids:
+                - e853850f4f9931afc5e755de31ff3f78cfd2fa5c1f9b21f6049152d3728f40c1
+              - reference_id: masking
+                role: masking_methodology
+                url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.download_transfer_report.sas&scope=Campus&agg_level=campus&RptClass=transfer&_debug=0&school_year=2025&report_format=csv&Campus_Transfer_Report=Get+a+Campus+Transfer+Report
+                title: 2024-25 statewide campus transfer CSV footnotes
+                provenance_ids:
+                - 785606f825deb15011a31afaa03bcdb17683021f9be062ef28b93fe0392ea8ee
+                reviewed_sha256: ea11eaf275f6c5abb79ead6213ded0223b17b70511798a4dc81f8abe03936372
+              - reference_id: historical_endpoint_directory
+                role: source_notes
+                url: https://tealprod.tea.state.tx.us/Tea.AskTed.Web/Forms/ArchivedSchoolAndDistrictDataFiles.aspx
+                title: AskTED 2024-25 fall archive for historical transfer endpoint identity
+                provenance_ids:
+                - 47a463c7d24bd8904487e4e8c05896e4b8b22b6587f7486523bd66b343e5c0a9
+                reviewed_sha256: cab7762fe83eb3a79c1d213796587b9cf64facfbf3c7597f6fd7e271d250329e
+              - reference_id: historical_endpoint_lifecycle
+                role: source_notes
+                url: https://tealprod.tea.state.tx.us/Tea.AskTed.Web/Forms/ReportSelection.aspx
+                title: AskTED All Public Schools Closed, printed 2026-11-07
+                provenance_ids:
+                - 8a5a39cc5a688bcb6af6dd0f9f85c208240ece373178eb961b0c61d4605e588d
+                reviewed_sha256: 39beba4c209fb3ea2748a26223b0a2537bd247622d58495fd83e9b7c86129551
+              - reference_id: columns_source
+                role: schema
+                path: schemas/campus-transfer-reports--2025--crosswalk.json
+                title: 2024-25 campus transfer native source crosswalk
+                provenance_ids:
+                - 7cb2847069f897b6bd42d92858a3134f7a1ae66e8fc8ef782ffb91522a95697b
+                reviewed_sha256: 034c1d2cf70e8752bf52ac8b67d60ff009a04746633f43075280c6d5307c9763
   campus_peims_financials:
     2024:
       path: data/campus_peims_financials/2023-2024 Campus PEIMS Actual Financials
@@ -17681,6 +17735,504 @@ data_sources:
               district: 9b4ed15e6fab5cbf79fdfc58585147666e9bc1c28080b419109bc05e9e43c46b
               campus: 540c12a72c6373e8a073a7203158a5a5b1c7e872b835a1c6e8490ac5289b07fb
   peims_financial_single_file_actuals:
+    2013:
+      path: data/peims/2013/actget2013.zip
+      metadata:
+        title: FY2013 PEIMS Single File Financial Actuals
+        publisher: Texas Education Agency
+        version: '2013'
+        period:
+          kind: fiscal_year
+          start_year: 2012
+          end_year: 2013
+        source_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads
+        identifiers:
+        - district_number
+        source_qualifiers:
+          family: peims_financial
+          reference_id: release_listing
+          financial_basis: actual
+        notes: Separate district and charter account layouts. Signed reported actuals are in nominal dollars. The
+          fiscal edition, account year code and publisher update date are separate. The historical dictionary has
+          incomplete coverage of the published layouts. Cross-report reconciliation, longitudinal comparability and
+          finality are unasserted.
+        metrics:
+          actual_amount:
+            field: actual_amount
+            unit: currency
+        references: &peims_historical_actuals_references
+        - reference_id: release_listing
+          role: source_notes
+          title: TEA PEIMS Single File Financial Data Downloads
+          url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads
+          reviewed_sha256: f68f7aa97c623474265e55ecc3af95885227524e3c6a2f10a65c238b9d36440d
+          provenance_ids:
+          - aa916cadc8c599353b7b6207f3557b738f1f6cfe9141f18d7f4b7d88b2265bb1
+        - reference_id: historical_dictionary
+          role: data_dictionary
+          title: TEA historical single-file dictionary
+          url: https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/reports-and-downloadable-data/datadictionary.pdf
+          reviewed_sha256: 7d5a5121f09d3e6b45986ee352bb5ab933dc39b7730b34855ac1f8aaceea8ade
+          provenance_ids:
+          - e1c3fb464a07f3376e875ea5d3710e533aa9975eba147a59dc96c1c995123e15
+        - reference_id: column_crosswalk
+          role: schema
+          path: schemas/peims--2013-2022--single-file-financial-actuals-crosswalk.json
+          title: Exact historical district and charter account headers
+          reviewed_sha256: ec10424d8ab046ed6b54426a629a7b0b65c6f6f87349f871f0465d01f1abd663
+          provenance_ids:
+          - 47ab0f4b6039ae6cdad6a2cfcd658c637d93e998ddd5d420d9e2846db4bd5758
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2022--single-file-financial-actuals-crosswalk.json
+            archives:
+              district:
+                receipt_id: 59a6e289a84ee93ec6503a26a6f9dcd8837ecb6c3cd2e26fd3fc6874f1bfa2b3
+                member: ACTget2013.csv
+                rows: 4241392
+                requested_url: https://tea.texas.gov/WorkArea/linkit.aspx?LinkIdentifier=id&ItemID=25769810372
+                resolved_url: https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/reports-and-downloadable-data/actget2013.zip
+                key_order: publisher
+              charter:
+                receipt_id: edd4fa53824857d40f9149929adc9e4a0e63a530d196d861fa41d5cce0138768
+                member: CharAct13.csv
+                rows: 123431
+                requested_url: https://tea.texas.gov/WorkArea/linkit.aspx?LinkIdentifier=id&ItemID=25769810373
+                resolved_url: https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/reports-and-downloadable-data/charact13.zip
+                key_order: publisher
+    2014:
+      path: data/peims/2014/actget2014.zip
+      metadata:
+        title: FY2014 PEIMS Single File Financial Actuals
+        publisher: Texas Education Agency
+        version: '2014'
+        period:
+          kind: fiscal_year
+          start_year: 2013
+          end_year: 2014
+        source_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads
+        identifiers:
+        - district_number
+        source_qualifiers:
+          family: peims_financial
+          reference_id: release_listing
+          financial_basis: actual
+        notes: Statewide district and charter account files use separate publisher layouts. Signed actual amounts
+          are retained in nominal dollars. The archive fiscal edition, source account year code and update date are
+          separate. The district code NUL is an observed No Cost Center code for the two districts documented by the
+          FY2014 alternate-format lookup. Cross-report reconciliation, cross-year comparability and finality are unasserted.
+        metrics:
+          actual_amount:
+            field: actual_amount
+            unit: currency
+        references:
+        - reference_id: release_listing
+          role: source_notes
+          title: TEA PEIMS Single File Financial Data Downloads
+          url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads
+          reviewed_sha256: f68f7aa97c623474265e55ecc3af95885227524e3c6a2f10a65c238b9d36440d
+          provenance_ids:
+          - aa916cadc8c599353b7b6207f3557b738f1f6cfe9141f18d7f4b7d88b2265bb1
+        - reference_id: historical_dictionary
+          role: data_dictionary
+          title: TEA historical single-file dictionary
+          url: https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/reports-and-downloadable-data/datadictionary.pdf
+          reviewed_sha256: 7d5a5121f09d3e6b45986ee352bb5ab933dc39b7730b34855ac1f8aaceea8ade
+          provenance_ids:
+          - e1c3fb464a07f3376e875ea5d3710e533aa9975eba147a59dc96c1c995123e15
+        - reference_id: district_no_cost_center_lookup
+          role: data_dictionary
+          title: FY2014 PEIMS Multiple File Actuals. See FIN_UNIT_2014F.TXT and FIN_UNIT_TYPEF.TXT for district No
+            Cost Center.
+          url: https://tea.texas.gov/WorkArea/linkit.aspx?ItemID=25769820604&LinkIdentifier=id
+          reviewed_sha256: 9f429bcecd6a1060376d963fd3c9c35f20a99ed9e24c47593b81a9447d7ed4c0
+          provenance_ids:
+          - 08ee5928a0ff0f0487633eeb1911bb796d3b716e6ec3a6da8ada0a4129b103f6
+        - reference_id: column_crosswalk
+          role: schema
+          title: Exact FY2014 district and charter account headers
+          path: schemas/peims--2014--single-file-financial-actuals-crosswalk.json
+          reviewed_sha256: e0c70159173729b9e45165d4f90e46d7e1fdacf2359d73d384fc0898615f9529
+          provenance_ids:
+          - 2b40075cb6abb16e2df7c70191061b24fd4ee99d29157518739ea97f970a563d
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2014--single-file-financial-actuals-crosswalk.json
+            archives:
+              district:
+                receipt_id: b88a1731b12a006ece56628d5c0ae21364c5b7af90abe5225a8732636b973b04
+                member: ACTget2014.csv
+                rows: 4389284
+                requested_url: https://tea.texas.gov/WorkArea/linkit.aspx?LinkIdentifier=id&ItemID=25769820605
+                resolved_url: https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/reports-and-downloadable-data/actget2014.zip
+                key_order: publisher
+                no_cost_center:
+                  reference_id: district_no_cost_center_lookup
+                  district_counts:
+                    071902: 2
+                    '123910': 3
+              charter:
+                receipt_id: 17bcaecda2f33a411b7c796178f07b9fbccce34592d9d11052ec4cb8211a284f
+                member: CharAct14.csv
+                rows: 133062
+                requested_url: https://tea.texas.gov/WorkArea/linkit.aspx?LinkIdentifier=id&ItemID=25769820606
+                resolved_url: https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/reports-and-downloadable-data/charact14.zip
+                key_order: publisher
+    2015:
+      path: data/peims/2015/actget2015.zip
+      metadata:
+        title: FY2015 PEIMS Single File Financial Actuals
+        publisher: Texas Education Agency
+        version: '2015'
+        period:
+          kind: fiscal_year
+          start_year: 2014
+          end_year: 2015
+        source_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads
+        identifiers:
+        - district_number
+        source_qualifiers:
+          family: peims_financial
+          reference_id: release_listing
+          financial_basis: actual
+        notes: Separate district and charter account layouts. Signed reported actuals are in nominal dollars. The
+          fiscal edition, account year code and publisher update date are separate. The historical dictionary has
+          incomplete coverage of the published layouts. Cross-report reconciliation, longitudinal comparability and
+          finality are unasserted.
+        metrics:
+          actual_amount:
+            field: actual_amount
+            unit: currency
+        references: *peims_historical_actuals_references
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2022--single-file-financial-actuals-crosswalk.json
+            archives:
+              district:
+                receipt_id: 5075a90a7ef8d8f2ba0388fcce073ff4fc8adca0f33ba8d9608c0632c784189a
+                member: ACTget2015.csv
+                rows: 4471506
+                requested_url: https://tea.texas.gov/WorkArea/linkit.aspx?LinkIdentifier=id&ItemID=25769825543
+                resolved_url: https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/reports-and-downloadable-data/actget2015.zip
+                key_order: publisher
+              charter:
+                receipt_id: ff44336dfca113d2190e90dfe2d8490b432758bebf26344f19ecb2f6bc30ef6d
+                member: CharAct15.csv
+                rows: 146132
+                requested_url: https://tea.texas.gov/WorkArea/linkit.aspx?LinkIdentifier=id&ItemID=25769825544
+                resolved_url: https://tea.texas.gov/data-reports/financial-reports/school-finance-reports-and-data/reports-and-downloadable-data/charact15.zip
+                key_order: publisher
+    2016:
+      path: data/peims/2016/actget2016.zip
+      metadata:
+        title: FY2016 PEIMS Single File Financial Actuals
+        publisher: Texas Education Agency
+        version: '2016'
+        period:
+          kind: fiscal_year
+          start_year: 2015
+          end_year: 2016
+        source_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads
+        identifiers:
+        - district_number
+        source_qualifiers:
+          family: peims_financial
+          reference_id: release_listing
+          financial_basis: actual
+        notes: Separate district and charter account layouts. Signed reported actuals are in nominal dollars. The
+          fiscal edition, account year code and publisher update date are separate. The historical dictionary has
+          incomplete coverage of the published layouts. Cross-report reconciliation, longitudinal comparability and
+          finality are unasserted.
+        metrics:
+          actual_amount:
+            field: actual_amount
+            unit: currency
+        references: *peims_historical_actuals_references
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2022--single-file-financial-actuals-crosswalk.json
+            archives:
+              district:
+                receipt_id: d57c36f53c563b341f733f8fa8806300666664fcfcf7f7f8fbc030ce08fa2ee6
+                member: ACTget2016.csv
+                rows: 4515028
+                requested_url: https://tea.texas.gov/sites/default/files/ACTget2016.zip
+                resolved_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/actget2016.zip
+              charter:
+                receipt_id: c339d1b889563946f6c845aad1ba92a353492fc4fd4fe6f70179b0c604184db9
+                member: CharAct16.csv
+                rows: 153688
+                requested_url: https://tea.texas.gov/sites/default/files/CharAct16.zip
+                resolved_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/charact16.zip
+                key_order: publisher
+    2017:
+      path: data/peims/2017/actget2017.zip
+      metadata:
+        title: FY2017 PEIMS Single File Financial Actuals
+        publisher: Texas Education Agency
+        version: '2017'
+        period:
+          kind: fiscal_year
+          start_year: 2016
+          end_year: 2017
+        source_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads
+        identifiers:
+        - district_number
+        source_qualifiers:
+          family: peims_financial
+          reference_id: release_listing
+          financial_basis: actual
+        notes: Separate district and charter account layouts. Signed reported actuals are in nominal dollars. The
+          fiscal edition, account year code and publisher update date are separate. The historical dictionary has
+          incomplete coverage of the published layouts. Cross-report reconciliation, longitudinal comparability and
+          finality are unasserted.
+        metrics:
+          actual_amount:
+            field: actual_amount
+            unit: currency
+        references: *peims_historical_actuals_references
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2022--single-file-financial-actuals-crosswalk.json
+            archives:
+              district:
+                receipt_id: 14f45974d70f026be30ad5afae3c8d01109428be998deeedd726cecb03796b36
+                member: ACTget2017.csv
+                rows: 4741590
+                requested_url: https://tea.texas.gov/sites/default/files/ACTget2017.zip
+                resolved_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/actget2017.zip
+              charter:
+                receipt_id: 3f8f2da09aa4ca4ead6c7305d6e450acbc327e7d71b0259ed765bc4c9b7660cd
+                member: CharAct17.csv
+                rows: 189888
+                requested_url: https://tea.texas.gov/sites/default/files/CharAct17.zip
+                resolved_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/charact17.zip
+                key_order: publisher
+    2018:
+      path: data/peims/2018/actget2018.zip
+      metadata:
+        title: FY2018 PEIMS Single File Financial Actuals
+        publisher: Texas Education Agency
+        version: '2018'
+        period:
+          kind: fiscal_year
+          start_year: 2017
+          end_year: 2018
+        source_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads
+        identifiers:
+        - district_number
+        source_qualifiers:
+          family: peims_financial
+          reference_id: release_listing
+          financial_basis: actual
+        notes: Separate district and charter account layouts. Signed reported actuals are in nominal dollars. The
+          fiscal edition, account year code and publisher update date are separate. The historical dictionary has
+          incomplete coverage of the published layouts. Cross-report reconciliation, longitudinal comparability and
+          finality are unasserted.
+        metrics:
+          actual_amount:
+            field: actual_amount
+            unit: currency
+        references: *peims_historical_actuals_references
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2022--single-file-financial-actuals-crosswalk.json
+            archives:
+              district:
+                receipt_id: e641c65da51940cf8b3abe9eaf005914d78c1fff8104e4d5ec734e223b4ad896
+                member: ACTget2018.csv
+                rows: 4792235
+                requested_url: https://tea.texas.gov/sites/default/files/ACTget2018.zip
+                resolved_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/actget2018.zip
+              charter:
+                receipt_id: 1d23dc677227b68631a17fec836b7769dffdc18be5726ece86d7c8a0dd9b1a54
+                member: CharAct18.csv
+                rows: 208431
+                requested_url: https://tea.texas.gov/sites/default/files/CharAct18.zip
+                resolved_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/charact18.zip
+                key_order: publisher
+    2019:
+      path: data/peims/2019/actget2019.zip
+      metadata:
+        title: FY2019 PEIMS Single File Financial Actuals
+        publisher: Texas Education Agency
+        version: '2019'
+        period:
+          kind: fiscal_year
+          start_year: 2018
+          end_year: 2019
+        source_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads
+        identifiers:
+        - district_number
+        source_qualifiers:
+          family: peims_financial
+          reference_id: release_listing
+          financial_basis: actual
+        notes: Separate district and charter account layouts. Signed reported actuals are in nominal dollars. The
+          fiscal edition, account year code and publisher update date are separate. The historical dictionary has
+          incomplete coverage of the published layouts. Cross-report reconciliation, longitudinal comparability and
+          finality are unasserted. The publisher's listing size label differs from the exact linked district archive.
+        metrics:
+          actual_amount:
+            field: actual_amount
+            unit: currency
+        references: *peims_historical_actuals_references
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2022--single-file-financial-actuals-crosswalk.json
+            archives:
+              district:
+                receipt_id: 3f395f6418440049fdf4e75972be703094930ec1af7047b4598fe19fcff32288
+                member: ACTget2019.csv
+                rows: 4872439
+                requested_url: https://tea.texas.gov/sites/default/files/ACTget2019.zip
+                resolved_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/actget2019.zip
+                key_order: publisher
+              charter:
+                receipt_id: 562e9b07676af2fb20712fab5a449413b520e9fa079304c3266adfce2ac6257b
+                member: CharAct19.csv
+                rows: 247786
+                requested_url: https://tea.texas.gov/sites/default/files/charact19.zip
+                resolved_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/charact19.zip
+                key_order: publisher
+    2020:
+      path: data/peims/2020/actget2020.zip
+      metadata:
+        title: FY2020 PEIMS Single File Financial Actuals
+        publisher: Texas Education Agency
+        version: '2020'
+        period:
+          kind: fiscal_year
+          start_year: 2019
+          end_year: 2020
+        source_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads
+        identifiers:
+        - district_number
+        source_qualifiers:
+          family: peims_financial
+          reference_id: release_listing
+          financial_basis: actual
+        notes: Separate district and charter account layouts. Signed reported actuals are in nominal dollars. The
+          fiscal edition, account year code and publisher update date are separate. The historical dictionary has
+          incomplete coverage of the published layouts. Cross-report reconciliation, longitudinal comparability and
+          finality are unasserted.
+        metrics:
+          actual_amount:
+            field: actual_amount
+            unit: currency
+        references: *peims_historical_actuals_references
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2022--single-file-financial-actuals-crosswalk.json
+            archives:
+              district:
+                receipt_id: fddb5729377dc1b5dd744bd522bc6fc2b6db0cc51aef5510e262443991b24282
+                member: ACTget2020.csv
+                rows: 5190148
+                requested_url: https://tea.texas.gov/sites/default/files/actget2020.zip
+                resolved_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/actget2020.zip
+              charter:
+                receipt_id: e8d43ea16ba2c90a95d0bdbdeb4565930712689ce529870a26309669ec6b2144
+                member: CharAct20.csv
+                rows: 277577
+                requested_url: https://tea.texas.gov/sites/default/files/charact20.zip
+                resolved_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/charact20.zip
+    2021:
+      path: data/peims/2021/actget2021.zip
+      metadata:
+        title: FY2021 PEIMS Single File Financial Actuals
+        publisher: Texas Education Agency
+        version: '2021'
+        period:
+          kind: fiscal_year
+          start_year: 2020
+          end_year: 2021
+        source_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads
+        identifiers:
+        - district_number
+        source_qualifiers:
+          family: peims_financial
+          reference_id: release_listing
+          financial_basis: actual
+        notes: Separate district and charter account layouts. Signed reported actuals are in nominal dollars. The
+          fiscal edition, account year code and publisher update date are separate. The historical dictionary has
+          incomplete coverage of the published layouts. Cross-report reconciliation, longitudinal comparability and
+          finality are unasserted.
+        metrics:
+          actual_amount:
+            field: actual_amount
+            unit: currency
+        references: *peims_historical_actuals_references
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2022--single-file-financial-actuals-crosswalk.json
+            archives:
+              district:
+                receipt_id: 958ebc385031d573503d70791198ca4aecaae1bd2f7c26288af6f0ac43a5aae8
+                member: ACTget2021.csv
+                rows: 5465388
+                requested_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/actget2021.zip
+                resolved_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/actget2021.zip
+              charter:
+                receipt_id: c67752be6918f5b316e3cb1208e443d41ef67d0011e8f9589d0a527f1100b6ea
+                member: CharAct21.csv
+                rows: 299463
+                requested_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/charact21.zip
+                resolved_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/charact21.zip
+                key_order: publisher
+    2022:
+      path: data/peims/2022/actget2022.zip
+      metadata:
+        title: FY2022 PEIMS Single File Financial Actuals
+        publisher: Texas Education Agency
+        version: '2022'
+        period:
+          kind: fiscal_year
+          start_year: 2021
+          end_year: 2022
+        source_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads
+        identifiers:
+        - district_number
+        source_qualifiers:
+          family: peims_financial
+          reference_id: release_listing
+          financial_basis: actual
+        notes: Separate district and charter account layouts. Signed reported actuals are in nominal dollars. The
+          fiscal edition, account year code and publisher update date are separate. The historical dictionary has
+          incomplete coverage of the published layouts. Cross-report reconciliation, longitudinal comparability and
+          finality are unasserted. The publisher's listing size label differs from the exact linked charter archive.
+        metrics:
+          actual_amount:
+            field: actual_amount
+            unit: currency
+        references: *peims_historical_actuals_references
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2022--single-file-financial-actuals-crosswalk.json
+            archives:
+              district:
+                receipt_id: 3d2631738bd7d12d3a00bf01f8c737d15c7cb427ac3550ef419879c2fab91e07
+                member: actget2022.csv
+                rows: 5850022
+                requested_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/actget2022.zip
+                resolved_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/actget2022.zip
+              charter:
+                receipt_id: 4182b545d8ab4a13c93c6c468735b0e8f0bf6c1eb8b574171a18a53443a1b935
+                member: charact22.csv
+                rows: 359286
+                requested_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/charact22.zip
+                resolved_url: https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/charact22.zip
+                key_order: publisher
     2023:
       path: data/peims/2023/actget2023.zip
       metadata:

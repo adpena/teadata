@@ -9,14 +9,29 @@ from decimal import Decimal
 from hashlib import sha256
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterator
+from typing import TYPE_CHECKING, Any, Iterator, Literal, TypedDict
 
 import pyarrow as pa
 import pyarrow.compute as arrow_compute
 import pyarrow.parquet as pq
 
+from .acquisition import AcquisitionError
+from .campus_transfer_leaves import (
+    DATASET as CAMPUS_TRANSFERS,
+    DIRECTORY_REFERENCE,
+    _ENDPOINTS,
+    _HISTORICAL_FIELDS,
+    _OBSOLESCENCE_FIELDS,
+    _CampusObsolescence,
+    _append_campus_obsolescence,
+    _campus_obsolescence,
+    _fall_directory,
+    _fall_identity_rows,
+    _lifecycle_reference,
+    _validate_campus_acquisition,
+)
 from .column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
-from .dataset_metadata import COLUMN_SCHEMA_MAX_BYTES, DataPeriod
+from .dataset_metadata import COLUMN_SCHEMA_MAX_BYTES, DataPeriod, ResolvedDataset
 from .manifest import canonical_json
 from .district_types import DISTRICT_TYPE_COLUMNS, DISTRICT_TYPE_REFERENCE, reviewed_district_types
 from .peims_leaves import DATASETS as PEIMS_DATASETS, PRIMARY_DISABILITY
@@ -33,7 +48,8 @@ from .peims_staff import (
 from .provenance import validate_record_graph
 from .source_csv import SourceLines
 from .source_parity import _FieldReport, _Uncovered
-from .transfer_leaves import _district_projection
+from .teadata_config import load_config_bytes
+from .transfer_leaves import _leaf_projection
 from .transfer_sources import _FOOTNOTES, _selected_encoding, _transfer_projection, district_batch_inputs, transfer_columns
 from .values import ValueStatus
 
@@ -59,6 +75,23 @@ class _Original:
     annotations: tuple[dict[str, Any], ...] = ()
 
 
+class _FallEndpoint(TypedDict):
+    record: int
+    district: str
+    name: str
+
+
+@dataclass(frozen=True)
+class _CampusHistory:
+    as_of: str
+    endpoints: dict[str, _FallEndpoint]
+    obsolescence: _CampusObsolescence | None = None
+
+    @property
+    def context(self) -> tuple[str, ...]:
+        return _HISTORICAL_FIELDS + (_OBSOLESCENCE_FIELDS if self.obsolescence is not None else ())
+
+
 @dataclass(frozen=True)
 class _Typed:
     names: list[str]
@@ -74,6 +107,8 @@ class _Typed:
     lineage: dict[str, Any]
     staff_scope: str | None = None
     district_types: dict[str, str] | None = None
+    transfer_grain: Literal["campus", "district"] | None = None
+    campus_history: _CampusHistory | None = None
 
 
 def _digest(value: Any) -> str:
@@ -89,6 +124,81 @@ def _resource(store: ProvenanceStore, artifact: dict, maximum: int, label: str) 
     return raw
 
 
+def _validate_fall_endpoints(directory: str, claimed: Any) -> dict[str, _FallEndpoint]:
+    if not isinstance(claimed, dict):
+        raise ValueError("Campus transfer recipe lacks historical endpoint records")
+    observed: dict[str, _FallEndpoint] = {}
+    for record, campus, district, name in _fall_identity_rows(directory, claimed):
+        if campus in observed or district is None or campus[:7] != district or not name:
+            raise ValueError("Campus transfer recipe names an ambiguous or malformed fall identity")
+        observed[campus] = {"record": record, "district": district, "name": name}
+    if any(not isinstance(entry, dict) or type(entry.get("record")) is not int for entry in claimed.values()):
+        raise ValueError("Campus transfer recipe lacks exact historical row positions")
+    if observed != claimed:
+        raise ValueError("Campus transfer recipe differs from the exact fall archive rows")
+    return observed
+
+
+def _campus_history(store: ProvenanceStore, source: ResolvedDataset, year: int, recipe: dict,
+                    graph: dict, direct_inputs: list[str], config_artifact: dict, resource_bytes: int) -> _CampusHistory:
+    reference, = [item for item in source.metadata.references if item.reference_id == DIRECTORY_REFERENCE]
+    directory_receipt, = reference.provenance_ids
+    index_receipt = graph[directory_receipt]["parameters"]["archive_index_record"]
+    directory_receipts = [directory_receipt, index_receipt]
+    if (len(set(directory_receipts)) != 2 or recipe.get("directory_receipts") != directory_receipts
+            or not set(directory_receipts) <= set(direct_inputs)):
+        raise ValueError("Campus transfer recipe does not bind both AskTED archive receipts")
+    if any(graph[identifier]["artifact"]["size_bytes"] > resource_bytes for identifier in directory_receipts):
+        raise _Uncovered("AskTED archive evidence exceeds its retained resource budget")
+    try:
+        directory, as_of, observed = _fall_directory(store, source, year)
+    except AcquisitionError as error:
+        raise ValueError(str(error)) from error
+    if directory_receipts != list(observed) or recipe.get("directory_archive_as_of") != as_of:
+        raise ValueError("Campus transfer recipe differs from its exact fall archive")
+    companion, = [graph[value]["artifact"] for value in direct_inputs if graph[value]["kind"] == "acquisition"
+                  and graph[value]["dataset"] == "reference:transfer_companion-registry-manifest"]
+    manifest = json.loads(_resource(store, companion, resource_bytes, "Companion registry manifest"))
+    if (companion["sha256"] != recipe.get("registry_manifest_sha256")
+            or manifest["artifacts"]["entities"] != recipe.get("registry_entities")
+            or manifest["catalog"]["build_id"] != recipe.get("registry_build_id")):
+        raise ValueError("Campus transfer recipe differs from its companion registry manifest")
+    endpoints = _validate_fall_endpoints(directory, recipe.get("historical_endpoints"))
+    reference = _lifecycle_reference(source)
+    if config_artifact["filename"] != "source-config.input":
+        raise ValueError("Campus transfer retained configuration has an unexpected filename")
+    raw_config = _resource(store, config_artifact, resource_bytes, "Transfer configuration")
+    try:
+        config = load_config_bytes(raw_config, path=Path(config_artifact["filename"]))
+    except (RuntimeError, OverflowError) as error:
+        raise ValueError("Campus transfer retained configuration cannot be parsed") from error
+    configured = config.resolve_dataset(source.dataset, year, reader_profile="source", exact=True)
+    if _lifecycle_reference(configured) != reference:
+        raise ValueError("Campus lifecycle reference differs from its retained source configuration")
+    if reference is None:
+        if "campus_obsolescence" in recipe:
+            raise ValueError("Campus transfer recipe lacks its reviewed lifecycle reference")
+        return _CampusHistory(as_of, endpoints)
+    receipt, = reference.provenance_ids
+    if receipt not in direct_inputs:
+        raise ValueError("Campus transfer recipe omits its reviewed lifecycle input")
+    if graph[receipt]["artifact"]["size_bytes"] > resource_bytes:
+        raise _Uncovered("AskTED lifecycle report exceeds its retained resource budget")
+    obsolescence = _campus_obsolescence(store, reference, as_of=as_of, historical=endpoints)
+    if canonical_json(recipe.get("campus_obsolescence")) != canonical_json(obsolescence.recipe()):
+        raise ValueError("Campus transfer recipe differs from the exact AskTED obsolete dates")
+    return _CampusHistory(as_of, endpoints, obsolescence)
+
+
+def _check_campus_directional_witness(report: dict, validation: object, policy: ValuePolicy, original_sha256: str) -> None:
+    directions = report["source_validation"]
+    if (not isinstance(validation, dict) or not isinstance(directions, dict) or directions.get("status") != "PASS"
+            or directions.get("raw_count_token_differences") != 0
+            or directions.get("input_sha256") != original_sha256 or directions != validation.get("directional_readback")
+            or report.get("policy_sha256") != sha256(json.dumps(policy.to_dict(), sort_keys=True).encode()).hexdigest()):
+        raise ValueError("Campus preparation differs from its accepted directional witness")
+
+
 def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *, resource_bytes: int) -> _Typed:
     variables = list(release.catalog.variables(edition=key))
     plans = release.catalog.resolve_artifacts((key, row["field"]) for row in variables)
@@ -102,8 +212,17 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
     recipe = parameters.get("recipe", {})
     peims = key.dataset in PEIMS_DATASETS
     staff = key.dataset == STAFF
-    pair = ("teadata.scripts.refresh_peims", STAFF_RECIPE if staff else "reviewed_peims_student_csv_projection") if peims else (
-        "teadata.scripts.refresh_transfers.materialize", "accepted_transfer_preparation_projection")
+    campus = key.dataset == CAMPUS_TRANSFERS
+    grain: Literal["campus", "district"] = "campus" if campus else "district"
+    if peims:
+        pair = ("teadata.scripts.refresh_peims", STAFF_RECIPE if staff else "reviewed_peims_student_csv_projection")
+        config_name = "peims_leaf_config"
+    elif campus:
+        pair = ("teadata.scripts.refresh_transfers.materialize-campus", "campus_transfer_historical_endpoint_admission")
+        config_name = "transfer_source-config"
+    else:
+        pair = ("teadata.scripts.refresh_transfers.materialize", "accepted_transfer_preparation_projection")
+        config_name = "transfer_leaf_config"
     if (record.get("processor"), recipe.get("operation")) != pair:
         raise _Uncovered("No supported recorded typed replay recipe")
     output = record.get("outputs", {}).get(ref.output, {})
@@ -114,10 +233,9 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
             or _digest(recipe) != contract["recipe_sha256"]
             or any(output.get(name) != getattr(ref, name) for name in ("sha256", "size_bytes"))):
         raise ValueError("Typed leaf processing does not bind its selected descriptor and recipe")
-    config_name = "peims_leaf_config" if peims else "transfer_leaf_config"
-    configs = [graph[value]["artifact"]["sha256"] for value in record["inputs"]
+    configs = [graph[value]["artifact"] for value in record["inputs"]
                if graph[value]["kind"] == "acquisition" and graph[value]["dataset"] == f"reference:{config_name}"]
-    if configs != [recipe.get("config_sha256")]:
+    if [item["sha256"] for item in configs] != [recipe.get("config_sha256")]:
         raise ValueError("Typed leaf recipe does not bind its exact retained source configuration")
     metadata = release.catalog.metadata(key.dataset, edition=key)
     period = metadata.period
@@ -156,6 +274,7 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
     prepared = None
     projection = {}
     district_types = None
+    history = None
     attached_hashes = []
     if peims:
         if (key.scope not in SCOPES_BY_DATASET[key.dataset] or key.table != key.scope or len(ids) != 1
@@ -207,9 +326,9 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
         inputs = [(ENCODING, None, contract["rows"], ())]
         upstream = graph
     else:
-        if (key.scope, key.table) != ("district", "report_rows"):
-            raise _Uncovered("Only the regional district transfer report table is supported")
-        preparation_id = recipe.get("prepared_processing_id")
+        if (key.scope, key.table) != (grain, "report_rows") or (campus and period.end_year in {2021, 2022}):
+            raise _Uncovered("Transfer table or historical CSV layout is unsupported")
+        preparation_id = recipe.get("preparation" if campus else "prepared_processing_id")
         if preparation_id not in record["inputs"]:
             raise ValueError("Transfer leaf does not bind its historical preparation")
         upstream = validate_record_graph(graph.__getitem__, [preparation_id])
@@ -217,24 +336,48 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
         validation, prior = preparation.get("validation", {}), preparation.get("parameters", {})
         if (preparation["kind"] != "processing" or preparation["dataset"] != key.dataset
                 or preparation["processor"] != "teadata.scripts.refresh_transfers"
-                or preparation["code_version"] != recipe.get("historical_preparation_producer")
+                or (not campus and preparation["code_version"] != recipe.get("historical_preparation_producer"))
                 or preparation["code_version"] != prior.get("processor_sha256")
-                or validation.get("status") != "PASS" or validation.get("raw_string_readback_equal") is not True
-                or prior.get("value_policy") != policy.to_dict() or recipe.get("publisher_totals_computed") is not False
+                or not isinstance(validation, dict) or validation.get("status") != "PASS" or validation.get("raw_string_readback_equal") is not True
+                or prior.get("value_policy") != policy.to_dict()
+                or (not campus and recipe.get("publisher_totals_computed") is not False)
                 or set(preparation["outputs"]) != {"prepared_source", "annotations", "validation_report"}):
             raise ValueError("Transfer preparation does not match its accepted historical recipe")
         report = json.loads(_resource(store, preparation["outputs"]["validation_report"], min(2 * 1024**2, resource_bytes), "Transfer report"))
+        if not isinstance(report, dict):
+            raise ValueError("Transfer preparation report must be a JSON object")
         annotations = json.loads(_resource(store, preparation["outputs"]["annotations"],
                                            min(2 * 1024**2, resource_bytes), "Transfer annotations"))["sources"]
-        index, = [upstream[value]["artifact"] for value in preparation["inputs"]
-                  if upstream[value]["kind"] == "acquisition"
-                  and upstream[value]["dataset"] == "reference:transfer_batch_index"]
-        ordered, controls = district_batch_inputs(store, _resource(store, index, min(2 * 1024**2, resource_bytes), "Transfer index"),
-                                                 period.end_year, all_offered=True)
+        if campus:
+            original, = ids
+            source = ResolvedDataset(key.dataset, "data_sources", period.end_year, period.end_year, "", metadata)
+            _validate_campus_acquisition(upstream[original], source, period.end_year)
+            _check_campus_directional_witness(report, record["validation"], policy, hashes[0])
+            if (record["validation"].get("publisher_totals_computed") is not False
+                    or any(validation.get(name) is not True or report.get(name) is not True for name in (
+                        "prepared_source_qualified", "canonical_edges_qualified"))
+                    or report.get("implementation") != {name: prior.get(name) for name in ("processor_sha256", "cli_sha256")}
+                    or report.get("toolchain") != prior.get("toolchain")):
+                raise ValueError("Campus preparation differs from its accepted directional witness")
+            history = _campus_history(store, source, period.end_year, recipe, graph, record["inputs"], configs[0],
+                                      resource_bytes)
+            if history.obsolescence is not None:
+                attached_hashes.append(history.obsolescence.sha256)
+            if record["validation"].get("historical_endpoints_qualified") != len(history.endpoints):
+                raise ValueError("Campus preparation differs from its historical endpoint coverage")
+            ordered, controls = list(zip(ids, hashes, strict=True)), {original: None}
+        else:
+            index, = [upstream[value]["artifact"] for value in preparation["inputs"]
+                      if upstream[value]["kind"] == "acquisition"
+                      and upstream[value]["dataset"] == "reference:transfer_batch_index"]
+            ordered, controls = district_batch_inputs(store, _resource(store, index, min(2 * 1024**2, resource_bytes), "Transfer index"),
+                                                     period.end_year, all_offered=True)
         artifact = preparation["outputs"]["prepared_source"]
         prepared = store.verify_artifact(artifact["sha256"])
         hashes.append(artifact["sha256"])
-        names, support, operations = _district_projection(report["columns"], fields)
+        extra = history.context if history is not None else ()
+        names, support, operations = _leaf_projection([*report["columns"], *extra], fields, grain=grain,
+                                                      year=period.end_year, extra_context=extra)
         if (ordered != list(zip(ids, hashes[:-1], strict=True)) or not set(ids) <= set(preparation["inputs"])
                 or report["status"] != "prepared" or report["year"] != period.end_year or report["grain"] != key.scope
                 or report.get("publisher_totals_computed") is not False or report.get("raw_string_readback_equal") is not True
@@ -249,6 +392,7 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
             encoding, encoding_evidence = _selected_encoding(receipt, entry["encoding"]["selected_encoding"])
             if (entry["source_input"] != number or entry["status"] != "parsed" or entry["record_id"] != claimed["record_id"]
                     or entry["artifact"] != claimed["artifact"] or annotation["layout"] != "original"
+                    or (campus and entry["region"] is not None)
                     or annotation["source_input"] != number or annotation["record_id"] != claimed["record_id"]
                     or annotation["input_sha256"] != claimed["artifact"]["sha256"]
                     or entry["encoding"] != encoding_evidence or type(entry["rows"]) is not int or entry["rows"] < 1):
@@ -277,7 +421,7 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
                   {"leaf_processing_id": ref.processing_id, "leaf_sha256": ref.sha256,
                    "prepared_sha256": hashes[-1] if prepared else None, "crosswalk_sha256": schema.reviewed_sha256,
                    "acquisitions": acquisitions}, staff_scope=key.scope if staff else None,
-                  district_types=district_types)
+                  district_types=district_types, transfer_grain=None if peims else grain, campus_history=history)
 
 
 def _wire(original: _Original, selection: _Typed, *, limit: int) -> Iterator[tuple[list[str], int, int, int, int]]:
@@ -300,7 +444,8 @@ def _wire(original: _Original, selection: _Typed, *, limit: int) -> Iterator[tup
         digest = sha256()
         if header != [field["label"] for field in selection.fields]:
             raise ValueError("PEIMS reviewed code and label headers differ")
-    titles = ["T E X A S E D U C A T I O N A G E N C Y", "Region Level Transfer Report", "PEIMS Student Transfer Report"]
+    report_scope = "Campus" if selection.transfer_grain == "campus" else "Region"
+    titles = ["T E X A S E D U C A T I O N A G E N C Y", f"{report_scope} Level Transfer Report", "PEIMS Student Transfer Report"]
     preamble: list[str] = []
     notes: list[str] = []
     found_header = footer = False
@@ -348,9 +493,9 @@ def _wire(original: _Original, selection: _Typed, *, limit: int) -> Iterator[tup
                             kind = "preamble"
                             preamble.append(title)
                             if preamble != titles[:len(preamble)]:
-                                raise ValueError("Unexpected district transfer publisher title")
+                                raise ValueError("Unexpected transfer publisher title")
                     else:
-                        raise ValueError("Unexpected district transfer preamble or header")
+                        raise ValueError("Unexpected transfer preamble or header")
                 elif len(row) == len(header) and not footer:
                     data = True
                 else:
@@ -360,7 +505,7 @@ def _wire(original: _Original, selection: _Typed, *, limit: int) -> Iterator[tup
                         kind = "footer"
                         notes.append(note)
                     if len(row) > 1 or tuple(notes) != _FOOTNOTES[:len(notes)]:
-                        raise ValueError("Unexpected district transfer publisher footnote or data after the footer")
+                        raise ValueError("Unexpected transfer publisher footnote or data after the footer")
                 if data:
                     if len(row) != len(header) or not found_header:
                         raise ValueError(f"Publisher data at CSV record {record} differs from its literal header")
@@ -370,7 +515,7 @@ def _wire(original: _Original, selection: _Typed, *, limit: int) -> Iterator[tup
                     observed = {"kind": kind, "record": record, "first_line": first_line, "last_line": last_line,
                                 "raw_sha256": sha256(lines.record).hexdigest(), "text": lines.record.decode(lines.encoding)}
                     if next(transfer_annotations, None) != observed:
-                        raise ValueError("District transfer original annotations differ from retained preparation")
+                        raise ValueError("Transfer original annotations differ from retained preparation")
         except csv.Error as error:
             raise ValueError(f"Invalid publisher CSV near physical line {reader.line_num}: {error}") from error
         if lines.digest.hexdigest() != original.sha256:
@@ -430,12 +575,35 @@ def _batch(selection: _Typed, index: int, rows: list[list[str]], positions: list
             arrays[DISTRICT_TYPE_COLUMNS[1]] = pa.array([None if code is None else code == "I" for code in codes], type=pa.bool_())
         return pa.table(arrays)
     context = [pa.array(values, type=pa.int64()) for values in zip(*positions, strict=True)]
+    grain = selection.transfer_grain
+    assert grain is not None
     source = pa.Table.from_arrays([*columns, *context],
-                                  names=[*transfer_columns("district"), *_POSITIONS])
-    source = _transfer_projection(source, grain="district", period=selection.period, policy=selection.policy,
+                                  names=[*transfer_columns(grain, year=selection.period.end_year), *_POSITIONS])
+    source = _transfer_projection(source, grain=grain, period=selection.period, policy=selection.policy,
                                   region=selection.originals[index].region, layout="original")
     return source.append_column("transfer_source_input", pa.repeat(pa.scalar(index, type=pa.int32()), len(rows)))
 
+
+def _append_historical_locators(table: pa.Table, history: _CampusHistory, seen: set[str]) -> pa.Table:
+    details = pc.equal(table["transfer_row_kind"], "detail")
+    keys = tuple(history.endpoints)
+    ids = pa.array(keys, type=pa.string())
+    records = pa.array([history.endpoints[key]["record"] for key in keys], type=pa.int64())
+    locations = []
+    for column, (campus, district, name) in zip(_HISTORICAL_FIELDS[:2], _ENDPOINTS, strict=True):
+        offsets = pc.index_in(table[campus], value_set=ids)
+        affected = table.select([campus, district, name]).filter(pc.and_(details, pc.is_valid(offsets)))
+        for row in affected.group_by([campus, district, name]).aggregate([]).to_pylist():
+            identifier = row[campus]
+            evidence = history.endpoints[identifier]
+            if row[district] != evidence["district"] or row[name].strip() != evidence["name"]:
+                raise ValueError("Campus transfer source disagrees with the recorded fall identity")
+            seen.add(identifier)
+        locator = pc.if_else(details, pc.take(records, offsets), pa.scalar(None, type=pa.int64()))
+        locations.append(locator)
+        table = table.append_column(column, locator)
+    attached = pc.or_(pc.is_valid(locations[0]), pc.is_valid(locations[1]))
+    return table.append_column(_HISTORICAL_FIELDS[2], pc.if_else(attached, history.as_of, None))
 
 class _Target:
     def __init__(self, file: pq.ParquetFile, stage: str, names: list[str], limit: int):
@@ -513,13 +681,15 @@ def compare_typed(release: DataRelease, store: ProvenanceStore, key: EditionKey,
     if selection.prepared is not None:
         paths["prepared"] = selection.prepared
         reverse = {target: source for source, target in selection.projection.items()}
-        columns["prepared"] = [reverse.get(name, name) for name in selection.names]
+        columns["prepared"] = [reverse.get(name, name) for name in selection.names
+                               if selection.campus_history is None or name not in selection.campus_history.context]
     before = {stage: path.stat() for stage, path in paths.items()}
     with ExitStack() as stack:
         targets = {stage: _Target(stack.enter_context(pq.ParquetFile(path)), stage, columns[stage], slot)
                    for stage, path in paths.items()}
         examples_left = max_examples
         total = 0
+        seen: set[str] = set()
         for index, original in enumerate(selection.originals):
             rows: list[list[str]] = []
             positions: list[tuple[int, int, int]] = []
@@ -533,6 +703,10 @@ def compare_typed(release: DataRelease, store: ProvenanceStore, key: EditionKey,
                 records = expected["transfer_source_record" if selection.prepared else "peims_source_record"].chunk(0)
                 if "prepared" in targets:
                     examples_left = targets["prepared"].compare(expected, index, records, examples_left)
+                    if selection.campus_history is not None:
+                        expected = _append_historical_locators(expected, selection.campus_history, seen)
+                        if selection.campus_history.obsolescence is not None:
+                            expected = _append_campus_obsolescence(expected, selection.campus_history.obsolescence)
                     expected = expected.rename_columns([selection.projection.get(name, name) for name in expected.column_names])
                 examples_left = targets["artifact"].compare(expected, index, records, examples_left)
                 total += len(rows)
@@ -552,6 +726,8 @@ def compare_typed(release: DataRelease, store: ProvenanceStore, key: EditionKey,
                 size += row_bytes
             if rows:
                 compare_pending()
+        if selection.campus_history is not None and seen != selection.campus_history.endpoints.keys():
+            raise ValueError("Recorded historical endpoint IDs do not all occur in publisher detail rows")
         diagnostics = {stage: target.finish() for stage, target in targets.items()}
     for stage, path in paths.items():
         initial, final = before[stage], path.stat()
@@ -561,6 +737,14 @@ def compare_typed(release: DataRelease, store: ProvenanceStore, key: EditionKey,
     if total != selection.rows:
         raise ValueError("Original publisher row count differs from the typed leaf contract")
     mismatches = sum(value["mismatches"] for fields in diagnostics.values() for value in fields.values())
+    if selection.campus_history is not None:
+        selection.lineage["historical_endpoint_evidence"] = {
+            "fall_archive_as_of": selection.campus_history.as_of,
+            "recorded_endpoint_count": len(selection.campus_history.endpoints),
+            "companion_roster_gap_requalified": False,
+        }
+        if selection.campus_history.obsolescence is not None:
+            selection.lineage["campus_obsolescence"] = selection.campus_history.obsolescence.recipe()
     return {"status": "FAIL_MISMATCH" if mismatches else "PASS_RAW_PARITY",
             "rows": total, "fields": len(selection.fields), "raw_cells": total * len(selection.fields),
             "compared_cells": sum(value["checked"] for fields in diagnostics.values() for value in fields.values()),

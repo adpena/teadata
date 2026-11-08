@@ -155,6 +155,18 @@ because normalized or projected tables cannot reproduce its source layout.
 For typed tables, exports contain public fields. Use `SourceFields.select()`
 to include available raw tokens and statuses for a district or campus.
 
+Use `release.provenance(edition_key).publisher_data_citation` for a
+copyable citation of the publisher data and exact native source artifact. The
+same citation appears in the XLSX Provenance sheet and in the companion
+workbook available through `provenance.to_excel()`. A publisher may
+revise historical data after marking it final. Keep the edition and
+artifact hash with the citation. The download date is when TEA Data
+obtained the source bytes. Publisher publication and revision dates
+describe the publisher's edition separately. Structured provenance
+and the workbook's edition acquisitions retain the exact UTC
+`downloaded_at` and the hash of each input. Unknown dates stay
+unrecorded, including for local historical files.
+
 CSV preserves literal publisher text, including text that spreadsheet apps
 may interpret as formulas. Use the XLSX export to open those values as text
 in a spreadsheet.
@@ -382,7 +394,7 @@ their serialized metadata and leaf semantic hashes remain unchanged.
 ### PEIMS Single File Financial Actuals
 
 The source-only `peims_financial_single_file_actuals` dataset catalogs the
-district and charter account archives for fiscal years ending 2023, 2024 and
+district and charter account archives for fiscal years ending 2013 through
 2025. Each year has two separate tables at district scope. The seven account
 codes form the unique row key within each table and exact source revision.
 `financial_unit_code` can identify an administrative unit, so it cannot serve
@@ -392,8 +404,8 @@ retained separately from the archive's fiscal edition.
 `actual_amount` preserves the signed, whole-dollar amount as published, with
 the raw token, observed status and CSV record number. The historical dictionary
 describes `ACTAMT` in budget terms and says zero rows are absent. The current
-publisher listing identifies the six ZIPs as actuals, and their CSVs contain
-explicit zeros. Release finality is unspecified. Reconciliation to derived
+publisher listing identifies the FY2023–FY2025 ZIPs as actuals, and their CSVs
+contain explicit zeros. Release finality is unspecified. Reconciliation to derived
 reports and signed district audits is a separate qualification step. TEA's
 listing schedules FY2026 actuals for spring 2027 and currently offers FY2026
 budgets. [TEA download listing](https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads)
@@ -409,6 +421,42 @@ Build an opt-in candidate from the exact retained archives and reference
 receipts. The writer streams each CSV into Parquet and compares every row on
 readback. Select the exact edition and project account and measure columns with
 the Arrow dataset API. The account leaves stay outside default entity hydration.
+
+For a reviewed pre-FY2023 actuals archive with unsorted keys, the packaged and
+supplied source profiles must bind the same exact archive and declare
+`key_order: publisher` for its sector. The producer keeps publisher row
+order and record numbers, checks the full account key for duplicates on the
+staged leaf, and removes its temporary DuckDB files before installation.
+An unexpected token, duplicate key or resource failure blocks the candidate.
+The FY2013 through FY2022 district and charter account archives have
+exact source profiles. The publisher's ZIP-size labels for FY2019 district
+and FY2022 charter differ from the retained files linked by that listing.
+The exact linked files can be replayed in an unpublished native candidate.
+TEA's [independently listed text exports and dictionaries](https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-multiple-file-financial-data-downloads)
+match all 4,872,439 FY2019 district account records and all 359,286 FY2022
+charter account records in those files, including their update dates after
+decoding the text date representation. The original ZIP size labels remain
+part of the evidence. Cross-report controls, longitudinal comparability,
+and public release admission are separate steps.
+
+The [PEIMS summary workbook](https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-financial-data-downloads)
+supplies 48,236 published instruction and guidance and counseling controls
+for district and charter General Fund and All Funds measures in FY2013–FY2022.
+The [annual workbooks](https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-financial-standard-reports)
+provide 28,816 overlapping controls in FY2017–FY2022. General Fund and
+charter All Funds matched directly. Every district All Funds difference
+equaled the contribution from capital-project fund 699. Applying that
+exclusion only to the comparison reproduced the published figures.
+This is an empirical result for the checked measures and editions. The
+raw account leaves retain the full fund data.
+
+For FY2014, the district archive preserves the literal `NUL` financial unit code in two
+rows for district `071902` and three for district `123910`. TEA's FY2014
+multiple-file lookup defines those district/unit pairs as No Cost Center.
+Use the edition's data-dictionary reference for the lookup and its archive
+citation for the original CSV. The charter archive uses its separate publisher
+account layout. Cross-report controls and comparisons across years require
+separate qualification. [TEA multiple-file archive listing](https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-multiple-file-financial-data-downloads)
 
 ```sh
 uv run --locked python -m teadata.scripts.refresh_peims_actuals \

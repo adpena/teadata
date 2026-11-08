@@ -28,13 +28,14 @@ or reject a missing destination.
 
 ## Common Operators
 
-- `>> ("campuses_in",)` — expand the current district query into its district-operated campuses (excludes charters and private schools)
-- `>> ("privates_within", district)` — private schools inside or on the reported district boundary (`covers`); geographic containment is separate from institutional governance, and border points can match multiple districts
+- `districts >> ("campuses_in",)` expands districts to their non-private member campuses.
+- `engine >> ("within", boundary[, charter_only[, covers]])` finds campuses geographically inside a district boundary or a WGS84 Polygon or MultiPolygon. The chained form is `districts >> ("within", None, None)`, which uses the first input district. General containment excludes boundary points unless `covers=True`.
+- `districts >> ("privates_within",)` selects private campuses inside or on reported district boundaries. The engine entry form is `engine >> ("privates_within", district)`. Geographic containment is separate from institutional governance, and border points can match multiple districts.
 - `>> ("filter", predicate)` or `>> (lambda x: ...)`
 - `>> ("sort", key_fn, descending: bool=False)`
 - `>> ("take", n)`
 - `>> ("radius", (longitude, latitude), miles)` — campuses within an inclusive great-circle distance. Radius and KNN use valid longitude and latitude coordinates.
-- `>> ("nearest_charter", coords, mile_limit, k)` — from repo-level query context
+- `>> ("nearest_charter", coords, limit, max_miles)` selects nearby charter campuses. `limit` defaults to one.
 - `first()` — take first element
 - Attribute fall-through: `Query.attr` proxies to `first().attr` for convenience.
 
@@ -42,14 +43,55 @@ or reject a missing destination.
     You can mix spatial and attribute filters easily:
     
     ```python
-    engine >> ("within", d, "campuses") >> (lambda c: c.rating in {"A","B"})
+    engine >> ("charters_within", district) >> (lambda c: c.rating in {"A", "B"})
     ```
+
+## Discover Query operators
+
+`describe_operators()` returns a versioned, JSON-ready description of the
+operators you can use after creating a `Query`. It lists names, aliases,
+supported positional forms, argument types and defaults, and result shapes.
+Read it without loading a release or constructing an engine.
+
+```python
+import json
+from teadata.query import describe_operators
+
+print(json.dumps(describe_operators(), indent=2))
+```
+
+The result has `schema_version`, `receiver`, `operators` and
+`release_methods` keys. A tuple
+form lists its arguments after the operator name. A callable form represents
+`query >> predicate`. Arguments list their supported type alternatives.
+An alternative with `python_only: true` needs a live Python value, such as
+a callable, an `EditionKey` or a `DataRelease`. `optional` means the slot
+may be omitted, and `nullable` means you can pass `None` explicitly. For
+example, the `observations` tuple requires the school year slot and accepts
+`None` there. `availability: "custom_repository"` means a Query operator
+needs a method outside the stock engine.
+
+The operator list covers Query shifts. `release_methods` describes
+`DataRelease.series()` with argument positions, types, defaults and result
+methods. The `DataEngine` entry syntax and the
+[`SourceTable.query()` expression syntax](#write-a-query-string) are separate.
+Use `release.catalog.editions()`, `release.catalog.variables()` and
+`release.observation_years()` to find datasets, fields and periods in your
+selected release.
 
 ## School years and source editions
 
+Select by ending year. `2025`, `"2025"`, `25`, `"25"`, `"2024-25"`
+and `"2024–2025"` all select 2024–25. Integers 0–99 and exactly
+two-digit strings mean 2000–2099. A four-digit string selects the
+literal year, including `"0025"` for a period ending in year 25.
+A label requires a four-digit start and a consecutive ending year.
+For example, `"1999-00"` resolves to 2000. These spellings work in
+the observation and statewide-comparison methods and tuple operators.
+
 `Query` starts from entities in the loaded snapshot. When the entity build pins
 a native source, `observations` selects its fields by measurement school year.
-Pass the ending year as an integer for an exact selection. Omit it to use the
+Pass a supported year spelling for an exact selection. Omit it to use the
 latest school year when every selected field has that same latest year and one
 edition provides them together. The result is a lazy `SourceTable`.
 
@@ -78,13 +120,109 @@ manifest, edition, artifact and measurement period.
 The same year selection works directly on a separately published native
 `DataRelease`. Filter its source keys to reach historical entities absent from
 the current snapshot. For several years, iterate the desired values from
-`observation_years` and check each edition's definitions before comparing.
+`observation_years`. To pass each year back literally, use `f"{year:04d}"`.
+Check each edition's definitions before comparing.
 Discovery and planning may read selected catalog metadata, while execution
 opens the data leaf. Online releases can fetch that metadata and the selected
 leaf into their verified cache. Offline releases require those bytes locally.
 The 2025 annual dropout edition measures school year 2024–25, even though
 TEA published it in 2026. Check field periods separately from the report
 period. See [entity build inputs](source-coverage.md) for snapshot coverage.
+
+
+## Retrieve a time series
+
+Use `release.series()` to collect several published fields across explicit
+measurement years. Pass `ids` for a fixed public district or campus cohort.
+An ID can be an integer or a string with or without an Excel apostrophe.
+District IDs are padded to six digits and campus IDs to nine. Omit both
+`ids` and `names` to read the full publisher roster.
+This example requires a release containing all three PEIMS editions.
+
+```python
+series = release.series(
+    "peims_special_education_by_primary_disability",
+    "primary_specific_learning_disability_count",
+    "primary_autism_count",
+    scope="district",
+    years=[13, "2018–19", 2022],
+    ids=[227901, "'246909"],
+)
+frame = series.to_df()
+one_year = series.for_year("2018–19")  # The same pinned SourceTable interface
+```
+
+Use `names=["Austin ISD"]` in place of `ids` for case-insensitive exact
+name selection. An entity release uses its own directory by default.
+With a native-only release, pass a specific entity release as
+`entity_release`. This opens the verified entity directory, while the
+observation tables remain lazy. Provenance identifies that directory and
+records the requested names and resolved IDs. Use the directory edition
+appropriate to your question. The directory match alone establishes no
+historical name or affiliation.
+
+Exact engine selectors `engine.district_named(name)` and
+`engine.campus_named(name)`, and the exact-name forms of
+`engine >> ("district", name)` and `engine >> ("campus", name)`, raise
+`EntitySelectionError` on a miss or on multiple exact matches.
+`error.to_dict()` returns a reason and candidate names with IDs. The exception message
+shows up to five name and ID pairs. Structured ambiguity errors retain
+all exact matches. Suggestions account for common punctuation and word-order
+differences, preserve numbered names, and leave the original labels intact.
+Use a wildcard for a search that can return several matches. A valid absent
+numeric ID still yields an empty engine query.
+
+Source fields in `observations()`, `observation_years()` and `series()`
+accept case-insensitive names. Observation tables and series preserve the
+canonical spelling. The `observation_years()` dictionary keys preserve
+the requested spelling. Selection errors distinguish an unknown field from a field that is
+unavailable for the requested school year. Suggested spellings are advisory.
+A series requires the same canonical field in each selected edition.
+Renamed fields need a reviewed mapping that accounts for changes in method,
+population and denominator.
+
+The output adds `measurement_school_year` and retains each source's key,
+raw values, and status columns. It preserves year order and publisher row
+order within each year. An ID with no published row for a year remains
+part of the requested cohort in provenance. Edition-specific context
+columns are null where the source lacks them. Select compatible
+field types, source grain, and value support across years. A requested year with unavailable
+fields or multiple revisions raises with the available choices. Pass
+`editions={2019: key}` to pin a revision for that year.
+
+`iter_batches()` scans the selected source leaves one year at a time.
+`to_arrow()` and `to_df()` collect the selected data. The Arrow schema
+metadata and DataFrame attrs carry `teadata_provenance`, including the
+pinned source, period and selection for each year. Call `provenance()`
+to inspect that record before opening data leaves. Use
+`release.observation_years()` to discover field coverage and
+`describe_operators()["release_methods"]` for the input contract.
+Format discovered years as four digits when passing them back literally.
+Review publisher
+definitions and historical identity before calculating changes.
+
+## Align two years by public ID
+
+Use `series.pair_years(from_year=13, to_year=2022)` to align two years
+already in the series. Both editions must publish one row per district or
+campus for the selected year. The returned plan exposes `schema` and
+`provenance()` before it opens data. Call `to_arrow()` or `to_df()` to
+read the two endpoints.
+
+The output retains both publishers' raw values and key columns, plus any
+status columns the source provides, with `from_` and `to_` prefixes. The leading district or campus number is
+the normalized alignment key. The two presence flags distinguish an
+absent row from a published row with suppressed or missing values. A
+requested ID remains in the output even when absent from both years.
+Without an ID or name cohort, the output is the sorted union of the two
+publisher rosters.
+
+Alignment keeps source editions pinned. It checks both complete endpoint
+projections for duplicate canonical IDs before selecting the cohort. When
+a publisher has a physical `school_year` key, the supported spelling is the
+bound full period, such as `2021-2022`. Pairing makes no determination about
+historical entity continuity or whether changes in the measure are
+comparable. Inspect both source definitions before calculating change.
 
 ## Select an entity's published source fields
 
@@ -206,6 +344,17 @@ only with trusted expressions on that DataFrame because it can execute Python co
 the exact local source edition. Results retain both edition identities, the
 measurement period, raw tokens, value statuses and numeric values. A percent
 comparison exposes its difference in percentage points as `difference_pp`.
+
+Pass `school_year=2025` to select measurements for 2024–25 within the
+pinned editions. A wildcard selects the reviewed metrics for that year.
+A named metric must cover that same school year. An unavailable year
+raises `ContractError` before the comparison reads observation data.
+Omit the year or pass `None` to keep the reviewed periods of the selected
+metrics. The tuple form accepts the year after the dimensions argument.
+
+```python
+result = districts >> ("compare_statewide", release, local, texas, "*", None, 2025)
+```
 
 Prepared [2026 TPRS student bundles](config.md#selected-2026-tprs-student-membership-and-enrollment-reports)
 use this same interface for all 168 reviewed Membership/Enrollment count and
@@ -361,3 +510,20 @@ missing values and unavailable entities retain their individual statuses.
 Observed zero is numeric. A difference is available when both rates are
 observed. The population is the STAAR accountability subset described by
 [TEA's TPRS guidance](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/texas-performance-reporting-system).
+
+## Look up names in a dated AskTED directory
+
+The [offline archive reader](spatial.md#archived-administrative-geography)
+accepts a pinned receipt and season. It resolves names case-insensitively
+within that directory. An ambiguous or suggested name reports its ID
+and, where the selected edition has a single usable value, its site city
+and administrative county.
+
+Pass other verified directories explicitly as `aliases_from` to search
+names observed in those editions as well. Results retain the exact names,
+source receipts and record numbers. Repeated occurrences for one ID are
+one candidate. A name used by different IDs remains ambiguous.
+Place labels come from the selected directory. A historical ID absent
+from that directory has no inferred city or county. Resolve names or
+cohorts first, then pass the IDs explicitly to `series()` for the desired
+performance-report periods.

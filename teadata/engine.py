@@ -13,20 +13,21 @@ import fnmatch
 import gzip
 import logging
 import math
+from numbers import Integral
 import os
 import pickle
+import re
 import sys
 import time
 import uuid
+
+from shapely.geometry import MultiPolygon as PolygonCollection, Polygon
 
 from .manifest import ContractError, DatasetCatalog, read_sqlite_catalog
 from .identifiers import EntityIdentityError, canonical_source_identifier
 from .release import current_release, snapshot_build_id
 from .boundary_store import BoundaryStore
 from teadata.identifiers import normalize_campus_lookup_key
-from teadata.teadata_config import (
-    normalize_district_number_value,
-)
 
 from .entities import (
     Campus,
@@ -47,15 +48,18 @@ from .geometry import (
     district_boundary_issue,
     euclidean,
     haversine_miles,
-    point_in_polygon,
     point_xy,
     probably_lonlat,
 )
-from .query import Query, unwrap_query
+from .query import Query, _validate_within_flags, unwrap_query
+from .selectors import _live_name
 
 if TYPE_CHECKING:
     from .observations import _ObservationModel
     from .release import DataRelease
+
+_NUMBER_SELECTOR = re.compile(r"'?\s*[0-9]+(?:\.0+)?")
+_DISTRICT_SELECTOR = re.compile(r"['’`]?\s*[0-9]+(?:\.0+|-[0-9]{3})?")
 
 GZIP_MAGIC = b"\x1f\x8b"
 
@@ -354,7 +358,6 @@ class _SphericalCampusIndex:
 class _CampusSpatialCaches:
     geodesic: dict[bool, _SphericalCampusIndex] | None = None
     by_school_type: dict[str, _SphericalCampusIndex] | None = None
-    bounding_box: tuple[Any, list[Campus]] | None = None
     containment: tuple[Any, list[Campus]] | None = None
 
 
@@ -477,18 +480,8 @@ class DataEngine:
         self._boundary_store = None
         self._boundary_store_path = None
 
-        # Fast name lookups (lowercase exact match)
-        self._district_by_name_lower: Dict[str, uuid.UUID] = {}
-        self._campus_by_name_lower: Dict[str, uuid.UUID] = {}
         self._districts_by_number_norm: dict[str, uuid.UUID] = {}
         self._campus_by_key: dict[str, uuid.UUID] = {}
-        self._districts_by_name_lower_multi: Dict[str, List[uuid.UUID]] = {}
-        self._campuses_by_name_lower_multi: Dict[str, List[uuid.UUID]] = {}
-        self._district_name_upper_index: List[Tuple[str, uuid.UUID]] = []
-        self._campus_name_upper_index: List[Tuple[str, uuid.UUID]] = []
-        self._district_wildcard_cache: Dict[str, Tuple[int, List[uuid.UUID]]] = {}
-        self._campus_wildcard_cache: Dict[str, Tuple[int, List[uuid.UUID]]] = {}
-        self._name_lookup_version = 0
 
         if eager_indexes and self._indexes_enabled:
             try:
@@ -513,10 +506,6 @@ class DataEngine:
         except Exception:
             pass
         try:
-            self._ensure_all_xy_arrays()
-        except Exception:
-            pass
-        try:
             self._ensure_charter_cache()
         except Exception:
             pass
@@ -532,16 +521,6 @@ class DataEngine:
         self._clear_spatial_indexes()
 
         # Keep identity indexes available to validate inserts even with caches cleared.
-        self._campus_by_name_lower = {}
-        self._district_by_name_lower = {}
-        self._districts_by_name_lower_multi = {}
-        self._campuses_by_name_lower_multi = {}
-        self._district_name_upper_index = []
-        self._campus_name_upper_index = []
-        self._district_wildcard_cache = {}
-        self._campus_wildcard_cache = {}
-        self._name_lookup_version = getattr(self, "_name_lookup_version", 0) + 1
-
         if self._boundary_store:
             self._boundary_store.close()
 
@@ -566,46 +545,30 @@ class DataEngine:
 
     # --- Convenience name lookups ---
     def district_by_name(self, name: str) -> Optional["District"]:
-        """
-        Case-insensitive exact match for district name.
-        Returns the first match or None.
-        """
-        target = (name or "").strip().lower()
+        """Return the first case-insensitive exact match, or None."""
+        target = (name or "").strip().casefold()
         if not target:
             return None
-        try:
-            did = self._district_by_name_lower.get(target)
-            if did is not None:
-                hit = self._districts.get(did)
-                if hit is not None:
-                    return hit
-        except Exception:
-            pass
-        for d in self._districts.values():
-            if d.name.lower() == target:
-                return d
-        return None
+        return next((item for item in self._districts.values()
+                     if (item.name or "").strip().casefold() == target), None)
 
     def campus_by_name(self, name: str) -> Optional["Campus"]:
-        """
-        Case-insensitive exact match for campus name.
-        Returns the first match or None.
-        """
-        target = (name or "").strip().lower()
+        """Return the first case-insensitive exact match, or None."""
+        target = (name or "").strip().casefold()
         if not target:
             return None
-        try:
-            cid = self._campus_by_name_lower.get(target)
-            if cid is not None:
-                hit = self._campuses.get(cid)
-                if hit is not None:
-                    return hit
-        except Exception:
-            pass
-        for c in self._campuses.values():
-            if c.name.lower() == target:
-                return c
-        return None
+        return next((item for item in self._campuses.values()
+                     if (item.name or "").strip().casefold() == target), None)
+
+    def district_named(self, name: str) -> District:
+        """Select exactly one stored district name, with actionable errors."""
+        return _live_name(name, "district", self._districts.values(), label=lambda item: item.name or "",
+                          identifier=lambda item: item.district_number_canon or str(item.id))
+
+    def campus_named(self, name: str) -> Campus:
+        """Select exactly one stored campus name, with actionable errors."""
+        return _live_name(name, "campus", self._campuses.values(), label=lambda item: item.name or "",
+                          identifier=lambda item: item.lookup_key or str(item.id))
 
     def campus_by_key(self, lookup_key: str | None) -> Optional["Campus"]:
         """Find a public TEA campus or a source-qualified private school."""
@@ -696,6 +659,9 @@ class DataEngine:
              -> Query[District] (chainable; use >> "campuses_in" etc)
              Note: "district" returns a Query[District]. Most repo methods accept Query inputs by unwrapping the first item.
 
+             repo >> ("within", district)
+             -> Query[Campus]
+
              repo >> ("charters_within", district)
              -> Query[Campus]
 
@@ -715,70 +681,29 @@ class DataEngine:
             if key == "district":
                 raw = query[1]
 
-                # 1) District-number lookup if the input looks number-ish (int or contains any digit)
-                if isinstance(raw, int) or (
-                    isinstance(raw, str) and any(ch.isdigit() for ch in raw)
+                if isinstance(raw, Integral) or (
+                    isinstance(raw, str) and _DISTRICT_SELECTOR.fullmatch(raw.strip())
                 ):
-                    hits: List[District] = []
-                    norm = normalize_district_number_value(raw)
-                    if norm and (did := self._districts_by_number_norm.get(norm)) is not None:
-                        hits = [self._districts[did]]
-                    return Query(hits, self)
+                    # Retain legacy district selectors with a campus suffix or Excel punctuation.
+                    value = raw.strip().lstrip("’`").partition("-")[0] if isinstance(raw, str) else raw
+                    try:
+                        norm = canonical_source_identifier(value, width=6)
+                    except ValueError:
+                        raise ValueError(f"Invalid district number {raw!r}. Use up to six digits, such as '011901'.") from None
+                    did = self._districts_by_number_norm.get(norm[1:]) if norm is not None else None
+                    return Query([self._districts[did]] if did is not None else [], self)
 
                 # 2) Name lookup (supports wildcards); case-insensitive
-                target = (str(raw) if raw is not None else "").strip()
-                if not target:
-                    return Query([], self)
+                if not isinstance(raw, str) or not raw.strip():
+                    raise ValueError("Select a nonblank district name or use its ID.")
+                target = raw.strip()
 
                 # Allow SQL-like '%' and '_' or glob '*' and '?'
-                pattern = target.replace("%", "*").replace("_", "?")
-                pattern_up = pattern.upper()
-                has_glob = any(ch in pattern_up for ch in ("*", "?"))
-
-                matches: List[District] = []
-                if has_glob:
-                    index = getattr(self, "_district_name_upper_index", None)
-                    cache = getattr(self, "_district_wildcard_cache", {})
-                    version = getattr(self, "_name_lookup_version", 0)
-                    ids: List[uuid.UUID] | None = None
-                    cached = cache.get(pattern_up)
-                    if cached and cached[0] == version:
-                        ids = list(cached[1])
-                    if ids is None:
-                        if index:
-                            ids = [
-                                did
-                                for name_up, did in index
-                                if fnmatch.fnmatchcase(name_up, pattern_up)
-                            ]
-                        else:
-                            ids = [
-                                d.id
-                                for d in self._districts.values()
-                                if fnmatch.fnmatchcase(
-                                    (d.name or "").upper(), pattern_up
-                                )
-                            ]
-                        cache[pattern_up] = (version, list(ids))
-                    matches = [
-                        self._districts[did] for did in ids if did in self._districts
-                    ]
-                else:
-                    key_lower = target.lower()
-                    multi = getattr(self, "_districts_by_name_lower_multi", None)
-                    if multi:
-                        ids = multi.get(key_lower, [])
-                        matches = [
-                            self._districts[did]
-                            for did in ids
-                            if did in self._districts
-                        ]
-                    else:
-                        for d in self._districts.values():
-                            if (d.name or "").upper() == pattern_up:
-                                matches.append(d)
-
-                return Query(matches, self)
+                pattern = target.casefold().replace("%", "*").replace("_", "?")
+                if "*" in pattern or "?" in pattern:
+                    return Query([item for item in self._districts.values()
+                                  if fnmatch.fnmatchcase((item.name or "").casefold(), pattern)], self)
+                return Query([self.district_named(target)], self)
 
             if key == "campus":
                 raw = query[1]
@@ -787,62 +712,25 @@ class DataEngine:
                     campus = self.campus_by_key(raw)
                     return Query([campus] if campus is not None else [], self)
 
-                if isinstance(raw, int) or (
-                    isinstance(raw, str) and any(ch.isdigit() for ch in raw)
+                if isinstance(raw, Integral) or (
+                    isinstance(raw, str) and _NUMBER_SELECTOR.fullmatch(raw.strip())
                 ):
-                    campus = self.campus_by_number(raw)
+                    try:
+                        norm = canonical_source_identifier(raw, width=9)
+                    except ValueError:
+                        raise ValueError(f"Invalid campus number {raw!r}. Use up to nine digits, such as '011901001'.") from None
+                    campus = self.campus_by_number(norm)
                     return Query([campus] if campus is not None else [], self)
 
-                target = (str(raw) if raw is not None else "").strip()
-                if not target:
-                    return Query([], self)
+                if not isinstance(raw, str) or not raw.strip():
+                    raise ValueError("Select a nonblank campus name or use its ID.")
+                target = raw.strip()
 
-                pattern = target.replace("%", "*").replace("_", "?")
-                pattern_up = pattern.upper()
-                has_glob = any(ch in pattern_up for ch in ("*", "?"))
-
-                matches: List[Campus] = []
-                if has_glob:
-                    index = getattr(self, "_campus_name_upper_index", None)
-                    cache = getattr(self, "_campus_wildcard_cache", {})
-                    version = getattr(self, "_name_lookup_version", 0)
-                    ids: List[uuid.UUID] | None = None
-                    cached = cache.get(pattern_up)
-                    if cached and cached[0] == version:
-                        ids = list(cached[1])
-                    if ids is None:
-                        if index:
-                            ids = [
-                                cid
-                                for name_up, cid in index
-                                if fnmatch.fnmatchcase(name_up, pattern_up)
-                            ]
-                        else:
-                            ids = [
-                                c.id
-                                for c in self._campuses.values()
-                                if fnmatch.fnmatchcase(
-                                    (c.name or "").upper(), pattern_up
-                                )
-                            ]
-                        cache[pattern_up] = (version, list(ids))
-                    matches = [
-                        self._campuses[cid] for cid in ids if cid in self._campuses
-                    ]
-                else:
-                    key_lower = target.lower()
-                    multi = getattr(self, "_campuses_by_name_lower_multi", None)
-                    if multi:
-                        ids = multi.get(key_lower, [])
-                        matches = [
-                            self._campuses[cid] for cid in ids if cid in self._campuses
-                        ]
-                    else:
-                        for c in self._campuses.values():
-                            if (c.name or "").upper() == pattern_up:
-                                matches.append(c)
-
-                return Query(matches, self)
+                pattern = target.casefold().replace("%", "*").replace("_", "?")
+                if "*" in pattern or "?" in pattern:
+                    return Query([item for item in self._campuses.values()
+                                  if fnmatch.fnmatchcase((item.name or "").casefold(), pattern)], self)
+                return Query([self.campus_named(target)], self)
 
             if key == "campuses_in":
                 # Accept a District instance or a Query[District]; unwrap if needed
@@ -850,6 +738,15 @@ class DataEngine:
                 if district is None:
                     return Query([], self)
                 return Query(self.campuses_in(district), self)
+
+            if key == "within":
+                if len(query) > 4:
+                    raise ValueError("within expects a boundary and up to two optional flags")
+                charter_only = query[2] if len(query) >= 3 else False
+                covers = query[3] if len(query) == 4 else False
+                if isinstance(charter_only, str) and charter_only == "campuses":
+                    charter_only = False
+                return Query(self.campuses_within(query[1], charter_only=charter_only, covers=covers), self)
 
             if key == "charters_within":
                 district = unwrap_query(query[1])
@@ -1068,9 +965,13 @@ class DataEngine:
             caches = self._campus_spatial_caches = _CampusSpatialCaches()
         return caches
 
-    def _drop_legacy_spatial_indexes(self) -> None:
+    def _drop_legacy_indexes(self) -> None:
         # Old pickles can still contain these derived attributes.
         for attr in (
+            "_district_by_name_lower", "_campus_by_name_lower",
+            "_districts_by_name_lower_multi", "_campuses_by_name_lower_multi",
+            "_district_name_upper_index", "_campus_name_upper_index",
+            "_district_wildcard_cache", "_campus_wildcard_cache", "_name_lookup_version",
             "_charter_cache",
             "_all_xy_np",
             "_kdtree",
@@ -1149,52 +1050,7 @@ class DataEngine:
             if c.district_id in self._districts:
                 self._campuses_by_district[c.district_id].append(c.id)
         self._clear_spatial_indexes()
-        self._drop_legacy_spatial_indexes()
-
-        # Rebuild name indexes separately from the entity identity constraint.
-        try:
-            self._campus_by_name_lower = {}
-            self._district_by_name_lower = {}
-            self._districts_by_name_lower_multi = {}
-            self._campuses_by_name_lower_multi = {}
-            self._district_name_upper_index = []
-            self._campus_name_upper_index = []
-            self._district_wildcard_cache = {}
-            self._campus_wildcard_cache = {}
-            self._name_lookup_version = getattr(self, "_name_lookup_version", 0) + 1
-            for did, d in self._districts.items():
-                dname = d.name or ""
-                key = dname.lower()
-                if key:
-                    ikey = sys.intern(key)
-                    if ikey not in self._district_by_name_lower:
-                        self._district_by_name_lower[ikey] = did
-                    self._districts_by_name_lower_multi.setdefault(ikey, []).append(did)
-                    self._district_name_upper_index.append((dname.upper(), did))
-            for cid, c in self._campuses.items():
-                cname = c.name or ""
-                name_key = cname.lower()
-                if name_key:
-                    iname_key = sys.intern(name_key)
-                    if iname_key not in self._campus_by_name_lower:
-                        self._campus_by_name_lower[iname_key] = cid
-                    self._campuses_by_name_lower_multi.setdefault(iname_key, []).append(
-                        cid
-                    )
-                    self._campus_name_upper_index.append((cname.upper(), cid))
-        except (ValueError, TypeError, AttributeError):
-            raise
-        except Exception:
-            logger.exception("Unable to rebuild entity name indexes")
-            self._campus_by_name_lower = {}
-            self._district_by_name_lower = {}
-            self._districts_by_name_lower_multi = {}
-            self._campuses_by_name_lower_multi = {}
-            self._district_name_upper_index = []
-            self._campus_name_upper_index = []
-            self._district_wildcard_cache = {}
-            self._campus_wildcard_cache = {}
-            self._name_lookup_version = getattr(self, "_name_lookup_version", 0) + 1
+        self._drop_legacy_indexes()
 
         if not hasattr(self, "_xfers_missing"):
             self._xfers_missing = {"src": 0, "dst": 0, "either": 0}
@@ -1204,8 +1060,9 @@ class DataEngine:
         ENABLE_PROFILING = bool(on)
 
     def _ensure_point_strtree(self) -> tuple[Any, list[Campus]] | None:
-        if not self._indexes_enabled or not SHAPELY:
+        if not self._indexes_enabled or not SHAPELY or ShapelyPoint is None:
             return None
+        point_type = ShapelyPoint
         caches = self._spatial_caches()
         if caches.containment is None:
             from shapely.strtree import STRtree
@@ -1216,7 +1073,8 @@ class DataEngine:
                 if point is not None:
                     campuses.append(campus)
                     geometry = campus.point
-                    points.append(geometry if isinstance(geometry, ShapelyPoint) else ShapelyPoint(*point))
+                    points.append(geometry if isinstance(geometry, point_type) and point_xy(geometry) == point
+                                  else point_type(*point))
             if campuses:
                 caches.containment = STRtree(points), campuses
         return caches.containment
@@ -1246,84 +1104,6 @@ class DataEngine:
             if entries and all(probably_lonlat(*point) for _, point in entries)
         }
         return caches.geodesic
-
-    def _ensure_all_xy_arrays(self) -> tuple[Any, list[Campus]] | None:
-        if not self._indexes_enabled:
-            return None
-        caches = self._spatial_caches()
-        if caches.bounding_box is None:
-            import numpy as np
-
-            campuses, points = [], []
-            for campus in tuple(self._campuses.values()):
-                point = _campus_point(campus)
-                if point is not None:
-                    campuses.append(campus)
-                    points.append(point)
-            if campuses:
-                caches.bounding_box = np.array(points, dtype=float), campuses
-        return caches.bounding_box
-
-    @staticmethod
-    def _extract_polygon_coords(poly) -> List[Tuple[float, float]]:
-        """Return a cleaned list of (x, y) vertices for non-Shapely polygons."""
-
-        try:
-            coords = list(poly)
-        except TypeError:
-            return []
-
-        cleaned: List[Tuple[float, float]] = []
-        for pt in coords:
-            if (
-                isinstance(pt, (tuple, list))
-                and len(pt) == 2
-                and all(isinstance(v, (int, float)) for v in pt)
-            ):
-                cleaned.append((float(pt[0]), float(pt[1])))
-        return cleaned
-
-    def _bbox_candidates(self, poly) -> List[Campus]:
-        """Return campuses whose points fall within the polygon's axis-aligned bounding box."""
-        if not SHAPELY or not getattr(self, "_indexes_enabled", True):
-            # Fallback: simple Python loop without NumPy
-            if hasattr(poly, "bounds"):
-                minx, miny, maxx, maxy = poly.bounds
-            else:
-                coords = self._extract_polygon_coords(poly)
-                if not coords:
-                    return []
-                xs = [pt[0] for pt in coords]
-                ys = [pt[1] for pt in coords]
-                minx = min(xs)
-                maxx = max(xs)
-                miny = min(ys)
-                maxy = max(ys)
-            if minx is None:
-                return []
-            out = []
-            for c in self._campuses.values():
-                p = getattr(c, "point", None) or getattr(c, "location", None)
-                if p is None:
-                    continue
-                xy = point_xy(p)
-                if xy is None:
-                    continue
-                x, y = xy
-                if (minx <= x <= maxx) and (miny <= y <= maxy):
-                    out.append(c)
-            return out
-
-        # NumPy fast path
-        index = self._ensure_all_xy_arrays()
-        if index is None:
-            return []
-
-        points, campuses = index
-        minx, miny, maxx, maxy = poly.bounds
-        xs, ys = points.T
-        mask = (xs >= minx) & (xs <= maxx) & (ys >= miny) & (ys <= maxy)
-        return [campuses[i] for i in mask.nonzero()[0]]
 
     def _nearby_campuses(
         self,
@@ -1523,25 +1303,6 @@ class DataEngine:
         if not self._add_entity(d, self._districts, self._districts_by_number_norm):
             return
         self._district_cover_index = None
-        if not self._in_bulk:
-            if not hasattr(self, "_district_by_name_lower"):
-                self._district_by_name_lower = {}
-            if not hasattr(self, "_districts_by_name_lower_multi"):
-                self._districts_by_name_lower_multi = {}
-            if not hasattr(self, "_district_name_upper_index"):
-                self._district_name_upper_index = []
-            if not hasattr(self, "_district_wildcard_cache"):
-                self._district_wildcard_cache = {}
-            if not hasattr(self, "_name_lookup_version"):
-                self._name_lookup_version = 0
-            key = (d.name or "").lower()
-            if key and key not in self._district_by_name_lower:
-                self._district_by_name_lower[key] = d.id
-            if key:
-                self._districts_by_name_lower_multi.setdefault(key, []).append(d.id)
-                self._district_name_upper_index.append(((d.name or "").upper(), d.id))
-            self._district_wildcard_cache = {}
-            self._name_lookup_version += 1
 
     def add_campus(self, c: Campus) -> None:
         if not isinstance(c, Campus):
@@ -1549,28 +1310,8 @@ class DataEngine:
         if not self._add_entity(c, self._campuses, self._campus_by_key):
             return
         self._clear_spatial_indexes()
-        # Only append to _campuses_by_district if the district exists
-        if not self._in_bulk:
-            if c.district_id in self._districts:
-                self._campuses_by_district[c.district_id].append(c.id)
-            if not hasattr(self, "_campus_by_name_lower"):
-                self._campus_by_name_lower = {}
-            if not hasattr(self, "_campuses_by_name_lower_multi"):
-                self._campuses_by_name_lower_multi = {}
-            if not hasattr(self, "_campus_name_upper_index"):
-                self._campus_name_upper_index = []
-            if not hasattr(self, "_campus_wildcard_cache"):
-                self._campus_wildcard_cache = {}
-            if not hasattr(self, "_name_lookup_version"):
-                self._name_lookup_version = 0
-            key = (c.name or "").lower()
-            if key and key not in self._campus_by_name_lower:
-                self._campus_by_name_lower[key] = c.id
-            if key:
-                self._campuses_by_name_lower_multi.setdefault(key, []).append(c.id)
-                self._campus_name_upper_index.append(((c.name or "").upper(), c.id))
-            self._campus_wildcard_cache = {}
-            self._name_lookup_version += 1
+        if not self._in_bulk and c.district_id in self._districts:
+            self._campuses_by_district[c.district_id].append(c.id)
 
     def campuses_in(self, d: Any) -> "EntityList":
         """
@@ -1590,125 +1331,77 @@ class DataEngine:
         return EntityList([c for c in campuses if not is_private(c)])
 
 
+    def campuses_within(
+        self,
+        boundary: District | Query | Polygon | PolygonCollection,
+        *,
+        charter_only: bool = False,
+        covers: bool = False,
+    ) -> list[Campus]:
+        """Find campuses in a WGS84 district or polygon, independently of governance.
+
+        By default points on the boundary are excluded. Set covers=True to include
+        them. Charter-only results exclude private schools.
+        """
+        _validate_within_flags(charter_only, covers)
+        target = unwrap_query(boundary)
+        if target is None:
+            raise ValueError("campuses_within requires a district or polygon")
+        return self._campuses_within_filtered(
+            target,
+            predicate=(lambda campus: is_charter(campus) and not is_private(campus)) if charter_only else None,
+            label="campuses_within",
+            covers=covers,
+        )
+
     def _campuses_within_filtered(
         self,
-        district: Any,
+        target: object,
         *,
-        predicate: Callable[["Campus"], bool],
+        predicate: Callable[[Campus], bool] | None,
         label: str,
-    ) -> List[Campus]:
-        district = unwrap_query(district)
-        if district is None:
+        covers: bool,
+    ) -> list[Campus]:
+        boundary = unwrap_query(target)
+        if boundary is None:
             return []
+        if not SHAPELY or ShapelyPoint is None or ShapelyPolygon is None or MultiPolygon is None:
+            raise RuntimeError("Geographic containment requires Shapely")
+        point_type = ShapelyPoint
 
-        poly = self.ensure_boundary(district, required=True, context=label)
-        if poly is None:
-            return []
-
-        # Quick AABB prefilter (NumPy) to cut the candidate set; then exact covers
-        if SHAPELY and hasattr(poly, "bounds"):
-            bbox_cands = self._bbox_candidates(poly)
-            if bbox_cands:
-                prep = getattr(district, "prepared", None) if poly is getattr(district, "polygon", None) else None
-                out_bb: List[Campus] = []
-                for c in bbox_cands:
-                    try:
-                        if not predicate(c):
-                            continue
-                    except Exception:
-                        continue
-                    p = getattr(c, "point", None) or getattr(c, "location", None)
-                    if p is None:
-                        continue
-                    try:
-                        inside = prep.covers(p) if prep is not None else poly.covers(p)
-                    except Exception:
-                        inside = False
-                    if inside:
-                        out_bb.append(c)
-                if out_bb:
-                    return out_bb
-
-        # STRtree (Shapely 2.x) fast path using indices
-        if SHAPELY and getattr(self, "_indexes_enabled", True):
-            index = self._ensure_point_strtree()
-            if index is not None:
-                tree, campuses = index
+        if isinstance(boundary, District):
+            polygon = self.ensure_boundary(boundary, required=True, context=label)
+            if isinstance(polygon, (list, tuple)):
                 try:
-                    idxs = tree.query(poly, predicate="covers")
-                    # Some builds return (geoms, idxs) if return_geometry=True sneaks in; normalize:
-                    if isinstance(idxs, tuple):
-                        _, idxs = idxs
-                    idxs = list(map(int, idxs)) if idxs is not None else []
-                except TypeError:
-                    # Old API; fall back to slow scan
-                    idxs = []
-                except Exception:
-                    idxs = []
+                    polygon = ShapelyPolygon(polygon)
+                except (TypeError, ValueError) as error:
+                    raise ValueError(f"Cannot use boundary for {boundary.district_number}: {error}") from error
+                if issue := district_boundary_issue(polygon):
+                    raise ValueError(f"Cannot use boundary for {boundary.district_number}: {issue}")
+        elif isinstance(boundary, (ShapelyPolygon, MultiPolygon)):
+            polygon = boundary
+            if issue := district_boundary_issue(polygon):
+                raise ValueError(f"Cannot use containment polygon: {issue}")
+        else:
+            raise ValueError("Geographic containment requires a district or polygon")
 
-                if idxs:
-                    prep = getattr(district, "prepared", None)
-                    out: List[Campus] = []
-                    for i in idxs:
-                        c = campuses[i]
-                        try:
-                            if not predicate(c):
-                                continue
-                        except Exception:
-                            continue
-                        p = getattr(c, "point", None) or getattr(c, "location", None)
-                        if p is None:
-                            continue
-                        try:
-                            inside = (
-                                prep.covers(p) if prep is not None else poly.covers(p)
-                            )
-                        except Exception:
-                            inside = False
-                        if inside:
-                            out.append(c)
-                    if out:
-                        return out
+        if not isinstance(polygon, (ShapelyPolygon, MultiPolygon)):
+            raise ValueError("District boundary is not a polygon")
+        if index := self._ensure_point_strtree():
+            tree, campuses = index
+            indices = sorted(tree.query(polygon, predicate="covers" if covers else "contains"))
+            return [campuses[i] for i in indices if predicate is None or predicate(campuses[i])]
 
-        # Final robust fallback: exact scan
-        slow: List[Campus] = []
-        poly_coords: Optional[List[Tuple[float, float]]] = None
-        for c in self._campuses.values():
-            try:
-                if not predicate(c):
-                    continue
-            except Exception:
-                continue
-            p = getattr(c, "point", None) or getattr(c, "location", None)
-            if p is None:
-                continue
-            inside = False
-            if SHAPELY and hasattr(poly, "covers"):
-                try:
-                    inside = poly.covers(p)
-                except Exception:
-                    inside = False
-            if not inside:
-                if poly_coords is None:
-                    poly_coords = self._extract_polygon_coords(poly)
-                if poly_coords:
-                    xy = point_xy(p)
-                    if xy is not None:
-                        try:
-                            inside = point_in_polygon(xy, poly_coords)
-                        except Exception:
-                            inside = False
-            if inside:
-                slow.append(c)
+        from shapely.prepared import prep
 
-        if ENABLE_PROFILING:
-            try:
-                print(
-                    f"[sanity] {label} fast=0 slow={len(slow)} — using {'slow' if slow else 'fast'} path"
-                )
-            except Exception:
-                pass
-        return slow
+        prepared = prep(polygon)
+        contains = prepared.covers if covers else prepared.contains
+        return [
+            campus for campus in self._campuses.values()
+            if (predicate is None or predicate(campus))
+            and (point := _campus_point(campus)) is not None
+            and contains(point_type(*point))
+        ]
 
     def charter_campuses_within(self, district: Any):
         """
@@ -1720,8 +1413,9 @@ class DataEngine:
 
         return self._campuses_within_filtered(
             district,
-            predicate=is_charter,
+            predicate=lambda campus: is_charter(campus) and not is_private(campus),
             label="charter_campuses_within",
+            covers=True,
         )
 
     def _districts_covering(self, campus: "Campus") -> "EntityList":
@@ -1764,6 +1458,7 @@ class DataEngine:
             district,
             predicate=is_private,
             label="private_campuses_within",
+            covers=True,
         )
 
     # ---------------- Transfers enrichment (campus->campus edges) ----------------

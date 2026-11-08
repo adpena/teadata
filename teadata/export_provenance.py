@@ -129,6 +129,34 @@ def describe_export(release: DataRelease, artifact: ArtifactRef, fields: tuple[s
                                             "citation": citation(release).text}))
 
 
+def _download_summary(acquisitions: list[dict[str, Any]]) -> str:
+    days = sorted({row["downloaded_at"][:10] for row in acquisitions
+                   if row["method"] == "download" and row["downloaded_at"]})
+    if not days:
+        return "Download date unrecorded."
+    if len(days) == 1:
+        summary = f"Downloaded {days[0]} UTC."
+    else:
+        summary = f"Downloaded {days[0]} through {days[-1]} UTC ({len(days)} observed dates)."
+    if any(row["method"] != "download" or not row["downloaded_at"] for row in acquisitions):
+        summary += " Some input download dates are unrecorded."
+    return summary
+
+
+def _publisher_data_citation(document: dict[str, Any], download_summary: str) -> str:
+    source, edition = document["source"], document["edition"]
+    title = source["title"] or edition["dataset"]
+    segments = [f"{title} ({edition['edition']}, {edition['scope']}) [Data set]."]
+    if source["publisher"]:
+        segments.insert(0, f"{source['publisher']}.")
+    if source["revised_at"]:
+        segments.append(f"Publisher revision {source['revised_at']}.")
+    if url := source["url"] or source["download_url"]:
+        segments.append(url)
+    segments.extend((download_summary, f"Artifact SHA-256 {document['artifact']['sha256']}."))
+    return " ".join(segments)
+
+
 @dataclass(frozen=True, slots=True)
 class ExportProvenance:
     """A detached export description, independent of how the rows are written."""
@@ -138,6 +166,12 @@ class ExportProvenance:
     def to_dict(self) -> dict[str, Any]:
         """Return a fresh JSON-compatible representation of the export selection."""
         return json.loads(self._json)
+
+    @property
+    def publisher_data_citation(self) -> str:
+        """Cite the publisher edition, exact artifact and known UTC download dates."""
+        document = self.to_dict()
+        return _publisher_data_citation(document, _download_summary(document["edition_acquisitions"]))
 
     def to_excel(self, path_or_buf: str | Path | BinaryIO) -> None:
         """Write the same Provenance worksheet as a standalone companion workbook."""
@@ -196,6 +230,9 @@ class ExportProvenance:
         if rows is not None:
             append(("Rows exported", rows))
         append(("Citation", document["citation"]))
+        download_summary = _download_summary(document["edition_acquisitions"])
+        append(("Publisher data citation", _publisher_data_citation(document, download_summary)))
+        append(("Input download dates", download_summary))
         if source["publisher_citation"]:
             append(("Publisher citation", source["publisher_citation"]))
         if source.get("notes"):

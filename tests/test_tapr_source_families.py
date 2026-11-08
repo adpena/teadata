@@ -459,6 +459,10 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     assert list(selected_entry) == [2026, 'latest'] and selected_entry['latest'] == 2026
     assert current['schema']['data_sources'].pop(selected_students) == ['html']
     assert current['value_policies'].pop('tprs_student_selected_2026')['reference_id'] == 'legend'
+    campus_transfer = current['data_sources']['campus_transfer_reports'][2025]
+    transfer_profiles = campus_transfer['reader'].pop('profiles')
+    assert list(transfer_profiles) == ['source']
+    assert transfer_profiles['source']['metadata']['version'] == '2025'
     previous_tested_grades = {}
     for scope in ('state', 'district', 'campus', 'region'):
         for family, *_ in STAAR_TESTED_GRADES:
@@ -523,7 +527,7 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     assert current['schema']['data_sources'].pop(indicator) == ['xlsx']
     assert current['value_policies'].pop('spp_ind11_workbook')['reference_id'] == 'spp_masking'
     actuals = 'peims_financial_single_file_actuals'
-    assert list(current['data_sources'].pop(actuals)) == [2023, 2024, 2025]
+    assert list(current['data_sources'].pop(actuals)) == list(range(2013, 2026))
     assert current['schema']['data_sources'].pop(actuals) == ['zip']
     budgets = 'peims_financial_single_file_budgets'
     assert list(current['data_sources'].pop(budgets)) == [2026]

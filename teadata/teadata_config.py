@@ -874,19 +874,21 @@ class Config:
             raise ContractError(str(error)) from error
 
     def is_source_only(self, dataset: str, year: int | None = None, *,
-                       section: str = "data_sources") -> bool:
+                       section: str = "data_sources", reader_profile: Literal["source"] | None = None) -> bool:
         """Describe preparation-only availability from the reviewed source contract.
 
         A named retained reader (such as accountability ratings) still belongs
         in release coverage. Only the explicit source-only crosswalk opts out.
         Source-only datasets can be excluded from release coverage even when
-        their first edition is newer than the requested build year.
+        their first edition is newer than the requested build year. Explicit
+        source-profile reads honor its crosswalk even when a default reader exists.
         """
         from .column_schema import crosswalk_dataset, has_default_reader
 
         def source_only(edition_year: int | None) -> bool:
             source = self.resolve_dataset(dataset, edition_year, section=section)
-            if has_default_reader(source.reader) or "source" not in source.reader.get("profiles", {}):
+            if ((reader_profile is None and has_default_reader(source.reader))
+                    or "source" not in source.reader.get("profiles", {})):
                 return False
             resource = self._read_column_contract(dataset, edition_year, section=section, reader_profile="source")
             if resource is None:
@@ -1031,7 +1033,7 @@ class Config:
             if list(frame.columns) != expected_schema:
                 raise ContractError("Full TAPR source preparation differs from its complete crosswalk")
             return source.resolved_year, frame
-        if reader_profile == "source" and self.is_source_only(dataset, year, section=section):
+        if reader_profile == "source" and self.is_source_only(dataset, year, section=section, reader_profile="source"):
             raise ContractError(
                 f"Source-only discovery for {dataset} requires a dedicated preparation workflow to load rows"
             )

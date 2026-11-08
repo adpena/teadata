@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from collections.abc import Iterator, Sequence
 from dataclasses import dataclass
 from hashlib import sha256
@@ -12,6 +13,7 @@ import re
 import sys
 from tempfile import TemporaryDirectory
 from typing import Any, Literal
+from urllib.parse import urlsplit
 from zipfile import ZipFile
 
 import pyarrow as pa
@@ -32,6 +34,7 @@ DATASET = "peims_financial_single_file_actuals"
 BUDGET_DATASET = "peims_financial_single_file_budgets"
 _RECORD = "source_record"
 _WIDTHS = (6, 3, 4, 2, 4, 3, 2)
+_UNIT_INDEX = 5
 _BLOCK_BYTES = 2 * 1024**2
 _MAX_ARCHIVE_BYTES = 40 * 1024**2
 _MAX_MEMBER_BYTES = 320 * 1024**2
@@ -62,6 +65,12 @@ _BUDGETS = _FinancialBasis("budget", BUDGET_DATASET, "BUDGAMT")
 
 
 @dataclass(frozen=True)
+class _NoCostCenter:
+    reference_id: str
+    district_counts: tuple[tuple[str, int], ...]
+
+
+@dataclass(frozen=True)
 class _Archive:
     basis: _FinancialBasis
     source: ResolvedDataset
@@ -73,6 +82,8 @@ class _Archive:
     codes: tuple[str, ...]
     names: tuple[str, ...]
     references: tuple[str, ...]
+    publisher_order: bool = False
+    no_cost_center: _NoCostCenter | None = None
 
     @property
     def schema(self) -> pa.Schema:
@@ -115,6 +126,13 @@ def _admit(config: Config, canonical: Config, store: ProvenanceStore, year: int,
     archives = reader_options(source.reader, "source").get("archives")
     if not isinstance(archives, dict) or archives.keys() != tables.keys() or tables.keys() != reviewed.keys():
         raise ValueError("PEIMS financial accounts require separate district and charter sources")
+    historical = basis == _ACTUALS and year < 2023
+    reviewed_archives = {}
+    if historical:
+        reviewed_source = canonical.resolve_dataset(basis.dataset, year, reader_profile="source", exact=True)
+        reviewed_archives = reader_options(reviewed_source.reader, "source")["archives"]
+        if source.metadata != reviewed_source.metadata:
+            raise ValueError("Historical PEIMS metadata differs from the packaged contract")
     references = tuple(dict.fromkeys(
         identifier for ref in source.metadata.references for identifier in ref.provenance_ids
     ))
@@ -124,27 +142,45 @@ def _admit(config: Config, canonical: Config, store: ProvenanceStore, year: int,
         if table["fields"] != reviewed[population]["fields"]:
             raise ValueError(f"PEIMS financial {basis.name}s {population} columns differ from the packaged source crosswalk")
         selection = archives[population]
+        required = {"receipt_id", "member", "rows", "requested_url", "resolved_url"}
         if (not isinstance(selection, dict)
-                or set(selection) != {"receipt_id", "member", "rows", "requested_url", "resolved_url"}
+                or set(selection) - {"key_order", "no_cost_center"} != required
                 or type(selection["rows"]) is not int or selection["rows"] < 1
                 or not isinstance(selection["member"], str)
-                or re.fullmatch(r"[a-z0-9]+\.csv", selection["member"]) is None):
+                or re.fullmatch(r"[A-Za-z0-9]+\.csv" if historical else r"[a-z0-9]+\.csv", selection["member"]) is None):
             raise ValueError(f"Invalid {population} archive contract")
+        publisher_order = "key_order" in selection
+        if publisher_order and (not historical or selection["key_order"] != "publisher"):
+            raise ValueError("Publisher order requires a reviewed historical actuals archive")
+        if historical:
+            if (selection != reviewed_archives[population]
+                    or table_input_sha256s(table) != table_input_sha256s(reviewed[population])):
+                raise ValueError("Historical PEIMS archive differs from the packaged contract")
         identifier = selection["receipt_id"]
         record = store.read_record(identifier)
         digest, = table_input_sha256s(table)
         artifact = record["artifact"]
+        receipt_metadata = record["source_metadata"]
+        dataset_receipt = (record["dataset"] == basis.dataset and record["section"] == source.section
+                           and receipt_metadata["source_url"] == source.metadata.source_url
+                           and record["parameters"].get("population") == population)
+        # Older statewide downloads were retained directly by the publisher archive
+        # census. The exact packaged descriptor supplies the sector binding.
+        historical_receipt = (
+            historical and record["section"] == "reference"
+            and record["dataset"] == f"reference:peims_financial_archive:{Path(urlsplit(selection['requested_url']).path).name}"
+            and receipt_metadata["source_url"] == selection["requested_url"]
+            and receipt_metadata.get("publisher") == source.metadata.publisher == "Texas Education Agency"
+        )
         if (record["kind"] != "acquisition" or record["method"] != "download"
-                or record["dataset"] != basis.dataset or record["section"] != source.section
+                or not (dataset_receipt or historical_receipt)
                 or (record["requested_year"], record["resolved_year"]) != (year, year)
-                or record["source_metadata"]["version"] != str(year)
-                or record["source_metadata"]["period"] != source.metadata.period.to_dict()
-                or record["source_metadata"]["source_url"] != source.metadata.source_url
+                or receipt_metadata["version"] != str(year)
+                or receipt_metadata["period"] != source.metadata.period.to_dict()
                 or record["requested_url"] != selection["requested_url"]
                 or record["resolved_url"] != selection["resolved_url"]
                 or record["parameters"].get("http_method") != "GET"
                 or record["parameters"].get("http_status") != 200
-                or record["parameters"].get("population") != population
                 or artifact["sha256"] != digest or not 0 < artifact["size_bytes"] <= _MAX_ARCHIVE_BYTES):
             raise ValueError(f"PEIMS financial {basis.name}s {population} acquisition differs from its reviewed contract")
         fields = table["fields"]
@@ -156,8 +192,27 @@ def _admit(config: Config, canonical: Config, store: ProvenanceStore, year: int,
                 or set(names) & {basis.raw, basis.status, _RECORD}
                 or [field["field"] for field in fields if field["disposition"] == "fact"] != [amount]):
             raise ValueError(f"PEIMS financial {basis.name}s {population} crosswalk is not the reviewed account layout")
+        no_cost_center = None
+        if "no_cost_center" in selection:
+            descriptor = selection["no_cost_center"]
+            if (not historical or population != "district" or codes[_UNIT_INDEX] != "FIN_UNIT"
+                    or not isinstance(descriptor, dict) or set(descriptor) != {"reference_id", "district_counts"}):
+                raise ValueError("No Cost Center requires a reviewed historical district FIN_UNIT contract")
+            counts = descriptor["district_counts"]
+            if (not isinstance(counts, dict) or not counts
+                    or any(not isinstance(district, str) or re.fullmatch(r"[0-9]{6}", district) is None
+                           or district == "000000" or type(count) is not int or count < 1
+                           for district, count in counts.items())
+                    or sum(counts.values()) > selection["rows"]):
+                raise ValueError("Invalid reviewed No Cost Center district counts")
+            reference_id = descriptor["reference_id"]
+            if not any(ref.reference_id == reference_id and ref.role == "data_dictionary"
+                       and ref.status == "available" and ref.reviewed_sha256 and len(ref.provenance_ids) == 1
+                       for ref in source.metadata.references):
+                raise ValueError("No Cost Center requires the reviewed publisher lookup receipt")
+            no_cost_center = _NoCostCenter(reference_id, tuple(sorted(counts.items())))
         yield _Archive(basis, source, population, selection["member"], selection["rows"], identifier, digest,
-                       codes, names, references)
+                       codes, names, references, publisher_order, no_cost_center)
 
 
 def _all(values: pa.Array) -> bool:
@@ -167,6 +222,9 @@ def _all(values: pa.Array) -> bool:
 def _batches(path: Path, archive: _Archive) -> Iterator[pa.RecordBatch]:
     schema = archive.schema
     offset, previous = 2, None
+    expected_units = dict(archive.no_cost_center.district_counts) if archive.no_cost_center else {}
+    unit_districts = pa.array(list(expected_units), type=pa.string())
+    observed_units: Counter[str] = Counter()
     with ZipFile(path) as package:
         members = package.infolist()
         if (len(members) != 1 or members[0].filename != archive.member
@@ -183,9 +241,17 @@ def _batches(path: Path, archive: _Archive) -> Iterator[pa.RecordBatch]:
                     strings_can_be_null=False, null_values=[]))
             for batch in reader:
                 columns = batch.columns
-                if any(not _all(pc.match_substring_regex(column, rf"^[0-9]{{{width}}}$"))
-                       for width, column in zip(_WIDTHS, columns[:len(_WIDTHS)], strict=True)):
-                    raise ValueError("PEIMS financial CSV has a malformed account code")
+                for index, (width, column) in enumerate(zip(_WIDTHS, columns[:len(_WIDTHS)], strict=True)):
+                    valid = pc.match_substring_regex(column, rf"^[0-9]{{{width}}}$")
+                    if index == _UNIT_INDEX and expected_units:
+                        no_cost = pc.equal(column, "NUL")
+                        valid = pc.or_(valid, pc.and_(no_cost, pc.is_in(columns[0], value_set=unit_districts)))
+                        districts = pc.filter(columns[0], no_cost)
+                        if len(districts):
+                            for count in pc.value_counts(districts).to_pylist():
+                                observed_units[count["values"]] += count["counts"]
+                    if not _all(valid):
+                        raise ValueError("PEIMS financial CSV has a malformed account code")
                 if not _all(pc.not_equal(columns[0], "000000")):
                     raise ValueError("PEIMS financial CSV has a zero district identifier")
                 raw = columns[7]
@@ -193,13 +259,13 @@ def _batches(path: Path, archive: _Archive) -> Iterator[pa.RecordBatch]:
                     raise ValueError("PEIMS financial CSV has an unknown amount token")
                 if not _all(pc.match_substring_regex(columns[8], r"^[0-9]{2}[A-Z]{3}[0-9]{4}$")):
                     raise ValueError("PEIMS financial CSV has a malformed publisher update date")
-                # These reviewed files are ordered by their full account key. Checking strict
-                # ordering proves uniqueness without a statewide hash table or a sort.
-                keys = pc.binary_join_element_wise(*columns[:len(_WIDTHS)], "")
-                if ((previous is not None and previous >= keys[0].as_py()) or
-                        (len(keys) > 1 and not _all(pc.less(keys.slice(0, len(keys) - 1), keys.slice(1))))):
-                    raise ValueError("PEIMS financial CSV account keys are repeated or out of order")
-                previous = keys[-1].as_py()
+                if not archive.publisher_order:
+                    # Strict publisher order proves uniqueness without retaining all account keys.
+                    keys = pc.binary_join_element_wise(*columns[:len(_WIDTHS)], "")
+                    if ((previous is not None and previous >= keys[0].as_py()) or
+                            (len(keys) > 1 and not _all(pc.less(keys.slice(0, len(keys) - 1), keys.slice(1))))):
+                        raise ValueError("PEIMS financial CSV account keys are repeated or out of order")
+                    previous = keys[-1].as_py()
                 stop = offset + batch.num_rows
                 columns[7] = pc.cast(raw, pa.int64(), safe=True)
                 yield pa.RecordBatch.from_arrays([
@@ -207,12 +273,37 @@ def _batches(path: Path, archive: _Archive) -> Iterator[pa.RecordBatch]:
                     pa.array(range(offset, stop), type=pa.int64()),
                 ], schema=schema)
                 offset = stop
+    if observed_units != expected_units:
+        raise ValueError("PEIMS No Cost Center counts differ from the reviewed district archive")
     if offset - 2 != archive.rows:
         raise ValueError("PEIMS financial CSV differs from the reviewed record count")
 
 
+def _verify_publisher_keys(source: pq.ParquetFile, spill_parent: Path, archive: _Archive) -> None:
+    import duckdb
+
+    # Account columns have exact, fixed widths, so concatenation is injective.
+    keys = ", ".join('"' + name.replace('"', '""') + '"' for name in archive.key_columns)
+    schema = pa.schema([source.schema_arrow.field(name) for name in archive.key_columns])
+    batches = source.iter_batches(columns=archive.key_columns, use_threads=False)
+    reader = pa.RecordBatchReader.from_batches(schema, batches)
+    with TemporaryDirectory(prefix=".peims-key-check-", dir=spill_parent) as spill:
+        with duckdb.connect(config={"threads": 1, "memory_limit": "256MB", "temp_directory": spill}) as connection:
+            # Set the spill cap before closing external access; DuckDB 2.0 can ignore it at connect time.
+            connection.execute("SET max_temp_directory_size = '1GB'")
+            connection.execute("SET enable_external_access = false")
+            connection.register("publisher_keys", reader)
+            duplicate = connection.execute(
+                f"SELECT 1 FROM publisher_keys GROUP BY concat({keys}) HAVING count(*) > 1 LIMIT 1",
+            ).fetchone()
+    if duplicate is not None:
+        raise ValueError("PEIMS financial CSV has repeated account keys")
+
+
 def _verify_leaf(leaf: Path, source: Path, archive: _Archive) -> None:
     with pq.ParquetFile(leaf) as readback:
+        if archive.publisher_order:
+            _verify_publisher_keys(readback, leaf.parent, archive)
         for index, expected in enumerate(_batches(source, archive)):
             actual = readback.read_row_group(index, use_threads=False).replace_schema_metadata(None)
             if not pa.Table.from_batches([expected]).equals(actual, check_metadata=True):
@@ -273,10 +364,17 @@ def _materialize(store: ProvenanceStore, *, config: Path, config_sha256: str,
                              "district", archive.table, "one publisher row per complete account code tuple")
             recipe = {"operation": f"peims_single_file_{basis.name}s_projection", "archive_member": archive.member,
                       "config_sha256": config_sha256, "input_block_bytes": _BLOCK_BYTES}
+            leaf_toolchain = toolchain
+            if archive.publisher_order:
+                recipe["account_key_order"] = "publisher"
+                leaf_toolchain = {**toolchain, "duckdb": version("duckdb")}
+            if archive.no_cost_center:
+                recipe["no_cost_center"] = {"reference_id": archive.no_cost_center.reference_id,
+                                            "district_counts": dict(archive.no_cost_center.district_counts)}
             schema = archive.schema
             contract = recorder.leaf_contract(key, source, native_schema=schema.serialize().to_pybytes(),
                 columns=schema.names, key_columns=archive.key_columns, rows=archive.rows, inputs=[archive.digest],
-                recipe=recipe, toolchain=toolchain,
+                recipe=recipe, toolchain=leaf_toolchain,
                 column_support={"fields": {basis.amount: {"raw": basis.raw, "status": basis.status}}, "context": [_RECORD]})
             identity = sha256(canonical_json(contract).encode()).hexdigest()
             leaf = stage / f"{identity}.parquet"
@@ -284,7 +382,7 @@ def _materialize(store: ProvenanceStore, *, config: Path, config_sha256: str,
             _verify_leaf(leaf, raw, archive)
             processing = target.record_processing(dataset=basis.dataset, inputs=[archive.receipt_id, *archive.references, config_id],
                 outputs={"leaf": leaf}, processor="teadata.peims_actuals", code_version=recorder.processor_sha256,
-                parameters={"leaf_contract_sha256": identity, "recipe": recipe, "toolchain": toolchain},
+                parameters={"leaf_contract_sha256": identity, "recipe": recipe, "toolchain": leaf_toolchain},
                 validation={"native_projection_readback_equal": True, "rows": archive.rows,
                             "cross_report_reconciliation_qualified": False, "release_activation": False})
             ref = ArtifactRef(key, physical["sha256"], physical["size_bytes"], leaf.name,

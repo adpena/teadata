@@ -270,4 +270,15 @@ edition or acquisition date with each district or campus ID occurrence,
 and use each performance report's own roster to establish its population.
 [AskTED archive index](https://tealprod.tea.state.tx.us/Tea.AskTed.Web/Forms/ArchivedSchoolAndDistrictDataFiles.aspx) · [AskTED directory](https://tealprod.tea.state.tx.us/tea.askted.web/Forms/Home.aspx)
 
+The retained statewide AskTED lifecycle exports are separate from the
+term directories. `teadata.askted_lifecycle.read_lifecycle_report` reads
+one verified public campus, charter campus, district closure, or district
+reorganization CSV from its acquisition receipt and exact object hash.
+The typed events preserve publisher order, logical CSV record numbers,
+printed names and dates, and explicit annexation roles. A reused ID can
+have multiple observations. Charter campus records overlap public campus
+records. Keep both source identities when reconciling events. The raw
+January 1, 1800 date remains unresolved. The report print date does not
+establish the date of any event. [AskTED reports](https://tealprod.tea.state.tx.us/Tea.AskTed.Web/Forms/ReportSelection.aspx)
+
 [School-year selection and source identity](querying.md#school-years-and-source-editions)

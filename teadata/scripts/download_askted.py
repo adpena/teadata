@@ -122,7 +122,11 @@ def validate_archive_response(headers, selected: Archive) -> None:
 def validate_archive_columns(path: Path, selected: Archive) -> None:
     import csv
     with path.open(encoding="utf-8-sig", newline="") as stream:
-        columns = next(csv.reader(stream), [])
+        validate_archive_header(next(csv.reader(stream), []), selected)
+
+
+def validate_archive_header(columns: list[str], selected: Archive) -> None:
+    """Check a publisher header already captured by an offline reader."""
     required = {"District Number", "District Name", "District Type", "School Number", "School Name", "School Status", "Charter Type"}
     # Both published seasons carry enrollment from October of the starting year.
     expected = {f"{scope} Enrollment as of Oct {selected.end_year - 1}" for scope in ("District", "School")}

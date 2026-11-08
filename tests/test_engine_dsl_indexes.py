@@ -10,6 +10,7 @@ from threading import Event
 import pytest
 
 
+from teadata import EntitySelectionError
 from teadata.classes import Campus, DataEngine, District
 from teadata.engine import _SphericalCampusIndex
 from teadata.geometry import haversine_miles
@@ -48,7 +49,7 @@ def _campus(
     )
 
 
-def test_district_number_is_unique_and_name_returns_all_matches():
+def test_district_number_and_exact_name_disambiguation():
     repo = DataEngine()
     d1 = _district("Alpha ISD", "123")
     d2 = _district("Alpha ISD", "'000124")
@@ -60,14 +61,19 @@ def test_district_number_is_unique_and_name_returns_all_matches():
     number_hits = repo >> ("district", 123)
     assert [d.id for d in number_hits] == [d1.id]
 
-    exact_hits = repo >> ("district", "ALPHA ISD")
-    assert [d.id for d in exact_hits] == [d1.id, d2.id]
+    with pytest.raises(EntitySelectionError, match="Multiple exact matches") as error:
+        repo >> ("district", "aLpHa iSd")
+    assert [item["id"] for item in error.value.to_dict()["candidates"]] == ["000123", "000124"]
+    assert repo.district_named(" beta isd ") is d3
+    with pytest.raises(EntitySelectionError, match="Did you mean") as error:
+        repo.district_named("Bta ISD")
+    assert ("BETA ISD", "000456") in error.value.candidates
 
     wildcard_hits = repo >> ("district", "ALPHA*")
     assert [d.id for d in wildcard_hits] == [d1.id, d2.id]
 
 
-def test_campus_lookup_by_exact_name_returns_all_matches():
+def test_campus_exact_names_use_live_registry_and_wildcards_return_multiple_matches():
     repo = DataEngine()
     d1 = _district("Gamma ISD", "111111")
     d2 = _district("Delta ISD", "222222")
@@ -90,8 +96,16 @@ def test_campus_lookup_by_exact_name_returns_all_matches():
     repo.add_campus(c1)
     repo.add_campus(c2)
 
-    hits = repo >> ("campus", "CENTRAL HIGH")
+    hits = repo >> ("campus", "central*")
     assert [c.id for c in hits] == [c1.id, c2.id]
+    repo.clear_indexes()
+    with pytest.raises(EntitySelectionError, match="Multiple exact matches"):
+        repo >> ("campus", "central high")
+    c2.name = "OTHER CENTRAL HIGH"
+    assert list(repo >> ("campus", "central high")) == [c1]
+    assert list(repo >> ("campus", "central*")) == [c1]
+    assert list(repo >> ("campus", "other*")) == [c2]
+    assert repo.campus_by_name("other central high") is c2
 
 
 def test_nearest_campuses_charter_only_returns_empty_when_no_charters():
@@ -277,3 +291,71 @@ def test_slow_index_build_cannot_republish_after_location_change(monkeypatch, sa
         assert old_query.result(timeout=5) is near
     assert nearest() is far
     assert math.isnan(haversine_miles(-97, 32, math.nan, 32))
+
+
+@pytest.mark.parametrize("indexed", [True, False])
+def test_stock_within_respects_holes_boundaries_and_geometry_updates(indexed):
+    from shapely.geometry import MultiPolygon, Polygon, box
+
+    engine = DataEngine(indexes_enabled=indexed)
+    outer = [(-99, 30), (-95, 30), (-95, 34), (-99, 34)]
+    hole = [(-98, 31), (-96, 31), (-96, 33), (-98, 33)]
+    geometry = MultiPolygon([Polygon(outer, [hole]), box(-94, 30, -93, 31)])
+    district = _district("Geography ISD", "012345")
+    district.boundary = geometry
+    other = _district("Other ISD", "012346")
+    engine.add_district(district)
+    engine.add_district(other)
+
+    def campus(code, point, owner=other, charter=False):
+        result = _campus(owner, name=code, campus_number=code, lon=point[0], lat=point[1], is_charter=charter)
+        engine.add_campus(result)
+        return result
+
+    interior = campus("012346001", (-98.5, 32))
+    boundary = campus("012346002", (-99, 32), charter=True)
+    in_hole = campus("012345003", (-97, 32), owner=district)
+    hole_boundary = campus("012346004", (-98, 32))
+    island = campus("012346005", (-93.5, 30.5))
+    private = Campus(uuid.uuid4(), None, "Private", "Private", True, is_private=True,
+                     source_namespace="tefa", source_id="example", location=(-98.5, 32))
+    engine.add_campus(private)
+
+    assert list(engine >> ("within", geometry)) == [interior, island, private]
+    assert list(engine >> ("within", district, False, True)) == [interior, boundary, hole_boundary, island, private]
+    assert list(engine >> ("within", district, True, True)) == [boundary]
+    assert engine.charter_campuses_within(district) == [boundary]
+    assert engine.private_campuses_within(district) == [private]
+    assert len(engine.campuses_in(district)) == 1
+    assert list((engine >> ("district", "012345")) >> ("within", None, None)) == [interior, island, private]
+    interior.point = (-97, 32)
+    assert engine.campuses_within(geometry) == [island, private]
+
+    with pytest.raises(ValueError, match="Boolean"):
+        engine >> ("within", district, "charter")
+    with pytest.raises(ValueError, match="outside WGS84"):
+        engine.campuses_within(box(190, 30, 191, 31))
+    with pytest.raises(ValueError, match="Boundary geometry unavailable"):
+        engine.campuses_within(other)
+
+    district.boundary = outer
+    assert engine.campuses_within(district) == [interior, in_hole, hole_boundary, private]
+
+
+def test_digit_bearing_names_and_legacy_numeric_selectors():
+    engine = DataEngine()
+    district = _district("Innovation 2 ISD", "012345")
+    campus = _campus(district, name="Innovation 2 Academy", campus_number="012345001", lon=-98, lat=32)
+    engine.add_district(district)
+    engine.add_campus(campus)
+    for selector in ("Innovation 2 ISD", "Innovation 2%", "012345-001", "’012345", "'12345.0", 12345):
+        assert list(engine >> ("district", selector)) == [district]
+    for selector in ("Innovation 2 Academy", "Innovation 2*", "'12345001.0", 12345001):
+        assert list(engine >> ("campus", selector)) == [campus]
+    with pytest.raises(EntitySelectionError, match="No exact match"):
+        engine >> ("district", "Unknown 012345 ISD")
+    assert list(engine >> ("campus", "999999999")) == []
+    with pytest.raises(ValueError, match="Invalid district number"):
+        engine >> ("district", True)
+    with pytest.raises(ValueError, match="take requires a count"):
+        (engine >> ("district", "012345")) >> ("take",)

@@ -35,7 +35,8 @@ EOC_METRIC = "staar_performance_eoc_algebra_i_all_students_percent_at_meets_gl_s
 @pytest.fixture
 def comparison_release(tmp_path, monkeypatch, request):
     selection = getattr(request, "param", FAMILY)
-    family, year = selection if isinstance(selection, tuple) else (selection, 2025)
+    fiscal = selection == "student_profile_fiscal"
+    family, year = selection if isinstance(selection, tuple) else ("student_profile" if fiscal else selection, 2025)
     staar = family == "staar_tested_grade_3"
     store = ProvenanceStore(tmp_path / "source-store")
     masking = tmp_path / "masking.txt"
@@ -84,7 +85,7 @@ def comparison_release(tmp_path, monkeypatch, request):
             observations = [row + ["1200" if scope == "state" else "105"] for row in observations]
             metrics["membership_count"] = {
                 "field": "membership_count", "unit": "count",
-                "period": {"kind": "school_year", "start_year": 2024, "end_year": 2025},
+                "period": {"kind": "fiscal_year" if fiscal else "school_year", "start_year": 2024, "end_year": 2025},
             }
         with path.open("w", newline="") as stream:
             csv.writer(stream).writerows([labels, codes, *observations])
@@ -231,6 +232,73 @@ def test_student_profile_comparison_keeps_counts_and_distinct_periods(comparison
     assert (count.unit, count.period.end_year, count.local_value, count.statewide_value) == ("count", 2025, 105, 1200)
     assert count.difference_pp is None
     assert (unknown.local_raw, unknown.local_status, unknown.difference) == ("-1", "uninterpreted", None)
+
+
+@pytest.mark.parametrize("comparison_release", ["student_profile"], indirect=True)
+def test_exact_comparison_year_projects_only_matching_vintage(comparison_release, monkeypatch):
+    release, editions = comparison_release
+    district = District(uuid4(), "Observed", district_number="227901")
+    query = Query([district], repo=None)
+    local, state = editions["district"], editions["state"]
+    open_leaf = release.analytical_dataset
+    requested = []
+
+    class ObserveColumns:
+        def __init__(self, dataset):
+            self.dataset = dataset
+
+        def head(self, count, *, columns, filter):
+            requested.append(columns)
+            return self.dataset.head(count, columns=columns, filter=filter)
+
+        def to_table(self, *, columns, filter):
+            requested.append(columns)
+            return self.dataset.to_table(columns=columns, filter=filter)
+
+    monkeypatch.setattr(release, "analytical_dataset", lambda identity: ObserveColumns(open_leaf(identity)))
+    count, = query >> ("compare_statewide", release, local, state, "*", {}, 25)
+    assert (count.metric, count.period.end_year, count.local_value, count.statewide_value) == (
+        "membership_count", 2025, 105, 1200)
+    assert len(requested) == 2
+    assert all("membership_count" in columns and "dual_credit_rate" not in columns for columns in requested)
+    def unexpected_leaf(_identity):
+        raise AssertionError("A rejected school year opened an observation leaf")
+
+    monkeypatch.setattr(release, "analytical_dataset", unexpected_leaf)
+    with pytest.raises(ContractError, match=r"covers 2023-2024 .*Requested school year ends in 2025"):
+        query.compare_statewide(release=release, local=local, statewide=state, metric=METRIC, school_year=2025)
+    with pytest.raises(ContractError, match="Available school-year end years: 2024, 2025"):
+        query.compare_statewide(release=release, local=local, statewide=state, school_year=2026)
+    for invalid in (False, "2024-26", 2025.0, -1, 10_000):
+        with pytest.raises(ValueError, match="Invalid school_year.*2024-25"):
+            query.compare_statewide(release=release, local=local, statewide=state, school_year=invalid)
+
+    args = {"release": release, "local": local, "statewide": state, "school_year": "2024–25"}
+    for argument, value, error, message in (
+        ("local", "district", TypeError, "EditionKey.*edition_id removed"),
+        ("statewide", {}, TypeError, "EditionKey"),
+        ("release", "release.json", TypeError, "DataRelease"),
+        ("metric", [], ValueError, "reviewed metric name"),
+        ("metric", "typo", ContractError, "Examples of common metric names"),
+        ("dimensions", {"course_code": 3100500}, ContractError, "literal publisher strings"),
+    ):
+        with pytest.raises(error, match=message):
+            query.compare_statewide(**(args | {argument: value}))
+
+
+@pytest.mark.parametrize("comparison_release", ["student_profile_fiscal"], indirect=True)
+def test_comparison_does_not_treat_a_fiscal_year_as_a_school_year(comparison_release, monkeypatch):
+    release, editions = comparison_release
+    district = District(uuid4(), "Observed", district_number="227901")
+
+    def unexpected_leaf(_identity):
+        raise AssertionError("A fiscal-year mismatch opened an observation leaf")
+
+    monkeypatch.setattr(release, "analytical_dataset", unexpected_leaf)
+    with pytest.raises(ContractError, match=r"covers 2024-2025 \(fiscal_year\)"):
+        Query([district], repo=None).compare_statewide(
+            release=release, local=editions["district"], statewide=editions["state"],
+            metric="membership_count", school_year=2025)
 
 
 def test_campus_course_geography_hold_precedes_any_leaf_or_catalog_read():

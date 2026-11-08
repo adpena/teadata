@@ -47,6 +47,15 @@ def main(argv: list[str] | None = None) -> int:
     materialize.add_argument("--config-sha256", required=True)
     materialize.add_argument("--prepared-input", nargs=2, action="append", required=True, metavar=("YEAR", "PROCESSING_RECORD"))
     materialize.add_argument("--output", type=Path, required=True, help="New exclusive unpublished candidate directory")
+    campus = sub.add_parser("materialize-campus", help="Build one unpublished campus transfer edition with historical endpoint evidence")
+    campus.add_argument("--store", type=Path, required=True)
+    campus.add_argument("--config", type=Path, required=True)
+    campus.add_argument("--config-sha256", required=True)
+    campus.add_argument("--year", type=int, required=True)
+    campus.add_argument("--preparation", required=True)
+    campus.add_argument("--registry-manifest", type=Path, required=True)
+    campus.add_argument("--registry-sha256", required=True)
+    campus.add_argument("--output", type=Path, required=True)
     compare = sub.add_parser("compare-campus-district", help="Check wholly visible cross-district transfer rollups offline")
     compare.add_argument("--store", type=Path, required=True, help="Retained campus preparation and its original provenance")
     compare.add_argument("--year", type=int, required=True)
@@ -70,6 +79,18 @@ def main(argv: list[str] | None = None) -> int:
             parser.error("--prepared-input YEAR requires an integer annual edition")
         result = materialize_district_transfers(store, config=args.config, config_sha256=args.config_sha256,
             preparations=preparations, output=args.output)
+        print(json.dumps({name: result[name] for name in ("status", "build_id", "release_activation")}, sort_keys=True))
+        return 0
+    if args.command == "materialize-campus":
+        from teadata.campus_transfer_leaves import HistoricalEndpointHold, materialize_campus_transfers
+
+        try:
+            result = materialize_campus_transfers(store, config=args.config, config_sha256=args.config_sha256,
+                year=args.year, preparation=args.preparation, registry_manifest=args.registry_manifest,
+                registry_sha256=args.registry_sha256, output=args.output)
+        except HistoricalEndpointHold as hold:
+            print(json.dumps({"school_year_end": args.year, **hold.report}, sort_keys=True))
+            return 2
         print(json.dumps({name: result[name] for name in ("status", "build_id", "release_activation")}, sort_keys=True))
         return 0
     if args.command == "prepare":

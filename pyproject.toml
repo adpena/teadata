@@ -240,7 +240,6 @@ exclude = [
     "teadata/load_data.py",
     "teadata/map_store.py",
     "teadata/persistence/**",
-    "teadata/query.py",
     "teadata/scripts/**",
     "examples/**",
     "tests/**",

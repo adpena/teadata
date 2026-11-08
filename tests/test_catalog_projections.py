@@ -147,7 +147,8 @@ def edition_fixture(tmp_path):
 
 def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staff"), multiple_inputs=False, damage_inputs=None,
                          normalized=False, support_damage=None, source_qualifiers=None, row_runs=None,
-                         qualifier_reference_damage=None, amount_period=None, observed_amount=5, entity_grain=False):
+                         qualifier_reference_damage=None, amount_period=None, observed_amount=5, entity_grain=False,
+                         name_period=None, extra_context=None, unique_entity_key=False):
     """The same tiny fixture, optionally widened without adding source rows."""
     import pyarrow as pa
     import pyarrow.csv as pacsv
@@ -193,6 +194,8 @@ def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staf
                   for index, (code, label, field) in enumerate(zip(
                       codes, labels,
                       ["campus_number", "campus_name", "amount", *extra_names]), 1)]
+        if name_period is not None:
+            fields[1].update(disposition="fact", dictionary_status="not_documented")
         table: dict[str, Any] = {"table": family, "input_sha256": raw_sha,
                  "source_schema_sha256": source_schema_fingerprint(labels, codes),
                  "fields": fields, "metric_period": {"kind": "unknown"}}
@@ -217,6 +220,10 @@ def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staf
             "reader": {"profiles": {"source": {"column_schema": resource.name,
                 "references": [{"reference_id": "columns", "role": "schema", "path": resource.name,
                     "reviewed_sha256": schema_sha, "status": "available", "provenance_ids": [schema_observation]}]}}}}}
+        if name_period is not None:
+            datasets[dataset][2025]["metadata"]["metrics"]["campus_name"] = {
+                "field": "campus_name", "unit": "text", "period": name_period,
+            }
         profile = datasets[dataset][2025]["reader"]["profiles"]["source"]
         datasets[dataset][2025]["metadata"]["references"] = profile.pop("references")
         if normalized:
@@ -292,11 +299,17 @@ def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staf
                                  ("row_kind", pa.array(["detail"] * actual.num_rows)), ("NAME", actual["campus_name"]),
                                  ("name_support", pa.array(["fixture name context"] * actual.num_rows))]:
                 actual = actual.append_column(name, values)
+            if extra_context is not None:
+                actual = actual.append_column(extra_context, pa.array(["retained context"] * actual.num_rows))
             native = actual.schema.remove_metadata()
             keys = ["campus_number", "source_record"] if entity_grain else ["source_record"]
+            if unique_entity_key:
+                keys = ["campus_number"]
             support = {"fields": {"amount": {"raw": "VALUE", "status": "amount_status"},
                                   "campus_name": {"raw": "NAME", "auxiliary": ["name_support"]}},
                        "context": ["source_record", "row_kind"]}
+            if extra_context is not None:
+                support["context"].append(extra_context)
             recipe = {**recipe, "operation": "canonical values.measure of raw amount plus lossless names and source-record locators"}
             if support_damage == "overlap":
                 support["context"].append("amount")
@@ -1823,7 +1836,7 @@ def test_school_year_query_keeps_the_saved_parent_and_native_grain(tmp_path, sel
     with using_release(current):
         with pytest.raises(ContractError, match="release for their entity build"):
             query.observations("campus_student", "amount", school_year=2024)
-        pinned = query.observations("campus_student", "amount", school_year=2024, release=old)
+        pinned = query.observations("campus_student", "amount", school_year="2023–24", release=old)
         with pytest.raises(ContractError, match="school year"):
             old.observations("campus_student", "amount", school_year=2025, scope="campus")
         empty = query >> (lambda _: False)
@@ -1837,7 +1850,7 @@ def test_school_year_query_keeps_the_saved_parent_and_native_grain(tmp_path, sel
     with pytest.raises(ContractError, match="period"):
         planned.select("campus_name").to_arrow()
     assert empty.observations("campus_student", "amount", school_year=2024, scope="campus", release=old).to_arrow().num_rows == 0
-    assert current.observations("campus_student", "amount", school_year=2025, scope="campus").to_arrow()["amount"][-1].as_py() == 7
+    assert current.observations("campus_student", "amount", school_year=25, scope="campus").to_arrow()["amount"][-1].as_py() == 7
     old_leaf.write_bytes(b"different bytes")
     with pytest.raises(ContractError, match="checksum or size"):
         old.verify_native_sources()
@@ -1870,7 +1883,7 @@ def test_native_observation_year_discovery_does_not_open_leaves(tmp_path, schema
     assert release.observation_years(key.dataset, "amount", scope="campus", edition=key) == {"amount": (2024,)}
     absent = replace(key, revision_sha256="f" * 64)
     assert release.observation_years(key.dataset, "amount", scope="campus", edition=absent) == {"amount": ()}
-    with pytest.raises(ValueError, match="dataset and scope"):
+    with pytest.raises(ValueError, match="scope must be a nonblank publisher scope"):
         release.observation_years(key.dataset, "amount", scope=None)
     with pytest.raises(ContractError, match=r"Available years: \{'amount': \(2024,\)\}"):
         release.observations(key.dataset, "amount", scope="campus", school_year=2025)
@@ -1886,6 +1899,34 @@ def test_native_observation_year_discovery_does_not_open_leaves(tmp_path, schema
     assert frame.attrs["teadata"]["manifest_sha256"] == release.manifest_sha256
     assert "entity_manifest_sha256" not in frame.attrs["teadata"]
     assert len(calls) == 1
+
+
+def test_school_year_parser_and_query_validation_precede_release_resolution(monkeypatch):
+    import numpy as np
+
+    from teadata.dataset_metadata import _parse_school_year
+    from teadata.query import Query
+
+    accepted = [(25, 2025), ("25", 2025), (2025, 2025), ("2025", 2025), ("2024-25", 2025),
+                (" 2024 – 2025 ", 2025), ("1999-00", 2000), ("2099-00", 2100),
+                ("00", 2000), ("0025", 25), ("0024-0025", 25), (123, 123), (None, None)]
+    assert [_parse_school_year(value) for value, _ in accepted] == [result for _, result in accepted]
+    invalid = (True, 25.0, "", "2024-24", "2025–2024", "9999-00", "2O25", "２０２５", "2024/25", "2024\n-25")
+    for value in invalid:
+        with pytest.raises(ValueError, match=r"Invalid school_year.*2024-25"):
+            _parse_school_year(value)
+    monkeypatch.setattr("teadata.release.current_release", lambda: pytest.fail("Invalid selection opened a release"))
+    query = Query([], repo=None)
+    for arguments, keywords, error, message in (
+        (("example", "amount"), {"school_year": "2024-26"}, ValueError, "Invalid school_year"),
+        (("example", "amount"), {"scope": np.array(["district", "campus"])}, ValueError, "scope must be"),
+        (("", "amount"), {"scope": "district"}, ValueError, "dataset must be"),
+        (("example", " "), {"scope": "district"}, ValueError, "distinct source fields"),
+        (("example", "amount"), {"scope": "district", "edition": {}}, TypeError, "EditionKey.*edition_id removed"),
+        (("example", "amount"), {"scope": "district", "release": "release.json"}, TypeError, "DataRelease"),
+    ):
+        with pytest.raises(error, match=message):
+            query.observations(*arguments, **keywords)
 
 
 def test_observation_selection_rejects_mixed_years_and_same_year_revisions(tmp_path, monkeypatch):

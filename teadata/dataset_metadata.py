@@ -427,6 +427,55 @@ class FieldBinding:
                 "column": self.column, "dependencies": [list(pair) for pair in self.dependencies]}
 
 
+def _parse_school_year(school_year: int | str | None) -> int | None:
+    if school_year is None:
+        return None
+    if type(school_year) is int:
+        if 0 <= school_year <= 99:
+            return 2000 + school_year
+        if 100 <= school_year <= 9999:
+            return school_year
+    elif isinstance(school_year, str):
+        value = school_year.strip()
+        if re.fullmatch(r"[0-9]{2}|[0-9]{4}", value):
+            year = int(value)
+            if len(value) == 2:
+                return 2000 + year
+            if 2 <= year <= 9999:
+                return year
+        elif match := re.fullmatch(r"([0-9]{4})[ \t]*[-–][ \t]*([0-9]{2}|[0-9]{4})", value):
+            start, suffix = match.groups()
+            end = int(start) + 1
+            if 2 <= end <= 9999 and int(suffix) == (end % 100 if len(suffix) == 2 else end):
+                return end
+    if isinstance(school_year, str):
+        received = repr(school_year[:80])
+    elif type(school_year) is int and -99_999 <= school_year <= 99_999:
+        received = str(school_year)
+    else:
+        received = type(school_year).__name__
+    raise ValueError(f"Invalid school_year ({received}). Use an integer ending year such as 2025 or 25, "
+                     "or text such as '2025', '25', '2024-25', or '2024–2025'. Range years must be consecutive.")
+
+
+_EDITION_KEY_GUIDANCE = (
+    "Build a key with EditionKey.from_dict() using a row from the native release's catalog.editions(include_metadata=False) "
+    "with edition_id removed."
+)
+
+
+def _validate_observation_selection(dataset: str, fields: tuple[str, ...], scope: str,
+                                    edition: EditionKey | None) -> None:
+    if not isinstance(dataset, str) or not dataset.strip():
+        raise ValueError("dataset must be a nonblank source name, for example 'peims_student_enrollment_by_ethnicity'.")
+    if not isinstance(scope, str) or not scope.strip():
+        raise ValueError("scope must be a nonblank publisher scope, such as 'district', 'campus', or 'state'.")
+    if not fields or any(not isinstance(field, str) or not field.strip() for field in fields) or len(set(fields)) != len(fields):
+        raise ValueError("Select one or more distinct source fields by their exact nonblank string names.")
+    if edition is not None and not isinstance(edition, EditionKey):
+        raise TypeError(f"edition must be an EditionKey or None. {_EDITION_KEY_GUIDANCE}")
+
+
 @dataclass(frozen=True)
 class DataPeriod:
     """A source's reference period; a catalog year alone does not establish one."""

@@ -24,7 +24,8 @@ A: Prefer the package-internal `.cache/` for the “best known” snapshot. The 
 A: Normalizers accept either digits-only or apostrophe-prefixed strings and standardize internally.
 
 **Q: Can I chain spatial + attribute filters?**
-A: Yes — use `>>` to compose: `engine >> ("within", d, "campuses") >> (lambda c: c.rating in {"A","B"})`.
+A: Use `engine >> ("charters_within", district) >> (lambda c: c.rating in {"A", "B"})`.
+See [Query operator discovery](querying.md#discover-query-operators) for the syntax after an engine command.
 
 ## License
 

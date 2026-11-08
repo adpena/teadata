@@ -74,6 +74,7 @@ if TYPE_CHECKING:
     from .provenance import ProvenanceStore
     from .manifest import DatasetCatalog
     from .release import DataRelease, current_release
+    from .selectors import EntitySelectionError
     from .teadata_config import load_config
     from .values import Measurement, ValueStatus, ValuePolicy, EstimationPolicy, measure, aggregate
 
@@ -83,6 +84,7 @@ _EXPORT_MODULES = {
     **dict.fromkeys(("DataEngine", "District", "Campus"), ".classes"),
     **dict.fromkeys(("DataPeriod", "DatasetMetadata", "ResolvedDataset"), ".dataset_metadata"),
     "ProvenanceStore": ".provenance",
+    "EntitySelectionError": ".selectors",
     "DatasetCatalog": ".manifest",
     **dict.fromkeys(("DataRelease", "current_release"), ".release"),
     "load_config": ".teadata_config",
@@ -111,6 +113,7 @@ __all__ = [
     "Citation",
     "citation",
     "DataEngine",
+    "EntitySelectionError",
     "District",
     "Campus",
     "__version__",

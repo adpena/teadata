@@ -327,7 +327,7 @@ def validate_source_parity(release: DataRelease, store: ProvenanceStore, *, edit
             or type(working_bytes) is not int or not 0 < working_bytes <= 1024**3
             or type(verify_export) is not bool):
         raise ValueError('Explicit unique edition IDs and bounded example/working-byte budgets are required')
-    output: dict[str, Any] = {'scope': 'admitted lossless TAPR, typed PEIMS and typed district transfer leaves', 'status': 'HOLD', 'editions': [],
+    output: dict[str, Any] = {'scope': 'admitted lossless TAPR, typed PEIMS and typed district and campus transfer leaves', 'status': 'HOLD', 'editions': [],
         'working_bytes': working_bytes,
         'scientific_qualification': False, 'publisher_authenticity_verified': False,
         'exceptions_supported': False, 'semantic_goldens_replaced': False}
@@ -344,7 +344,7 @@ def validate_source_parity(release: DataRelease, store: ProvenanceStore, *, edit
                 raise _Uncovered(unsupported or 'Exact edition is not present in this release')
             key = choices[identifier]
             item['edition'] = key.to_dict()
-            if key.dataset in (*PEIMS_DATASETS, "district_transfer_reports"):
+            if key.dataset in (*PEIMS_DATASETS, "district_transfer_reports", "campus_transfer_reports"):
                 if verify_export:
                     raise _Uncovered("Original-header export comparison requires a complete raw TAPR edition")
                 from .source_parity_typed import compare_typed
@@ -362,7 +362,7 @@ def validate_source_parity(release: DataRelease, store: ProvenanceStore, *, edit
                                 csv_export={'status': 'FAIL_MISMATCH', 'diagnostic': str(error)})
         except (_Uncovered, FileNotFoundError) as error:
             item.update(status='HOLD_UNCOVERED', diagnostic=str(error))
-        except (ContractError, OSError, ValueError, KeyError, TypeError) as error:
+        except (ContractError, OSError, ValueError, KeyError, TypeError, csv.Error) as error:
             item.update(status='FAIL_MISMATCH', diagnostic=str(error))
         output['editions'].append(item)
     output['status'] = 'PASS_RAW_PARITY' if all(item['status'] == 'PASS_RAW_PARITY' for item in output['editions']) else 'HOLD'

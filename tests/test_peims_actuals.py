@@ -1,5 +1,6 @@
 from datetime import UTC, datetime
 from hashlib import sha256
+import json
 from pathlib import Path
 from zipfile import ZipFile
 
@@ -25,25 +26,39 @@ ROW = "001902,199,2026,11,6100,101,23,-125,18FEB2026\n"
 ZERO = "001902,199,2026,11,6100,101,33,0,18FEB2026\n"
 
 
-def _case(tmp_path, damage=None, *, budget=False):
+def _case(tmp_path, damage=None, *, budget=False, year_override=None, publisher_order=(),
+          no_cost_center=None):
     store = ProvenanceStore(tmp_path / "provenance")
     schema = BUDGET_SCHEMA if budget else ACTUALS_SCHEMA
     basis = "budget" if budget else "actual"
     edition = parse_column_schema(schema.read_bytes())["datasets"][-1]
     dataset, year = edition["dataset"], int(edition["edition"])
+    if year_override is not None:
+        year = year_override
+        edition["edition"] = str(year)
+        for table in edition["tables"]:
+            table["metric_period"] = DataPeriod("fiscal_year", year - 1, year).to_dict()
     metadata = DatasetMetadata(version=str(year), period=DataPeriod("fiscal_year", year - 1, year),
-                               source_url=LISTING)
+                               source_url=LISTING, publisher="Texas Education Agency")
     original = ResolvedDataset(dataset, "data_sources", year, year, "", metadata)
     archives = {}
     for table in edition["tables"]:
         kind = table["table"]
         url = f"{LISTING}/{kind}.zip"
-        member = f"{kind}.csv"
+        member = f"{kind}.csv" if year_override is None else f"{kind.title()}.csv"
         path = tmp_path / f"{kind}.zip"
         fields = ",".join(field["code"] for field in table["fields"])
-        body = ROW + ZERO
+        keeps_order = kind in publisher_order
+        body = ZERO + ROW if keeps_order else ROW + ZERO
+        if keeps_order and kind == "district" and damage == "duplicate":
+            body += ZERO.replace(",0,18FEB2026", ",123,19FEB2026")
+        if kind == no_cost_center and damage != "missing-unit":
+            unit_row = ROW.replace(",101,", ",NUL,")
+            if damage == "foreign-unit":
+                unit_row = unit_row.replace("001902", "001903")
+            body = body.replace(ROW, unit_row)
         if kind == "district":
-            if damage == "duplicate":
+            if damage == "duplicate" and not keeps_order:
                 body = ROW + ROW
             elif damage == "header":
                 fields = fields.replace("PROGRAM_INTENT", "PROGRAM_CODE")
@@ -58,11 +73,25 @@ def _case(tmp_path, damage=None, *, budget=False):
             package.writestr(member, fields + "\n" + body)
             if kind == "district" and damage == "member":
                 package.writestr("unexpected.csv", body)
-        receipt = store.record_acquisition(path, original, downloaded_at=NOW, recorded_at=NOW, requested_url=url,
-            resolved_url=url, parameters={"http_method": "GET", "http_status": 200, "population": kind})
+        parameters = {"http_method": "GET", "http_status": 200}
+        if year_override == 2014:
+            archive_source = ResolvedDataset(f"reference:peims_financial_archive:{path.name}", "reference",
+                year, year, "", DatasetMetadata(version=str(year), period=metadata.period,
+                                               source_url=url, publisher=metadata.publisher))
+        else:
+            archive_source = original
+            parameters["population"] = kind
+        receipt = store.record_acquisition(path, archive_source, downloaded_at=NOW, recorded_at=NOW, requested_url=url,
+            resolved_url=url, parameters=parameters)
         table["input_sha256s"] = [sha256(path.read_bytes()).hexdigest()]
-        archives[kind] = {"receipt_id": receipt, "member": member, "rows": 3 if damage == "rows" else 2,
+        archives[kind] = {"receipt_id": receipt, "member": member,
+                          "rows": 3 if damage == "rows" else body.count("\n"),
                           "requested_url": url, "resolved_url": url}
+        if keeps_order:
+            archives[kind]["key_order"] = "publisher"
+        if kind == no_cost_center:
+            archives[kind]["no_cost_center"] = {"reference_id": "publisher_units",
+                                               "district_counts": {"001902": 1}}
     if damage == "custody":
         archives["charter"]["receipt_id"] = archives["district"]["receipt_id"]
     crosswalk = tmp_path / "crosswalk.json"
@@ -70,7 +99,12 @@ def _case(tmp_path, damage=None, *, budget=False):
     listing = tmp_path / "listing.html"
     listing.write_text("Fixture publisher listings for district and charter actuals")
     references = []
-    for identifier, role, path in (("listing", "source_notes", listing), ("crosswalk", "schema", crosswalk)):
+    documents = [("listing", "source_notes", listing), ("crosswalk", "schema", crosswalk)]
+    if no_cost_center:
+        lookup = tmp_path / "publisher_units.txt"
+        lookup.write_text("001902,NUL,00,NO COST CENTER")
+        documents.append(("publisher_units", "data_dictionary", lookup))
+    for identifier, role, path in documents:
         receipt = store.record_acquisition(path, ResolvedDataset(f"reference:{identifier}", "reference", None, None,
             "", DatasetMetadata(title=identifier)))
         references.append({"reference_id": identifier, "role": role, "title": identifier, "status": "available",
@@ -154,12 +188,127 @@ def test_financial_archive_drift_and_cross_batch_duplicate_never_publish(tmp_pat
     assert not output.exists()
 
 
+@pytest.mark.parametrize("damage", [None, "duplicate", "omit", "null", "custody"], ids=[
+    "preserve-order", "duplicate-across-batches", "omit-order", "null-order", "substitute-receipt",
+])
+def test_historical_actuals_bind_publisher_order_and_check_full_keys(tmp_path, monkeypatch, damage):
+    year = 2019
+    store, config = _case(tmp_path, damage if damage == "duplicate" else None,
+                          year_override=year, publisher_order=("district",))
+    canonical = load_config(config)
+    monkeypatch.setattr("teadata.peims_actuals.load_config", lambda: canonical)
+    monkeypatch.setattr("teadata.peims_actuals._BLOCK_BYTES", len(ROW.encode()) + 1)
+    candidate = tmp_path / "candidate[exact]"
+    if damage in {"omit", "null", "custody"}:
+        data = json.loads(config.read_bytes())
+        sources = data["data_sources"][DATASET][str(year)]["reader"]["profiles"]["source"]["archives"]
+        if damage == "omit":
+            del sources["district"]["key_order"]
+        elif damage == "null":
+            sources["district"]["key_order"] = None
+        else:
+            sources["district"]["receipt_id"] = sources["charter"]["receipt_id"]
+        config.write_text(canonical_json(data))
+    parameters = dict(config=config, config_sha256=sha256(config.read_bytes()).hexdigest(),
+                      years=[year], output=candidate)
+    if damage is not None:
+        match = {"duplicate": "repeated account keys", "omit": "differs from the packaged contract",
+                 "null": "requires a reviewed historical", "custody": "differs from the packaged contract"}[damage]
+        with pytest.raises(ValueError, match=match):
+            materialize_peims_actuals(store, **parameters)
+        assert not candidate.exists()
+        assert not list(tmp_path.glob(".peims-actuals-*"))
+        return
+
+    result = materialize_peims_actuals(store, **parameters)
+    path = candidate / "release.json"
+    release = DataRelease(path, expected_sha256=sha256(path.read_bytes()).hexdigest(), offline=True)
+    assert len(release.verify()) == 2
+    for edition in result["editions"]:
+        ref = release.catalog.artifact_ref(edition["artifact_id"])
+        leaf = release.analytical_dataset(edition["artifact_id"])
+        data = leaf.to_table(columns=["actual_amount", "raw_actual_amount", "source_record"])
+        processing = ProvenanceStore(candidate / "provenance").read_record(ref.processing_id)["parameters"]
+        if edition["key"]["table"] == "district":
+            expected = (0, -125)
+            assert processing["recipe"]["account_key_order"] == "publisher"
+            assert processing["toolchain"]["duckdb"]
+        else:
+            expected = (-125, 0)
+            assert "account_key_order" not in processing["recipe"]
+            assert "duckdb" not in processing["toolchain"]
+        assert data.to_pylist() == [
+            {"actual_amount": amount, "raw_actual_amount": str(amount), "source_record": index}
+            for index, amount in enumerate(expected, 2)
+        ]
+
+
+@pytest.mark.parametrize("budget", [False, True], ids=["actuals", "budgets"])
+def test_modern_financial_sources_cannot_opt_into_publisher_order(tmp_path, budget):
+    store, config = _case(tmp_path, budget=budget, publisher_order=("district",))
+    materialize = materialize_peims_budgets if budget else materialize_peims_actuals
+    output = tmp_path / "candidate"
+    with pytest.raises(ValueError, match="requires a reviewed historical"):
+        materialize(store, config=config, config_sha256=sha256(config.read_bytes()).hexdigest(),
+                    years=[2026 if budget else YEAR], output=output)
+    assert not output.exists()
+
+
+@pytest.mark.parametrize(("damage", "year", "sector", "message"), [
+    (None, 2014, "district", None),
+    ("foreign-unit", 2014, "district", "malformed account code"),
+    ("missing-unit", 2014, "district", "counts differ"),
+    ("missing-lookup", 2014, "district", "metadata differs from the packaged contract"),
+    ("foreign-listing", 2014, "district", "metadata differs from the packaged contract"),
+    (None, 2014, "charter", "historical district FIN_UNIT contract"),
+    (None, 2025, "district", "historical district FIN_UNIT contract"),
+])
+def test_no_cost_center_requires_exact_district_scope_and_lookup(tmp_path, monkeypatch, damage, year, sector, message):
+    historical = year < 2023
+    store, config = _case(tmp_path, damage, year_override=year if historical else None,
+                          publisher_order=(sector,) if historical else (), no_cost_center=sector)
+    canonical = load_config(config)
+    monkeypatch.setattr("teadata.peims_actuals.load_config", lambda: canonical)
+    monkeypatch.setattr("teadata.peims_actuals._BLOCK_BYTES", len(ROW.encode()) + 1)
+    if damage in {"missing-lookup", "foreign-listing"}:
+        document = json.loads(config.read_bytes())
+        metadata = document["data_sources"][DATASET][str(year)]["metadata"]
+        if damage == "missing-lookup":
+            metadata["references"].pop()
+        else:
+            metadata["source_url"] = "https://example.test/other-listing"
+        config.write_text(canonical_json(document))
+    candidate = tmp_path / "candidate"
+    options = dict(config=config, config_sha256=sha256(config.read_bytes()).hexdigest(),
+                   years=[year], output=candidate)
+    if message:
+        with pytest.raises(ValueError, match=message):
+            materialize_peims_actuals(store, **options)
+        assert not candidate.exists()
+        return
+    result = materialize_peims_actuals(store, **options)
+    manifest = candidate / "release.json"
+    release = DataRelease(manifest, expected_sha256=sha256(manifest.read_bytes()).hexdigest(), offline=True)
+    district, = [item for item in result["editions"] if item["key"]["table"] == "district"]
+    table = release.analytical_dataset(district["artifact_id"]).to_table(columns=["financial_unit_code"])
+    assert table["financial_unit_code"].to_pylist() == ["101", "NUL"]
+    processing = ProvenanceStore(candidate / "provenance").read_record(district["processing_record_id"])
+    assert processing["parameters"]["recipe"]["no_cost_center"]["district_counts"] == {"001902": 1}
+    edition = release.catalog.artifact_ref(district["artifact_id"]).edition
+    acquisition, = release.catalog.acquisitions(DATASET, edition=edition)
+    assert acquisition["record_id"] == district["acquisition_id"]
+    assert acquisition["dataset"] == "reference:peims_financial_archive:district.zip"
+    lookup, = [ref for ref in release.catalog.metadata(DATASET, edition=edition).references
+               if ref.reference_id == "publisher_units"]
+    assert set(lookup.provenance_ids) <= set(processing["inputs"])
+
+
 @pytest.mark.parametrize(("dataset", "years", "basis"), [
     (DATASET, (2023, 2024, 2025), "actual"), (BUDGET_DATASET, (2026,), "budget"),
 ])
 def test_annual_financial_config_has_reviewed_separate_publisher_bindings(dataset, years, basis):
     cfg = load_config()
-    assert set(cfg.data_sources[dataset].entries) == set(years)
+    assert set(cfg.data_sources[dataset].entries) == set(years) | (set(range(2013, 2023)) if dataset == DATASET else set())
     store = ProvenanceStore(ROOT / "provenance")
     # Admission reads archived bytes; this static check uses only checked-in receipt headers.
     for year in years:

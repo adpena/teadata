@@ -386,3 +386,39 @@ comparable groups yields `HOLD`. The 2023–24 campus preparation's canonical
 edge status remains `HOLD` because of the directional masking differences
 described above. The comparison can use its separately accepted source rows
 without upgrading that status.
+
+
+### Campus native source check
+
+Use `scripts/check --source-parity` with the exact native candidate
+manifest, retained source store, and campus edition ID. The streaming
+check compares each publisher column and its typed projection against both
+the prepared table and native leaf. It checks recorded historical campus
+locators against the pinned fall AskTED directory. An independent recheck
+of the companion registry's missing campus roster is a separate step.
+
+If `materialize-campus` finds unresolved historical endpoints, it emits a
+JSON `HOLD_HISTORICAL_TRANSFER_ENDPOINTS` result and exits with status 2.
+The result groups endpoint IDs by reason and gives distinct affected
+detail-row counts, with reporting and partner counts shown separately.
+The candidate directory is created only after admission succeeds.
+
+The 2024–25 source view can also carry separate AskTED obsolete dates and
+logical record locators for the reporting or partner endpoint. A dated entry
+in the pinned All Public Schools Closed report must match the fall directory's
+campus ID and name. The report's print date, its obsolete date, the fall
+archive's as-of date, and the transfer measurement period describe different
+events. The obsolete date supplies historical context. It does not prove why
+an endpoint was absent from the companion registry, change any transfer
+count, or change the current campus roster. Empty obsolete-date columns mean
+the workflow attached no qualifying evidence from this report.
+
+### Publisher values, calculated sums and estimates
+
+Keep a TEA-published pair count or total distinct from a TEA Data
+calculation. A sum of observed charter-destination counts is derived
+from the available pair counts. It can omit transfers to masked
+destinations. The estimated total adds a midpoint of five per eligible
+masked destination at the model's grain. Cite both the publisher inputs
+and the [estimation methodology](https://github.com/adpena/teadata/blob/main/teadata/methodologies/charter-transfer-midpoint.md)
+where the estimate appears.

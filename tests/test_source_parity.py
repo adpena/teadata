@@ -201,6 +201,7 @@ def test_export_provenance_is_shared_and_catalog_only(tmp_path, monkeypatch):
     assert document['selector']['opaque_filter'] is True
     assert '-999' not in json.dumps(document)
     assert document['edition_acquisitions'][0]['downloaded_at'] is None
+    assert 'Download date unrecorded.' in provenance.publisher_data_citation
     assert 'path' not in document['source']['references'][0]
     assert document['release']['manifest_sha256'] == release.manifest_sha256
     frame = view.to_df(restore_original_headers=True)
@@ -216,7 +217,10 @@ def test_export_provenance_is_shared_and_catalog_only(tmp_path, monkeypatch):
         sheet = book['Provenance']
         assert sheet['B2'].data_type == 's'
         assert sheet['B2'].value == '=Untrusted publisher title'
-        assert any(row[:2] == ('Rows exported', 2) for row in sheet.values)
+        rows = list(sheet.values)
+        assert any(row[:2] == ('Rows exported', 2) for row in rows)
+        assert any(row[:2] == ('Publisher data citation', provenance.publisher_data_citation) for row in rows)
+        assert any(row[:2] == ('Input download dates', 'Download date unrecorded.') for row in rows)
     finally:
         book.close()
     csv_file = BytesIO()
@@ -229,7 +233,8 @@ def test_export_provenance_is_shared_and_catalog_only(tmp_path, monkeypatch):
 
 def test_direct_export_provenance_reflects_its_own_physical_columns(tmp_path):
     release, _, key, _ = fixture_release(tmp_path, damage='normalized', schema_version=4, http_receipt=True)
-    direct = release.provenance(key).to_dict()
+    provenance = release.provenance(key)
+    direct = provenance.to_dict()
     assert [column['column'] for column in direct['columns']] == ['district_number', 'membership', 'enrollment']
     assert release.to_df(key).attrs['teadata_provenance'] == direct
     assert direct['source']['url'] == 'https://example.org/report'
@@ -239,9 +244,28 @@ def test_direct_export_provenance_reflects_its_own_physical_columns(tmp_path):
     assert acquisition['resolved_url'] == 'https://example.org/resolved.csv'
     assert acquisition['downloaded_at'] == '2025-08-01T00:00:00+00:00'
     assert acquisition['recorded_at'] >= acquisition['downloaded_at']
+    assert 'Downloaded 2025-08-01 UTC.' in provenance.publisher_data_citation
+    assert direct['artifact']['sha256'] in provenance.publisher_data_citation
+    assert acquisition['recorded_at'] not in provenance.publisher_data_citation
     columns = {column['column']: column for column in release.table(key).select('membership').provenance().to_dict()['columns']}
     assert columns['membership_raw']['support_for'] == [{'field': 'membership', 'role': 'raw'}]
     assert columns['membership_status']['support_for'] == [{'field': 'membership', 'role': 'status'}]
+
+
+def test_publisher_data_citation_keeps_mixed_input_dates_explicit(tmp_path):
+    from teadata.export_provenance import ExportProvenance
+    from teadata.manifest import canonical_json
+
+    release, _, key, _ = fixture_release(tmp_path, schema_version=4, http_receipt=True)
+    document = release.provenance(key).to_dict()
+    download, = document['edition_acquisitions']
+    document['edition_acquisitions'].extend([
+        {**download, 'downloaded_at': '2025-08-06T18:00:00+00:00'},
+        {**download, 'method': 'local_observation', 'downloaded_at': None},
+    ])
+    provenance = ExportProvenance(canonical_json(document))
+    assert ('Downloaded 2025-08-01 through 2025-08-06 UTC (2 observed dates). '
+            'Some input download dates are unrecorded.') in provenance.publisher_data_citation
 
 
 @pytest.mark.parametrize('notes', [None, '', '=Retrospective release; older dictionary has edition gaps.'])
@@ -760,5 +784,5 @@ def test_source_parity_cli_is_explicit_offline_and_reports_its_limited_scope(tmp
     verification.main()
     report = json.loads(capsys.readouterr().out)
     assert report['status'] == 'PASS_RAW_PARITY'
-    assert report['scope'] == 'admitted lossless TAPR, typed PEIMS and typed district transfer leaves'
+    assert report['scope'] == 'admitted lossless TAPR, typed PEIMS and typed district and campus transfer leaves'
     assert report['scientific_qualification'] is False

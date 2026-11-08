@@ -55,11 +55,17 @@ def _entity_predicate(native: Dataset, entity_key: str, identifiers: tuple[str, 
     pc: Any = arrow_compute
     if not identifiers:
         return scalar(False)
-    keys = native.to_table(columns=[entity_key])[entity_key]
-    normalized = canonical_source_identifiers(keys, width=6 if entity_key == "district_number" else 9)
-    selected = pa.array(["'" + identifier for identifier in identifiers], type=keys.type)
-    aliases = pc.unique(pc.filter(keys, pc.is_in(normalized, value_set=selected)))
-    return field(entity_key).isin(aliases)
+    key_type = native.schema.field(entity_key).type
+    if not (pa.types.is_string(key_type) or pa.types.is_large_string(key_type)):
+        raise ValueError("Source identifier batches require Arrow strings")
+    selected = pa.array(["'" + identifier for identifier in identifiers], type=key_type)
+    width = 6 if entity_key == "district_number" else 9
+    aliases = set()
+    for batch in native.to_batches(columns=[entity_key], batch_size=65_536, use_threads=False):
+        keys = batch.column(0)
+        normalized = canonical_source_identifiers(keys, width=width)
+        aliases.update(pc.unique(pc.filter(keys, pc.is_in(normalized, value_set=selected))).to_pylist())
+    return field(entity_key).isin(pa.array(sorted(aliases), type=key_type))
 
 
 @dataclass(frozen=True, slots=True, eq=False)
@@ -334,7 +340,18 @@ def prepare_export(release: DataRelease, edition: EditionKey, *, restore_origina
                    entity_ids: tuple[str, ...] | None = None) -> _TableExport:
     selection = _plan_export(release, edition, restore_original_headers=restore_original_headers,
                              selected_fields=selected_fields, include_support=include_support, period=period)
+    return _open_export(release, selection, restore_original_headers=restore_original_headers,
+                        predicate=predicate, queries=queries, period=period, entity_build=entity_build, entity_ids=entity_ids)
+
+
+def _open_export(
+    release: DataRelease, selection: _ExportSelection, *, restore_original_headers: bool = False,
+    predicate: Expression | None = None, queries: tuple[Callable[[pa.Schema], Expression], ...] = (),
+    period: DataPeriod | None = None, entity_build: tuple[str, str] | None = None,
+    entity_ids: tuple[str, ...] | None = None,
+) -> _TableExport:
     artifact = selection.artifact
+    edition = artifact.edition
     opaque_filter = bool(queries) or predicate is not None
     entity_key = _entity_key(artifact) if entity_ids is not None else None
     native = release.analytical_dataset(artifact.identity)

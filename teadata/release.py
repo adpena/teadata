@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping, Sequence
 from functools import lru_cache, partial
 from contextlib import contextmanager
 from contextvars import ContextVar
@@ -23,7 +23,7 @@ from platformdirs import user_cache_path
 
 from .analytical import ANALYTICAL_DATASETS, ANALYTICAL_ROLES, analytical_dataset, validate_artifact, validate_leaf_artifact
 from .dataset_metadata import ArtifactRef, COLUMN_SCHEMA_MAX_BYTES, ColumnSchemaRef, EditionKey, EditionMetadataRef, validate_http_url
-from .dataset_metadata import DataPeriod, NativeSourceRef
+from .dataset_metadata import DataPeriod, NativeSourceRef, _parse_school_year, _validate_observation_selection
 from .manifest import (
     ContractError,
     DatasetCatalog,
@@ -33,6 +33,7 @@ from .manifest import (
 )
 
 if TYPE_CHECKING:
+    from .source_series import ObservationSeries
     from .export_provenance import ExportProvenance
     from .entities import Campus, District
     from .source_views import EntitySources, SourceTable
@@ -605,12 +606,7 @@ class DataRelease:
     def _observation_year_options(
         self, dataset: str, fields: tuple[str, ...], scope: str, edition: EditionKey | None,
     ) -> Iterator[tuple[DataRelease, EditionKey, dict[str, int]]]:
-        if any(not isinstance(value, str) or not value.strip() for value in (dataset, scope)):
-            raise ValueError("Observation selection requires a dataset and scope")
-        if not fields or any(not isinstance(field, str) or not field for field in fields) or len(set(fields)) != len(fields):
-            raise ValueError("Select one or more distinct source fields")
-        if edition is not None and not isinstance(edition, EditionKey):
-            raise TypeError("Edition selection requires an exact EditionKey")
+        _validate_observation_selection(dataset, fields, scope, edition)
 
         def sources():
             if self._v3:
@@ -631,9 +627,13 @@ class DataRelease:
             for key in keys:
                 if edition is not None and key != edition:
                     continue
-                periods = child.catalog._field_periods(key, fields)
-                yield child, key, {field: period.end_year for field, period in periods.items()
-                                   if period.kind == "school_year" and period.end_year is not None}
+                resolved = child.catalog._observation_fields(key, fields)
+                periods = child.catalog._field_periods(key, tuple(resolved.values()))
+                yield child, key, {
+                    field: period.end_year
+                    for field, canonical in resolved.items()
+                    if (period := periods[canonical]).kind == "school_year" and period.end_year is not None
+                }
 
     @staticmethod
     def _years_by_field(
@@ -650,16 +650,33 @@ class DataRelease:
         """List exact measurement years per field from release metadata without opening data leaves."""
         return self._years_by_field(fields, self._observation_year_options(dataset, fields, scope, edition))
 
-    def observations(self, dataset: str, *fields: str, school_year: int | None = None,
+    def observations(self, dataset: str, *fields: str, school_year: int | str | None = None,
                      scope: str, edition: EditionKey | None = None) -> SourceTable:
         """Plan one native table by exact or latest shared measurement school year."""
+        school_year = _parse_school_year(school_year)
+        options = list(self._observation_year_options(dataset, fields, scope, edition))
+        return self._select_observation_view(fields, scope, school_year, options)
+
+    def _select_observation_view(
+        self, fields: tuple[str, ...], scope: str, school_year: int | None,
+        options: Sequence[tuple[DataRelease, EditionKey, dict[str, int]]],
+    ) -> SourceTable:
         from .observations import _ObservationModel, _ObservationRequest
         from .source_views import SourceTable
 
-        if school_year is not None and (type(school_year) is not int or not 2 <= school_year <= 9999):
-            raise ValueError("School year must be its integer ending year")
-        options = list(self._observation_year_options(dataset, fields, scope, edition))
         available = self._years_by_field(fields, options)
+        if any(not years for years in available.values()) and options:
+            from .selectors import _field_suggestions
+
+            names = {name for child, key, _ in options for name in child.catalog._edition_field_names(key)}
+            folded = {name.casefold() for name in names}
+            unknown = {field: _field_suggestions(field, names) for field, years in available.items()
+                       if not years and field.casefold() not in folded}
+            if unknown:
+                raise ContractError(
+                    f"Unknown source field for {scope}. Did you mean: {unknown}? "
+                    "See catalog.variables() for exact names."
+                )
         if school_year is None:
             latest = {years[-1] for years in available.values() if years}
             if len(latest) != 1 or any(not years for years in available.values()):
@@ -676,11 +693,25 @@ class DataRelease:
             raise ContractError(f"Multiple editions match school year {school_year} and {scope}. Select edition: {choices}")
         child, key = matches[0]
         period = DataPeriod("school_year", school_year - 1, school_year)
-        plan = _ObservationModel(self.catalog, [child]).plan(_ObservationRequest(key, field, period) for field in fields)
+        canonical_fields = tuple(child.catalog._observation_fields(key, fields).values())
+        plan = _ObservationModel(self.catalog, [child]).plan(
+            _ObservationRequest(key, field, period) for field in canonical_fields
+        )
         if len(plan.projections) != 1:
             raise ContractError("Observation view requires fields from one native table")
-        return SourceTable(child, key, _fields=fields, _period=period,
+        return SourceTable(child, key, _fields=canonical_fields, _period=period,
                            _entity_build=None if self._v3 else (self.build_id, self.manifest_sha256))
+
+    def series(
+        self, dataset: str, *fields: str, scope: str, years: Sequence[int | str],
+        ids: Sequence[int | str] | None = None, editions: Mapping[int | str, EditionKey] | None = None,
+        names: Sequence[str] | None = None, entity_release: DataRelease | None = None,
+    ) -> ObservationSeries:
+        """Plan the selected fields across explicit measurement school years."""
+        from .source_series import ObservationSeries
+
+        return ObservationSeries._plan(self, dataset, fields, scope=scope, years=years, ids=ids, editions=editions,
+                                       names=names, entity_release=entity_release)
 
     def to_csv(self, edition: EditionKey, path_or_buf: str | Path | BinaryIO, *,
                restore_original_headers: bool = False) -> None:

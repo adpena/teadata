@@ -1257,6 +1257,30 @@ class DatasetCatalog:
         resolved = self._resolve_field(field, scope)
         return self._field_metadata(*resolved) if resolved is not None else None
 
+    def _edition_field_names(self, edition: EditionKey) -> tuple[str, ...]:
+        """Read canonical names from the edition index without opening crosswalks."""
+        self._require_index()
+        identifier = edition.identity
+        if self._edition_keys.get(identifier) != edition:
+            raise ContractError("Exact edition selection is missing")
+        catalog = self._edition_view(identifier) if getattr(self, "_v4", False) else self
+        return tuple(field for key, field in catalog._field_bindings if key == identifier)
+
+    def _observation_fields(self, edition: EditionKey, fields: tuple[str, ...]) -> dict[str, str]:
+        from .selectors import _folded_field_names
+
+        resolved = {}
+        for requested, matches in _folded_field_names(fields, self._edition_field_names(edition)).items():
+            if requested in matches:
+                resolved[requested] = requested
+            elif len(matches) == 1:
+                resolved[requested] = matches[0]
+            elif matches:
+                raise ContractError(f"Ambiguous source field {requested!r}. Use exact spelling: {matches}.")
+        if len(resolved.values()) != len(set(resolved.values())):
+            raise ContractError("Source fields must resolve to distinct canonical fields.")
+        return resolved
+
     def _field_periods(self, edition: EditionKey, fields: tuple[str, ...]) -> dict[str, DataPeriod]:
         """Read selected periods from the same validated headers as field_metadata."""
         self._require_index()

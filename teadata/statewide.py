@@ -12,7 +12,10 @@ from math import isfinite
 from typing import TYPE_CHECKING, Any
 
 from .column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
-from .dataset_metadata import STATEWIDE_SINGLETON_GRAIN, ArtifactRef, DataPeriod, DatasetMetadata, EditionKey
+from .dataset_metadata import (
+    STATEWIDE_SINGLETON_GRAIN, ArtifactRef, DataPeriod, DatasetMetadata, EditionKey,
+    _EDITION_KEY_GUIDANCE, _parse_school_year,
+)
 from .entities import Campus, District
 from .identifiers import canonical_source_identifiers
 from .manifest import ContractError, canonical_json
@@ -121,6 +124,7 @@ class _StudentContract:
     columns: Mapping[str, tuple[str, ...]]
     sources: Mapping[str, tuple[str, str]]
     local_columns: Mapping[tuple[str, str], int]
+    roster_bound: bool
     cohort: tuple[str, str, str, str] | None = None
 
     def value(self, row: dict[str, Any], field: str, unit: str) -> tuple[str | None, str, Number | None]:
@@ -211,7 +215,7 @@ def _reviewed_students(release: DataRelease, key: EditionKey) -> tuple[str, str,
     local_columns = {(population, quantity): index + 2
                      for index, (population, quantity, role) in enumerate(students.definition()["column_roles"][key.scope])
                      if role == "local"}
-    typed = _StudentContract(key.scope, fields, policy, pointers, sources, local_columns, cohort)
+    typed = _StudentContract(key.scope, fields, policy, pointers, sources, local_columns, bool(attachments), cohort)
     return key.revision_sha256, mapping, replace(review, references=metadata.references), policy_hash, typed
 
 
@@ -308,15 +312,19 @@ def _projection(release: DataRelease, key: EditionKey, fields: list[tuple[str, D
 
 def _statistics(local: EditionKey, local_metadata: DatasetMetadata,
                 statewide_metadata: DatasetMetadata, local_review: DatasetMetadata,
-                statewide_review: DatasetMetadata, metric: str) -> list[_Statistic]:
+                statewide_review: DatasetMetadata, metric: str, school_year: int | None) -> list[_Statistic]:
     common = local_review.metrics.keys() & statewide_review.metrics.keys()
     if local.dataset == PRIMARY_DISABILITY and int(local.edition) < 2025:
         common.discard("primary_developmental_delay_count")
+    if metric != "*" and metric not in common:
+        examples = ", ".join(sorted(common)[:5]) or "none"
+        raise ContractError(f"Statewide comparison requires the same reviewed numeric metric in both editions: {metric!r}. "
+                            f"Examples of common metric names: {examples}. Use '*' for all reviewed metrics.")
     names = sorted(common) if metric == "*" else [metric]
     result = []
     for name in names:
         left, right = local_metadata.metrics.get(name), statewide_metadata.metrics.get(name)
-        if (name not in common or left is None or right is None
+        if (left is None or right is None
                 or left != local_review.metrics[name] or right != statewide_review.metrics[name]
                 or left.unit is None or left.unit != right.unit or left.unit not in _NUMERIC_UNITS):
             raise ContractError(f"Statewide comparison requires the same reviewed numeric metric in both editions: {name}")
@@ -328,15 +336,31 @@ def _statistics(local: EditionKey, local_metadata: DatasetMetadata,
         result.append(_Statistic(name, left.unit, period, left.field, right.field))
     if not result:
         raise ContractError("These editions have no reviewed common numeric metrics")
-    return result
+    if school_year is None:
+        return result
+    selected = [stat for stat in result if stat.period.kind == "school_year" and stat.period.end_year == school_year]
+    if selected:
+        return selected
+    if metric != "*":
+        period = result[0].period
+        raise ContractError(f"Metric {metric} covers {period.label} ({period.kind}). Requested school year ends in {school_year}.")
+    years = sorted({stat.period.end_year for stat in result
+                    if stat.period.kind == "school_year" and stat.period.end_year is not None})
+    available = ", ".join(map(str, years)) if years else "none"
+    raise ContractError(f"No reviewed comparison metrics for school year ending in {school_year}. "
+                        f"Available school-year end years: {available}.")
 
 
 def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionKey, metric: str,
-                    dimensions: Mapping[str, str]) -> tuple[list[_Statistic], _Projection, _Projection]:
+                    dimensions: Mapping[str, str], school_year: int | None = None) -> tuple[list[_Statistic], _Projection, _Projection]:
     key_column = f"{local.scope}_number"
     course_pair = local.dataset == statewide.dataset == COURSES
     if course_pair and local.scope != "district":
         raise ContractError("Campus course comparisons are on hold pending publisher geography qualification")
+    from .release import DataRelease
+
+    if not isinstance(release, DataRelease):
+        raise TypeError("release must be a DataRelease opened from a release manifest.")
     catalog = release.catalog
     local_metadata = catalog.metadata(local.dataset, edition=local)
     state_metadata = catalog.metadata(statewide.dataset, edition=statewide)
@@ -362,7 +386,14 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
         local_keys, state_keys = [key_column], []
         left_revision, left_mapping, left_review, left_policy, left_student = _reviewed_students(release, local)
         right_revision, right_mapping, right_review, right_policy, right_student = _reviewed_students(release, statewide)
-        if left_student.cohort != right_student.cohort:
+        if local.scope == "campus" and left_student.roster_bound:
+            # Campus coverage has its own roster. The reviewed Texas observation
+            # supplies the same statewide baseline for each campus partition.
+            witness = students.definition()["witnesses"]["state"]
+            if (right_student.cohort is None or right_student.sources.get(witness["identifier"])
+                    != (witness["html_receipt"], witness["html_sha256"])):
+                raise ContractError("Campus student comparison requires the pinned direct Texas report")
+        elif left_student.cohort != right_student.cohort:
             raise ContractError("Student comparison requires the same pinned statewide cohort")
     elif course_pair or (local.dataset == statewide.dataset and local.dataset in SCOPES_BY_DATASET):
         scopes = {"state", "district"} if course_pair else SCOPES_BY_DATASET[local.dataset]
@@ -377,7 +408,8 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
         right_revision, right_mapping, right_review, right_policy = _reviewed_peims(statewide.dataset, int(statewide.edition), "state")
         expected_dimensions = set(state_keys) - {"school_year"}
         if set(dimensions) != expected_dimensions:
-            raise ContractError(f"Expected exact publisher dimensions {sorted(expected_dimensions)}")
+            raise ContractError(f"Expected exact publisher dimensions {sorted(expected_dimensions)}. "
+                                f"Received keys {sorted(dimensions)}. Use the publisher's literal strings for their values.")
     elif (local.table in _TAPR_RAW_FAMILIES and local.table == statewide.table
           and local.dataset == f"{local.scope}_tapr_{local.table}"
           and statewide.dataset == f"state_tapr_{local.table}" and local.edition == str(EDITION)):
@@ -398,7 +430,7 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
     if any((selected.value_policy, selected.references) != (review.value_policy, review.references)
            for selected, review in ((local_metadata, left_review), (state_metadata, right_review))):
         raise ContractError("Comparison requires the reviewed methodology and source references")
-    statistics = _statistics(local, local_metadata, state_metadata, left_review, right_review, metric)
+    statistics = _statistics(local, local_metadata, state_metadata, left_review, right_review, metric, school_year)
     return (statistics, _projection(release, local, [(stat.local_field, stat.period) for stat in statistics],
                                     keys=local_keys, mapping=left_mapping, policy=left_policy, raw_policy=raw_policy,
                                     integer_rates=staar, student=left_student),
@@ -409,10 +441,17 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
 
 def compare_statewide(items: Sequence[object], *, release: DataRelease, local: EditionKey,
                       statewide: EditionKey, metric: str = "*",
-                      dimensions: Mapping[str, str] | None = None) -> list[StatewideComparison]:
+                      dimensions: Mapping[str, str] | None = None, school_year: int | str | None = None) -> list[StatewideComparison]:
     """Compare reviewed metrics against the publisher's exact statewide values."""
+    school_year = _parse_school_year(school_year)
+    if not isinstance(local, EditionKey) or not isinstance(statewide, EditionKey):
+        raise TypeError(f"local and statewide must be EditionKey objects. {_EDITION_KEY_GUIDANCE}")
+    if not isinstance(metric, str) or not metric.strip():
+        raise ValueError("metric must be a reviewed metric name as a nonblank string, or '*' for all reviewed metrics.")
     if local.scope not in {"district", "campus", "region"} or statewide.scope != "state" or local.edition != statewide.edition:
-        raise ContractError("Statewide comparison requires matched local and statewide editions")
+        raise ContractError("Statewide comparison requires matched local and statewide editions. Use a local "
+                            "district, campus or supported region and a statewide state edition from the same report year. "
+                            f"Received {local.scope!r}/{local.edition!r} and {statewide.scope!r}/{statewide.edition!r}.")
     regional = local.scope == "region"
     entity_type = Campus if local.scope == "campus" else District
     if not regional and any(not isinstance(item, entity_type) for item in items):
@@ -423,8 +462,9 @@ def compare_statewide(items: Sequence[object], *, release: DataRelease, local: E
     dimensions = {} if dimensions is None else dimensions
     if not isinstance(dimensions, Mapping) or any(not isinstance(key, str) or not isinstance(value, str)
                                                   for key, value in dimensions.items()):
-        raise ContractError("Comparison dimensions must use literal publisher strings")
-    statistics, local_plan, state_plan = _compare_source(release, local, statewide, metric, dimensions)
+        raise ContractError("Comparison dimensions must use literal publisher strings in a mapping, "
+                            "such as {'course_code': '03100500'}, or None when the source has no dimensions.")
+    statistics, local_plan, state_plan = _compare_source(release, local, statewide, metric, dimensions, school_year)
     if not items:
         return []
 
@@ -449,12 +489,12 @@ def compare_statewide(items: Sequence[object], *, release: DataRelease, local: E
     applicable = [not (isinstance(item, Campus) and item.is_private) for item in items]
     key_prefix = "" if regional else "'"
     wanted = {key_prefix + identifier for identifier, applies in zip(identifiers, applicable, strict=True) if applies and identifier}
-    full_student = local_plan.student if local_plan.student is not None and local_plan.student.cohort is not None else None
+    roster_student = local_plan.student if local_plan.student is not None and local_plan.student.roster_bound else None
     raw_by_key = {}
     if wanted:
         key_column = f"{local.scope}_number"
         local_filter = predicate
-        if full_student is not None:
+        if roster_student is not None:
             # This leaf has already committed to exact unquoted publisher IDs.
             local_filter = ds.field(key_column).isin([key[1:] for key in sorted(wanted)])
         source_rows = release.analytical_dataset(local_plan.artifact.identity).to_table(
@@ -471,8 +511,8 @@ def compare_statewide(items: Sequence[object], *, release: DataRelease, local: E
     dimension_values = tuple(sorted(dimensions.items()))
     for identifier, applies in zip(identifiers, applicable, strict=True):
         local_row = raw_by_key.get(key_prefix + identifier) if applies and identifier else None
-        if local_row is None and full_student is not None and applies and identifier in full_student.sources:
-            raise ContractError("Statewide student leaf omits a requested district from its report ledger")
+        if local_row is None and roster_student is not None and applies and identifier in roster_student.sources:
+            raise ContractError(f"Student leaf omits a requested {local.scope} from its report ledger")
         for stat, (state_raw, state_status, state_value) in zip(statistics, state_values, strict=True):
             if local_row is None:
                 raw, status, value = None, "unavailable" if applies else "not_applicable", None
