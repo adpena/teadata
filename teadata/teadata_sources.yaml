@@ -796,6 +796,86 @@ data_sources:
       reader:
         column_schema: schemas/data_sources--charter_reference--2025--default.json
   district_transfer_reports:
+    2019:
+      metadata:
+        metrics:
+          transfers:
+            field: student_transfer_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+        notes: One statewide logical report from all 20 offered regional originals. Publisher residence-area-to-attendance
+          observations use historical district identifiers. Report details, publisher totals and separators remain
+          separate. The observed reporting districts do not establish exhaustive LEA coverage. The dedicated transfer
+          preparation and native catalog workflow owns row access. This edition retains independent inbound and
+          outbound rows. The 62 reciprocal masking differences are not reconciled. A literal zero on a separator
+          remains in the raw column and carries missing status in the typed count.
+        period:
+          end_year: 2019
+          kind: school_year
+          start_year: 2018
+        provenance_ids:
+        - b1df4c771aca09ae0ef5775c7be8ef11d2676fad4fce73120e29459145855e49
+        - 5d6cdb30f0556951606dafddbcc6e7cc48ff1f03a27cfa53b3e893d4df5b8dd9
+        - e61d7ba38bbf81a46b4255b447c403be669d558dbe6c80bd09a42a8130cdf790
+        - f4f04287d1e549bfe7e7a4a3c95ad7db2fa7936ae3d05d7b72f4cb7539b13571
+        - 164fd932873b4b3b9f25fcceb6699d3f1f0f1552c57f2cb3d81e7adfe886c0ba
+        - 77cdb781c189c8a89e546b4577b80ca83373a2aad1dc991e7ce49c150251c8b3
+        - 182dde3c9bfb45089ae072a497668e7af78f06762f8c5f3941ba790584ac118e
+        - 4654ee7b4b1e918c3acde85511a0269ddecd9c494d698d1c6bca08c040a28164
+        - 51cb218d3169231a4318509a3dfa8057cca342fabeaf3cb8e8ad701227251282
+        - b54f66944f2813f76f509a79b050d795fbb6be5a9f213bc8da1b08b2e89190af
+        - e8f0f41fb52b09f2fb38ba6bad558eabdb31574bef660a6ead4f8d192ce20a89
+        - 2b6f40775305a7af1afb55f3173a7b43296870501c564b9b10ac3c145997a238
+        - 25c30813d993dcd736de7898605dd1aedfec56b3558966cbabbe345f4e2198c1
+        - ee98f95825ddf704a038d04361f7458cdfdb6c09e5533b2619203253301a9877
+        - 2f69755b6ac462385c7ff1549b8b55f6f17d5f5e16235f564ae7681b096abdea
+        - ec406f4fbe27ae35f1e243146cedf72f2dbc4951e126b42db3249e87f2348f03
+        - 3679b3ab4c01512cc613b220a45395c085d7109833439003c714f6c3803f1797
+        - 1ccbc84f633dfb0b274cb2960108b250648e22aa670dbf719265720abb62758a
+        - f64a0beb01b4dd7ede6b90e0f37178ef83952dea9f645063f970b3968b1f84f3
+        - 51fd4bfaaa44b2765e57528f9b7d05515509036a84766d17bb026fe59af5e028
+        publisher: Texas Education Agency
+        references:
+        - path: schemas/district-transfer-reports--2019--crosswalk.json
+          provenance_ids:
+          - a6bd67bca6e712d6b03d8e520db0c0e1dc6a9e06f754f9dbb7133806ecae3130
+          reference_id: columns
+          reviewed_sha256: e0cc30b3af829d5d75a41dd3fcdeeec592b4a786592da8a10be92272b6cdd4a3
+          role: schema
+          status: available
+          title: TEA Data generated ordered district transfer header mapping, edition 2019
+        - provenance_ids:
+          - b1df4c771aca09ae0ef5775c7be8ef11d2676fad4fce73120e29459145855e49
+          reference_id: masking
+          reviewed_sha256: 53aacc3bbe826ccc3df09a0db377e7c08a0ae9f997010f23604b08af90b4c888
+          role: masking_methodology
+          status: available
+          title: Original 2019 Region01 district CSV containing publisher FERPA masking notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.download_transfer_report.sas&scope=Region&agg_level=region&_debug=0&school_year=2019&report_format=csv&selected_id=01&Region_District_Xfr_Report=Get+a+Region+District+Transfer+Report
+        - provenance_ids:
+          - e853850f4f9931afc5e755de31ff3f78cfd2fa5c1f9b21f6049152d3728f40c1
+          reference_id: transfer_definitions
+          reviewed_sha256: 2501a791870e5015247bb0b5837e31047da8ad4741917b7f0c4a3a44fa417302
+          role: methodology
+          status: available
+          title: About Transfer Reports
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/about_transfer_reports.html
+        - provenance_ids: []
+          reference_id: dictionary
+          role: data_dictionary
+          status: unreviewed
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/region_district_transfer_report.html
+        title: TEA PEIMS district transfer reports, 2018-2019, all offered regional originals
+        value_policy: campus_transfers
+        version: '2019'
+      path: data/transfer_reports/district-2019-report-rows.parquet
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/district-transfer-reports--2019--crosswalk.json
     2020:
       metadata:
         metrics:

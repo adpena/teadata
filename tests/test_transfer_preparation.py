@@ -27,6 +27,9 @@ DISTRICT_HEADER = ["YEAR", "REPORT_REGION", "REPORT_REGION_NAME", "REPORT_DISTNA
 DISTRICT_HEADER_2020 = ["YEAR", "REPORT_REGION", "REPORT_REGION_NAME_PROP", "REPORT_DISTNAME_NUMBER_PROPCASE",
     "REPORT_CHARTER_STATUS", "REPORT_NUMBER", "REPORT_TYPE", "LINE_GROUP_NUMBER", "DISTNAME_NUMBER_RES_ATTEND_PROP",
     "TRANSFERS_IN_OUT"]
+DISTRICT_HEADER_2019 = ["YEAR", "REPORT_REGION", "REPORT_REGION_NAME_PROP", "report_distname_number_propcase",
+    "REPORT_CHARTER_STATUS", "REPORT_NUMBER", "REPORT_TYPE", "LINE_GROUP_NUMBER", "distname_number_res_attend_prop",
+    "TRANSFERS_IN_OUT"]
 NOTES = [
     " -999 indicates counts or percentages are not available (i.e. masked) to comply with the Family Educational Rights and Privacy Act (FERPA).",
     "Masked numbers are typically small although larger numbers may be masked to prevent imputation.",
@@ -181,6 +184,29 @@ def test_2020_district_original_requires_its_literal_heading_and_title(tmp_path)
     with pytest.raises(ValueError, match="Unexpected transfer publisher title"):
         read(*original(tmp_path, rows, grain="district", report_scope="Region", district_header=DISTRICT_HEADER_2020),
              grain="district", year=2020, region="04")
+
+
+def test_2019_district_original_distinguishes_zero_separators_from_observations(tmp_path):
+    report = ["2018-2019", "04", "REGION IV HOUSTON", "Example ISD (001902)", "Traditional ISD/CSD",
+              "100", "Transfers In From"]
+    rows = [[*report, "100", "Partner ISD (002902)", "0"],
+            [*report, "100", "Masked ISD (002903)", "-999"],
+            [*report, "200", "Total Transfers In", "0"], [*report, "300", "", "0"]]
+    options = {"grain": "district", "report_scope": "Region", "report_title": "PEIMS Student Transfers Report"}
+    table = read(*original(tmp_path, rows, district_header=DISTRICT_HEADER_2019, **options),
+                 grain="district", year=2019, region="04").table
+    assert table.column_names[:10] == DISTRICT_HEADER_2019
+    assert table["transfer_partner_number"].to_pylist() == ["'002902", "'002903", None, None]
+    assert table["TRANSFERS_IN_OUT"].to_pylist() == ["0", "-999", "0", "0"]
+    assert table["transfer_count_status"].to_pylist() == ["observed", "suppressed", "observed", "missing"]
+    assert table["transfer_count_value"].to_pylist() == [0, None, 0, None]
+    rows[-1][-1] = ""
+    with pytest.raises(ValueError, match="literal zero placeholder"):
+        read(*original(tmp_path, rows, district_header=DISTRICT_HEADER_2019, **options),
+             grain="district", year=2019, region="04")
+    with pytest.raises(ValueError, match="preamble/header schema"):
+        read(*original(tmp_path, rows, district_header=DISTRICT_HEADER_2020, **options),
+             grain="district", year=2019, region="04")
 
 
 def test_district_published_total_is_retained_independently_of_masked_detail(tmp_path):

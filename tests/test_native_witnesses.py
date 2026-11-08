@@ -97,7 +97,7 @@ def test_transfer_witness_rejects_a_truncated_data_row_as_a_footer(tmp_path):
 
 
 @pytest.mark.parametrize("label", ["District (001902)", "District (01902)", "District (001903)"])
-@pytest.mark.parametrize("year", [2020, 2021])
+@pytest.mark.parametrize("year", [2019, 2020, 2021])
 def test_historical_transfer_witness_requires_the_exact_parenthesized_district(tmp_path, label, year):
     report = tmp_path / "district.csv"
     headings = transfer_columns("district", year=year)

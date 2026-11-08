@@ -185,13 +185,18 @@ assumed. All 20 regional originals have been acquired for each year from
 2022–23 through 2025–26. Compare their district coverage separately against the expected
 scope. Individual district examples provide additional publisher witnesses.
 
-The 2019–20 and 2020–21 regional and individual district originals put the
+The 2018–19 through 2020–21 regional and individual district originals put the
 six-digit ID in parentheses at the end of the label. Preparation reads that
 final ID as text and retains the full original label. A shorter or missing ID
 fails preparation. The 2019–20 edition uses the title `PEIMS Student Transfers
 Report` and three distinct headings: `REPORT_REGION_NAME_PROP`,
 `REPORT_DISTNAME_NUMBER_PROPCASE`, and `DISTNAME_NUMBER_RES_ATTEND_PROP`.
-The prepared table and source catalog retain those labels.
+The 2018–19 edition uses the same plural title and spells the two district
+label headings `report_distname_number_propcase` and
+`distname_number_res_attend_prop`. The prepared table and source catalog
+retain those labels. A literal `0` on a 2018–19 separator is a structural
+placeholder. The typed count is missing only on that row kind. An observed
+zero on a detail or publisher total stays observed.
 
 For a regional batch:
 
@@ -293,7 +298,7 @@ change the default source configuration, or qualify a release scientifically.
 
 `refresh_transfers materialize` accepts exact annual preparation processing IDs
 and a reviewed, SHA-pinned source Config. The packaged `teadata_sources.yaml`
-includes source discovery for 2019–20, 2020–21 and 2022–23 through 2025–26 district
+includes source discovery for 2018–19 through 2020–21 and 2022–23 through 2025–26 district
 reports. The 2021–22 identity join remains on hold.
 The builder requires every offered region from the preparation's captured
 index/form, in source order. Each annual batch contains all 20 regional originals.
@@ -320,6 +325,7 @@ uv run --locked --offline python -m teadata.scripts.refresh_transfers materializ
   --store "$TRANSFER_PROVENANCE_STORE" \
   --config teadata/teadata_sources.yaml \
   --config-sha256 "$TRANSFER_REVIEWED_CONFIG_SHA256" \
+  --prepared-input 2019 bd964fcff77bf0b711aab985f39a7dddbd56baa3684399fbfe9ab78d1895d6ed \
   --prepared-input 2020 731c37240f1561456266a34bdc90234d2ffc5a77468a58a8300ef60a61942318 \
   --prepared-input 2021 1205b8ef77e262ce8102f67ab880d1e121cc550568b3d23aaf4d41c126d3617b \
   --prepared-input 2023 f884f3ebdd177607d6ac2b417dec9664c19a98349bb775b0ce22fcea06381f37 \
@@ -328,6 +334,15 @@ uv run --locked --offline python -m teadata.scripts.refresh_transfers materializ
   --prepared-input 2026 02977bde453c093ff624ff81537cf9c26d163aed6434e7045239273e1a3e0b18 \
   --output "$TRANSFER_NEW_CANDIDATE_DIR"
 ```
+
+For 2018–19, all 20 originals provided 34,776 rows across 1,200 reporting
+districts, including 28,188 directional details, 2,196 published totals and
+4,392 separators. Four individual reports matched 118 regional rows in source
+order and reproduced both directions for two of the 62 reciprocal pairs where
+one direction reports a count and the other masks it. In 42 pairs the inbound
+count is masked, and in 20 the outbound count is masked. The native table
+retains each direction's raw token and status. A combined edge would lose
+that distinction and is outside this candidate.
 
 For 2019–20, all 20 originals provided 35,807 rows across 1,202 reporting
 districts, including 29,216 directional details, 2,197 published totals and

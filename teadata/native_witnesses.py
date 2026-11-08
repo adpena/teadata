@@ -13,7 +13,7 @@ from urllib.parse import urlencode
 
 from .manifest import ContractError
 from .peims_leaves import PRIMARY_DISABILITY
-from .transfer_sources import _FOOTNOTES, transfer_columns
+from .transfer_sources import _FOOTNOTES, _PARENTHESIZED_DISTRICT_ID_EDITIONS, transfer_columns
 
 if TYPE_CHECKING:
     from .dataset_metadata import ArtifactRef, EditionKey
@@ -259,7 +259,7 @@ def _transfer(path: Path, ref: ArtifactRef, district: str, table: Any) -> int:
     header, = (index for index, row in enumerate(rows) if row == headings)
     number = district.split(" ", 1)[0]
     period = f"{year - 1}-{year}"
-    district_suffix = f" ({number})" if year in {2020, 2021} else f"  -  {number}"
+    district_suffix = f" ({number})" if year in _PARENTHESIZED_DISTRICT_ID_EDITIONS else f"  -  {number}"
     body = rows[header + 1:]
     end = next((index for index, row in enumerate(body) if len(row) != len(headings)), len(body))
     source, footer = body[:end], body[end:]

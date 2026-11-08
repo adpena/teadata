@@ -351,6 +351,12 @@ _DISTRICT_COLUMNS_2020 = (
     *_DISTRICT_COLUMNS[:2], "REPORT_REGION_NAME_PROP", "REPORT_DISTNAME_NUMBER_PROPCASE",
     *_DISTRICT_COLUMNS[4:8], "DISTNAME_NUMBER_RES_ATTEND_PROP", _DISTRICT_COLUMNS[-1],
 )
+_DISTRICT_ORIGINAL_COLUMNS = {
+    2019: (*_DISTRICT_COLUMNS_2020[:3], "report_distname_number_propcase",
+           *_DISTRICT_COLUMNS_2020[4:8], "distname_number_res_attend_prop", _DISTRICT_COLUMNS[-1]),
+    2020: _DISTRICT_COLUMNS_2020,
+}
+_PARENTHESIZED_DISTRICT_ID_EDITIONS = frozenset({2019, 2020, 2021})
 _FOOTNOTES = (
     "-999 indicates counts or percentages are not available (i.e. masked) to comply with the Family Educational Rights and Privacy Act (FERPA).",
     "Masked numbers are typically small although larger numbers may be masked to prevent imputation.",
@@ -373,7 +379,7 @@ def _campus_wire_schema(year: int | None, layout: str = "original") -> bytes:
 
 def transfer_columns(grain: str, *, year: int | None = None, layout: str = "original") -> tuple[str, ...]:
     if grain == "district":
-        return _DISTRICT_COLUMNS_2020 if year == 2020 and layout == "original" else _DISTRICT_COLUMNS
+        return _DISTRICT_ORIGINAL_COLUMNS.get(year, _DISTRICT_COLUMNS) if layout == "original" else _DISTRICT_COLUMNS
     if grain == "campus":
         return tuple(json.loads(_campus_wire_schema(year, layout))["columns"])
     raise ValueError("Transfer grain must be campus or district")
@@ -381,7 +387,7 @@ def transfer_columns(grain: str, *, year: int | None = None, layout: str = "orig
 
 def _transfer_titles(grain: str, *, year: int | None, region: str | None) -> list[str]:
     scope = "Region" if region is not None else grain.title()
-    report = "PEIMS Student Transfers Report" if grain == "district" and year == 2020 else "PEIMS Student Transfer Report"
+    report = "PEIMS Student Transfers Report" if grain == "district" and year in {2019, 2020} else "PEIMS Student Transfer Report"
     return ["T E X A S E D U C A T I O N A G E N C Y", f"{scope} Level Transfer Report", report]
 
 
@@ -464,8 +470,7 @@ def _transfer_projection(table, *, grain: str, period: DataPeriod, policy: Value
             require(pc.or_(pc.invert(pc.or_(separator, total)), pc.equal(table[name], "")),
                     "Transfer separator/total unexpectedly carries a partner identity")
     else:
-        # The 2019–20 and 2020–21 originals place the full district ID in parentheses.
-        if layout == "original" and period.end_year in {2020, 2021}:
+        if layout == "original" and period.end_year in _PARENTHESIZED_DISTRICT_ID_EDITIONS:
             pattern = r"^.*\S\s+\((?P<number>[0-9]{6})\)$"
         else:
             pattern = r"^.*\S\s+-\s+(?P<number>[0-9]{6})$"
@@ -490,8 +495,14 @@ def _transfer_projection(table, *, grain: str, period: DataPeriod, policy: Value
     indices = pc.index_in(table[count_column], value_set=unique)
     statuses = pc.take(pa.array([value.status.value for value in interpreted]), indices)
     values = pc.take(pa.array([value.numeric for value in interpreted], type=pa.int64()), indices)
-    require(pc.or_(pc.invert(separator), pc.equal(statuses, ValueStatus.MISSING.value)),
-            "Transfer separator carries a nonmissing count")
+    if grain == "district" and period.end_year == 2019 and layout == "original":
+        require(pc.or_(pc.invert(separator), pc.equal(table[count_column], "0")),
+                "2018–19 district transfer separator must carry its literal zero placeholder")
+        statuses = pc.if_else(separator, ValueStatus.MISSING.value, statuses)
+        values = pc.if_else(separator, pa.scalar(None, type=pa.int64()), values)
+    else:
+        require(pc.or_(pc.invert(separator), pc.equal(statuses, ValueStatus.MISSING.value)),
+                "Transfer separator carries a nonmissing count")
     names = transfer_value_columns(grain, year=period.end_year, layout=layout)
     columns = {
         names["REPORT_REGION"]: regions,
