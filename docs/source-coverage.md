@@ -78,10 +78,15 @@ duplicate codes even when their source spellings differ.
 
 In the 2024–25 Student Information report, mobility, student attrition, and
 disciplinary placements describe 2023–24. Campus and district metadata record
-that period for the reviewed count and percent fields. The statewide attrition
-fields remain raw because the glossary's description and formula disagree on
-the fall-to-fall cohort. Staff retention and turnover need their own cohort
-review.
+that period for the reviewed count and percent fields. The
+[annual attrition workbook](https://tea.texas.gov/data-reports/school-performance/accountability-research/completion-graduation-and-dropout/2023-24-annual-attrition-rates_0.xlsx)
+independently corroborates the reviewed direct Texas count (765,408) and rate
+(18.0%). It measures whether eligible students enrolled in fall 2023–24
+returned to the same campus in fall 2024–25; a student can stay in the same
+district and count as a nonreturner. The TAPR glossary prose names the prior
+fall interval. The workbook and the exact report observations support the
+2023–24 binding; their reporting rosters and disclosure tokens are separate.
+Staff retention and turnover need their own cohort review.
 
 ## Published 2026 entity snapshot
 

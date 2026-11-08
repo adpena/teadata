@@ -14501,6 +14501,14 @@ data_sources:
         version: '2025'
         source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
         metrics:
+          student_membership_attrition_all_students_count:
+            field: state_2025_student_membership_2023_24_attrition_all_students_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_attrition_all_students_percent:
+            field: state_2025_student_membership_2023_24_attrition_all_students_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
           daep_count:
             field: state_2024_daep_count
             unit: count
@@ -14830,6 +14838,14 @@ data_sources:
           provenance_ids:
           - 05d8b500dfdbab97e6b5e0dfe13f8458f9d6b7b45df9c4630db79f6498e23606
           reviewed_sha256: a4fa6bb001446cd39a43c2a86e1eb39eaa451803457b0cf2d8816ae96c239d5c
+        - reference_id: annual_attrition_witness
+          role: source_notes
+          url: https://tea.texas.gov/data-reports/school-performance/accountability-research/completion-graduation-and-dropout/2023-24-annual-attrition-rates_0.xlsx
+          title: TEA annual attrition workbook, fall 2023–24 to fall 2024–25
+          status: available
+          provenance_ids:
+          - 6552c7f1abe6165a5a4d5a55c3ec6e02c13067d314808dae25c31ce6ec503bf5
+          reviewed_sha256: a3145fed153b03e09112c9597947d811bf2e784de98dd1d6ff0ad1b88be2d458
         - reference_id: glossary
           role: glossary
           url: https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf
@@ -14855,7 +14871,10 @@ data_sources:
           - fc9a3e917bee914c1942c226e2e6e9aa6ad628622ba57e84ae2e1ecd11728f1d
           reviewed_sha256: c1ee7d733464d706fe3521ed895bb20bf278bf38a9afa1d9c93c1ef120acfaab
         notes: TEA's corrected 2024–25 STUD CSV and ordered dictionary are retained. The code vectors and all
-          data cells match the prior original. Selected measurement periods remain as reviewed for their fields.
+          data cells match the prior original. Attrition follows eligible students from fall 2023–24
+          to fall 2024–25 and measures return to the same campus, even when summarized by district or Texas.
+          The annual attrition workbook corroborates the period and published statewide values. The TAPR
+          glossary's prose names an earlier fall interval; it does not date these two reviewed fields.
       reader:
         profiles:
           source:

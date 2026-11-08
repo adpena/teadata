@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import argparse
 from collections.abc import Callable
+from contextlib import closing
 import csv
 from decimal import Decimal, ROUND_HALF_UP
 import json
 from pathlib import Path
 from shutil import copyfile
 from tempfile import TemporaryDirectory
+
+from openpyxl import load_workbook
 
 from teadata.native_witnesses import _Rows
 from teadata.provenance import ProvenanceStore
@@ -68,7 +71,8 @@ def verify_rates(values: dict[str, str], rows: list[list[str]], *, measures: dic
 
 
 def _verify_source(store: ProvenanceStore, dataset: str,
-                   verify: Callable[[dict[str, str], Callable[[str], Path], set[str]], dict[str, int]]) -> dict[str, int]:
+                   verify: Callable[[dict[str, str], Callable[[str], Path], set[str]], dict[str, int]],
+                   *, expected_bindings: dict[str, str] | None = None) -> dict[str, int]:
     cfg = load_config()
     metadata = cfg.resolve_dataset(dataset, EDITION, exact=True, reader_profile="source").metadata
     refs = {ref.reference_id: ref for ref in metadata.references if ref.provenance_ids}
@@ -98,7 +102,10 @@ def _verify_source(store: ProvenanceStore, dataset: str,
     if [item.column_record() for item in occurrences] != request.mapping["dictionary_records"]:
         raise ValueError("Statewide TAPR dictionary differs from the reviewed occurrence mapping")
     field_codes = {field["field"]: field["code"] for field in fields}
-    bound_codes = {field_codes[metric.field] for metric in metadata.metrics.values()}
+    bound_metrics = {name: field_codes[metric.field] for name, metric in metadata.metrics.items()}
+    if expected_bindings and any(bound_metrics.get(name) != code for name, code in expected_bindings.items()):
+        raise ValueError("Statewide TAPR metric binds the wrong publisher code")
+    bound_codes = set(bound_metrics.values())
     return {
         "raw_cells": len(values),
         "dictionary_occurrences": len(occurrences),
@@ -201,12 +208,29 @@ def verify_state_student_profile(store: ProvenanceStore) -> dict[str, int]:
         for code, displayed in expected.items():
             if Decimal(values[code]) != Decimal(displayed.removesuffix("%").replace(",", "")):
                 raise ValueError(f"Statewide student report differs for {code}")
-        held = {"SPETATTC", "SPETATTP"}
-        if bound_codes != expected.keys() - held:
+        if bound_codes != expected.keys():
             raise ValueError("Statewide student bindings differ from the independently reviewed report fields")
-        return {"displayed_comparable_cells": len(bound_codes), "displayed_held_cells": len(held)}
+        with (original("annual_attrition_witness").open("rb") as stream,
+              closing(load_workbook(stream, read_only=True, data_only=True)) as workbook):
+            headers, observation = workbook["state"].values
+            overview = " ".join(str(value) for row in workbook["Overview"].values for value in row if value)
+        if (headers != ("SA0ATTR24D", "SA0ATTR24N", "SA0ATTR24R")
+                or "fall of the 2023-24 school year" not in overview
+                or "fall of the 2024-25 school year" not in overview
+                or "did not return to the same campus" not in overview):
+            raise ValueError("Annual attrition witness has a different period, population or source layout")
+        denominator, numerator, rate = (Decimal(str(value).replace(",", "")) for value in observation)
+        if (not 0 <= numerator <= denominator or denominator == 0
+                or (numerator * 100 / denominator).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP) != rate
+                or numerator != Decimal(values["SPETATTC"]) or rate != Decimal(values["SPETATTP"])):
+            raise ValueError("Direct Texas attrition count or rate differs from the annual research workbook")
+        return {"displayed_comparable_cells": len(bound_codes), "displayed_held_cells": 0,
+                "annual_attrition_witness_cells": 2}
 
-    return _verify_source(store, STUDENT_DATASET, verify)
+    return _verify_source(store, STUDENT_DATASET, verify, expected_bindings={
+        "student_membership_attrition_all_students_count": "SPETATTC",
+        "student_membership_attrition_all_students_percent": "SPETATTP",
+    })
 
 
 def main() -> None:

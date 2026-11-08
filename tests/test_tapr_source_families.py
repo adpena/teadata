@@ -955,3 +955,21 @@ def test_program_source_request_admission_preserves_scope_and_key_fences(tmp_pat
     wrong['source_schema_sha256'] = source_schema_fingerprint(['Publisher identifier'], ['WRONG_SOURCE_KEY'])
     with pytest.raises(ValueError, match='source key must bind publisher code'):
         TaprSourceRequest(path, wrong, key, dataset, '2024').open()
+
+
+def test_tapr_statewide_attrition_uses_lagged_interval_and_publisher_witness():
+    config = load_config()
+    for scope in ("campus", "district", "state"):
+        dataset = f"{scope}_tapr_student_profile"
+        metadata = config.resolve_dataset(dataset, 2025, exact=True, reader_profile="source").metadata
+        request, = config.tapr_source_requests(dataset, 2025)
+        codes = {field["field"]: field["code"] for field in request.mapping["fields"]}
+        for suffix, code in (("count", "C"), ("percent", "P")):
+            metric = metadata.metrics[f"student_membership_attrition_all_students_{suffix}"]
+            assert (metric.unit, metric.period.start_year, metric.period.end_year) == (suffix, 2023, 2024)
+            assert codes[metric.field] == f"{scope[0].upper()}PETATT{code}"
+    state = config.resolve_dataset("state_tapr_student_profile", 2025, exact=True,
+                                   reader_profile="source").metadata
+    witness, = (ref for ref in state.references if ref.reference_id == "annual_attrition_witness")
+    assert witness.provenance_ids == ("6552c7f1abe6165a5a4d5a55c3ec6e02c13067d314808dae25c31ce6ec503bf5",)
+    assert "2023-24-annual-attrition-rates" in witness.url
