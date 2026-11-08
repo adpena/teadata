@@ -311,10 +311,8 @@ def test_state_student_profile_binds_corrected_race_labels_and_explicit_populati
     fields = {row['code']: row for row in table['fields']}
     assert len(fields) == 228 and len(table['dictionary_records']) == 241
     assert table['metric_period'] == metadata.period.to_dict() == UNKNOWN
-    assert len(metadata.metrics) == 74
+    assert len(metadata.metrics) == 76
     assert fields['SPNTINDC']['label'] == 'State 2025 Student Enrollment: American Indian Count'
-    held = {'SPETATTC', 'SPETATTP'}
-    assert {fields[code]['field'] for code in held}.isdisjoint(metric.field for metric in metadata.metrics.values())
     state_codes = {row['field']: code for code, row in fields.items()}
     for scope in ('district', 'campus'):
         local_dataset = f'{scope}_tapr_student_profile'
@@ -330,6 +328,8 @@ def test_state_student_profile_binds_corrected_race_labels_and_explicit_populati
         ('student_enrollment_asian_count', 'SPNTASIC', 'count', 2025),
         ('student_enrollment_american_indian_count', 'SPNTINDC', 'count', 2025),
         ('student_membership_mobility_all_students_percent', 'SPEMALLP', 'percent', 2024),
+        ('student_membership_attrition_all_students_count', 'SPETATTC', 'count', 2024),
+        ('student_membership_attrition_all_students_percent', 'SPETATTP', 'percent', 2024),
         ('daep_count', 'SPETDISC', 'count', 2024),
     ):
         metric = metadata.metrics[name]
