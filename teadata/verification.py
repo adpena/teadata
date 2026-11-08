@@ -212,7 +212,7 @@ def _input_identity(root: Path, *, kind: str, paired_library: Path | None, relea
         if document.get("catalog", {}).get("native_sources"):
             from teadata.manifest import ContractError
             from teadata.release import DataRelease
-            from teadata.tprs_statewide_intake import REVIEWED_DISTRICT_STATE_MANIFEST, retained_tprs_evidence
+            from teadata.tprs_statewide_intake import REVIEWED_STATEWIDE_TPRS_MANIFESTS, retained_tprs_evidence
 
             try:
                 parent = DataRelease(path, expected_sha256=result["release_manifest_sha256"], offline=True)
@@ -220,7 +220,7 @@ def _input_identity(root: Path, *, kind: str, paired_library: Path | None, relea
                 result["native_sources"] = {pin: {name: _digest(asset) for name, asset in files.items()}
                                             for pin, files in sources.items()}
                 for ref in parent.catalog.native_sources:
-                    if ref.manifest_sha256 == REVIEWED_DISTRICT_STATE_MANIFEST:
+                    if ref.manifest_sha256 in REVIEWED_STATEWIDE_TPRS_MANIFESTS:
                         child, store = _open_reviewed_tprs_evidence(parent, ref)
                         result["native_tprs_evidence"] = retained_tprs_evidence(child, store)
             except (ContractError, OSError, ValueError) as error:
@@ -821,7 +821,7 @@ def _validate_tefa_cases(release: DataRelease) -> dict[str, Any]:
 
 def _validate_release(path: str, kind: str) -> None:
     from teadata.release import DataRelease
-    from teadata.tprs_statewide_intake import REVIEWED_DISTRICT_STATE_MANIFEST, qualify_statewide_tprs
+    from teadata.tprs_statewide_intake import REVIEWED_STATEWIDE_TPRS_MANIFESTS, qualify_statewide_tprs
     release = DataRelease(Path(path).expanduser(), offline=True)
     if release.catalog.to_dict()["schema_version"] != 2:
         raise ReceiptError("Edition catalogs require --native-release with an exact pin and retained source store")
@@ -834,7 +834,7 @@ def _validate_release(path: str, kind: str) -> None:
         if release.catalog.to_dict()["processor_sha256"] != processor_identity():
             raise ReceiptError("Release was built from different processing code or lockfile; rebuild it")
     unsupported = [ref.manifest_sha256 for ref in release.catalog.native_sources
-                   if ref.manifest_sha256 != REVIEWED_DISTRICT_STATE_MANIFEST]
+                   if ref.manifest_sha256 not in REVIEWED_STATEWIDE_TPRS_MANIFESTS]
     if unsupported:
         pins = ", ".join(unsupported)
         raise ReceiptError(f"Attached native sources passed structural verification only. "
@@ -880,11 +880,11 @@ def _validate_native_release(path: Path, pin: str, source_store: Path) -> dict[s
     )
     from teadata.release import DataRelease
     from teadata.source_parity import validate_source_parity
-    from teadata.tprs_statewide_intake import REVIEWED_DISTRICT_STATE_MANIFEST, qualify_statewide_tprs
+    from teadata.tprs_statewide_intake import REVIEWED_STATEWIDE_TPRS_MANIFESTS, qualify_statewide_tprs
 
     try:
         release = DataRelease(path, expected_sha256=pin, offline=True)
-        if release.manifest_sha256 == REVIEWED_DISTRICT_STATE_MANIFEST:
+        if release.manifest_sha256 in REVIEWED_STATEWIDE_TPRS_MANIFESTS:
             return qualify_statewide_tprs(release, _retained_store(source_store))
         if is_reviewed_budget(release.manifest_sha256):
             return qualify_budget(release, _retained_store(release.path.parent / "provenance"),

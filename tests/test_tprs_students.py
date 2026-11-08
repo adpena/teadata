@@ -5,6 +5,7 @@ from hashlib import sha256
 from html import escape
 import json
 from pathlib import Path
+from types import SimpleNamespace
 from urllib.parse import urlencode
 from zipfile import ZipFile
 
@@ -24,6 +25,35 @@ from teadata.teadata_config import load_config, load_config_bytes
 from teadata.values import ValueStatus
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+@pytest.mark.parametrize("fault", [None, "missing_campus", "duplicate_campus", "conflicting_region", "missing_region"])
+def test_reviewed_campus_census_requires_disjoint_complete_publisher_roster(monkeypatch, fault):
+    regions = tprs_statewide_intake.REGIONS
+    expected = {region: (region + "0000001",) for region in regions}
+    monkeypatch.setattr(tprs_statewide_intake, "campus_roster", lambda store, region, pin: expected[region])
+
+    def leaf(rosters, identifiers):
+        return SimpleNamespace(
+            artifact=SimpleNamespace(edition=SimpleNamespace(scope="campus")),
+            campus_rosters=rosters,
+            reports=tuple(SimpleNamespace(identifier=identifier) for identifier in identifiers),
+        )
+
+    sources = [leaf(((region, region),), expected[region]) for region in regions]
+    if fault == "missing_campus":
+        sources[-1] = leaf(((regions[-1], regions[-1]),), ())
+    elif fault == "duplicate_campus":
+        sources.append(sources[0])
+    elif fault == "conflicting_region":
+        sources.append(leaf(((regions[0], "other pin"),), ()))
+    elif fault == "missing_region":
+        sources.pop()
+    if fault is None:
+        tprs_statewide_intake._verify_campus_census(tuple(sources), None)
+    else:
+        with pytest.raises(ContractError, match="Campus|campus"):
+            tprs_statewide_intake._verify_campus_census(tuple(sources), None)
 
 
 @pytest.fixture(scope="module")

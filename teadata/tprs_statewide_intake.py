@@ -39,8 +39,11 @@ MAX_ROSTER_BYTES = 256 * 1024
 MAX_CAMPUS_ROSTER_BYTES = 512 * 1024
 MAX_CAMPUS_COHORT_REPORTS = 1500
 MAX_STATEWIDE_HTML_BYTES = 160 * 1024**2
-# Reviewed 128-row-group district/Texas candidate. A new revision needs its own review.
+# Reviewed district/Texas projection and the complete campus composition.
+# Each new revision needs its own source review.
 REVIEWED_DISTRICT_STATE_MANIFEST = "373041dfb0eb994ccde4a88f1e7e630e7b395bf9f7a51199655d843788a2b5f6"
+REVIEWED_CAMPUS_STUDENT_MANIFEST = "c96effc9bcbfd01c7cd969082cf701a2dc4e1900b6d6973b23c0ed2d21559f9e"
+REVIEWED_STATEWIDE_TPRS_MANIFESTS = frozenset({REVIEWED_DISTRICT_STATE_MANIFEST, REVIEWED_CAMPUS_STUDENT_MANIFEST})
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,18 +138,22 @@ class _ReplayLeaf:
     artifact: ArtifactRef
     audit: ColumnSchemaRef
     reports: tuple[ReportSelection, ...]
+    campus_rosters: tuple[tuple[str, str], ...] = ()
 
 
 def _reviewed_leaves(release: DataRelease) -> tuple[_ReplayLeaf, ...]:
     from .release import _student_attachments
 
-    _need(release.offline and release.manifest_sha256 == REVIEWED_DISTRICT_STATE_MANIFEST,
+    _need(release.offline and release.manifest_sha256 in REVIEWED_STATEWIDE_TPRS_MANIFESTS,
           "Statewide TPRS replay requires the exact reviewed offline manifest")
+    complete_campuses = release.manifest_sha256 == REVIEWED_CAMPUS_STUDENT_MANIFEST
     catalog = release.catalog.to_dict()
-    _need(catalog["schema_version"] == 4 and len(catalog["artifacts"]) == len(catalog["editions"]) == 2,
-          "Reviewed statewide TPRS requires exactly two native leaves")
+    _need(catalog["schema_version"] == 4 and len(catalog["artifacts"]) == len(catalog["editions"])
+          and (len(catalog["artifacts"]) > 2 if complete_campuses else len(catalog["artifacts"]) == 2),
+          "Reviewed statewide TPRS requires exact native leaves for its scopes")
     leaves = []
     cohorts = set()
+    statewide_scopes = []
     for identifier in catalog["artifacts"]:
         artifact = release.catalog.artifact_ref(identifier)
         key = artifact.edition
@@ -154,18 +161,47 @@ def _reviewed_leaves(release: DataRelease) -> tuple[_ReplayLeaf, ...]:
         refs = _student_attachments(release.catalog, artifact)
         _need(bool(refs), "Reviewed statewide TPRS lacks its report ledger")
         reports, cohort = release._student_report_ledger(artifact, refs)
-        _need(cohort is not None, "Reviewed statewide TPRS requires a district and Texas cohort")
-        cohorts.add(cohort)
-        leaves.append(_ReplayLeaf(artifact, refs["raw_audit"], reports))
-    _need(len(cohorts) == 1 and {leaf.artifact.edition.scope for leaf in leaves} == {"state", "district"},
+        campus_rosters = ()
+        if key.scope == "campus":
+            _need(complete_campuses and cohort is None, "Reviewed statewide TPRS does not include this campus leaf")
+            roster = json.loads(release._column_schema_bytes(refs["roster"]), object_pairs_hook=_unique_object)
+            campus_rosters = tuple(sorted((region, value["receipt"]) for region, value in roster.items()))
+        else:
+            _need(cohort is not None, "Reviewed statewide TPRS requires a district and Texas cohort")
+            cohorts.add(cohort)
+            statewide_scopes.append(key.scope)
+        leaves.append(_ReplayLeaf(artifact, refs["raw_audit"], reports, campus_rosters))
+    _need(len(cohorts) == 1 and sorted(statewide_scopes) == ["district", "state"],
           "Reviewed TPRS leaves must share the district and Texas cohort")
     return tuple(leaves)
+
+
+def _verify_campus_census(leaves: tuple[_ReplayLeaf, ...], store: ProvenanceStore) -> None:
+    rosters = {}
+    observed = set()
+    for leaf in leaves:
+        if leaf.artifact.edition.scope != "campus":
+            continue
+        for region, pin in leaf.campus_rosters:
+            _need(rosters.setdefault(region, pin) == pin, "Campus leaves disagree on a regional roster receipt")
+        identifiers = {item.identifier for item in leaf.reports}
+        _need(len(identifiers) == len(leaf.reports) and observed.isdisjoint(identifiers),
+              "Campus leaves repeat a publisher campus identifier")
+        observed.update(identifiers)
+    _need(set(rosters) == set(REGIONS), "Reviewed campus census requires all 20 regional rosters")
+    expected = set()
+    for region, pin in sorted(rosters.items()):
+        identifiers = set(campus_roster(store, region, pin))
+        _need(expected.isdisjoint(identifiers), "Publisher regional campus rosters overlap")
+        expected.update(identifiers)
+    _need(observed == expected, "Campus leaves do not cover the exact publisher roster")
 
 
 def _retained_replay_records(leaves: tuple[_ReplayLeaf, ...], store: ProvenanceStore) -> list[str]:
     from .tprs_students import definition
 
     roots = {item.receipt for leaf in leaves for item in leaf.reports}
+    roots.update(pin for leaf in leaves for _, pin in leaf.campus_rosters)
     roots.update(witness[role] for witness in definition()["witnesses"].values() for role in ("html_receipt", "xlsx_receipt"))
     # Each identifier commits the complete record and its artifact digest. The
     # store checks the actual artifact bytes again when verifying a check receipt.
@@ -178,11 +214,14 @@ def retained_tprs_evidence(release: DataRelease, store: ProvenanceStore) -> list
 
 
 def qualify_statewide_tprs(release: DataRelease, store: ProvenanceStore) -> dict[str, Any]:
-    """Qualify the reviewed district/Texas projection from retained publisher evidence."""
+    """Qualify the reviewed TPRS projection from retained publisher evidence."""
     from .tprs_students import _verify_statewide_projection, verify_workbook_witnesses
 
     leaves = _reviewed_leaves(release)
     paths = release.verify()
+    complete_campuses = release.manifest_sha256 == REVIEWED_CAMPUS_STUDENT_MANIFEST
+    if complete_campuses:
+        _verify_campus_census(leaves, store)
     evidence = _retained_replay_records(leaves, store)
     counts = {}
     for leaf in leaves:
@@ -190,12 +229,14 @@ def qualify_statewide_tprs(release: DataRelease, store: ProvenanceStore) -> dict
         audit = release._resource_path(leaf.audit.location, leaf.audit.sha256, leaf.audit.size_bytes)
         _verify_statewide_projection(store, leaf.reports, release.catalog.policy(key.dataset, edition=key),
                                      paths[leaf.artifact.identity], audit)
-        counts[key.scope] = len(leaf.reports)
+        counts[key.scope] = counts.get(key.scope, 0) + len(leaf.reports)
     return {"status": "PASS_REVIEWED_NATIVE", "manifest_sha256": release.manifest_sha256,
             "build_id": release.build_id, "structural_integrity": True,
             "report_replay_counts": counts, "retained_records": len(evidence),
             "publisher_witnesses": verify_workbook_witnesses(store),
-            "scope": "Reviewed 2025–26 district and Texas student projection, with explicit raw field holds"}
+            "scope": ("Reviewed 2025–26 campus, district and Texas student projection, with explicit raw field holds"
+                      if complete_campuses else
+                      "Reviewed 2025–26 district and Texas student projection, with explicit raw field holds")}
 
 
 def _check_roster_regions(roster: Mapping[str, Any], scope: str) -> None:

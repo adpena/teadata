@@ -42,6 +42,8 @@ Consult the selected release's catalog for queryable editions and fields.
 | Historical TPRS | [TPRS archive](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/texas-performance-reporting-system-archives) lists editions starting in 2012–13 | District, campus, region, and Texas reports. Check domain and bulk availability for each edition independently of TAPR. |
 | PEIMS standard reports | [TEA product index](https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports) lists years separately for each product. See the [primary-disability series](data-releases.md#peims-primary-disability-counts) for one historical example. | Enrollment and programs have campus, district, and Texas products. The primary-disability series has district, county, region, and Texas scope. |
 | Accountability | [2013](https://rptsvr1.tea.texas.gov/perfreport/account/2013/) and [2014](https://rptsvr1.tea.texas.gov/perfreport/account/2014/) final ratings, manuals, and data download links | District and campus ratings, with separate region and Texas summaries. Calendar-year systems and rating scales can change. |
+| Longitudinal graduation and annual leavers | [TEA's completion, graduation and dropout data index](https://tea.texas.gov/data-reports/school-performance/accountability-research/completion-graduation-and-dropout/completion-graduation-and-dropout-data) | Four-, five-, and six-year graduation are separate longitudinal cohorts and follow-up windows. Annual leavers and annual graduates describe separate reporting populations. Check the annual archive for campus, district, county, ESC, and direct Texas routes. |
+| Student grade-level retention | [TEA's grade-level retention data index](https://tea.texas.gov/data-reports/school-performance/accountability-research/grade-level-retention/grade-level-retention-data-search) | Compare spring grade with the following fall. The denominator includes students who return or graduate. Bulk campus, district and, where offered, county files are separate from printed Texas and ESC reports. |
 | PEIMS financial actuals and budgets | District and charter [single-file archives](https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads) include both years. The [financial reports index](https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-financial-standard-reports) also lists both years of campus actuals. | District and charter account files are separate populations. The historical reports organized by campus require a district selection. Retain direct Texas figures from their own published reports. See [financial sources](financial-sources.md). |
 | Summary of Finances | Verified [School District State Aid Reports](https://tealprod.tea.state.tx.us/Tea.FspReports.Web/) district and charter downloads for 2012–13 and 2013–14 | These summaries are direct statewide totals for separate sectors. TEA also offers individual district and charter reports. Keep the run-list date, workbook update date, run, status, and any row-level run IDs separately. |
 | Geography | [TEA's ArcGIS archive](https://schoolsdata2-db440-tea-texas.opendata.arcgis.com/) and historical locator layers for [2012–13](https://schoolsdata2-tea-texas.opendata.arcgis.com/datasets/school2012) and [2013–14](https://schoolsdata2-tea-texas.opendata.arcgis.com/datasets/school2013) | Campus points and district polygons have separate vintages. Preserve records with absent coordinates and investigate duplicate campus identifiers before using points for joins. Establish historical polygon coverage independently. |
@@ -86,7 +88,15 @@ returned to the same campus in fall 2024–25; a student can stay in the same
 district and count as a nonreturner. The TAPR glossary prose names the prior
 fall interval. The workbook and the exact report observations support the
 2023–24 binding; their reporting rosters and disclosure tokens are separate.
-Staff retention and turnover need their own cohort review.
+The [2024–25 TAPR Staff Information glossary, page 37](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf#page=37)
+defines teacher turnover against fall 2023–24 teacher FTE, with fall 2024–25
+as the comparison. Teachers who stay employed by the district in a
+non-teaching role can count toward turnover. The report does not show
+this measure at campus level. The denominator is separate from the
+fall 2024–25 total teacher FTE. Average actual salary covers regular
+duties; supplemental pay is outside the measure. Retain the printed
+rate alongside its published numerator and denominator, whose displayed
+precision can differ.
 
 ## Published 2026 entity snapshot
 

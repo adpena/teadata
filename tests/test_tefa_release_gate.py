@@ -292,10 +292,12 @@ def test_composed_release_holds_until_attached_sources_are_qualified(monkeypatch
         verification._validate_release("candidate.json", "app")
 
 
-def test_composed_release_replays_exact_tprs_attachment(monkeypatch, tmp_path, capsys):
-    from teadata.tprs_statewide_intake import REVIEWED_DISTRICT_STATE_MANIFEST
+@pytest.mark.parametrize("complete_campuses", [False, True])
+def test_composed_release_replays_exact_tprs_attachment(monkeypatch, tmp_path, capsys, complete_campuses):
+    from teadata.tprs_statewide_intake import REVIEWED_CAMPUS_STUDENT_MANIFEST, REVIEWED_DISTRICT_STATE_MANIFEST
 
-    ref = SimpleNamespace(manifest_sha256=REVIEWED_DISTRICT_STATE_MANIFEST)
+    pin = REVIEWED_CAMPUS_STUDENT_MANIFEST if complete_campuses else REVIEWED_DISTRICT_STATE_MANIFEST
+    ref = SimpleNamespace(manifest_sha256=pin)
     catalog = SimpleNamespace(to_dict=lambda: {"schema_version": 2}, native_sources=[ref])
     parent = SimpleNamespace(catalog=catalog, verify=lambda: None, path=tmp_path / "parent.json", build_id="parent")
     child = SimpleNamespace(path=tmp_path / "child" / "release.json", remote=False)
