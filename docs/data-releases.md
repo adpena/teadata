@@ -727,7 +727,7 @@ tagged canonical decimal lane, never a float. Raw dict/list JSON preserves
 insertion order and nested types. Signed floating zero and integer versus float
 disclosure bounds survive transport. `raw_present` means actual source-key
 membership for field rows and is null for metric rows, whose absent-key
-attribute fallback is evaluated by the canonical scalar API. Private-school
+attribute fallback is evaluated by the canonical scalar API. Private school
 not-applicable results can retain the actual source raw cell while their sparse
 Measurement keeps its canonical null raw value. `measurement_from_row()`
 materializes that scalar object only when requested; it does not reclassify.

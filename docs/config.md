@@ -345,7 +345,7 @@ uv run python -m teadata.scripts.build_tapr_profiles \
 
 The legacy `tepsac` reader and its header-normalization and geocoding commands
 are retired. `cfg.load_df("tepsac", 2025)` raises `KeyError`; it does not fall
-back to another source. Current private-school listings come from the
+back to another source. Current private school listings come from the
 [Texas Comptroller's TEFA finder](https://finder.educationfreedom.texas.gov/).
 Use `cfg.resolve_dataset("tefa")` to inspect the selected program edition,
 source links and provenance. TEFA uses opaque listing IDs and does not provide

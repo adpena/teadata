@@ -28,6 +28,8 @@
 
 ## Coding Style & Naming Conventions
 
+Write “public school,” “charter school,” and “private school” as two words in authored prose and catalog notes, including when they modify another noun.
+
 Python 3.14 and 3.15 are required compatibility targets alongside supported earlier versions. Dependency and compatibility changes require isolated checks and real retained-bundle loading on those interpreters; classifiers alone do not establish support.
 - Python 3.11+, PEP 8 defaults, 4-space indents, and type hints preferred (modules use `from __future__ import annotations`).
 - Modules and functions use `snake_case`; classes use `PascalCase`; keep public attributes stable for pickled snapshots.

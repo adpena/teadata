@@ -16862,7 +16862,7 @@ data_sources:
           primary_developmental_delay_count: {field: primary_developmental_delay_count, unit: count}
           primary_traumatic_brain_injury_count: {field: primary_traumatic_brain_injury_count, unit: count}
           primary_noncategorical_early_childhood_count: {field: primary_noncategorical_early_childhood_count, unit: count}
-        notes: October PEIMS public-school service counts by reported primary disability.
+        notes: October PEIMS public school service counts by reported primary disability.
           Separate from PEIMS program Enrollment and TAPR/TPRS Membership.
           The publisher does not specify finality. No overall count is inferred from categories.
           Interpretation HOLD for the 14 statewide Developmental Delay records that precede the
@@ -16924,7 +16924,7 @@ data_sources:
     2024:
       metadata:
         metrics: *peims_primary_disability_counts
-        notes: October PEIMS public-school service counts by reported primary disability.
+        notes: October PEIMS public school service counts by reported primary disability.
           Separate from PEIMS program Enrollment and TAPR/TPRS Membership.
           The publisher does not specify finality. No overall count is inferred from categories.
           Interpretation HOLD for the 12 statewide Developmental Delay records that precede the
@@ -16947,7 +16947,7 @@ data_sources:
     2025:
       metadata:
         metrics: *peims_primary_disability_counts
-        notes: October PEIMS public-school service counts by reported primary disability.
+        notes: October PEIMS public school service counts by reported primary disability.
           Separate from PEIMS program Enrollment and TAPR/TPRS Membership.
           The publisher does not specify finality. No overall count is inferred from categories.
         period: {kind: school_year, start_year: 2024, end_year: 2025}
@@ -16968,7 +16968,7 @@ data_sources:
     2026:
       metadata:
         metrics: *peims_primary_disability_counts
-        notes: October PEIMS public-school service counts by reported primary disability.
+        notes: October PEIMS public school service counts by reported primary disability.
           Separate from PEIMS program Enrollment and TAPR/TPRS Membership.
           The publisher does not specify finality. No overall count is inferred from categories.
         period: {kind: school_year, start_year: 2025, end_year: 2026}
@@ -16990,7 +16990,7 @@ data_sources:
     2013:
       metadata:
         metrics: *peims_primary_disability_counts
-        notes: October PEIMS public-school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change. District charter classification is joined from the same-year TEA District Type roster and remains separate from the publisher columns.
+        notes: October PEIMS public school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change. District charter classification is joined from the same-year TEA District Type roster and remains separate from the publisher columns.
         period: {kind: school_year, start_year: 2012, end_year: 2013}
         publisher: Texas Education Agency
         references:
@@ -17028,7 +17028,7 @@ data_sources:
     2014:
       metadata:
         metrics: *peims_primary_disability_counts
-        notes: October PEIMS public-school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change. District charter classification is joined from the same-year TEA District Type roster and remains separate from the publisher columns.
+        notes: October PEIMS public school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change. District charter classification is joined from the same-year TEA District Type roster and remains separate from the publisher columns.
         period: {kind: school_year, start_year: 2013, end_year: 2014}
         publisher: Texas Education Agency
         references:
@@ -17059,7 +17059,7 @@ data_sources:
     2015:
       metadata:
         metrics: *peims_primary_disability_counts
-        notes: October PEIMS public-school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change. District charter classification is joined from the same-year TEA District Type roster and remains separate from the publisher columns.
+        notes: October PEIMS public school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change. District charter classification is joined from the same-year TEA District Type roster and remains separate from the publisher columns.
         period: {kind: school_year, start_year: 2014, end_year: 2015}
         publisher: Texas Education Agency
         references:
@@ -17090,7 +17090,7 @@ data_sources:
     2016:
       metadata:
         metrics: *peims_primary_disability_counts
-        notes: October PEIMS public-school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change. District charter classification is joined from the same-year TEA District Type roster and remains separate from the publisher columns.
+        notes: October PEIMS public school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change. District charter classification is joined from the same-year TEA District Type roster and remains separate from the publisher columns.
         period: {kind: school_year, start_year: 2015, end_year: 2016}
         publisher: Texas Education Agency
         references:
@@ -17121,7 +17121,7 @@ data_sources:
     2017:
       metadata:
         metrics: *peims_primary_disability_counts
-        notes: October PEIMS public-school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change.
+        notes: October PEIMS public school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change.
         period: {kind: school_year, start_year: 2016, end_year: 2017}
         publisher: Texas Education Agency
         references: &peims_primary_disability_historical_references
@@ -17145,7 +17145,7 @@ data_sources:
     2018:
       metadata:
         metrics: *peims_primary_disability_counts
-        notes: October PEIMS public-school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change.
+        notes: October PEIMS public school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change.
         period: {kind: school_year, start_year: 2017, end_year: 2018}
         publisher: Texas Education Agency
         references: *peims_primary_disability_historical_references
@@ -17164,7 +17164,7 @@ data_sources:
     2019:
       metadata:
         metrics: *peims_primary_disability_counts
-        notes: October PEIMS public-school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change.
+        notes: October PEIMS public school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change.
         period: {kind: school_year, start_year: 2018, end_year: 2019}
         publisher: Texas Education Agency
         references: *peims_primary_disability_historical_references
@@ -17183,7 +17183,7 @@ data_sources:
     2020:
       metadata:
         metrics: *peims_primary_disability_counts
-        notes: October PEIMS public-school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change.
+        notes: October PEIMS public school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change.
         period: {kind: school_year, start_year: 2019, end_year: 2020}
         publisher: Texas Education Agency
         references: *peims_primary_disability_historical_references
@@ -17202,7 +17202,7 @@ data_sources:
     2021:
       metadata:
         metrics: *peims_primary_disability_counts
-        notes: October PEIMS public-school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change.
+        notes: October PEIMS public school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change.
         period: {kind: school_year, start_year: 2020, end_year: 2021}
         publisher: Texas Education Agency
         references: *peims_primary_disability_historical_references
@@ -17221,7 +17221,7 @@ data_sources:
     2022:
       metadata:
         metrics: *peims_primary_disability_counts
-        notes: October PEIMS public-school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change.
+        notes: October PEIMS public school service counts by reported primary disability. The publisher does not specify finality. No overall count is inferred from categories. Interpretation of pre-2024–25 Developmental Delay counts is on hold because their lineage predates the documented eligibility change.
         period: {kind: school_year, start_year: 2021, end_year: 2022}
         publisher: Texas Education Agency
         references: *peims_primary_disability_historical_references

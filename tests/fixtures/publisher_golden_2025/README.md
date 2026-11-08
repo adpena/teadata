@@ -74,7 +74,7 @@ signed zero, duplicate indices and row order.
 ## Acceptance work still open
 
 These items are **not** xfailed/skipped passing tests. The accountability cleanup
-and private-school governing-affiliation repairs were separately qualified for
+and private school governing-affiliation repairs were separately qualified for
 0.0.126; the old 0.0.125 failures below describe historical regressions, not an
 active hold on 0.0.126. This small pack does not certify every released fact.
 The corrected demographic build still requires its own artifact qualification.
@@ -90,7 +90,7 @@ The corrected demographic build still requires its own artifact qualification.
   Austin ISD enrichment. A point inside Austin ISD does not establish public
   governing affiliation. The 0.0.126 repair keeps those concepts separate and was
   checked against retained entities. This publisher-example gate covers TAPR
-  applicability, not the entire affiliation-ingestion or private-school roster.
+  applicability, not the entire affiliation-ingestion or private school roster.
 - **Reporting-only Rocketship:** it appears in TAPR and accountability but not
   among the 9,739 retained GIS campus identifiers. Preserve it with no invented
   point; absence in this file alone does not establish closure or status. The

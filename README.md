@@ -5,7 +5,7 @@ It provides:
 
 - `District` and `Campus` domain models
 - a fluent query DSL using `>>`
-- geospatial lookups (nearest charter, campuses in district boundaries, private-school overlap)
+- geospatial lookups (nearest charter, campuses in district boundaries, private school overlap)
 - config-driven enrichment from TAPR, accountability, transfers, PEIMS financials, and closure datasets
 - sidecar sqlite stores for fast boundary/map/entity lookup
 
