@@ -50,7 +50,17 @@ from .source_csv import SourceLines
 from .source_parity import _FieldReport, _Uncovered
 from .teadata_config import load_config_bytes
 from .transfer_leaves import _leaf_projection
-from .transfer_sources import _FOOTNOTES, _selected_encoding, _transfer_projection, _transfer_titles, district_batch_inputs, transfer_columns
+from .transfer_sources import (
+    _FOOTNOTES,
+    _HEADER_FIRST_DISTRICT_YEARS,
+    _historical_district_masking_receipt,
+    _selected_encoding,
+    _transfer_projection,
+    _transfer_titles,
+    _validate_transfer_policy,
+    district_batch_inputs,
+    transfer_columns,
+)
 from .values import ValueStatus
 
 if TYPE_CHECKING:
@@ -372,6 +382,14 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
                       and upstream[value]["dataset"] == "reference:transfer_batch_index"]
             ordered, controls = district_batch_inputs(store, _resource(store, index, min(2 * 1024**2, resource_bytes), "Transfer index"),
                                                      period.end_year, all_offered=True)
+            if period.end_year in _HEADER_FIRST_DISTRICT_YEARS:
+                _validate_transfer_policy(policy, grain="district", year=period.end_year)
+                source = ResolvedDataset(key.dataset, "data_sources", period.end_year, period.end_year, "", metadata)
+                region_csv, = (identifier for identifier, region in controls.items() if region == "13")
+                witness = _historical_district_masking_receipt(source, policy, region_csv, upstream.__getitem__)
+                if witness not in preparation["inputs"] or witness not in record["inputs"]:
+                    raise ValueError("Historical district replay lacks its exact masking reference input")
+                attached_hashes.append(upstream[witness]["artifact"]["sha256"])
         artifact = preparation["outputs"]["prepared_source"]
         prepared = store.verify_artifact(artifact["sha256"])
         hashes.append(artifact["sha256"])
@@ -444,6 +462,7 @@ def _wire(original: _Original, selection: _Typed, *, limit: int) -> Iterator[tup
         digest = sha256()
         if header != [field["label"] for field in selection.fields]:
             raise ValueError("PEIMS reviewed code and label headers differ")
+    historical = selection.transfer_grain == "district" and selection.period.end_year in _HEADER_FIRST_DISTRICT_YEARS
     titles = (_transfer_titles(selection.transfer_grain, year=selection.period.end_year, region=original.region)
               if selection.transfer_grain else [])
     preamble: list[str] = []
@@ -484,10 +503,10 @@ def _wire(original: _Original, selection: _Typed, *, limit: int) -> Iterator[tup
                     else:
                         raise ValueError("Unexpected PEIMS source record outside its reviewed layout")
                 elif not found_header:
-                    if row == header and preamble == titles:
+                    if row == header and (record == 1 if historical else preamble == titles):
                         found_header = True
                         kind = "header"
-                    elif len(row) <= 1:
+                    elif not historical and len(row) <= 1:
                         title = " ".join(row[0].split()) if row else ""
                         if title:
                             kind = "preamble"
@@ -499,6 +518,8 @@ def _wire(original: _Original, selection: _Typed, *, limit: int) -> Iterator[tup
                 elif len(row) == len(header) and not footer:
                     data = True
                 else:
+                    if historical and (footer or row):
+                        raise ValueError("Header-first district replay requires one trailing blank record")
                     footer = True
                     note = " ".join(row[0].split()) if len(row) == 1 else ""
                     if note:
@@ -522,7 +543,8 @@ def _wire(original: _Original, selection: _Typed, *, limit: int) -> Iterator[tup
             raise ValueError("Publisher original changed during typed replay")
     if (not found_header or count != original.rows
             or (peims and (record != end or annotation is not None))
-            or (not peims and (tuple(notes) != _FOOTNOTES or next(transfer_annotations, None) is not None))):
+            or (not peims and ((not footer if historical else tuple(notes) != _FOOTNOTES)
+                               or next(transfer_annotations, None) is not None))):
         raise ValueError("Publisher records do not account for the full retained input")
 
 

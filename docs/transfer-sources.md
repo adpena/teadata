@@ -298,12 +298,21 @@ change the default source configuration, or qualify a release scientifically.
 
 `refresh_transfers materialize` accepts exact annual preparation processing IDs
 and a reviewed, SHA-pinned source Config. The packaged `teadata_sources.yaml`
-includes source discovery for 2018–19 through 2020–21 and 2022–23 through 2025–26 district
+includes source discovery for 2012–13 through 2020–21 and 2022–23 through 2025–26 district
 reports. The 2021–22 identity join remains on hold.
 The builder requires every offered region from the preparation's captured
 index/form, in source order. Each annual batch contains all 20 regional originals.
 The result contains one statewide district logical table and native leaf per
 selected year. Regions are physical acquisition partitions.
+
+The 2012–13 through 2017–18 regional CSVs begin with the literal header and
+end with one blank record. Preparation requires the pinned statewide regional
+batch and an exact same-year Region 13 HTML masking reference. Those CSVs
+carry a period on separator rows. On details and totals, the FERPA token is
+`-9999999` through 2016–17 and `-999` in 2017–18. The older HTML legend also
+covers certain totals, so masked cells have no inferred numeric bound.
+The four earliest CSVs retain their abbreviated year strings and have no
+charter status field. Their catalog periods use full school years.
 
 The reviewed source profile must enumerate every original SHA in the ordered
 header contract, retain genuine schema/masking-reference acquisitions, identify
@@ -325,6 +334,12 @@ uv run --locked --offline python -m teadata.scripts.refresh_transfers materializ
   --store "$TRANSFER_PROVENANCE_STORE" \
   --config teadata/teadata_sources.yaml \
   --config-sha256 "$TRANSFER_REVIEWED_CONFIG_SHA256" \
+  --prepared-input 2013 069a7a51cd7ebe37864961f1dab2bca05469321b9f7b4f343db9acccb605f970 \
+  --prepared-input 2014 c3ef5de198dffb1397f8158739edf67cbaf0b9bcca0429ea18324534d1ecb902 \
+  --prepared-input 2015 24d7a29a524de672c6a05dd748f77dd21d7421315969901023409d38862c355d \
+  --prepared-input 2016 d88daaa6cd48baf1c9c1e2f3f2dbc902e6bd5832d2343773bf8d5871ebf6aaa1 \
+  --prepared-input 2017 7c7d1c38030d79208552a76ecc70ae2b5c544071547912b01902c1c54b978212 \
+  --prepared-input 2018 1cf64c210a39727d3fd7ecacb090132a2008425f6f41b56aaa34089c1c168e75 \
   --prepared-input 2019 bd964fcff77bf0b711aab985f39a7dddbd56baa3684399fbfe9ab78d1895d6ed \
   --prepared-input 2020 731c37240f1561456266a34bdc90234d2ffc5a77468a58a8300ef60a61942318 \
   --prepared-input 2021 1205b8ef77e262ce8102f67ab880d1e121cc550568b3d23aaf4d41c126d3617b \
@@ -334,6 +349,11 @@ uv run --locked --offline python -m teadata.scripts.refresh_transfers materializ
   --prepared-input 2026 02977bde453c093ff624ff81537cf9c26d163aed6434e7045239273e1a3e0b18 \
   --output "$TRANSFER_NEW_CANDIDATE_DIR"
 ```
+
+For 2012–13 through 2017–18, six Region 13 HTML reports independently match
+11,236 native detail and total observations. This is a check of one region
+per edition. All 120 original regional CSVs pass statewide typed and raw
+readback for those editions.
 
 For 2018–19, all 20 originals provided 34,776 rows across 1,200 reporting
 districts, including 28,188 directional details, 2,196 published totals and

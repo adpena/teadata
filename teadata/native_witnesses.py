@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+from email.message import Message
 from html.parser import HTMLParser
 from importlib.resources import files
 import json
@@ -11,9 +12,18 @@ import re
 from typing import TYPE_CHECKING, Any
 from urllib.parse import urlencode
 
+from .dataset_metadata import ResolvedDataset
 from .manifest import ContractError
 from .peims_leaves import PRIMARY_DISABILITY
-from .transfer_sources import _FOOTNOTES, _PARENTHESIZED_DISTRICT_ID_EDITIONS, transfer_columns
+from .transfer_sources import (
+    _DISTRICT_YEARS_WITHOUT_CHARTER,
+    _FOOTNOTES,
+    _HEADER_FIRST_DISTRICT_YEARS,
+    _PARENTHESIZED_DISTRICT_ID_EDITIONS,
+    _historical_district_masking_receipt,
+    _historical_mask_token,
+    transfer_columns,
+)
 
 if TYPE_CHECKING:
     from .dataset_metadata import ArtifactRef, EditionKey
@@ -277,6 +287,77 @@ def _transfer(path: Path, ref: ArtifactRef, district: str, table: Any) -> int:
     return len(source)
 
 
+def _historical_transfer(release: DataRelease, store: ProvenanceStore, ref: ArtifactRef, receipt: str, table: Any) -> int:
+    from pyarrow.dataset import field
+
+    key = ref.edition
+    year = int(key.edition)
+    metadata = release.catalog.metadata(key.dataset, edition=key)
+    policy = release.catalog.policy(key.dataset, edition=key)
+    source = ResolvedDataset(key.dataset, "data_sources", year, year, "", metadata)
+    region_csv, = (item["record_id"] for item in release.catalog.acquisitions(key.dataset, edition=key)
+                   if dict(item["parameters"]["form_controls"]).get("selected_id") == "13")
+    if receipt != _historical_district_masking_receipt(source, policy, region_csv, store.read_record):
+        raise ContractError("Historical transfer witness differs from the bound Region 13 report")
+    record = store.read_record(receipt)
+    artifact = record["artifact"]
+    mime = Message()
+    mime["content-type"] = record["response_headers"]["content-type"]
+    charset = mime.get_content_charset()
+    if not charset or not 0 < artifact["size_bytes"] <= 1024 * 1024:
+        raise ContractError("Historical transfer HTML lacks bounded publisher bytes or charset")
+    path = store.verify_artifact(artifact["sha256"])
+    if path.stat().st_size != artifact["size_bytes"]:
+        raise ContractError("Historical transfer HTML size differs from its receipt")
+    rows = _Rows(path.read_text(encoding=charset)).rows
+    short = year in _DISTRICT_YEARS_WITHOUT_CHARTER
+    period = f"{year - 1}-{year % 100:02d}" if short else f"{year - 1}-{year}"
+    title, = (index for index, row in enumerate(rows[:2]) if row == ["Texas Education Agency"])
+    if rows[title:title + 4] != [["Texas Education Agency"], ["Student Transfers Report"], [period], ["Region XIII Austin"]]:
+        raise ContractError("Historical transfer HTML period or region differs")
+    legend = ('Certain values are masked with the value "n/a" to comply with FERPA.' if year == 2018 else
+              'Counts less than 5 and greater than 0, and certain totals, are masked with the value "n/a" to comply with FERPA.')
+    if [legend] not in rows:
+        raise ContractError("Historical transfer HTML lacks the exact publisher masking legend")
+    district_id = re.compile(r"^.+ \(([0-9]{6})\)$")
+    directions = {"Transfers In From": "in", "Transfers Out To": "out"}
+    totals = {"in": "Total Transfers In", "out": "Total Transfers Out"}
+    owner = direction = None
+    html: dict[tuple[str, str, str | None], str] = {}
+    for row in rows:
+        if len(row) == 1 and (match := district_id.fullmatch(row[0])):
+            owner, direction = "'" + match[1], None
+        elif len(row) == 3 and row[1] not in {"", "District Name (Number)"}:
+            direction = directions[row[0]] if row[0] else direction
+            if owner is None or direction is None:
+                raise ContractError("Historical transfer HTML observation lacks its report district or direction")
+            partner = None
+            if row[1] != totals[direction]:
+                match = district_id.fullmatch(row[1])
+                if match is None:
+                    raise ContractError("Historical transfer HTML partner lacks its full district identifier")
+                partner = "'" + match[1]
+            key_tuple = owner, direction, partner
+            if key_tuple in html:
+                raise ContractError("Historical transfer HTML repeats a directional observation")
+            html[key_tuple] = row[2]
+    native = table.to_table(columns=["reporting_district_number", "transfer_direction", "partner_district_number",
+        "TRANSFERS_IN_OUT", "transfer_count_status", "student_transfer_count"],
+        filter=(field("reporting_region") == "'13") & (field("transfer_row_kind") != "separator"))
+    for row in native.to_pylist():
+        key_tuple = row["reporting_district_number"], row["transfer_direction"], row["partner_district_number"]
+        raw = row["TRANSFERS_IN_OUT"]
+        masked = raw == _historical_mask_token(year)
+        expected = "n/a" if masked else f"{int(raw):,}"
+        if (html.pop(key_tuple, None) != expected
+                or row["transfer_count_status"] != ("suppressed" if masked else "observed")
+                or row["student_transfer_count"] != (None if masked else int(raw))):
+            raise ContractError("Historical transfer HTML and native observations differ")
+    if not native.num_rows or html:
+        raise ContractError("Historical transfer HTML and native rosters differ")
+    return native.num_rows
+
+
 def validate_native_witnesses(release: DataRelease, store: ProvenanceStore, references: dict[str, Any]) -> dict[str, Any]:
     """Check the exact reviewed artifacts against independent report bytes."""
     from pyarrow.dataset import field
@@ -299,11 +380,16 @@ def validate_native_witnesses(release: DataRelease, store: ProvenanceStore, refe
             try:
                 if "unreported_codes" in witness and key.dataset != PRIMARY_DISABILITY:
                     raise ContractError("Unreported codes require a primary disability witness")
-                path = _open_witness(store, receipt, ref, entity)
-                if key.dataset == _TRANSFER:
-                    count = _transfer(path, ref, entity, table)
+                if key.dataset == _TRANSFER and int(key.edition) in _HEADER_FIRST_DISTRICT_YEARS:
+                    if entity != "Region 13":
+                        raise ContractError("Historical transfer HTML witness must select Region 13")
+                    count = _historical_transfer(release, store, ref, receipt, table)
+                    transfer_rows += count
+                elif key.dataset == _TRANSFER:
+                    count = _transfer(_open_witness(store, receipt, ref, entity), ref, entity, table)
                     transfer_rows += count
                 else:
+                    path = _open_witness(store, receipt, ref, entity)
                     content = path.read_text(encoding="cp1252")
                     if f"{int(key.edition) - 1}-{key.edition}" not in content:
                         raise ContractError("PEIMS publisher report school year differs")

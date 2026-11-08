@@ -21,7 +21,16 @@ from .column_schema import crosswalk_dataset, parse_column_schema, table_input_s
 from .dataset_metadata import ArtifactRef, DataPeriod, DatasetMetadata, EditionKey, ResolvedDataset
 from .manifest import BuildRecorder, canonical_json, file_identity
 from .provenance import ProvenanceStore, _identifier, validate_reference_records
-from .transfer_sources import _captured_input, _write_index, district_batch_inputs, transfer_columns, transfer_value_columns
+from .transfer_sources import (
+    _HEADER_FIRST_DISTRICT_YEARS,
+    _captured_input,
+    _historical_district_masking_receipt,
+    _validate_transfer_policy,
+    _write_index,
+    district_batch_inputs,
+    transfer_columns,
+    transfer_value_columns,
+)
 
 if TYPE_CHECKING:
     from .teadata_config import Config
@@ -99,7 +108,7 @@ def _admit_preparation(store: ProvenanceStore, cfg: Config, year: int, identifie
         raise ValueError("Statewide district leaf requires one retained regional batch-index input")
     index_artifact = indices[0]["artifact"]
     raw_index = _captured_input(store.verify_artifact(index_artifact["sha256"]), index_artifact["sha256"])
-    acquisitions, _ = district_batch_inputs(store, raw_index, year, all_offered=True)
+    acquisitions, regions = district_batch_inputs(store, raw_index, year, all_offered=True)
     actual = report.get("inputs", [])
     if (len(actual) != len(acquisitions) or any(item.get("status") != "parsed" or item.get("source_input") != number
             or item.get("record_id") != selected[0] or item.get("artifact") != graph[selected[0]]["artifact"]
@@ -119,6 +128,14 @@ def _admit_preparation(store: ProvenanceStore, cfg: Config, year: int, identifie
             or report.get("policy_sha256") != sha256(json.dumps(policy.to_dict(), sort_keys=True).encode()).hexdigest()):
         raise ValueError("District leaf value policy differs from its retained preparation")
     validate_reference_records(source, store.read_record, verify_all_claimed=True)
+    witness_sha = None
+    if year in _HEADER_FIRST_DISTRICT_YEARS:
+        _validate_transfer_policy(policy, grain="district", year=year)
+        region_csv, = (identifier for identifier, region in regions.items() if region == "13")
+        witness = _historical_district_masking_receipt(source, policy, region_csv, graph.__getitem__)
+        if witness not in record["inputs"]:
+            raise ValueError("Historical district preparation did not bind its masking reference")
+        witness_sha = graph[witness]["artifact"]["sha256"]
     resource = cfg.column_contract(source.dataset, year, reader_profile="source")
     if resource is None:
         raise ValueError("District leaf requires a reviewed source-header resource")
@@ -145,7 +162,7 @@ def _admit_preparation(store: ProvenanceStore, cfg: Config, year: int, identifie
     names, support, operations = _leaf_projection(report["columns"], table["fields"], grain="district", year=year)
     return {"year": year, "processing_id": identifier, "record": record, "report": report,
         "acquisitions": acquisitions, "source": source, "table": table, "artifact": artifact,
-        "names": names, "support": support, "operations": operations}
+        "names": names, "support": support, "operations": operations, "witness_sha": witness_sha}
 
 
 def materialize_district_transfers(store: ProvenanceStore, *, config: Path, config_sha256: str,
@@ -228,7 +245,8 @@ def materialize_district_transfers(store: ProvenanceStore, *, config: Path, conf
                 "batch_rows": 4096, "batch_bytes": 8 * 1024 * 1024, "publisher_totals_computed": False}
             contract = recorder.leaf_contract(key, source, native_schema=item["schema"].serialize().to_pybytes(),
                 columns=item["names"], key_columns=["transfer_source_input", "transfer_source_record"], rows=report["rows"],
-                inputs=[*raw_hashes, item["artifact"]["sha256"]], recipe=recipe, toolchain=toolchain, column_support=item["support"])
+                inputs=[*raw_hashes, item["artifact"]["sha256"], *([item["witness_sha"]] if item["witness_sha"] else [])],
+                recipe=recipe, toolchain=toolchain, column_support=item["support"])
             leaf_id = sha256(canonical_json(contract).encode()).hexdigest()
             leaf = stage / (leaf_id + ".parquet")
             prepared = target_store.verify_artifact(item["artifact"]["sha256"])

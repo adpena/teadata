@@ -209,6 +209,46 @@ def test_2019_district_original_distinguishes_zero_separators_from_observations(
              grain="district", year=2019, region="04")
 
 
+@pytest.mark.parametrize(("year", "year_token", "mask", "charter"), [
+    (2013, "2012-13", "-9999999", False),
+    (2017, "2016-2017", "-9999999", True),
+    (2018, "2017-2018", "-999", True),
+])
+def test_header_first_district_contract_is_exact(tmp_path, year, year_token, mask, charter):
+    header = [column for column in DISTRICT_HEADER_2019 if column != "REPORT_CHARTER_STATUS" or charter]
+    prefix = [year_token, "04", "REGION IV HOUSTON", "Example ISD (001902)"]
+    if charter:
+        prefix.append("Traditional ISD/CSD")
+    prefix.extend(["100", "Transfers In From"])
+    baseline = ValuePolicy.from_dict(POLICY)
+    policy = ValuePolicy(baseline.policy_id, {mask: baseline.tokens["-999"], ".": baseline.tokens["."]}, baseline.reference_id)
+    rows = [[*prefix, "100", "Partner ISD (002902)", mask], [*prefix, "200", "Total Transfers In", "0"],
+            [*prefix, "300", "", "."]]
+    path = tmp_path / "historical.csv"
+
+    def selected(report, *, region="04"):
+        with path.open("w", newline="") as stream:
+            csv.writer(stream).writerows(report)
+        return read_transfer_table(path, expected_sha256=sha256(path.read_bytes()).hexdigest(), encoding="utf-8",
+                                   grain="district", year=year, region=region, policy=policy)
+
+    source = selected([header, *rows, []])
+    assert source.table["YEAR"].to_pylist() == [year_token] * 3
+    assert source.period.label == f"{year-1}-{year}"
+    assert source.table["TRANSFERS_IN_OUT"].to_pylist() == [mask, "0", "."]
+    assert source.table["transfer_count_status"].to_pylist() == ["suppressed", "observed", "missing"]
+    assert source.table["transfer_partner_number"].to_pylist() == ["'002902", None, None]
+    with pytest.raises(ValueError, match="regional selection"):
+        selected([header, *rows, []], region=None)
+    with pytest.raises(ValueError, match="preamble/header"):
+        selected([[], header, *rows, []])
+    with pytest.raises(ValueError, match="complete exact header"):
+        selected([header, *rows])
+    rows[0][-1] = "."
+    with pytest.raises(ValueError, match="Unexpected count token"):
+        selected([header, *rows, []])
+
+
 def test_district_published_total_is_retained_independently_of_masked_detail(tmp_path):
     common = ["2024-2025", "04", "REGION IV HOUSTON", "Example ISD  -  001902", "Traditional ISD/CSD", "100", "Transfers In From"]
     rows = [[*common, "100", "Partner ISD  -  002902", "-999"],

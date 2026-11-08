@@ -18,7 +18,7 @@ import os
 from pathlib import Path
 import re
 import tempfile
-from typing import Any, Mapping, NotRequired, Sequence, TypedDict
+from typing import Any, Callable, Mapping, NotRequired, Sequence, TypedDict
 from urllib.parse import urljoin
 from urllib.request import build_opener
 
@@ -351,12 +351,18 @@ _DISTRICT_COLUMNS_2020 = (
     *_DISTRICT_COLUMNS[:2], "REPORT_REGION_NAME_PROP", "REPORT_DISTNAME_NUMBER_PROPCASE",
     *_DISTRICT_COLUMNS[4:8], "DISTNAME_NUMBER_RES_ATTEND_PROP", _DISTRICT_COLUMNS[-1],
 )
+_DISTRICT_COLUMNS_2019 = (
+    *_DISTRICT_COLUMNS_2020[:3], "report_distname_number_propcase",
+    *_DISTRICT_COLUMNS_2020[4:8], "distname_number_res_attend_prop", _DISTRICT_COLUMNS[-1],
+)
+_HEADER_FIRST_DISTRICT_YEARS = range(2013, 2019)
+_DISTRICT_YEARS_WITHOUT_CHARTER = range(2013, 2017)
 _DISTRICT_ORIGINAL_COLUMNS = {
-    2019: (*_DISTRICT_COLUMNS_2020[:3], "report_distname_number_propcase",
-           *_DISTRICT_COLUMNS_2020[4:8], "distname_number_res_attend_prop", _DISTRICT_COLUMNS[-1]),
+    **dict.fromkeys(_DISTRICT_YEARS_WITHOUT_CHARTER, (*_DISTRICT_COLUMNS_2019[:4], *_DISTRICT_COLUMNS_2019[5:])),
+    **dict.fromkeys(range(2017, 2020), _DISTRICT_COLUMNS_2019),
     2020: _DISTRICT_COLUMNS_2020,
 }
-_PARENTHESIZED_DISTRICT_ID_EDITIONS = frozenset({2019, 2020, 2021})
+_PARENTHESIZED_DISTRICT_ID_EDITIONS = range(2013, 2022)
 _FOOTNOTES = (
     "-999 indicates counts or percentages are not available (i.e. masked) to comply with the Family Educational Rights and Privacy Act (FERPA).",
     "Masked numbers are typically small although larger numbers may be masked to prevent imputation.",
@@ -391,6 +397,51 @@ def _transfer_titles(grain: str, *, year: int | None, region: str | None) -> lis
     return ["T E X A S E D U C A T I O N A G E N C Y", f"{scope} Level Transfer Report", report]
 
 
+def _historical_mask_token(year: int | None) -> str:
+    return "-9999999" if year in range(2013, 2018) else "-999"
+
+
+def _validate_transfer_policy(policy: ValuePolicy, *, grain: str, year: int | None) -> None:
+    mask = _historical_mask_token(year) if grain == "district" else "-999"
+    if (set(policy.tokens) != {mask, "."}
+            or policy.tokens[mask].status != ValueStatus.SUPPRESSED
+            or policy.tokens["."].status != ValueStatus.MISSING
+            or policy.tokens[mask].lower is not None or policy.tokens[mask].upper is not None):
+        raise ValueError("Selected transfer policy does not match the publisher masking contract")
+
+
+def _historical_district_masking_receipt(source: ResolvedDataset, policy: ValuePolicy, region_csv: str,
+                                        read_record: Callable[[str], Mapping[str, Any]]) -> str:
+    """Bind a header-first edition's policy to its exact alternate-format report."""
+    reference, = (ref for ref in source.metadata.references if ref.reference_id == policy.reference_id)
+    identifier, = reference.provenance_ids
+    html = read_record(identifier)
+    csv_record = read_record(region_csv)
+    year = source.resolved_year
+    csv_parameters, html_parameters = csv_record["parameters"], html["parameters"]
+    csv_fields = csv_parameters["form_controls"]
+    csv_controls = dict(csv_fields)
+    expected_url, _, expected_controls = _form_request(
+        _ACTION, "GET", [(key, "html" if key == "report_format" else value) for key, value in csv_fields], None)
+    mime = Message()
+    mime["content-type"] = html["response_headers"].get("content-type", "")
+    if (reference.role != "masking_methodology" or reference.status != "available"
+            or html["kind"] != "acquisition" or html["method"] != "download"
+            or html["dataset"] != f"reference:district_transfer:{year}:13:html"
+            or html["requested_year"] != year or html["resolved_year"] != year
+            or DataPeriod.from_dict(html["source_metadata"].get("period")) != source.metadata.period
+            or reference.reviewed_sha256 != html["artifact"]["sha256"]
+            or not (reference.url == html["requested_url"] == html["resolved_url"] == expected_url)
+            or html_parameters["form_url"] != _ACTION or csv_parameters["form_url"] != _ACTION
+            or html_parameters["http_method"] != "GET" or html_parameters["http_status"] != 200
+            or mime.get_content_type() != "text/html" or not mime.get_content_charset()
+            or len(csv_controls) != len(csv_fields)
+            or csv_controls.get("selected_id") != "13" or csv_controls.get("report_format") != "csv"
+            or html_parameters["form_controls"] != [list(pair) for pair in expected_controls]):
+        raise ValueError("Historical district masking requires the exact same-year Region 13 HTML report")
+    return identifier
+
+
 @dataclass(frozen=True)
 class TransferSourceTable:
     table: Any
@@ -407,7 +458,7 @@ def transfer_value_columns(grain: str, *, year: int | None = None, layout: str =
     columns = transfer_columns(grain, year=year, layout=layout)
     return {"REPORT_REGION": "transfer_reporting_region", "REPORT_TYPE": "transfer_direction",
         "REPORT_CAMPUS" if grain == "campus" else columns[3]: "transfer_reporting_number",
-        "CAMPUS_RES_OR_ATTEND" if grain == "campus" else columns[8]: "transfer_partner_number",
+        "CAMPUS_RES_OR_ATTEND" if grain == "campus" else columns[-2]: "transfer_partner_number",
         columns[-1]: "transfer_count_value"}
 
 
@@ -419,14 +470,19 @@ def _transfer_projection(table, *, grain: str, period: DataPeriod, policy: Value
 
     pc: Any = arrow_compute
     wire_columns = transfer_columns(grain, year=period.end_year, layout=layout)
+    historical = grain == "district" and layout == "original" and period.end_year in _HEADER_FIRST_DISTRICT_YEARS
     reporting_column = "REPORT_CAMPUS" if grain == "campus" else wire_columns[3]
-    partner_column = "CAMPUS_RES_OR_ATTEND" if grain == "campus" else wire_columns[8]
+    partner_column = "CAMPUS_RES_OR_ATTEND" if grain == "campus" else wire_columns[-2]
 
     def require(condition, message: str) -> None:
         if not pc.all(pc.fill_null(condition, False)).as_py():
             raise ValueError(message)
 
-    require(pc.equal(table["YEAR"], period.label), "Transfer source YEAR differs from the selected school-year label")
+    year_label = period.label
+    if historical and period.end_year in _DISTRICT_YEARS_WITHOUT_CHARTER:
+        assert period.end_year is not None
+        year_label = f"{period.start_year}-{period.end_year % 100:02d}"
+    require(pc.equal(table["YEAR"], year_label), "Transfer source YEAR differs from the selected school-year label")
     regions = canonical_source_identifiers(table["REPORT_REGION"], width=2)
     require(pc.invert(pc.is_null(regions)), "Transfer row requires its report-time region")
     if region is not None:
@@ -486,6 +542,13 @@ def _transfer_projection(table, *, grain: str, period: DataPeriod, policy: Value
         reporting_district, partner_district = reporting, partner
 
     count_column = wire_columns[-1]
+    if historical:
+        _validate_transfer_policy(policy, grain=grain, year=period.end_year)
+        token = table[count_column]
+        numeric = pc.match_substring_regex(token, r"^[0-9]+$")
+        require(pc.if_else(separator, pc.equal(token, "."),
+                           pc.or_(numeric, pc.equal(token, _historical_mask_token(period.end_year)))),
+                "Unexpected count token in header-first district transfer row")
     unique = pc.unique(table[count_column])
     if len(unique) > 4096:
         raise ValueError("Transfer source exceeds bounded distinct-count-token interpretation")
@@ -543,6 +606,9 @@ def read_transfer_table(path: Path, *, grain: str, year: int, policy: ValuePolic
         raise ValueError("Transfer source exceeds its admitted input byte limit")
     period = DataPeriod("school_year", year - 1, year)
     columns = transfer_columns(grain, year=year, layout=layout)
+    historical = grain == "district" and layout == "original" and year in _HEADER_FIRST_DISTRICT_YEARS
+    if historical and region is None:
+        raise ValueError("Header-first district transfers require an exact regional selection")
     if region is not None and grain != "district":
         raise ValueError("Regional report selection is supported only for district-grain originals")
     titles = _transfer_titles(grain, year=year, region=region)
@@ -587,11 +653,11 @@ def read_transfer_table(path: Path, *, grain: str, year: int, policy: ValuePolic
                     and " ".join(row[0].split()) in ("", *(_FOOTNOTES if header else titles))
                 )
                 if not header and tuple(row) == columns:
-                    if (layout == "original" and nonblank_titles != titles) or (layout == "legacy_prepared" and record != 1):
+                    if (record != 1 if historical or layout == "legacy_prepared" else nonblank_titles != titles):
                         raise ValueError("Transfer header is not preceded by the selected layout's exact publisher titles")
                     header, kind = True, "header"
                 elif not header:
-                    if layout != "original" or (len(row) > 1 and not padded_annotation):
+                    if historical or layout != "original" or (len(row) > 1 and not padded_annotation):
                         raise ValueError("Unexpected transfer preamble/header schema")
                     text = " ".join((row[0] if row else "").split())
                     if text:
@@ -609,6 +675,8 @@ def read_transfer_table(path: Path, *, grain: str, year: int, policy: ValuePolic
                     positions.append((record, first_line, reader.line_num))
                     continue
                 else:
+                    if historical and (footer or row):
+                        raise ValueError("Header-first district transfers require one trailing blank record")
                     footer = True
                     if len(row) > 1 and not padded_annotation:
                         raise ValueError("Unexpected full-width/data row after transfer footer")
@@ -633,7 +701,7 @@ def read_transfer_table(path: Path, *, grain: str, year: int, policy: ValuePolic
     if (before.st_dev, before.st_ino, before.st_size, before.st_mtime_ns, before.st_ctime_ns) != (
             after.st_dev, after.st_ino, after.st_size, after.st_mtime_ns, after.st_ctime_ns):
         raise ValueError("Transfer source changed during structural preparation")
-    if not header or (layout == "original" and nonblank_notes != list(_FOOTNOTES)):
+    if not header or (not footer if historical else layout == "original" and nonblank_notes != list(_FOOTNOTES)):
         raise ValueError("Transfer source lacks its complete exact header/footnotes")
     if positions:
         decode()
@@ -898,11 +966,10 @@ def prepare_transfer_sources(
     if value_policy not in cfg.value_policies:
         raise ValueError("Selected value policy is not declared by the pinned Config")
     policy = cfg.value_policies[value_policy]
-    if (set(policy.tokens) != {"-999", "."}
-            or policy.tokens["-999"].status != ValueStatus.SUPPRESSED
-            or policy.tokens["."].status != ValueStatus.MISSING
-            or policy.tokens["-999"].lower is not None or policy.tokens["-999"].upper is not None):
-        raise ValueError("Selected transfer policy does not match the retained publisher masking footnotes")
+    _validate_transfer_policy(policy, grain=grain, year=year)
+    historical = grain == "district" and year in _HEADER_FIRST_DISTRICT_YEARS
+    if historical and batch_index is None:
+        raise ValueError("Header-first district preparation requires the exact statewide regional batch")
     selected = list(inputs)
     regions: dict[str, str] = {}
     index_raw = None
@@ -910,11 +977,17 @@ def prepare_transfer_sources(
         if grain != "district":
             raise ValueError("Regional district indices cannot select campus reports")
         index_raw = _captured_input(*batch_index)
-        selected, regions = district_batch_inputs(store, index_raw, year)
+        selected, regions = district_batch_inputs(store, index_raw, year, all_offered=historical)
     if not selected or len({identifier for identifier, _ in selected}) != len(selected):
         raise ValueError("Transfer preparation requires distinct explicit source receipts")
     expected_dataset = grain + "_transfer_reports"
     roots = [identifier for identifier, _ in selected]
+    if historical:
+        source = cfg.resolve_dataset(expected_dataset, year, reader_profile="source", exact=True)
+        if source.metadata.value_policy != policy.policy_id or source.metadata.provenance_ids != tuple(roots):
+            raise ValueError("Historical district policy and original receipts differ from the exact source edition")
+        region_csv, = (identifier for identifier, region in regions.items() if region == "13")
+        roots.append(_historical_district_masking_receipt(source, policy, region_csv, store.read_record))
     if compare_input is not None:
         roots.append(compare_input[0])
     records = store.verify_record_closure(roots)

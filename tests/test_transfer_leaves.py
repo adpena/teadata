@@ -1,6 +1,7 @@
 """Synthetic publisher-shaped leaves; no TEA field-correctness qualification."""
 
 from copy import deepcopy
+from dataclasses import replace
 from hashlib import sha256
 import json
 from pathlib import Path
@@ -20,7 +21,7 @@ from teadata.scripts.refresh_transfers import main
 from teadata.teadata_config import load_config
 from teadata.transfer_leaves import materialize_district_transfers
 from teadata.transfer_rollups import _compare_details
-from teadata.transfer_sources import acquire_regional_transfers, prepare_transfer_sources
+from teadata.transfer_sources import _historical_district_masking_receipt, acquire_regional_transfers, prepare_transfer_sources
 from teadata.values import measure
 
 
@@ -71,7 +72,7 @@ def test_campus_district_rollup_checks_only_fully_observed_cross_district_groups
     assert _compare_details(campus.slice(0, 0), district.slice(0, 0))["status"] == "HOLD"
 
 
-@pytest.mark.parametrize("year", [2019, 2020, 2021, 2023, 2024, 2025, 2026])
+@pytest.mark.parametrize("year", [*range(2013, 2022), *range(2023, 2027)])
 def test_packaged_district_transfer_discovery_binds_all_regional_originals(year):
     root = Path(__file__).resolve().parents[1]
     config = load_config(root / "teadata/teadata_sources.yaml")
@@ -79,7 +80,8 @@ def test_packaged_district_transfer_discovery_binds_all_regional_originals(year)
     source = config.resolve_dataset(dataset, year, reader_profile="source", exact=True)
     assert config.is_source_only(dataset, year)
     assert config.column_schema(dataset, year) is None
-    assert config.column_schema(dataset, year, reader_profile="source") == FIELDS
+    expected = [field for field in FIELDS if field != "reporting_charter_status" or year >= 2017]
+    assert config.column_schema(dataset, year, reader_profile="source") == expected
     read_record = ProvenanceStore(root / "provenance").read_record
     roots = [*source.metadata.provenance_ids,
              *(identifier for ref in source.metadata.references for identifier in ref.provenance_ids)]
@@ -96,6 +98,34 @@ def test_packaged_district_transfer_discovery_binds_all_regional_originals(year)
     assert contract is not None
     table, = crosswalk_dataset(parse_column_schema(contract["text"].encode()), dataset, str(year))["tables"]
     table_input_sha256s(table, acquisition_sha256s=[record["artifact"]["sha256"] for record in originals])
+
+
+@pytest.mark.parametrize("damage", ["url", "duplicate_control", "reordered_control", "year"])
+def test_historical_masking_reference_requires_exact_publisher_request(damage):
+    root = Path(__file__).resolve().parents[1]
+    config = load_config(root / "teadata/teadata_sources.yaml")
+    source = config.resolve_dataset("district_transfer_reports", 2013, reader_profile="source", exact=True)
+    policy = config.value_policies["historical_district_transfers"]
+    region_csv = source.metadata.provenance_ids[12]
+    store = ProvenanceStore(root / "provenance")
+    receipt = _historical_district_masking_receipt(source, policy, region_csv, store.read_record)
+    html = store.read_record(receipt)
+    if damage == "url":
+        html["requested_url"] = html["resolved_url"] = "https://example.com/alternate"
+        references = tuple(replace(ref, url=html["requested_url"]) if ref.reference_id == "masking" else ref
+                           for ref in source.metadata.references)
+        source = replace(source, metadata=replace(source.metadata, references=references))
+    elif damage == "year":
+        html["resolved_year"] = 2014
+    else:
+        controls = html["parameters"]["form_controls"]
+        if damage == "duplicate_control":
+            controls.append(controls[0])
+        else:
+            controls.reverse()
+    with pytest.raises(ValueError, match="exact same-year Region 13 HTML"):
+        _historical_district_masking_receipt(source, policy, region_csv,
+            lambda identifier: html if identifier == receipt else store.read_record(identifier))
 
 
 def prepared_fixture(tmp_path, monkeypatch, years=(2024, 2025), *, complete=True, damage=None):
