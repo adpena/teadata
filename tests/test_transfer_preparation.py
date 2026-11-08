@@ -139,13 +139,15 @@ def test_2026_campus_original_requires_its_literal_count_header(tmp_path):
     assert comparison["only_old"] == comparison["only_new"] == 0
 
 
-def test_2021_district_original_reads_only_the_final_parenthesized_id(tmp_path):
+@pytest.mark.parametrize("region", ["04", None])
+def test_2021_district_original_reads_only_the_final_parenthesized_id(tmp_path, region):
     owner = "Example ISD (111111) (001902)"
     partner = "Partner ISD (002902)"
     row = ["2020-2021", "04", "REGION IV HOUSTON", owner, "Traditional ISD/CSD",
            "100", "Transfers In From", "100", partner, "-999"]
-    source = read(*original(tmp_path, [row], grain="district", report_scope="Region"),
-                  grain="district", year=2021, region="04")
+    scope = "Region" if region else "District"
+    source = read(*original(tmp_path, [row], grain="district", report_scope=scope),
+                  grain="district", year=2021, region=region)
     assert source.table["REPORT_DISTNAME_NUMBER"].to_pylist() == [owner]
     assert source.table["DISTNAME_NUMBER_RES_ATTEND"].to_pylist() == [partner]
     assert source.table["transfer_reporting_number"].to_pylist() == ["'001902"]
@@ -154,8 +156,8 @@ def test_2021_district_original_reads_only_the_final_parenthesized_id(tmp_path):
 
     row[8] = "Partner ISD (02902)"
     with pytest.raises(ValueError, match="missing historical source identifier"):
-        read(*original(tmp_path, [row], grain="district", report_scope="Region"),
-             grain="district", year=2021, region="04")
+        read(*original(tmp_path, [row], grain="district", report_scope=scope),
+             grain="district", year=2021, region=region)
 
 
 def test_district_published_total_is_retained_independently_of_masked_detail(tmp_path):

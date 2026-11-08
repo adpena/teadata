@@ -263,11 +263,12 @@ def _transfer(path: Path, ref: ArtifactRef, district: str, table: Any) -> int:
     header, = (index for index, row in enumerate(rows) if row == _TRANSFER_HEADER)
     number = district.split(" ", 1)[0]
     period = f"{int(ref.edition.edition) - 1}-{ref.edition.edition}"
+    district_suffix = f" ({number})" if ref.edition.edition == "2021" else f"  -  {number}"
     body = rows[header + 1:]
     end = next((index for index, row in enumerate(body) if len(row) != len(_TRANSFER_HEADER)), len(body))
     source, footer = body[:end], body[end:]
     if (("District Level Transfer Report",) not in rows[:header] or not source
-            or any(row[0] != period or not row[3].endswith(f"  -  {number}") for row in source)
+            or any(row[0] != period or not row[3].endswith(district_suffix) for row in source)
             or any(len(row) > 1 for row in footer)
             or tuple(row[0].strip() for row in footer if row) != _FOOTNOTES):
         raise ContractError("Independent transfer report edition, district or row width differs")

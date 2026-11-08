@@ -185,9 +185,10 @@ assumed. All 20 regional originals have been acquired for each year from
 2022–23 through 2025–26. Compare their district coverage separately against the expected
 scope. Individual district examples provide additional publisher witnesses.
 
-The 2020–21 regional district originals put the six-digit ID in parentheses at the
-end of the label. Preparation reads that final ID as text and retains the
-full original label. A shorter or missing ID fails preparation.
+The 2020–21 regional and individual district originals put the six-digit ID
+in parentheses at the end of the label. Preparation reads that final ID as
+text and retains the full original label. A shorter or missing ID fails
+preparation.
 
 For a regional batch:
 
@@ -289,7 +290,8 @@ change the default source configuration, or qualify a release scientifically.
 
 `refresh_transfers materialize` accepts exact annual preparation processing IDs
 and a reviewed, SHA-pinned source Config. The packaged `teadata_sources.yaml`
-includes source discovery for the 2022–23 through 2025–26 district reports.
+includes source discovery for 2020–21 and 2022–23 through 2025–26 district
+reports. The 2021–22 identity join remains on hold.
 The builder requires every offered region from the preparation's captured
 index/form, in source order. Each annual batch contains all 20 regional originals.
 The result contains one statewide district logical table and native leaf per
@@ -315,12 +317,21 @@ uv run --locked --offline python -m teadata.scripts.refresh_transfers materializ
   --store "$TRANSFER_PROVENANCE_STORE" \
   --config teadata/teadata_sources.yaml \
   --config-sha256 "$TRANSFER_REVIEWED_CONFIG_SHA256" \
+  --prepared-input 2021 1205b8ef77e262ce8102f67ab880d1e121cc550568b3d23aaf4d41c126d3617b \
   --prepared-input 2023 f884f3ebdd177607d6ac2b417dec9664c19a98349bb775b0ce22fcea06381f37 \
   --prepared-input 2024 20b4640c31a135b55c435725f50f75d8798f769ad2790a20b10447d182cfd1da \
   --prepared-input 2025 a79a1f84b46c02b4929f3ec0dc942fa2adce8d6e3ca9f60539bf6ede31549fb5 \
   --prepared-input 2026 02977bde453c093ff624ff81537cf9c26d163aed6434e7045239273e1a3e0b18 \
   --output "$TRANSFER_NEW_CANDIDATE_DIR"
 ```
+
+For 2020–21, all 20 originals provided 37,460 rows across 1,204 reporting
+districts, including 30,860 directional details, 2,200 published totals,
+and 4,400 separators. The native candidate passed raw and typed source
+parity. The 15,430 reciprocal pairs matched on the original count or
+masking token. Three individual district reports retrieved on November 8,
+2026, independently matched 208 of those rows in source order. The local candidate uses
+the reported district population and remains unpublished.
 
 For 2022–23, all 20 regional originals had the same ten ordered headings and
 the same masking notes. The local candidate retained 40,703 source rows,

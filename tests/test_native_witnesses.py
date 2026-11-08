@@ -95,6 +95,25 @@ def test_transfer_witness_rejects_a_truncated_data_row_as_a_footer(tmp_path):
         native_witnesses._transfer(report, cast(ArtifactRef, ref), "227901 DISTRICT", Mock())
 
 
+@pytest.mark.parametrize("label", ["District (001902)", "District (01902)", "District (001903)"])
+def test_2021_transfer_witness_requires_the_exact_parenthesized_district(tmp_path, label):
+    report = tmp_path / "district.csv"
+    row = ["2020-2021", "13", "REGION", label, "", "100", "Transfers In From",
+           "100", "Partner (002902)", "-999"]
+    with report.open("w", newline="", encoding="utf-8") as stream:
+        csv.writer(stream).writerows([["District Level Transfer Report"], native_witnesses._TRANSFER_HEADER,
+                                     row, [], *[[line] for line in native_witnesses._FOOTNOTES]])
+    table = Mock()
+    table.to_table.return_value.to_pylist.return_value = [dict(zip(native_witnesses._TRANSFER_COLUMNS, row, strict=True))]
+    ref = cast(ArtifactRef, SimpleNamespace(edition=SimpleNamespace(edition="2021")))
+    if label == "District (001902)":
+        assert native_witnesses._transfer(report, ref, "001902 DISTRICT", table) == 1
+    else:
+        with pytest.raises(ContractError, match="row width differs"):
+            native_witnesses._transfer(report, ref, "001902 DISTRICT", table)
+        table.to_table.assert_not_called()
+
+
 @pytest.mark.parametrize("damage", [None, "metadata", "extra-edition", "parity", "witness"])
 def test_native_gate_requires_reviewed_identity_parity_and_independent_witnesses(monkeypatch, damage):
     case = {"artifact": "leaf", "sha256": "bytes", "processing_id": "receipt", "metadata_sha256": "metadata"}

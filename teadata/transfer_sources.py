@@ -451,8 +451,8 @@ def _transfer_projection(table, *, grain: str, period: DataPeriod, policy: Value
             require(pc.or_(pc.invert(pc.or_(separator, total)), pc.equal(table[name], "")),
                     "Transfer separator/total unexpectedly carries a partner identity")
     else:
-        # The 2020–21 regional originals end district labels with the full ID in parentheses.
-        if layout == "original" and period.end_year == 2021 and region is not None:
+        # The 2020–21 originals end district labels with the full ID in parentheses.
+        if layout == "original" and period.end_year == 2021:
             pattern = r"^.*\S\s+\((?P<number>[0-9]{6})\)$"
         else:
             pattern = r"^.*\S\s+-\s+(?P<number>[0-9]{6})$"

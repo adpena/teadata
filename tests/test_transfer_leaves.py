@@ -71,7 +71,7 @@ def test_campus_district_rollup_checks_only_fully_observed_cross_district_groups
     assert _compare_details(campus.slice(0, 0), district.slice(0, 0))["status"] == "HOLD"
 
 
-@pytest.mark.parametrize("year", [2023, 2024, 2025, 2026])
+@pytest.mark.parametrize("year", [2021, 2023, 2024, 2025, 2026])
 def test_packaged_district_transfer_discovery_binds_all_regional_originals(year):
     root = Path(__file__).resolve().parents[1]
     config = load_config(root / "teadata/teadata_sources.yaml")
