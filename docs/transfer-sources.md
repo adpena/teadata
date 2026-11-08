@@ -185,6 +185,10 @@ assumed. All 20 regional originals have been acquired for each year from
 2022–23 through 2025–26. Compare their district coverage separately against the expected
 scope. Individual district examples provide additional publisher witnesses.
 
+The 2020–21 regional district originals put the six-digit ID in parentheses at the
+end of the label. Preparation reads that final ID as text and retains the
+full original label. A shorter or missing ID fails preparation.
+
 For a regional batch:
 
 ```sh
