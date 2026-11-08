@@ -796,6 +796,85 @@ data_sources:
       reader:
         column_schema: schemas/data_sources--charter_reference--2025--default.json
   district_transfer_reports:
+    2023:
+      metadata:
+        metrics:
+          transfers:
+            field: student_transfer_count
+            period:
+              end_year: 2023
+              kind: school_year
+              start_year: 2022
+            unit: count
+        notes: One statewide logical report from all 20 offered regional originals. Publisher residence-area-to-attendance
+          observations use historical district identifiers. Report details, publisher totals and separators
+          remain separate. The observed reporting districts do not establish exhaustive LEA coverage.
+          The dedicated transfer preparation and native catalog workflow owns row access.
+        period:
+          end_year: 2023
+          kind: school_year
+          start_year: 2022
+        provenance_ids:
+        - 9bbe68c2515ce6b08b3e61bd36fc5c9d1d922ee22b34465cd4c26dd946e87a03
+        - 1c364ffedddcb02af6856d88a10f42e11eb2011d2cbc186eca85901640e060e0
+        - beced0eb825de9cc1d0718b5b7242bd85e870abaedf86fa1883e71290cbf6e0f
+        - b0f3a6dc3ac9f9ef25c171766e1f8f1e5b1f5b1892bd6b8f0ca040686cf864f1
+        - 955f2501245ad2057b55f65f1e8a6a8f1d70ce04518194c1f65c2c5de47c637c
+        - 72f5dd154ffc006ee147c147a4f4685364a280f25053123523a6d2f066bba862
+        - d814baf624c59b0d151478f7b338e60fb8dd76e0b55031bb9bb65088510d484a
+        - 8298efc691072b47180363289943b56b74aeb10890d1766d0b0cb7560bb5ee98
+        - eb11dfd5e4c1f3d4a79f7e9fd3547a926702138eb817b9b25bbb33524be28366
+        - 105b95b83a172558ed446ed3eed9e200bac2dc63102a5ca8103cde541a6194b5
+        - 13c72a3e59e616b15920692abd8379251c0f739d5c7b5caa371bcf74c6e9a832
+        - e94105730350999fd41ddc4b503d5b3bbb7a533332d18b505e1ac8920ec476ab
+        - 5f443b2e41629d6fc70116d0115af80b0c4cd02d48ac04b0db32b360b741967c
+        - ccfd2c01861403be6a9b9be03a7b167176bc89834e72aa6b19341dcd20df333a
+        - 68a7416ce421b430c96685d02f93cd5ea945140de477e9f377037a728467c600
+        - 5fff1f29940af617c7b196220dd10cd436b6e5221e0f58b348b8a2fdc6a80566
+        - d699fa7f4cc6cf19167b2744e1d92f2e2ec5b6af3fe9f96c7c997a906bcb5b32
+        - 46be535d5bfd1d9aa5b639f2b8da9d0c43083fb07261ee8e65a3bc8c75bcd2c7
+        - 5454768b0e9e40a4de8414fa5507d4c45c63fff91f2a77e766d05e8e0fbdf50a
+        - e2a05348848564aa8752e522b83a2d06f2562da8c8820caa758788f89561da5d
+        publisher: Texas Education Agency
+        references:
+        - path: schemas/district-transfer-reports--2023--crosswalk.json
+          provenance_ids:
+          - 334a4ae05998f4db7f050bc9d967006e254870017dd1d861afeffea4bd13c176
+          reference_id: columns
+          reviewed_sha256: d88fe896096872f9d1126471fb80746f4991e2b13cf90e56b772011134eb7680
+          role: schema
+          status: available
+          title: TEA Data generated ordered district transfer header mapping, edition 2023; not a
+            TEA dictionary
+        - provenance_ids:
+          - 9bbe68c2515ce6b08b3e61bd36fc5c9d1d922ee22b34465cd4c26dd946e87a03
+          reference_id: masking
+          reviewed_sha256: dacc4659d6a859faafd7c2ab1c04da6d379e3fc0254eb5ffdedace833c6f2381
+          role: masking_methodology
+          status: available
+          title: Original 2023 Region01 district CSV containing publisher FERPA masking notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.download_transfer_report.sas&scope=Region&agg_level=region&_debug=0&school_year=2023&report_format=csv&selected_id=01&Region_District_Xfr_Report=Get+a+Region+District+Transfer+Report
+        - provenance_ids:
+          - e853850f4f9931afc5e755de31ff3f78cfd2fa5c1f9b21f6049152d3728f40c1
+          reference_id: transfer_definitions
+          reviewed_sha256: 2501a791870e5015247bb0b5837e31047da8ad4741917b7f0c4a3a44fa417302
+          role: methodology
+          status: available
+          title: About Transfer Reports
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/about_transfer_reports.html
+        - provenance_ids: []
+          reference_id: dictionary
+          role: data_dictionary
+          status: unreviewed
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/region_district_transfer_report.html
+        title: TEA PEIMS district transfer reports, 2022-2023, all offered regional originals
+        value_policy: campus_transfers
+        version: '2023'
+      path: data/transfer_reports/district-2023-report-rows.parquet
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/district-transfer-reports--2023--crosswalk.json
     2024:
       metadata:
         metrics:

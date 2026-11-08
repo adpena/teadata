@@ -181,8 +181,8 @@ stage. Field-level qualification and release activation are pending.
 SHA-pinned completed regional batch index. District parsing is independent of
 partitioning: an independently acquired statewide district original, if found,
 can use `--input` without a regional index. No speculative statewide endpoint is
-assumed. All 20 regional originals have been acquired for each of 2023-2024 and
-2024-2025. Compare their district coverage separately against the expected
+assumed. All 20 regional originals have been acquired for each year from
+2022–23 through 2025–26. Compare their district coverage separately against the expected
 scope. Individual district examples provide additional publisher witnesses.
 
 For a regional batch:
@@ -285,7 +285,7 @@ change the default source configuration, or qualify a release scientifically.
 
 `refresh_transfers materialize` accepts exact annual preparation processing IDs
 and a reviewed, SHA-pinned source Config. The packaged `teadata_sources.yaml`
-includes source discovery for the 2023–24, 2024–25, and 2025–26 district reports.
+includes source discovery for the 2022–23 through 2025–26 district reports.
 The builder requires every offered region from the preparation's captured
 index/form, in source order. Each annual batch contains all 20 regional originals.
 The result contains one statewide district logical table and native leaf per
@@ -311,11 +311,26 @@ uv run --locked --offline python -m teadata.scripts.refresh_transfers materializ
   --store "$TRANSFER_PROVENANCE_STORE" \
   --config teadata/teadata_sources.yaml \
   --config-sha256 "$TRANSFER_REVIEWED_CONFIG_SHA256" \
+  --prepared-input 2023 f884f3ebdd177607d6ac2b417dec9664c19a98349bb775b0ce22fcea06381f37 \
   --prepared-input 2024 20b4640c31a135b55c435725f50f75d8798f769ad2790a20b10447d182cfd1da \
   --prepared-input 2025 a79a1f84b46c02b4929f3ec0dc942fa2adce8d6e3ca9f60539bf6ede31549fb5 \
   --prepared-input 2026 02977bde453c093ff624ff81537cf9c26d163aed6434e7045239273e1a3e0b18 \
   --output "$TRANSFER_NEW_CANDIDATE_DIR"
 ```
+
+For 2022–23, all 20 regional originals had the same ten ordered headings and
+the same masking notes. The local candidate retained 40,703 source rows,
+including 34,076 directional details, 2,209 published totals, and 4,418
+separators across 1,209 reporting districts. Offline source parity checked all
+rows and found no differences through preparation and the native table. Each
+of the 17,038 incoming details had a reciprocal outgoing detail with the same
+raw count or masking token. These checks describe the regional reports and do
+not establish full LEA roster coverage. Separately, all 201 rows in the
+individual reports for Austin ISD, Hutto ISD, and Harmony Public Schools –
+Houston North matched in source order, including the original count tokens
+and published totals. Those three witnesses were retrieved on November 8,
+2026, through TEA's [District Transfer Report selector](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/district_transfer_report.html).
+The edition remains unpublished.
 
 To read the candidate directly, open its manifest and choose an explicit
 edition and field. The catalog resolves the leaf and includes the raw count,
