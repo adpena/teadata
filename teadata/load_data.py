@@ -2035,7 +2035,8 @@ def _split_map_payload(payload: dict) -> tuple[dict, dict]:
 
 def _encode_payload(payload: dict) -> bytes:
     raw = json.dumps(payload, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
-    return gzip.compress(raw, mtime=0)
+    # Level 6 keeps map-store size close to level 9 without its build-time cost.
+    return gzip.compress(raw, compresslevel=6, mtime=0)
 
 
 def _save_map_store(
