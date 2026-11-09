@@ -101,9 +101,15 @@ precision can differ.
 The 2024–25 regional Student Information and regional and statewide Staff
 Information source profiles retain the original two-header CSVs and exact
 publisher dictionaries. Each regional file has all 20 ESC identifiers. The
-statewide Staff file is one direct Texas observation. These source profiles
-preserve publisher tokens and leave measurement periods and value policies
-unbound. Campus and district enrichment use their separately configured inputs.
+statewide Staff file is one direct Texas observation. Regional and statewide
+Staff bind the 2024–25 school year and published units for teacher FTE, average
+professional experience, average regular-duty salary, students per teacher
+FTE, and teacher turnover. The five values match separate TEA Staff reports
+for direct Texas and ESCs 06 and 16. Each observation keeps its publisher
+scope and raw CSV token. The turnover rate uses the fall 2023–24 baseline and
+fall 2024–25 comparison. The remaining fields have unbound semantics, and
+these source profiles carry no table-wide value policy. Campus and district
+enrichment use their separately configured inputs.
 [TEA TAPR data download](https://rptsvr1.tea.texas.gov/perfreport/tapr/tapr_dd_download.html?year=2025)
 
 ## Published 2026 entity snapshot

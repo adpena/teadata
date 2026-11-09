@@ -15450,8 +15450,8 @@ data_sources:
           kind: unknown
         source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html
         download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
-        notes: Publisher labels, codes, cells and ordered dictionary observations are retained. Measurement periods and token
-          interpretations remain unbound.
+        notes: Five teacher measures bind the 2024–25 reporting period and published units. Turnover compares fall 2023–24
+          with fall 2024–25. Other source fields retain raw publisher values without a measurement period or value policy.
         references:
         - reference_id: csv_headers
           role: source_notes
@@ -15479,6 +15479,22 @@ data_sources:
           reviewed_sha256: 3ce6fc9be7f5cb73d739800a8ae31c6cd830417fc5e85573bf60c64191444650
         - *tapr_2025_aggregate_glossary
         - *tapr_2025_aggregate_masking
+        - reference_id: printed_region_06
+          role: source_notes
+          title: TEA 2024–25 Staff Information report for ESC 06
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=06&lev=R&prgopt=reports%2Ftapr%2Fstaff.sas
+          provenance_ids:
+          - 75ac91bfdc2ef0b94742573a6a955eda38b3bbb40c9297152f70f7db37254705
+          reviewed_sha256: f1d80566edfdd82e7f2cc1b3e1a8b7c56d7b13d856d813bb2791412af770576b
+        - reference_id: printed_region_16
+          role: source_notes
+          title: TEA 2024–25 Staff Information report for ESC 16
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=16&lev=R&prgopt=reports%2Ftapr%2Fstaff.sas
+          provenance_ids:
+          - 640c8151f71a059c252261b6b6de628dcd731a23adf8985b6055a2c27bdfe696
+          reviewed_sha256: f13c73cb410e88f8f13485574ed2c6619160acd0f1f709e3359e89fa9bf04f85
         - reference_id: columns_source
           role: schema
           path: schemas/tapr--2025--aggregate-profile-crosswalk.json
@@ -15487,6 +15503,42 @@ data_sources:
           provenance_ids:
           - f8b72f9efb421e07633c9283f4c27b736b27288204a080d58847a6b944ab9cc0
           reviewed_sha256: 78a7a9e00d992a1656ee4bd3f7f16372bf4a16dc8639e54bca716a36e0f99ea6
+        metrics:
+          staff_teacher_total_full_time_equiv_count:
+            field: region_2025_staff_teacher_total_full_time_equiv_count
+            unit: fte
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+          staff_teacher_experience_average:
+            field: region_2025_staff_teacher_experience_average
+            unit: years
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+          staff_teacher_total_base_salary_average:
+            field: region_2025_staff_teacher_total_base_salary_average
+            unit: currency
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+          staff_teacher_student_ratio:
+            field: region_2025_staff_teacher_student_ratio
+            unit: ratio
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+          staff_teacher_turnover_ratio:
+            field: region_2025_staff_teacher_turnover_ratio
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
       reader:
         profiles:
           source:
@@ -15506,8 +15558,8 @@ data_sources:
           kind: unknown
         source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html
         download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
-        notes: Publisher labels, codes, cells and ordered dictionary observations are retained. Measurement periods and token
-          interpretations remain unbound.
+        notes: Five teacher measures bind the 2024–25 reporting period and published units. Turnover compares fall 2023–24
+          with fall 2024–25. Other source fields retain raw publisher values without a measurement period or value policy.
         references:
         - reference_id: csv_headers
           role: source_notes
@@ -15535,6 +15587,14 @@ data_sources:
           reviewed_sha256: 5250f48b53266e3615dde83727ca771927fd8eb5a5768f2487dec1fda29848d7
         - *tapr_2025_aggregate_glossary
         - *tapr_2025_aggregate_masking
+        - reference_id: printed_texas
+          role: source_notes
+          title: TEA 2024–25 Staff Information report for Texas
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=S&lev=S&prgopt=reports%2Ftapr%2Fstaff.sas
+          provenance_ids:
+          - f2e49d707ae5782c4ad142da19c02e3ee9307c1013c4724acb7b572740948724
+          reviewed_sha256: 5c760755ec97ceee11861f8137ab60f2d392b9fab6cad8779102dcc543b74898
         - reference_id: columns_source
           role: schema
           path: schemas/tapr--2025--aggregate-profile-crosswalk.json
@@ -15543,6 +15603,42 @@ data_sources:
           provenance_ids:
           - f8b72f9efb421e07633c9283f4c27b736b27288204a080d58847a6b944ab9cc0
           reviewed_sha256: 78a7a9e00d992a1656ee4bd3f7f16372bf4a16dc8639e54bca716a36e0f99ea6
+        metrics:
+          staff_teacher_total_full_time_equiv_count:
+            field: state_2025_staff_teacher_total_full_time_equiv_count
+            unit: fte
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+          staff_teacher_experience_average:
+            field: state_2025_staff_teacher_experience_average
+            unit: years
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+          staff_teacher_total_base_salary_average:
+            field: state_2025_staff_teacher_total_base_salary_average
+            unit: currency
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+          staff_teacher_student_ratio:
+            field: state_2025_staff_teacher_student_ratio
+            unit: ratio
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+          staff_teacher_turnover_ratio:
+            field: state_2025_staff_teacher_turnover_ratio
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
       reader:
         profiles:
           source:

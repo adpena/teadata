@@ -159,6 +159,30 @@ def test_human_readable_names_preserve_exact_code_label_maps_and_literal_lengths
         assert cfg.header_records(scope + '_tapr_reference', edition='2024', reader_profile='source')[0]['dictionary_occurrences'][0]['publisher_type'] != 'Caller mutation'
 
 
+@pytest.mark.parametrize('scope, prefix, witnesses', [('region', 'R', {'printed_region_06', 'printed_region_16'}),
+                                                       ('state', 'S', {'printed_texas'})])
+def test_aggregate_staff_binds_only_the_five_publisher_checked_fields(scope, prefix, witnesses):
+    cfg = load_config()
+    dataset = f'{scope}_tapr_staff_profile'
+    metadata = cfg.resolve_dataset(dataset, 2025, exact=True, reader_profile='source').metadata
+    year = {'kind': 'school_year', 'start_year': 2024, 'end_year': 2025}
+    expected = {
+        'staff_teacher_total_full_time_equiv_count': ('PSTTOFC', 'fte'),
+        'staff_teacher_experience_average': ('PSTEXPA', 'years'),
+        'staff_teacher_total_base_salary_average': ('PSTTOSA', 'currency'),
+        'staff_teacher_student_ratio': ('PSTKIDR', 'ratio'),
+        'staff_teacher_turnover_ratio': ('PSTURNR', 'percent'),
+    }
+    rows = {row['code']: row for row in cfg.header_records(dataset, edition='2025', reader_profile='source')}
+    assert metadata.period.to_dict() == UNKNOWN and metadata.value_policy is None
+    assert set(metadata.metrics) == set(expected)
+    assert {row['code'] for row in rows.values() if row['period'] != UNKNOWN} == {prefix + code for code, _ in expected.values()}
+    for metric, (code, unit) in expected.items():
+        assert metadata.metrics[metric].to_dict() == {'field': rows[prefix + code]['field'], 'period': year, 'unit': unit}
+    assert {ref.reference_id for ref in metadata.references if ref.reference_id.startswith('printed_')} == witnesses
+    assert all(ref.reviewed_sha256 and ref.provenance_ids for ref in metadata.references if ref.reference_id in witnesses)
+
+
 @pytest.mark.parametrize('scope,missing_sha', [('campus', 'df20c2f8ff4841fc064d6e38085ee97ca44bbb722f37636b223806f5443b6793'),
     ('district', 'cc36466eed9e9d7c26977459909d15aa04aab7a8a6b47ffff0050e7c2107e401')])
 def test_every_undocumented_fact_is_retained_without_guessed_type_or_semantics(scope, missing_sha):
