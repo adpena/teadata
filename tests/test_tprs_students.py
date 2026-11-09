@@ -827,13 +827,13 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(
             engine.add_campus(Campus(UUID(int=number), None, identifier, "", False, campus_number=identifier))
         cohort = Query([engine.campus_by_number(identifier) for identifier in (first_id, last_id)], engine)
         route_calls = []
-        original = DataRelease.tprs_student_campus_index
+        original = DataRelease._build_student_campus_index
 
-        def route(instance, *, edition):
+        def route(instance, edition, trace=None):
             route_calls.append(edition)
-            return original(instance, edition=edition)
+            return original(instance, edition, trace)
 
-        monkeypatch.setattr(DataRelease, "tprs_student_campus_index", route)
+        monkeypatch.setattr(DataRelease, "_build_student_campus_index", route)
         with monkeypatch.context() as planning:
             planning.setattr(DataRelease, "artifact", lambda *a, **k: pytest.fail("Planning opened a native leaf"))
             pinned = cohort.observations(students.DATASET, field, school_year=26, edition=key, release=parent)
@@ -843,7 +843,7 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(
                 both = cohort >> ("observations", students.DATASET, "2025-26", (field,))
             assert isinstance(one, SourceTable) and one.edition == key
             assert isinstance(both, PartitionedSourceTable) and both.editions[-1] == key
-            assert route_calls == ["2026"]
+            assert route_calls == ["2026"] * (1 if getattr(os, "O_NOFOLLOW", 0) else 2)
             if getattr(os, "O_NOFOLLOW", 0):
                 assert set(one.release.catalog._edition_views) == {key.identity}
                 assert "_campus_observation_plan" not in parent.__getstate__()
@@ -852,6 +852,44 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(
                                  lambda *args: pytest.fail("Warm planning rebuilt all campus editions"))
                     again = cohort.observations(students.DATASET, field, school_year=26, release=parent)
                     assert isinstance(again, PartitionedSourceTable) and again.editions == both.editions
+
+                other_leaf = next(composed.catalog.artifact_ref(artifact_id)
+                                  for artifact_id, edition_id in composed.catalog._artifact_routes.items()
+                                  if edition_id != key.identity)
+                roster = _student_attachments(composed.catalog, other_leaf)["roster"]
+                roster_path = composed.path.with_name(roster.location)
+                original_roster = roster_path.read_bytes()
+                for year in (26, None):
+                    # Latest can reuse the route even though it has a different selection.
+                    try:
+                        roster_path.write_bytes(b" " + original_roster[1:])
+                        with pytest.raises(ContractError, match="resource checksum"):
+                            (engine >> ("campus", last_id)).observations(
+                                students.DATASET, field, school_year=year, release=parent,
+                            )
+                    finally:
+                        roster_path.write_bytes(original_roster)
+                    restored = (engine >> ("campus", last_id)).observations(
+                        students.DATASET, field, school_year=26, release=parent,
+                    )
+                    assert restored.edition == key
+
+                original_route = parent._automatic_student_campus_index
+
+                def change_after_route_check(child, edition):
+                    route = original_route(child, edition)
+                    roster_path.write_bytes(b" " + original_roster[1:])
+                    return route
+
+                try:
+                    with monkeypatch.context() as between_checks:
+                        between_checks.setattr(parent, "_automatic_student_campus_index", change_after_route_check)
+                        with pytest.raises(ContractError, match="resource checksum"):
+                            (engine >> ("campus", last_id)).observations(
+                                students.DATASET, field, school_year=None, release=parent,
+                            )
+                finally:
+                    roster_path.write_bytes(original_roster)
 
                 unselected = next(ref for ref in one.release.catalog.edition_metadata_refs()
                                   if ref.sha256 != one.release.catalog._edition_metadata_refs[key.identity].sha256)
