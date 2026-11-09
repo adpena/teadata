@@ -216,6 +216,37 @@ def test_regional_student_binds_publisher_populations_and_lagged_periods():
         assert report.reviewed_sha256 and report.provenance_ids
 
 
+def test_2024_texas_student_binds_exact_codes_and_lagged_periods():
+    cfg = load_config()
+    dataset = 'state_tapr_student_profile'
+    prior = cfg.resolve_dataset(dataset, 2024, exact=True, reader_profile='source').metadata
+    latest = cfg.resolve_dataset(dataset, 2025, exact=True, reader_profile='source').metadata
+    rows = {row['field']: row for row in cfg.header_records(dataset, edition='2024', reader_profile='source')}
+    latest_rows = {row['field']: row for row in cfg.header_records(dataset, edition='2025', reader_profile='source')}
+    assert len(rows) == 240 and len(prior.metrics) == 76
+    assert prior.period.to_dict() == UNKNOWN and prior.value_policy is None
+    assert prior.metrics.keys() == latest.metrics.keys()
+    assert {field for field, row in rows.items() if row['period'] != UNKNOWN} == {
+        metric.field for metric in prior.metrics.values()
+    }
+    for key, metric in prior.metrics.items():
+        row = rows[metric.field]
+        assert row['code'] == latest_rows[latest.metrics[key].field]['code']
+        lagged = row['code'].startswith(('SPEM', 'SPETATT', 'SPETDIS'))
+        end_year = 2023 if lagged else 2024
+        assert metric.period.to_dict() == row['period'] == {
+            'kind': 'school_year', 'start_year': end_year - 1, 'end_year': end_year,
+        }
+        assert metric.unit == latest.metrics[key].unit
+    refs = {ref.reference_id: ref for ref in prior.references}
+    assert refs['annual_attrition_witness'].provenance_ids == (
+        '0fc6efda0115dd7d937659de199d1e660e1d6e91a0cd93a52126f7d25d955c0b',
+    )
+    assert all(row['dictionary_status'] == 'documented' for row in rows.values())
+    assert sum(len(row['dictionary_occurrences']) for row in rows.values()) == 241
+    assert cfg.is_source_only(dataset, 2024)
+
+
 @pytest.mark.parametrize('scope,missing_sha', [('campus', 'df20c2f8ff4841fc064d6e38085ee97ca44bbb722f37636b223806f5443b6793'),
     ('district', 'cc36466eed9e9d7c26977459909d15aa04aab7a8a6b47ffff0050e7c2107e401')])
 def test_every_undocumented_fact_is_retained_without_guessed_type_or_semantics(scope, missing_sha):
@@ -601,7 +632,7 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     annual_dropout = 'accountability_research_annual_dropout'
     assert list(current['data_sources'].pop(annual_dropout)) == [2025]
     assert current['schema']['data_sources'].pop(annual_dropout) == ['xlsx']
-    # Remove only the explicitly added 2025 outcome opt-ins before reconstructing history.
+    # Remove only the explicitly added source opt-ins before reconstructing history.
     for scope in ('campus', 'district'):
         for family in ('college_career_military_readiness', 'college_readiness_components'):
             dataset = scope + '_tapr_' + family
@@ -610,7 +641,8 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     for family in ('college_career_military_readiness', 'college_readiness_components',
                    'four_year_longitudinal_rate', 'student_profile'):
         statewide = 'state_tapr_' + family
-        assert list(current['data_sources'].pop(statewide)) == [2025]
+        years = [2024, 2025] if family == 'student_profile' else [2025]
+        assert list(current['data_sources'].pop(statewide)) == years
         assert current['schema']['data_sources'].pop(statewide) == ['csv']
     for scope in ('state', 'region'):
         dataset = scope + '_tapr_dropout_attendance'

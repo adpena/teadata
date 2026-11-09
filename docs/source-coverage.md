@@ -109,6 +109,15 @@ attrition workbook also matches both attrition fields for all 20 ESCs.
 A campus change within the same region can count as attrition. Regional
 values use TEA's own regional reporting population.
 
+Direct Texas Student Information also has a reviewed 2023–24 edition.
+It retains all 240 source columns and binds 76 measures to their exact
+periods. Mobility, disciplinary placements and attrition describe 2022–23.
+The disciplinary placements display includes DAEP and JJAEP. Attrition
+observes return to the same campus in fall 2023–24. The annual attrition
+workbook corroborates the published count and rate. The linked masking
+guide has a 2022–23 page title and 2023–24 body. The raw source has no
+table-wide value policy. [TEA 2023–24 reports and references](https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/index.html).
+
 The statewide Staff file is one direct Texas observation. Regional and statewide
 Staff bind the 2024–25 school year and published units for teacher FTE, average
 professional experience, average regular-duty salary, students per teacher

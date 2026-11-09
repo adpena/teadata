@@ -15827,6 +15827,398 @@ data_sources:
               tables:
                 staff_profile: data/tapr/raw/2025-S-STAF-original.csv
   state_tapr_student_profile:
+    2024:
+      path: data/tapr/raw/2024-S-STUD-original.csv
+      metadata:
+        title: 2023–24 TAPR State Student Information selection (STUD)
+        publisher: Texas Education Agency
+        version: '2024'
+        period:
+          kind: unknown
+        source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/index.html
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        notes: Named Membership and Enrollment measures use 2023–24. Selected mobility, disciplinary placement and attrition measures
+          use 2022–23. The disciplinary placements display includes DAEP and JJAEP. Attrition compares return to the same campus
+          in fall 2023–24. The linked masking guidance has a 2022–23 page title and a 2023–24 body. Unreviewed fields remain raw,
+          and no table-wide value policy is applied.
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          title: Original publisher CSV and request
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+          provenance_ids:
+          - 6e9623914a3d5f539b067be823573242e2dbe1e2faa5af4ef6f6217d487d9fce
+          reviewed_sha256: 1af89f5e4ad3da1158acf812b7d877c2c58b3758dea4c0fd2198be1e7348e22c
+        - reference_id: exact_selection_form
+          role: source_notes
+          title: Original publisher selection form
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+          provenance_ids:
+          - fa7fb15902600f35cc40c246484e0524aec0d0cdfe7b3e21ccff7a77f0f6118a
+          reviewed_sha256: 0ccb855319a54a44011a0ddb7d5e16663d2bfc2a33eca890918df0c46de91f91
+        - reference_id: dictionary
+          role: data_dictionary
+          title: Statewide Student Information dictionary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=S&dsname=STUD&dd=student&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          provenance_ids:
+          - 652e742b3a0347253d3de6e77355195661d486d149b7af683a8c6e3dcd2cec97
+          reviewed_sha256: 5b0aa404c31f8b643bb3fc5a146294aeaafc8465939e7ebe09bc11f73b2a9030
+        - reference_id: glossary
+          role: glossary
+          title: 2023–24 Comprehensive TAPR Glossary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+          provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+        - reference_id: masking
+          role: masking_methodology
+          title: 2023–24 linked TAPR masking guidance
+          status: available
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+          provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+        - reference_id: state_student_report
+          role: source_notes
+          title: 2023–24 TEA Student Information report for Texas
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2024&id=S&lev=S&prgopt=reports%2Ftapr%2Fstudent.sas
+          provenance_ids:
+          - 6324e3d13aaba2e5706eead20945994a411a7f020f8135efd2ca744fc8288ef9
+          reviewed_sha256: e9703d07e9649a01171e8d0f8f833321ec3e3c4884a9339ca36275d26972bfda
+        - reference_id: annual_attrition_witness
+          role: source_notes
+          title: TEA annual attrition workbook, fall 2022–23 to fall 2023–24
+          status: available
+          url: https://tea.texas.gov/data-reports/school-performance/accountability-research/completion-graduation-and-dropout/2022-23-annual-attrition-rates-v2.xlsx
+          provenance_ids:
+          - 0fc6efda0115dd7d937659de199d1e660e1d6e91a0cd93a52126f7d25d955c0b
+          reviewed_sha256: 09379b953db76cae8afc7a691f0b447af985489504ef664010e40555b53026a8
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2024--state-student-profile-crosswalk.json
+          title: Reviewed statewide Student Information header crosswalk
+          status: available
+          provenance_ids:
+          - 49820123e1c728ecf8c734de6ca506eb0adc8fa2b719dcf2421396f56e1ed3c2
+          reviewed_sha256: d25f8f5375efb38836ecade2c48bb03b839846c7763511c0b9c7a7cfdd3d5d0a
+        metrics:
+          student_membership_attrition_all_students_count:
+            field: state_2024_student_membership_2022_23_attrition_all_students_count
+            unit: count
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_attrition_all_students_percent:
+            field: state_2024_student_membership_2022_23_attrition_all_students_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          daep_count:
+            field: state_2023_daep_count
+            unit: count
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          daep_percent:
+            field: state_2023_daep_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_enrollment_african_american_count:
+            field: state_2024_student_enrollment_african_american_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_african_american_percent:
+            field: state_2024_student_enrollment_african_american_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_all_students_count:
+            field: state_2024_student_enrollment_all_students_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_asian_count:
+            field: state_2024_student_enrollment_asian_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_asian_percent:
+            field: state_2024_student_enrollment_asian_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_dyslexia_count:
+            field: state_2024_student_enrollment_dyslexia_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_dyslexia_percent:
+            field: state_2024_student_enrollment_dyslexia_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_eb_el_count:
+            field: state_2024_student_enrollment_el_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_eb_el_percent:
+            field: state_2024_student_enrollment_el_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_gifted_and_talented_count:
+            field: state_2024_student_enrollment_gifted_and_talented_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_gifted_and_talented_percent:
+            field: state_2024_student_enrollment_gifted_and_talented_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_hispanic_count:
+            field: state_2024_student_enrollment_hispanic_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_hispanic_percent:
+            field: state_2024_student_enrollment_hispanic_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_pacific_islander_count:
+            field: state_2024_student_enrollment_pacific_islander_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_pacific_islander_percent:
+            field: state_2024_student_enrollment_pacific_islander_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_section_504_count:
+            field: state_2024_student_enrollment_section_504_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_section_504_percent:
+            field: state_2024_student_enrollment_section_504_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_special_ed_count:
+            field: state_2024_student_enrollment_special_ed_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_special_ed_percent:
+            field: state_2024_student_enrollment_special_ed_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_two_or_more_races_count:
+            field: state_2024_student_enrollment_two_or_more_races_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_two_or_more_races_percent:
+            field: state_2024_student_enrollment_two_or_more_races_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_white_count:
+            field: state_2024_student_enrollment_white_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_white_percent:
+            field: state_2024_student_enrollment_white_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_african_american_count:
+            field: state_2024_student_membership_african_american_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_african_american_percent:
+            field: state_2024_student_membership_african_american_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_all_students_count:
+            field: state_2024_student_membership_all_students_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_american_indian_count:
+            field: state_2024_student_membership_american_indian_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_american_indian_percent:
+            field: state_2024_student_membership_american_indian_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_asian_count:
+            field: state_2024_student_membership_asian_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_asian_percent:
+            field: state_2024_student_membership_asian_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_dyslexia_count:
+            field: state_2024_student_membership_dyslexia_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_dyslexia_percent:
+            field: state_2024_student_membership_dyslexia_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_eb_el_count:
+            field: state_2024_student_membership_eb_el_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_eb_el_percent:
+            field: state_2024_student_membership_eb_el_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_gifted_and_talented_count:
+            field: state_2024_student_membership_gifted_and_talented_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_gifted_and_talented_percent:
+            field: state_2024_student_membership_gifted_and_talented_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_hispanic_count:
+            field: state_2024_student_membership_hispanic_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_hispanic_percent:
+            field: state_2024_student_membership_hispanic_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_african_american_count:
+            field: state_2024_student_membership_2023_mobility_african_american_count
+            unit: count
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_mobility_african_american_percent:
+            field: state_2024_student_membership_2023_mobility_african_american_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_mobility_all_students_count:
+            field: state_2024_student_membership_2023_mobility_all_students_count
+            unit: count
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_mobility_all_students_percent:
+            field: state_2024_student_membership_2023_mobility_all_students_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_mobility_american_indian_count:
+            field: state_2024_student_membership_2023_mobility_american_indian_count
+            unit: count
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_mobility_american_indian_percent:
+            field: state_2024_student_membership_2023_mobility_american_indian_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_mobility_asian_count:
+            field: state_2024_student_membership_2023_mobility_asian_count
+            unit: count
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_mobility_asian_percent:
+            field: state_2024_student_membership_2023_mobility_asian_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_mobility_eb_el_count:
+            field: state_2024_student_membership_2023_mobility_eb_el_count
+            unit: count
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_mobility_eb_el_percent:
+            field: state_2024_student_membership_2023_mobility_eb_el_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_mobility_econ_disadv_count:
+            field: state_2024_student_membership_2023_mobility_econ_disadv_count
+            unit: count
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_mobility_econ_disadv_percent:
+            field: state_2024_student_membership_2023_mobility_econ_disadv_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_mobility_hispanic_count:
+            field: state_2024_student_membership_2023_mobility_hispanic_count
+            unit: count
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_mobility_hispanic_percent:
+            field: state_2024_student_membership_2023_mobility_hispanic_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_mobility_pacific_islander_count:
+            field: state_2024_student_membership_2023_mobility_pacific_islander_count
+            unit: count
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_mobility_pacific_islander_percent:
+            field: state_2024_student_membership_2023_mobility_pacific_islander_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_mobility_special_ed_count:
+            field: state_2024_student_membership_2023_mobility_special_ed_count
+            unit: count
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_mobility_special_ed_percent:
+            field: state_2024_student_membership_2023_mobility_special_ed_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_mobility_two_or_more_races_count:
+            field: state_2024_student_membership_2023_mobility_two_or_more_races_count
+            unit: count
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_mobility_two_or_more_races_percent:
+            field: state_2024_student_membership_2023_mobility_two_or_more_races_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_mobility_white_count:
+            field: state_2024_student_membership_2023_mobility_white_count
+            unit: count
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_mobility_white_percent:
+            field: state_2024_student_membership_2023_mobility_white_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2022, end_year: 2023}
+          student_membership_pacific_islander_count:
+            field: state_2024_student_membership_pacific_islander_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_pacific_islander_percent:
+            field: state_2024_student_membership_pacific_islander_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_section_504_count:
+            field: state_2024_student_membership_section_504_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_section_504_percent:
+            field: state_2024_student_membership_section_504_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_special_ed_count:
+            field: state_2024_student_membership_special_ed_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_special_ed_percent:
+            field: state_2024_student_membership_special_ed_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_two_or_more_races_count:
+            field: state_2024_student_membership_two_or_more_races_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_two_or_more_races_percent:
+            field: state_2024_student_membership_two_or_more_races_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_white_count:
+            field: state_2024_student_membership_white_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_white_percent:
+            field: state_2024_student_membership_white_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_american_indian_count:
+            field: state_2024_student_enrollment_american_indian_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_enrollment_american_indian_percent:
+            field: state_2024_student_enrollment_american_indian_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--state-student-profile-crosswalk.json
+            tapr_source:
+              scope: state
+              tables:
+                student_profile: data/tapr/raw/2024-S-STUD-original.csv
     2025:
       path: data/tapr/raw/state-STUD-2025-canonical.csv
       metadata:

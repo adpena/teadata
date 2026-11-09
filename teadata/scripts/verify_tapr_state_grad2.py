@@ -72,9 +72,9 @@ def verify_rates(values: dict[str, str], rows: list[list[str]], *, measures: dic
 
 def _verify_source(store: ProvenanceStore, dataset: str,
                    verify: Callable[[dict[str, str], Callable[[str], Path], set[str]], dict[str, int]],
-                   *, expected_bindings: dict[str, str] | None = None) -> dict[str, int]:
+                   *, expected_bindings: dict[str, str] | None = None, edition: int = EDITION) -> dict[str, int]:
     cfg = load_config()
-    metadata = cfg.resolve_dataset(dataset, EDITION, exact=True, reader_profile="source").metadata
+    metadata = cfg.resolve_dataset(dataset, edition, exact=True, reader_profile="source").metadata
     refs = {ref.reference_id: ref for ref in metadata.references if ref.provenance_ids}
     records = store.verify_record_closure([identifier for ref in refs.values() for identifier in ref.provenance_ids])
 
@@ -88,10 +88,10 @@ def _verify_source(store: ProvenanceStore, dataset: str,
         return store.verify_artifact(digest)
 
     with TemporaryDirectory(prefix="teadata-state-readiness-") as temporary:
-        request, = cfg.tapr_source_requests(dataset, EDITION, input_dir=temporary)
+        request, = cfg.tapr_source_requests(dataset, edition, input_dir=temporary)
         raw = original("csv_headers")
         copyfile(raw, request.path)
-        source, = cfg.read_tapr_sources(dataset, EDITION, input_dir=temporary)
+        source, = cfg.read_tapr_sources(dataset, edition, input_dir=temporary)
     with raw.open(encoding="cp1252", newline="") as stream:
         labels, codes, values = csv.reader(stream, strict=True)
     fields = request.mapping["fields"]
@@ -158,10 +158,15 @@ def verify_state_comp4(store: ProvenanceStore) -> dict[str, int]:
     return _verify_source(store, COMP4_DATASET, verify)
 
 
-def verify_state_student_profile(store: ProvenanceStore) -> dict[str, int]:
+def verify_state_student_profile(store: ProvenanceStore, *, edition: int = EDITION) -> dict[str, int]:
+    report_year = f"{edition - 1}-{edition % 100:02}"
+    lagged_year = f"{edition - 2}-{(edition - 1) % 100:02}"
+    mobility_title = f"Mobility ({lagged_year})"
+    attrition_title = f"Student Attrition ({lagged_year})"
+
     def verify(values: dict[str, str], original: Callable[[str], Path], bound_codes: set[str]) -> dict[str, int]:
         rows = _Rows(original("state_student_report").read_text(encoding="cp1252")).rows
-        if (rows[1:3] != [["2024-25 Student Information"], ["State"]]
+        if (rows[1:3] != [[f"{report_year} Student Information"], ["State"]]
                 or rows[4:6] != [["", "Membership", "Enrollment"],
                                  ["Student Information", "Count", "Percent", "Count", "Percent"]]):
             raise ValueError("Unexpected statewide student report edition, scope, or populations")
@@ -183,7 +188,7 @@ def verify_state_student_profile(store: ProvenanceStore) -> dict[str, int]:
         ethnic = section("Ethnic Distribution", "Sex")
         programs = section("Students by Instructional Program", "Students with Disabilities by Type of Primary Disability")
         other = section("Other Student Cohorts", "Students by Instructional Program")
-        mobility = section("Mobility (2023-24)", "Student Attrition (2023-24)")
+        mobility = section(mobility_title, attrition_title)
         if rows[6][0] != "Total Students":
             raise ValueError("Unexpected statewide student total row")
         expected = {"SPETALLC": rows[6][1], "SPNTALLC": rows[6][3]}
@@ -200,8 +205,8 @@ def verify_state_student_profile(store: ProvenanceStore) -> dict[str, int]:
                             "LEP": "Count and Percent of EB Students/EL who are Mobile",
                             "ECO": "Count and Percent of Econ Dis Students who are Mobile"}.items():
             expected.update(control("SPEM" + code, mobility[label][:2]))
-        expected.update(control("SPETDIS", other["Students w/ Disciplinary Placements (2023-24)"][:2]))
-        attrition = rows[rows.index(["Student Attrition (2023-24)"]) + 1]
+        expected.update(control("SPETDIS", other[f"Students w/ Disciplinary Placements ({lagged_year})"][:2]))
+        attrition = rows[rows.index([attrition_title]) + 1]
         if attrition[0] != "Total Student Attrition":
             raise ValueError("Unexpected statewide student attrition row")
         expected.update(control("SPETATT", attrition[1:3]))
@@ -214,9 +219,9 @@ def verify_state_student_profile(store: ProvenanceStore) -> dict[str, int]:
               closing(load_workbook(stream, read_only=True, data_only=True)) as workbook):
             headers, observation = workbook["state"].values
             overview = " ".join(str(value) for row in workbook["Overview"].values for value in row if value)
-        if (headers != ("SA0ATTR24D", "SA0ATTR24N", "SA0ATTR24R")
-                or "fall of the 2023-24 school year" not in overview
-                or "fall of the 2024-25 school year" not in overview
+        if (headers != tuple(f"SA0ATTR{(edition - 1) % 100:02}{suffix}" for suffix in "DNR")
+                or f"fall of the {lagged_year} school year" not in overview
+                or f"fall of the {report_year} school year" not in overview
                 or "did not return to the same campus" not in overview):
             raise ValueError("Annual attrition witness has a different period, population or source layout")
         denominator, numerator, rate = (Decimal(str(value).replace(",", "")) for value in observation)
@@ -227,7 +232,7 @@ def verify_state_student_profile(store: ProvenanceStore) -> dict[str, int]:
         return {"displayed_comparable_cells": len(bound_codes), "displayed_held_cells": 0,
                 "annual_attrition_witness_cells": 2}
 
-    return _verify_source(store, STUDENT_DATASET, verify, expected_bindings={
+    return _verify_source(store, STUDENT_DATASET, verify, edition=edition, expected_bindings={
         "student_membership_attrition_all_students_count": "SPETATTC",
         "student_membership_attrition_all_students_percent": "SPETATTP",
     })
