@@ -4,10 +4,13 @@ from datetime import datetime, timezone
 import gzip
 from hashlib import sha256
 from html import escape
+from io import BytesIO
 import json
 from pathlib import Path
+from shutil import copyfile
 from types import SimpleNamespace
 from urllib.parse import urlencode
+from uuid import UUID
 from zipfile import ZipFile
 
 import pyarrow as pa
@@ -18,12 +21,18 @@ import yaml
 from teadata import tprs_statewide_intake, tprs_students as students
 from teadata.column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
 from teadata.dataset_metadata import DatasetMetadata, EditionKey, ResolvedDataset
+from teadata.engine import DataEngine
+from teadata.entities import Campus
 from teadata.manifest import ContractError, DatasetCatalog, canonical_json
 from teadata.provenance import ProvenanceStore
-from teadata.release import DataRelease
+from teadata.query import Query
+from teadata.release import DataRelease, _schema_publication_destinations, _student_attachments, publish_release, using_release
+from teadata.source_views import PartitionedSourceTable, SourceTable
 from teadata.scripts import verify_tprs_campus_coverage as campus_coverage
 from teadata.teadata_config import load_config, load_config_bytes
 from teadata.values import ValueStatus
+
+from test_catalog_projections import attach_observation_child, selected_catalog  # noqa: F401
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -670,7 +679,9 @@ def test_campus_cohort_rejects_expanded_and_linked_report_objects(campus_cohort,
 
 
 @pytest.mark.parametrize("partitioned", [False, True])
-def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(partitioned, request, tmp_path, grid, monkeypatch):
+def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(
+    partitioned, request, tmp_path, grid, monkeypatch,
+):
     if partitioned:
         store, intake, earlier = request.getfixturevalue("campus_partition")
     else:
@@ -781,6 +792,107 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(partit
                 release.tprs_student_campus_index(edition="2026")
         finally:
             metadata_path.write_bytes(original_metadata)
+
+        previous_raw = (canonical_json({**intake, "partition": 0, "reports": earlier}) + "\n").encode()
+        previous_intake = tmp_path / "previous-intake" / "intake.json"
+        previous_intake.parent.mkdir()
+        previous_intake.write_bytes(previous_raw)
+        previous = tmp_path / "previous"
+        students.materialize_students(store, config=config_path, config_sha256=sha256(config).hexdigest(),
+            intake=previous_intake, intake_sha256=sha256(previous_raw).hexdigest(), output=previous)
+        combined = tmp_path / "combined"
+        combined.mkdir()
+        catalog_document = {"schema_version": 4, "description": "Two campus partitions", "editions": {}, "artifacts": {}}
+        for child in (release, DataRelease(previous / "release.json", offline=True)):
+            document = child.catalog.to_dict()
+            for section in ("editions", "artifacts"):
+                catalog_document[section].update(document[section])
+            for name in _schema_publication_destinations(child.catalog)[1]:
+                copyfile(child.path.with_name(name), combined / name)
+        def load(ref):
+            return (combined / ref.location).read_bytes()
+
+        catalog = DatasetCatalog({**catalog_document, "build_id": sha256(canonical_json(catalog_document).encode()).hexdigest()},
+                                 column_schema_loader=load, edition_metadata_loader=load)
+        composed = DataRelease(publish_release(combined, catalog, schema_version=4), offline=True)
+        composed = DataRelease(composed.path.rename(combined / "native.json"), offline=True)
+        parent = attach_observation_child(request.getfixturevalue("selected_catalog"), composed)
+        first_id, last_id = earlier[0]["identifier"], intake["reports"][0]["identifier"]
+        field = "membership_total_students_count"
+        options = {"school_year": 2026, "scope": "campus", "edition": None}
+        engine = DataEngine()
+        engine.catalog = parent.catalog
+        for number, identifier in enumerate((first_id, last_id), 1):
+            engine.add_campus(Campus(UUID(int=number), None, identifier, "", False, campus_number=identifier))
+        cohort = Query([engine.campus_by_number(identifier) for identifier in (first_id, last_id)], engine)
+        route_calls = []
+        original = DataRelease.tprs_student_campus_index
+
+        def route(instance, *, edition):
+            route_calls.append(edition)
+            return original(instance, edition=edition)
+
+        monkeypatch.setattr(DataRelease, "tprs_student_campus_index", route)
+        with monkeypatch.context() as planning:
+            planning.setattr(DataRelease, "artifact", lambda *a, **k: pytest.fail("Planning opened a native leaf"))
+            pinned = cohort.observations(students.DATASET, field, school_year=26, edition=key, release=parent)
+            assert pinned.edition == key and not route_calls
+            one = (engine >> ("campus", last_id)).observations(students.DATASET, field, school_year=26, release=parent)
+            with using_release(parent):
+                both = cohort >> ("observations", students.DATASET, "2025-26", (field,))
+            assert isinstance(one, SourceTable) and one.edition == key
+            assert isinstance(both, PartitionedSourceTable) and both.editions[-1] == key
+            assert route_calls == ["2026"]
+            with pytest.raises(ContractError, match="No report for 1 campus IDs"):
+                composed._entity_observations(students.DATASET, (field,), identifiers=(first_id, "999999999"), **options)
+            original_options = parent._observation_year_options
+
+            def options_with_a_gap(*args):
+                return ((child, edition, {} if edition == key else periods)
+                        for child, edition, periods in original_options(*args))
+
+            planning.setattr(parent, "_observation_year_options", options_with_a_gap)
+            with pytest.raises(ContractError, match="Selected fields unavailable for 1 campus IDs"):
+                (engine >> ("campus", last_id)).observations(students.DATASET, field, school_year=26, release=parent)
+            uncached = DataRelease(parent.path, offline=True)
+            planning.setattr("teadata.release._student_attachments", lambda catalog, artifact:
+                             {} if artifact.edition == key else _student_attachments(catalog, artifact))
+            with pytest.raises(ContractError, match="Multiple editions match school year"):
+                cohort.observations(students.DATASET, field, school_year=26, release=uncached)
+            planning.setattr(uncached, "_observation_year_options", options_with_a_gap)
+            legacy = cohort.observations(students.DATASET, field, school_year=26, release=uncached)
+            assert isinstance(legacy, SourceTable) and legacy.edition != key
+        with monkeypatch.context() as filters:
+            from teadata.analytical import _leaf_schema
+
+            filter_only = "enrollment_total_students_count"
+
+            def incomplete_schema(contract):
+                schema = _leaf_schema(contract)
+                return schema.remove(schema.get_field_index(filter_only)) if contract["edition"] == key.to_dict() else schema
+
+            filters.setattr("teadata.analytical._leaf_schema", incomplete_schema)
+            filters.setattr(DataRelease, "artifact", lambda *a, **k: pytest.fail("Invalid filter opened a native leaf"))
+            buffer = BytesIO()
+            with pytest.raises(ContractError, match="Filter does not match campus partition"):
+                both.where(ds.field(filter_only) == 1).to_csv(buffer)
+            assert not buffer.getvalue()
+        view = both.query(f"{field} == 1", record=True)
+        provenance = view.provenance().to_dict()
+        frame = view.to_df()
+        assert frame["campus_number"].tolist() == [first_id, last_id]
+        assert frame.attrs["teadata_provenance"] == provenance
+        assert len(provenance["partitions"]) == 2
+        assert {row["edition"]["revision_sha256"] for row in provenance["partitions"]} == {
+            edition.revision_sha256 for edition in both.editions}
+        csv_buffer, workbook = BytesIO(), BytesIO()
+        view.to_csv(csv_buffer)
+        view.to_excel(workbook)
+        assert all(identifier.encode() in csv_buffer.getvalue() for identifier in (first_id, last_id))
+        with ZipFile(workbook) as contents:
+            assert contents.read("xl/workbook.xml").count(b'name="Provenance"') == 1
+            metadata = contents.read("xl/worksheets/sheet2.xml")
+            assert all(row["description_sha256"].encode() in metadata for row in provenance["partitions"])
     release.verify()
     table = release.table(key).select("membership_total_students_count")
     included = table.where(ds.field("campus_number") == intake["reports"][0]["identifier"]).to_arrow().to_pylist()

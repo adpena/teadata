@@ -19,10 +19,19 @@ if TYPE_CHECKING:
     from typing import BinaryIO
 
     from openpyxl import Workbook
+    from openpyxl.worksheet._write_only import WriteOnlyWorksheet
 
     from .dataset_metadata import ArtifactRef
     from .release import DataRelease
     from .source_views import SourceTable
+
+
+def _provenance_sheet(workbook: Workbook) -> WriteOnlyWorksheet:
+    sheet = workbook.create_sheet("Provenance")
+    sheet.freeze_panes = "A2"
+    for name, width in zip("ABCDEFGH", (24, 52, 30, 23, 24, 48, 70, 55), strict=True):
+        sheet.column_dimensions[name].width = width
+    return sheet
 
 
 def _public_url(value: str | None) -> str | None:
@@ -263,16 +272,15 @@ class ExportProvenance:
         with _excel_workbook(path_or_buf) as workbook:
             self._append_sheet(workbook)
 
-    def _append_sheet(self, workbook: Workbook, *, rows: int | None = None) -> None:
+    def _append_sheet(self, workbook: Workbook, *, rows: int | None = None,
+                      sheet: WriteOnlyWorksheet | None = None) -> None:
         from openpyxl.cell import WriteOnlyCell
         from openpyxl.styles import Alignment, Font, PatternFill
 
         from .source_views import validate_excel_text
 
-        sheet = workbook.create_sheet("Provenance")
-        sheet.freeze_panes = "A2"
-        for name, width in zip("ABCDEFGH", (24, 52, 30, 23, 24, 48, 70, 55), strict=True):
-            sheet.column_dimensions[name].width = width
+        if sheet is None:
+            sheet = _provenance_sheet(workbook)
         header_fill = PatternFill("solid", fgColor="132840")
         header_font = Font(bold=True, color="FFFFFF")
         wrapped = Alignment(vertical="top", wrap_text=True)

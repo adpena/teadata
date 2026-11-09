@@ -120,7 +120,7 @@ def test_dispatch_reads_the_tuple_operator_once():
 def test_discovery_identifies_positional_forms_and_terminal_results(monkeypatch):
     operators = {operator["name"]: operator for operator in describe_operators()["operators"]}
     observations = operators["observations"]
-    assert observations["result"] == {"type": "SourceTable"}
+    assert observations["result"] == {"type": "SourceTable", "alternate_type": "PartitionedSourceTable"}
     _, year, fields, scope, edition = observations["forms"][0]["arguments"]
     assert year["nullable"] and not year["optional"] and "default" not in year
     assert "2024-25" in year["description"] and "2025 or 25" in year["description"]

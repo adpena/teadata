@@ -1765,16 +1765,23 @@ def test_entity_observation_plan_preserves_pinned_primary_bindings_and_grain(
 
 
 def make_observation_release(tmp_path, selected_catalog, year, amount):
-    from teadata.dataset_metadata import NativeSourceRef
-    from teadata.release import DataRelease, ROLES
+    from teadata.release import DataRelease
     stage = tmp_path / str(year)
     stage.mkdir()
     period = DataPeriod("school_year", year - 1, year).to_dict()
     fixture = make_edition_fixture(stage, normalized=True, amount_period=period,
                                    observed_amount=amount, entity_grain=True)
     child = DataRelease(fixture["root"].rename(stage / "native.json"), offline=True)
-    ref = NativeSourceRef("native.json", child.manifest_sha256, child.build_id,
-                          tuple(key for key, _, _ in fixture["leaves"].values()))
+    return attach_observation_child(selected_catalog, child), fixture["leaves"]["student"][2]
+
+
+def attach_observation_child(selected_catalog, child):
+    from teadata.dataset_metadata import NativeSourceRef
+    from teadata.release import DataRelease, ROLES
+
+    keys = tuple(EditionKey.from_dict({name: row[name] for name in EditionKey.__dataclass_fields__})
+                 for row in child.catalog.editions(include_metadata=False))
+    ref = NativeSourceRef(child.path.name, child.manifest_sha256, child.build_id, keys)
     catalog = selected_catalog.to_dict()
     catalog.pop("build_id")
     catalog["native_sources"] = [ref.to_dict()]
@@ -1782,10 +1789,10 @@ def make_observation_release(tmp_path, selected_catalog, year, amount):
     assets = {role: {"filename": role, "sha256": "0" * 64, "size_bytes": 1} for role in ROLES}
     record = {"kind": "processing", "parameters": {"build_id": catalog["build_id"],
                 "native_sources": [ref.to_dict()]}, "outputs": assets}
-    parent = stage / "release.json"
+    parent = child.path.with_name("release.json")
     parent.write_text(canonical_json({"schema_version": 1, "catalog": catalog, "artifacts": assets,
         "processing": {"record_id": sha256((canonical_json(record) + "\n").encode()).hexdigest(), "record": record}}))
-    return DataRelease(parent, offline=True), fixture["leaves"]["student"][2]
+    return DataRelease(parent, offline=True)
 
 
 def test_observations_golden(tmp_path, selected_catalog):

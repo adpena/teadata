@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from .dataset_metadata import EditionKey
     from .engine import DataEngine
     from .release import DataRelease
-    from .source_views import SourceTable
+    from .source_views import PartitionedSourceTable, SourceTable
 
 from .entities import (
     Campus,
@@ -62,6 +62,7 @@ class _Form(TypedDict):
 
 class _Result(TypedDict):
     type: Literal["Query", "SourceTable"]
+    alternate_type: NotRequired[Literal["PartitionedSourceTable"]]
     item_type: NotRequired[str]
     tuple_fields: NotRequired[list[dict[str, str]]]
 
@@ -567,13 +568,13 @@ class Query:
 
     # ---------------------- individual handlers ----------------------
     def observations(self, dataset: str, *fields: str, school_year: int | str | None = None, scope: str | None = None,
-                     edition: EditionKey | None = None, release: DataRelease | None = None) -> SourceTable:
+                     edition: EditionKey | None = None, release: DataRelease | None = None) -> SourceTable | PartitionedSourceTable:
         """Plan published rows for the selected public entities and a measurement school year."""
         from .dataset_metadata import _parse_school_year, _validate_observation_selection
         from .manifest import ContractError
         from .release import DataRelease, current_release
 
-        _parse_school_year(school_year)
+        year = _parse_school_year(school_year)
         if release is not None and not isinstance(release, DataRelease):
             raise TypeError("release must be a DataRelease opened from a release manifest, or None.")
         if scope is not None and (not isinstance(scope, str) or scope not in ("district", "campus")):
@@ -602,10 +603,10 @@ class Query:
         parent = release if release is not None else current_release()
         if parent.build_id != catalog.build_id:
             raise ContractError("Observation queries require the release for their entity build")
-        return parent.observations(dataset, *fields, school_year=school_year, scope=scope, edition=edition)._for_entity_ids(
-            tuple(dict.fromkeys(identifiers)))
+        return parent._entity_observations(dataset, fields, school_year=year, scope=scope, edition=edition,
+                                           identifiers=tuple(dict.fromkeys(identifiers)))
 
-    def _op_observations(self, op: tuple) -> SourceTable:
+    def _op_observations(self, op: tuple) -> SourceTable | PartitionedSourceTable:
         if not isinstance(op[3], (tuple, list)):
             raise ValueError("Use ('observations', dataset, school_year, ('field',)) with optional scope and edition. "
                              "The field names must be a list or tuple of distinct nonblank strings.")
@@ -1024,14 +1025,15 @@ _register(
         _argument("dataset", "nonblank string"),
         _argument("school_year", "integer", "string", nullable=True,
                   description=_SCHOOL_YEAR_INPUT + " Use None only when the selected fields share their latest year "
-                              "and one edition provides them together."),
+                              "and one publisher edition provides them together."),
         _argument("fields", "nonempty list or tuple of distinct nonempty strings"),
         _argument("scope", "string", choices=["district", "campus"], default=None, nullable=True,
                   description="Infer from input items when omitted. An empty Query needs an explicit scope."),
         _argument("edition", python_types=("EditionKey",), default=None, nullable=True),
     ),),
-    result={"type": "SourceTable"},
-    requires="One scope of public district or campus entities bound to a release with the attached native source.",
+    result={"type": "SourceTable", "alternate_type": "PartitionedSourceTable"},
+    requires="One scope of public district or campus entities bound to a release with the attached native source. "
+             "Roster-backed TPRS Student campus queries route across partitions within one report edition.",
     errors=(("ValueError", "Invalid operands, mixed scopes, or missing exact entity identifiers."),
             ("TypeError", "The edition has the wrong object type."),
             ("ContractError", "The entity build or release does not match, or the source, year or edition cannot resolve.")),

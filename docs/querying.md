@@ -102,7 +102,8 @@ the observation and statewide-comparison methods and tuple operators.
 a native source, `observations` selects its fields by measurement school year.
 Pass a supported year spelling for an exact selection. Omit it to use the
 latest school year when every selected field has that same latest year and one
-edition provides them together. The result is a lazy `SourceTable`.
+publisher edition provides them together. The result is a lazy `SourceTable`,
+or a `PartitionedSourceTable` when a routed campus query spans partitions.
 
 ```python
 dataset = "tprs_student_membership_enrollment_reports"
@@ -255,9 +256,19 @@ name resolves to more than one table or revision. Scalar access requires one pub
 the entity. For a table with more than one row per entity, pass a PyArrow
 expression to `select(..., where=...)` to narrow its grain.
 
-For a partitioned TPRS Student release, prepare a campus index once and reuse
-it for lookups. It reads the release's pinned report ledgers without opening
-the underlying data tables.
+An entity query routes partitioned TPRS Student reports automatically. For example,
+`(engine >> ("campus", "001902103")).observations(dataset, field, school_year=26)`
+uses the selected campus and exact measurement year. A cohort spanning
+partitions supports the same filters and Arrow, pandas, CSV, and Excel
+exports. Inspect `observations.editions` on a partitioned result or
+`observations.edition` on a single table. Partitioned exports carry each
+source record, and their XLSX output puts those records in one Provenance
+worksheet. If a requested campus has no report or its partition lacks a
+selected field for that period, the query identifies the affected campus
+IDs. Select an explicit edition to restrict a read to that partition.
+
+For direct release queries, prepare the campus index once and reuse it. The
+index reads the pinned report ledgers without opening the data tables.
 
 ```python
 import pyarrow.dataset as ds

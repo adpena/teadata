@@ -18,7 +18,7 @@ from typing import TYPE_CHECKING, Any, BinaryIO, Generator, Iterator, overload
 
 from .dataset_metadata import ArtifactRef, DataPeriod, EditionKey
 from .identifiers import canonical_source_identifiers
-from .manifest import ContractError
+from .manifest import ContractError, canonical_json
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -160,6 +160,151 @@ class SourceTable:
         write_excel(self._prepare(restore_original_headers=restore_original_headers), path_or_buf)
 
 
+@dataclass(frozen=True, slots=True, eq=False)
+class PartitionedSourceTable:
+    """One measurement period and campus cohort across exact source partitions."""
+
+    partitions: tuple[SourceTable, ...]
+
+    def __post_init__(self) -> None:
+        if len(self.partitions) < 2 or self.partitions[0].measurement_period is None:
+            raise ValueError("A partitioned observation requires at least two pinned partitions and a measurement period")
+        first = self.partitions[0]
+        if len(set(self.editions)) != len(self.partitions) or any(
+            part.release.manifest_sha256 != first.release.manifest_sha256
+            or part.measurement_period != first.measurement_period
+            or part._entity_build != first._entity_build
+            or part.edition.scope != "campus" or not part._entity_ids
+            for part in self.partitions
+        ):
+            raise ValueError("A partitioned observation requires distinct campus partitions from one release and period")
+
+    @property
+    def editions(self) -> tuple[EditionKey, ...]:
+        return tuple(part.edition for part in self.partitions)
+
+    @property
+    def measurement_period(self) -> DataPeriod:
+        period = self.partitions[0].measurement_period
+        assert period is not None
+        return period
+
+    def select(self, *fields: str) -> PartitionedSourceTable:
+        return PartitionedSourceTable(tuple(part.select(*fields) for part in self.partitions))
+
+    def where(self, predicate: Expression) -> PartitionedSourceTable:
+        return PartitionedSourceTable(tuple(part.where(predicate) for part in self.partitions))
+
+    def query(self, expression: str, *, params: Mapping[str, object] | None = None,
+              record: bool = False) -> PartitionedSourceTable:
+        from .source_predicates import prepare_predicate
+
+        query = prepare_predicate(expression, params, record=record)
+        return PartitionedSourceTable(tuple(replace(part, _queries=(*part._queries, query)) for part in self.partitions))
+
+    @overload
+    def __getitem__(self, key: str) -> Expression: ...
+
+    @overload
+    def __getitem__(self, key: list[str] | tuple[str, ...] | Expression) -> PartitionedSourceTable: ...
+
+    def __getitem__(self, key: str | list[str] | tuple[str, ...] | Expression) -> Expression | PartitionedSourceTable:
+        from pyarrow.dataset import field
+
+        if isinstance(key, str):
+            return field(key)
+        if isinstance(key, (list, tuple)):
+            return self.select(*key)
+        return self.where(key)
+
+    def _prepare(self, *, restore_original_headers: bool = False) -> _TableExport:
+        import pyarrow as pa
+        from pyarrow.dataset import dataset
+
+        from .analytical import _leaf_schema
+
+        plans = tuple(_plan_export(part.release, part.edition, restore_original_headers=restore_original_headers,
+                                   selected_fields=part._fields, include_support=True, period=part.measurement_period)
+                      for part in self.partitions)
+        first = plans[0]
+        native = _leaf_schema(first.artifact.contract)
+        schema = pa.schema([native.field(name) for name in first.columns])
+        first_support = first.artifact.column_support
+        for part, plan in zip(self.partitions, plans, strict=True):
+            native = _leaf_schema(plan.artifact.contract)
+            support = plan.artifact.column_support
+            if (plan.fields != first.fields or plan.headers != first.headers or plan.columns != first.columns
+                    or (support is None) != (first_support is None)
+                    or (support is not None and first_support is not None and any(
+                        support.projection(field) != first_support.projection(field) for field in first.fields))
+                    or not schema.equals(pa.schema([native.field(name) for name in plan.columns]), check_metadata=True)):
+                raise ContractError("Campus partitions have incompatible fields or source types. Read their exact editions separately.")
+            if part._predicate is not None or part._queries:
+                try:
+                    empty = dataset(pa.Table.from_batches([], schema=native))
+                    empty.scanner(filter=_bind_queries(part._predicate, part._queries, native))
+                except (pa.ArrowException, KeyError, TypeError, ValueError) as error:
+                    raise ContractError(f"Filter does not match campus partition {part.edition.revision_sha256[:12]}: {error}") from error
+        scanner = _PartitionScan(schema, tuple(zip(self.partitions, plans, strict=True)))
+
+        def provenance() -> PartitionedExportProvenance:
+            return PartitionedExportProvenance(self.measurement_period, tuple(
+                plan.provenance(part.release, period=part.measurement_period, entity_build=part._entity_build,
+                                entity_ids=part._entity_ids, opaque_filter=part._predicate is not None, queries=part._queries)
+                for part, plan in scanner.partitions
+            ))
+
+        return _TableExport(scanner, first.headers, restore_original_headers, None,
+                            {"measurement_period": self.measurement_period.to_dict(),
+                             "editions": [key.to_dict() for key in self.editions]}, provenance)
+
+    def to_arrow(self) -> pa.Table:
+        return self._prepare().to_arrow()
+
+    def to_df(self, *, restore_original_headers: bool = False) -> pd.DataFrame:
+        return self._prepare(restore_original_headers=restore_original_headers).to_df()
+
+    def provenance(self, *, restore_original_headers: bool = False) -> PartitionedExportProvenance:
+        result = self._prepare(restore_original_headers=restore_original_headers).provenance()
+        assert isinstance(result, PartitionedExportProvenance)
+        return result
+
+    def to_csv(self, path_or_buf: str | Path | BinaryIO, *, restore_original_headers: bool = False) -> None:
+        write_csv(self._prepare(restore_original_headers=restore_original_headers), path_or_buf)
+
+    def to_excel(self, path_or_buf: str | Path | BinaryIO, *, restore_original_headers: bool = False) -> None:
+        write_excel(self._prepare(restore_original_headers=restore_original_headers), path_or_buf)
+
+
+@dataclass(frozen=True, slots=True)
+class PartitionedExportProvenance:
+    """Keep each partition's canonical export record and its selected entity IDs."""
+
+    measurement_period: DataPeriod
+    partitions: tuple[ExportProvenance, ...]
+
+    def to_dict(self) -> dict[str, Any]:
+        return {"schema_version": 1, "operation": "partitioned_source_observations",
+                "measurement_period": self.measurement_period.to_dict(),
+                "partitions": [part.to_dict() for part in self.partitions]}
+
+    def to_excel(self, path_or_buf: str | Path | BinaryIO) -> None:
+        with _excel_workbook(path_or_buf) as workbook:
+            self._append_sheet(workbook)
+
+    def _append_sheet(self, workbook: Workbook, *, rows: int | None = None) -> None:
+        from .export_provenance import _provenance_sheet
+
+        sheet = _provenance_sheet(workbook)
+        sheet.append(("TEA Data partitioned export provenance", self.measurement_period.label))
+        if rows is not None:
+            sheet.append(("Total rows exported", rows))
+        for number, partition in enumerate(self.partitions, 1):
+            sheet.append(())
+            sheet.append(("Source partition", number))
+            partition._append_sheet(workbook, sheet=sheet)
+
+
 @dataclass(frozen=True, slots=True)
 class SourceFields:
     release: DataRelease
@@ -235,12 +380,12 @@ class EntitySources:
 
 @dataclass(frozen=True, slots=True)
 class _TableExport:
-    scanner: Scanner
+    scanner: Scanner | _PartitionScan
     headers: tuple[tuple[str, ...], ...]
     restore_original_headers: bool
     rows_hint: int | None
     lineage: dict[str, Any]
-    provenance: Callable[[], ExportProvenance]
+    provenance: Callable[[], ExportProvenance | PartitionedExportProvenance]
 
     @property
     def schema(self) -> pa.Schema:
@@ -255,16 +400,23 @@ class _TableExport:
     def to_arrow(self) -> pa.Table:
         import pyarrow as pa
 
-        return pa.Table.from_batches(self.batches(), schema=self.schema)
+        schema = self.schema
+        if isinstance(self.scanner, _PartitionScan):
+            schema = schema.with_metadata({b"teadata_provenance": canonical_json(self.provenance().to_dict()).encode()})
+        return pa.Table.from_batches(self.batches(), schema=schema)
 
     def to_df(self) -> pd.DataFrame:
         import pandas as pd
 
-        frame = self.to_arrow().to_pandas(types_mapper=pd.ArrowDtype)
+        table = self.to_arrow()
+        frame = table.to_pandas(types_mapper=pd.ArrowDtype)
         if self.restore_original_headers:
             frame.columns = pd.Index(self.headers[0]) if len(self.headers) == 1 else pd.MultiIndex.from_arrays(self.headers)
         frame.attrs["teadata"] = self.lineage
-        frame.attrs["teadata_provenance"] = self.provenance().to_dict()
+        if isinstance(self.scanner, _PartitionScan):
+            frame.attrs["teadata_provenance"] = json.loads((table.schema.metadata or {})[b"teadata_provenance"])
+        else:
+            frame.attrs["teadata_provenance"] = self.provenance().to_dict()
         frame.attrs["teadata_export"] = {"rows": len(frame)}
         return frame
 
@@ -297,6 +449,20 @@ class _ExportSelection:
         return describe_export(release, self.artifact, self.fields, self.columns, self.headers,
                                period=period, entity_build=entity_build, entity_ids=entity_ids,
                                opaque_filter=opaque_filter, query_replay=replay)
+
+
+@dataclass(frozen=True, slots=True)
+class _PartitionScan:
+    projected_schema: pa.Schema
+    partitions: tuple[tuple[SourceTable, _ExportSelection], ...]
+
+    def to_batches(self) -> Iterator[pa.RecordBatch]:
+        for part, plan in self.partitions:
+            export = _open_export(part.release, plan, restore_original_headers=plan.restore_original_headers,
+                                  predicate=part._predicate, queries=part._queries, period=part.measurement_period,
+                                  entity_build=part._entity_build, entity_ids=part._entity_ids)
+            for batch in export.batches():
+                yield batch.replace_schema_metadata(None)
 
 
 def _plan_export(release: DataRelease, edition: EditionKey, *, restore_original_headers: bool,
@@ -373,9 +539,7 @@ def _open_export(
     if entity_key is not None and entity_ids is not None:
         expression = _entity_predicate(native, entity_key, entity_ids)
         predicate = expression if predicate is None else predicate & expression
-    for query in queries:
-        expression = query(native.schema)
-        predicate = expression if predicate is None else predicate & expression
+    predicate = _bind_queries(predicate, queries, native.schema)
     rows_hint = artifact.contract["rows"] if predicate is None else None
     scanner = native.scanner(columns=list(selection.columns), filter=predicate, batch_size=256, use_threads=False)
     lineage: dict[str, Any] = {"build_id": release.build_id, "edition": edition.to_dict(), "artifact_sha256": artifact.sha256,
@@ -390,6 +554,14 @@ def _open_export(
                                     entity_ids=entity_ids, opaque_filter=opaque_filter, queries=queries)
 
     return _TableExport(scanner, selection.headers, restore_original_headers, rows_hint, lineage, provenance)
+
+
+def _bind_queries(predicate: Expression | None, queries: tuple[PreparedPredicate, ...],
+                  schema: pa.Schema) -> Expression | None:
+    for query in queries:
+        expression = query(schema)
+        predicate = expression if predicate is None else predicate & expression
+    return predicate
 
 
 def write_csv(table: _TableExport, path_or_buf: str | Path | BinaryIO) -> None:

@@ -36,7 +36,7 @@ if TYPE_CHECKING:
     from .source_series import ObservationSeries
     from .export_provenance import ExportProvenance
     from .entities import Campus, District
-    from .source_views import EntitySources, SourceTable
+    from .source_views import EntitySources, PartitionedSourceTable, SourceTable
     from .tprs_statewide_intake import ReportSelection, TPRSStudentCampusIndex
 
 _StudentCohort = tuple[str, str, str, str]
@@ -358,7 +358,7 @@ class DataRelease:
         if self._v3:
             return {"_v3": True, "source": self.source, "pin": self.manifest_sha256, "offline": self.offline,
                     "cache_dir": self._cache_dir}
-        return self.__dict__.copy()
+        return {key: value for key, value in self.__dict__.items() if key != "_campus_observation_routes"}
 
     def __setstate__(self, state: dict) -> None:
         if state.get("_v3") is True:
@@ -722,9 +722,17 @@ class DataRelease:
         self, fields: tuple[str, ...], scope: str, school_year: int | None,
         options: Sequence[tuple[DataRelease, EditionKey, dict[str, int]]],
     ) -> SourceTable:
-        from .observations import _ObservationModel, _ObservationRequest
-        from .source_views import SourceTable
+        school_year, matches = self._observation_matches(fields, scope, school_year, options)
+        if len(matches) > 1:
+            choices = [key.to_dict() for _, key in sorted(matches, key=lambda match: match[1].identity)]
+            raise ContractError(f"Multiple editions match school year {school_year} and {scope}. Select edition: {choices}")
+        child, key = matches[0]
+        return self._observation_view(fields, school_year, child, key)
 
+    def _observation_matches(
+        self, fields: tuple[str, ...], scope: str, school_year: int | None,
+        options: Sequence[tuple[DataRelease, EditionKey, dict[str, int]]],
+    ) -> tuple[int, list[tuple[DataRelease, EditionKey]]]:
         available = self._years_by_field(fields, options)
         if any(not years for years in available.values()) and options:
             from .selectors import _field_suggestions
@@ -749,10 +757,14 @@ class DataRelease:
         if not matches:
             raise ContractError(f"Fields are unavailable together for school year {school_year} and {scope}. "
                                 f"Available years: {available}")
-        if len(matches) > 1:
-            choices = [key.to_dict() for _, key in sorted(matches, key=lambda match: match[1].identity)]
-            raise ContractError(f"Multiple editions match school year {school_year} and {scope}. Select edition: {choices}")
-        child, key = matches[0]
+        return school_year, matches
+
+    def _observation_view(
+        self, fields: tuple[str, ...], school_year: int, child: DataRelease, key: EditionKey,
+    ) -> SourceTable:
+        from .observations import _ObservationModel, _ObservationRequest
+        from .source_views import SourceTable
+
         period = DataPeriod("school_year", school_year - 1, school_year)
         canonical_fields = tuple(child.catalog._observation_fields(key, fields).values())
         plan = _ObservationModel(self.catalog, [child]).plan(
@@ -762,6 +774,65 @@ class DataRelease:
             raise ContractError("Observation view requires fields from one native table")
         return SourceTable(child, key, _fields=canonical_fields, _period=period,
                            _entity_build=None if self._v3 else (self.build_id, self.manifest_sha256))
+
+    def _entity_observations(
+        self, dataset: str, fields: tuple[str, ...], *, school_year: int | None, scope: str,
+        edition: EditionKey | None, identifiers: tuple[str, ...],
+    ) -> SourceTable | PartitionedSourceTable:
+        from .source_views import PartitionedSourceTable
+        from .tprs_statewide_intake import DATASET
+
+        options = list(self._observation_year_options(dataset, fields, scope, edition))
+        if dataset == DATASET and scope == "campus" and edition is None and identifiers:
+            year, matches = self._observation_matches(fields, scope, school_year, options)
+            child, first = matches[0]
+            identity = (child.manifest_sha256, first.edition)
+            if getattr(child.catalog, "_v4", False) and all(
+                (source.manifest_sha256, key.edition) == identity for source, key in matches
+            ):
+                index = self._automatic_student_campus_index(child, first.edition)
+                if index is None:
+                    return self._select_observation_view(fields, scope, year, options)._for_entity_ids(identifiers)
+                matching_keys = {key for _, key in matches}
+                groups: dict[EditionKey, list[str]] = {}
+                missing, unavailable = [], []
+                for identifier in identifiers:
+                    key = index.edition_for(identifier)
+                    if key is None:
+                        missing.append(identifier)
+                    elif key not in matching_keys:
+                        unavailable.append(identifier)
+                    else:
+                        groups.setdefault(key, []).append(identifier)
+                if missing or unavailable:
+                    raise ContractError(
+                        f"Campus Student Information is incomplete for school year {year} "
+                        f"in report edition {first.edition}. "
+                        f"No report for {len(missing)} campus IDs: {missing[:5]}. "
+                        f"Selected fields unavailable for {len(unavailable)} campus IDs: {unavailable[:5]}."
+                    )
+                parts = tuple(self._observation_view(fields, year, child, key)._for_entity_ids(tuple(ids))
+                              for key, ids in groups.items())
+                return parts[0] if len(parts) == 1 else PartitionedSourceTable(parts)
+        return self._select_observation_view(fields, scope, school_year, options)._for_entity_ids(identifiers)
+
+    def _automatic_student_campus_index(self, child: DataRelease, edition: str) -> TPRSStudentCampusIndex | None:
+        from .tprs_statewide_intake import DATASET
+
+        identity = (child.manifest_sha256, edition)
+        indexes: dict[tuple[str, str], TPRSStudentCampusIndex] = self.__dict__.setdefault("_campus_observation_routes", {})
+        if identity in indexes:
+            return indexes[identity]
+        catalog = child.catalog
+        keys = {key.identity for key in catalog._edition_keys.values()
+                if (key.dataset, key.scope, key.edition) == (DATASET, "campus", edition)}
+        artifacts = [catalog.artifact_ref(identifier) for identifier, key in catalog._artifact_routes.items() if key in keys]
+        roster_backed = [_student_attachments(catalog, artifact) for artifact in artifacts]
+        if not all(roster_backed) or len(artifacts) != len(keys):
+            return None
+        index = child.tprs_student_campus_index(edition=edition)
+        indexes[identity] = index
+        return index
 
     def series(
         self, dataset: str, *fields: str, scope: str, years: Sequence[int | str],
