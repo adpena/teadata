@@ -500,9 +500,10 @@ class DatasetCatalog:
                     raise ValueError("Edition key identity mismatch")
                 self._edition_keys[identifier] = key
                 self._edition_metadata_refs[identifier] = EditionMetadataRef.from_dict(entry["metadata"])
-            self._artifact_routes = document["artifacts"]
-            if not isinstance(self._artifact_routes, dict) or not self._artifact_routes:
+            routes = document["artifacts"]
+            if not isinstance(routes, dict) or not routes:
                 raise ValueError("An edition index requires artifact routes")
+            self._artifact_routes = routes.copy()
             for identifier, edition in self._artifact_routes.items():
                 if (not isinstance(identifier, str) or len(identifier) != 64
                         or any(c not in "0123456789abcdef" for c in identifier)
@@ -512,7 +513,7 @@ class DatasetCatalog:
                 raise ValueError("Every edition requires an artifact route")
             self._edition_buffers: dict[str, bytes] = {}
             self._edition_children: dict[str, dict[str, Any]] = {}
-            self._edition_views: dict[str, DatasetCatalog] = {}
+            self._edition_views: dict[str, tuple[DatasetCatalog, tuple[str, ...]]] = {}
             self._build_id, self._serialized = identity, canonical_json(document)
             self._v3, self._v4 = True, True
         except (KeyError, TypeError, ValueError) as error:
@@ -570,27 +571,32 @@ class DatasetCatalog:
                     for edition, _field in FieldBinding.from_dict(value).dependencies:
                         visit(edition)
         try:
+            if cached := self._edition_views.get(identifier):
+                view, dependencies = cached
+                # The immutable index pins every child. The resolver must still
+                # reject changes to those bytes even when interpretation is cached.
+                for dependency in dependencies:
+                    self.edition_metadata_bytes(dependency)
+                return view
             visit(identifier)
-            if identifier not in self._edition_views:
-                combined: dict[str, Any] = {"schema_version": 3, "editions": {}, "artifacts": {}, "field_bindings": [],
-                                            "column_schemas": {}, "provenance": {}, "value_policies": {}, "description": ""}
-                policies = {}
-                for selected, child in children.items():
-                    combined["editions"][selected] = child["edition"]
-                    policies[selected] = child["value_policies"]
-                    combined["field_bindings"].extend(child["field_bindings"])
-                    for section in ("artifacts", "column_schemas", "provenance"):
-                        for key, value in child[section].items():
-                            if key in combined[section] and combined[section][key] != value:
-                                raise ValueError("Conflicting metadata identity across edition children")
-                            combined[section][key] = value
-                combined["build_id"] = sha256(canonical_json(combined).encode()).hexdigest()
-                view = object.__new__(DatasetCatalog)
-                view._column_schema_loader = self._column_schema_loader
-                view._init_editions(combined, None, edition_policies=policies)
-                self._edition_views[identifier] = view
-            view = self._edition_views[identifier]
+            combined: dict[str, Any] = {"schema_version": 3, "editions": {}, "artifacts": {}, "field_bindings": [],
+                                        "column_schemas": {}, "provenance": {}, "value_policies": {}, "description": ""}
+            policies = {}
+            for selected, child in children.items():
+                combined["editions"][selected] = child["edition"]
+                policies[selected] = child["value_policies"]
+                combined["field_bindings"].extend(child["field_bindings"])
+                for section in ("artifacts", "column_schemas", "provenance"):
+                    for key, value in child[section].items():
+                        if key in combined[section] and combined[section][key] != value:
+                            raise ValueError("Conflicting metadata identity across edition children")
+                        combined[section][key] = value
+            combined["build_id"] = sha256(canonical_json(combined).encode()).hexdigest()
+            view = object.__new__(DatasetCatalog)
+            view._column_schema_loader = self._column_schema_loader
+            view._init_editions(combined, None, edition_policies=policies)
             self._check_metadata_locations((*self.edition_metadata_refs(), *view.column_schema_refs(), *view._artifact_refs.values()))
+            self._edition_views[identifier] = view, tuple(children)
             return view
         except (KeyError, TypeError, ValueError) as error:
             raise ContractError(f"Invalid selected edition dependency closure: {error}") from error

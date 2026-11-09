@@ -1101,6 +1101,21 @@ def test_audit_json_decoder_rejects_invalid_utf8():
         list(tprs_statewide_intake.audit_rows(raw, ()))
 
 
+@pytest.mark.parametrize(("field", "bad"), [
+    ("receipt", []), ("row", True), ("column", 2.0), ("section", None),
+    ("raw", 0), ("token_status", []), ("token_status", "unknown"), ("reason", {}),
+])
+def test_audit_row_rejects_invalid_field_types(field, bad):
+    selection = (tprs_statewide_intake.ReportSelection("state", "S", "a" * 64, "b" * 64),)
+    row = {"receipt": selection[0].receipt, "row": 1, "column": 2, "section": "Students",
+           "label": "Label", "population": "All", "measure": "Count", "reason": None,
+           "token_status": "observed", "token_reason": None, "raw": "0"}
+    row[field] = bad
+    raw = gzip.compress((canonical_json(row) + "\n").encode())
+    with pytest.raises(ContractError, match="Invalid student raw audit record"):
+        list(tprs_statewide_intake.audit_rows(raw, selection))
+
+
 def test_dynamic_crosswalk_changes_only_ordered_actual_input_identity():
     a, b = "a" * 64, "b" * 64
     forward = students._crosswalk({"district": [a, b]})

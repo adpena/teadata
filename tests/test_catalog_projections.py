@@ -1729,7 +1729,7 @@ def test_v4_index_discovery_and_construction_never_prefetch_children(edition_ind
     assert len(calls) == 1 and "metadata" in first
     assert list(catalog.editions(dataset=first["dataset"])) == [first]
     assert len(set(calls)) == 1
-    assert not catalog._edition_views[first["edition_id"]]._validated_editions  # no crosswalk needed for source metadata
+    assert not catalog._edition_view(first["edition_id"])._validated_editions  # no crosswalk needed for source metadata
 
 
 def test_entity_observation_plan_preserves_pinned_primary_bindings_and_grain(
@@ -2065,10 +2065,28 @@ def test_v4_selected_foreign_dependency_closure_uses_existing_resolver(edition_i
     assert len(set(calls)) == 2
     with pytest.raises(ContractError, match="period"):
         catalog.resolve_artifacts([(student, "campus_number")], period=DataPeriod(kind="calendar_year", year=2025))
+    dependency_pin = catalog._edition_metadata_refs[staff.identity].sha256
+    def damaged(descriptor):
+        raw = original(descriptor)
+        return raw[:-1] + b"x" if descriptor.sha256 == dependency_pin else raw
+    catalog._edition_metadata_loader = damaged
+    with pytest.raises(ContractError, match="checksum mismatch"):
+        catalog.artifact_ref(ref.identity)
     def foreign(child):
         next(row for row in child["field_bindings"] if row["field"] == "amount")["dependencies"] = [["f" * 64, "amount"]]
     with pytest.raises(ContractError, match="metadata"):
         index_with_child(fixture, student, foreign).artifact_ref(ref.identity)
+
+
+def test_v4_invalid_metadata_location_does_not_populate_view_cache(edition_index_fixture):
+    key, ref, _ = edition_index_fixture["leaves"]["student"]
+    def collide(child):
+        child["artifacts"][ref.identity]["location"] = "ReLeAsE.JsOn"
+    catalog = index_with_child(edition_index_fixture, key, collide)
+    for _ in range(2):
+        with pytest.raises(ContractError, match="destinations collide"):
+            catalog.artifact_ref(ref.identity)
+        assert not catalog._edition_views
 
 
 def test_v4_cache_advice_preserves_leaf_verification(edition_index_fixture):

@@ -557,12 +557,19 @@ def audit_rows(raw: bytes, reports: tuple[ReportSelection, ...]) -> Iterator[dic
             # wire form. Keep json.loads encoding detection for other byte prefixes.
             row = (decode(line.decode("utf-8", "surrogatepass")) if line.startswith(b'{"')
                    else json.loads(line, object_pairs_hook=_unique_object))
-            _need(isinstance(row, dict) and row.keys() == fields and isinstance(row["receipt"], str)
-                  and row["receipt"] in receipts and all(type(row[key]) is int and row[key] > 0 for key in ("row", "column"))
-                  and all(isinstance(row[key], str) for key in ("section", "label", "population", "measure", "raw", "token_status"))
-                  and all(row[key] is None or isinstance(row[key], str) for key in ("reason", "token_reason"))
-                  and row["token_status"] in statuses, "Invalid student raw audit record")
-            current = (receipts[row["receipt"]], row["row"], row["column"])
+            _need(isinstance(row, dict) and row.keys() == fields, "Invalid student raw audit record")
+            receipt, source_row, column = row["receipt"], row["row"], row["column"]
+            status, reason, token_reason = row["token_status"], row["reason"], row["token_reason"]
+            report = receipts.get(receipt) if isinstance(receipt, str) else None
+            _need(report is not None and type(source_row) is int and source_row > 0
+                  and type(column) is int and column > 0
+                  and isinstance(row["section"], str) and isinstance(row["label"], str)
+                  and isinstance(row["population"], str) and isinstance(row["measure"], str)
+                  and isinstance(row["raw"], str) and isinstance(status, str) and status in statuses
+                  and (reason is None or isinstance(reason, str))
+                  and (token_reason is None or isinstance(token_reason, str)), "Invalid student raw audit record")
+            assert report is not None
+            current = (report, source_row, column)
             _need(current > last, "Duplicate or unordered student raw audit coordinates")
             last = current
             yield row
