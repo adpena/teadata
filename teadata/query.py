@@ -83,11 +83,11 @@ class _MethodArgument(_Argument):
 
 
 class _SeriesMethod(TypedDict):
-    name: Literal["pair_years", "to_sql"]
+    name: Literal["pair_years", "to_sql", "iter_sql_batches"]
     receiver: Literal["ObservationSeries"]
     description: str
     arguments: list[_MethodArgument]
-    result: Literal["ObservationPair", "SeriesSqlExport"]
+    result: Literal["ObservationPair", "SeriesSqlExport", "Iterator[RecordBatch]"]
     result_methods: list[str]
     requires: NotRequired[str]
 
@@ -987,7 +987,8 @@ _RELEASE_METHODS: list[_ReleaseMethod] = [{
                                              description="Entity directory for names. Required for native-only releases.")},
     ],
     "result": "ObservationSeries",
-    "result_methods": ["for_year", "iter_batches", "to_arrow", "to_df", "provenance", "pair_years", "to_sql"],
+    "result_methods": ["for_year", "iter_batches", "to_arrow", "to_df", "provenance", "pair_years", "to_sql",
+                       "iter_sql_batches"],
     "result_operations": [{
         "name": "pair_years",
         "receiver": "ObservationSeries",
@@ -1012,6 +1013,21 @@ _RELEASE_METHODS: list[_ReleaseMethod] = [{
         "result": "SeriesSqlExport",
         "result_methods": ["to_dict"],
         "requires": "teadata[database], an active transaction, and caller-defined SQLAlchemy tables.",
+    }, {
+        "name": "iter_sql_batches",
+        "receiver": "ObservationSeries",
+        "description": "Read an exact series import as typed Arrow batches with optional year filtering.",
+        "arguments": [
+            {"kind": "positional", **_argument("connection", python_types=("sqlalchemy.Connection",))},
+            {"kind": "positional", **_argument("observations", python_types=("sqlalchemy.Table",))},
+            {"kind": "keyword_only", **_argument("receipts", python_types=("sqlalchemy.Table",))},
+            {"kind": "keyword_only", **_argument("import_id", "64-character SQL import identifier")},
+            {"kind": "keyword_only", **_argument("years", "nonempty subset of distinct series years",
+                                                 default=None, nullable=True)},
+        ],
+        "result": "Iterator[RecordBatch]",
+        "result_methods": ["close"],
+        "requires": "teadata[database], an open connection, and a matching to_sql receipt in a trusted database.",
     }],
     "discovery": ["catalog.editions", "catalog.variables", "observation_years",
                   "DataEngine.district_named", "DataEngine.campus_named"],

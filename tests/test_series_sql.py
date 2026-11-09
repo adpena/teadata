@@ -6,11 +6,12 @@ from pathlib import Path
 import runpy
 import sqlite3
 
+import pyarrow as pa
 import pytest
 from sqlalchemy import Column, Integer, JSON, MetaData, String, Table, Text, create_engine, func, select
 from sqlalchemy.exc import IntegrityError
 
-from teadata.manifest import canonical_json
+from teadata.manifest import ContractError, canonical_json
 from teadata.persistence import SeriesCoverageError
 from teadata.release import DataRelease
 from test_source_series import releases, use_children
@@ -24,9 +25,9 @@ def test_sql_projection_preserves_support_and_transactional_coverage(tmp_path, m
     metadata = MetaData()
     receipts = Table("imports", metadata, Column("id", String(64), primary_key=True), Column("receipt", JSON))
     facts = Table("facts", metadata, Column("import_id", String(64), nullable=False))
-    for name in series.schema.names:
-        datatype = Integer if name in {"amount", "measurement_school_year"} else Text
-        facts.append_column(Column("publisher_token" if name == "VALUE" else name, datatype, key=name))
+    for field in series.schema:
+        datatype = Integer if pa.types.is_integer(field.type) else Text
+        facts.append_column(Column("publisher_token" if field.name == "VALUE" else field.name, datatype, key=field.name))
     legacy = getattr(sqlite3, "LEGACY_TRANSACTION_CONTROL", None)
     engine = create_engine("sqlite://", connect_args={"autocommit": legacy} if legacy is not None else {})
     metadata.create_all(engine)
@@ -58,6 +59,7 @@ def test_sql_projection_preserves_support_and_transactional_coverage(tmp_path, m
         assert sha256(canonical_json(document).encode()).hexdigest() == result.import_id
         assert document["selection"] == series.provenance()
         assert document["release"]["manifest_sha256"] == parent.manifest_sha256
+        assert document["destination"]["schema"] == "main"
         assert document["destination"]["columns"]["VALUE"] == "publisher_token"
         assert str(parent.path) not in canonical_json(document)
         rows = connection.execute(select(facts.c.amount, facts.c.VALUE, facts.c.amount_status)
@@ -69,6 +71,36 @@ def test_sql_projection_preserves_support_and_transactional_coverage(tmp_path, m
         stored = connection.execute(select(receipts.c.receipt).where(receipts.c.id == partial.import_id)).scalar_one()
         assert stored["materialization"]["missing_entity_years"] == [[2023, "000000999"], [2024, "000000999"]]
         assert connection.scalar(select(func.count()).select_from(facts)) == 6
+    with engine.connect() as connection:
+        connection.exec_driver_sql("CREATE TEMP TABLE facts AS SELECT * FROM main.facts WHERE 0")
+        connection.exec_driver_sql("CREATE TEMP TABLE imports AS SELECT * FROM main.imports WHERE 0")
+        batches = list(series.iter_sql_batches(connection, facts, receipts=receipts, import_id=result.import_id,
+                                               years=["2023-24"]))
+        batch, = batches
+        assert batch.schema == series.schema
+        assert sorted(zip(batch["amount"].to_pylist(), batch["VALUE"].to_pylist(),
+                          batch["amount_status"].to_pylist(), strict=True), key=lambda row: row[1]) == [
+            (None, "-999", "suppressed"), (7, "7", "observed"),
+        ]
+        with pytest.raises(ContractError, match="selection differs"):
+            list(series.iter_sql_batches(connection, facts, receipts=receipts, import_id=partial.import_id))
+        with pytest.raises(ContractError, match="destination table or column mapping differs"):
+            list(series.iter_sql_batches(connection, facts.to_metadata(MetaData(), schema="temp"),
+                                         receipts=receipts, import_id=result.import_id))
+        with pytest.raises(ValueError, match="distinct years"):
+            series.iter_sql_batches(connection, facts, receipts=receipts, import_id=result.import_id, years=[2025])
+        connection.exec_driver_sql("DROP TABLE temp.facts")
+        connection.exec_driver_sql("DROP TABLE temp.imports")
+
+    with engine.begin() as connection:
+        connection.execute(facts.update().where(facts.c.import_id == result.import_id).values(amount=7.5))
+        with pytest.raises(ContractError, match="expected type.*amount"):
+            list(series.iter_sql_batches(connection, facts, receipts=receipts, import_id=result.import_id))
+        stored = connection.execute(select(receipts.c.receipt).where(receipts.c.id == result.import_id)).scalar_one()
+        stored["destination"]["table"] = "elsewhere"
+        connection.execute(receipts.update().where(receipts.c.id == result.import_id).values(receipt=stored))
+        with pytest.raises(ContractError, match="plan digest differs"):
+            list(series.iter_sql_batches(connection, facts, receipts=receipts, import_id=result.import_id))
     engine.dispose()
 
 
@@ -95,10 +127,10 @@ def test_official_peims_sql_golden():
             result = series.to_sql(connection, facts, receipts=receipts)
             assert result.rows_by_year == {2020: 12, 2021: 12, 2022: 12}
             assert not result.missing_entity_years
-            rows = connection.execute(select(facts.c.ethnicity, facts.c[field], facts.c[f"peims_raw_{field}"],
-                                             facts.c[f"peims_status_{field}"]).where(
-                facts.c.campus_number == "057829001", facts.c.measurement_school_year == 2022)).all()
-            assert set(rows) == {
+            batches = series.iter_sql_batches(connection, facts, receipts=receipts,
+                                              import_id=result.import_id, years=[2022])
+            assert {(row["ethnicity"], row[field], row[f"peims_raw_{field}"], row[f"peims_status_{field}"])
+                    for batch in batches for row in batch.to_pylist() if row["campus_number"] == "057829001"} == {
                 ("Asian", None, "<10", "suppressed"), ("Black or African American", 33, "33", "observed"),
                 ("Hispanic/Latino", 796, "796", "observed"), ("Two or more races", None, "<10", "suppressed"),
                 ("White", 17, "17", "observed"),

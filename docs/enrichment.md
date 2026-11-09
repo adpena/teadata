@@ -172,6 +172,27 @@ the missing pairs in the receipt. Suppressed rows remain present with a SQL
 `NULL` numeric value and their original token. Duplicate imports into the
 same table raise on the receipt's primary key.
 
+Read the same import back as typed Arrow batches using the original series
+and the import ID returned by `to_sql`:
+
+```python
+with engine.connect() as connection:
+    for batch in series.iter_sql_batches(connection, observations, receipts=receipts,
+                                         import_id=result.import_id, years=[2022]):
+        print(batch.num_rows)
+```
+
+The year filter runs in SQL. The reader checks the release, selection and
+physical destination against the stored plan, then decodes the stored columns
+using the series schema. All raw and status columns stay available. Use a
+trusted database because the plan digest covers provenance and table mapping,
+while the stored rows remain under database control. Row order is unspecified.
+Unqualified tables resolve to `main` in SQLite. In PostgreSQL, the reader and
+writer resolve persistent tables on the connection's search path and use
+their physical schema names. Supply explicit names to bypass name lookup.
+Earlier receipts that recorded no physical schema require a new export before
+using this reader. Leave PostgreSQL autocommit disabled for cursor streaming.
+
 The example's 2021–22 observations for A+ Academy Elementary (`057829001`)
 were checked against [TEA's campus report](https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.addispatch.sas&endyear=22&major=st&minor=e&format=w&selsumm=nc&linespg=60&charsln=120&grouping=e&loop=2&key=057829001&_debug=0),
 retrieved November 9, 2026, under acquisition receipt

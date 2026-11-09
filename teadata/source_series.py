@@ -299,6 +299,26 @@ class ObservationSeries:
 
         return _export_series(self, connection, observations, receipts=receipts, require_complete=require_complete)
 
+    def iter_sql_batches(self, connection: Connection, observations: Table, *, receipts: Table,
+                         import_id: str, years: Sequence[int | str] | None = None) -> Iterator[pa.RecordBatch]:
+        """Read a matching SQL import, preserving the series schema and raw support columns.
+
+        Supply the import ID from `to_sql` and optionally a subset of the
+        series years. Batches have no guaranteed row order. Consume or close
+        the iterator before closing the connection. The receipt checks the
+        import plan; use a trusted database for the stored observations.
+        """
+        from .persistence.series import _read_series
+
+        selected = None
+        if years is not None:
+            if not isinstance(years, Sequence) or isinstance(years, (str, bytes)) or not years:
+                raise ValueError("Pass a nonempty sequence of school years.")
+            selected = tuple(_required_year(year) for year in years)
+            if len(set(selected)) != len(selected) or not set(selected) <= set(self.years):
+                raise ValueError(f"Select distinct years from {self.years}.")
+        return _read_series(self, connection, observations, receipts=receipts, import_id=import_id, years=selected)
+
 
 @dataclass(frozen=True, slots=True, eq=False)
 class ObservationPair:
