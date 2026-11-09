@@ -41,16 +41,24 @@ def _district_select(*, include_meta: bool, has_projection: bool, lookup: bool =
     fields = ("a.organization_sub_type, a.district_boundary_status, a.district_boundary_reason, a.district_id"
               if has_projection else "NULL, NULL, NULL, NULL")
     join = "LEFT JOIN district_source_projection a ON a.district_id = d.id" if has_projection else ""
+    if lookup:
+        # Count the matched district's indexed campus range. A point read
+        # should not regroup the entire statewide campus roster.
+        campus_count = "(SELECT COUNT(*) FROM campuses c WHERE c.district_id = d.id)"
+        counts_join = ""
+    else:
+        campus_count = "COALESCE(counts.campus_count, 0)"
+        counts_join = """
+            LEFT JOIN (
+                SELECT district_id, COUNT(*) AS campus_count
+                FROM campuses
+                GROUP BY district_id
+            ) counts ON counts.district_id = d.id
+        """
     query = f"""
         SELECT d.name, d.district_number, d.district_number_canon, d.enrollment, d.rating, d.aea, d.aea_raw, {meta},
-               COALESCE(counts.campus_count, 0), d.id, {fields}
-        FROM districts d
-        LEFT JOIN (
-            SELECT district_id,
-                   COUNT(*) AS campus_count
-            FROM campuses
-            GROUP BY district_id
-        ) counts ON counts.district_id = d.id
+               {campus_count}, d.id, {fields}
+        FROM districts d {counts_join}
         {join}
     """
     if lookup:

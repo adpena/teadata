@@ -70,6 +70,21 @@ def test_entity_store_round_trip(tmp_path, catalog):
     assert "campus_2025_demo" in keys
 
 
+@pytest.mark.parametrize("include_meta", [False, True])
+def test_district_lookup_preserves_iteration_counts_including_empty_districts(tmp_path, catalog, include_meta):
+    path = _build_entity_store(tmp_path, catalog)
+    with closing(sqlite3.connect(path)) as connection, connection:
+        connection.execute(
+            "INSERT INTO districts (id, name, district_number_canon) VALUES (?, ?, ?)",
+            (uuid.uuid4().hex, "District without campus rows", "654321"),
+        )
+    with entity_store.EntityStore(path) as store:
+        records = {row["district_number_canon"]: row for row in store.iter_districts(include_meta=include_meta)}
+        assert {key: row["campus_count"] for key, row in records.items()} == {"123456": 1, "654321": 0}
+        for key, record in records.items():
+            assert store.get_district("'" + key, include_meta=include_meta, cache=False) == record
+
+
 @pytest.mark.parametrize(("subtype", "label", "charter"), [
     ("INDEPENDENT", "ISD", False),
     ("COMMON", "Common school district", False),
