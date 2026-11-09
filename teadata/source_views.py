@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from decimal import Decimal
 from io import StringIO
+import json
 from math import isfinite
 import os
 from pathlib import Path
@@ -27,6 +28,7 @@ if TYPE_CHECKING:
 
     from .export_provenance import ExportProvenance
     from .release import DataRelease
+    from .source_predicates import PreparedPredicate
 
 
 def _projection(release: DataRelease, edition: EditionKey, fields: tuple[str, ...], *,
@@ -76,7 +78,7 @@ class SourceTable:
     edition: EditionKey
     _fields: tuple[str, ...] | None = None
     _predicate: Expression | None = None
-    _queries: tuple[Callable[[pa.Schema], Expression], ...] = ()
+    _queries: tuple[PreparedPredicate, ...] = ()
     _period: DataPeriod | None = None
     _entity_build: tuple[str, str] | None = None
     _entity_ids: tuple[str, ...] | None = None
@@ -100,11 +102,12 @@ class SourceTable:
             raise TypeError("Filter requires an Arrow expression")
         return replace(self, _predicate=predicate if self._predicate is None else self._predicate & predicate)
 
-    def query(self, expression: str, *, params: Mapping[str, object] | None = None) -> SourceTable:
+    def query(self, expression: str, *, params: Mapping[str, object] | None = None,
+              record: bool = False) -> SourceTable:
         """Add a bounded query string with explicit parameters to this lazy scan."""
         from .source_predicates import prepare_predicate
 
-        return replace(self, _queries=(*self._queries, prepare_predicate(expression, params)))
+        return replace(self, _queries=(*self._queries, prepare_predicate(expression, params, record=record)))
 
     @overload
     def __getitem__(self, key: str) -> Expression: ...
@@ -145,7 +148,8 @@ class SourceTable:
         selection = _plan_export(self.release, self.edition, restore_original_headers=restore_original_headers,
                                  selected_fields=self._fields, include_support=True, period=self._period)
         return selection.provenance(self.release, period=self._period, entity_build=self._entity_build,
-                                    entity_ids=self._entity_ids, opaque_filter=bool(self._queries) or self._predicate is not None)
+                                    entity_ids=self._entity_ids, opaque_filter=self._predicate is not None,
+                                    queries=self._queries)
 
     def to_csv(self, path_or_buf: str | Path | BinaryIO, *, restore_original_headers: bool = False) -> None:
         """Stream the selected rows to CSV."""
@@ -271,17 +275,28 @@ class _ExportSelection:
     fields: tuple[str, ...]
     columns: tuple[str, ...]
     headers: tuple[tuple[str, ...], ...]
+    selected_fields: tuple[str, ...] | None
+    restore_original_headers: bool
 
     def provenance(self, release: DataRelease, *, period: DataPeriod | None,
                    entity_build: tuple[str, str] | None, entity_ids: tuple[str, ...] | None,
-                   opaque_filter: bool) -> ExportProvenance:
+                   opaque_filter: bool, queries: tuple[PreparedPredicate, ...] = ()) -> ExportProvenance:
         from .export_provenance import describe_export
 
         if entity_ids is not None:
             _entity_key(self.artifact)
+        records = [query.recipe_json for query in queries]
+        opaque_filter = opaque_filter or any(record is None for record in records)
+        replay = None
+        if records and not opaque_filter:
+            replay = {
+                "version": 1, "fields": self.selected_fields,
+                "restore_original_headers": self.restore_original_headers,
+                "queries": [json.loads(record) for record in records if record is not None],
+            }
         return describe_export(release, self.artifact, self.fields, self.columns, self.headers,
                                period=period, entity_build=entity_build, entity_ids=entity_ids,
-                               opaque_filter=opaque_filter)
+                               opaque_filter=opaque_filter, query_replay=replay)
 
 
 def _plan_export(release: DataRelease, edition: EditionKey, *, restore_original_headers: bool,
@@ -329,12 +344,12 @@ def _plan_export(release: DataRelease, edition: EditionKey, *, restore_original_
             raise ContractError(original_error)
     output_headers = (columns,) if not restore_original_headers else tuple(
         tuple(row[kind] for row in headers) for kind in header_kinds)
-    return _ExportSelection(artifact, requested, columns, output_headers)
+    return _ExportSelection(artifact, requested, columns, output_headers, selected_fields, restore_original_headers)
 
 
 def prepare_export(release: DataRelease, edition: EditionKey, *, restore_original_headers: bool,
                    selected_fields: tuple[str, ...] | None = None, predicate: Expression | None = None,
-                   queries: tuple[Callable[[pa.Schema], Expression], ...] = (),
+                   queries: tuple[PreparedPredicate, ...] = (),
                    include_support: bool = False, period: DataPeriod | None = None,
                    entity_build: tuple[str, str] | None = None,
                    entity_ids: tuple[str, ...] | None = None) -> _TableExport:
@@ -346,13 +361,13 @@ def prepare_export(release: DataRelease, edition: EditionKey, *, restore_origina
 
 def _open_export(
     release: DataRelease, selection: _ExportSelection, *, restore_original_headers: bool = False,
-    predicate: Expression | None = None, queries: tuple[Callable[[pa.Schema], Expression], ...] = (),
+    predicate: Expression | None = None, queries: tuple[PreparedPredicate, ...] = (),
     period: DataPeriod | None = None, entity_build: tuple[str, str] | None = None,
     entity_ids: tuple[str, ...] | None = None,
 ) -> _TableExport:
     artifact = selection.artifact
     edition = artifact.edition
-    opaque_filter = bool(queries) or predicate is not None
+    opaque_filter = predicate is not None
     entity_key = _entity_key(artifact) if entity_ids is not None else None
     native = release.analytical_dataset(artifact.identity)
     if entity_key is not None and entity_ids is not None:
@@ -372,7 +387,7 @@ def _open_export(
 
     def provenance() -> ExportProvenance:
         return selection.provenance(release, period=period, entity_build=entity_build,
-                                    entity_ids=entity_ids, opaque_filter=opaque_filter)
+                                    entity_ids=entity_ids, opaque_filter=opaque_filter, queries=queries)
 
     return _TableExport(scanner, selection.headers, restore_original_headers, rows_hint, lineage, provenance)
 

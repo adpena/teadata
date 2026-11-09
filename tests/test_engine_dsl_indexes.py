@@ -359,3 +359,83 @@ def test_digit_bearing_names_and_legacy_numeric_selectors():
         engine >> ("district", True)
     with pytest.raises(ValueError, match="take expects positional arguments: n"):
         (engine >> ("district", "012345")) >> ("take",)
+
+
+@pytest.mark.parametrize("indexed", [True, False])
+def test_engine_selectors_keep_governance_geometry_and_namespace_separate(indexed):
+    from array import array as coordinates
+    from numpy import array
+    from pandas import Series
+    from shapely.geometry import box
+
+    engine = DataEngine(indexes_enabled=indexed)
+    district = District(uuid.uuid4(), "Example ISD", district_number="001001", boundary=box(-98, 30, -97, 31))
+    charter = District(uuid.uuid4(), "Example Charter", district_number="001801", meta={"is_charter": True})
+    empty = District(uuid.uuid4(), "Empty ISD", district_number="001002", boundary=box(-95, 30, -94, 31))
+    for item in (district, charter, empty):
+        engine.add_district(item)
+
+    inside = _campus(district, name="Inside", campus_number="001001001", lon=-97.5, lat=30.5)
+    outside = _campus(district, name="Outside", campus_number="001001002", lon=-96.5, lat=30.5)
+    missing = Campus(uuid.uuid4(), district.id, "Missing point", "", False, campus_number="001001003")
+    charter_in = _campus(charter, name="Charter inside", campus_number="001801001", lon=-97.7, lat=30.5, is_charter=True)
+    charter_edge = _campus(charter, name="Charter edge", campus_number="001801002", lon=-97, lat=30.5, is_charter=True)
+    private = Campus(uuid.uuid4(), None, "Private edge", "", False, is_private=True,
+                     source_namespace="tefa", source_id="K/Ké", location=(-97, 30.5))
+    for campus in (inside, outside, missing, charter_in, charter_edge, private):
+        engine.add_campus(campus)
+
+    isd_query = engine >> ("district", "`001001-001")
+    assert list(isd_query) == [district]
+    assert list(engine >> ("district", "example%")) == [district, charter]
+    assert list(engine >> ("district", 999999)) == []
+    assert list(engine >> ("campus", "tefa:K%2FK%C3%A9")) == [private]
+    assert list(engine >> ("campus", "tefa:absent")) == []
+    assert list(engine >> ("campus", "'001801001")) == [charter_in]
+    assert list(engine >> ("campus", 1001999)) == []
+    assert list(engine >> ("campuses_in", isd_query)) == [inside, outside, missing]
+    assert list(engine >> ("campuses_in", charter)) == [charter_in, charter_edge]
+    assert list(engine >> ("campuses_in", empty)) == []
+    assert list(engine >> ("campuses_in", Query([], engine))) == []
+    assert list(engine >> ("within", district)) == [inside, charter_in]
+    assert list(engine >> ("within", district, "campuses", True)) == [inside, charter_in, charter_edge, private]
+    assert list(engine >> ("within", empty)) == []
+    assert list(engine >> ("charters_within", district)) == [charter_in, charter_edge]
+    assert list(engine >> ("privates_within", district)) == [private]
+    assert list(engine >> ("nearest", inside)) == [inside]
+    for pair in (array([-97.5, 30.5]), coordinates("d", [-97.5, 30.5]), Series([-97.5, 30.5])):
+        assert list(engine >> ("nearest", pair)) == [inside]
+    assert list(engine >> ("nearest", (-97, 30.5), 10, 0)) == [charter_edge, private]
+    assert list(engine >> ("nearest_charter", private, 10, 0)) == [charter_edge]
+    with pytest.raises(ValueError, match="Boundary geometry unavailable"):
+        engine >> ("within", charter)
+    with pytest.raises(ValueError, match="expects a District"):
+        engine >> ("campuses_in", inside)
+    with pytest.raises(ValueError, match="seed item with geometry"):
+        engine >> ("nearest", missing)
+
+
+@pytest.mark.parametrize("name,max_args", [
+    ("district", 1), ("campus", 1), ("campuses_in", 1), ("within", 3),
+    ("charters_within", 1), ("privates_within", 1), ("nearest", 3), ("nearest_charter", 3),
+])
+def test_engine_selector_arity_is_checked_before_dispatch(name, max_args):
+    engine = DataEngine()
+    for operands in ((), (None,) * (max_args + 1)):
+        with pytest.raises(ValueError, match=f"{name} expects positional arguments"):
+            engine >> (name, *operands)
+
+
+@pytest.mark.parametrize("selector,message", [
+    (([], None), "selector name must be a string"),
+    (("unknown", None), "Unsupported engine selector"),
+    (("district", True), "Invalid district number"),
+    (("campus", False), "Invalid campus number"),
+    (("nearest", (-97, 30), True), "nearest limit must be an integer"),
+    (("nearest_charter", (-97, 30), 1, "10"), "nearest max_miles must be a number"),
+    (("nearest", ("-97", 30)), "longitude must be a number"),
+    (("nearest", None), "seed item with geometry"),
+])
+def test_engine_selectors_reject_invalid_operands(selector, message):
+    with pytest.raises(ValueError, match=message):
+        DataEngine() >> selector

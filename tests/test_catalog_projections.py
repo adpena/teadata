@@ -1790,6 +1790,7 @@ def make_observation_release(tmp_path, selected_catalog, year, amount):
 
 def test_observations_golden(tmp_path, selected_catalog):
     from teadata.entities import Campus
+    from teadata.export_provenance import ExportProvenance
     from teadata.release import using_release
     from uuid import UUID
 
@@ -1803,6 +1804,14 @@ def test_observations_golden(tmp_path, selected_catalog):
         table = query >> ("observations", "campus_student", "2023–24", ("amount",), "campus", edition)
         assert table.to_arrow()["amount"].to_pylist() == [5]
         assert table.measurement_period.to_dict() == {"kind": "school_year", "start_year": 2023, "end_year": 2024}
+        recorded = table.query("amount == @amount", params={"amount": 5}, record=True)
+        saved = ExportProvenance.from_dict(recorded.provenance().to_dict())
+        replayed = saved.replay_table(table.release)
+        assert replayed.to_arrow().equals(recorded.to_arrow())
+        assert replayed.measurement_period == table.measurement_period
+        assert saved.to_dict()["selector"]["entity_ids"] == ["000000004"]
+        with pytest.raises(ContractError, match="exact native release"):
+            saved.replay_table(release)
         unknown_revision = replace(edition, revision_sha256="f" * 64)
         with pytest.raises(ContractError, match="unavailable together for school year 2024"):
             query >> ("observations", "campus_student", 24, ("amount",), "campus", unknown_revision)

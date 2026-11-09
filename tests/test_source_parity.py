@@ -17,6 +17,7 @@ import pytest
 from teadata.analytical import write_leaf_artifact
 from teadata.column_schema import source_schema_fingerprint, validate_source_layout
 from teadata.dataset_metadata import ArtifactRef, DatasetMetadata, EditionKey, ResolvedDataset
+from teadata.export_provenance import ExportProvenance
 from teadata.manifest import BuildRecorder, ContractError, canonical_json, file_identity
 from teadata.provenance import ProvenanceStore
 from teadata.release import DataRelease, publish_release
@@ -214,6 +215,7 @@ def test_export_provenance_is_shared_and_catalog_only(tmp_path, monkeypatch):
     workbook = BytesIO()
     view.to_excel(workbook, restore_original_headers=True)
     assert read_provenance_workbook(workbook) == (['Data', 'Provenance'], document)
+
     book = load_workbook(workbook, read_only=True)
     try:
         sheet = book['Provenance']
@@ -232,6 +234,112 @@ def test_export_provenance_is_shared_and_catalog_only(tmp_path, monkeypatch):
         b'"001001","0","11"\n"001003","17",""\n'
     )
 
+
+def test_recorded_query_replays_the_dataframe_csv_and_excel_selection(tmp_path, monkeypatch):
+    release, _, key, _ = fixture_release(tmp_path, schema_version=4, periods=True)
+    parameters = {"tokens": ["0", "17"], "unused": object()}
+    view = release.table(key).select("enrollment", "membership").query(
+        "membership in @tokens", params=parameters, record=True,
+    ).query("district_number != @excluded", params={"excluded": "001001"}, record=True)
+    parameters["tokens"][:] = ["-999"]
+
+    with monkeypatch.context() as isolated:
+        isolated.setattr(release, "analytical_dataset", lambda *_: pytest.fail("Replay opened a leaf"))
+        companion = BytesIO()
+        view.provenance(restore_original_headers=True).to_excel(companion)
+        _, document = read_provenance_workbook(companion)
+        saved = ExportProvenance.from_dict(document)
+        rebuilt = saved.replay_table(release)
+    assert saved.restore_original_headers
+    assert document["selector"]["query_replay"]["queries"] == [
+        {"expression": "membership in @tokens", "params": {"tokens": ["0", "17"]}},
+        {"expression": "district_number != @excluded", "params": {"excluded": "001001"}},
+    ]
+    assert document["selector"]["opaque_filter"] is False
+    frame = rebuilt.to_df(restore_original_headers=saved.restore_original_headers)
+    assert frame.to_numpy().tolist() == [["001003", "17", ""]]
+    assert frame.attrs["teadata_provenance"] == document
+    csv_export = BytesIO()
+    rebuilt.to_csv(csv_export, restore_original_headers=saved.restore_original_headers)
+    assert list(csv.reader(StringIO(csv_export.getvalue().decode())))[-1] == ["001003", "17", ""]
+    workbook = BytesIO()
+    rebuilt.to_excel(workbook, restore_original_headers=saved.restore_original_headers)
+    assert read_provenance_workbook(workbook) == (["Data", "Provenance"], document)
+
+
+def test_recorded_query_retains_typed_parameters_and_rejects_mixed_filters(tmp_path, monkeypatch):
+    release, _, key, _ = fixture_release(tmp_path, schema_version=4, damage="normalized")
+    table = release.table(key).select("membership")
+    view = table.query(
+        "membership in @selected or membership is @null",
+        params={"selected": [9007199254740993, Decimal("17.00"), -0.0], "null": None},
+        record=True,
+    )
+    saved = view.provenance()
+    assert saved.to_dict()["selector"]["query_replay"]["queries"][0]["params"] == {
+        "null": None, "selected": [
+            {"integer": "9007199254740993"}, {"decimal": "17.00"}, {"float64": "8000000000000000"},
+        ],
+    }
+    rows = saved.replay_table(release).to_arrow()
+    assert rows["membership"].to_pylist() == [9007199254740993, None, 17]
+    assert rows["membership_status"].to_pylist() == ["observed", "suppressed", "observed"]
+    with localcontext() as context:
+        context.capitals = 1
+        exact = table.query("membership >= @limit", params={"limit": Decimal("1e-7")}, record=True).provenance()
+    with localcontext() as context:
+        context.capitals = 0
+        assert exact.replay_table(release).to_arrow()["membership"].to_pylist() == [9007199254740993, 17]
+
+    altered = saved.to_dict()
+    altered["selector"]["query_replay"]["queries"][0]["params"]["null"] = False
+    with pytest.raises(ContractError, match="description digest"):
+        ExportProvenance.from_dict(altered)
+
+    monkeypatch.setattr(release, "analytical_dataset", lambda *_: pytest.fail("Replay opened a leaf"))
+    for mixed in (view.where(table["membership"] > 0), view.query("membership == 17")):
+        provenance = mixed.provenance()
+        assert provenance.to_dict()["selector"]["opaque_filter"] is True
+        assert "query_replay" not in provenance.to_dict()["selector"]
+        with pytest.raises(ContractError, match="opaque filter"):
+            provenance.replay_table(release)
+
+
+def test_recorded_query_freezes_a_repeated_parameter_and_refuses_a_different_release(tmp_path, monkeypatch):
+    from collections import defaultdict
+
+    class ReadOnce(dict):
+        def __getitem__(self, name):
+            return self.pop(name)
+
+    source_path, other_path = tmp_path / "source", tmp_path / "other"
+    source_path.mkdir()
+    other_path.mkdir()
+    release, _, key, _ = fixture_release(source_path, schema_version=4, damage="normalized")
+    other, _, _, _ = fixture_release(other_path, schema_version=4, damage="normalized", last_enrollment="24")
+    table = release.table(key).select("membership").query(
+        "@point <= membership <= @point", params=ReadOnce(point=17), record=True,
+    )
+    saved = table.provenance()
+    assert saved.replay_table(release).to_arrow()["membership"].to_pylist() == [17]
+    implicit = defaultdict(lambda: "implicit default")
+    with pytest.raises(ValueError, match="Missing query parameter 'missing'"):
+        table.query("membership == @missing", params=implicit, record=True)
+    assert not implicit
+    with pytest.raises(ContractError, match="exact native release"):
+        saved.replay_table(other)
+
+    monkeypatch.setattr(release, "analytical_dataset", lambda *_: pytest.fail("Replay opened a leaf"))
+    for replacement, message in (
+        ({"params": {"point": {"float64": "00 00 00 00 0000"}}}, "Invalid recorded source selection"),
+        ({"expression": "@point <= unknown"}, "does not match the pinned source schema"),
+    ):
+        changed = saved.to_dict()
+        changed["selector"]["query_replay"]["queries"][0].update(replacement)
+        body = {key: value for key, value in changed.items() if key not in {"description_sha256", "citation"}}
+        changed["description_sha256"] = sha256(canonical_json(body).encode()).hexdigest()
+        with pytest.raises(ContractError, match=message):
+            ExportProvenance.from_dict(changed).replay_table(release)
 
 def test_direct_export_provenance_reflects_its_own_physical_columns(tmp_path):
     release, _, key, _ = fixture_release(tmp_path, damage='normalized', schema_version=4, http_receipt=True)

@@ -61,6 +61,17 @@ if TYPE_CHECKING:
 _NUMBER_SELECTOR = re.compile(r"'?\s*[0-9]+(?:\.0+)?")
 _DISTRICT_SELECTOR = re.compile(r"['’`]?\s*[0-9]+(?:\.0+|-[0-9]{3})?")
 
+_ENGINE_QUERY_ARGUMENTS = {
+    "district": ("id_or_name",),
+    "campus": ("id_or_name",),
+    "campuses_in": ("district",),
+    "within": ("boundary", "[charter_only]", "[covers]"),
+    "charters_within": ("boundary",),
+    "privates_within": ("boundary",),
+    "nearest": ("seed", "[limit]", "[max_miles]"),
+    "nearest_charter": ("seed", "[limit]", "[max_miles]"),
+}
+
 GZIP_MAGIC = b"\x1f\x8b"
 
 
@@ -675,8 +686,15 @@ class DataEngine:
             return Query([o for o in self if query(o)], self)
 
         # 2) Tuple-based queries
-        if isinstance(query, tuple) and len(query) >= 2:
+        if isinstance(query, tuple) and query:
             key = query[0]
+            if not isinstance(key, str):
+                raise ValueError("Engine selector name must be a string")
+            arguments = _ENGINE_QUERY_ARGUMENTS.get(key)
+            if arguments is None:
+                raise ValueError(f"Unsupported engine selector: {key!r}")
+            if not 2 <= len(query) <= len(arguments) + 1:
+                raise ValueError(f"{key} expects positional arguments: {', '.join(arguments)}")
 
             if key == "district":
                 raw = query[1]
@@ -737,11 +755,11 @@ class DataEngine:
                 district = unwrap_query(query[1])
                 if district is None:
                     return Query([], self)
+                if not isinstance(district, District):
+                    raise ValueError("campuses_in expects a District or a Query[District]")
                 return Query(self.campuses_in(district), self)
 
             if key == "within":
-                if len(query) > 4:
-                    raise ValueError("within expects a boundary and up to two optional flags")
                 charter_only = query[2] if len(query) >= 3 else False
                 covers = query[3] if len(query) == 4 else False
                 if isinstance(charter_only, str) and charter_only == "campuses":
@@ -756,71 +774,16 @@ class DataEngine:
                 district = unwrap_query(query[1])
                 return Query(self.private_campuses_within(district), self)
 
-            if key == "nearest":
-                seed = query[1]
-                n = int(query[2]) if len(query) >= 3 else 1
-                max_m = (
-                    float(query[3])
-                    if len(query) >= 4 and query[3] is not None
-                    else None
-                )
-                # If seed is a Query or Campus, try to infer coords
-                seed = unwrap_query(seed)
-                if hasattr(seed, "point"):
-                    xy = point_xy(getattr(seed, "point"))
-                    if xy is not None:
-                        items = self.nearest_campuses(
-                            xy[0],
-                            xy[1],
-                            limit=n,
-                            charter_only=False,
-                            max_miles=max_m,
-                            geodesic=True,
-                        )
-                        return Query(items, self)
-                # Otherwise assume it's a (lon, lat) tuple
-                coords = seed
-                items = self.nearest_campuses(
-                    coords[0],
-                    coords[1],
-                    limit=n,
-                    charter_only=False,
-                    max_miles=max_m,
-                    geodesic=True,
-                )
-                return Query(items, self)
-
-            if key == "nearest_charter":
-                seed = query[1]
-                n = int(query[2]) if len(query) >= 3 else 1
-                max_m = (
-                    float(query[3])
-                    if len(query) >= 4 and query[3] is not None
-                    else None
-                )
-                seed = unwrap_query(seed)
-                if hasattr(seed, "point"):
-                    xy = point_xy(getattr(seed, "point"))
-                    if xy is not None:
-                        items = self.nearest_campuses(
-                            xy[0],
-                            xy[1],
-                            limit=n,
-                            charter_only=True,
-                            max_miles=max_m,
-                            geodesic=True,
-                        )
-                        return Query(items, self)
-                coords = seed
-                items = self.nearest_campuses(
-                    coords[0],
-                    coords[1],
-                    limit=n,
-                    charter_only=True,
-                    max_miles=max_m,
-                    geodesic=True,
-                )
-                return Query(items, self)
+            if key in ("nearest", "nearest_charter"):
+                seed = unwrap_query(query[1])
+                if (not isinstance(seed, (list, tuple, str, bytes)) and hasattr(seed, "__getitem__")
+                        and point_xy(getattr(seed, "point", None)) is None):
+                    try:
+                        if len(seed) == 2:
+                            seed = (seed[0], seed[1])
+                    except (IndexError, KeyError, TypeError):
+                        pass
+                return Query([], self) >> (key, seed, *query[2:])
 
         raise ValueError(f"Unsupported >> query: {query!r}")
 

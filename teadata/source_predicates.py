@@ -8,7 +8,9 @@ from dataclasses import dataclass
 from decimal import Context, Decimal, InvalidOperation, ROUND_FLOOR
 from functools import reduce
 from io import StringIO
+import json
 from operator import and_, eq, ge, gt, le, lt, ne, or_
+from struct import pack, unpack
 import tokenize
 from typing import TYPE_CHECKING
 
@@ -34,6 +36,56 @@ class _FloatLiteral:
     value: float
 
 
+@dataclass(frozen=True, slots=True)
+class PreparedPredicate:
+    bind: Callable[[Schema], Expression]
+    recipe_json: str | None
+
+    def __call__(self, schema: Schema) -> Expression:
+        return self.bind(schema)
+
+
+def _encode_parameter(value):
+    if type(value) is tuple:
+        return [_encode_parameter(item) for item in value]
+    if type(value) is Decimal:
+        return {"decimal": str(value).upper()}
+    if type(value) is float:
+        return {"float64": pack(">d", value).hex()}
+    if type(value) is int:
+        return {"integer": str(value)}
+    return value
+
+
+def _decode_parameter(raw, *, sequence: bool = True):
+    if raw is None or type(raw) in (str, bool):
+        return raw
+    if sequence and type(raw) is list and len(raw) <= 512:
+        return tuple(_decode_parameter(value, sequence=False) for value in raw)
+    if type(raw) is dict and len(raw) == 1:
+        (kind, value), = raw.items()
+        if type(value) is str:
+            try:
+                if kind == "decimal" and len(value) <= 85:
+                    return _decimal(Decimal(value))
+                if kind == "integer" and len(value) <= 21:
+                    return int(value)
+                if kind == "float64" and len(value) == 16 and all(c in "0123456789abcdef" for c in value):
+                    return unpack(">d", bytes.fromhex(value))[0]
+            except (InvalidOperation, ValueError):
+                pass
+    raise ValueError("Invalid recorded query parameter")
+
+
+def restore_query(raw: object) -> tuple[str, dict[str, object]]:
+    """Decode parameters before the normal query parser validates their use."""
+    if (not isinstance(raw, dict) or set(raw) != {"expression", "params"}
+            or type(raw["expression"]) is not str or not isinstance(raw["params"], dict)
+            or len(raw["params"]) > 512):
+        raise ValueError("Invalid recorded query")
+    return raw["expression"], {key: _decode_parameter(value) for key, value in raw["params"].items()}
+
+
 def _decimal(value: Decimal) -> Decimal:
     if value.is_finite():
         _, digits, exponent = value.as_tuple()
@@ -52,7 +104,7 @@ def _parameter_size(value: object) -> int:
     raise ValueError("Query parameters require bounded scalar values")
 
 
-def prepare_predicate(expression: str, params: Mapping[str, object] | None) -> Callable[[Schema], Expression]:
+def prepare_predicate(expression: str, params: Mapping[str, object] | None, *, record: bool = False) -> PreparedPredicate:
     """Validate a query now and bind numeric operands to the native schema at read time."""
     from pyarrow import array, scalar as arrow_scalar, types
     from pyarrow.dataset import field
@@ -62,6 +114,8 @@ def prepare_predicate(expression: str, params: Mapping[str, object] | None) -> C
         raise ValueError("Query expression must be nonempty and at most 8192 UTF-8 bytes")
     if params is not None and not isinstance(params, Mapping):
         raise TypeError("Query parameters must be a mapping")
+    if type(record) is not bool:
+        raise ValueError("Query recording must be explicitly enabled or disabled")
     parameters = {} if params is None else params
 
     try:
@@ -85,6 +139,7 @@ def prepare_predicate(expression: str, params: Mapping[str, object] | None) -> C
         raise ValueError("Query expression exceeds 512 syntax nodes")
 
     parameter_bytes = 0
+    captured = {}
 
     def operand(node: ast.expr):
         nonlocal parameter_bytes
@@ -92,18 +147,28 @@ def prepare_predicate(expression: str, params: Mapping[str, object] | None) -> C
             if not node.id.startswith(_PARAMETER):
                 return _Field(node.id)
             name = node.id.removeprefix(_PARAMETER)
-            if name not in parameters:
-                raise ValueError(f"Missing query parameter {name!r}")
-            value = parameters[name]
-            if type(value) is list or type(value) is tuple:
-                if len(value) > 512:
-                    raise ValueError("Query membership parameters require at most 512 values")
+            if name not in captured:
+                # The default Mapping membership check reads a value. Use an
+                # explicit check only when the mapping supplies its own.
+                if type(parameters).__contains__ is not Mapping.__contains__ and name not in parameters:
+                    raise ValueError(f"Missing query parameter {name!r}")
+                try:
+                    value = parameters[name]
+                except KeyError:
+                    raise ValueError(f"Missing query parameter {name!r}") from None
+                if type(value) is list or type(value) is tuple:
+                    if len(value) > 512:
+                        raise ValueError("Query membership parameters require at most 512 values")
+                    value = tuple(value)
+                captured[name] = value
+            value = captured[name]
+            if type(value) is tuple:
                 parameter_bytes += sum(_parameter_size(item) for item in value)
             else:
                 parameter_bytes += _parameter_size(value)
             if parameter_bytes > _QUERY_BYTES:
                 raise ValueError("Query parameter uses exceed 8192 bytes")
-            return tuple(value) if type(value) is list or type(value) is tuple else value
+            return value
         if isinstance(node, (ast.List, ast.Tuple)):
             return tuple(operand(item) for item in node.elts)
         if isinstance(node, (ast.Constant, ast.UnaryOp)):
@@ -248,4 +313,8 @@ def prepare_predicate(expression: str, params: Mapping[str, object] | None) -> C
             return lambda _: field(node.id)
         raise ValueError("Unsupported source query. Use comparisons, membership and boolean operators")
 
-    return predicate(tree.body)
+    compiled = predicate(tree.body)
+    recipe = json.dumps({"expression": expression, "params": {
+        key: _encode_parameter(value) for key, value in captured.items()
+    }}, sort_keys=True, allow_nan=False) if record else None
+    return PreparedPredicate(compiled, recipe)

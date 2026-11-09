@@ -80,6 +80,10 @@ or `False` in flag slots, integers in count slots, and numeric coordinates
 and distances. For `nearest`, `nearest_charter`, `radius`, and `knn`, pass
 `None` as the seed to use the first input item. An explicit seed must resolve
 to coordinates. `within` resolves a district or polygon as described above.
+`DataEngine` entry selectors have their own positional forms. Entry
+`nearest` and `nearest_charter` require a seed. Pass a point-bearing entity
+or a longitude and latitude pair. A valid ID absent from the engine returns
+an empty selection.
 Use `release.catalog.editions()`, `release.catalog.variables()` and
 `release.observation_years()` to find datasets, fields and periods in your
 selected release.
@@ -339,8 +343,24 @@ unopened. Use `release.provenance(edition)` with a direct `release.to_csv()`
 export. The worksheet's numbered canonical record rows contain the same
 JSON in base64-encoded UTF-8 for machine readback. The description checksum
 covers the structured record excluding the runtime citation and checksum.
-Keep filter expressions and parameters with a file export if you need to
-replay them. The record marks these filters as opaque and omits their values.
+Filters are opaque by default and their text and values are omitted.
+Opt in with `record=True` on every source query in a selection to include
+its expression and the parameter values it uses. A selection that also
+uses an Arrow filter or an unrecorded query stays opaque. Only opt in when
+the expression and values can travel with the exported file.
+
+```python
+from teadata.export_provenance import ExportProvenance
+
+selected = table.query("district_number == @district", params={"district": "001001"}, record=True)
+saved = ExportProvenance.from_dict(selected.provenance().to_dict())
+replayed = saved.replay_table(release)
+frame = replayed.to_df(restore_original_headers=saved.restore_original_headers)
+```
+
+Open the exact native manifest named in the provenance, which can be a child
+of the release used to select entities. Use the saved header mode with CSV
+and Excel too. The description checksum detects changes to the record.
 
 ## Write a query string
 

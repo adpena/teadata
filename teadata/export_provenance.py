@@ -7,11 +7,12 @@ from collections import defaultdict
 from dataclasses import dataclass
 from hashlib import sha256
 import json
+import re
 from typing import TYPE_CHECKING, Any
 
 from .citations import citation
-from .dataset_metadata import DataPeriod, validate_http_url
-from .manifest import canonical_json
+from .dataset_metadata import DataPeriod, EditionKey, validate_http_url
+from .manifest import ContractError, canonical_json
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -21,6 +22,7 @@ if TYPE_CHECKING:
 
     from .dataset_metadata import ArtifactRef
     from .release import DataRelease
+    from .source_views import SourceTable
 
 
 def _public_url(value: str | None) -> str | None:
@@ -34,7 +36,8 @@ def _public_url(value: str | None) -> str | None:
 def describe_export(release: DataRelease, artifact: ArtifactRef, fields: tuple[str, ...],
                     columns: tuple[str, ...], headers: tuple[tuple[str, ...], ...], *,
                     period: DataPeriod | None, entity_build: tuple[str, str] | None,
-                    entity_ids: tuple[str, ...] | None, opaque_filter: bool) -> ExportProvenance:
+                    entity_ids: tuple[str, ...] | None, opaque_filter: bool,
+                    query_replay: dict[str, Any] | None = None) -> ExportProvenance:
     """Project the admitted catalog, without opening the data leaf."""
     edition = artifact.edition
     artifact_id = artifact.identity
@@ -124,6 +127,8 @@ def describe_export(release: DataRelease, artifact: ArtifactRef, fields: tuple[s
     }
     if source.notes:
         document["source"]["notes"] = source.notes
+    if query_replay is not None:
+        document["selector"]["query_replay"] = query_replay
     description_sha256 = sha256(canonical_json(document).encode()).hexdigest()
     return ExportProvenance(canonical_json({**document, "description_sha256": description_sha256,
                                             "citation": citation(release).text}))
@@ -163,9 +168,87 @@ class ExportProvenance:
 
     _json: str
 
+    @classmethod
+    def from_dict(cls, document: dict[str, Any]) -> ExportProvenance:
+        """Read a detached provenance record and check its description digest."""
+        if not isinstance(document, dict):
+            raise ContractError("Export provenance must be a record")
+        body = {key: value for key, value in document.items() if key not in {"citation", "description_sha256"}}
+        if (type(body.get("schema_version")) is not int or body["schema_version"] != 1
+                or sha256(canonical_json(body).encode()).hexdigest() != document.get("description_sha256")):
+            raise ContractError("Export provenance version or description digest differs")
+        return cls(canonical_json(document))
+
     def to_dict(self) -> dict[str, Any]:
         """Return a fresh JSON-compatible representation of the export selection."""
         return json.loads(self._json)
+
+    @property
+    def restore_original_headers(self) -> bool:
+        """Return the saved header mode for a recorded source query."""
+        selector = self.to_dict()["selector"]
+        return selector.get("query_replay", {}).get("restore_original_headers") is True
+
+    def replay_table(self, release: DataRelease) -> SourceTable:
+        """Restore a recorded selection against its exact open native release."""
+        from dataclasses import replace
+
+        from .source_predicates import restore_query
+
+        document = self.from_dict(self.to_dict()).to_dict()
+        if document.get("release") != {"build_id": release.build_id, "manifest_sha256": release.manifest_sha256}:
+            raise ContractError("Replay requires the exact native release")
+        selector = document.get("selector")
+        if not isinstance(selector, dict) or selector.get("opaque_filter") is not False:
+            raise ContractError("Export provenance contains an opaque filter")
+        recipe = selector.get("query_replay")
+        if (not isinstance(recipe, dict) or set(recipe) != {"version", "fields", "restore_original_headers", "queries"}
+                or type(recipe["version"]) is not int or recipe["version"] != 1
+                or type(recipe["restore_original_headers"]) is not bool
+                or not isinstance(recipe["queries"], list) or not recipe["queries"]):
+            raise ContractError("Export provenance has no supported query replay recipe")
+        fields = recipe["fields"]
+        identifiers = selector.get("entity_ids")
+        entity = selector.get("entity_release")
+        if (fields is not None and (not isinstance(fields, list) or any(type(field) is not str for field in fields))
+                or identifiers is not None and (not isinstance(identifiers, list)
+                                                or any(type(identifier) is not str for identifier in identifiers))
+                or entity is not None and (not isinstance(entity, dict) or set(entity) != {"build_id", "manifest_sha256"}
+                                           or any(type(value) is not str or not re.fullmatch(r"[0-9a-f]{64}", value)
+                                                  for value in entity.values()))):
+            raise ContractError("Invalid recorded source selection")
+        try:
+            table = release.table(EditionKey.from_dict(document["edition"]))
+            period = selector.get("measurement_period")
+            table = replace(table, _period=DataPeriod.from_dict(period) if period is not None else None,
+                            _entity_build=(entity["build_id"], entity["manifest_sha256"]) if entity else None)
+            if fields is not None:
+                table = table.select(*fields)
+            if identifiers is not None:
+                table = table._for_entity_ids(tuple(identifiers))
+            for recorded in recipe["queries"]:
+                expression, params = restore_query(recorded)
+                table = table.query(expression, params=params, record=True)
+            rebuilt = table.provenance(restore_original_headers=recipe["restore_original_headers"]).to_dict()
+        except (KeyError, TypeError, ValueError) as error:
+            raise ContractError("Invalid recorded source selection") from error
+        if rebuilt["description_sha256"] != document["description_sha256"]:
+            raise ContractError("Recorded source selection differs from the pinned release")
+        # Bind the filters against the admitted schema without opening the data.
+        from pyarrow import ArrowException, Table
+        from pyarrow.dataset import dataset
+
+        from .analytical import _leaf_schema
+
+        artifact = release.catalog.artifact_ref(rebuilt["artifact"]["id"])
+        schema = _leaf_schema(artifact.contract)
+        empty = dataset(Table.from_batches([], schema=schema))
+        try:
+            for query in table._queries:
+                empty.scanner(filter=query(schema))
+        except (ArrowException, KeyError, TypeError, ValueError) as error:
+            raise ContractError("Recorded filter does not match the pinned source schema") from error
+        return table
 
     @property
     def publisher_data_citation(self) -> str:
@@ -246,6 +329,9 @@ class ExportProvenance:
             append(("Value policy", source["policy"]["policy_id"]))
         if document["selector"]["opaque_filter"]:
             append(("Filter", "Selection includes a filter that cannot be replayed from this record."))
+        elif recipe := document["selector"].get("query_replay"):
+            for query in recipe["queries"]:
+                append(("Recorded filter", query["expression"]))
         append(("Column", "Export header", "Publisher code", "Measurement period", "Unit", "Binding", "Publisher definition"), heading=True)
         for column in document["columns"]:
             header = " / ".join(column["headers"])
