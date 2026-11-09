@@ -6,6 +6,7 @@ from collections.abc import Iterable, Iterator, Mapping, Sequence
 from functools import lru_cache, partial
 from contextlib import contextmanager
 from contextvars import ContextVar
+from dataclasses import dataclass
 from hashlib import sha256
 import json
 import gzip
@@ -50,6 +51,29 @@ SNAPSHOT_MAGIC = b"TEADATA_SNAPSHOT_V1 "
 _ACTIVE_RELEASE: ContextVar[DataRelease | None] = ContextVar(
     "teadata_active_release", default=None
 )
+
+
+@dataclass(frozen=True, slots=True)
+class _CampusObservationPlan:
+    request: tuple[tuple[str, ...], int | None]
+    year: int
+    source: NativeSourceRef
+    location: tuple[Path, Path]
+    keys: frozenset[EditionKey]
+    index: TPRSStudentCampusIndex
+    files: tuple[tuple[Path, tuple[int, ...]], ...]
+
+    def matches_files(self, child: DataRelease) -> bool:
+        if (child.path, child.cache) != self.location:
+            return False
+        try:
+            for path, stamp in self.files:
+                _require_cache_file(path)
+                if _metadata_stamp(path.stat(follow_symlinks=False)) != stamp:
+                    return False
+        except (ContractError, OSError, ValueError):
+            return False
+        return True
 
 
 def _open_native_source(ref: NativeSourceRef, parent: str | Path, *, offline: bool,
@@ -112,13 +136,13 @@ def _download(url: str, path: Path, *, expected: dict | None = None) -> None:
             temporary.unlink(missing_ok=True)
 
 
+def _metadata_stamp(state: os.stat_result) -> tuple[int, ...]:
+    return (state.st_dev, state.st_ino, state.st_mode, state.st_uid, state.st_size, state.st_mtime_ns, state.st_ctime_ns)
+
+
 def _capture_column_schema(path: Path, descriptor: ColumnSchemaRef | EditionMetadataRef, *,
                            cached: tuple[Path, tuple[int, ...], bytes] | None = None) -> tuple[bytes, tuple[int, ...]]:
     """Admit one regular metadata file before reading its exact verified buffer."""
-    def signature(state):
-        return tuple(getattr(state, key) for key in
-                     ("st_dev", "st_ino", "st_mode", "st_uid", "st_size", "st_mtime_ns", "st_ctime_ns"))
-
     def regular(state):
         return stat.S_ISREG(state.st_mode) and not (
             getattr(state, "st_file_attributes", 0) & stat.FILE_ATTRIBUTE_REPARSE_POINT)
@@ -129,14 +153,14 @@ def _capture_column_schema(path: Path, descriptor: ColumnSchemaRef | EditionMeta
         if (not regular(state) or not 0 < descriptor.size_bytes <= COLUMN_SCHEMA_MAX_BYTES
                 or state.st_size != descriptor.size_bytes):
             raise ContractError("Column-schema resource must be regular and match its declared bounded size")
-        before = signature(state)
+        before = _metadata_stamp(state)
         if nofollow and cached is not None and cached[:2] == (path, before):
             return cached[2], before
         flags = os.O_RDONLY | nofollow | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0)
         fd = os.open(path, flags)
         with os.fdopen(fd, "rb") as stream:
             opened = os.fstat(stream.fileno())
-            opened_stamp = signature(opened)
+            opened_stamp = _metadata_stamp(opened)
             # Windows pathname and descriptor stat expose different identity
             # fields. Compare their size and mtime, then recheck each separately.
             matches = (opened_stamp == before if nofollow else
@@ -145,10 +169,10 @@ def _capture_column_schema(path: Path, descriptor: ColumnSchemaRef | EditionMeta
                 raise ContractError("Column-schema resource changed before reading")
             raw = stream.read(descriptor.size_bytes + 1)
             current = os.fstat(stream.fileno())
-            if not regular(current) or signature(current) != opened_stamp:
+            if not regular(current) or _metadata_stamp(current) != opened_stamp:
                 raise ContractError("Column-schema resource changed during reading")
             current = path.stat(follow_symlinks=False)
-            if not regular(current) or signature(current) != before:
+            if not regular(current) or _metadata_stamp(current) != before:
                 raise ContractError("Column-schema resource changed during reading")
         if len(raw) != descriptor.size_bytes or sha256(raw).hexdigest() != descriptor.sha256:
             raise ContractError("Column-schema resource checksum, size or identity mismatch")
@@ -216,6 +240,8 @@ def _local_manifest_stamp(path: Path) -> _ManifestStamp:
 
 class DataRelease:
     """A complete bundle with one catalog and content hashes for every artifact."""
+
+    _metadata_trace: set[tuple[Path, tuple[int, ...]]] | None = None
 
     def __init__(self, manifest: str | Path, *, expected_sha256: str | None = None, offline: bool = False,
                  cache_dir: Path | None = None, _local_manifest: _LocalManifest | None = None):
@@ -352,13 +378,16 @@ class DataRelease:
         raw, before = _capture_column_schema(path, descriptor, cached=self._column_schema_data.get(descriptor.sha256))
         if getattr(os, "O_NOFOLLOW", 0):
             self._column_schema_data[descriptor.sha256] = path, before, raw
+        if (trace := getattr(self, "_metadata_trace", None)) is not None and len(trace) <= 256:
+            trace.add((path, before))
         return raw
 
     def __getstate__(self) -> dict:
         if self._v3:
             return {"_v3": True, "source": self.source, "pin": self.manifest_sha256, "offline": self.offline,
                     "cache_dir": self._cache_dir}
-        return {key: value for key, value in self.__dict__.items() if key != "_campus_observation_routes"}
+        return {key: value for key, value in self.__dict__.items()
+                if key not in {"_campus_observation_routes", "_campus_observation_plan"}}
 
     def __setstate__(self, state: dict) -> None:
         if state.get("_v3") is True:
@@ -666,6 +695,7 @@ class DataRelease:
 
     def _observation_year_options(
         self, dataset: str, fields: tuple[str, ...], scope: str, edition: EditionKey | None,
+        trace_metadata: bool = False,
     ) -> Iterator[tuple[DataRelease, EditionKey, dict[str, int]]]:
         _validate_observation_selection(dataset, fields, scope, edition)
 
@@ -681,8 +711,11 @@ class DataRelease:
                 keys = [key for key in ref.editions if key.dataset == dataset and key.scope == scope
                         and (edition is None or key == edition)]
                 if keys:
-                    yield _open_native_source(ref, parent, offline=self.offline,
-                                              cache_dir=getattr(self, "_cache_dir", None)), keys
+                    child = _open_native_source(ref, parent, offline=self.offline,
+                                                cache_dir=getattr(self, "_cache_dir", None))
+                    if trace_metadata and getattr(child.catalog, "_v4", False):
+                        child._metadata_trace = set()
+                    yield child, keys
 
         for child, keys in sources():
             for key in keys:
@@ -779,11 +812,25 @@ class DataRelease:
         self, dataset: str, fields: tuple[str, ...], *, school_year: int | None, scope: str,
         edition: EditionKey | None, identifiers: tuple[str, ...],
     ) -> SourceTable | PartitionedSourceTable:
-        from .source_views import PartitionedSourceTable
         from .tprs_statewide_intake import DATASET
 
-        options = list(self._observation_year_options(dataset, fields, scope, edition))
-        if dataset == DATASET and scope == "campus" and edition is None and identifiers:
+        route_campuses = dataset == DATASET and scope == "campus" and edition is None and bool(identifiers)
+        memoize = (route_campuses and not self._v3 and bool(getattr(os, "O_NOFOLLOW", 0))
+                   and 0 < len(fields) <= 32 and all(isinstance(name, str) and len(name) <= 256 for name in fields))
+        request = (fields, school_year)
+        parent = self.source if self.remote else self.path
+        cache_dir = getattr(self, "_cache_dir", None)
+        if memoize:
+            memo: _CampusObservationPlan | None = getattr(self, "_campus_observation_plan", None)
+            if memo is not None and memo.request == request:
+                child = _open_native_source(memo.source, parent, offline=self.offline, cache_dir=cache_dir)
+                if memo.matches_files(child):
+                    return self._routed_student_campuses(fields, memo.year, child, memo.keys, memo.index, identifiers)
+                self.__dict__.pop("_campus_observation_plan", None)
+        selected_options = (self._observation_year_options(dataset, fields, scope, edition, True) if memoize else
+                            self._observation_year_options(dataset, fields, scope, edition))
+        options = list(selected_options)
+        if route_campuses:
             year, matches = self._observation_matches(fields, scope, school_year, options)
             child, first = matches[0]
             identity = (child.manifest_sha256, first.edition)
@@ -793,28 +840,49 @@ class DataRelease:
                 index = self._automatic_student_campus_index(child, first.edition)
                 if index is None:
                     return self._select_observation_view(fields, scope, year, options)._for_entity_ids(identifiers)
-                matching_keys = {key for _, key in matches}
-                groups: dict[EditionKey, list[str]] = {}
-                missing, unavailable = [], []
-                for identifier in identifiers:
-                    key = index.edition_for(identifier)
-                    if key is None:
-                        missing.append(identifier)
-                    elif key not in matching_keys:
-                        unavailable.append(identifier)
-                    else:
-                        groups.setdefault(key, []).append(identifier)
-                if missing or unavailable:
-                    raise ContractError(
-                        f"Campus Student Information is incomplete for school year {year} "
-                        f"in report edition {first.edition}. "
-                        f"No report for {len(missing)} campus IDs: {missing[:5]}. "
-                        f"Selected fields unavailable for {len(unavailable)} campus IDs: {unavailable[:5]}."
-                    )
-                parts = tuple(self._observation_view(fields, year, child, key)._for_entity_ids(tuple(ids))
-                              for key, ids in groups.items())
-                return parts[0] if len(parts) == 1 else PartitionedSourceTable(parts)
+                matching_keys = frozenset(key for _, key in matches)
+                trace = getattr(child, "_metadata_trace", None)
+                if (memoize and trace and len(trace) <= 256 and len(options) <= 64
+                        and all(len(str(path)) <= 4096 for path, _ in trace)
+                        and all(source is child for source, _, _ in options)):
+                    ref, = (ref for ref in self.catalog.native_sources if ref.manifest_sha256 == child.manifest_sha256)
+                    memo = _CampusObservationPlan(request, year, ref, (child.path, child.cache), matching_keys,
+                                                  index, tuple(trace))
+                    selected = _open_native_source(ref, parent, offline=self.offline, cache_dir=cache_dir)
+                    if memo.matches_files(selected):
+                        # Keep returned views independent of catalogs used only for discovery.
+                        result = self._routed_student_campuses(fields, year, selected, matching_keys, index, identifiers)
+                        self._campus_observation_plan = memo
+                        return result
+                return self._routed_student_campuses(fields, year, child, matching_keys, index, identifiers)
         return self._select_observation_view(fields, scope, school_year, options)._for_entity_ids(identifiers)
+
+    def _routed_student_campuses(
+        self, fields: tuple[str, ...], year: int, child: DataRelease, matching_keys: frozenset[EditionKey],
+        index: TPRSStudentCampusIndex, identifiers: tuple[str, ...],
+    ) -> SourceTable | PartitionedSourceTable:
+        from .source_views import PartitionedSourceTable
+
+        groups: dict[EditionKey, list[str]] = {}
+        missing, unavailable = [], []
+        for identifier in identifiers:
+            key = index.edition_for(identifier)
+            if key is None:
+                missing.append(identifier)
+            elif key not in matching_keys:
+                unavailable.append(identifier)
+            else:
+                groups.setdefault(key, []).append(identifier)
+        if missing or unavailable:
+            raise ContractError(
+                f"Campus Student Information is incomplete for school year {year} "
+                f"in report edition {index.edition}. "
+                f"No report for {len(missing)} campus IDs: {missing[:5]}. "
+                f"Selected fields unavailable for {len(unavailable)} campus IDs: {unavailable[:5]}."
+            )
+        parts = tuple(self._observation_view(fields, year, child, key)._for_entity_ids(tuple(ids))
+                      for key, ids in groups.items())
+        return parts[0] if len(parts) == 1 else PartitionedSourceTable(parts)
 
     def _automatic_student_campus_index(self, child: DataRelease, edition: str) -> TPRSStudentCampusIndex | None:
         from .tprs_statewide_intake import DATASET

@@ -6,6 +6,7 @@ from hashlib import sha256
 from html import escape
 from io import BytesIO
 import json
+import os
 from pathlib import Path
 from shutil import copyfile
 from types import SimpleNamespace
@@ -843,6 +844,35 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(
             assert isinstance(one, SourceTable) and one.edition == key
             assert isinstance(both, PartitionedSourceTable) and both.editions[-1] == key
             assert route_calls == ["2026"]
+            if getattr(os, "O_NOFOLLOW", 0):
+                assert set(one.release.catalog._edition_views) == {key.identity}
+                assert "_campus_observation_plan" not in parent.__getstate__()
+                with monkeypatch.context() as warm:
+                    warm.setattr(parent, "_observation_year_options",
+                                 lambda *args: pytest.fail("Warm planning rebuilt all campus editions"))
+                    again = cohort.observations(students.DATASET, field, school_year=26, release=parent)
+                    assert isinstance(again, PartitionedSourceTable) and again.editions == both.editions
+
+                unselected = next(ref for ref in one.release.catalog.edition_metadata_refs()
+                                  if ref.sha256 != one.release.catalog._edition_metadata_refs[key.identity].sha256)
+                metadata_path = one.release.path.with_name(unselected.location)
+                original_metadata = metadata_path.read_bytes()
+                try:
+                    metadata_path.write_bytes(b" " + original_metadata[1:])
+                    with pytest.raises(ContractError, match="resource checksum"):
+                        (engine >> ("campus", last_id)).observations(students.DATASET, field, school_year=26, release=parent)
+                finally:
+                    metadata_path.write_bytes(original_metadata)
+                no_memo = DataRelease(parent.path, offline=True)
+                with monkeypatch.context() as path_check:
+                    def decline_memo(path):
+                        raise ContractError("Metadata path is eligible only for direct admission")
+
+                    path_check.setattr("teadata.release._require_cache_file", decline_memo)
+                    direct = (engine >> ("campus", last_id)).observations(
+                        students.DATASET, field, school_year=26, release=no_memo,
+                    )
+                assert direct.edition == key and not hasattr(no_memo, "_campus_observation_plan")
             with pytest.raises(ContractError, match="No report for 1 campus IDs"):
                 composed._entity_observations(students.DATASET, (field,), identifiers=(first_id, "999999999"), **options)
             original_options = parent._observation_year_options
