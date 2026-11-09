@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 import pytest
 
 from teadata import comptroller_pvs
-from teadata.comptroller_pvs import _county_rows, _index_counties, read_comptroller_county_roster
+from teadata.comptroller_pvs import _Edition, _county_rows, _index_counties, read_comptroller_county_roster
 from teadata.dataset_metadata import DataPeriod, DatasetMetadata, ReferenceDocument, ResolvedDataset
 from teadata.provenance import ProvenanceStore
 
@@ -14,6 +14,7 @@ TITLE = ("<h1>2025 Final Findings</h1>"
          "<h1>SCHOOL DISTRICT PROPERTY VALUE STUDY<br>(GOV’T. CODE §403.302)</h1>"
          "<h1>2025 Final Findings</h1>")
 NAMES = {"188": "Potter", "191": "Randall"}
+CURRENT = _Edition(2025)
 INDEX_TITLE = ("<h1>School District Property Value Study<br>Government Code Section 403.302<br>"
                "2025 Final Findings</h1><h2>School District Findings by County</h2>")
 
@@ -84,40 +85,43 @@ def test_2025_final_roster_keeps_two_counties_and_local_labels_for_one_district(
 ])
 def test_county_page_rejects_ambiguous_or_incomplete_heading_link_pairs(malformed):
     with pytest.raises(ValueError):
-        _county_rows(f"<main>{TITLE}{malformed}</main>", NAMES, "r")
+        _county_rows(f"<main>{TITLE}{malformed}</main>", NAMES, "r", CURRENT)
 
 
 def test_county_and_index_ignore_unrelated_footer_and_reject_relocated_source_links():
     report = f"<main>{TITLE}{POTTER}{RANDALL}</main>"
-    assert len(_county_rows(report + "<footer><a href=/other>Help</a></footer>", NAMES, "r")) == 2
+    assert len(_county_rows(report + "<footer><a href=/other>Help</a></footer>", NAMES, "r", CURRENT)) == 2
     with pytest.raises(ValueError, match="does not match"):
-        _county_rows(report + "<footer>" + _district("191", "Other ISD", "191901") + "</footer>", NAMES, "r")
+        _county_rows(report + "<footer>" + _district("191", "Other ISD", "191901") + "</footer>", NAMES, "r", CURRENT)
     with pytest.raises(ValueError, match="outside the county list"):
         _index_counties(f"<main>{INDEX_TITLE}<ul class=three-columns></ul>"
-                        f"<a href={REPORTS}188index.php>Potter-Randall</a></main>")
+                        f"<a href={REPORTS}188index.php>Potter-Randall</a></main>", CURRENT)
     with pytest.raises(ValueError, match="direct link entries"):
         _index_counties(f"<main>{INDEX_TITLE}<ul class=three-columns><li><aside><ul>"
-                        f"<li><a href={REPORTS}188index.php>Potter-Randall</a></li></ul></aside></li></ul></main>")
+                        f"<li><a href={REPORTS}188index.php>Potter-Randall</a></li></ul></aside></li></ul></main>", CURRENT)
 
 
 def test_county_page_rejects_sidebar_rows_and_orphan_details():
     sidebar = "<aside>" + _district("191", "Other ISD", "191901") + "</aside>"
     with pytest.raises(ValueError, match="does not match"):
-        _county_rows(f"<main>{TITLE}{POTTER}{RANDALL}{sidebar}</main>", NAMES, "r")
+        _county_rows(f"<main>{TITLE}{POTTER}{RANDALL}{sidebar}</main>", NAMES, "r", CURRENT)
     detail = f"<a href={REPORTS}1911919011L.php>Deduction Detail</a>"
     with pytest.raises(ValueError, match="Orphan Comptroller"):
-        _county_rows(f"<main>{TITLE}{POTTER}{RANDALL}{detail}</main>", NAMES, "r")
+        _county_rows(f"<main>{TITLE}{POTTER}{RANDALL}{detail}</main>", NAMES, "r", CURRENT)
+    listing = POTTER.replace("<a href=", "<ul class=three-columns><li><a href=") + "</li></ul>"
+    with pytest.raises(ValueError, match="does not match"):
+        _county_rows(f"<main>{TITLE}{listing}{RANDALL}</main>", NAMES, "r", CURRENT)
 
 
 def test_county_report_elements_cannot_come_from_inert_or_ancillary_content():
     report = f"<main>{TITLE}{POTTER}{RANDALL}</main>"
     with pytest.raises(ValueError, match="main report boundary"):
-        _county_rows(f"<template>{report}</template>", NAMES, "r")
+        _county_rows(f"<template>{report}</template>", NAMES, "r", CURRENT)
     with pytest.raises(ValueError, match="crosses a sidebar"):
         _county_rows(report.replace("School District Summary Worksheet",
-                                    "<aside>School District Summary Worksheet</aside>", 1), NAMES, "r")
+                                    "<aside>School District Summary Worksheet</aside>", 1), NAMES, "r", CURRENT)
     with pytest.raises(ValueError, match="does not match"):
-        _county_rows(f"<main>{TITLE}<aside></footer>{POTTER}</aside>{RANDALL}</main>", NAMES, "r")
+        _county_rows(f"<main>{TITLE}<aside></footer>{POTTER}</aside>{RANDALL}</main>", NAMES, "r", CURRENT)
 
 
 def test_county_roster_requires_complete_distinct_inputs(capture):
@@ -167,3 +171,44 @@ def test_county_roster_rejects_malformed_transport_metadata(capture):
     pages["151"] = store._record(malformed)
     with pytest.raises(ValueError, match="direct 2025 Final"):
         read_comptroller_county_roster(store, index_receipt=index, county_page_receipts=pages)
+
+
+def test_archived_index_uses_h3_and_ignores_unrelated_update_list(monkeypatch):
+    monkeypatch.setattr(comptroller_pvs, "_PAGE_CODES", frozenset({"188"}))
+    edition = _Edition(2022)
+    title = ("<h1>SCHOOL DISTRICT PROPERTY VALUE STUDY<br>GOVERNMENT CODE SECTION 403.302<br>"
+             "2022 FINAL FINDINGS</h1><h3>School District Findings by County</h3>")
+    county_link = '<li><a href="/auto-data/PT2/PVS/2022F/188index.php">Potter-Randall</a></li>'
+    updates = '<h4>Updated district reports</h4><ul class="three-columns"><li>Example ISD</li></ul>'
+    html = f'<main>{title}<ul class="three-columns">{county_link}</ul>{updates}</main>'
+    assert _index_counties(html, edition) == {"188": "Potter-Randall"}
+    with pytest.raises(ValueError, match="outside the county list"):
+        _index_counties(html.replace("<li>Example ISD</li>", county_link), edition)
+    with pytest.raises(ValueError, match="outside the county list"):
+        _index_counties(html.replace("<li>Example ISD</li>", county_link.replace("2022F", "2025F")), edition)
+    with pytest.raises(ValueError, match="immediately"):
+        _index_counties(html.replace(title, title + "<div></div>"), edition)
+    with pytest.raises(ValueError, match="2022 Final School District Property Value Study index"):
+        _index_counties(html.replace("FINAL FINDINGS", "Final Findings"), edition)
+
+
+def test_archived_county_report_requires_its_own_worksheet_year():
+    edition = _Edition(2022)
+    title = TITLE.replace("2025", "2022")
+    body = (POTTER + RANDALL).replace("2025F", "2022F")
+    rows = _county_rows(f"<main>{title}{body}</main>", NAMES, "r", edition)
+    assert [row.worksheet_url.rsplit("/", 2)[-2] for row in rows] == ["2022F", "2022F"]
+    with pytest.raises(ValueError, match="different edition"):
+        _county_rows(f"<main>{title}{POTTER}{body}</main>", NAMES, "r", edition)
+    detail = f"<a href={REPORTS}1911919011L.php>Deduction Detail</a>"
+    with pytest.raises(ValueError, match="different edition"):
+        _county_rows(f"<main>{title}{body}{detail}</main>", NAMES, "r", edition)
+
+
+def test_other_year_cannot_reuse_current_edition_receipts(capture):
+    store, index, pages, *_ = capture
+    with pytest.raises(ValueError, match="direct 2024 Final"):
+        read_comptroller_county_roster(store, index_receipt=index, county_page_receipts=pages, tax_year=2024)
+    for year in (2018, 2021, 2026, 2022.0, True):
+        with pytest.raises(ValueError, match="2022 through 2025"):
+            read_comptroller_county_roster(store, index_receipt=index, county_page_receipts=pages, tax_year=year)

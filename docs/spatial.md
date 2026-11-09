@@ -163,7 +163,7 @@ Amarillo ISD (188901) can appear in both sections.
 from teadata.comptroller_pvs import read_comptroller_county_roster
 
 roster = read_comptroller_county_roster(
-    store, index_receipt=index_receipt, county_page_receipts=page_receipts
+    store, index_receipt=index_receipt, county_page_receipts=page_receipts, tax_year=2025
 )
 counties = roster.for_district("248902")  # Wink-Loving ISD in Loving and Winkler
 districts = roster.for_county("191")     # Randall County
@@ -175,14 +175,20 @@ its acquisition receipt. The index receipt and each row's county receipt
 locate the original bytes and download timestamps in the store. The row
 includes the county code and name, district ID, publisher label with
 whitespace normalized, and direct worksheet URL. Counties use Comptroller
-codes. The period is tax year 2025.
+codes. The selected calendar tax year is separate from a school year. The
+reader supports Final tax years 2022 through 2025 and defaults to 2025.
+Select the matching index and page receipts for each year.
 
 The relationships describe what the publisher included in this study. A
 valid district ID can be absent. Use separate sources for school-year
 administrative assignments, campus locations, and district boundary overlaps.
-The reader supports this retained 2025 Final edition. Earlier published
-editions require their own source validation. The current integrated data
-manifest and app profiles do not include this roster.
+Earlier published editions require their own source validation. The
+2016–2018 reports group Potter and Randall under one appraisal district and
+do not establish the separate county relationships. The current workflow
+reads retained pages through the library. App profiles require a separately
+qualified geographic release and projection.
+[Comptroller archive](https://comptroller.texas.gov/taxes/property-tax/pvs/index.php)
+· [2018 Potter–Randall report](https://comptroller.texas.gov/taxes/property-tax/pvs/2018f/188index.php)
 
 ### Archived administrative geography
 

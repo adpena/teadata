@@ -1,4 +1,4 @@
-"""Read county relationships from retained 2025 Final Property Value Study pages."""
+"""Read county relationships from retained Final Property Value Study pages."""
 
 from __future__ import annotations
 
@@ -16,19 +16,40 @@ from .provenance import ProvenanceStore, validate_record_graph
 
 
 _HOST = "https://comptroller.texas.gov"
-_INDEX = f"{_HOST}/taxes/property-tax/pvs/2025f/index.php"
-_REPORTS = "/auto-data/PT2/PVS/2025F/"
+_REPORTS = r"/auto-data/PT2/PVS/([0-9]{4}[FP])/"
 _COUNTY_PAGE = re.compile(rf"{_REPORTS}([0-9]{{3}})index\.php")
 _WORKSHEET = re.compile(rf"{_REPORTS}([0-9]{{3}})([0-9]{{6}})1([DF-L])\.php")
 _COUNTY_HEADING = re.compile(r"([0-9]{3}) (.+) County")
 _DISTRICT_HEADING = re.compile(r"([0-9]{3})-([0-9]{3}) (.+)")
 _COUNTIES = frozenset(f"{number:03}" for number in range(1, 255))
 _PAGE_CODES = _COUNTIES - {"191"}
-_PERIOD = DataPeriod("calendar_year", year=2025)
 _MAX_BYTES = 1_000_000
 _SUMMARY_LABEL = "School District Summary Worksheet"
+_COUNTY_LIST_TITLE = "School District Findings by County"
+_COUNTY_REPORT_TITLE = "SCHOOL DISTRICT PROPERTY VALUE STUDY (GOV’T. CODE §403.302)"
 _ALTERNATE = {"template", "noscript"}
 _EXCLUDED = _ALTERNATE | {"aside", "footer"}
+
+
+@dataclass(frozen=True, slots=True)
+class _Edition:
+    year: int
+
+    @property
+    def index_url(self) -> str:
+        return f"{_HOST}/taxes/property-tax/pvs/{self.year}f/index.php"
+
+    @property
+    def report_path(self) -> str:
+        return f"/auto-data/PT2/PVS/{self.year}F/"
+
+    @property
+    def county_heading(self) -> str:
+        return "h3" if self.year == 2022 else "h2"
+
+    @property
+    def period(self) -> DataPeriod:
+        return DataPeriod("calendar_year", year=self.year)
 
 
 @dataclass(frozen=True, slots=True)
@@ -69,7 +90,7 @@ class _Element(NamedTuple):
 
 
 class _Page(HTMLParser):
-    def __init__(self, html: str) -> None:
+    def __init__(self, html: str, *, county_heading: str | None = None) -> None:
         super().__init__(convert_charrefs=True)
         self.elements: list[_Element] = []
         self._heading: tuple[str, list[str]] | None = None
@@ -77,14 +98,23 @@ class _Page(HTMLParser):
         self._main = False
         self._main_seen = False
         self._excluded: list[str] = []
+        self._county_heading = county_heading
+        self._awaiting_county_list = False
         self._list_depth = 0
         self._list_item_has_link = False
         self.feed(html)
         self.close()
-        if not self._main_seen or self._main:
+        if not self._main_seen or self._main or self._awaiting_county_list:
             raise ValueError("Expected one complete Comptroller main report")
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if self._awaiting_county_list:
+            if tag != "ul" or "three-columns" not in (dict(attrs).get("class") or "").split():
+                raise ValueError("Expected the list immediately after the Comptroller county heading")
+            self._awaiting_county_list = False
+            self.elements.append(_Element("county_list", ""))
+            self._list_depth = 1
+            return
         if self._list_depth:
             expected = {1: "li", 2: "a"}.get(self._list_depth)
             if tag != expected or (tag == "li" and attrs) or (
@@ -103,11 +133,10 @@ class _Page(HTMLParser):
             if self._main and (self._heading is not None or self._anchor is not None):
                 raise ValueError("Comptroller report element crosses a sidebar or footer boundary")
             self._excluded.append(tag)
-        elif tag == "ul" and self._main and not self._excluded:
+        elif tag == "ul" and self._county_heading is None and self._main and not self._excluded:
             if "three-columns" in (dict(attrs).get("class") or "").split():
-                self.elements.append(_Element("county_list", ""))
                 self._list_depth = 1
-        elif tag in {"h1", "h2"} and self._main and not self._excluded:
+        elif tag in {"h1", "h2", "h3"} and self._main and not self._excluded:
             self._heading = (tag, [])
         elif tag == "a":
             hrefs = [value for name, value in attrs if name == "href"]
@@ -118,12 +147,16 @@ class _Page(HTMLParser):
             self.handle_data(" ")
 
     def handle_data(self, data: str) -> None:
+        if self._awaiting_county_list and data.strip():
+            raise ValueError("Expected the list immediately after the Comptroller county heading")
         if self._heading is not None:
             self._heading[1].append(data)
         if self._anchor is not None:
             self._anchor[1].append(data)
 
     def handle_endtag(self, tag: str) -> None:
+        if self._awaiting_county_list:
+            raise ValueError("Expected the list immediately after the Comptroller county heading")
         if tag == "main":
             if not self._main or self._heading is not None or self._anchor is not None or self._list_depth:
                 raise ValueError("Unexpected Comptroller main report boundary")
@@ -133,7 +166,10 @@ class _Page(HTMLParser):
                 raise ValueError("Comptroller report element crosses a sidebar or footer boundary")
             self._excluded.pop()
         if self._heading is not None and tag == self._heading[0]:
-            self.elements.append(_Element(tag, " ".join("".join(self._heading[1]).split())))
+            heading_text = " ".join("".join(self._heading[1]).split())
+            self.elements.append(_Element(tag, heading_text))
+            if tag == self._county_heading and heading_text == _COUNTY_LIST_TITLE:
+                self._awaiting_county_list = True
             self._heading = None
         if self._anchor is not None and tag == "a":
             href, parts = self._anchor
@@ -148,42 +184,39 @@ class _Page(HTMLParser):
             self._list_depth -= 1
 
 
-def _index_counties(html: str) -> dict[str, str]:
-    elements = _Page(html).elements
-    title = "School District Property Value Study Government Code Section 403.302 2025 Final Findings"
+def _index_counties(html: str, edition: _Edition) -> dict[str, str]:
+    elements = _Page(html, county_heading=edition.county_heading).elements
+    title = f"School District Property Value Study Government Code Section 403.302 {edition.year} Final Findings"
+    if edition.year == 2022:
+        title = title.upper()
     if [element.text for element in elements if element.tag == "h1"] != [title]:
-        raise ValueError("Expected the 2025 Final School District Property Value Study index")
-    headings = [i for i, element in enumerate(elements)
-                if element.tag == "h2" and element.text == "School District Findings by County"]
-    if len(headings) != 1:
-        raise ValueError("Expected one Comptroller county list")
-    start = headings[0]
-    end = next((i for i in range(start + 1, len(elements)) if elements[i].tag == "h2"), len(elements))
-    if sum(element.tag == "county_list" for element in elements[start + 1:end]) != 1:
+        raise ValueError(f"Expected the {edition.year} Final School District Property Value Study index")
+    if sum(element.tag == "county_list" for element in elements) != 1:
         raise ValueError("Expected one list under the Comptroller county heading")
     counties = {}
-    for index, element in enumerate(elements):
+    for element in elements:
         if element.tag != "a":
             continue
         match = _COUNTY_PAGE.fullmatch(element.href or "")
-        if element.scope != "county_list" or not start < index < end:
+        if element.scope != "county_list":
             if match is not None:
                 raise ValueError("Comptroller county link falls outside the county list")
             continue
-        if match is None or not element.text or match[1] in counties:
+        if match is None or match[1] != f"{edition.year}F" or not element.text or match[2] in counties:
             raise ValueError("Malformed or repeated Comptroller county index link")
-        counties[match[1]] = element.text
+        counties[match[2]] = element.text
     if counties.keys() != _PAGE_CODES or counties["188"] != "Potter-Randall":
         raise ValueError("Incomplete or unrecognized Comptroller county index")
     return counties
 
 
-def _county_rows(html: str, county_names: Mapping[str, str], receipt: str) -> list[CountyDistrictFinding]:
+def _county_rows(html: str, county_names: Mapping[str, str], receipt: str,
+                 edition: _Edition) -> list[CountyDistrictFinding]:
     elements = _Page(html).elements
-    if [element.text for element in elements if element.tag == "h1"] != [
-        "2025 Final Findings", "SCHOOL DISTRICT PROPERTY VALUE STUDY (GOV’T. CODE §403.302)", "2025 Final Findings",
-    ]:
-        raise ValueError("Expected a 2025 Final Comptroller county report")
+    subtitle = f"{edition.year} Final Findings"
+    titles = [subtitle, _COUNTY_REPORT_TITLE, subtitle]
+    if [element.text for element in elements if element.tag == "h1"] != titles:
+        raise ValueError(f"Expected a {edition.year} Final Comptroller county report")
     county_code = ""
     pending: tuple[str, str] | None = None
     last_district: str | None = None
@@ -209,12 +242,14 @@ def _county_rows(html: str, county_names: Mapping[str, str], receipt: str) -> li
         worksheet = _WORKSHEET.fullmatch(href)
         if worksheet is None and element.text != _SUMMARY_LABEL:
             continue
-        if worksheet is not None and worksheet[3] != "D" and element.text != _SUMMARY_LABEL:
-            if element.scope == "main" and pending is None and (county_code, last_district) == worksheet.group(1, 2):
+        if worksheet is not None and worksheet[1] != f"{edition.year}F":
+            raise ValueError(f"Comptroller worksheet belongs to a different edition: {href!r}")
+        if worksheet is not None and worksheet[4] != "D" and element.text != _SUMMARY_LABEL:
+            if element.scope == "main" and pending is None and (county_code, last_district) == worksheet.group(2, 3):
                 continue
             raise ValueError(f"Orphan Comptroller district detail worksheet: {href!r}")
-        if (element.scope != "main" or worksheet is None or worksheet[3] != "D" or element.text != _SUMMARY_LABEL
-                or pending is None or (county_code, pending[0]) != worksheet.group(1, 2) or pending[0] == "000000"):
+        if (element.scope != "main" or worksheet is None or worksheet[4] != "D" or element.text != _SUMMARY_LABEL
+                or pending is None or (county_code, pending[0]) != worksheet.group(2, 3) or pending[0] == "000000"):
             raise ValueError(f"Comptroller worksheet does not match its county and district headings: {href!r}")
         district_id, label = pending
         if (county_code, district_id) in districts:
@@ -231,7 +266,7 @@ def _county_rows(html: str, county_names: Mapping[str, str], receipt: str) -> li
 
 
 def _source_html(store: ProvenanceStore, record: Mapping[str, Any], *, url: str,
-                 parents: list[str]) -> str:
+                 parents: list[str], edition: _Edition) -> str:
     if record["kind"] != "acquisition":
         raise ValueError(f"Expected a Comptroller acquisition receipt for {url}")
     metadata, parameters, artifact = (record["source_metadata"], record["parameters"], record["artifact"])
@@ -245,15 +280,17 @@ def _source_html(store: ProvenanceStore, record: Mapping[str, Any], *, url: str,
             and downloaded.utcoffset() == recorded.utcoffset() == timedelta(0) and downloaded <= recorded
             and downloaded.isoformat() == record["downloaded_at"] and recorded.isoformat() == record["recorded_at"]
             and record["dataset"] == "reference:comptroller_pvs_county_rosters"
-            and record["section"] == "reference" and record["requested_year"] == record["resolved_year"] == 2025
+            and record["section"] == "reference"
+            and type(record["requested_year"]) is type(record["resolved_year"]) is int
+            and record["requested_year"] == record["resolved_year"] == edition.year
             and record["requested_url"] == record["resolved_url"] == url
             and metadata["publisher"] == "Texas Comptroller of Public Accounts"
-            and metadata["version"] == "2025-final" and metadata["source_url"] == _INDEX
-            and metadata["period"] == _PERIOD.to_dict() and metadata["provenance_ids"] == parents
+            and metadata["version"] == f"{edition.year}-final" and metadata["source_url"] == edition.index_url
+            and metadata["period"] == edition.period.to_dict() and metadata["provenance_ids"] == parents
             and metadata["references"] == []
             and parameters.get("http_method") == "GET" and type(status) is int and status == 200
             and 0 < artifact["size_bytes"] <= _MAX_BYTES):
-        raise ValueError(f"Expected a direct 2025 Final Comptroller acquisition for {url}")
+        raise ValueError(f"Expected a direct {edition.year} Final Comptroller acquisition for {url}")
     # The graph validates artifact IDs. Hash the bounded bytes that will be parsed.
     digest = artifact["sha256"]
     with (store.root / "objects" / digest).open("rb") as stream:
@@ -264,29 +301,33 @@ def _source_html(store: ProvenanceStore, record: Mapping[str, Any], *, url: str,
 
 
 def read_comptroller_county_roster(
-    store: ProvenanceStore, *, index_receipt: str, county_page_receipts: Mapping[str, str],
+    store: ProvenanceStore, *, index_receipt: str, county_page_receipts: Mapping[str, str], tax_year: int = 2025,
 ) -> ComptrollerCountyRoster:
-    """Read the complete tax-year 2025 Final county roster from a pinned capture.
+    """Read a complete 2022–2025 Final county roster from a pinned capture.
 
     This offline reader returns taxable-property reporting relationships. The
     county codes are Comptroller codes, and the rows contain no geometry or
     campus assignments. All county receipts must point to the selected index.
     """
+    if type(tax_year) is not int or not 2022 <= tax_year <= 2025:
+        raise ValueError("Choose a Comptroller Final tax year from 2022 through 2025")
+    edition = _Edition(tax_year)
     if county_page_receipts.keys() != _PAGE_CODES:
-        raise ValueError("Supply all 253 county page receipts for the 2025 Final study")
+        raise ValueError(f"Supply all 253 county page receipts for the {tax_year} Final study")
     selected = {index_receipt, *county_page_receipts.values()}
     if len(selected) != len(_PAGE_CODES) + 1:
         raise ValueError("Comptroller index and county page receipts must be distinct")
     records = validate_record_graph(store.read_record, sorted(selected))
     if records.keys() != selected:
         raise ValueError("Comptroller receipts contain unexpected inputs")
-    counties = _index_counties(_source_html(store, records[index_receipt], url=_INDEX, parents=[]))
+    index_html = _source_html(store, records[index_receipt], url=edition.index_url, parents=[], edition=edition)
+    counties = _index_counties(index_html, edition)
     rows: list[CountyDistrictFinding] = []
     for code, name in counties.items():
         receipt = county_page_receipts[code]
-        url = f"{_HOST}{_REPORTS}{code}index.php"
+        url = f"{_HOST}{edition.report_path}{code}index.php"
         names = {"188": "Potter", "191": "Randall"} if code == "188" else {code: name}
-        rows.extend(_county_rows(_source_html(store, records[receipt], url=url, parents=[index_receipt]),
-                                 names, receipt))
+        html = _source_html(store, records[receipt], url=url, parents=[index_receipt], edition=edition)
+        rows.extend(_county_rows(html, names, receipt, edition))
     rows.sort(key=lambda row: (row.county_code, row.district_id))
-    return ComptrollerCountyRoster(_PERIOD, index_receipt, tuple(rows))
+    return ComptrollerCountyRoster(edition.period, index_receipt, tuple(rows))
