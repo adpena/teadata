@@ -15367,6 +15367,190 @@ data_sources:
               scope: region
               tables:
                 staar_bilingual_esl_growth: *tapr_2026_staar_bilingual_esl_growth_region_csv
+  region_tapr_student_profile:
+    2025:
+      path: data/tapr/raw/2025-R-STUD-original.csv
+      metadata:
+        title: 2024–25 TAPR Regional Student Information
+        publisher: Texas Education Agency
+        version: '2025'
+        period:
+          kind: unknown
+        source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        notes: Publisher labels, codes, cells and ordered dictionary observations are retained. Measurement periods and token
+          interpretations remain unbound.
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          title: Original publisher CSV and request
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+          provenance_ids:
+          - f24158aca93b8a102840a17a6683fe022f44c961bd90791bca5da17f1d11a9b7
+          reviewed_sha256: 1489212295d006dcc8b9e6900e54de42290938c223daa4f53f75c921e992e4b3
+        - reference_id: exact_selection_form
+          role: source_notes
+          title: Original publisher selection form
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+          provenance_ids:
+          - ab3a908981b1e2615ae7730126d659694c967dac053c48fd6c08392d1d981f97
+          reviewed_sha256: acca37f40c1c897b88cab69f54090571f479785e59e71fc7f9b78bea952d3b64
+        - reference_id: actual2025_dictionary
+          role: data_dictionary
+          title: Regional Student Information dictionary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=R&dsname=STUD&dd=student&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          provenance_ids:
+          - 2decbfaab1a150f2f7c00ef5103f4dc01f9de900feccb37963414ad881e8fcb6
+          reviewed_sha256: 180b572292a58472724aa2935fafc12d5609cd9a99ee8b3fda81fb9cc09bbbd3
+        - &tapr_2025_aggregate_glossary
+          reference_id: glossary
+          role: glossary
+          url: https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf
+          title: 2024-25 Comprehensive TAPR Glossary
+          status: available
+          provenance_ids:
+          - e9cb78a172cd247ca3101727a81e31d6b59e9c7372e8c54863f4f0574e1412db
+          reviewed_sha256: 846810954d479a13467d9e4add3b0ed626247bd48ca9b677ff8a5ec11aedd416
+        - &tapr_2025_aggregate_masking
+          reference_id: masking
+          role: masking_methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html
+          title: 2024-2025 TAPR Masking Rules
+          status: available
+          provenance_ids:
+          - 6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554
+          reviewed_sha256: 7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2025--aggregate-profile-crosswalk.json
+          title: Reviewed aggregate publisher header and dictionary crosswalk
+          status: available
+          provenance_ids:
+          - f8b72f9efb421e07633c9283f4c27b736b27288204a080d58847a6b944ab9cc0
+          reviewed_sha256: 78a7a9e00d992a1656ee4bd3f7f16372bf4a16dc8639e54bca716a36e0f99ea6
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2025--aggregate-profile-crosswalk.json
+            tapr_source:
+              scope: region
+              tables:
+                student_profile: data/tapr/raw/2025-R-STUD-original.csv
+  region_tapr_staff_profile:
+    2025:
+      path: data/tapr/raw/2025-R-STAF-original.csv
+      metadata:
+        title: 2024–25 TAPR Regional Staff Information
+        publisher: Texas Education Agency
+        version: '2025'
+        period:
+          kind: unknown
+        source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        notes: Publisher labels, codes, cells and ordered dictionary observations are retained. Measurement periods and token
+          interpretations remain unbound.
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          title: Original publisher CSV and request
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+          provenance_ids:
+          - e12532f4fd1f6ff3bf9d46bf4fdcb9ba890bad00f1a5924bbaf9d84518fb0b5a
+          reviewed_sha256: ceb2492d8c19b891ecdf508ffe0dd5189d4901c5f9a6cf8ed3c3963f76c50885
+        - reference_id: exact_selection_form
+          role: source_notes
+          title: Original publisher selection form
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+          provenance_ids:
+          - 18ea07b912ffe32408e5dd1220ef0510742e6089a266a58c51539ddfc0df4732
+          reviewed_sha256: d8e1d236d400f23dd16b19bcc562a1891fbbf0b6be4a6ef728ced83002ab2a3c
+        - reference_id: actual2025_dictionary
+          role: data_dictionary
+          title: Regional Staff Information dictionary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=R&dsname=STAF&dd=staff&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          provenance_ids:
+          - 304067e40367eb586a94012ac916dc007accc1556d33a056e5db41e88c2c2830
+          reviewed_sha256: 3ce6fc9be7f5cb73d739800a8ae31c6cd830417fc5e85573bf60c64191444650
+        - *tapr_2025_aggregate_glossary
+        - *tapr_2025_aggregate_masking
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2025--aggregate-profile-crosswalk.json
+          title: Reviewed aggregate publisher header and dictionary crosswalk
+          status: available
+          provenance_ids:
+          - f8b72f9efb421e07633c9283f4c27b736b27288204a080d58847a6b944ab9cc0
+          reviewed_sha256: 78a7a9e00d992a1656ee4bd3f7f16372bf4a16dc8639e54bca716a36e0f99ea6
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2025--aggregate-profile-crosswalk.json
+            tapr_source:
+              scope: region
+              tables:
+                staff_profile: data/tapr/raw/2025-R-STAF-original.csv
+  state_tapr_staff_profile:
+    2025:
+      path: data/tapr/raw/2025-S-STAF-original.csv
+      metadata:
+        title: 2024–25 TAPR Statewide Staff Information
+        publisher: Texas Education Agency
+        version: '2025'
+        period:
+          kind: unknown
+        source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html
+        download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+        notes: Publisher labels, codes, cells and ordered dictionary observations are retained. Measurement periods and token
+          interpretations remain unbound.
+        references:
+        - reference_id: csv_headers
+          role: source_notes
+          title: Original publisher CSV and request
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+          provenance_ids:
+          - 2859fe020dbd666416663a146c45da6d9e9dbe182ab349c9184eba3f38837627
+          reviewed_sha256: 88bbb84c538f59776c6eb2efa7b54e57d41c72fd3434b84d11d4d31a2f593b82
+        - reference_id: exact_selection_form
+          role: source_notes
+          title: Original publisher selection form
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
+          provenance_ids:
+          - 53dd0b9e0a20d0aab18b14319dc1fd52ab4f1ff87704647ec215bd7f7cd8d281
+          reviewed_sha256: 2c1906aef2bb1491ede8f92e45d5cda4cc5262ac4f19c9ba3e1b3cfd84fa2d87
+        - reference_id: actual2025_dictionary
+          role: data_dictionary
+          title: Statewide Staff Information dictionary
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&sumlev=S&dsname=STAF&dd=staff&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+          provenance_ids:
+          - 17c5e0bec9eb4f970c7093015e0ebec7f215ee360e976307965289b8f55e36d2
+          reviewed_sha256: 5250f48b53266e3615dde83727ca771927fd8eb5a5768f2487dec1fda29848d7
+        - *tapr_2025_aggregate_glossary
+        - *tapr_2025_aggregate_masking
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2025--aggregate-profile-crosswalk.json
+          title: Reviewed aggregate publisher header and dictionary crosswalk
+          status: available
+          provenance_ids:
+          - f8b72f9efb421e07633c9283f4c27b736b27288204a080d58847a6b944ab9cc0
+          reviewed_sha256: 78a7a9e00d992a1656ee4bd3f7f16372bf4a16dc8639e54bca716a36e0f99ea6
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2025--aggregate-profile-crosswalk.json
+            tapr_source:
+              scope: state
+              tables:
+                staff_profile: data/tapr/raw/2025-S-STAF-original.csv
   state_tapr_student_profile:
     2025:
       path: data/tapr/raw/state-STUD-2025-canonical.csv
@@ -20946,6 +21130,12 @@ schema:
     campus_tapr_staar_bilingual_esl_growth:
     - csv
     region_tapr_staar_bilingual_esl_growth:
+    - csv
+    region_tapr_student_profile:
+    - csv
+    region_tapr_staff_profile:
+    - csv
+    state_tapr_staff_profile:
     - csv
     state_tapr_student_profile:
     - csv

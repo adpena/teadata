@@ -98,6 +98,14 @@ duties; supplemental pay is outside the measure. Retain the printed
 rate alongside its published numerator and denominator, whose displayed
 precision can differ.
 
+The 2024–25 regional Student Information and regional and statewide Staff
+Information source profiles retain the original two-header CSVs and exact
+publisher dictionaries. Each regional file has all 20 ESC identifiers. The
+statewide Staff file is one direct Texas observation. These source profiles
+preserve publisher tokens and leave measurement periods and value policies
+unbound. Campus and district enrichment use their separately configured inputs.
+[TEA TAPR data download](https://rptsvr1.tea.texas.gov/perfreport/tapr/tapr_dd_download.html?year=2025)
+
 ## Published 2026 entity snapshot
 
 The explicit [v0.0.136 entity snapshot](data-releases.md#2026-entity-snapshot-and-tprs-student-data)
