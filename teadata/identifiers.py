@@ -111,18 +111,19 @@ def canonical_source_identifier(value: Any, *, width: int) -> str | None:
         return None
     if isinstance(value, bool):
         raise ValueError("Boolean is not a source identifier")
-    import pandas as pd
+    if type(value) is not str:
+        import pandas as pd
 
-    if not pd.api.types.is_scalar(value):
-        raise ValueError("Source identifier must be a scalar")
-    try:
-        absent = pd.isna(value)
-        if not isinstance(absent, bool):
-            absent = bool(absent)
-        if absent:
-            return None
-    except (TypeError, ValueError):
-        raise ValueError("Source identifier must be a scalar") from None
+        if not pd.api.types.is_scalar(value):
+            raise ValueError("Source identifier must be a scalar")
+        try:
+            absent = pd.isna(value)
+            if not isinstance(absent, bool):
+                absent = bool(absent)
+            if absent:
+                return None
+        except (TypeError, ValueError):
+            raise ValueError("Source identifier must be a scalar") from None
     if isinstance(value, numbers.Integral):
         text = str(int(value))
     elif isinstance(value, numbers.Real):

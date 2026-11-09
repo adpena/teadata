@@ -1,3 +1,4 @@
+import builtins
 import json
 from pathlib import Path
 from types import SimpleNamespace
@@ -34,6 +35,17 @@ def historical_ace_campus(*, include_location: bool = True):
 @pytest.mark.parametrize("value", ["227901180", "'227901180", "227901180.0"])
 def test_public_lookup_key_stays_the_existing_nine_digits(value):
     assert normalize_campus_lookup_key(value) == "227901180"
+
+
+def test_public_string_lookup_does_not_import_pandas(monkeypatch):
+    import_module = builtins.__import__
+
+    def checked_import(name, *args, **kwargs):
+        assert name != "pandas"
+        return import_module(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", checked_import)
+    assert normalize_campus_lookup_key(" '1902103.0 ") == "001902103"
 
 
 @pytest.mark.parametrize("identifier", ["rec1kXXvIucG7UkoA", "Case/Sensitive % café", "rec", "001"])
