@@ -101,7 +101,15 @@ precision can differ.
 The 2024–25 regional Student Information and regional and statewide Staff
 Information source profiles retain the original two-header CSVs and exact
 publisher dictionaries. Each regional file has all 20 ESC identifiers. The
-statewide Staff file is one direct Texas observation. Regional and statewide
+regional Student profile binds 2024–25 Membership and Enrollment totals,
+race counts and percentages, and special education counts and percentages.
+Total mobility and attrition use 2023–24. All 38 selected fields match the
+separate TEA Student Information reports for ESCs 06 and 16. The annual
+attrition workbook also matches both attrition fields for all 20 ESCs.
+A campus change within the same region can count as attrition. Regional
+values use TEA's own regional reporting population.
+
+The statewide Staff file is one direct Texas observation. Regional and statewide
 Staff bind the 2024–25 school year and published units for teacher FTE, average
 professional experience, average regular-duty salary, students per teacher
 FTE, and teacher turnover. The five values match separate TEA Staff reports

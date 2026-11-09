@@ -15378,8 +15378,10 @@ data_sources:
           kind: unknown
         source_url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html
         download_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker
-        notes: Publisher labels, codes, cells and ordered dictionary observations are retained. Measurement periods and token
-          interpretations remain unbound.
+        notes: The bound Membership and Enrollment totals, race, and special education fields use 2024–25.
+          The bound total mobility and attrition fields use 2023–24.
+          The attrition comparison observes whether eligible students returned to the same campus in fall 2024–25.
+          Other fields remain raw without a bound measurement period or value policy.
         references:
         - reference_id: csv_headers
           role: source_notes
@@ -15423,6 +15425,30 @@ data_sources:
           provenance_ids:
           - 6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554
           reviewed_sha256: 7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8
+        - reference_id: printed_region_06
+          role: source_notes
+          title: TEA 2024–25 Student Information report for ESC 06
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=06&lev=R&prgopt=reports%2Ftapr%2Fstudent.sas
+          provenance_ids:
+          - 6adee0fc1c27e48fa4bf76328b3a7e57705a393a3c495aae296537f9539da85d
+          reviewed_sha256: ee4dd6d4c0c330249353b8c98e1f4960853e681532214dbad16ccb94cbf4d388
+        - reference_id: printed_region_16
+          role: source_notes
+          title: TEA 2024–25 Student Information report for ESC 16
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=16&lev=R&prgopt=reports%2Ftapr%2Fstudent.sas
+          provenance_ids:
+          - 440f73a23133380a85ccd95603b52ce1148edd29d22011b15fa1eb2d65f28ce2
+          reviewed_sha256: e80aaa4896bea683edc80544900b6e17e38a793e0d63ce904aef70ffcef7dbd4
+        - reference_id: annual_attrition_witness
+          role: source_notes
+          title: TEA annual attrition workbook, fall 2023–24 to fall 2024–25
+          status: available
+          url: https://tea.texas.gov/data-reports/school-performance/accountability-research/completion-graduation-and-dropout/2023-24-annual-attrition-rates_0.xlsx
+          provenance_ids:
+          - 6552c7f1abe6165a5a4d5a55c3ec6e02c13067d314808dae25c31ce6ec503bf5
+          reviewed_sha256: a3145fed153b03e09112c9597947d811bf2e784de98dd1d6ff0ad1b88be2d458
         - reference_id: columns_source
           role: schema
           path: schemas/tapr--2025--aggregate-profile-crosswalk.json
@@ -15431,6 +15457,159 @@ data_sources:
           provenance_ids:
           - f8b72f9efb421e07633c9283f4c27b736b27288204a080d58847a6b944ab9cc0
           reviewed_sha256: 78a7a9e00d992a1656ee4bd3f7f16372bf4a16dc8639e54bca716a36e0f99ea6
+        metrics:
+          student_enrollment_african_american_count:
+            field: region_2025_student_enrollment_african_american_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_african_american_percent:
+            field: region_2025_student_enrollment_african_american_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_all_students_count:
+            field: region_2025_student_enrollment_all_students_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_american_indian_count:
+            field: region_2025_student_enrollment_american_indian_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_american_indian_percent:
+            field: region_2025_student_enrollment_american_indian_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_asian_count:
+            field: region_2025_student_enrollment_asian_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_asian_percent:
+            field: region_2025_student_enrollment_asian_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_hispanic_count:
+            field: region_2025_student_enrollment_hispanic_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_hispanic_percent:
+            field: region_2025_student_enrollment_hispanic_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_pacific_islander_count:
+            field: region_2025_student_enrollment_pacific_islander_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_pacific_islander_percent:
+            field: region_2025_student_enrollment_pacific_islander_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_special_ed_count:
+            field: region_2025_student_enrollment_special_ed_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_special_ed_percent:
+            field: region_2025_student_enrollment_special_ed_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_two_or_more_races_count:
+            field: region_2025_student_enrollment_two_or_more_races_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_two_or_more_races_percent:
+            field: region_2025_student_enrollment_two_or_more_races_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_white_count:
+            field: region_2025_student_enrollment_white_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_enrollment_white_percent:
+            field: region_2025_student_enrollment_white_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_african_american_count:
+            field: region_2025_student_membership_african_american_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_african_american_percent:
+            field: region_2025_student_membership_african_american_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_all_students_count:
+            field: region_2025_student_membership_all_students_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_american_indian_count:
+            field: region_2025_student_membership_american_indian_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_american_indian_percent:
+            field: region_2025_student_membership_american_indian_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_asian_count:
+            field: region_2025_student_membership_asian_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_asian_percent:
+            field: region_2025_student_membership_asian_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_attrition_all_students_count:
+            field: region_2025_student_membership_2023_24_attrition_all_students_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_attrition_all_students_percent:
+            field: region_2025_student_membership_2023_24_attrition_all_students_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_hispanic_count:
+            field: region_2025_student_membership_hispanic_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_hispanic_percent:
+            field: region_2025_student_membership_hispanic_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_mobility_all_students_count:
+            field: region_2025_student_membership_2024_mobility_all_students_count
+            unit: count
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_mobility_all_students_percent:
+            field: region_2025_student_membership_2024_mobility_all_students_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2023, end_year: 2024}
+          student_membership_pacific_islander_count:
+            field: region_2025_student_membership_pacific_islander_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_pacific_islander_percent:
+            field: region_2025_student_membership_pacific_islander_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_special_ed_count:
+            field: region_2025_student_membership_special_ed_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_special_ed_percent:
+            field: region_2025_student_membership_special_ed_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_two_or_more_races_count:
+            field: region_2025_student_membership_two_or_more_races_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_two_or_more_races_percent:
+            field: region_2025_student_membership_two_or_more_races_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_white_count:
+            field: region_2025_student_membership_white_count
+            unit: count
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
+          student_membership_white_percent:
+            field: region_2025_student_membership_white_percent
+            unit: percent
+            period: {kind: school_year, start_year: 2024, end_year: 2025}
       reader:
         profiles:
           source:

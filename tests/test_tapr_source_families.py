@@ -183,6 +183,39 @@ def test_aggregate_staff_binds_only_the_five_publisher_checked_fields(scope, pre
     assert all(ref.reviewed_sha256 and ref.provenance_ids for ref in metadata.references if ref.reference_id in witnesses)
 
 
+def test_regional_student_binds_publisher_populations_and_lagged_periods():
+    cfg = load_config()
+    dataset = 'region_tapr_student_profile'
+    metadata = cfg.resolve_dataset(dataset, 2025, exact=True, reader_profile='source').metadata
+    state = cfg.resolve_dataset('state_tapr_student_profile', 2025, exact=True, reader_profile='source').metadata
+    rows = {row['code']: row for row in cfg.header_records(dataset, edition='2025', reader_profile='source')}
+    current = {prefix + 'ALLC' for prefix in ('RPET', 'RPNT')}
+    current.update(prefix + group + suffix for prefix in ('RPET', 'RPNT')
+                   for group in ('BLA', 'HIS', 'WHI', 'IND', 'ASI', 'PCI', 'TWO', 'SPE')
+                   for suffix in ('C', 'P'))
+    lagged = {'RPEMALLC', 'RPEMALLP', 'RPETATTC', 'RPETATTP'}
+    metrics = {value.field: value.to_dict() for value in metadata.metrics.values()}
+    assert metadata.period.to_dict() == UNKNOWN and metadata.value_policy is None
+    assert len(metrics) == len(metadata.metrics) == 38
+    assert {code for code, row in rows.items() if row['period'] != UNKNOWN} == current | lagged
+    for code in current | lagged:
+        year = 2024 if code in lagged else 2025
+        period = {'kind': 'school_year', 'start_year': year - 1, 'end_year': year}
+        field = rows[code]['field']
+        assert rows[code]['period'] == period
+        assert metrics[field] == {'field': field, 'period': period, 'unit': 'count' if code.endswith('C') else 'percent'}
+    for key, metric in metadata.metrics.items():
+        assert state.metrics[key].field == metric.field.replace('region_', 'state_', 1)
+    refs = {ref.reference_id: ref for ref in metadata.references}
+    assert refs['annual_attrition_witness'].provenance_ids == (
+        '6552c7f1abe6165a5a4d5a55c3ec6e02c13067d314808dae25c31ce6ec503bf5',
+    )
+    for region in ('06', '16'):
+        report = refs[f'printed_region_{region}']
+        assert f'id={region}&lev=R' in report.url
+        assert report.reviewed_sha256 and report.provenance_ids
+
+
 @pytest.mark.parametrize('scope,missing_sha', [('campus', 'df20c2f8ff4841fc064d6e38085ee97ca44bbb722f37636b223806f5443b6793'),
     ('district', 'cc36466eed9e9d7c26977459909d15aa04aab7a8a6b47ffff0050e7c2107e401')])
 def test_every_undocumented_fact_is_retained_without_guessed_type_or_semantics(scope, missing_sha):
