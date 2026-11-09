@@ -539,7 +539,8 @@ def _open_export(
     if entity_key is not None and entity_ids is not None:
         expression = _entity_predicate(native, entity_key, entity_ids)
         predicate = expression if predicate is None else predicate & expression
-    predicate = _bind_queries(predicate, queries, native.schema)
+    if queries:
+        predicate = _bind_queries(predicate, queries, native.schema)
     rows_hint = artifact.contract["rows"] if predicate is None else None
     scanner = native.scanner(columns=list(selection.columns), filter=predicate, batch_size=256, use_threads=False)
     lineage: dict[str, Any] = {"build_id": release.build_id, "edition": edition.to_dict(), "artifact_sha256": artifact.sha256,
