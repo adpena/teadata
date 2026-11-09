@@ -1607,10 +1607,11 @@ def test_portable_metadata_capture_rechecks_bytes_without_nofollow(edition_fixtu
     release = DataRelease(edition_fixture["root"])
     key, _, _ = edition_fixture["leaves"]["student"]
     assert len(list(release.catalog.variables(edition=key))) == 3
-    assert not release._column_schema_data
     digest = release.catalog.to_dict()["editions"][key.identity]["column_schema_sha256"]
     descriptor = next(ref for ref in release.catalog.column_schema_refs() if ref.sha256 == digest)
     path = release.path.with_name(descriptor.location)
+    verified_path, _, buffer = release._column_schema_data[digest]
+    assert verified_path == path and buffer is None
     before = path.stat()
     raw = path.read_bytes()
     path.write_bytes(bytes([raw[0] ^ 1]) + raw[1:])
@@ -1793,6 +1794,22 @@ def attach_observation_child(selected_catalog, child):
     parent.write_text(canonical_json({"schema_version": 1, "catalog": catalog, "artifacts": assets,
         "processing": {"record_id": sha256((canonical_json(record) + "\n").encode()).hexdigest(), "record": record}}))
     return DataRelease(parent, offline=True)
+
+
+def test_native_inventory_includes_verified_metadata_without_nofollow(edition_index_fixture, selected_catalog, monkeypatch):
+    from teadata.release import DataRelease
+
+    monkeypatch.delattr(os, "O_NOFOLLOW", raising=False)
+    child = DataRelease(edition_index_fixture["root"], offline=True)
+    parent = attach_observation_child(selected_catalog, child)
+    expected = {"manifest": child.path}
+    expected.update({ref.sha256: child.path.with_name(ref.location)
+                     for ref in (*child.catalog.edition_metadata_refs(), *child.catalog.column_schema_refs())})
+    for identifier in child.catalog.to_dict()["artifacts"]:
+        artifact = child.catalog.artifact_ref(identifier)
+        expected[artifact.sha256] = child.path.with_name(artifact.location)
+
+    assert parent.verify_native_sources() == {child.manifest_sha256: expected}
 
 
 def test_observations_golden(tmp_path, selected_catalog):

@@ -44,6 +44,7 @@ _StudentCohort = tuple[str, str, str, str]
 _ManifestStamp = tuple[int, int, int, int, int]
 _LocalManifest = tuple[Path, _ManifestStamp]
 _MetadataStamp = tuple[Path, tuple[int, ...]]
+_VerifiedMetadata = tuple[Path, tuple[int, ...], bytes | None]
 
 
 ROLES = frozenset({"snapshot", "entities", "maps", "boundaries"})
@@ -153,7 +154,7 @@ def _metadata_stamp(state: os.stat_result) -> tuple[int, ...]:
 
 
 def _capture_column_schema(path: Path, descriptor: ColumnSchemaRef | EditionMetadataRef, *,
-                           cached: tuple[Path, tuple[int, ...], bytes] | None = None) -> tuple[bytes, tuple[int, ...]]:
+                           cached: _VerifiedMetadata | None = None) -> tuple[bytes, tuple[int, ...]]:
     """Admit one regular metadata file before reading its exact verified buffer."""
     def regular(state):
         return stat.S_ISREG(state.st_mode) and not (
@@ -166,7 +167,7 @@ def _capture_column_schema(path: Path, descriptor: ColumnSchemaRef | EditionMeta
                 or state.st_size != descriptor.size_bytes):
             raise ContractError("Column-schema resource must be regular and match its declared bounded size")
         before = _metadata_stamp(state)
-        if nofollow and cached is not None and cached[:2] == (path, before):
+        if nofollow and cached is not None and cached[:2] == (path, before) and cached[2] is not None:
             return cached[2], before
         flags = os.O_RDONLY | nofollow | getattr(os, "O_NONBLOCK", 0) | getattr(os, "O_BINARY", 0)
         fd = os.open(path, flags)
@@ -304,7 +305,7 @@ class DataRelease:
                 raise ContractError(f"Schema{version} roots require one authoritative edition catalog")
             self._verified = {}
             self._verified_bytes: dict[str, tuple[Path, tuple[int, int, int, int]]] = {}
-            self._column_schema_data: dict[str, tuple[Path, tuple[int, ...], bytes]] = {}
+            self._column_schema_data: dict[str, _VerifiedMetadata] = {}
             self.catalog = DatasetCatalog(document["catalog"], column_schema_loader=self._column_schema_bytes,
                                           edition_metadata_loader=self._column_schema_bytes)
             return
@@ -388,8 +389,8 @@ class DataRelease:
     def _column_schema_bytes(self, descriptor: ColumnSchemaRef | EditionMetadataRef) -> bytes:
         path = self._resource_path(descriptor.location, descriptor.sha256, descriptor.size_bytes)
         raw, before = _capture_column_schema(path, descriptor, cached=self._column_schema_data.get(descriptor.sha256))
-        if getattr(os, "O_NOFOLLOW", 0):
-            self._column_schema_data[descriptor.sha256] = path, before, raw
+        # Inventory records successful verification even when bytes cannot be reused.
+        self._column_schema_data[descriptor.sha256] = path, before, raw if getattr(os, "O_NOFOLLOW", 0) else None
         if (trace := getattr(self, "_metadata_trace", None)) is not None and len(trace) <= 256:
             trace.add((path, before))
         return raw
