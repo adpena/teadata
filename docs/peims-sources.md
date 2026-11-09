@@ -237,3 +237,54 @@ these CSV comparisons separately from the HTML measure comparisons.
 This establishes the district selection used by TEA for the checked slices.
 The submitting organization, campus affiliation and valid aggregation rules
 still require separate evidence.
+
+## PEIMS College Credit
+
+The source profile registers five school years, 2021–22 through 2025–26, for
+Texas, education service center regions and reporting districts, including
+reporting charters. TEA does not offer a campus report in this family. The
+offline producer builds a separate native candidate. The source profile does
+not automatically add College Credit to the default entity engine.
+
+The [TEA College Credit criteria](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/abt_cte_college_credit_reports.html)
+describe public school course completion reported in the summer PEIMS
+submission. Each geography has service-code rows and a published Total row.
+A student earning credit in multiple courses can appear multiple times in
+that Total. Use it as a publisher-reported total of course-level counts.
+It is unsuitable as a count of unique students, a participation rate, or an
+annual-graduate readiness measure. Texas totals come from the Texas report.
+
+| School years | CTE group | Field prefix |
+| --- | --- | --- |
+| 2021–22 | Explorers, Concentrators and Completers | `cte_excluding_participants_` |
+| 2022–23 to 2024–25 | All four CTE program groups | `cte_all_program_groups_` |
+| 2025–26 | Participants, Concentrators and Completers | `cte_excluding_explorers_` |
+
+The all-student fields include the reported CTE group. They use the same names
+across editions. This is a source mapping, and longitudinal comparisons still
+require review of submission rules and eligibility. The 2025–26 TEDS reporting
+changes warrant care when interpreting changes in course credit. The reports
+do not independently identify the affected OnRamps records.
+
+The candidate retains zero, masked tokens, decimal precision, the literal
+publisher columns and the physical CSV record number. Use the data frame,
+CSV or Excel export with `restore_original_headers=True` for the publisher
+column names and tokens. The output is a table projection without the report
+preamble, footer or blank separator rows. The empty publisher header is
+retained, and a field subset retains Service and Service Description so course
+and Total rows stay distinguishable.
+
+```sh
+PEIMS_CONFIG=teadata/teadata_sources.yaml
+uv run --locked --offline python -m teadata.scripts.refresh_peims_college_credit \
+  --store "$TEADATA_PROVENANCE_DIR" \
+  --config "$PEIMS_CONFIG" \
+  --config-sha256 "$(shasum -a 256 "$PEIMS_CONFIG" | cut -d ' ' -f1)" \
+  --edition 2026 state --edition 2026 district \
+  --output "$PEIMS_CANDIDATE_DIR"
+```
+
+The store must already contain the reviewed acquisition and reference
+receipts and their original bytes. Choose each desired year and scope with a
+separate `--edition`. Earlier layouts and the unresolved HTML/CSV token
+differences from 2018–19 through 2020–21 are outside this producer's contract.

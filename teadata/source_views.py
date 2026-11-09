@@ -486,24 +486,39 @@ def _plan_export(release: DataRelease, edition: EditionKey, *, restore_original_
     artifact, projected = _projection(release, edition, requested, period=period)
     columns = projected if include_support else fields
     original_error = ("Original headers require a complete raw TAPR table or reviewed code-only RDA district table"
-                      " or reviewed PEIMS course table")
+                      " or reviewed PEIMS course or College Credit table")
     header_kinds = ()
     publisher_columns = None
     if restore_original_headers:
+        from .peims_college_credit import DATASET as credit_dataset
         from .rda_native import NATIVE_DATASET as rda_dataset
 
-        if edition.dataset == course_dataset:
-            from .peims_course_sources import CSV_HEADERS, course_column_support, matches_course_header
-            from .peims_courses import course_key_columns
-
+        if edition.dataset in {course_dataset, credit_dataset}:
             scope = edition.scope
-            support = course_column_support()
-            if (scope != edition.table or scope not in CSV_HEADERS
-                    or fields != artifact.public_columns or artifact.contract.get("column_support") != support
-                    or artifact.contract["key_columns"] != course_key_columns(scope)
-                    or not matches_course_header(release.catalog._source_header_table(edition), scope)):
-                raise ContractError("Original PEIMS course headers require the reviewed positional and raw column contract")
             selected = set(projected)
+            table = release.catalog._source_header_table(edition)
+            if edition.dataset == course_dataset:
+                from .peims_course_sources import CSV_HEADERS, course_column_support, matches_course_header
+                from .peims_courses import course_key_columns
+
+                valid = scope in CSV_HEADERS and matches_course_header(table, scope)
+                support, keys = course_column_support(), course_key_columns(scope) if valid else []
+                family = "course"
+            else:
+                from .peims_college_credit import (SCOPES, SERVICE_FIELDS, YEARS, college_credit_keys,
+                    college_credit_support, matches_college_credit_header)
+
+                family = "College Credit"
+                if scope not in SCOPES or edition.edition not in tuple(map(str, YEARS)):
+                    raise ContractError("Original PEIMS College Credit headers require a reviewed year and scope")
+                year = int(edition.edition)
+                valid = matches_college_credit_header(table, year, scope)
+                support, keys = college_credit_support(year, scope), college_credit_keys(scope)
+                selected.update(SERVICE_FIELDS)
+            if (scope != edition.table or not valid
+                    or fields != artifact.public_columns or artifact.contract.get("column_support") != support
+                    or artifact.contract["key_columns"] != keys):
+                raise ContractError(f"Original PEIMS {family} headers require the reviewed positional and raw column contract")
             headers = [row for row in headers if row["field"] in selected]
             publisher_columns = tuple(row["field"] for row in headers)
             raw = {field: entry["raw"] for field, entry in support["fields"].items()}

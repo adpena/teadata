@@ -201,9 +201,12 @@ def validate_header_table(table: Mapping[str, Any], *, expected_identity: Header
                 or set(field) - {"position", "code", "label", "field", "publisher_type", "publisher_length", "disposition",
                                  "dictionary_status", "publisher_description"}
                 or type(field["position"]) is not int or field["position"] != position
-                or not isinstance(field["code"], str) or not field["code"].strip()
-                or not isinstance(field["label"], str) or not field["label"].strip()
+                or not isinstance(field["code"], str) or not isinstance(field["label"], str)
                 or not isinstance(field["field"], str)):
+            raise ValueError(f"Invalid header crosswalk column {position}")
+        if not (field["code"].strip() and field["label"].strip()) and not (
+                identity == "position" and field["code"] == field["label"] == ""
+                and field["field"] == "publisher_separator" and field.get("disposition") == "identity"):
             raise ValueError(f"Invalid header crosswalk column {position}")
         if "dictionary_status" in field:
             status = field["dictionary_status"]

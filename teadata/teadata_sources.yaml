@@ -1,6 +1,13 @@
 contract_version: 1
 year_min: 2009
 value_policies:
+  peims_college_credit_csv:
+    policy_id: peims_college_credit_csv
+    reference_id: college_credit_criteria
+    tokens:
+      '-999':
+        status: suppressed
+        reason: publisher_ferpa_suppression
   tprs_student_selected_2026:
     policy_id: tprs_student_selected_2026
     reference_id: legend
@@ -18090,6 +18097,267 @@ data_sources:
             worksheet: Rolled up Data
             column_schema: schemas/edrs--2026--initial-certification-rollup-crosswalk.json
 
+  peims_college_credit:
+    2022:
+      metadata:
+        title: 2021–22 PEIMS College Credit
+        publisher: Texas Education Agency
+        version: '2022'
+        period:
+          end_year: 2022
+          kind: school_year
+          start_year: 2021
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/CTE_Students_College_Credit/CTE_Reports.html
+        references: &peims_college_credit_references
+        - reference_id: college_credit_criteria
+          role: methodology
+          status: available
+          title: TEA College Credit criteria and masking rules
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/abt_cte_college_credit_reports.html
+          reviewed_sha256: 8f91dc49add909d6b220d027a2fbc1d8892c688fcecf8972fc09d0a83000ad4d
+          provenance_ids:
+          - 9bcb598084bd3e0f4f506857d2fceec976887beb63cb59b537c9dba9e6d5e3df
+        - reference_id: college_credit_selector
+          role: source_notes
+          status: available
+          title: TEA College Credit report selector
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/CTE_Students_College_Credit/CTE_Reports.html
+          reviewed_sha256: 55837e14c36ac0a88e1260f43ec0bd41684e239135de62609b62686242c8bb02
+          provenance_ids:
+          - 15dbb94cb1b828053a234f65e5ecd9d025a138ae642972a2e4119fd70bbf0a94
+        - reference_id: column_crosswalk
+          role: schema
+          status: available
+          title: Reviewed PEIMS College Credit CSV positional crosswalk and physical framing
+          path: schemas/peims--2022-2026--college-credit-crosswalk.json
+          reviewed_sha256: 7182a98748be4a9757dfc4c9e07112a00bd29d868a8fac9ba3e2aaa42965831a
+          provenance_ids:
+          - c7e7176db66a8c00ccc39ccd4c9e29bf8c4100668e6414b115db031f5da84d93
+        value_policy: peims_college_credit_csv
+        metrics:
+          cte_excluding_participants_students_earning_college_credit_count:
+            field: cte_excluding_participants_students_earning_college_credit_count
+            unit: count
+          cte_excluding_participants_college_credit_hours:
+            field: cte_excluding_participants_college_credit_hours
+            unit: credit_hours
+          cte_excluding_participants_average_credit_hours_per_student:
+            field: cte_excluding_participants_average_credit_hours_per_student
+            unit: credit_hours_per_student
+          students_earning_college_credit_count:
+            field: students_earning_college_credit_count
+            unit: count
+          college_credit_hours:
+            field: college_credit_hours
+            unit: credit_hours
+          average_credit_hours_per_student:
+            field: average_credit_hours_per_student
+            unit: credit_hours_per_student
+        notes: The CTE group excludes Participants. The all-student group includes the CTE group.
+          The published Total can count a student multiple times across courses. Masked cells remain suppressed.
+          Publisher finality is unspecified.
+      path: data/peims/2022/peims_college_credit.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2022-2026--college-credit-crosswalk.json
+            acquisition_ids:
+              state: 156455b03c376b3e151c09d4477ec0658e1a35521bfb8ea98e1344a15990074f
+              region: c159316e546f53e99adff43c89aaf465f001eb9662b865930b3cae4f29a83492
+              district: 2b656ebf11549fa8b84ea741d7c1bb9ca72f51e21920eee39cb5775f9f391e66
+            row_counts:
+              state: 652
+              region: 3736
+              district: 17462
+    2023:
+      metadata:
+        title: 2022–23 PEIMS College Credit
+        publisher: Texas Education Agency
+        version: '2023'
+        period:
+          end_year: 2023
+          kind: school_year
+          start_year: 2022
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/CTE_Students_College_Credit/CTE_Reports.html
+        references: *peims_college_credit_references
+        value_policy: peims_college_credit_csv
+        metrics:
+          cte_all_program_groups_students_earning_college_credit_count:
+            field: cte_all_program_groups_students_earning_college_credit_count
+            unit: count
+          cte_all_program_groups_college_credit_hours:
+            field: cte_all_program_groups_college_credit_hours
+            unit: credit_hours
+          cte_all_program_groups_average_credit_hours_per_student:
+            field: cte_all_program_groups_average_credit_hours_per_student
+            unit: credit_hours_per_student
+          students_earning_college_credit_count:
+            field: students_earning_college_credit_count
+            unit: count
+          college_credit_hours:
+            field: college_credit_hours
+            unit: credit_hours
+          average_credit_hours_per_student:
+            field: average_credit_hours_per_student
+            unit: credit_hours_per_student
+        notes: The CTE group includes all four CTE program groups. The all-student group includes the CTE group.
+          The published Total can count a student multiple times across courses. Masked cells remain suppressed.
+          Publisher finality is unspecified.
+      path: data/peims/2023/peims_college_credit.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2022-2026--college-credit-crosswalk.json
+            acquisition_ids:
+              state: 85f04bf65a27e0a6c0fc1b2c8aaac3c30b47aca38461587d60248607a17d09cd
+              region: 4213e6f0c1f883d123d16e2e55ae42946588e4483d7d5a3fc2eb7d1202fd9e81
+              district: 99b60f1cdc3e5ae79863503d51af08a285ffbdd44909c1ba9e387e2dcba7ccb0
+            row_counts:
+              state: 668
+              region: 3972
+              district: 18535
+    2024:
+      metadata:
+        title: 2023–24 PEIMS College Credit
+        publisher: Texas Education Agency
+        version: '2024'
+        period:
+          end_year: 2024
+          kind: school_year
+          start_year: 2023
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/CTE_Students_College_Credit/CTE_Reports.html
+        references: *peims_college_credit_references
+        value_policy: peims_college_credit_csv
+        metrics:
+          cte_all_program_groups_students_earning_college_credit_count:
+            field: cte_all_program_groups_students_earning_college_credit_count
+            unit: count
+          cte_all_program_groups_college_credit_hours:
+            field: cte_all_program_groups_college_credit_hours
+            unit: credit_hours
+          cte_all_program_groups_average_credit_hours_per_student:
+            field: cte_all_program_groups_average_credit_hours_per_student
+            unit: credit_hours_per_student
+          students_earning_college_credit_count:
+            field: students_earning_college_credit_count
+            unit: count
+          college_credit_hours:
+            field: college_credit_hours
+            unit: credit_hours
+          average_credit_hours_per_student:
+            field: average_credit_hours_per_student
+            unit: credit_hours_per_student
+        notes: The CTE group includes all four CTE program groups. The all-student group includes the CTE group.
+          The published Total can count a student multiple times across courses. Masked cells remain suppressed.
+          Publisher finality is unspecified.
+      path: data/peims/2024/peims_college_credit.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2022-2026--college-credit-crosswalk.json
+            acquisition_ids:
+              state: f8c8b95545a2836e5f78c686ed30015bc94d44e01ac8ef1736fa05ebc3182906
+              region: cd48bf3829247b363210bf16256eff208a0e78ea15cac43a195aefd24e2d276f
+              district: 14583cf2a8f13380bc3d1ae71d9bdf58eefb3be2030abbe99564d4d3a4c329bd
+            row_counts:
+              state: 686
+              region: 4187
+              district: 19757
+    2025:
+      metadata:
+        title: 2024–25 PEIMS College Credit
+        publisher: Texas Education Agency
+        version: '2025'
+        period:
+          end_year: 2025
+          kind: school_year
+          start_year: 2024
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/CTE_Students_College_Credit/CTE_Reports.html
+        references: *peims_college_credit_references
+        value_policy: peims_college_credit_csv
+        metrics:
+          cte_all_program_groups_students_earning_college_credit_count:
+            field: cte_all_program_groups_students_earning_college_credit_count
+            unit: count
+          cte_all_program_groups_college_credit_hours:
+            field: cte_all_program_groups_college_credit_hours
+            unit: credit_hours
+          cte_all_program_groups_average_credit_hours_per_student:
+            field: cte_all_program_groups_average_credit_hours_per_student
+            unit: credit_hours_per_student
+          students_earning_college_credit_count:
+            field: students_earning_college_credit_count
+            unit: count
+          college_credit_hours:
+            field: college_credit_hours
+            unit: credit_hours
+          average_credit_hours_per_student:
+            field: average_credit_hours_per_student
+            unit: credit_hours_per_student
+        notes: The CTE group includes all four CTE program groups. The all-student group includes the CTE group.
+          The published Total can count a student multiple times across courses. Masked cells remain suppressed.
+          Publisher finality is unspecified.
+      path: data/peims/2025/peims_college_credit.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2022-2026--college-credit-crosswalk.json
+            acquisition_ids:
+              state: 35288443150985eef724f93dc87ae34447ba4dcc383ab2de329306d9cb47ee6d
+              region: 7a8950268270c666bc54c061ab5fc9b922d2526e8e3bca56778adf86934a7388
+              district: dc1c664817383c4bfd174b53acc52d59c832be3340087f165f5921ecccd7e9ff
+            row_counts:
+              state: 705
+              region: 4448
+              district: 21745
+    2026:
+      metadata:
+        title: 2025–26 PEIMS College Credit
+        publisher: Texas Education Agency
+        version: '2026'
+        period:
+          end_year: 2026
+          kind: school_year
+          start_year: 2025
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/CTE_Students_College_Credit/CTE_Reports.html
+        references: *peims_college_credit_references
+        value_policy: peims_college_credit_csv
+        metrics:
+          cte_excluding_explorers_students_earning_college_credit_count:
+            field: cte_excluding_explorers_students_earning_college_credit_count
+            unit: count
+          cte_excluding_explorers_college_credit_hours:
+            field: cte_excluding_explorers_college_credit_hours
+            unit: credit_hours
+          cte_excluding_explorers_average_credit_hours_per_student:
+            field: cte_excluding_explorers_average_credit_hours_per_student
+            unit: credit_hours_per_student
+          students_earning_college_credit_count:
+            field: students_earning_college_credit_count
+            unit: count
+          college_credit_hours:
+            field: college_credit_hours
+            unit: credit_hours
+          average_credit_hours_per_student:
+            field: average_credit_hours_per_student
+            unit: credit_hours_per_student
+        notes: The CTE group excludes Explorers. The all-student group includes the CTE group.
+          The published Total can count a student multiple times across courses. Masked cells remain suppressed.
+          Publisher finality is unspecified.
+      path: data/peims/2026/peims_college_credit.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2022-2026--college-credit-crosswalk.json
+            acquisition_ids:
+              state: 932b8f90fea5fdc7b70de0d79617699f4e913c74a63cf03f8d9bce598869cf41
+              region: fb60a97887c315e0aa1adce2e83b23fa0bbdd20092aebdd36679572d2a1448a5
+              district: ab212ca0d443bf6723cd4d01a1664eecb1c9f96fad31b89cf0e69e776c5ddda9
+            row_counts:
+              state: 696
+              region: 4698
+              district: 23488
+
   peims_teacher_course_enrollment:
     2023:
       metadata:
@@ -21684,6 +21952,8 @@ schema:
     - xlsx
     frc_per_pupil_expenditure:
     - html
+    peims_college_credit:
+    - csv
     peims_teacher_course_enrollment:
     - csv
     peims_staff_fte_and_salary:
