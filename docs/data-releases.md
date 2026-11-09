@@ -79,6 +79,24 @@ snapshot.
 
 ### 2026 entity snapshot and TPRS student data
 
+The [v0.0.138 assets](https://github.com/adpena/teadata/releases/tag/v0.0.138)
+include the 2025–26 TPRS Student Information attachment. It covers 9,105
+campus reports from all 20 TEA rosters, 1,202 district reports, and a direct
+Texas report. Those counts apply to this report family. The entity release
+retains the entity snapshot's original field periods. Select the exact TPRS
+source edition when analyzing 2025–26 Membership and Enrollment.
+
+| Manifest | Manifest SHA-256 |
+| --- | --- |
+| [`release.json`](https://github.com/adpena/teadata/releases/download/v0.0.138/release.json) | `e4c3bd0c50e6cc3e3669741710682709a36342b650ab3148220954aab3aac988` |
+| [`tprs-student-2026-campus-complete.release.json`](https://github.com/adpena/teadata/releases/download/v0.0.138/tprs-student-2026-campus-complete.release.json) | `c96effc9bcbfd01c7cd969082cf701a2dc4e1900b6d6973b23c0ed2d21559f9e` |
+
+Pass either URL and its SHA-256 to `DataRelease`. Use the parent `release.json`
+with `TEADATA_RELEASE_URL` and `TEADATA_RELEASE_SHA256` for an application that
+needs the entity snapshot. Unset `TEADATA_RELEASE` when switching from a local
+manifest to a URL. Select the attachment directly for source-only analysis.
+The package keeps the data artifacts external.
+
 Select the [v0.0.136 release assets](https://github.com/adpena/teadata/releases/tag/v0.0.136)
 with `DataRelease(manifest_url, expected_sha256=manifest_sha256)`. The entity
 manifest pins the native TPRS attachment. Select the attachment directly
