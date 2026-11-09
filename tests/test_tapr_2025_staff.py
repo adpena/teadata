@@ -57,12 +57,40 @@ def test_staff_crosswalk_retains_every_actual_column_without_default_activation(
     assert len({r['code'] for r in records} - old_codes) == new_count
     cfg = load_config()
     assert cfg.availability_report()['data_sources'][dataset['dataset']]['years'] == [2024, 2025]
-    assert cfg.header_records(dataset['dataset'], edition='2025', reader_profile='source') == records
+    expected = {
+        'staff_teacher_total_full_time_equiv_count': ('PSTTOFC', 'fte'),
+        'staff_teacher_experience_average': ('PSTEXPA', 'years'),
+        'staff_teacher_total_base_salary_average': ('PSTTOSA', 'currency'),
+        'staff_teacher_student_ratio': ('PSTKIDR', 'ratio'),
+    }
+    if scope == 'district':
+        expected['staff_teacher_turnover_ratio'] = ('PSTURNR', 'percent')
+    period = {'kind': 'school_year', 'start_year': 2024, 'end_year': 2025}
+    selected = cfg.header_records(dataset['dataset'], edition='2025', reader_profile='source')
+    assert [{**record, 'period': {'kind': 'unknown'}} for record in selected] == records
+    fields = {row['field']: row for row in selected}
     assert cfg.is_source_only(dataset['dataset'], 2025)
     assert cfg.column_schema(dataset['dataset'], 2025) is None
-    source = cfg.resolve_dataset(dataset['dataset'], 2025)
+    source = cfg.resolve_dataset(dataset['dataset'], 2025, exact=True)
     assert source.metadata.period.kind == 'unknown' and source.metadata.value_policy is None
-    assert not source.metadata.metrics and not source.metadata.provenance_ids and source.metadata.field_year is None
+    assert not source.metadata.provenance_ids and source.metadata.field_year is None
+    assert source.metadata.metrics.keys() == expected.keys()
+    assert {row['field'] for row in selected if row['period'] != {'kind': 'unknown'}} == {
+        f'{scope}_2025_{name}' for name in expected
+    }
+    for name, (code, unit) in expected.items():
+        definition = source.metadata.metrics[name]
+        field = f'{scope}_2025_{name}'
+        assert definition.to_dict() == {'field': field, 'unit': unit, 'period': period}
+        assert fields[field]['period'] == period and fields[field]['code'] == scope[0].upper() + code
+    previous = cfg.resolve_dataset(dataset['dataset'], 2024, exact=True)
+    assert previous.metadata.metrics.keys() == {'staff_all_staff_total_full_time_equiv_count'}
+    with pytest.raises(KeyError, match='No exact data available for catalog year 2026'):
+        cfg.resolve_dataset(dataset['dataset'], 2026, exact=True)
+    witness = next(ref for ref in source.metadata.references if ref.reference_id == 'published_staff_comparison')
+    assert witness.reviewed_sha256 and len(witness.provenance_ids) == 1
+    receipt = ProvenanceStore(ROOT / 'provenance').read_record(witness.provenance_ids[0])
+    assert receipt['requested_url'] == witness.url and receipt['artifact']['sha256'] == witness.reviewed_sha256
     raw_reference = next(r for r in source.metadata.references if r.reference_id == 'csv_headers')
     assert raw_reference.provenance_ids == (raw_id,) and raw_reference.reviewed_sha256 == raw_sha
     assert source.reader['profiles']['source']['tapr_source']['tables']['staff_profile'] == f'data/tapr/raw/2025-{scope}-STAF-all-checked.csv'

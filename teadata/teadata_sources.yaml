@@ -3969,8 +3969,38 @@ data_sources:
           occurrence is retained. Original HTTP dates and controls remain in their
           genuine receipts; old local-download dates remain unknown. The historical
           2025 composite is a separate prior revision, not a fallback or current alias.
-          No released default, semantic binding, entity enrichment or app data is
-          activated.
+          The named metrics below have reviewed units and a 2024–25 reporting period.
+          Salary covers regular duties. The student–teacher ratio uses teacher FTE.
+          The native edition retains the original raw fields for independent analysis.
+        metrics:
+          staff_teacher_total_full_time_equiv_count:
+            field: campus_2025_staff_teacher_total_full_time_equiv_count
+            unit: fte
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+          staff_teacher_experience_average:
+            field: campus_2025_staff_teacher_experience_average
+            unit: years
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+          staff_teacher_total_base_salary_average:
+            field: campus_2025_staff_teacher_total_base_salary_average
+            unit: currency
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+          staff_teacher_student_ratio:
+            field: campus_2025_staff_teacher_student_ratio
+            unit: ratio
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
         references:
         - reference_id: csv_headers
           role: source_notes
@@ -4014,6 +4044,14 @@ data_sources:
           provenance_ids:
           - 6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554
           reviewed_sha256: 7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8
+        - reference_id: published_staff_comparison
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=084908042&lev=C&prgopt=reports%2Ftapr%2Fstaff.sas
+          title: 2024–25 Staff Information for Crosby Middle
+          status: available
+          provenance_ids:
+          - 5097279234ac7fad89a902f98fa59e62e76e639ea12d0e3ceec6a72d734ff7db
+          reviewed_sha256: 5238d0d125e304fd073cbf0cca13662941f58ac12f2e3fbb416b207ad40195c5
         - reference_id: columns_source
           role: schema
           path: schemas/tapr--2025--staff-profile-crosswalk.json
@@ -4837,8 +4875,47 @@ data_sources:
           occurrence is retained. Original HTTP dates and controls remain in their
           genuine receipts; old local-download dates remain unknown. The historical
           2025 composite is a separate prior revision, not a fallback or current alias.
-          No released default, semantic binding, entity enrichment or app data is
-          activated.
+          The named metrics below have reviewed units and a 2024–25 reporting period.
+          Salary covers regular duties. The student–teacher ratio uses teacher FTE. District turnover compares fall 2023–24 teacher FTE with fall
+          2024–25 and can include teachers who remain employed in a non-teaching
+          role. The denominator is the fall 2023–24 teacher FTE.
+          The native edition retains the original raw fields for independent analysis.
+        metrics:
+          staff_teacher_total_full_time_equiv_count:
+            field: district_2025_staff_teacher_total_full_time_equiv_count
+            unit: fte
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+          staff_teacher_experience_average:
+            field: district_2025_staff_teacher_experience_average
+            unit: years
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+          staff_teacher_total_base_salary_average:
+            field: district_2025_staff_teacher_total_base_salary_average
+            unit: currency
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+          staff_teacher_student_ratio:
+            field: district_2025_staff_teacher_student_ratio
+            unit: ratio
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+          staff_teacher_turnover_ratio:
+            field: district_2025_staff_teacher_turnover_ratio
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
         references:
         - reference_id: csv_headers
           role: source_notes
@@ -4882,6 +4959,14 @@ data_sources:
           provenance_ids:
           - 6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554
           reviewed_sha256: 7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8
+        - reference_id: published_staff_comparison
+          role: source_notes
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=084908&lev=D&prgopt=reports%2Ftapr%2Fstaff.sas
+          title: 2024–25 Staff Information for Hitchcock ISD
+          status: available
+          provenance_ids:
+          - daf62f4fef4d0ae1bd33a608be963dca642708069cd2c460ff55c7c32b13ba5b
+          reviewed_sha256: d9805d3a5afc99cb0675b7f98320a792e14d8f63116be006b9aaddfbb91d0889
         - reference_id: columns_source
           role: schema
           path: schemas/tapr--2025--staff-profile-crosswalk.json

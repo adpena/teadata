@@ -117,6 +117,16 @@ duties; supplemental pay is outside the measure. Retain the printed
 rate alongside its published numerator and denominator, whose displayed
 precision can differ.
 
+The separate 2024–25 campus and district Staff Information source editions
+carry explicit periods and units for teacher FTE, average teacher experience,
+average regular-duty salary, and students per teacher FTE. The district
+edition also binds the published turnover percentage. Independent TEA
+reports for Hitchcock ISD and Crosby Middle verify the selected columns.
+Other fields retain their raw publisher tokens and unknown measurement
+periods. Read these editions explicitly for source analysis.
+[Hitchcock ISD Staff Information](https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=084908&lev=D&prgopt=reports%2Ftapr%2Fstaff.sas)
+· [Crosby Middle Staff Information](https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2025&id=084908042&lev=C&prgopt=reports%2Ftapr%2Fstaff.sas)
+
 The 2024–25 regional Student Information and regional and statewide Staff
 Information source profiles retain the original two-header CSVs and exact
 publisher dictionaries. Each regional file has all 20 ESC identifiers. The
