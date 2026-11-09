@@ -62,7 +62,25 @@ def main(argv: list[str] | None = None) -> int:
     compare.add_argument("--campus-preparation", required=True)
     compare.add_argument("--district-release", type=Path, required=True)
     compare.add_argument("--district-pin", required=True)
+    audit = sub.add_parser("audit-district-directions", help="Compare independently reported district In and Out details offline")
+    audit.add_argument("--district-release", type=Path, required=True)
+    audit.add_argument("--district-pin", required=True)
+    audit.add_argument("--year", action="append", required=True, help="Exact school year, repeat for multiple editions")
+    audit.add_argument("--store", type=Path, help="Retained official district-type rosters for 2012–13 through 2015–16")
     args = parser.parse_args(argv)
+    if args.command == "audit-district-directions":
+        from teadata.manifest import ContractError
+        from teadata.release import DataRelease
+        from teadata.transfer_rollups import PASS_RECIPROCAL_DISTRICT_DIRECTIONS, compare_district_directions
+
+        try:
+            release = DataRelease(args.district_release, expected_sha256=args.district_pin, offline=True)
+            roster_store = ProvenanceStore(args.store) if args.store is not None else None
+            results = [compare_district_directions(release, school_year=year, roster_store=roster_store) for year in args.year]
+        except (ContractError, ValueError, OSError) as error:
+            parser.error(str(error))
+        print(json.dumps({"editions": results}, sort_keys=True))
+        return 0 if all(row["status"] == PASS_RECIPROCAL_DISTRICT_DIRECTIONS for row in results) else 2
     store = ProvenanceStore(args.store)
     if args.command == "compare-campus-district":
         from teadata.transfer_rollups import PASS_OBSERVED_TRANSFER_ROLLUP, compare_transfer_rollup

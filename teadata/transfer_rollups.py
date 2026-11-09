@@ -1,17 +1,18 @@
-"""Compare published campus and district transfer details without filling masks."""
+"""Compare published transfer details without filling masks."""
 
 from __future__ import annotations
 
 from collections import Counter
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
 import pyarrow as pa
 import pyarrow.compute as arrow_compute
 import pyarrow.parquet as pq
 
-from .dataset_metadata import DataPeriod
+from .dataset_metadata import ArtifactRef, DataPeriod, EditionKey, _parse_school_year
+from .district_types import DISTRICT_TYPE_REFERENCE, project_district_types, reviewed_district_types
 from .provenance import ProvenanceStore
 from .release import DataRelease
 from .transfer_sources import _captured_input
@@ -21,7 +22,12 @@ _CAMPUS_IDS = ["transfer_reporting_number", "transfer_partner_number"]
 _STATUS = "transfer_count_status"
 _CAMPUS_VALUE = "transfer_count_value"
 _DISTRICT_VALUE = "student_transfer_count"
+_DISTRICT_DATASET = "district_transfer_reports"
+_REPORT_CHARTER = "reporting_charter_status"
+_CHARTER = "Open Enrollment Charter"
+_PAIR = ["origin", "destination"]
 PASS_OBSERVED_TRANSFER_ROLLUP = "PASS_OBSERVED_TRANSFER_ROLLUP"
+PASS_RECIPROCAL_DISTRICT_DIRECTIONS = "PASS_RECIPROCAL_DISTRICT_DIRECTIONS"
 pc: Any = arrow_compute
 
 
@@ -34,6 +40,190 @@ def _validate_details(table: pa.Table, value: str) -> None:
             or not pc.all(pc.equal(pc.equal(table[_STATUS], "observed"), pc.is_valid(table[value]))).as_py()
             or pc.any(pc.less(table[value], 0)).as_py()):
         raise ValueError("Transfer detail keys, directions or count statuses differ from their reviewed types")
+
+
+def _district_editions(release: DataRelease) -> tuple[EditionKey, ...]:
+    return tuple(
+        EditionKey.from_dict({name: value for name, value in row.items() if name != "edition_id"})
+        for row in release.catalog.editions(dataset=_DISTRICT_DATASET, scope="district", include_metadata=False)
+        if row["table"] == "report_rows"
+    )
+
+
+def _district_leaf(release: DataRelease, year: int) -> ArtifactRef:
+    keys = _district_editions(release)
+    selected = [key for key in keys if key.edition == str(year)]
+    if not selected:
+        years = ", ".join(sorted({key.edition for key in keys})) or "none"
+        raise ValueError(f"No district transfer edition for {year}. Available school-year ends: {years}.")
+    if len(selected) != 1:
+        raise ValueError(f"District transfer edition for {year} is ambiguous in this release.")
+    key, = selected
+    period = DataPeriod("school_year", year - 1, year)
+    if release.catalog.metadata(key.dataset, edition=key).period != period:
+        raise ValueError("District transfer period differs from the selected school year")
+    plans = release.catalog.resolve_artifacts([(key, _DISTRICT_VALUE)], period=period)
+    if len(plans) != 1 or plans[0]["artifact"].edition != key or plans[0]["artifact"].output != "leaf":
+        raise ValueError("Expected one exact district transfer leaf for the selected school year")
+    ref = plans[0]["artifact"]
+    # Schema 3 embeds edition descriptors. Schema 4 indexes them by identity.
+    edition = key.to_dict()
+    registered = [identifier for identifier, entry in release.catalog.to_dict()["artifacts"].items()
+                  if entry == key.identity or (isinstance(entry, dict) and entry.get("edition") == edition)]
+    if registered != [ref.identity]:
+        raise ValueError("District transfer edition requires exactly one registered leaf")
+    return ref
+
+
+class DirectionCoverage(TypedDict):
+    matched: int
+    out_only: int
+    in_only: int
+    matching_observed: int
+    matching_suppressed: int
+    status_differences: int
+    observed_count_differences: int
+    raw_token_only_differences: int
+
+
+def _count_true(mask: pa.Array | pa.ChunkedArray) -> int:
+    return pc.sum(mask).as_py() or 0
+
+
+def _direction_coverage(joined: pa.Table) -> DirectionCoverage:
+    out, incoming = joined["out_status"], joined["in_status"]
+    has_out, has_in = pc.is_valid(out), pc.is_valid(incoming)
+    matched = pc.and_(has_out, has_in)
+    status_differs = pc.not_equal(out, incoming)
+    both_observed = pc.and_(pc.equal(out, "observed"), pc.equal(incoming, "observed"))
+    value_differs = pc.not_equal(joined["out_value"], joined["in_value"])
+    equal_observed = pc.and_(both_observed, pc.invert(value_differs))
+    equal_suppressed = pc.and_(pc.equal(out, "suppressed"), pc.equal(incoming, "suppressed"))
+    raw_differs = pc.not_equal(joined["out_raw"], joined["in_raw"])
+    return {
+        "matched": _count_true(matched),
+        "out_only": _count_true(pc.and_(has_out, pc.invert(has_in))),
+        "in_only": _count_true(pc.and_(has_in, pc.invert(has_out))),
+        "matching_observed": _count_true(equal_observed),
+        "matching_suppressed": _count_true(equal_suppressed),
+        "status_differences": _count_true(status_differs),
+        "observed_count_differences": _count_true(pc.and_(both_observed, value_differs)),
+        "raw_token_only_differences": _count_true(pc.and_(pc.or_kleene(equal_observed, equal_suppressed), raw_differs)),
+    }
+
+
+def _district_pairs(details: pa.Table, raw: str) -> pa.Table:
+    if not pa.types.is_integer(details[_DISTRICT_VALUE].type):
+        raise ValueError("District transfer detail requires integral counts")
+    _validate_details(details, _DISTRICT_VALUE)
+    direction, reporting, partner = _KEYS
+    for name in (reporting, partner):
+        ids = details[name]
+        valid = pc.and_(pc.match_substring_regex(ids, r"^'[0-9]{6}$"), pc.not_equal(ids, "'000000"))
+        if details.num_rows and not pc.all(valid).as_py():
+            raise ValueError("District transfer detail requires canonical six-digit endpoint IDs")
+    if details[raw].null_count or pc.any(pc.equal(details[reporting], details[partner])).as_py():
+        raise ValueError("District transfer detail has a missing raw count or a within-district pair")
+
+    sides = []
+    for view, endpoints in (("out", (reporting, partner)), ("in", (partner, reporting))):
+        selected = details.filter(pc.equal(details[direction], view)).select([*endpoints, _STATUS, _DISTRICT_VALUE, raw])
+        selected = selected.rename_columns([*_PAIR, f"{view}_status", f"{view}_value", f"{view}_raw"])
+        if selected.group_by(_PAIR, use_threads=False).aggregate([]).num_rows != selected.num_rows:
+            raise ValueError(f"Duplicate {view} district transfer pair")
+        sides.append(selected)
+    return sides[0].join(sides[1], keys=_PAIR, join_type="full outer", coalesce_keys=True, use_threads=False)
+
+
+def _historical_roster(store: ProvenanceStore, year: int) -> tuple[dict[str, str], dict]:
+    from .teadata_config import load_config
+
+    # Reuse the already reviewed annual TEA reference. No PEIMS rows are opened.
+    metadata = load_config(Path(__file__).with_name("teadata_sources.yaml")).resolve_dataset(
+        "peims_special_education_by_primary_disability", year, reader_profile="source", exact=True,
+    ).metadata
+    ref, = (ref for ref in metadata.references if ref.reference_id == DISTRICT_TYPE_REFERENCE)
+    records = store.verify_record_closure(ref.provenance_ids)
+    roster = reviewed_district_types(metadata, store, records)
+    if roster is None:
+        raise ValueError("Historical district transfer audit lacks the reviewed same-year district types")
+    receipt, = ref.provenance_ids
+    return roster, {"basis": "same_year_tea_district_types", "receipt": receipt,
+                    "sha256": ref.reviewed_sha256, "url": ref.url}
+
+
+def _district_types(table: pa.Table, pairs: pa.Table, *, year: int, store: ProvenanceStore | None) -> dict:
+    if _REPORT_CHARTER in table.column_names:
+        reporting = _KEYS[1]
+        flags = table.select([reporting, _REPORT_CHARTER]).group_by(
+            [reporting, _REPORT_CHARTER], use_threads=False,
+        ).aggregate([])
+        flags = flags.filter(pc.is_valid(flags[reporting]))
+        allowed = pa.array(["Traditional ISD/CSD", _CHARTER])
+        if (len(flags[reporting].unique()) != flags.num_rows
+                or (flags.num_rows and not pc.all(pc.is_in(flags[_REPORT_CHARTER], value_set=allowed)).as_py())):
+            raise ValueError("District report contains conflicting or unsupported reporter charter flags")
+        source = {"basis": "same_edition_publisher_flags"}
+        origin, destination = (
+            pc.equal(pc.take(flags[_REPORT_CHARTER], pc.index_in(pairs[name], value_set=flags[reporting])), _CHARTER)
+            for name in _PAIR
+        )
+    elif store is not None and 2013 <= year <= 2016:
+        roster, source = _historical_roster(store, year)
+        origin, destination = (
+            project_district_types(pc.utf8_slice_codeunits(pairs[name], start=1), roster)[1] for name in _PAIR
+        )
+    else:
+        source = {"basis": "unavailable"}
+        origin = destination = pa.nulls(pairs.num_rows, type=pa.bool_())
+    return {
+        **source,
+        "unknown_origin_pairs": origin.null_count,
+        "unknown_destination_pairs": destination.null_count,
+        "charter_origin_pairs": _count_true(origin),
+        "charter_destinations": (
+            _direction_coverage(pairs.filter(destination)) if source["basis"] != "unavailable" else None
+        ),
+    }
+
+
+def compare_district_directions(release: DataRelease, *, school_year: int | str,
+                                roster_store: ProvenanceStore | None = None) -> dict:
+    """Audit independent publisher views in one exact offline district edition."""
+    year = _parse_school_year(school_year)
+    if year is None or not release.offline:
+        raise ValueError("District direction audit requires an explicit school year and offline release")
+    ref = _district_leaf(release, year)
+    support = ref.column_support
+    count_support = support.projection(_DISTRICT_VALUE) if support is not None else {}
+    raw = count_support.get("raw")
+    if not isinstance(raw, str) or count_support.get("status") != _STATUS:
+        raise ValueError("District direction audit requires bound raw counts and statuses")
+    kind = "transfer_row_kind"
+    columns = [*_KEYS, _DISTRICT_VALUE, _STATUS, raw, kind]
+    leaf = release.analytical_dataset(ref.identity)
+    if _REPORT_CHARTER in leaf.schema.names:
+        columns.append(_REPORT_CHARTER)
+    table = leaf.to_table(columns=columns, use_threads=False)
+    kinds = pa.array(["detail", "publisher_total", "separator"])
+    if table.num_rows and not pc.all(pc.is_in(table[kind], value_set=kinds)).as_py():
+        raise ValueError("District transfer leaf contains an unrecognized row kind")
+    details = table.filter(pc.equal(table[kind], "detail"))
+    pairs = _district_pairs(details, raw)
+    coverage = _direction_coverage(pairs)
+    classification = _district_types(table, pairs, year=year, store=roster_store)
+    passed = coverage["matched"] > 0 and not any(coverage[name] for name in (
+        "out_only", "in_only", "status_differences", "observed_count_differences",
+    )) and classification["charter_origin_pairs"] == 0
+    return {
+        "status": PASS_RECIPROCAL_DISTRICT_DIRECTIONS if passed else "HOLD_RECIPROCAL_DISTRICT_DIRECTIONS",
+        "edition": ref.edition.to_dict(),
+        "manifest_sha256": release.manifest_sha256,
+        "leaf_sha256": ref.sha256,
+        "directional_detail_rows": details.num_rows,
+        "coverage": coverage,
+        "classification": classification,
+    }
 
 
 def _compare_details(campus: pa.Table, district: pa.Table) -> dict:
@@ -127,14 +317,7 @@ def compare_transfer_rollup(store: ProvenanceStore, *, year: int, campus_prepara
         if campus_file.metadata.num_rows != report["rows"]:
             raise ValueError("Campus transfer rows differ from the retained preparation")
     release = DataRelease(district_release, expected_sha256=district_pin, offline=True)
-    refs = [release.catalog.artifact_ref(key) for key in release.catalog.to_dict()["artifacts"]]
-    selected = [ref for ref in refs if (ref.edition.dataset, ref.edition.edition, ref.edition.scope, ref.edition.table)
-                == ("district_transfer_reports", str(year), "district", "report_rows")]
-    if len(selected) != 1:
-        raise ValueError("Expected one district transfer leaf for the selected school year")
-    ref = selected[0]
-    if release.catalog.metadata(ref.edition.dataset, edition=ref.edition).period != DataPeriod("school_year", year - 1, year):
-        raise ValueError("District transfer period differs from the selected school year")
+    ref = _district_leaf(release, year)
     filters = [("transfer_row_kind", "=", "detail")]
     result = _compare_details(
         pq.read_table(campus_path, columns=[*_KEYS, *_CAMPUS_IDS, _STATUS, _CAMPUS_VALUE], filters=filters),

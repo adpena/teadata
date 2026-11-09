@@ -455,6 +455,35 @@ establish all-LEA coverage. The packaged entries expose the source contracts
 without adding district rows to the default engine or app. Engine/app consumer
 cutover, field correctness and release qualification remain separate reviewed steps.
 
+## Compare the district publisher directions
+
+Run the direction audit on an exact pinned native district release. Repeat
+`--year` to check multiple school years.
+
+```sh
+uv run --locked --offline python -m teadata.scripts.refresh_transfers audit-district-directions \
+  --district-release "$DISTRICT_RELEASE_MANIFEST" --district-pin "$DISTRICT_MANIFEST_SHA256" \
+  --store "$TRANSFER_PROVENANCE_STORE" --year 2012-13 --year 2018-19 --year 2025-26
+```
+
+The audit compares independently reported detail rows after orienting them
+from residence to attendance. It reports one-sided pairs, differing statuses,
+unequal observed counts, and equivalent measurements with different raw
+tokens. Publisher totals and separators stay outside the pair comparison.
+The report returns aggregate discrepancy counts.
+
+Charter flags come from the same edition's reporting rows. The optional store
+supplies verified annual TEA district-type rosters for 2012–13 through 2015–16.
+The report identifies that receipt and counts unknown origins and destinations
+separately. Absence from a roster remains unknown. The district reader keeps
+TEA's In and Out observations and totals independent.
+
+Exit status 2 signals a held edition. For example, the published 2018–19
+district edition has 62 reciprocal pairs with different suppression status,
+including nine charter destinations. A passing result establishes reciprocal
+detail agreement for the checked edition. Source qualification, roster
+coverage, historical geometry, and activation have separate gates.
+
 ## Compare campus observations with district reports
 
 `compare-campus-district` compares cross-district directional details from a
