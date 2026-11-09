@@ -539,6 +539,10 @@ def student_report_ledger(document: Mapping[str, Any], key: EditionKey, roster: 
 def audit_rows(raw: bytes, reports: tuple[ReportSelection, ...]) -> Iterator[dict[str, Any]]:
     """Stream the exact scope's audited source coordinates with finite bounds."""
     receipts = {entry.receipt: number for number, entry in enumerate(reports)}
+    fields = {"receipt", "row", "column", "section", "label", "population", "measure", "reason",
+              "token_status", "token_reason", "raw"}
+    statuses = {status.value for status in ValueStatus}
+    decode = json.JSONDecoder(object_pairs_hook=_unique_object).decode
     last = (-1, 0, 0)
     total = 0
     with gzip.GzipFile(fileobj=BytesIO(raw)) as stream:
@@ -549,14 +553,15 @@ def audit_rows(raw: bytes, reports: tuple[ReportSelection, ...]) -> Iterator[dic
             total += len(line)
             _need(number < MAX_AUDIT_ROWS and total <= MAX_AUDIT_BYTES and len(line) <= MAX_AUDIT_LINE_BYTES
                   and line.endswith(b"\n"), "Student raw audit exceeds its bounds")
-            row = json.loads(line, object_pairs_hook=_unique_object)
-            fields = {"receipt", "row", "column", "section", "label", "population", "measure", "reason",
-                      "token_status", "token_reason", "raw"}
-            _need(isinstance(row, dict) and set(row) == fields and isinstance(row["receipt"], str)
+            # A quoted key immediately after the brace identifies the usual UTF-8
+            # wire form. Keep json.loads encoding detection for other byte prefixes.
+            row = (decode(line.decode("utf-8", "surrogatepass")) if line.startswith(b'{"')
+                   else json.loads(line, object_pairs_hook=_unique_object))
+            _need(isinstance(row, dict) and row.keys() == fields and isinstance(row["receipt"], str)
                   and row["receipt"] in receipts and all(type(row[key]) is int and row[key] > 0 for key in ("row", "column"))
                   and all(isinstance(row[key], str) for key in ("section", "label", "population", "measure", "raw", "token_status"))
                   and all(row[key] is None or isinstance(row[key], str) for key in ("reason", "token_reason"))
-                  and row["token_status"] in {status.value for status in ValueStatus}, "Invalid student raw audit record")
+                  and row["token_status"] in statuses, "Invalid student raw audit record")
             current = (receipts[row["receipt"]], row["row"], row["column"])
             _need(current > last, "Duplicate or unordered student raw audit coordinates")
             last = current

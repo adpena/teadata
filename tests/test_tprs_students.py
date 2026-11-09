@@ -855,6 +855,28 @@ def test_statewide_audit_rejects_missing_held_cell_despite_valid_gzip(grid, poli
         tprs_statewide_intake.verify_audit_coverage(gzip.compress(b"".join(encoded[:-1])), selection, grid_bytes)
 
 
+@pytest.mark.parametrize(('encoding', 'leading'), [('utf-8', ''), ('utf-8', ' '), ('utf-8-sig', ''),
+                                                  ('utf-16-be', ''), ('utf-32-be', '')])
+def test_audit_json_decoder_preserves_rows_and_duplicate_rejection(encoding, leading):
+    selection = (tprs_statewide_intake.ReportSelection('state', 'S', 'a' * 64, 'b' * 64),)
+    row = {'receipt': selection[0].receipt, 'row': 1, 'column': 2, 'section': 'café', 'label': 'Label',
+           'population': 'All', 'measure': 'Count', 'reason': None, 'token_status': 'suppressed',
+           'token_reason': None, 'raw': '\ud800'}
+    wire = json.dumps(row, ensure_ascii=encoding != 'utf-8') + '\n'
+    raw = gzip.compress((leading + wire).encode(encoding, 'surrogatepass'))
+    assert list(tprs_statewide_intake.audit_rows(raw, selection)) == [row]
+
+    duplicate = gzip.compress((leading + '{"receipt": null,' + wire[1:]).encode(encoding, 'surrogatepass'))
+    with pytest.raises(ValueError, match='duplicate JSON keys'):
+        list(tprs_statewide_intake.audit_rows(duplicate, selection))
+
+
+def test_audit_json_decoder_rejects_invalid_utf8():
+    raw = gzip.compress(b'{"receipt": "\xff"}\n')
+    with pytest.raises(UnicodeDecodeError):
+        list(tprs_statewide_intake.audit_rows(raw, ()))
+
+
 def test_dynamic_crosswalk_changes_only_ordered_actual_input_identity():
     a, b = "a" * 64, "b" * 64
     forward = students._crosswalk({"district": [a, b]})
