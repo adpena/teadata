@@ -63,6 +63,25 @@ advanced count downloads have separate rules.
 | 2024–25 TAPR | [Edition index](https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/index.html) · [Bulk download selector](https://rptsvr1.tea.texas.gov/perfreport/tapr/tapr_dd_download.html?year=2025) | [Glossary](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/2024-25-comprehensive-tapr-glossary-0.pdf) · [Masking guide](https://rptsvr1.tea.texas.gov/perfreport/tapr/2025/masking.html) |
 | 2025–26 TPRS observations | [2026–27 user guide and publication schedule](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/tprs-user-guide-2026.pdf) | [Comprehensive glossary](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/comprehensive-tprs-glossary.pdf) and the disclosure legend on the exact report. |
 
+The 2025–26 TPRS Graduation Profile measures **2024–25 annual graduates**.
+The named-report intake reader verifies the selected geography and keeps
+the displayed benchmark cells separate from the local count and percent.
+The campus display includes district and Texas benchmark counts. The
+district display includes Texas counts and percents. The direct Texas
+report provides the statewide observation. The report legend identifies
+`-` as no students in the group and `?` as a value outside a reasonable
+range. The reader preserves both raw tokens and keeps them distinct from
+an observed zero. [Named Texas report](https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2026&id=S&lev=S&prgopt=reports%2Ftapr%2Fgradprofile.sas)
+
+The named layout has been checked against selected campus, district and
+Texas reports. Statewide intake and release activation remain open. The
+linked Excel reports in the checked sample declare a worksheet range
+that omits the final CTE Completers row. TEA's separate Annual Leavers
+report publishes 400,377 graduate records and warns that students can
+appear more than once. TPRS prints 400,365 annual graduates. Keep the
+two source totals separate. Neither is the four-year longitudinal
+graduation count. [Annual Leavers state report](https://rptsvr1.tea.texas.gov/acctres/leavers/2425/state.html) · [Class of 2025 graduation definitions](research-graduation.md)
+
 PEIMS [submission standards](https://tea.texas.gov/data-reports/data-submission/peims/peims-data-standards/peims-data-standards)
 document input elements and codes. Public aggregate products have their own
 definitions and disclosure rules, such as the [primary-disability report criteria](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/abtspeced.html)
