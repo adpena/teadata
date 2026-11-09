@@ -132,7 +132,94 @@ Prefer a shared database over large pickle blobs? Install the optional extra and
 uv add "teadata[database]"
 ```
 
-### Export to SQL
+### Materialize selected observations into your own tables
+
+Use `DataRelease.series()` to select source fields, measurement school years
+and, optionally, campus or district IDs. Inspect `series.schema` and
+`series.provenance()` before opening the observations. Use
+`series.to_sql(connection, observations, receipts=receipts)` with your
+SQLAlchemy Core tables and an active transaction. The same contract appears
+in `describe_operators()["release_methods"]`.
+
+Run the [SQLite example](../examples/materialize_research_db.py) from this
+checkout. It uses public release assets and a database path you choose.
+
+```bash
+uv run --extra database python examples/materialize_research_db.py research.sqlite
+sqlite3 research.sqlite 'SELECT measurement_school_year, campus_number, COUNT(*) FROM campus_enrollment GROUP BY 1, 2 ORDER BY 1, 2;'
+```
+
+The observation table uses each projected Arrow field as a SQLAlchemy column
+key, plus an `import_id` referencing the receipt's primary key. Use text
+columns for identifiers and original publisher tokens. A SQLAlchemy
+`Column(key=...)` can map a source key to a different SQL column name. The
+example's fact key combines the import, measurement year, campus and
+ethnicity. Adapt keys and types to the publisher's grain. TEA Data inserts
+one native batch at a time using bound parameters. It preserves support
+columns, including raw tokens and status, and leaves DDL, indexes, commit
+and rollback to the caller. Let errors propagate out of
+`with engine.begin() as connection` to roll back an incomplete import.
+With SQLite's legacy transaction mode, use a top-level transaction.
+
+The JSON receipt stores the exact root build and manifest checksum, edition
+and artifact identities, field definitions, publisher links, acquisition
+dates where known, selector, citations and observed row counts by year.
+The returned `SeriesSqlExport.to_dict()` is JSON-ready. An absent
+requested entity-year raises `SeriesCoverageError` by default. Its
+`result.missing_entity_years` identifies the gaps. For a deliberately sparse
+panel, pass `require_complete=False` to store only published rows and include
+the missing pairs in the receipt. Suppressed rows remain present with a SQL
+`NULL` numeric value and their original token. Duplicate imports into the
+same table raise on the receipt's primary key.
+
+The example's 2021–22 observations for A+ Academy Elementary (`057829001`)
+were checked against [TEA's campus report](https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.addispatch.sas&endyear=22&major=st&minor=e&format=w&selsumm=nc&linespg=60&charsln=120&grouping=e&loop=2&key=057829001&_debug=0),
+retrieved November 9, 2026, under acquisition receipt
+`0183affaf59a4bed506785d6febf31e3095cea562ddbefd4dfe24866dd15755e`.
+The five checked cells include Asian enrollment suppressed as `<10` and
+White enrollment observed as `17`. To run that golden against the original
+published native artifact or a verified local copy, set
+`TEADATA_SQL_GOLDEN_MANIFEST` to the manifest and run
+`uv run --extra database pytest tests/test_series_sql.py`.
+
+#### Query from Django, Flask, or SQL
+
+Build the database outside web requests. For Django, use a dedicated database
+alias and reviewed unmanaged models for separately built tables. Django's
+`inspectdb --database <alias>` can scaffold model fields. Review the primary
+key and use read-only database credentials or SQLite `mode=ro` to enforce
+read-only access. Django's `managed = False` controls migrations. Use a
+management command only if the app needs an app-specific rebuild workflow.
+See the [TEA Data app's production example](https://github.com/adpena/teadata-app/blob/main/docs/data-release-migration.md#read-only-profile-snapshot)
+and [Django's database integration guide](https://docs.djangoproject.com/en/6.1/howto/legacy-databases/).
+
+In Flask, use a [Flask-SQLAlchemy bind](https://flask-sqlalchemy.palletsprojects.com/en/stable/binds/)
+for the same tables or open them with SQLAlchemy Core. Raw SQL clients can
+query the fact table and join its `import_id` to the receipt. PostgreSQL
+deployments can supply their own transactional SQLAlchemy connection, driver
+and schema. The same example rows and rollback behavior were checked in
+SQLite and PostgreSQL.
+
+For DuckDB, [query the Arrow stream directly](https://duckdb.org/docs/stable/guides/python/sql_on_arrow).
+Register a new reader for each query that consumes it. Keep
+`series.provenance()` with any result you save.
+
+```python
+import duckdb
+import pyarrow as pa
+
+with duckdb.connect() as connection:
+    reader = pa.RecordBatchReader.from_batches(series.schema, series.iter_batches())
+    connection.register("observations", reader)
+    counts = connection.sql(
+        "SELECT measurement_school_year, COUNT(*) AS observations "
+        "FROM observations GROUP BY 1 ORDER BY 1"
+    ).fetchall()
+```
+
+### Round-trip the canonical entity graph
+
+#### Export to SQL
 
 ```python
 from teadata import DataEngine
@@ -169,7 +256,7 @@ They do not hydrate ORM records, query every entity, or read the destination's
 entire transfer history. `batch_size` controls additional row buffers; the input
 `DataEngine` itself still contains its object graph.
 
-### Import from SQL
+#### Import from SQL
 
 ```python
 from teadata.persistence import import_dataengine
@@ -214,7 +301,7 @@ UUIDs or JSONB columns must be recreated and refilled from the catalog-bound
 source: those representations may already have lost information. `ensure_schema`
 refuses those layouts and does not silently alter or repair existing databases.
 
-### Querying Metadata in SQL
+#### Querying Metadata in SQL
 
 Want to query enrichment fields directly? Example Postgres snippets:
 

@@ -83,12 +83,13 @@ class _MethodArgument(_Argument):
 
 
 class _SeriesMethod(TypedDict):
-    name: Literal["pair_years"]
+    name: Literal["pair_years", "to_sql"]
     receiver: Literal["ObservationSeries"]
     description: str
     arguments: list[_MethodArgument]
-    result: Literal["ObservationPair"]
+    result: Literal["ObservationPair", "SeriesSqlExport"]
     result_methods: list[str]
+    requires: NotRequired[str]
 
 
 class _ReleaseMethod(TypedDict):
@@ -986,7 +987,7 @@ _RELEASE_METHODS: list[_ReleaseMethod] = [{
                                              description="Entity directory for names. Required for native-only releases.")},
     ],
     "result": "ObservationSeries",
-    "result_methods": ["for_year", "iter_batches", "to_arrow", "to_df", "provenance", "pair_years"],
+    "result_methods": ["for_year", "iter_batches", "to_arrow", "to_df", "provenance", "pair_years", "to_sql"],
     "result_operations": [{
         "name": "pair_years",
         "receiver": "ObservationSeries",
@@ -997,6 +998,20 @@ _RELEASE_METHODS: list[_ReleaseMethod] = [{
         ],
         "result": "ObservationPair",
         "result_methods": ["provenance", "to_arrow", "to_df"],
+    }, {
+        "name": "to_sql",
+        "receiver": "ObservationSeries",
+        "description": "Stream pinned observations and a provenance receipt into existing SQL tables.",
+        "arguments": [
+            {"kind": "positional", **_argument("connection", python_types=("sqlalchemy.Connection",))},
+            {"kind": "positional", **_argument("observations", python_types=("sqlalchemy.Table",))},
+            {"kind": "keyword_only", **_argument("receipts", python_types=("sqlalchemy.Table",))},
+            {"kind": "keyword_only", **_argument("require_complete", "boolean", default=True,
+                                                 description="Require rows for every explicitly selected entity-year.")},
+        ],
+        "result": "SeriesSqlExport",
+        "result_methods": ["to_dict"],
+        "requires": "teadata[database], an active transaction, and caller-defined SQLAlchemy tables.",
     }],
     "discovery": ["catalog.editions", "catalog.variables", "observation_years",
                   "DataEngine.district_named", "DataEngine.campus_named"],

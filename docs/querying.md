@@ -211,6 +211,10 @@ Format discovered years as four digits when passing them back literally.
 Review publisher
 definitions and historical identity before calculating changes.
 
+Use [`series.to_sql()`](enrichment.md#materialize-selected-observations-into-your-own-tables)
+to stream the same projected records and provenance into caller-defined
+SQL tables. For ad hoc DuckDB queries, register the series' Arrow batches.
+
 ## Align two years by public ID
 
 Use `series.pair_years(from_year=13, to_year=2022)` to align two years

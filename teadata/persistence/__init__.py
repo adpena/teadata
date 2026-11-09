@@ -1,5 +1,6 @@
 """Persistence helpers for working with relational databases."""
 
+from .series import SeriesCoverageError, SeriesSqlExport
 from .sqlalchemy_store import (
     Base,
     CampusMetaRecord,
@@ -26,6 +27,8 @@ __all__ = [
     "DistrictMetaRecord",
     "DistrictRecord",
     "LazyMetaDict",
+    "SeriesCoverageError",
+    "SeriesSqlExport",
     "available_meta_keys",
     "create_engine",
     "create_sessionmaker",

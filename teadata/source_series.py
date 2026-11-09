@@ -16,8 +16,10 @@ from .source_views import SourceTable, _entity_key, _open_export, _plan_export
 if TYPE_CHECKING:
     import pandas as pd
     import pyarrow as pa
+    from sqlalchemy import Connection, Table
 
     from .export_provenance import ExportProvenance
+    from .persistence import SeriesSqlExport
     from .release import DataRelease
     from .source_views import _ExportSelection
 
@@ -80,6 +82,7 @@ class ObservationSeries:
     _sources: tuple[tuple[int, SourceTable, _ExportSelection, ExportProvenance], ...]
     schema: pa.Schema
     _registry: tuple[str, str, tuple[str, ...]] | None
+    _release: DataRelease
 
     @classmethod
     def _plan(
@@ -198,7 +201,12 @@ class ObservationSeries:
         registry_identity = None if registry is None else (registry.build_id, registry.manifest_sha256, selected_names)
         selected_fields = views[0][1]._fields
         assert selected_fields is not None
-        return cls(dataset, selected_fields, scope, cohort, tuple(views), schema, registry_identity)
+        return cls(dataset, selected_fields, scope, cohort, tuple(views), schema, registry_identity, release)
+
+    @property
+    def release(self) -> DataRelease:
+        """The pinned root release used to select this series' editions."""
+        return self._release
 
     @property
     def years(self) -> tuple[int, ...]:
@@ -274,6 +282,22 @@ class ObservationSeries:
         frame = table.to_pandas(types_mapper=pd.ArrowDtype)
         frame.attrs["teadata_provenance"] = json.loads((table.schema.metadata or {})[_PROVENANCE_KEY])
         return frame
+
+    def to_sql(self, connection: Connection, observations: Table, *, receipts: Table,
+               require_complete: bool = True) -> SeriesSqlExport:
+        """Stream into caller-defined SQLAlchemy tables with a pinned JSON receipt.
+
+        Install `teadata[database]`. Use an active transactional connection
+        (for example `with engine.begin() as connection`) and let errors
+        propagate for rollback. Observation column keys match `series.schema`
+        plus `import_id`. The receipt table has `id` as its primary key and a
+        JSON `receipt` column. This method does not create tables or commit.
+        Explicitly selected IDs require a row for every selected year by
+        default. Pass `require_complete=False` to record missing pairs.
+        """
+        from .persistence.series import _export_series
+
+        return _export_series(self, connection, observations, receipts=receipts, require_complete=require_complete)
 
 
 @dataclass(frozen=True, slots=True, eq=False)

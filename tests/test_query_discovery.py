@@ -64,10 +64,14 @@ def test_series_discovery_matches_the_release_method_signature():
     assert method["name"] == "series" and method["receiver"] == "DataRelease"
     assert method["result"] == "ObservationSeries"
     assert {"to_arrow", "to_df", "provenance", "iter_batches"} <= set(method["result_methods"])
-    operation, = method["result_operations"]
-    assert operation["name"] in method["result_methods"]
-    assert operation["result"] == "ObservationPair"
-    assert [arg["name"] for arg in operation["arguments"]] == list(signature(ObservationSeries.pair_years).parameters)[1:]
+    operations = {operation["name"]: operation for operation in method["result_operations"]}
+    assert operations.keys() == {"pair_years", "to_sql"}
+    for name, operation in operations.items():
+        assert name in method["result_methods"]
+        assert [arg["name"] for arg in operation["arguments"]] == list(
+            signature(getattr(ObservationSeries, name)).parameters)[1:]
+    assert operations["pair_years"]["result"] == "ObservationPair"
+    assert operations["to_sql"]["result"] == "SeriesSqlExport"
     arguments = method["arguments"]
     parameters = tuple(signature(DataRelease.series).parameters.values())[1:]
     assert [item["name"] for item in arguments] == [parameter.name for parameter in parameters]
@@ -87,7 +91,7 @@ import importlib.abc, json, pathlib, socket, sqlite3, sys, urllib.request
 
 class Trap(importlib.abc.MetaPathFinder):
     def find_spec(self, fullname, path=None, target=None):
-        if fullname in {"teadata.release", "teadata.engine"}:
+        if fullname in {"teadata.release", "teadata.engine", "sqlalchemy"}:
             raise AssertionError("Unexpected import: " + fullname)
 
 def forbidden(*args, **kwargs):
