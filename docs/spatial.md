@@ -89,7 +89,7 @@ results, exports and app profiles.
 
 | Geography | Source to qualify | Distinct relationships to expose |
 | --- | --- | --- |
-| County | [Census TIGER/Line archive](https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-geodatabase-file.2013.html) and [TEA geography](https://tea.texas.gov/families-and-students/school-district-locator/geographic-data) | Campus location, district office location, and school district boundary overlap |
+| County | [Comptroller property value study](https://comptroller.texas.gov/taxes/property-tax/pvs/index.php), [Census TIGER/Line archive](https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-geodatabase-file.2013.html), and [TEA geography](https://tea.texas.gov/families-and-students/school-district-locator/geographic-data) | Taxable-property reporting, campus location, district office location, and school district boundary overlap |
 | Education service center | [TEA ESC map](https://tea.texas.gov/school-and-district-leaders/other-services/education-service-centers/education-service-centers-map) and [AskTED definitions](https://tea.texas.gov/reports-and-data/school-performance/accountability-research/exploring-askted.pdf) and [archive index](https://tealprod.tea.state.tx.us/Tea.AskTed.Web/Forms/ArchivedSchoolAndDistrictDataFiles.aspx) | District services, PEIMS reporting, office region, and physical campus region |
 | Texas House, Texas Senate, U.S. House, and State Board of Education | [Texas Legislative Council district plans](https://redistricting.capitol.texas.gov/Current-districts) and [plan history](https://redistricting.capitol.texas.gov/history) | Campus location and school district boundary overlap under a specified plan and effective date |
 | U.S. Senate | [U.S. Senate representation](https://www.senate.gov/about/origins-foundations/senate-and-constitution/two-senators-per-state.htm) | Texas statewide geography, with both seats represented on one state profile |
@@ -147,6 +147,42 @@ boundary year, 2020 Census population vintage, and effective representation
 date are distinct. The workbook percentages remain part of the literal
 source label. The reader loads Locator attributes only. Use separately pinned
 polygons to draw profile maps. [Legislative Council plans and resources](https://redistricting.capitol.texas.gov/Current-districts)
+
+### Comptroller taxable-property county rosters
+
+The 2025 Final School District Property Value Study lists school districts by
+county for taxable-property reporting. The retained edition has 1,549 county
+and district pairs across 254 counties and 1,013 school districts. The index
+links to 253 county pages because Potter (188) and Randall (191) share one
+page. Both county sections have their own worksheets. Districts such as
+Amarillo ISD (188901) can appear in both sections.
+[Comptroller 2025 Final index](https://comptroller.texas.gov/taxes/property-tax/pvs/2025f/index.php)
+· [Potter and Randall report](https://comptroller.texas.gov/auto-data/PT2/PVS/2025F/188index.php)
+
+```python
+from teadata.comptroller_pvs import read_comptroller_county_roster
+
+roster = read_comptroller_county_roster(
+    store, index_receipt=index_receipt, county_page_receipts=page_receipts
+)
+counties = roster.for_district("248902")  # Wink-Loving ISD in Loving and Winkler
+districts = roster.for_county("191")     # Randall County
+```
+
+The offline reader uses a provenance store with the index and its 253 exact
+page captures. Pass a mapping from each three-digit Comptroller page code to
+its acquisition receipt. The index receipt and each row's county receipt
+locate the original bytes and download timestamps in the store. The row
+includes the county code and name, district ID, publisher label with
+whitespace normalized, and direct worksheet URL. Counties use Comptroller
+codes. The period is tax year 2025.
+
+The relationships describe what the publisher included in this study. A
+valid district ID can be absent. Use separate sources for school-year
+administrative assignments, campus locations, and district boundary overlaps.
+The reader supports this retained 2025 Final edition. Earlier published
+editions require their own source validation. The current integrated data
+manifest and app profiles do not include this roster.
 
 ### Archived administrative geography
 
