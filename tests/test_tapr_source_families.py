@@ -611,6 +611,11 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     assert list(current['data_sources'].pop(courses)) == [2023, 2024, 2025, 2026]
     assert current['schema']['data_sources'].pop(courses) == ['csv']
     assert current['value_policies'].pop('peims_course_csv')['reference_id'] == 'course_criteria'
+    college_credit = current['data_sources'].pop('peims_college_credit')
+    assert list(college_credit) == [2022, 2023, 2024, 2025, 2026]
+    assert all(list(entry['reader']['profiles']) == ['source'] for entry in college_credit.values())
+    assert current['schema']['data_sources'].pop('peims_college_credit') == ['csv']
+    assert current['value_policies'].pop('peims_college_credit_csv')['reference_id'] == 'college_credit_criteria'
     indicator = 'spp_timely_initial_evaluation'
     assert list(current['data_sources'].pop(indicator)) == [2024, 2025]
     assert current['schema']['data_sources'].pop(indicator) == ['xlsx']
