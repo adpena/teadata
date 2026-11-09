@@ -829,22 +829,36 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(
         route_calls = []
         original = DataRelease._build_student_campus_index
 
-        def route(instance, edition, trace=None):
-            route_calls.append(edition)
-            return original(instance, edition, trace)
+        def route(instance, edition, trace=None, *, reuse_catalog=False):
+            route_calls.append((edition, id(instance), reuse_catalog))
+            return original(instance, edition, trace, reuse_catalog=reuse_catalog)
+
+        ledger_calls = []
+
+        def observe_ledger(reader, artifact, refs):
+            ledger_calls.append((id(reader), refs["roster"].location, refs["roster"].sha256))
+            return read_ledger(reader, artifact, refs)
 
         monkeypatch.setattr(DataRelease, "_build_student_campus_index", route)
         with monkeypatch.context() as planning:
             planning.setattr(DataRelease, "artifact", lambda *a, **k: pytest.fail("Planning opened a native leaf"))
             pinned = cohort.observations(students.DATASET, field, school_year=26, edition=key, release=parent)
             assert pinned.edition == key and not route_calls
-            one = (engine >> ("campus", last_id)).observations(students.DATASET, field, school_year=26, release=parent)
+            with monkeypatch.context() as cold:
+                cold.setattr(DataRelease, "_student_report_ledger", observe_ledger)
+                one = (engine >> ("campus", last_id)).observations(students.DATASET, field, school_year=26, release=parent)
             with using_release(parent):
                 both = cohort >> ("observations", students.DATASET, "2025-26", (field,))
             assert isinstance(one, SourceTable) and one.edition == key
             assert isinstance(both, PartitionedSourceTable) and both.editions[-1] == key
-            assert route_calls == ["2026"] * (1 if getattr(os, "O_NOFOLLOW", 0) else 2)
+            assert [call[0] for call in route_calls] == ["2026"] * (1 if getattr(os, "O_NOFOLLOW", 0) else 2)
             if getattr(os, "O_NOFOLLOW", 0):
+                _, discovery, reuse = route_calls[0]
+                assert reuse and len(ledger_calls) == 2 and all(receiver == discovery for receiver, _, _ in ledger_calls)
+                memo = parent._campus_observation_plan
+                roster_names = {name for _, name, _ in ledger_calls}
+                assert roster_names <= {path.name for path, _ in memo.route.files}
+                assert roster_names.isdisjoint(path.name for path, _ in memo.files)
                 assert set(one.release.catalog._edition_views) == {key.identity}
                 assert "_campus_observation_plan" not in parent.__getstate__()
                 with monkeypatch.context() as warm:
@@ -876,8 +890,8 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(
 
                 original_route = parent._automatic_student_campus_index
 
-                def change_after_route_check(child, edition):
-                    route = original_route(child, edition)
+                def change_after_route_check(child, edition, **kwargs):
+                    route = original_route(child, edition, **kwargs)
                     roster_path.write_bytes(b" " + original_roster[1:])
                     return route
 
@@ -911,6 +925,36 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(
                         students.DATASET, field, school_year=26, release=no_memo,
                     )
                 assert direct.edition == key and not hasattr(no_memo, "_campus_observation_plan")
+                assert {digest for _, _, digest in ledger_calls}.isdisjoint(direct.release._column_schema_data)
+                direct_buffers = direct.release._column_schema_data.copy()
+                ledger_calls.clear()
+                with monkeypatch.context() as standalone:
+                    standalone.setattr(DataRelease, "_student_report_ledger", observe_ledger)
+                    assert direct.release.tprs_student_campus_index(edition="2026").edition_for(last_id) == key
+                    native_view = direct.release._entity_observations(
+                        students.DATASET, (field,), identifiers=(last_id,), **options,
+                    )
+                assert native_view.edition == key and direct.release._column_schema_data == direct_buffers
+                assert len(ledger_calls) == 4 and all(receiver != id(direct.release) for receiver, _, _ in ledger_calls)
+
+                manifest = composed.path.read_bytes()
+
+                def damage_manifest(reader, artifact, refs):
+                    result = read_ledger(reader, artifact, refs)
+                    composed.path.write_bytes(b" " + manifest[1:])
+                    return result
+
+                try:
+                    with monkeypatch.context() as path_check:
+                        path_check.setattr("teadata.release._require_cache_file", decline_memo)
+                        path_check.setattr(DataRelease, "_student_report_ledger", damage_manifest)
+                        fresh_parent = DataRelease(parent.path, offline=True)
+                        with pytest.raises(ContractError, match="manifest checksum"):
+                            (engine >> ("campus", last_id)).observations(
+                                students.DATASET, field, school_year=26, release=fresh_parent,
+                            )
+                finally:
+                    composed.path.write_bytes(manifest)
             with pytest.raises(ContractError, match="No report for 1 campus IDs"):
                 composed._entity_observations(students.DATASET, (field,), identifiers=(first_id, "999999999"), **options)
             original_options = parent._observation_year_options

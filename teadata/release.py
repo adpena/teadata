@@ -649,7 +649,7 @@ class DataRelease:
         return self._build_student_campus_index(edition)
 
     def _build_student_campus_index(
-        self, edition: str, trace: set[_MetadataStamp] | None = None,
+        self, edition: str, trace: set[_MetadataStamp] | None = None, *, reuse_catalog: bool = False,
     ) -> TPRSStudentCampusIndex:
         from .tprs_statewide_intake import DATASET, TPRSStudentCampusIndex
 
@@ -679,14 +679,23 @@ class DataRelease:
             artifacts: dict[str, list[str]] = {}
             for artifact_id, edition_id in child.catalog._artifact_routes.items():
                 artifacts.setdefault(edition_id, []).append(artifact_id)
+            source = child.source if child.remote else child.path
+
+            def reopen() -> DataRelease:
+                return DataRelease(source, expected_sha256=child.manifest_sha256,
+                                   offline=child.offline, cache_dir=child._cache_dir)
+
+            if reuse_catalog:
+                pinned = reopen()
+                if (pinned.path, pinned.cache) != (child.path, child.cache):
+                    raise ContractError("Campus Student manifest location changed before routing")
             for key in keys:
                 ids = artifacts.get(key.identity, [])
                 if len(ids) != 1:
                     raise ContractError("Campus routing requires one artifact per Student edition")
-                source = child.source if child.remote else child.path
-                selected = DataRelease(source, expected_sha256=child.manifest_sha256,
-                                       offline=child.offline, cache_dir=getattr(child, "_cache_dir", None))
-                selected._metadata_trace = trace
+                selected = child if reuse_catalog else reopen()
+                if not reuse_catalog:
+                    selected._metadata_trace = trace
                 metadata = selected.catalog._edition_child(key.identity)
                 try:
                     bindings = (FieldBinding.from_dict(value) for value in metadata["field_bindings"])
@@ -709,6 +718,10 @@ class DataRelease:
                     if report.identifier in routes:
                         raise ContractError(f"Multiple Student editions contain campus {report.identifier}")
                     routes[report.identifier] = key
+            if reuse_catalog:
+                pinned = reopen()
+                if (pinned.path, pinned.cache) != (child.path, child.cache):
+                    raise ContractError("Campus Student manifest location changed during routing")
         return TPRSStudentCampusIndex(self.manifest_sha256, edition, routes)
 
     def _observation_year_options(
@@ -855,7 +868,8 @@ class DataRelease:
             if getattr(child.catalog, "_v4", False) and all(
                 (source.manifest_sha256, key.edition) == identity for source, key in matches
             ):
-                route = self._automatic_student_campus_index(child, first.edition)
+                reuse_catalog = memoize and child is not self and child._metadata_trace is not None
+                route = self._automatic_student_campus_index(child, first.edition, reuse_catalog=reuse_catalog)
                 if route is None:
                     return self._select_observation_view(fields, scope, year, options)._for_entity_ids(identifiers)
                 matching_keys = frozenset(key for _, key in matches)
@@ -867,7 +881,7 @@ class DataRelease:
                     memo = _CampusObservationPlan(request, year, ref, matching_keys, route, tuple(trace))
                     selected = _open_native_source(ref, parent, offline=self.offline, cache_dir=cache_dir)
                     if not route.matches_files(selected):
-                        route = self._automatic_student_campus_index(child, first.edition)
+                        route = self._automatic_student_campus_index(child, first.edition, reuse_catalog=reuse_catalog)
                         if route is None:
                             return self._select_observation_view(fields, scope, year, options)._for_entity_ids(identifiers)
                     elif _matches_metadata_files(memo.files):
@@ -905,7 +919,9 @@ class DataRelease:
                       for key, ids in groups.items())
         return parts[0] if len(parts) == 1 else PartitionedSourceTable(parts)
 
-    def _automatic_student_campus_index(self, child: DataRelease, edition: str) -> _CampusRouteAdmission | None:
+    def _automatic_student_campus_index(
+        self, child: DataRelease, edition: str, *, reuse_catalog: bool = False,
+    ) -> _CampusRouteAdmission | None:
         from .tprs_statewide_intake import DATASET
 
         identity = (child.manifest_sha256, edition)
@@ -922,7 +938,17 @@ class DataRelease:
         if not all(roster_backed) or len(artifacts) != len(keys):
             return None
         trace: set[_MetadataStamp] | None = set() if getattr(os, "O_NOFOLLOW", 0) else None
-        index = child._build_student_campus_index(edition, trace)
+        if reuse_catalog:
+            discovery_trace = child._metadata_trace
+            discovery_buffers = child._column_schema_data.copy()
+            child._metadata_trace = trace
+            try:
+                index = child._build_student_campus_index(edition, trace, reuse_catalog=True)
+            finally:
+                child._metadata_trace = discovery_trace
+                child._column_schema_data = discovery_buffers
+        else:
+            index = child._build_student_campus_index(edition, trace)
         files = tuple(trace) if trace and len(trace) <= 256 and all(len(str(path)) <= 4096 for path, _ in trace) else ()
         admission = _CampusRouteAdmission(index, (child.path, child.cache), files)
         if admission.matches_files(child):
