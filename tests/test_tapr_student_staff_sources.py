@@ -470,3 +470,19 @@ assert not any(n==p or n.startswith(p+'.') for n in sys.modules for p in heavy)
 '''
     result = subprocess.run([sys.executable, '-B', '-c', code, str(edition)], cwd=ROOT, capture_output=True, text=True)
     assert result.returncode == 0, result.stdout + result.stderr
+
+
+@pytest.mark.parametrize('scope', ['campus', 'district'])
+def test_2025_staff_edition_metadata_carries_its_schema_receipt(scope):
+    cfg = load_config()
+    dataset = f'{scope}_tapr_staff_profile'
+    source = cfg.resolve_dataset(dataset, 2025, exact=True, reader_profile='source')
+    contract = cfg.column_contract(dataset, 2025, reader_profile='source')
+    assert contract is not None
+    reference, = [ref for ref in source.metadata.references if ref.role == 'schema']
+    assert reference.reviewed_sha256 == contract['sha256']
+    pin, = reference.provenance_ids
+    observation = ProvenanceStore(ROOT / 'provenance').read_record(pin)
+    assert observation['dataset'] == dataset + ':schema'
+    assert observation['method'] == 'local_observation' and observation['downloaded_at'] is None
+    assert observation['artifact']['sha256'] == reference.reviewed_sha256

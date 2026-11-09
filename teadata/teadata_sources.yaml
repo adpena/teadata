@@ -3626,6 +3626,14 @@ data_sources:
           provenance_ids:
           - 6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554
           reviewed_sha256: 7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2025--staff-profile-crosswalk.json
+          title: Reviewed complete 2025 staff_profile source-only contract
+          status: available
+          provenance_ids:
+          - 433fcb120c57b50c9fd7e37160c9cd74bc166c4ec1875a22ae44a8fe5ecaa0e9
+          reviewed_sha256: 579619e1d337a6c34078ad45f8138ac9277c4d3e6751995a56ad084c9599300e
       reader:
         profiles:
           source:
@@ -3634,14 +3642,6 @@ data_sources:
               scope: campus
               tables:
                 staff_profile: data/tapr/raw/2025-campus-STAF-all-checked.csv
-            references:
-            - reference_id: columns_source
-              role: schema
-              path: schemas/tapr--2025--staff-profile-crosswalk.json
-              title: Reviewed complete 2025 staff_profile source-only contract
-              status: available
-              provenance_ids: []
-              reviewed_sha256: 579619e1d337a6c34078ad45f8138ac9277c4d3e6751995a56ad084c9599300e
   district_tapr_student_profile:
     2024:
       path: data/tapr/raw/2024 District Student Information.csv
@@ -4494,6 +4494,14 @@ data_sources:
           provenance_ids:
           - 6e4908dc2727a5de0610f9a00a3ec8983810f3aa7577d604c80ba53d93992554
           reviewed_sha256: 7b6e5840645656bf3c0d977431e7f9fcd6ea984bb1734b6387471f8ad4851de8
+        - reference_id: columns_source
+          role: schema
+          path: schemas/tapr--2025--staff-profile-crosswalk.json
+          title: Reviewed complete 2025 staff_profile source-only contract
+          status: available
+          provenance_ids:
+          - 175aad14cf1eb4a55f0a7f57832210e219e044dd1c370d425daa312bac64bc54
+          reviewed_sha256: 579619e1d337a6c34078ad45f8138ac9277c4d3e6751995a56ad084c9599300e
       reader:
         profiles:
           source:
@@ -4502,14 +4510,6 @@ data_sources:
               scope: district
               tables:
                 staff_profile: data/tapr/raw/2025-district-STAF-all-checked.csv
-            references:
-            - reference_id: columns_source
-              role: schema
-              path: schemas/tapr--2025--staff-profile-crosswalk.json
-              title: Reviewed complete 2025 staff_profile source-only contract
-              status: available
-              provenance_ids: []
-              reviewed_sha256: 579619e1d337a6c34078ad45f8138ac9277c4d3e6751995a56ad084c9599300e
   campus_tapr_graduation_profile:
     2024:
       path: data/tapr/raw/2024 Campus Graduation Profile.csv

@@ -600,6 +600,14 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     for scope in ('campus', 'district'):
         for family in ('student_staff_profile', 'student_profile'):
             current['data_sources'][scope + '_tapr_' + family].pop(2025)
+        staff = current['data_sources'][scope + '_tapr_staff_profile'][2025]
+        references = staff['metadata']['references']
+        schema = references.pop()
+        assert schema['reference_id'] == 'columns_source' and schema['role'] == 'schema'
+        assert len(schema['provenance_ids']) == 1
+        profile = staff['reader']['profiles']['source']
+        assert 'references' not in profile
+        profile['references'] = [{**schema, 'provenance_ids': []}]
     private = current['data_sources']['tefa']
     assert set(private) == {2025, 2027}
     private.pop(2027)
