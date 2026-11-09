@@ -163,6 +163,27 @@ def comparison_release(tmp_path, monkeypatch, request):
     _reviewed_staar_source.cache_clear()
 
 
+def test_statewide_golden(comparison_release):
+    from teadata.engine import DataEngine
+    from uuid import UUID
+
+    release, editions = comparison_release
+    engine = DataEngine()
+    for number in (227901, 1901, 1902, 1903, 999999):
+        engine.add_district(District(UUID(int=number), str(number), district_number=f"{number:06}"))
+    districts = engine >> (lambda item: isinstance(item, District))
+    rows = districts >> ("compare_statewide", release, editions["district"], editions["state"], METRIC, None, 24)
+    assert [(row.local_raw, row.local_status, row.statewide_percent, row.difference_pp) for row in rows] == [
+        ("35.6", "observed", 25.1, 10.5),
+        ("0", "observed", 25.1, -25.1),
+        ("-1", "suppressed", 25.1, None),
+        ("", "missing", 25.1, None),
+        (None, "unavailable", 25.1, None),
+    ]
+    with pytest.raises(ContractError, match="reviewed local grain and statewide singleton"):
+        districts >> ("compare_statewide", release, editions["district"], editions["state"], METRIC, {"grade": "12"})
+
+
 def test_statewide_operator_keeps_exact_values_and_distinguishes_unavailable(comparison_release):
     release, editions = comparison_release
     districts = [District(uuid4(), str(number), district_number=number)

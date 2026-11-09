@@ -4,9 +4,10 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass
+from operator import index
 from typing import (
     Any, Callable, Dict, List, Literal, Mapping, NotRequired, Optional,
-    Protocol, Sequence, Tuple, TYPE_CHECKING, TypedDict, Unpack,
+    Protocol, Sequence, SupportsFloat, SupportsIndex, Tuple, TYPE_CHECKING, TypedDict, Unpack,
 )
 
 if TYPE_CHECKING:
@@ -125,6 +126,34 @@ def _validate_within_flags(charter_only: object, covers: object) -> None:
 class _RegisteredOperator:
     handler: Callable[[Query, tuple], Any]
     description: _Operator
+    tuple_arities: frozenset[int]
+
+
+def _integer_operand(value: object, label: str) -> int:
+    if isinstance(value, SupportsIndex) and not isinstance(value, bool):
+        try:
+            return index(value)
+        except TypeError:
+            pass
+    raise ValueError(f"{label} must be an integer")
+
+
+def _boolean_operand(value: object, label: str) -> bool:
+    if not isinstance(value, bool):
+        raise ValueError(f"{label} must be a Boolean")
+    return value
+
+
+def _number_operand(value: object, label: str) -> float:
+    if isinstance(value, bool) or not isinstance(value, (SupportsFloat, SupportsIndex)):
+        raise ValueError(f"{label} must be a number")
+    return float(value)
+
+
+def _callable_operand(value: object, label: str) -> Callable[..., Any]:
+    if not callable(value):
+        raise ValueError(f"{label} must be callable")
+    return value
 
 
 _OPERATORS: dict[str, _RegisteredOperator] = {}
@@ -522,9 +551,18 @@ class Query:
             raise ValueError(f"Unsupported >> operation on Query: {op!r}")
 
         key = op[0]
+        if not isinstance(key, str):
+            raise ValueError("Query operator name must be a string")
         operator = _OPERATORS.get(_ALIASES.get(key, key))
         if operator is None:
             raise ValueError(f"Unsupported Query op: {op!r}")
+        if len(op) - 1 not in operator.tuple_arities:
+            forms = [
+                ", ".join(f"[{arg['name']}]" if arg["optional"] else arg["name"] for arg in form["arguments"])
+                or "no arguments"
+                for form in operator.description["forms"] if form["syntax"] == "tuple"
+            ]
+            raise ValueError(f"{key} expects positional arguments: {' or '.join(forms)}")
         return operator.handler(Query(self._items, self._repo), op)
 
     # ---------------------- individual handlers ----------------------
@@ -568,7 +606,7 @@ class Query:
             tuple(dict.fromkeys(identifiers)))
 
     def _op_observations(self, op: tuple) -> SourceTable:
-        if not 4 <= len(op) <= 6 or not isinstance(op[3], (tuple, list)):
+        if not isinstance(op[3], (tuple, list)):
             raise ValueError("Use ('observations', dataset, school_year, ('field',)) with optional scope and edition. "
                              "The field names must be a list or tuple of distinct nonblank strings.")
         return self.observations(op[1], *op[3], school_year=op[2], scope=op[4] if len(op) >= 5 else None,
@@ -585,9 +623,6 @@ class Query:
                                        school_year=school_year), self._repo)
 
     def _op_compare_statewide(self, op: tuple):
-        if not 4 <= len(op) <= 7:
-            raise ValueError("compare_statewide requires a release and two editions, "
-                             "with optional metric, dimensions and school year")
         return self.compare_statewide(release=op[1], local=op[2], statewide=op[3],
                                       metric=op[4] if len(op) >= 5 else "*",
                                       dimensions=op[5] if len(op) >= 6 else None,
@@ -598,29 +633,27 @@ class Query:
         return self
 
     def _op_filter(self, op: tuple):
-        pred = op[1]
+        pred = _callable_operand(op[1], "filter predicate")
         return self._op_filter_callable(pred)
 
     def _op_take(self, op: tuple):
-        if len(op) < 2:
-            raise ValueError("take requires a count")
-        n = int(op[1])
+        n = _integer_operand(op[1], "take count")
         self._items = self._items[:n]
         return self
 
     def _op_sort(self, op: tuple):
-        keyfunc = op[1]
-        reverse = bool(op[2]) if len(op) >= 3 else False
+        keyfunc = None if op[1] is None else _callable_operand(op[1], "sort key")
+        reverse = _boolean_operand(op[2], "sort descending") if len(op) >= 3 else False
         self._items.sort(key=keyfunc, reverse=reverse)
         return self
 
     def _op_map(self, op: tuple):
-        func = op[1]
+        func = _callable_operand(op[1], "map function")
         self._items = [func(o) for o in self._items]
         return self
 
     def _op_distinct(self, op: tuple):
-        keyfunc = op[1]
+        keyfunc = _callable_operand(op[1], "distinct key")
         seen = set()
         out = []
         for obj in self._items:
@@ -635,12 +668,8 @@ class Query:
     def _op_grade_overlap(self, op: tuple):
         if len(op) == 2:
             low, high = coerce_grade_bounds(op[1])
-        elif len(op) >= 3:
-            low, high = coerce_grade_bounds(op[1], op[2])
         else:
-            raise ValueError(
-                "grade_overlap requires a grade specification (low[, high])"
-            )
+            low, high = coerce_grade_bounds(op[1], op[2])
         if low is None and high is None:
             raise ValueError("grade_overlap received an empty/unknown grade span")
         if low is None or high is None:
@@ -674,63 +703,29 @@ class Query:
         return self
 
     def _op_privates_within(self, op: tuple):
-        if len(op) != 1 or any(not isinstance(item, District) for item in self._items):
+        if any(not isinstance(item, District) for item in self._items):
             raise ValueError("privates_within requires a district query")
         campuses = {campus.id: campus for district in self._items
                     for campus in self._repo.private_campuses_within(district)}
         self._items = list(campuses.values())
         return self
 
-    def _resolve_seed_coords(
-        self, op: tuple, *, offset: int = 1
-    ) -> Tuple[float, float]:
-        if len(op) <= offset:
-            raise ValueError(
-                "operation requires coordinates or a seed item in the chain"
-            )
-        seed = op[offset]
-        seed = unwrap_query(seed)
-        if hasattr(seed, "point"):
-            xy = point_xy(getattr(seed, "point"))
-            if xy is not None:
-                return xy
-        if not isinstance(seed, (list, tuple)):
-            if not self._items:
-                raise ValueError(
-                    "operation requires coordinates or a seed item with geometry in the chain"
-                )
+    def _resolve_seed_coords(self, seed: object) -> Tuple[float, float]:
+        if seed is None and self._items:
             seed = self._items[0]
-        if hasattr(seed, "point"):
-            xy = point_xy(getattr(seed, "point"))
-            if xy is None:
-                raise ValueError(
-                    "operation requires coordinates or a seed item with geometry in the chain"
-                )
+        seed = unwrap_query(seed)
+        xy = point_xy(getattr(seed, "point", None))
+        if xy is not None:
             return xy
-        coords = seed
-        if not (isinstance(coords, (list, tuple)) and len(coords) == 2):
-            raise ValueError(
-                "operation requires coordinates or a seed item with geometry in the chain"
-            )
-        return (float(coords[0]), float(coords[1]))
+        if isinstance(seed, (list, tuple)) and len(seed) == 2:
+            return _number_operand(seed[0], "longitude"), _number_operand(seed[1], "latitude")
+        raise ValueError("Spatial query requires coordinates or a seed item with geometry")
 
     def _op_nearest(self, op: tuple):
         charter = op[0] == "nearest_charter"
-        if len(op) >= 2 and op[1] is not None:
-            coords = self._resolve_seed_coords(op)
-        else:
-            if not self._items:
-                raise ValueError(
-                    "nearest/nearest_charter requires coordinates or a seed item with geometry in the chain"
-                )
-            seed = self._items[0]
-            coords = point_xy(getattr(seed, "point", None))
-            if coords is None:
-                raise ValueError(
-                    "nearest/nearest_charter requires coordinates or a seed item with geometry in the chain"
-                )
-        n = int(op[2]) if len(op) >= 3 else 1
-        max_m = float(op[3]) if len(op) >= 4 and op[3] is not None else None
+        coords = self._resolve_seed_coords(op[1] if len(op) >= 2 else None)
+        n = _integer_operand(op[2], "nearest limit") if len(op) >= 3 else 1
+        max_m = _number_operand(op[3], "nearest max_miles") if len(op) >= 4 and op[3] is not None else None
         items = self._repo.nearest_campuses(
             coords[0],
             coords[1],
@@ -742,31 +737,25 @@ class Query:
         return Query(items, self._repo)
 
     def _op_radius(self, op: tuple):
-        if len(op) < 3:
-            raise ValueError("radius requires coordinates and a distance in miles")
-        coords = self._resolve_seed_coords(op)
-        miles = float(op[2])
-        limit = int(op[3]) if len(op) >= 4 and op[3] is not None else None
-        charter_only = bool(op[4]) if len(op) >= 5 else False
+        coords = self._resolve_seed_coords(op[1])
+        miles = _number_operand(op[2], "radius miles")
+        limit = _integer_operand(op[3], "radius limit") if len(op) >= 4 and op[3] is not None else None
+        charter_only = _boolean_operand(op[4], "radius charter_only") if len(op) >= 5 else False
         items = self._repo.radius_campuses(
             coords[0], coords[1], miles, charter_only=charter_only, limit=limit
         )
         return Query(items, self._repo)
 
     def _op_knn(self, op: tuple):
-        if len(op) < 3:
-            raise ValueError("knn requires coordinates and k")
-        coords = self._resolve_seed_coords(op)
-        k = int(op[2])
-        charter_only = bool(op[3]) if len(op) >= 4 else False
+        coords = self._resolve_seed_coords(op[1])
+        k = _integer_operand(op[2], "knn k")
+        charter_only = _boolean_operand(op[3], "knn charter_only") if len(op) >= 4 else False
         items = self._repo.knn_campuses(
             coords[0], coords[1], k, charter_only=charter_only
         )
         return Query(items, self._repo)
 
     def _op_within(self, op: tuple):
-        if not 3 <= len(op) <= 5:
-            raise ValueError("within requires a seed and target and accepts up to two optional flags")
         seed = unwrap_query(op[1])
         target = unwrap_query(op[2])
         charter_only = op[3] if len(op) >= 4 else False
@@ -784,7 +773,7 @@ class Query:
         return Query(contain(target, charter_only=charter_only, covers=covers), self._repo)
 
     def _op_nearest_charter_same_type(self, op: tuple):
-        k = int(op[1]) if len(op) >= 2 else 1
+        k = _integer_operand(op[1], "nearest_charter_same_type k") if len(op) >= 2 else 1
         campuses: List[Any] = []
         for item in self._items:
             if isinstance(item, Campus):
@@ -827,8 +816,8 @@ class Query:
             arg = op[1]
             if isinstance(arg, bool):
                 charter_only = arg
-            elif callable(arg):
-                pred_to = arg
+            else:
+                pred_to = _callable_operand(arg, "transfers_out predicate (or pass a Boolean)")
 
         campuses = [
             it
@@ -860,7 +849,7 @@ class Query:
         return self
 
     def _op_where_to(self, op: tuple):
-        pred = op[1]
+        pred = _callable_operand(op[1], "where_to predicate")
         new_items = []
         for it in self._items:
             if isinstance(it, tuple) and len(it) >= 2:
@@ -902,7 +891,13 @@ def _register(name: str, handler: Callable[[Query, tuple], Any], description: st
         operator["requires"] = requires
     if errors:
         operator["errors"] = [{"type": kind, "condition": condition} for kind, condition in errors]
-    _OPERATORS[name] = _RegisteredOperator(handler, operator)
+    arities = set()
+    for form in operator["forms"]:
+        if form["syntax"] == "tuple":
+            arguments = form["arguments"]
+            required = max((i for i, arg in enumerate(arguments, start=1) if not arg["optional"]), default=0)
+            arities.update(range(required, len(arguments) + 1))
+    _OPERATORS[name] = _RegisteredOperator(handler, operator, frozenset(arities))
     _ALIASES.update(dict.fromkeys(aliases, name))
 
 

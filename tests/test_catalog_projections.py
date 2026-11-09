@@ -1764,36 +1764,62 @@ def test_entity_observation_plan_preserves_pinned_primary_bindings_and_grain(
     assert projection.columns == ("campus_number", "amount")
 
 
-def test_school_year_query_keeps_the_saved_parent_and_native_grain(tmp_path, selected_catalog, monkeypatch):
+def make_observation_release(tmp_path, selected_catalog, year, amount):
     from teadata.dataset_metadata import NativeSourceRef
+    from teadata.release import DataRelease, ROLES
+    stage = tmp_path / str(year)
+    stage.mkdir()
+    period = DataPeriod("school_year", year - 1, year).to_dict()
+    fixture = make_edition_fixture(stage, normalized=True, amount_period=period,
+                                   observed_amount=amount, entity_grain=True)
+    child = DataRelease(fixture["root"].rename(stage / "native.json"), offline=True)
+    ref = NativeSourceRef("native.json", child.manifest_sha256, child.build_id,
+                          tuple(key for key, _, _ in fixture["leaves"].values()))
+    catalog = selected_catalog.to_dict()
+    catalog.pop("build_id")
+    catalog["native_sources"] = [ref.to_dict()]
+    catalog["build_id"] = sha256(canonical_json(catalog).encode()).hexdigest()
+    assets = {role: {"filename": role, "sha256": "0" * 64, "size_bytes": 1} for role in ROLES}
+    record = {"kind": "processing", "parameters": {"build_id": catalog["build_id"],
+                "native_sources": [ref.to_dict()]}, "outputs": assets}
+    parent = stage / "release.json"
+    parent.write_text(canonical_json({"schema_version": 1, "catalog": catalog, "artifacts": assets,
+        "processing": {"record_id": sha256((canonical_json(record) + "\n").encode()).hexdigest(), "record": record}}))
+    return DataRelease(parent, offline=True), fixture["leaves"]["student"][2]
+
+
+def test_observations_golden(tmp_path, selected_catalog):
     from teadata.entities import Campus
-    from teadata.query import Query
-    from teadata.release import DataRelease, ROLES, using_release
+    from teadata.release import using_release
     from uuid import UUID
 
-    def compose(year, amount):
-        stage = tmp_path / str(year)
-        stage.mkdir()
-        period = DataPeriod("school_year", year - 1, year).to_dict()
-        fixture = make_edition_fixture(stage, normalized=True, amount_period=period,
-                                       observed_amount=amount, entity_grain=True)
-        child = DataRelease(fixture["root"].rename(stage / "native.json"), offline=True)
-        ref = NativeSourceRef("native.json", child.manifest_sha256, child.build_id,
-                              tuple(key for key, _, _ in fixture["leaves"].values()))
-        catalog = selected_catalog.to_dict()
-        catalog.pop("build_id")
-        catalog["native_sources"] = [ref.to_dict()]
-        catalog["build_id"] = sha256(canonical_json(catalog).encode()).hexdigest()
-        assets = {role: {"filename": role, "sha256": "0" * 64, "size_bytes": 1} for role in ROLES}
-        record = {"kind": "processing", "parameters": {"build_id": catalog["build_id"],
-                    "native_sources": [ref.to_dict()]}, "outputs": assets}
-        parent = stage / "release.json"
-        parent.write_text(canonical_json({"schema_version": 1, "catalog": catalog, "artifacts": assets,
-            "processing": {"record_id": sha256((canonical_json(record) + "\n").encode()).hexdigest(), "record": record}}))
-        return DataRelease(parent, offline=True), fixture["leaves"]["student"][2]
+    release, _ = make_observation_release(tmp_path, selected_catalog, 2024, 5)
+    engine = DataEngine()
+    engine.catalog = release.catalog
+    engine.add_campus(Campus(UUID(int=1), None, "Historical campus", "", False, campus_number="000000004"))
+    query = engine >> ("campus", 4)
+    edition = release.catalog.native_sources[0].editions[0]
+    with using_release(release):
+        table = query >> ("observations", "campus_student", "2023–24", ("amount",), "campus", edition)
+        assert table.to_arrow()["amount"].to_pylist() == [5]
+        assert table.measurement_period.to_dict() == {"kind": "school_year", "start_year": 2023, "end_year": 2024}
+        unknown_revision = replace(edition, revision_sha256="f" * 64)
+        with pytest.raises(ContractError, match="unavailable together for school year 2024"):
+            query >> ("observations", "campus_student", 24, ("amount",), "campus", unknown_revision)
+        empty = query >> ("take", 0)
+        assert (empty >> ("observations", "campus_student", None, ("amount",), "campus")).to_arrow().num_rows == 0
+        with pytest.raises(ValueError, match="empty Query needs scope"):
+            empty >> ("observations", "campus_student", None, ("amount",))
 
-    old, old_leaf = compose(2024, 5)
-    current, _ = compose(2025, 7)
+
+def test_school_year_query_keeps_the_saved_parent_and_native_grain(tmp_path, selected_catalog, monkeypatch):
+    from teadata.entities import Campus
+    from teadata.query import Query
+    from teadata.release import DataRelease, using_release
+    from uuid import UUID
+
+    old, old_leaf = make_observation_release(tmp_path, selected_catalog, 2024, 5)
+    current, _ = make_observation_release(tmp_path, selected_catalog, 2025, 7)
     assert old.build_id != current.build_id
     mismatched = json.loads(old.path.read_bytes())
     mismatched["catalog"] = selected_catalog.to_dict()

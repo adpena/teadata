@@ -186,7 +186,7 @@ def test_discovered_containment_forms_match_stock_engine_support():
     assert get_type_hints(DataEngine.campuses_within)["return"] == list[Campus]
     with pytest.raises(ValueError, match="Boolean"):
         selection >> ("within", None, district, "false")
-    with pytest.raises(ValueError, match="two optional flags"):
+    with pytest.raises(ValueError, match="within expects positional arguments"):
         selection >> ("within", None, district, False, True, "extra")
 
 

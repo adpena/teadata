@@ -357,5 +357,5 @@ def test_digit_bearing_names_and_legacy_numeric_selectors():
     assert list(engine >> ("campus", "999999999")) == []
     with pytest.raises(ValueError, match="Invalid district number"):
         engine >> ("district", True)
-    with pytest.raises(ValueError, match="take requires a count"):
+    with pytest.raises(ValueError, match="take expects positional arguments: n"):
         (engine >> ("district", "012345")) >> ("take",)

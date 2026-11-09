@@ -27,7 +27,7 @@ from teadata.teadata_config import Config
 
 def fixture_release(tmp_path, *, damage=None, schema_version=3, batch_bytes=1024, scope='district',
                     annotation=False, alias=False, last_enrollment='', source_headers='labels', periods=False,
-                    http_receipt=False, source_notes=None):
+                    http_receipt=False, source_notes=None, first_membership=None):
     store = ProvenanceStore(tmp_path / 'history')
     dataset = f'{scope}_tapr_student_profile'
     names = [f'{scope}_number', 'membership', 'enrollment']
@@ -36,7 +36,9 @@ def fixture_release(tmp_path, *, damage=None, schema_version=3, batch_bytes=1024
     keys = ['01', '13', '20'] if scope == 'region' else ['001001', '001002', '001003']
     if alias:
         keys[1] = "'1002.0"
-    membership = ['9007199254740993' if damage == 'normalized' else '0', '-999', '17']
+    if first_membership is None:
+        first_membership = '9007199254740993' if damage == 'normalized' else '0'
+    membership = [first_membership, '-999', '17']
     enrollment = ['11', '.', last_enrollment]
     raw = tmp_path / 'source.csv'
     data = [f'{key},{count},{other}' for key, count, other in zip(keys, membership, enrollment, strict=True)]
@@ -483,6 +485,20 @@ def test_source_query_string_uses_the_same_native_filter(tmp_path):
     assert query.to_arrow().equals(inline.to_arrow())
     assert table.query("district_number in @ids and not enrollment == '@literal'",
                        params={'ids': ['001001', '001002']}).select('membership').to_arrow().num_rows == 2
+
+
+@pytest.mark.parametrize(("expression", "expected"), [
+    ("membership == 0", ["001001"]),
+    ("membership is None", ["001002"]),
+    ("not (membership == 0 or membership is None)", ["001003"]),
+    ("membership is not None and 0 <= membership <= 17", ["001001", "001003"]),
+    ("district_number in @ids and (membership >= 17 or membership is None)", ["001002", "001003"]),
+])
+def test_source_query_golden_distinguishes_zero_and_mask(tmp_path, expression, expected):
+    release, _, key, _ = fixture_release(tmp_path, schema_version=4, damage="normalized", first_membership="0")
+    table = release.table(key).select("membership")
+    rows = table.query(expression, params={"ids": ["001002", "001003"]}).to_arrow()
+    assert rows["district_number"].to_pylist() == expected
 
 
 def test_query_decimals_bind_to_the_physical_column_type():

@@ -33,7 +33,7 @@ or reject a missing destination.
 - `districts >> ("privates_within",)` selects private campuses inside or on reported district boundaries. The engine entry form is `engine >> ("privates_within", district)`. Geographic containment is separate from institutional governance, and border points can match multiple districts.
 - `>> ("filter", predicate)` or `>> (lambda x: ...)`
 - `>> ("sort", key_fn, descending: bool=False)`
-- `>> ("take", n)`
+- `>> ("take", n)` takes an integer and uses Python slice semantics, including zero and negative counts.
 - `>> ("radius", (longitude, latitude), miles)` — campuses within an inclusive great-circle distance. Radius and KNN use valid longitude and latitude coordinates.
 - `>> ("nearest_charter", coords, limit, max_miles)` selects nearby charter campuses. `limit` defaults to one.
 - `first()` — take first element
@@ -75,6 +75,11 @@ The operator list covers Query shifts. `release_methods` describes
 `DataRelease.series()` with argument positions, types, defaults and result
 methods. The `DataEngine` entry syntax and the
 [`SourceTable.query()` expression syntax](#write-a-query-string) are separate.
+Chained operators report missing and extra positional arguments. Use `True`
+or `False` in flag slots, integers in count slots, and numeric coordinates
+and distances. For `nearest`, `nearest_charter`, `radius`, and `knn`, pass
+`None` as the seed to use the first input item. An explicit seed must resolve
+to coordinates. `within` resolves a district or polygon as described above.
 Use `release.catalog.editions()`, `release.catalog.variables()` and
 `release.observation_years()` to find datasets, fields and periods in your
 selected release.

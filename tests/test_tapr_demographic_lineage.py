@@ -194,6 +194,12 @@ def test_public_demographics_survive_preparation_enrichment_and_entity_store(tmp
         processing = archive.read_record(result["scopes"][scope]["processing_record_id"])
         assert repo.catalog.datasets[f"{scope}_tapr_student_profile"]["artifact"]["sha256"] == (
             processing["outputs"]["prepared_source"]["sha256"])
+        expected = [fact["expected"] for fact in demographic_facts(scope)]
+        selection = repo >> (scope, int(CASES[scope]["entity"]["number"]))
+        projected, = selection >> ("map", lambda entity: [
+            repo.catalog.measurement(entity, fact["metric"], scope=scope).value for fact in expected
+        ])
+        assert projected == [fact["value"] for fact in expected]
     database = tmp_path / "entities.sqlite"
     engine = create_engine(f"sqlite:///{database}")
     try:
