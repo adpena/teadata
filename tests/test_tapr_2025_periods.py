@@ -84,7 +84,9 @@ def test_complete_lagged_families_override_report_and_unknown_source_periods(sco
     if scope == "district":
         turnover = [row for row in staff if row["code"] in {"DPSTURNN", "DPSTURND", "DPSTURNR"}]
         assert len(turnover) == 3
-        assert all(row["period"] == {"kind": "unknown"} for row in turnover)
+        assert {row["code"]: row["period"] for row in turnover} == {
+            "DPSTURNN": {"kind": "unknown"}, "DPSTURND": {"kind": "unknown"}, "DPSTURNR": REPORT,
+        }
 
 
 def synthetic_catalog(tmp_path, family):

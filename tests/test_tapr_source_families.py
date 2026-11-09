@@ -701,8 +701,16 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
         for family in ('student_staff_profile', 'student_profile'):
             current['data_sources'][scope + '_tapr_' + family].pop(2025)
         staff = current['data_sources'][scope + '_tapr_staff_profile'][2025]
-        references = staff['metadata']['references']
+        metadata = staff['metadata']
+        # Undo the reviewed staff-only metadata; leave all other source wiring covered by the hash.
+        metadata['notes'] = metadata['notes'].split(' The named metrics below', 1)[0] + (
+            ' No released default, semantic binding, entity enrichment or app data is activated.'
+        )
+        metadata.pop('metrics')
+        references = metadata['references']
         schema = references.pop()
+        witness = references.pop()
+        assert witness['reference_id'] == 'published_staff_comparison'
         assert schema['reference_id'] == 'columns_source' and schema['role'] == 'schema'
         assert len(schema['provenance_ids']) == 1
         profile = staff['reader']['profiles']['source']
