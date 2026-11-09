@@ -117,6 +117,37 @@ boundary-overlap summaries and use official geography-level totals when
 available. Area overlap cannot allocate student counts or establish where
 students live.
 
+### Published school district rosters for legislative plans
+
+The Texas Legislative Council's Red-160 workbooks list school district
+subtotals by legislative constituency. The reviewed 2025–26 workbooks cover
+Texas House, Texas Senate, the State Board of Education, and both congressional
+plans. The library resolves the literal school names to six-digit TEA IDs
+using the same-year Locator name and ID columns. County qualifiers in the
+publisher's school names disambiguate identical names. A school district may
+appear in several constituencies.
+
+```python
+from teadata.legislative_rosters import (
+    LegislativePlan, RosterSource, read_legislative_school_rosters,
+)
+
+house, = read_legislative_school_rosters(
+    store,
+    district_locator=RosterSource(locator_receipt, locator_sha256),
+    workbooks={LegislativePlan.TEXAS_HOUSE: RosterSource(workbook_receipt, workbook_sha256)},
+)
+ids = house.district_ids(1)
+```
+
+Use the `scripts` extra for workbook intake. Supply retained receipt IDs and
+artifact hashes from the same provenance store. Each relationship retains the
+original workbook label and one-based worksheet row. The 2025–26 school
+boundary year, 2020 Census population vintage, and effective representation
+date are distinct. The workbook percentages remain part of the literal
+source label. The reader loads Locator attributes only. Use separately pinned
+polygons to draw profile maps. [Legislative Council plans and resources](https://redistricting.capitol.texas.gov/Current-districts)
+
 ### Archived administrative geography
 
 Use `read_askted_directory()` with a local provenance store, the exact
