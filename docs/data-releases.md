@@ -2,7 +2,7 @@
 
 TEA Data keeps one source contract in `teadata/teadata_sources.yaml`. Each version has a path, declared reference period, reader settings, an ordered column schema, a value policy, and documentation references. Reviewed, column-only JSON resources under `teadata/schemas/` define the expected headers; their hashes bind the reviewed documentation bytes. A catalog year selects a version; it does not establish its reference period. TAPR fields such as attrition and mobility can refer to an earlier period than the report. Their field definitions carry explicit overrides.
 
-A build records the files it actually reads. The runtime catalog is embedded in the snapshot and SQLite sidecars. `release.json` selects the source and analytical artifacts by content hash and one build identity. Runtime consumers use that catalog, rather than interpreting an old snapshot with the current YAML. Independent asset URLs, newest-file discovery, legacy pickle formats, and cache rebuilds that leave partial changes on failure have been retired.
+A build records the files it actually reads. The runtime catalog is embedded in the snapshot and SQLite sidecars. `release.json` selects the source and analytical artifacts by content hash and one build identity. Runtime consumers use the embedded catalog to interpret the snapshot. The default engine takes one manifest for the entity snapshot and its sidecars. Stand-alone data releases can be selected by their own pinned manifests.
 
 ## Researcher API
 
@@ -76,6 +76,40 @@ references. Their raw fields require source-specific interpretation before use
 as typed or longitudinal measures. The supplements use their own data-build
 identities. The default engine continues to use its separately configured
 snapshot.
+
+### Historical district transfers and TAPR aggregates in v0.0.141
+
+The [v0.0.141 assets](https://github.com/adpena/teadata/releases/tag/v0.0.141)
+provide three stand-alone native data releases.
+
+| Manifest | Coverage | Manifest SHA-256 |
+| --- | --- | --- |
+| [`district-transfers-2013-2026.json`](https://github.com/adpena/teadata/releases/download/v0.0.141/district-transfers-2013-2026.json) | 14 district report editions, 2012–13 through 2025–26 | `61a6ef3075c33fb12b89c81985808e38a68dc1ab92ee27dc36d8c4cbbe224e63` |
+| [`tapr-region-staff-student-2025.json`](https://github.com/adpena/teadata/releases/download/v0.0.141/tapr-region-staff-student-2025.json) | 2024–25 TAPR regional Student and Staff, plus direct Texas Staff | `9c4e189a85b1a12130207e4a3546d437a0704f4833c45225c401b8f88ea1a50c` |
+| [`tapr-texas-student-2024-2025.json`](https://github.com/adpena/teadata/releases/download/v0.0.141/tapr-texas-student-2024-2025.json) | Direct Texas Student for the 2023–24 and 2024–25 TAPR editions | `b86148a6147edb267ee93213053d5b126db46771f8bfc85a2f8beae918d582ec` |
+
+The transfer release keeps all 518,490 publisher rows, including directional
+details and reported totals, with their counts, labels, and masking. A reviewed
+2021–22 overlay restores normalized partner IDs on 1,076 rows covering 34
+charter districts and keeps the original labels available.
+Incoming and outgoing report rows retain separate provenance. The data
+support source-row analysis. Reconciled district-pair edges and direct
+Texas transfer totals remain outside this release.
+
+The TAPR releases retain raw columns alongside the reviewed field bindings.
+Use the measurement period on each field. Some Student fields in the
+2024–25 edition measure 2023–24. Five Staff measures have reviewed units
+and periods for direct Texas and all 20 ESCs. Unbound fields remain raw.
+
+```python
+from teadata import DataRelease
+
+transfers = DataRelease(
+    "https://github.com/adpena/teadata/releases/download/v0.0.141/district-transfers-2013-2026.json",
+    expected_sha256="61a6ef3075c33fb12b89c81985808e38a68dc1ab92ee27dc36d8c4cbbe224e63",
+)
+editions = transfers.catalog.editions(dataset="district_transfer_reports", include_metadata=False)
+```
 
 ### 2026 entity snapshot and TPRS student data
 
