@@ -23,6 +23,16 @@ CSV_HEADERS = {"state": (*_GEOGRAPHY, *_COURSE), "district": (
 ), "campus": (
     *_GEOGRAPHY, "DISTRICT", "DISTRICT NAME", "CAMPUS", "CAMPUS NAME", "CHARTER STATUS", "REGION", *_COURSE,
 )}
+COURSE_FACT_UNITS = {"teacher_head_count": "count", "teacher_fte_count": "fte",
+                     "contract_teacher_head_count": "count", "contract_teacher_fte_count": "fte",
+                     "course_enrollment_count": "count"}
+SOURCE_RECORD = "peims_source_record"
+_GEO_FIELDS = {
+    "state": (),
+    "district": ("district_number", "district_name", "charter_status", "region_number"),
+    "campus": ("source_district_number", "source_district_name", "campus_number", "campus_name",
+               "charter_status", "region_number"),
+}
 
 GRADE_LABELS = frozenset({
     "ALL GRADE LEVELS", "EARLY EDUCATION", "ELEMENTARY (GRADES 1-6)",
@@ -30,6 +40,26 @@ GRADE_LABELS = frozenset({
     "KINDERGARTEN", "KINDERGARTEN/ELEMENTARY (K-6)", "MIDDLE SCHOOL (GRADES 6 - 8)",
     "NOT APPLICABLE", "PRE-KINDERGARTEN", "SECONDARY (GRADES 7-12)",
 })
+
+
+def course_field_names(scope: str) -> tuple[str, ...]:
+    return ("source_scope", "aggregation_level", "school_year", *_GEO_FIELDS[scope],
+            "subject", "course_code", "course_title", "grade_level", *COURSE_FACT_UNITS)
+
+
+def course_column_support() -> dict[str, Any]:
+    return {"fields": {field: {"raw": f"peims_raw_{field}", "status": f"peims_status_{field}"}
+                       for field in COURSE_FACT_UNITS}, "context": [SOURCE_RECORD]}
+
+
+def matches_course_header(table: dict[str, Any], scope: str) -> bool:
+    layout = table.get("layout", {})
+    expected = tuple((header, header, field, "fact" if field in COURSE_FACT_UNITS else "identity")
+                     for header, field in zip(CSV_HEADERS[scope], course_field_names(scope), strict=True))
+    return (table.get("header_identity") == "position"
+            and (layout.get("code_record"), layout.get("label_record"), layout.get("first_data_record")) == (9, None, 10)
+            and tuple((row["code"], row["label"], row["field"], row.get("disposition")) for row in table["fields"])
+            == expected)
 
 
 def course_csv_preamble(year: int, scope: str) -> list[list[str]]:

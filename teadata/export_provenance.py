@@ -46,22 +46,25 @@ def describe_export(release: DataRelease, artifact: ArtifactRef, fields: tuple[s
                     columns: tuple[str, ...], headers: tuple[tuple[str, ...], ...], *,
                     period: DataPeriod | None, entity_build: tuple[str, str] | None,
                     entity_ids: tuple[str, ...] | None, opaque_filter: bool,
-                    query_replay: dict[str, Any] | None = None) -> ExportProvenance:
+                    query_replay: dict[str, Any] | None = None,
+                    publisher_columns: tuple[str, ...] | None = None) -> ExportProvenance:
     """Project the admitted catalog, without opening the data leaf."""
     edition = artifact.edition
     artifact_id = artifact.identity
     catalog = release.catalog
     source = catalog.metadata(edition.dataset, edition=edition)
     output = set(columns)
+    logical = columns if publisher_columns is None else publisher_columns
+    logical_output = set(logical)
     requested = set(fields)
-    definitions = catalog._export_field_headers(artifact, columns)
+    definitions = catalog._export_field_headers(artifact, logical)
     support_for = defaultdict(list)
     support = artifact.column_support
     key_columns = set(artifact.contract["key_columns"])
     for column, definition in definitions.items():
         definition.update(field=column, selected=column in requested, policy_id=source.value_policy)
     for entry in support.fields if support is not None else ():
-        if entry.field not in output:
+        if entry.field not in logical_output:
             continue
         for role, target in (("raw", entry.raw), ("status", entry.status)):
             if target in output:
@@ -90,10 +93,10 @@ def describe_export(release: DataRelease, artifact: ArtifactRef, fields: tuple[s
             "column": name,
             "headers": [row[index] for row in headers],
             "role": column_role(name),
-            "fields": [definitions[name]] if name in definitions else [],
+            "fields": [definitions[field]] if field in definitions else [],
             "support_for": sorted(support_for.get(name, ()), key=lambda field: (field["field"] or "", field["role"])),
         }
-        for index, name in enumerate(columns)
+        for index, (name, field) in enumerate(zip(columns, logical, strict=True))
     ]
     acquisitions = sorted(catalog.acquisitions(edition.dataset, edition=edition), key=lambda record: record["record_id"])
     receipts = [{

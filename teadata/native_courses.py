@@ -19,10 +19,13 @@ import pyarrow as pa
 import pyarrow.compute as arrow_compute
 import pyarrow.parquet as pq
 
-from .dataset_metadata import DataPeriod, EditionKey, LeafColumnSupport
+from .dataset_metadata import DataPeriod, EditionKey
 from .manifest import ContractError, canonical_json
-from .peims_course_sources import BROKER, CSV_HEADERS, DATASET, ENCODING, SELECTOR, course_csv_preamble
-from .peims_courses import COURSE_FACT_UNITS, COURSE_RECIPE, SOURCE_RECORD, _admit
+from .peims_course_sources import (
+    BROKER, COURSE_FACT_UNITS, CSV_HEADERS, DATASET, ENCODING, SELECTOR, SOURCE_RECORD,
+    course_column_support, course_csv_preamble, course_field_names,
+)
+from .peims_courses import COURSE_RECIPE, _admit
 from .provenance import ProvenanceStore
 from .release import DataRelease
 from .scripts.verify_peims_courses import _HTML_HEADER, _check_footer, _course_rows, _html_rows, _open_report
@@ -34,14 +37,6 @@ PASS_COURSE_CONTROLS = "PASS_REVIEWED_PEIMS_COURSE_CONTROLS"
 HOLD_CAMPUS_GEOGRAPHY = "HOLD_PEIMS_CAMPUS_GEOGRAPHY"
 _BATCH_ROWS = 4096
 _MAX_LINE_BYTES = 8192
-_GEO_FIELDS = {
-    "state": (),
-    "district": ("district_number", "district_name", "charter_status", "region_number"),
-    "campus": ("source_district_number", "source_district_name", "campus_number", "campus_name",
-               "charter_status", "region_number"),
-}
-_IDENTITY_FIELDS = ("school_year", "source_scope", "aggregation_level")
-_COURSE_FIELDS = ("subject", "course_code", "course_title", "grade_level")
 _MEASURE_FIELDS = tuple(COURSE_FACT_UNITS)
 _DISTRICT_CAMPUS_HEADER = (*CSV_HEADERS["campus"][:3], *CSV_HEADERS["campus"][5:])
 
@@ -99,10 +94,9 @@ def _typed_measure(raw: pa.Array, status: pa.Array, value: pa.Array, index: int)
 def _compare_batch(rows: list[list[str]], native: pa.RecordBatch, scope: str, first: int) -> int:
     if native.num_rows != len(rows):
         raise ContractError("Course raw and native batch sizes differ")
-    geo_fields = _GEO_FIELDS[scope]
     raw = list(zip(*rows, strict=True))
-    identity = (raw[2], raw[0], raw[1], *raw[3:3 + len(geo_fields) + len(_COURSE_FIELDS)])
-    for name, tokens in zip((*_IDENTITY_FIELDS, *geo_fields, *_COURSE_FIELDS), identity, strict=True):
+    names = course_field_names(scope)[:-len(_MEASURE_FIELDS)]
+    for name, tokens in zip(names, raw[:len(names)], strict=True):
         expected = pa.array(tokens, type=pa.string())
         if not native[name].equals(expected):
             raise ContractError(f"Course raw value differs for {name} at source line {first}")
@@ -298,7 +292,6 @@ def _replay(release: DataRelease, store: ProvenanceStore, witnesses: ProvenanceS
     parameters = processing["parameters"]
     recipe = parameters["recipe"]
     output = processing["outputs"][ref.output]
-    support = LeafColumnSupport.from_contract(contract)
     configs = [graph[identifier]["artifact"]["sha256"] for identifier in processing["inputs"]
                if graph[identifier]["kind"] == "acquisition"
                and graph[identifier]["dataset"] == "reference:peims_course_config"]
@@ -313,13 +306,10 @@ def _replay(release: DataRelease, store: ProvenanceStore, witnesses: ProvenanceS
             or graph[receipt_id] != {k: v for k, v in acquisition.items() if k != "record_id"}
             or [acquisition["artifact"]["sha256"]] != contract["inputs"]
             or output["sha256"] != ref.sha256 or output["size_bytes"] != ref.size_bytes
-            or support is None or support.context != (SOURCE_RECORD,)
-            or {f.field: (f.raw, f.status, f.auxiliary) for f in support.fields}
-            != {name: (f"peims_raw_{name}", f"peims_status_{name}", ()) for name in _MEASURE_FIELDS}):
+            or contract.get("column_support") != course_column_support()):
         raise ContractError("Course native leaf does not bind its reviewed source, processing or support contract")
     headings = release.catalog.header_records(key.dataset, edition_key=key)
-    names = ("source_scope", "aggregation_level", "school_year",
-             *_GEO_FIELDS[key.scope], *_COURSE_FIELDS, *_MEASURE_FIELDS)
+    names = course_field_names(key.scope)
     if (contract["key_columns"] != reviewed.keys or metadata.period != DataPeriod("school_year", year - 1, year)
             or {name: item.unit for name, item in metadata.metrics.items()} != COURSE_FACT_UNITS
             or [(row["code"], row["field"]) for row in headings] != list(zip(CSV_HEADERS[key.scope], names, strict=True))):

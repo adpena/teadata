@@ -16,7 +16,10 @@ from typing import TYPE_CHECKING, Any
 from .column_schema import crosswalk_dataset, parse_column_schema, reader_options, table_input_sha256s
 from .dataset_metadata import ArtifactRef, DataPeriod, DatasetMetadata, EditionKey, ResolvedDataset
 from .manifest import BuildRecorder, ContractError, canonical_json, file_identity
-from .peims_course_sources import CSV_HEADERS, DATASET, ENCODING, GRADE_LABELS, course_csv_preamble, open_course_report
+from .peims_course_sources import (
+    COURSE_FACT_UNITS, CSV_HEADERS, DATASET, ENCODING, GRADE_LABELS, SOURCE_RECORD,
+    course_column_support, course_csv_preamble, matches_course_header, open_course_report,
+)
 from .provenance import ProvenanceStore, validate_reference_records
 from .teadata_config import load_config, load_config_bytes
 from .values import ValueStatus
@@ -28,9 +31,6 @@ if TYPE_CHECKING:
 
 
 COURSE_RECIPE = "reviewed_peims_course_csv_projection"
-COURSE_FACT_UNITS = {"teacher_head_count": "count", "teacher_fte_count": "fte", "contract_teacher_head_count": "count",
-                     "contract_teacher_fte_count": "fte", "course_enrollment_count": "count"}
-SOURCE_RECORD = "peims_source_record"
 _CSV_BLOCK_BYTES = 512 * 1024
 _MAX_PHYSICAL_LINE = 16 * 1024
 _MAX_RECORDS = {"state": 5_000, "district": 300_000, "campus": 600_000}
@@ -69,8 +69,7 @@ class _CourseSource:
 
     @property
     def support(self) -> dict[str, Any]:
-        return {"fields": {field: {"raw": f"peims_raw_{field}", "status": f"peims_status_{field}"}
-                           for field in COURSE_FACT_UNITS}, "context": [SOURCE_RECORD]}
+        return course_column_support()
 
     @property
     def schema(self) -> pa.Schema:
@@ -106,14 +105,11 @@ def _admit(config: Config, canonical: Config, store: ProvenanceStore, year: int,
             or policy != canonical.value_policies.get(canonical_source.metadata.value_policy)
             or policy is None or set(policy.tokens) != {"-999"} or rule is None or rule.status != ValueStatus.SUPPRESSED):
         raise ContractError("PEIMS course source requires the exact period, units and masking policy")
-    if (not table or table != reviewed or table["header_identity"] != "position"
-            or tuple(field["code"] for field in table["fields"]) != CSV_HEADERS[scope]
-            or {field["field"] for field in table["fields"] if field["disposition"] == "fact"} != set(COURSE_FACT_UNITS)
+    if (not table or table != reviewed or not matches_course_header(table, scope)
             or table["metric_period"] != metadata.period.to_dict()):
         raise ContractError("PEIMS course edition or scope differs from the packaged crosswalk")
     layout = table["layout"]
-    if (layout["code_record"] != 9 or layout["label_record"] is not None or layout["first_data_record"] != 10
-            or not 9 < layout["last_data_record"] <= _MAX_RECORDS[scope]):
+    if not 9 < layout["last_data_record"] <= _MAX_RECORDS[scope]:
         raise ContractError("PEIMS course physical framing differs")
     references = tuple(dict.fromkeys(identifier for ref in metadata.references for identifier in ref.provenance_ids))
     records = store.verify_record_closure(references)

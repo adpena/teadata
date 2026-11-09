@@ -1089,14 +1089,18 @@ class DatasetCatalog:
         except ValueError as error:
             raise ContractError(str(error)) from error
 
-    def _source_header_kinds(self, edition: EditionKey) -> tuple[str, ...]:
+    def _source_header_table(self, edition: EditionKey) -> dict[str, Any]:
         identifier = self._selected_edition(edition.dataset, edition)
         if getattr(self, "_v4", False):
-            return self._edition_view(identifier)._source_header_kinds(edition)
+            return self._edition_view(identifier)._source_header_table(edition)
         self._ensure_edition(identifier)
         document = self._column_schemas[self._edition_entries[identifier]["column_schema_sha256"]]
         selected = crosswalk_dataset(document, edition.dataset, edition.edition)
         table, = (table for table in selected["tables"] if table["table"] == edition.table)
+        return table
+
+    def _source_header_kinds(self, edition: EditionKey) -> tuple[str, ...]:
+        table = self._source_header_table(edition)
         return ("code",) if table.get("layout", {}).get("code_only_export") else ("label", "code")
 
     def header_mapping(self, dataset: str, *, table: str, edition: str | None = None,

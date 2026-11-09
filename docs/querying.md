@@ -338,10 +338,14 @@ processing receipt identifies the exported artifact. Excel reports the
 observed row count separately from the source description. The DataFrame
 reports it in `attrs["teadata_export"]["rows"]`.
 
-For raw TAPR tables, `restore_original_headers=True` restores the reviewed
-headers in publisher order, including single-row codes where the crosswalk
-specifies that layout. CSV retains its ordinary tabular layout. Write a
-companion workbook using the same header mode as the data export.
+`restore_original_headers=True` restores reviewed publisher headings in
+publisher order for raw TAPR tables, the code-only RDA district table,
+and native PEIMS teacher course tables. PEIMS course exports use the
+single original header row and the retained source text, including
+suppression tokens and leading zeros. Filters still use the typed
+columns, and subsets retain their source keys. CSV retains its tabular
+layout. Write a companion workbook using the same header mode as the
+data export.
 
 ```python
 selected.to_csv("membership.csv")

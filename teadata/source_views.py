@@ -394,7 +394,7 @@ class _TableExport:
     def batches(self) -> Iterator[pa.RecordBatch]:
         for batch in self.scanner.to_batches():
             if self.restore_original_headers and any(column.null_count for column in batch.columns):
-                raise ContractError("A raw TAPR export cannot substitute blanks for null values")
+                raise ContractError("A publisher-header export cannot substitute blanks for null values")
             yield batch
 
     def to_arrow(self) -> pa.Table:
@@ -429,6 +429,7 @@ class _ExportSelection:
     headers: tuple[tuple[str, ...], ...]
     selected_fields: tuple[str, ...] | None
     restore_original_headers: bool
+    publisher_columns: tuple[str, ...] | None = None
 
     def provenance(self, release: DataRelease, *, period: DataPeriod | None,
                    entity_build: tuple[str, str] | None, entity_ids: tuple[str, ...] | None,
@@ -448,7 +449,8 @@ class _ExportSelection:
             }
         return describe_export(release, self.artifact, self.fields, self.columns, self.headers,
                                period=period, entity_build=entity_build, entity_ids=entity_ids,
-                               opaque_filter=opaque_filter, query_replay=replay)
+                               opaque_filter=opaque_filter, query_replay=replay,
+                               publisher_columns=self.publisher_columns)
 
 
 @dataclass(frozen=True, slots=True)
@@ -471,6 +473,7 @@ def _plan_export(release: DataRelease, edition: EditionKey, *, restore_original_
     import pyarrow as pa
 
     from .analytical import _leaf_schema
+    from .peims_course_sources import DATASET as course_dataset
     from .tapr import TAPR_SOURCE_KEYS, qualified_tapr_family
 
     if type(restore_original_headers) is not bool:
@@ -482,35 +485,55 @@ def _plan_export(release: DataRelease, edition: EditionKey, *, restore_original_
     requested = fields if selected_fields is None else selected_fields
     artifact, projected = _projection(release, edition, requested, period=period)
     columns = projected if include_support else fields
-    original_error = "Original headers require a complete raw TAPR table or reviewed code-only RDA district table"
+    original_error = "Original headers require a reviewed TAPR, RDA district, or PEIMS course table"
     header_kinds = ()
+    publisher_columns = None
     if restore_original_headers:
         from .rda_native import NATIVE_DATASET as rda_dataset
 
-        header_kinds = release.catalog._source_header_kinds(edition)
-        if not (edition.dataset == rda_dataset and edition.scope == edition.table == "district"
-                and header_kinds == ("code",)):
-            try:
-                qualified_tapr_family(edition.dataset, TAPR_SOURCE_KEYS.get(edition.scope))
-            except ValueError as error:
-                raise ContractError(original_error) from error
-        if artifact.column_support is not None or fields != artifact.public_columns:
-            raise ContractError(original_error)
-        if selected_fields is not None:
-            selected = set(columns)
+        if edition.dataset == course_dataset:
+            from .peims_course_sources import CSV_HEADERS, course_column_support, matches_course_header
+            from .peims_courses import course_key_columns
+
+            scope = edition.scope
+            support = course_column_support()
+            if (scope != edition.table or scope not in CSV_HEADERS
+                    or fields != artifact.public_columns or artifact.contract.get("column_support") != support
+                    or artifact.contract["key_columns"] != course_key_columns(scope)
+                    or not matches_course_header(release.catalog._source_header_table(edition), scope)):
+                raise ContractError("Original PEIMS course headers require the reviewed positional and raw column contract")
+            selected = set(projected)
             headers = [row for row in headers if row["field"] in selected]
-            columns = tuple(row["field"] for row in headers)
-            if set(columns) != selected:
-                raise ContractError(original_error)
+            publisher_columns = tuple(row["field"] for row in headers)
+            raw = {field: entry["raw"] for field, entry in support["fields"].items()}
+            columns = tuple(raw.get(field, field) for field in publisher_columns)
+            header_kinds = ("code",)
         else:
-            columns = fields
+            header_kinds = release.catalog._source_header_kinds(edition)
+            if not (edition.dataset == rda_dataset and edition.scope == edition.table == "district"
+                    and header_kinds == ("code",)):
+                try:
+                    qualified_tapr_family(edition.dataset, TAPR_SOURCE_KEYS.get(edition.scope))
+                except ValueError as error:
+                    raise ContractError(original_error) from error
+            if artifact.column_support is not None or fields != artifact.public_columns:
+                raise ContractError(original_error)
+            if selected_fields is not None:
+                selected = set(columns)
+                headers = [row for row in headers if row["field"] in selected]
+                columns = tuple(row["field"] for row in headers)
+                if set(columns) != selected:
+                    raise ContractError(original_error)
+            else:
+                columns = fields
         schema = _leaf_schema(artifact.contract)
         if not all(pa.types.is_string(schema.field(name).type) or pa.types.is_large_string(schema.field(name).type)
                    for name in columns):
             raise ContractError(original_error)
     output_headers = (columns,) if not restore_original_headers else tuple(
         tuple(row[kind] for row in headers) for kind in header_kinds)
-    return _ExportSelection(artifact, requested, columns, output_headers, selected_fields, restore_original_headers)
+    return _ExportSelection(artifact, requested, columns, output_headers, selected_fields,
+                            restore_original_headers, publisher_columns)
 
 
 def prepare_export(release: DataRelease, edition: EditionKey, *, restore_original_headers: bool,
