@@ -77,6 +77,22 @@ as typed or longitudinal measures. The supplements use their own data-build
 identities. The default engine continues to use its separately configured
 snapshot.
 
+### Historical PEIMS enrollment by ethnicity in v0.0.143
+
+The [stand-alone historical enrollment manifest](https://github.com/adpena/teadata/releases/download/v0.0.143/peims-enrollment-2019-2022.json)
+has SHA-256 `fdd86b5bf8e5c4b1e2a97523e3f651cf41281cf0f94cae5cfc7e0a97f0300791`.
+Open it explicitly with `DataRelease` and `expected_sha256`. It covers
+2018–19 through 2021–22 with 12 tables for campuses, districts and direct
+Texas counts. Each edition links TEA's criteria and annual report. The
+October PEIMS enrollment population is separate from TPRS Membership.
+
+All 217,122 rows passed replay against the retained CSVs. TEA's annual
+reports separately match 28 Texas ethnicity counts. Eight selected district
+and campus HTML reports match 49 cells, including suppression tokens. Use
+the direct Texas tables for Texas ethnicity counts. The linked annual
+reports provide the statewide totals. See the
+[PEIMS source notes](peims-sources.md) for scope and masking details.
+
 ### PEIMS College Credit in v0.0.142
 
 The [stand-alone College Credit manifest](https://github.com/adpena/teadata/releases/download/v0.0.142/peims-college-credit-2022-2026.json)
