@@ -485,7 +485,8 @@ def _plan_export(release: DataRelease, edition: EditionKey, *, restore_original_
     requested = fields if selected_fields is None else selected_fields
     artifact, projected = _projection(release, edition, requested, period=period)
     columns = projected if include_support else fields
-    original_error = "Original headers require a reviewed TAPR, RDA district, or PEIMS course table"
+    original_error = ("Original headers require a complete raw TAPR table or reviewed code-only RDA district table"
+                      " or reviewed PEIMS course table")
     header_kinds = ()
     publisher_columns = None
     if restore_original_headers:
