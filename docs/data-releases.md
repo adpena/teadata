@@ -15,6 +15,7 @@ catalog.metadata("campus_tapr_student_staff_profile").period.label
 catalog.metadata("campus_peims_financials").period.label
 catalog.metric_period("tapr.student_membership_attrition_all_students_percent")
 catalog.acquisitions("campus_transfer_reports")
+catalog.source_downloads("campus_transfer_reports")
 release.processing["record"]["validation"]
 
 engine = DataEngine.load_default(indexes_enabled=False)
@@ -24,6 +25,13 @@ campus.metric("financials.students_w_disabilities_af_per_student").to_dict()
 catalog.charter_transfer_summary(campus)
 catalog.measurements_frame([campus], ["enrollment", "accountability.student_count"])
 ```
+
+`acquisitions()` identifies the direct inputs of the selected dataset.
+`source_downloads()` also follows recorded preparation lineage to find
+same-edition downloads. For example, it can show the publisher's download date
+for a CSV that the entity build consumed as prepared Parquet. It keeps reference
+documents separate and preserves unknown dates. Select an exact `EditionKey`
+for a native catalog with multiple editions.
 
 Values carry `observed`, `suppressed`, `missing`, `not_applicable`, or `invalid` status, the raw token, reason, policy identifier, and any documented bounds. Bound measurements also identify their release, dataset, physical field, period, and input receipts. Detached caller values are explicitly marked `caller_supplied`; attaching metadata does not prove their input bytes came from a released entity. Known entities and bound measurements from another release are rejected. Zero is observed. A negative financial adjustment can be observed. A period has a meaning only under its source policy. Missing and invalid values do not become suppressed values or zeros. Public percentages are not used to reconstruct protected counts.
 

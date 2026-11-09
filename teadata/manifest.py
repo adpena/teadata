@@ -1160,6 +1160,68 @@ class DatasetCatalog:
             for identifier in self.metadata(dataset).provenance_ids
         ]
 
+    def source_downloads(self, dataset: str, *, edition: EditionKey | None = None) -> list[dict[str, Any]]:
+        """Return direct downloads and verified same-edition downloads behind prepared inputs."""
+        if getattr(self, "_v4", False):
+            identifier = self._selected_edition(dataset, edition)
+            key = self._edition_keys[identifier]
+            return self._edition_view(identifier).source_downloads(dataset, edition=key)
+
+        metadata = self.metadata(dataset, edition=edition)
+        downloads = {}
+        prepared = []
+        for receipt in self.acquisitions(dataset, edition=edition):
+            if receipt["method"] == "download":
+                downloads[receipt["record_id"]] = receipt
+            elif (receipt["dataset"] == dataset and receipt["method"] == "local_observation" and metadata.version is not None
+                  and metadata.period.kind != "unknown"
+                  and ("derived_from" in receipt or receipt["source_metadata"].get("provenance_ids"))):
+                prepared.append(receipt)
+        if not prepared:
+            return list(downloads.values())
+
+        def identity(receipt: Mapping[str, Any]) -> tuple[str, int | None, str | None, DataPeriod]:
+            declared = receipt["source_metadata"]
+            return (receipt["section"], receipt.get("resolved_year"), declared.get("version"),
+                    DataPeriod.from_dict(declared.get("period")))
+
+        try:
+            records = validate_record_graph(self._records.__getitem__, [receipt["record_id"] for receipt in prepared])
+            references = {identifier for ref in metadata.references for identifier in ref.provenance_ids}
+            references.update(identifier for record in records.values() if record["kind"] == "acquisition"
+                              and record["dataset"] == dataset and identity(record)[2:] == (metadata.version, metadata.period)
+                              for ref in record["source_metadata"].get("references", ())
+                              for identifier in ref.get("provenance_ids", ()))
+            for root in prepared:
+                expected = identity(root)
+                if expected[2:] != (metadata.version, metadata.period):
+                    continue
+                seen = set()
+                pending = [(root["record_id"], False)]
+                while pending:
+                    identifier, via_producer = pending.pop()
+                    if identifier in seen or (via_producer and identifier in references):
+                        continue
+                    seen.add(identifier)
+                    record = records[identifier]
+                    if record["dataset"] != dataset:
+                        continue
+                    if record["kind"] == "processing":
+                        pending.extend((parent, True) for parent in reversed(record["inputs"]))
+                    elif identity(record) == expected:
+                        if record["method"] == "download":
+                            if identifier not in downloads:
+                                downloads[identifier] = deepcopy({"record_id": identifier, **record})
+                            continue
+                        if record["method"] != "local_observation":
+                            continue
+                        if "derived_from" in record:
+                            pending.append((record["derived_from"], True))
+                        pending.extend((parent, False) for parent in reversed(record["source_metadata"].get("provenance_ids", ())))
+        except (KeyError, TypeError, ValueError) as error:
+            raise ContractError("Invalid prepared-source download lineage") from error
+        return list(downloads.values())
+
     def period_label(self, dataset: str, *, short: bool = False) -> str:
         period = self.metadata(dataset).period
         if period.label is None:

@@ -1,12 +1,15 @@
 """Public catalog validation must reject well-hashed but contradictory evidence."""
 
 from copy import deepcopy
+from dataclasses import replace
+from datetime import datetime, timezone
 from hashlib import sha256
 
 import pytest
 
-from teadata.dataset_metadata import DatasetMetadata
+from teadata.dataset_metadata import DataPeriod, DatasetMetadata, ReferenceDocument, ResolvedDataset
 from teadata.manifest import ContractError, DatasetCatalog, canonical_json
+from teadata.provenance import ProvenanceStore
 
 
 @pytest.fixture
@@ -107,3 +110,60 @@ def test_one_correct_receipt_cannot_hide_other_selected_input_bytes(catalog_inpu
     contradictory["artifact"]["sha256"] = "b" * 64
     with pytest.raises(ContractError, match="Input bytes"):
         make_catalog(metadata, artifact, [current, contradictory])
+
+
+@pytest.mark.parametrize("typed_producer", [False, True])
+def test_source_downloads_follow_only_exact_data_lineage(tmp_path, typed_producer):
+    store = ProvenanceStore(tmp_path / "provenance")
+    date = datetime(2026, 11, 4, tzinfo=timezone.utc)
+    current = DatasetMetadata(title="Campus transfers", version="2026", period=DataPeriod("school_year", 2025, 2026))
+
+    def capture(name, metadata, *, dataset="sample", year=2026):
+        path = tmp_path / name
+        path.write_text(name, encoding="utf-8")
+        url = "https://publisher.example/" + name
+        return store.record_acquisition(path, ResolvedDataset(dataset, "data_sources", year, year, str(path), metadata),
+                                        downloaded_at=date, recorded_at=date, requested_url=url, resolved_url=url)
+
+    original = capture("statewide.csv", current)
+    other_year = capture("prior.csv", replace(current, version="2025", period=DataPeriod("school_year", 2024, 2025)),
+                         year=2025)
+    other_period = capture("different-period.csv", replace(current, period=DataPeriod("school_year", 2024, 2025)))
+    other_dataset = capture("other.csv", current, dataset="other")
+    reference = capture("methodology.csv", current)
+    methodology = ReferenceDocument("methodology", "methodology", url="https://publisher.example/methodology.csv",
+                                    provenance_ids=(reference,))
+    path = tmp_path / "prepared.parquet"
+    path.write_bytes(b"prepared transfer bytes")
+    parents = (original, other_year, other_period, other_dataset)
+    producer = None
+    references = (methodology,)
+    if typed_producer:
+        producer = store.record_processing(dataset="sample", inputs=(*parents, reference), outputs={"prepared": path},
+                                           processor="test", code_version="0" * 64, recorded_at=date)
+    else:
+        references += (ReferenceDocument("masking", "masking_methodology", url="https://publisher.example/statewide.csv",
+                                         provenance_ids=(original,)),)
+    metadata = replace(current, provenance_ids=() if typed_producer else parents, references=references)
+    prepared = store.record_acquisition(path, ResolvedDataset("sample", "data_sources", 2026, 2026, str(path), metadata),
+                                        derived_from=producer, recorded_at=date)
+    records = store.verify_record_closure([prepared])
+    catalog = DatasetCatalog.create(
+        datasets={"sample": {"status": "loaded", "section": "data_sources",
+                             "metadata": replace(metadata, provenance_ids=(prepared,)).to_dict(),
+                             "artifact": records[prepared]["artifact"]}},
+        records=records, value_policies={}, metric_bindings={}, processor="0" * 64,
+    )
+    assert [row["record_id"] for row in catalog.acquisitions("sample")] == [prepared]
+    download, = catalog.source_downloads("sample")
+    assert download["record_id"] == original
+    assert download["downloaded_at"] == date.isoformat()
+    download["source_metadata"]["title"] = "Changed by caller"
+    assert catalog.source_downloads("sample")[0]["source_metadata"]["title"] == current.title
+
+
+def test_source_downloads_preserve_direct_unknown_period(catalog_inputs):
+    metadata, artifact, record = catalog_inputs
+    record.update(method="download", downloaded_at="2025-01-01T00:00:00+00:00")
+    catalog = make_catalog(metadata, artifact, [record])
+    assert catalog.source_downloads("sample") == catalog.acquisitions("sample")
