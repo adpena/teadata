@@ -1177,10 +1177,7 @@ class DatasetCatalog:
         policy = self._policy_for_edition(self._selected_edition(dataset, edition)) if getattr(self, "_v3", False) else self._policies[policy_id]
         return ValuePolicy.from_dict(policy.to_dict())
 
-    def _resolve_metric(self, metric: str, scope: str) -> tuple[MetricBinding, str, str, MetricDefinition | None]:
-        self._require_scalar_interpretation()
-        if scope not in {"campus", "district"}:
-            raise ContractError(f"Unknown entity scope: {scope}")
+    def _metric_selection(self, metric: str) -> tuple[MetricBinding, str]:
         selected = metric if metric in self._bindings else next((
             key for key in sorted(self._bindings, key=lambda item: len(item), reverse=True)
             if key.endswith(".*") and metric.startswith(key[:-1])
@@ -1191,15 +1188,30 @@ class DatasetCatalog:
         binding = self._bindings[selected]
         while isinstance(binding, str):
             binding = self._bindings[binding]
-        if scope not in binding.scopes:
-            raise ContractError(f"Metric {metric} is not defined for {scope}")
-        dataset = binding.dataset.replace("{scope}", scope)
+        return binding, suffix
+
+    def _metric_target(self, binding: MetricBinding, dataset: str, scope: str, suffix: str) -> tuple[str | None, MetricDefinition | None]:
         selector = binding.field.replace("{metric}", suffix)
         metadata = self._metadata[dataset]
         definition = metadata.metrics.get(selector)
+        if binding.field_mode == "metric" and definition is None and metadata.field_year is None:
+            return None, None
         key = self.field(dataset, selector, scope=scope) if binding.field_mode == "metric" else selector
         if definition is None:
             definition = next((value for value in metadata.metrics.values() if value.field == key), None)
+        return key, definition
+
+    def _resolve_metric(self, metric: str, scope: str) -> tuple[MetricBinding, str, str, MetricDefinition | None]:
+        self._require_scalar_interpretation()
+        if scope not in {"campus", "district"}:
+            raise ContractError(f"Unknown entity scope: {scope}")
+        binding, suffix = self._metric_selection(metric)
+        if scope not in binding.scopes:
+            raise ContractError(f"Metric {metric} is not defined for {scope}")
+        dataset = binding.dataset.replace("{scope}", scope)
+        key, definition = self._metric_target(binding, dataset, scope, suffix)
+        if key is None:
+            raise ContractError(f"Dataset {dataset} has no declared field year")
         if key not in self._read_columns[dataset]:
             raise ContractError(f"Metric {metric} is not a declared field in this release")
         return binding, dataset, key, definition
@@ -1395,10 +1407,10 @@ class DatasetCatalog:
             return None
         candidates = []
         for dataset in self._sources:
+            if field not in self._read_columns[dataset]:
+                continue
             metadata = self._metadata[dataset]
             definition_items = [(name, definition) for name, definition in metadata.metrics.items() if definition.field == field]
-            if field not in self._read_columns[dataset] and not definition_items:
-                continue
             for name, binding in self._bindings.items():
                 if not isinstance(binding, MetricBinding) or scope not in binding.scopes or binding.dataset.replace("{scope}", scope) != dataset:
                     continue
@@ -1412,7 +1424,10 @@ class DatasetCatalog:
                     metric = name[:-1] + selector
                 else:
                     metric = name
-                resolved_binding, _, resolved_field, definition = self._resolve_metric(metric, scope)
+                resolved_binding, suffix = self._metric_selection(metric)
+                if scope not in resolved_binding.scopes or resolved_binding.dataset.replace("{scope}", scope) != dataset:
+                    continue
+                resolved_field, definition = self._metric_target(resolved_binding, dataset, scope, suffix)
                 if resolved_field == field:
                     candidates.append((dataset, resolved_binding, definition, not name.endswith(".*")))
         if len({item[0] for item in candidates}) != 1:

@@ -303,14 +303,14 @@ def test_same_field_semantic_metrics_keep_their_distinct_effective_periods(catal
 
 def test_physical_field_contract_is_resolved_once_for_repeated_values(catalog, monkeypatch):
     _, field = catalog.source_for_metric("enrollment", "campus")
-    original = catalog._resolve_metric
+    original = catalog._metric_target
     calls = []
 
-    def resolving(metric, scope):
-        calls.append((metric, scope))
-        return original(metric, scope)
+    def resolving(binding, dataset, scope, suffix):
+        calls.append((binding, dataset, scope, suffix))
+        return original(binding, dataset, scope, suffix)
 
-    monkeypatch.setattr(catalog, "_resolve_metric", resolving)
+    monkeypatch.setattr(catalog, "_metric_target", resolving)
     assert catalog.measure_field(12, field).numeric == 12
     first_calls = len(calls)
     assert first_calls > 0
@@ -367,6 +367,61 @@ def test_physical_field_resolution_is_isolated_by_scope(catalog):
     assert district.unit == "percent" and district.status == ValueStatus.INVALID
     assert changed.measure_field(12, "shared_scope_field", scope="district").numeric == 12
     assert changed.measure_field(150, "shared_scope_field", scope="campus").unit == "count"
+
+
+def test_physical_field_lookup_ignores_unread_and_unrelated_bindings(catalog):
+    dataset, observed = catalog.source_for_metric("enrollment", "campus")
+    missing = "publisher_definition_without_column"
+
+    def change(document):
+        metrics = document["datasets"][dataset]["metadata"].setdefault("metrics", {})
+        metrics["unread"] = {
+            "field": missing, "unit": "count",
+        }
+        document["metric_bindings"]["a_unread"] = {
+            "dataset": dataset, "field": missing, "scopes": ["campus"], "unit": "count",
+        }
+
+    partial = revised(catalog, change)
+    assert partial.measure_field(7, observed).numeric == 7
+    assert partial.measure_field(7, missing) is None
+    with pytest.raises(ContractError, match="not a declared field"):
+        partial.metric_metadata("a_unread")
+
+
+def test_physical_field_lookup_skips_unrelated_binding_without_field_year(catalog):
+    dataset, observed = "campus_transfer_reports", "TRANSFERS_IN_OR_OUT"
+
+    def change(document):
+        source = document["datasets"][dataset]
+        source["metadata"].pop("field_year", None)
+        if not any(observed in read["columns"] for read in source["reads"]):
+            source["reads"][0]["columns"].append(observed)
+        document["metric_bindings"]["unbound_location"] = {
+            "dataset": dataset, "field": "not_in_publisher_definitions", "field_mode": "metric", "scopes": ["campus"],
+        }
+
+    partial = revised(catalog, change)
+    assert partial.measure_field(7, observed).numeric == 7
+    with pytest.raises(ContractError, match="has no declared field year"):
+        partial.metric_metadata("unbound_location")
+
+
+@pytest.mark.parametrize("override", ["scope", "dataset"])
+def test_physical_field_lookup_preserves_wildcard_override_boundaries(catalog, override):
+    dataset, _ = catalog.source_for_metric("enrollment", "campus")
+    field = "discovery_probe"
+
+    def change(document):
+        document["datasets"][dataset]["reads"][0]["columns"].append(field)
+        bindings = document["metric_bindings"]
+        bindings["availability.*"] = {"dataset": dataset, "field": "{metric}", "scopes": ["campus"]}
+        bindings[f"availability.{field}"] = {
+            "dataset": "accountability" if override == "dataset" else dataset,
+            "field": field, "scopes": ["district" if override == "scope" else "campus"], "unit": "count",
+        }
+
+    assert revised(catalog, change).measure_field(7, field) is None
 
 
 def test_ambiguous_physical_field_remains_opaque_after_reuse(catalog):
