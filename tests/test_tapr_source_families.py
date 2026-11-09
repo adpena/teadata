@@ -588,10 +588,11 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     assert set(current['value_policies'].pop('historical_district_transfers')['tokens']) == {'-9999999', '.'}
     # Student enrollment and programs have their own exact source contracts.
     for dataset in ('peims_student_enrollment_by_ethnicity', 'peims_student_programs_and_special_populations'):
-        assert list(current['data_sources'].pop(dataset)) == [2023, 2024, 2025, 2026]
+        editions = list(range(2019, 2027)) if dataset.endswith('_ethnicity') else list(range(2023, 2027))
+        assert list(current['data_sources'].pop(dataset)) == editions
         assert current['schema']['data_sources'].pop(dataset) == ['csv']
         assert current['value_policies'].pop(dataset + '_2026')['reference_id'] == 'peims_masking'
-        for year in (2023, 2024, 2025):
+        for year in editions[:-1]:
             reference = 'about' if dataset.endswith('_ethnicity') else 'peims_masking'
             assert current['value_policies'].pop(f'{dataset}_{year}')['reference_id'] == reference
     primary_disability = 'peims_special_education_by_primary_disability'

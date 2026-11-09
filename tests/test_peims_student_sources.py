@@ -53,7 +53,7 @@ def test_source_discovery_is_exact_and_excluded_from_retained_builds(
         assert cfg.is_source_only(dataset, year)
     assert not cfg.is_source_only("accountability", 2025)
     with pytest.raises(KeyError):
-        cfg.resolve_dataset(dataset, 2022, exact=True)
+        cfg.resolve_dataset(dataset, 2018, exact=True)
     with pytest.raises(ContractError, match="Reader profile is required"):
         cfg.load_df(dataset, 2026, exact=True)
     with pytest.raises(ContractError, match="requires a dedicated preparation workflow"):
@@ -89,7 +89,7 @@ def test_mixed_editions_never_hide_required_retained_sources():
     assert not cfg.is_source_only(ENROLLMENT, 2025)
     assert cfg.is_source_only(ENROLLMENT, 2026)
     with pytest.raises(KeyError, match="no prior fallback"):
-        cfg.is_source_only(ENROLLMENT, 2022)
+        cfg.is_source_only(ENROLLMENT, 2018)
 
     # A future active edition also prevents the dataset from being classified
     # as exclusively source-only for an unavailable earlier edition.
@@ -97,10 +97,12 @@ def test_mixed_editions_never_hide_required_retained_sources():
     editions[2027] = active
     assert not cfg.is_source_only(ENROLLMENT, 2027)
     with pytest.raises(KeyError, match="no prior fallback"):
-        cfg.is_source_only(ENROLLMENT, 2022)
+        cfg.is_source_only(ENROLLMENT, 2018)
 
 
 @pytest.mark.parametrize(('dataset', 'year', 'rows'), [
+    (ENROLLMENT, 2019, (7, 6837, 47295)), (ENROLLMENT, 2020, (7, 6836, 47470)),
+    (ENROLLMENT, 2021, (7, 6835, 47162)), (ENROLLMENT, 2022, (7, 6858, 47801)),
     (ENROLLMENT, 2023, (7, 6911, 48497)), (ENROLLMENT, 2024, (7, 6912, 48716)),
     (ENROLLMENT, 2025, (7, 6910, 48850)), (PROGRAMS, 2023, (1, 1209, 9054)),
     (PROGRAMS, 2024, (1, 1207, 9088)), (PROGRAMS, 2025, (1, 1208, 9088)),
@@ -128,6 +130,17 @@ def test_historical_peims_bind_each_scope_and_preserve_literal_headers(dataset, 
         if dataset == PROGRAMS:
             label = 'EMERGENT BILINGUAL/ENGLISH LEARNER' if year < 2025 else 'EMERGENT BILINGUAL'
             assert [f['code'] for f in table['fields'] if f['field'] == 'emergent_bilingual_count'] == [label]
+        elif year < 2023:
+            with pytest.raises(KeyError):
+                cfg.resolve_dataset(PROGRAMS, year, exact=True, reader_profile='source')
+            scope = table['table']
+            controls = dict(record['parameters']['form_controls'])
+            assert record['parameters']['http_method'] == 'GET'
+            assert controls['selsumm'] == {'state': 'ss', 'district': 'sd', 'campus': 'sc'}[scope]
+            assert (controls['endyear'], controls['grouping'], controls['format']) == (str(year)[-2:], 'e ', 'C')
+            if year == 2020 and scope != 'state':
+                other = 'CHARTER STATUS' if scope == 'district' else 'GRADE GROUP NAME'
+                assert [field['code'] for field in table['fields'][-3:]] == ['ETHNICITY', other, 'ENROLLMENT']
 
 
 @pytest.mark.parametrize(("year", "district_rows"), [(2023, 1209), (2024, 1206), (2025, 1206), (2026, 1201)])

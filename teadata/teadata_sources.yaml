@@ -1,6 +1,387 @@
 contract_version: 1
 year_min: 2009
 value_policies:
+  peims_student_enrollment_by_ethnicity_2019:
+    policy_id: peims_student_enrollment_by_ethnicity_2019
+    reference_id: about
+    tokens:
+      <1,000: &peims_2019_2022_enrollment_mask
+        status: suppressed
+        reason: publisher_ferpa_suppression
+      <1,010: *peims_2019_2022_enrollment_mask
+      <1,060: *peims_2019_2022_enrollment_mask
+      <1,070: *peims_2019_2022_enrollment_mask
+      <1,100: *peims_2019_2022_enrollment_mask
+      <1,170: *peims_2019_2022_enrollment_mask
+      <1,560: *peims_2019_2022_enrollment_mask
+      <1,740: *peims_2019_2022_enrollment_mask
+      <10: *peims_2019_2022_enrollment_mask
+      <100: *peims_2019_2022_enrollment_mask
+      <110: *peims_2019_2022_enrollment_mask
+      <120: *peims_2019_2022_enrollment_mask
+      <130: *peims_2019_2022_enrollment_mask
+      <140: *peims_2019_2022_enrollment_mask
+      <150: *peims_2019_2022_enrollment_mask
+      <160: *peims_2019_2022_enrollment_mask
+      <170: *peims_2019_2022_enrollment_mask
+      <180: *peims_2019_2022_enrollment_mask
+      <190: *peims_2019_2022_enrollment_mask
+      <2,180: *peims_2019_2022_enrollment_mask
+      <2,430: *peims_2019_2022_enrollment_mask
+      <20: *peims_2019_2022_enrollment_mask
+      <200: *peims_2019_2022_enrollment_mask
+      <210: *peims_2019_2022_enrollment_mask
+      <220: *peims_2019_2022_enrollment_mask
+      <230: *peims_2019_2022_enrollment_mask
+      <240: *peims_2019_2022_enrollment_mask
+      <250: *peims_2019_2022_enrollment_mask
+      <260: *peims_2019_2022_enrollment_mask
+      <270: *peims_2019_2022_enrollment_mask
+      <280: *peims_2019_2022_enrollment_mask
+      <290: *peims_2019_2022_enrollment_mask
+      <3,260: *peims_2019_2022_enrollment_mask
+      <30: *peims_2019_2022_enrollment_mask
+      <300: *peims_2019_2022_enrollment_mask
+      <310: *peims_2019_2022_enrollment_mask
+      <320: *peims_2019_2022_enrollment_mask
+      <330: *peims_2019_2022_enrollment_mask
+      <340: *peims_2019_2022_enrollment_mask
+      <350: *peims_2019_2022_enrollment_mask
+      <360: *peims_2019_2022_enrollment_mask
+      <370: *peims_2019_2022_enrollment_mask
+      <380: *peims_2019_2022_enrollment_mask
+      <390: *peims_2019_2022_enrollment_mask
+      <40: *peims_2019_2022_enrollment_mask
+      <400: *peims_2019_2022_enrollment_mask
+      <410: *peims_2019_2022_enrollment_mask
+      <420: *peims_2019_2022_enrollment_mask
+      <430: *peims_2019_2022_enrollment_mask
+      <440: *peims_2019_2022_enrollment_mask
+      <450: *peims_2019_2022_enrollment_mask
+      <460: *peims_2019_2022_enrollment_mask
+      <470: *peims_2019_2022_enrollment_mask
+      <480: *peims_2019_2022_enrollment_mask
+      <490: *peims_2019_2022_enrollment_mask
+      <50: *peims_2019_2022_enrollment_mask
+      <500: *peims_2019_2022_enrollment_mask
+      <510: *peims_2019_2022_enrollment_mask
+      <520: *peims_2019_2022_enrollment_mask
+      <530: *peims_2019_2022_enrollment_mask
+      <540: *peims_2019_2022_enrollment_mask
+      <550: *peims_2019_2022_enrollment_mask
+      <560: *peims_2019_2022_enrollment_mask
+      <570: *peims_2019_2022_enrollment_mask
+      <580: *peims_2019_2022_enrollment_mask
+      <590: *peims_2019_2022_enrollment_mask
+      <60: *peims_2019_2022_enrollment_mask
+      <600: *peims_2019_2022_enrollment_mask
+      <610: *peims_2019_2022_enrollment_mask
+      <620: *peims_2019_2022_enrollment_mask
+      <630: *peims_2019_2022_enrollment_mask
+      <640: *peims_2019_2022_enrollment_mask
+      <650: *peims_2019_2022_enrollment_mask
+      <660: *peims_2019_2022_enrollment_mask
+      <670: *peims_2019_2022_enrollment_mask
+      <680: *peims_2019_2022_enrollment_mask
+      <70: *peims_2019_2022_enrollment_mask
+      <700: *peims_2019_2022_enrollment_mask
+      <710: *peims_2019_2022_enrollment_mask
+      <720: *peims_2019_2022_enrollment_mask
+      <730: *peims_2019_2022_enrollment_mask
+      <740: *peims_2019_2022_enrollment_mask
+      <750: *peims_2019_2022_enrollment_mask
+      <760: *peims_2019_2022_enrollment_mask
+      <780: *peims_2019_2022_enrollment_mask
+      <790: *peims_2019_2022_enrollment_mask
+      <80: *peims_2019_2022_enrollment_mask
+      <800: *peims_2019_2022_enrollment_mask
+      <810: *peims_2019_2022_enrollment_mask
+      <830: *peims_2019_2022_enrollment_mask
+      <850: *peims_2019_2022_enrollment_mask
+      <860: *peims_2019_2022_enrollment_mask
+      <890: *peims_2019_2022_enrollment_mask
+      <90: *peims_2019_2022_enrollment_mask
+      <950: *peims_2019_2022_enrollment_mask
+  peims_student_enrollment_by_ethnicity_2020:
+    policy_id: peims_student_enrollment_by_ethnicity_2020
+    reference_id: about
+    tokens:
+      <1,010: *peims_2019_2022_enrollment_mask
+      <1,040: *peims_2019_2022_enrollment_mask
+      <1,090: *peims_2019_2022_enrollment_mask
+      <1,130: *peims_2019_2022_enrollment_mask
+      <1,150: *peims_2019_2022_enrollment_mask
+      <1,390: *peims_2019_2022_enrollment_mask
+      <1,580: *peims_2019_2022_enrollment_mask
+      <1,750: *peims_2019_2022_enrollment_mask
+      <10: *peims_2019_2022_enrollment_mask
+      <100: *peims_2019_2022_enrollment_mask
+      <110: *peims_2019_2022_enrollment_mask
+      <120: *peims_2019_2022_enrollment_mask
+      <130: *peims_2019_2022_enrollment_mask
+      <140: *peims_2019_2022_enrollment_mask
+      <150: *peims_2019_2022_enrollment_mask
+      <160: *peims_2019_2022_enrollment_mask
+      <170: *peims_2019_2022_enrollment_mask
+      <180: *peims_2019_2022_enrollment_mask
+      <190: *peims_2019_2022_enrollment_mask
+      <2,910: *peims_2019_2022_enrollment_mask
+      <20: *peims_2019_2022_enrollment_mask
+      <200: *peims_2019_2022_enrollment_mask
+      <210: *peims_2019_2022_enrollment_mask
+      <220: *peims_2019_2022_enrollment_mask
+      <230: *peims_2019_2022_enrollment_mask
+      <240: *peims_2019_2022_enrollment_mask
+      <250: *peims_2019_2022_enrollment_mask
+      <260: *peims_2019_2022_enrollment_mask
+      <270: *peims_2019_2022_enrollment_mask
+      <280: *peims_2019_2022_enrollment_mask
+      <290: *peims_2019_2022_enrollment_mask
+      <30: *peims_2019_2022_enrollment_mask
+      <300: *peims_2019_2022_enrollment_mask
+      <310: *peims_2019_2022_enrollment_mask
+      <320: *peims_2019_2022_enrollment_mask
+      <330: *peims_2019_2022_enrollment_mask
+      <340: *peims_2019_2022_enrollment_mask
+      <350: *peims_2019_2022_enrollment_mask
+      <360: *peims_2019_2022_enrollment_mask
+      <370: *peims_2019_2022_enrollment_mask
+      <380: *peims_2019_2022_enrollment_mask
+      <390: *peims_2019_2022_enrollment_mask
+      <40: *peims_2019_2022_enrollment_mask
+      <400: *peims_2019_2022_enrollment_mask
+      <410: *peims_2019_2022_enrollment_mask
+      <420: *peims_2019_2022_enrollment_mask
+      <430: *peims_2019_2022_enrollment_mask
+      <440: *peims_2019_2022_enrollment_mask
+      <450: *peims_2019_2022_enrollment_mask
+      <460: *peims_2019_2022_enrollment_mask
+      <470: *peims_2019_2022_enrollment_mask
+      <480: *peims_2019_2022_enrollment_mask
+      <490: *peims_2019_2022_enrollment_mask
+      <50: *peims_2019_2022_enrollment_mask
+      <500: *peims_2019_2022_enrollment_mask
+      <510: *peims_2019_2022_enrollment_mask
+      <520: *peims_2019_2022_enrollment_mask
+      <530: *peims_2019_2022_enrollment_mask
+      <540: *peims_2019_2022_enrollment_mask
+      <550: *peims_2019_2022_enrollment_mask
+      <560: *peims_2019_2022_enrollment_mask
+      <570: *peims_2019_2022_enrollment_mask
+      <580: *peims_2019_2022_enrollment_mask
+      <590: *peims_2019_2022_enrollment_mask
+      <60: *peims_2019_2022_enrollment_mask
+      <600: *peims_2019_2022_enrollment_mask
+      <610: *peims_2019_2022_enrollment_mask
+      <620: *peims_2019_2022_enrollment_mask
+      <630: *peims_2019_2022_enrollment_mask
+      <640: *peims_2019_2022_enrollment_mask
+      <660: *peims_2019_2022_enrollment_mask
+      <670: *peims_2019_2022_enrollment_mask
+      <680: *peims_2019_2022_enrollment_mask
+      <690: *peims_2019_2022_enrollment_mask
+      <70: *peims_2019_2022_enrollment_mask
+      <700: *peims_2019_2022_enrollment_mask
+      <710: *peims_2019_2022_enrollment_mask
+      <740: *peims_2019_2022_enrollment_mask
+      <750: *peims_2019_2022_enrollment_mask
+      <760: *peims_2019_2022_enrollment_mask
+      <770: *peims_2019_2022_enrollment_mask
+      <790: *peims_2019_2022_enrollment_mask
+      <80: *peims_2019_2022_enrollment_mask
+      <810: *peims_2019_2022_enrollment_mask
+      <820: *peims_2019_2022_enrollment_mask
+      <850: *peims_2019_2022_enrollment_mask
+      <860: *peims_2019_2022_enrollment_mask
+      <880: *peims_2019_2022_enrollment_mask
+      <890: *peims_2019_2022_enrollment_mask
+      <90: *peims_2019_2022_enrollment_mask
+      <900: *peims_2019_2022_enrollment_mask
+      <910: *peims_2019_2022_enrollment_mask
+      <930: *peims_2019_2022_enrollment_mask
+      <940: *peims_2019_2022_enrollment_mask
+      <970: *peims_2019_2022_enrollment_mask
+  peims_student_enrollment_by_ethnicity_2021:
+    policy_id: peims_student_enrollment_by_ethnicity_2021
+    reference_id: about
+    tokens:
+      <1,060: *peims_2019_2022_enrollment_mask
+      <1,080: *peims_2019_2022_enrollment_mask
+      <1,170: *peims_2019_2022_enrollment_mask
+      <1,270: *peims_2019_2022_enrollment_mask
+      <1,530: *peims_2019_2022_enrollment_mask
+      <1,850: *peims_2019_2022_enrollment_mask
+      <10: *peims_2019_2022_enrollment_mask
+      <100: *peims_2019_2022_enrollment_mask
+      <110: *peims_2019_2022_enrollment_mask
+      <120: *peims_2019_2022_enrollment_mask
+      <130: *peims_2019_2022_enrollment_mask
+      <140: *peims_2019_2022_enrollment_mask
+      <150: *peims_2019_2022_enrollment_mask
+      <160: *peims_2019_2022_enrollment_mask
+      <170: *peims_2019_2022_enrollment_mask
+      <180: *peims_2019_2022_enrollment_mask
+      <190: *peims_2019_2022_enrollment_mask
+      <2,040: *peims_2019_2022_enrollment_mask
+      <2,250: *peims_2019_2022_enrollment_mask
+      <20: *peims_2019_2022_enrollment_mask
+      <200: *peims_2019_2022_enrollment_mask
+      <210: *peims_2019_2022_enrollment_mask
+      <220: *peims_2019_2022_enrollment_mask
+      <230: *peims_2019_2022_enrollment_mask
+      <240: *peims_2019_2022_enrollment_mask
+      <250: *peims_2019_2022_enrollment_mask
+      <260: *peims_2019_2022_enrollment_mask
+      <280: *peims_2019_2022_enrollment_mask
+      <290: *peims_2019_2022_enrollment_mask
+      <3,000: *peims_2019_2022_enrollment_mask
+      <30: *peims_2019_2022_enrollment_mask
+      <300: *peims_2019_2022_enrollment_mask
+      <310: *peims_2019_2022_enrollment_mask
+      <320: *peims_2019_2022_enrollment_mask
+      <330: *peims_2019_2022_enrollment_mask
+      <340: *peims_2019_2022_enrollment_mask
+      <350: *peims_2019_2022_enrollment_mask
+      <360: *peims_2019_2022_enrollment_mask
+      <370: *peims_2019_2022_enrollment_mask
+      <380: *peims_2019_2022_enrollment_mask
+      <390: *peims_2019_2022_enrollment_mask
+      <40: *peims_2019_2022_enrollment_mask
+      <400: *peims_2019_2022_enrollment_mask
+      <410: *peims_2019_2022_enrollment_mask
+      <420: *peims_2019_2022_enrollment_mask
+      <430: *peims_2019_2022_enrollment_mask
+      <440: *peims_2019_2022_enrollment_mask
+      <450: *peims_2019_2022_enrollment_mask
+      <460: *peims_2019_2022_enrollment_mask
+      <470: *peims_2019_2022_enrollment_mask
+      <480: *peims_2019_2022_enrollment_mask
+      <490: *peims_2019_2022_enrollment_mask
+      <50: *peims_2019_2022_enrollment_mask
+      <500: *peims_2019_2022_enrollment_mask
+      <510: *peims_2019_2022_enrollment_mask
+      <520: *peims_2019_2022_enrollment_mask
+      <530: *peims_2019_2022_enrollment_mask
+      <540: *peims_2019_2022_enrollment_mask
+      <550: *peims_2019_2022_enrollment_mask
+      <570: *peims_2019_2022_enrollment_mask
+      <580: *peims_2019_2022_enrollment_mask
+      <590: *peims_2019_2022_enrollment_mask
+      <60: *peims_2019_2022_enrollment_mask
+      <600: *peims_2019_2022_enrollment_mask
+      <610: *peims_2019_2022_enrollment_mask
+      <620: *peims_2019_2022_enrollment_mask
+      <630: *peims_2019_2022_enrollment_mask
+      <640: *peims_2019_2022_enrollment_mask
+      <650: *peims_2019_2022_enrollment_mask
+      <660: *peims_2019_2022_enrollment_mask
+      <680: *peims_2019_2022_enrollment_mask
+      <690: *peims_2019_2022_enrollment_mask
+      <70: *peims_2019_2022_enrollment_mask
+      <700: *peims_2019_2022_enrollment_mask
+      <720: *peims_2019_2022_enrollment_mask
+      <730: *peims_2019_2022_enrollment_mask
+      <740: *peims_2019_2022_enrollment_mask
+      <760: *peims_2019_2022_enrollment_mask
+      <790: *peims_2019_2022_enrollment_mask
+      <80: *peims_2019_2022_enrollment_mask
+      <800: *peims_2019_2022_enrollment_mask
+      <830: *peims_2019_2022_enrollment_mask
+      <850: *peims_2019_2022_enrollment_mask
+      <90: *peims_2019_2022_enrollment_mask
+      <900: *peims_2019_2022_enrollment_mask
+      <920: *peims_2019_2022_enrollment_mask
+      <950: *peims_2019_2022_enrollment_mask
+      <980: *peims_2019_2022_enrollment_mask
+  peims_student_enrollment_by_ethnicity_2022:
+    policy_id: peims_student_enrollment_by_ethnicity_2022
+    reference_id: about
+    tokens:
+      <1,060: *peims_2019_2022_enrollment_mask
+      <1,070: *peims_2019_2022_enrollment_mask
+      <1,110: *peims_2019_2022_enrollment_mask
+      <1,180: *peims_2019_2022_enrollment_mask
+      <1,380: *peims_2019_2022_enrollment_mask
+      <1,390: *peims_2019_2022_enrollment_mask
+      <1,490: *peims_2019_2022_enrollment_mask
+      <1,740: *peims_2019_2022_enrollment_mask
+      <1,750: *peims_2019_2022_enrollment_mask
+      <1,840: *peims_2019_2022_enrollment_mask
+      <10: *peims_2019_2022_enrollment_mask
+      <100: *peims_2019_2022_enrollment_mask
+      <110: *peims_2019_2022_enrollment_mask
+      <120: *peims_2019_2022_enrollment_mask
+      <130: *peims_2019_2022_enrollment_mask
+      <140: *peims_2019_2022_enrollment_mask
+      <150: *peims_2019_2022_enrollment_mask
+      <160: *peims_2019_2022_enrollment_mask
+      <170: *peims_2019_2022_enrollment_mask
+      <180: *peims_2019_2022_enrollment_mask
+      <190: *peims_2019_2022_enrollment_mask
+      <2,840: *peims_2019_2022_enrollment_mask
+      <20: *peims_2019_2022_enrollment_mask
+      <200: *peims_2019_2022_enrollment_mask
+      <210: *peims_2019_2022_enrollment_mask
+      <220: *peims_2019_2022_enrollment_mask
+      <230: *peims_2019_2022_enrollment_mask
+      <240: *peims_2019_2022_enrollment_mask
+      <250: *peims_2019_2022_enrollment_mask
+      <260: *peims_2019_2022_enrollment_mask
+      <270: *peims_2019_2022_enrollment_mask
+      <280: *peims_2019_2022_enrollment_mask
+      <290: *peims_2019_2022_enrollment_mask
+      <30: *peims_2019_2022_enrollment_mask
+      <300: *peims_2019_2022_enrollment_mask
+      <310: *peims_2019_2022_enrollment_mask
+      <320: *peims_2019_2022_enrollment_mask
+      <330: *peims_2019_2022_enrollment_mask
+      <340: *peims_2019_2022_enrollment_mask
+      <350: *peims_2019_2022_enrollment_mask
+      <360: *peims_2019_2022_enrollment_mask
+      <370: *peims_2019_2022_enrollment_mask
+      <380: *peims_2019_2022_enrollment_mask
+      <390: *peims_2019_2022_enrollment_mask
+      <40: *peims_2019_2022_enrollment_mask
+      <400: *peims_2019_2022_enrollment_mask
+      <410: *peims_2019_2022_enrollment_mask
+      <420: *peims_2019_2022_enrollment_mask
+      <430: *peims_2019_2022_enrollment_mask
+      <440: *peims_2019_2022_enrollment_mask
+      <450: *peims_2019_2022_enrollment_mask
+      <460: *peims_2019_2022_enrollment_mask
+      <470: *peims_2019_2022_enrollment_mask
+      <480: *peims_2019_2022_enrollment_mask
+      <490: *peims_2019_2022_enrollment_mask
+      <50: *peims_2019_2022_enrollment_mask
+      <500: *peims_2019_2022_enrollment_mask
+      <510: *peims_2019_2022_enrollment_mask
+      <520: *peims_2019_2022_enrollment_mask
+      <530: *peims_2019_2022_enrollment_mask
+      <540: *peims_2019_2022_enrollment_mask
+      <550: *peims_2019_2022_enrollment_mask
+      <560: *peims_2019_2022_enrollment_mask
+      <570: *peims_2019_2022_enrollment_mask
+      <580: *peims_2019_2022_enrollment_mask
+      <590: *peims_2019_2022_enrollment_mask
+      <60: *peims_2019_2022_enrollment_mask
+      <610: *peims_2019_2022_enrollment_mask
+      <630: *peims_2019_2022_enrollment_mask
+      <640: *peims_2019_2022_enrollment_mask
+      <650: *peims_2019_2022_enrollment_mask
+      <660: *peims_2019_2022_enrollment_mask
+      <670: *peims_2019_2022_enrollment_mask
+      <680: *peims_2019_2022_enrollment_mask
+      <70: *peims_2019_2022_enrollment_mask
+      <720: *peims_2019_2022_enrollment_mask
+      <730: *peims_2019_2022_enrollment_mask
+      <770: *peims_2019_2022_enrollment_mask
+      <780: *peims_2019_2022_enrollment_mask
+      <790: *peims_2019_2022_enrollment_mask
+      <80: *peims_2019_2022_enrollment_mask
+      <820: *peims_2019_2022_enrollment_mask
+      <830: *peims_2019_2022_enrollment_mask
+      <90: *peims_2019_2022_enrollment_mask
+      <950: *peims_2019_2022_enrollment_mask
   peims_college_credit_csv:
     policy_id: peims_college_credit_csv
     reference_id: college_credit_criteria
@@ -19232,6 +19613,214 @@ data_sources:
               state: 91f0d4451162b93e16998737ad1519079b46d13da18c2c8eb595ccfe203fb96d
               district: a91adb5686193ef4886be24cc3aa17d2952114a94a1be8b77f695c6c7e0a9024
   peims_student_enrollment_by_ethnicity:
+    2019:
+      metadata:
+        metrics:
+          enrollment_by_ethnicity_count:
+            field: enrollment_by_ethnicity_count
+            unit: count
+        notes: October 2018 PEIMS Enrollment snapshot. Distinct state, district and campus acquisitions. The year-specific
+          CSV footers govern suppressed ranges. Historical extract publication date and finality are unspecified.
+          Separate from TPRS Membership.
+        period:
+          kind: school_year
+          start_year: 2018
+          end_year: 2019
+        publisher: Texas Education Agency
+        references:
+        - reference_id: about
+          role: source_notes
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.std_download_selected_report.sas&rpt_subject=about&fname=abtenrl19&ftype=html
+          title: TEA Student Enrollment report criteria
+          reviewed_sha256: f84b6c360e67d607ea81d0a8c46987e17aa55f37b6bd064cee62096131009b36
+          provenance_ids:
+          - 0f7e554dc3dbfb66dccb98af20ba98af7b503c56090474720cbb2f5a6f2dda8f
+        - reference_id: statewide_annual_report
+          role: source_notes
+          status: available
+          url: https://tea.texas.gov/sites/default/files/enroll_2018-19.pdf
+          title: TEA Enrollment in Texas Public Schools, Table 1
+          reviewed_sha256: 3707d99233987d5458b89507bb0a78656b87f92266529dd861e8c2ab59a78d31
+          provenance_ids:
+          - 4f79dc719db03bf6da43ac561f3e66782b3f32d7c43de4ca581d3ca0dd3321c1
+        - reference_id: column_crosswalk
+          role: schema
+          status: available
+          title: Exact PEIMS enrollment positional crosswalk
+          path: schemas/peims--2019-2022--student-enrollment-by-ethnicity-crosswalk.json
+          reviewed_sha256: c811fa693b88793d2633f828209ba938d19afd1cd4725a0d24bc39957868e431
+          provenance_ids:
+          - 3e85aeeb0cc2392218d1a100983a0450ff9c5126afde5e6572aebec2884b93b7
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adste.html
+        title: 2018–19 PEIMS Student Enrollment by Ethnicity
+        value_policy: peims_student_enrollment_by_ethnicity_2019
+        version: '2019'
+      path: data/peims/2019/peims_student_enrollment_by_ethnicity--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2019-2022--student-enrollment-by-ethnicity-crosswalk.json
+            acquisition_ids:
+              state: edd5c2886deddb9124235d481ad5494abf75d420938ee96d5328285120e47e96
+              district: ebf1f43bd21c560b4c2f7e513c6f082580ac364cb71f59036baa4caf9c87360b
+              campus: 3cf04c79cf81e4320234c26a612072c3f673f2f9173fbb7bc1cf3823c502bafb
+    2020:
+      metadata:
+        metrics:
+          enrollment_by_ethnicity_count:
+            field: enrollment_by_ethnicity_count
+            unit: count
+        notes: October 2019 PEIMS Enrollment snapshot. Distinct state, district and campus acquisitions. The year-specific
+          CSV footers govern suppressed ranges. Historical extract publication date and finality are unspecified.
+          Separate from TPRS Membership.
+        period:
+          kind: school_year
+          start_year: 2019
+          end_year: 2020
+        publisher: Texas Education Agency
+        references:
+        - reference_id: about
+          role: source_notes
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.std_download_selected_report.sas&rpt_subject=about&fname=abtenrl20&ftype=html
+          title: TEA Student Enrollment report criteria
+          reviewed_sha256: 60b18db8985fc67227ad28e99e33c4f8cd81f522fe67422f380d62244c1d843c
+          provenance_ids:
+          - 3aa001da2cee12d52bfe47fc1d515c495a09716e5322efde5acec65fd169ce3c
+        - reference_id: statewide_annual_report
+          role: source_notes
+          status: available
+          url: https://tea.texas.gov/sites/default/files/enroll_2019-20.pdf
+          title: TEA Enrollment in Texas Public Schools, Table 1
+          reviewed_sha256: 983f144de5b3c7bab8efcd97cae47e2a16218530f897964701b8d6751e50dcf9
+          provenance_ids:
+          - f2ee5bb9cfb76e97434ca1daa8e025361ac8a4a04b2e2afc896aa6ea6799e9d9
+        - reference_id: column_crosswalk
+          role: schema
+          status: available
+          title: Exact PEIMS enrollment positional crosswalk
+          path: schemas/peims--2019-2022--student-enrollment-by-ethnicity-crosswalk.json
+          reviewed_sha256: c811fa693b88793d2633f828209ba938d19afd1cd4725a0d24bc39957868e431
+          provenance_ids:
+          - 3e85aeeb0cc2392218d1a100983a0450ff9c5126afde5e6572aebec2884b93b7
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adste.html
+        title: 2019–20 PEIMS Student Enrollment by Ethnicity
+        value_policy: peims_student_enrollment_by_ethnicity_2020
+        version: '2020'
+      path: data/peims/2020/peims_student_enrollment_by_ethnicity--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2019-2022--student-enrollment-by-ethnicity-crosswalk.json
+            acquisition_ids:
+              state: 0c0db88cc263b096c8c06435c496eb81c1a83a5eeb52d73f24898846cd5bc28b
+              district: dfcff352f1e31b2c4daecd87a0a8adcb41bbd87b6e2ebf54869169143a9da98b
+              campus: 710558e14de2139f41472abce17ca6a9a4a082903025e4859e28d30eeb289cc3
+    2021:
+      metadata:
+        metrics:
+          enrollment_by_ethnicity_count:
+            field: enrollment_by_ethnicity_count
+            unit: count
+        notes: October 2020 PEIMS Enrollment snapshot. Distinct state, district and campus acquisitions. The year-specific
+          CSV footers govern suppressed ranges. Historical extract publication date and finality are unspecified.
+          Separate from TPRS Membership.
+        period:
+          kind: school_year
+          start_year: 2020
+          end_year: 2021
+        publisher: Texas Education Agency
+        references:
+        - reference_id: about
+          role: source_notes
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.std_download_selected_report.sas&rpt_subject=about&fname=abtenrl21&ftype=html
+          title: TEA Student Enrollment report criteria
+          reviewed_sha256: 4747a2c34c1c1e2fb6ddb7897290e5637b944ec40ba7af88bc7d18cf3a898cbc
+          provenance_ids:
+          - 093f5c52af68c47e574ef00d9d4dc9668e613a0a770752e2e2ca9917d7b90d08
+        - reference_id: statewide_annual_report
+          role: source_notes
+          status: available
+          url: https://tea.texas.gov/sites/default/files/enroll-2020-21.pdf
+          title: TEA Enrollment in Texas Public Schools, Table 1
+          reviewed_sha256: 85bc459faae8ccd078de4fee5a2b9c5f4c5527e93377cb67202337b4ad47ce42
+          provenance_ids:
+          - b689e797c97b05c8ba5b4353dda169a876bd16f23134fe397ef9155cc7689f1a
+        - reference_id: column_crosswalk
+          role: schema
+          status: available
+          title: Exact PEIMS enrollment positional crosswalk
+          path: schemas/peims--2019-2022--student-enrollment-by-ethnicity-crosswalk.json
+          reviewed_sha256: c811fa693b88793d2633f828209ba938d19afd1cd4725a0d24bc39957868e431
+          provenance_ids:
+          - 3e85aeeb0cc2392218d1a100983a0450ff9c5126afde5e6572aebec2884b93b7
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adste.html
+        title: 2020–21 PEIMS Student Enrollment by Ethnicity
+        value_policy: peims_student_enrollment_by_ethnicity_2021
+        version: '2021'
+      path: data/peims/2021/peims_student_enrollment_by_ethnicity--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2019-2022--student-enrollment-by-ethnicity-crosswalk.json
+            acquisition_ids:
+              state: c5b58b852e067cc2816130dedea24517d2932243d2a2f7cff6eb6b3e4d088dd0
+              district: 86cd502280b49f8f5028cef5a723afc8d4f290a1d0732635b4b97ae84ccf0171
+              campus: 6184cc01aebea31d74ae25bdd7bb8818d4bc4d18dfcb0f29ff8ed159ee274a74
+    2022:
+      metadata:
+        metrics:
+          enrollment_by_ethnicity_count:
+            field: enrollment_by_ethnicity_count
+            unit: count
+        notes: October 2021 PEIMS Enrollment snapshot. Distinct state, district and campus acquisitions. The year-specific
+          CSV footers govern suppressed ranges. Historical extract publication date and finality are unspecified.
+          Separate from TPRS Membership.
+        period:
+          kind: school_year
+          start_year: 2021
+          end_year: 2022
+        publisher: Texas Education Agency
+        references:
+        - reference_id: about
+          role: source_notes
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.std_download_selected_report.sas&rpt_subject=about&fname=abtenrl22&ftype=html
+          title: TEA Student Enrollment report criteria
+          reviewed_sha256: 15b5869c8daf638497e51af382b794b4a38b8382c7e8e1d2db758bc8b853f8e6
+          provenance_ids:
+          - 825c1432b51762e05fe737cd296a21413098d4b371f2626cbb73763101a5030b
+        - reference_id: statewide_annual_report
+          role: source_notes
+          status: available
+          url: https://tea.texas.gov/sites/default/files/enroll-2021-22.pdf
+          title: TEA Enrollment in Texas Public Schools, Table 1
+          reviewed_sha256: 466e25c752612f2f718480c8ffae2f1fe1534917f4fe4f7daec66ef690603698
+          provenance_ids:
+          - 3fc39b523ca916bca495a4d102ffbe3d3f8425b8ea1c536d6a3c83f3208d0b7a
+        - reference_id: column_crosswalk
+          role: schema
+          status: available
+          title: Exact PEIMS enrollment positional crosswalk
+          path: schemas/peims--2019-2022--student-enrollment-by-ethnicity-crosswalk.json
+          reviewed_sha256: c811fa693b88793d2633f828209ba938d19afd1cd4725a0d24bc39957868e431
+          provenance_ids:
+          - 3e85aeeb0cc2392218d1a100983a0450ff9c5126afde5e6572aebec2884b93b7
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adste.html
+        title: 2021–22 PEIMS Student Enrollment by Ethnicity
+        value_policy: peims_student_enrollment_by_ethnicity_2022
+        version: '2022'
+      path: data/peims/2022/peims_student_enrollment_by_ethnicity--district.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2019-2022--student-enrollment-by-ethnicity-crosswalk.json
+            acquisition_ids:
+              state: 7598fb71cfaefe9b6295e722898f139b615251e9c704bc0dafb4b8f0820dd620
+              district: cfbb51cd5ce25762e5ddcc16258e66e613661aaa5f2341757d811d585e751a24
+              campus: 4d93e255d0d5d68ed5aaa143c0bfddf31650631568bce71f988dbbb66e155386
     2023:
       metadata:
         metrics: &hist_enrl_001

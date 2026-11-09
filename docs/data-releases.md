@@ -77,6 +77,21 @@ as typed or longitudinal measures. The supplements use their own data-build
 identities. The default engine continues to use its separately configured
 snapshot.
 
+### PEIMS College Credit in v0.0.142
+
+The [stand-alone College Credit manifest](https://github.com/adpena/teadata/releases/download/v0.0.142/peims-college-credit-2022-2026.json)
+has SHA-256 `19fffe1f8d481d3c08bb01fe7cb4f73ae9ca8393d523a0d973411500cc33e3b8`.
+It covers 2021–22 through 2025–26 with separate Texas, ESC region and
+district tables, including reporting charter schools. Open it explicitly
+with `DataRelease` and `expected_sha256`. The existing Student Information
+parent remains the app's separate data release.
+
+All 15 College Credit tables were compared with the corresponding publisher
+CSV rows, and the five Texas tables were also compared with TEA's separate
+HTML reports. The district and ESC comparisons use their publisher CSVs.
+The [College Credit source notes](peims-sources.md#peims-college-credit)
+describe the three CTE populations, report grain, and original-header exports.
+
 ### Historical district transfers and TAPR aggregates in v0.0.141
 
 The [v0.0.141 assets](https://github.com/adpena/teadata/releases/tag/v0.0.141)

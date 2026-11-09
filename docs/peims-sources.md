@@ -1,7 +1,8 @@
 # PEIMS student reports
 
-The library registers two PEIMS report families for 2022–23 through 2025–26,
-with independent state, district and campus scopes. Each scope has its own
+The library registers PEIMS enrollment by ethnicity for 2018–19 through
+2025–26 and program counts for 2022–23 through 2025–26, with independent
+state, district and campus scopes. Each scope has its own
 exact source acquisition, publisher header crosswalk, and native Parquet leaf.
 These are October PEIMS Enrollment observations. TPRS Membership is a separate
 population.
@@ -13,7 +14,7 @@ population.
 
 The [PEIMS Standard Reports listing](https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports)
 gives the most recent publication dates and leaves finality unspecified. The
-three earlier extracts retain their acquisition timestamps and exact edition.
+historical extracts retain their acquisition timestamps and exact edition.
 The program reports for 2022–23 and 2023–24 label the emergent bilingual count
 `EMERGENT BILINGUAL/ENGLISH LEARNER`. That literal heading remains visible in
 the crosswalk for each year. The population and
@@ -23,7 +24,17 @@ preserves its request method, controls, filename, and download time. A replay
 receipt links to the earlier observation when available.
 
 The ethnicity report contains one row per published ethnicity and geography.
-For a direct total use `total_enrollment_count` from the matching program table.
+For 2022–23 through 2025–26, use `total_enrollment_count` from the matching
+program table for a direct total.
+For 2018–19 through 2021–22 the enrollment profiles link the independent
+TEA annual report, whose Table 1 gives the direct Texas total. The four
+historical statewide ethnicity CSVs have seven observed categories. The
+matching district and campus CSVs retain their original FERPA range tokens
+and exact headers, including the changed column order in 2019–20.
+One Austin ISD and one A+ Academy Elementary report per year checked 49
+individual cells. The 28 direct Texas ethnicity counts separately matched
+the annual reports. Earlier statewide CSVs and the older program reports
+have unresolved source discrepancies and remain outside these profiles.
 Program counts can overlap. The native leaves retain literal six-digit district
 and nine-digit campus IDs, including leading zeros. Count fields carry their
 publisher token, normalized value, status, and source record locator. The
