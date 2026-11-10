@@ -57,12 +57,17 @@ from sqlalchemy import (
     Text,
     Table,
     Uuid,
+    and_,
+    case,
+    cast as sql_cast,
     create_engine as _sa_create_engine,
     column as sql_column,
     delete,
     func,
     inspect,
     insert,
+    literal,
+    or_,
     select,
     text,
     table as sql_table,
@@ -71,6 +76,7 @@ from sqlalchemy import Index
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
+from sqlalchemy.exc import OperationalError
 from sqlalchemy.schema import CreateTable
 from sqlalchemy.orm import (
     DeclarativeBase,
@@ -497,7 +503,7 @@ def _flatten_meta(meta: Mapping[str, Any] | None) -> list[tuple[str, int, Any]]:
 class LazyMetaDict(UserDict[str, Any]):
     """A standard mutable mapping with one source-bound lazy data boundary.
 
-    Sparse prefetched reads may use the seed. Every whole-mapping operation or
+    Point reads may use the seed or project a single key. Whole-mapping operations and
     mutation first loads the complete current payload. UserDict supplies mapping
     equality, unions, updates, deletion, and copying without dict C fast paths.
     """
@@ -509,7 +515,10 @@ class LazyMetaDict(UserDict[str, Any]):
         | None = None,
         *,
         seed: Mapping[str, Any] | None = None,
+        read_key: Callable[[str], Mapping[str, Any] | None] | None = None,
     ):
+        self._read_key = read_key
+        self._point_keys: set[str] | None = None
         if callable(loader):
             self._loader: Callable[[], Mapping[str, Any] | None] | None = loader
             self._loaded = False
@@ -525,9 +534,15 @@ class LazyMetaDict(UserDict[str, Any]):
             assert self._loader is not None
             # Replace, rather than merge: a prefetched key may have been deleted.
             payload = dict(self._loader() or {})
+            for key in self._point_keys or ():
+                if key in payload:
+                    # Preserve the object already returned by an explicit point read.
+                    payload[key] = self._payload[key]
             self._payload = payload
             self._loaded = True
             self._loader = None
+            self._read_key = None
+            self._point_keys = None
         return self._payload
 
     @data.setter
@@ -535,14 +550,33 @@ class LazyMetaDict(UserDict[str, Any]):
         self._payload = payload
         self._loaded = True
         self._loader = None
+        self._read_key = None
+        self._point_keys = None
 
     def __getitem__(self, key: str) -> Any:
         if key in self._payload:
             return self._payload[key]
+        if self._read_key is not None and isinstance(key, str):
+            values = self._read_key(key)
+            if values is None or key not in values:
+                raise KeyError(key)
+            value = self._payload[key] = values[key]
+            if self._point_keys is None:
+                self._point_keys = set()
+            self._point_keys.add(key)
+            return value
         return self.data[key]
 
     def __contains__(self, key: object) -> bool:
-        return key in self._payload or key in self.data
+        if key in self._payload:
+            return True
+        if self._read_key is None or not isinstance(key, str):
+            return key in self.data
+        try:
+            self[key]
+        except KeyError:
+            return False
+        return True
 
     def pop(self, key: str, *default) -> Any:
         return self.data.pop(key, *default)
@@ -561,23 +595,110 @@ class LazyMetaDict(UserDict[str, Any]):
         """Give an engine union independent metadata without preloading rows."""
         if self._loader is None:
             return type(self)(self._payload)
-        return type(self)(self._loader, seed=self._payload)
+        copied = type(self)(self._loader, seed=self._payload, read_key=self._read_key)
+        if self._point_keys is not None:
+            copied._point_keys = self._point_keys.copy()
+        return copied
 
     def __reduce__(self):
         # A persisted graph must contain values, never Session/loader closures.
         return type(self), (dict(self.data),)
 
 
-def _meta_loader(
+def _default_postgresql_json(connection) -> bool:
+    if connection.dialect.driver != "psycopg":
+        return False
+    from psycopg import Cursor, ServerCursor
+    from psycopg.pq import Format
+    from psycopg.types.json import JsonBinaryLoader, JsonLoader
+
+    driver = connection.connection.driver_connection
+    adapters = driver.adapters
+    json_oid = adapters.types["json"].oid
+    return (driver.info.parameter_status("server_encoding") == "UTF8"
+            and driver.cursor_factory is Cursor
+            and driver.server_cursor_factory is ServerCursor
+            and adapters.get_loader(json_oid, Format.TEXT) is JsonLoader
+            and adapters.get_loader(json_oid, Format.BINARY) is JsonBinaryLoader
+            and getattr(JsonLoader, "_loads", None) is json.loads
+            and getattr(JsonBinaryLoader, "_loads", None) is json.loads)
+
+
+def _point_meta_dialect(connection) -> str | None:
+    dialect = connection.dialect
+    if getattr(dialect, "_json_deserializer", None) is not None:
+        return None
+    if dialect.name == "postgresql" and _default_postgresql_json(connection):
+        return "postgresql"
+    if dialect.name == "sqlite" and (dialect.server_version_info or ()) >= (3, 38, 0):
+        try:
+            connection.exec_driver_sql("SELECT json_valid('{}'), '{}' -> '$.x' FROM json_each('{}')").close()
+        except OperationalError as error:
+            if str(error.orig) not in {"no such function: json_valid", "no such function: ->", "no such table: json_each"}:
+                raise
+        else:
+            return "sqlite"
+    return None
+
+
+def _point_meta_key(key: str) -> bool:
+    # SQLite's path grammar is narrower than Python's JSON object key grammar.
+    return isinstance(key, str) and key.isascii() and key.isidentifier()
+
+
+def _projected_meta_token(meta, key: str, dialect: str):
+    """Project JSON text. SQL NULL means absent; empty text requests a whole read."""
+    raw = sql_cast(meta, Text)
+    if dialect == "postgresql":
+        # JSON can store escapes that native extraction cannot decode even in
+        # unrelated keys. Keep such documents on the typed JSON reader.
+        return case(
+            (raw.op("~")(r"\\u(?:0000|[dD][89a-fA-F][0-9a-fA-F]{2})"), ""),
+            (func.json_typeof(meta) == "object", sql_cast(meta.op("->")(literal(key, Text)), Text)),
+            else_=None,
+        )
+
+    value = sql_cast(meta.op("->")(f"$.{key}"), Text)
+    entries = func.json_each(meta).table_valued("key")
+    count = select(func.count()).select_from(entries).where(entries.c.key.collate("BINARY") == key).scalar_subquery()
+    # Some SQLite versions compare embedded NUL keys as if they ended early.
+    # Duplicate keys and mismatches with exact enumeration also need Python's
+    # original decoder. JSON -> text preserves big integers and signed zero.
+    return case(
+        (meta.is_(None), None),
+        (or_(func.typeof(meta) != "text", func.instr(raw, func.char(0)) > 0,
+             func.instr(raw, r"\u0000") > 0, func.json_valid(meta) != 1), ""),
+        (func.json_type(meta) != "object", None),
+        (count == 1, func.coalesce(value, "")),
+        (and_(count == 0, value.is_(None)), None),
+        else_="",
+    )
+
+
+def _meta_projection(meta, keys: tuple[str, ...], dialect: str):
+    tokens = tuple(_projected_meta_token(meta, key, dialect) for key in keys)
+    return (*tokens, case((or_(*(token == "" for token in tokens)), meta), else_=None))
+
+
+def _decode_meta_projection(keys: tuple[str, ...], values) -> Mapping[str, Any]:
+    if "" in values[:-1]:
+        raw = values[-1]
+        return {key: raw[key] for key in keys if key in raw} if isinstance(raw, Mapping) else {}
+    return {key: json.loads(token) for key, token in zip(keys, values[:-1], strict=True) if token is not None}
+
+
+def _lazy_meta(
     default_session: Session,
     session_factory: Callable[[], Session] | None,
     record_cls: type[DistrictRecord] | type[CampusRecord],
     pk_value: uuid.UUID,
     build_id: str,
-) -> Callable[[], Mapping[str, Any] | None]:
-    column = record_cls.id
+    dialect: str | None,
+    seed: Mapping[str, Any] | None,
+) -> LazyMetaDict:
+    projection_bind = default_session.get_bind() if dialect is not None else None
 
-    def _load() -> Mapping[str, Any] | None:
+    def _load(key: str | None = None) -> Mapping[str, Any]:
         # Reuse an active caller transaction, including its uncommitted writes.
         # Closing a second Session on SQLite's shared in-memory connection would
         # roll that transaction back. Only factory-created Sessions are owned.
@@ -588,22 +709,33 @@ def _meta_loader(
             active = default_session
             close_after = False
         try:
+            projected = (key is not None and dialect is not None and _point_meta_key(key)
+                         and active.get_bind(mapper=record_cls) is projection_bind)
+            if projected and dialect == "postgresql":
+                projected = _default_postgresql_json(active.connection(bind_arguments={"mapper": record_cls}))
+            columns = (_meta_projection(record_cls.meta, (key,), dialect)
+                       if projected and key is not None and dialect is not None else (record_cls.meta,))
             row = active.execute(
-                select(record_cls.meta)
+                select(*columns)
+                .select_from(record_cls)
                 .join(_CATALOG_RELATION, _CATALOG_RELATION.c.singleton == 1)
-                .where(column == pk_value, _CATALOG_RELATION.c.build_id == build_id)
+                .where(record_cls.id == pk_value, _CATALOG_RELATION.c.build_id == build_id)
             ).one_or_none()
             if row is None:
                 raise ContractError(
                     "Lazy metadata source was deleted or its dataset catalog changed"
                 )
-            result = row[0]
-            return result if isinstance(result, Mapping) else {}
+            if projected and key is not None:
+                return _decode_meta_projection((key,), row)
+            raw = row[0]
+            if not isinstance(raw, Mapping):
+                return {}
+            return raw if key is None else {key: raw[key]} if key in raw else {}
         finally:
             if close_after:
                 active.close()
 
-    return _load
+    return LazyMetaDict(_load, seed=seed, read_key=_load if dialect is not None else None)
 
 
 def _meta_value_payload(value: Any) -> dict[str, Any]:
@@ -1214,19 +1346,32 @@ def _read_catalog(session: Session) -> tuple[DatasetCatalog, str]:
 
 
 def _prefetch_raw_meta(
-    session: Session, model, keys: Iterable[str] | None, batch_size: int
+    session: Session, model, keys: Iterable[str] | None, batch_size: int,
+    *, dialect: str | None, build_id: str,
 ) -> dict[uuid.UUID, dict[str, Any]]:
     selected = tuple(dict.fromkeys(keys or ()))
     if not selected:
         return {}
     seeds: dict[uuid.UUID, dict[str, Any]] = {}
-    statement = select(model.id, model.meta).execution_options(yield_per=batch_size)
+    # Keep statement size and parameter count bounded even for unusual callers.
+    projected = (dialect is not None and len(selected) <= 16 and all(map(_point_meta_key, selected))
+                 and session.get_bind(mapper=model) is session.get_bind())
+    columns = _meta_projection(model.meta, selected, dialect) if projected and dialect is not None else (model.meta,)
+    statement = (
+        select(model.id, *columns)
+        .join(_CATALOG_RELATION, _CATALOG_RELATION.c.singleton == 1)
+        .where(_CATALOG_RELATION.c.build_id == build_id)
+        .execution_options(yield_per=batch_size)
+    )
     with session.execute(statement) as rows:
-        for identifier, raw in rows:
-            if isinstance(raw, Mapping):
-                seed = {key: raw[key] for key in selected if key in raw}
-                if seed:
-                    seeds[identifier] = seed
+        for row in rows:
+            if projected:
+                seed = dict(_decode_meta_projection(selected, row[1:]))
+            else:
+                raw = row[1]
+                seed = {key: raw[key] for key in selected if key in raw} if isinstance(raw, Mapping) else {}
+            if seed:
+                seeds[row[0]] = seed
     return seeds
 
 
@@ -1251,6 +1396,7 @@ def import_dataengine(
     batch_size = _checked_batch_size(batch_size)
     _validate_storage(session.connection())
     catalog, build_id = _read_catalog(session)
+    meta_dialect = _point_meta_dialect(session.connection()) if lazy_meta else None
     repo = DataEngine()
     repo.catalog = catalog
     if lazy_meta and meta_session_factory is None:
@@ -1259,13 +1405,15 @@ def import_dataengine(
         )
     district_seed = (
         _prefetch_raw_meta(
-            session, DistrictRecord, prefetch_district_meta_keys, batch_size
+            session, DistrictRecord, prefetch_district_meta_keys, batch_size,
+            dialect=meta_dialect, build_id=build_id,
         )
         if lazy_meta
         else {}
     )
     campus_seed = (
-        _prefetch_raw_meta(session, CampusRecord, prefetch_campus_meta_keys, batch_size)
+        _prefetch_raw_meta(session, CampusRecord, prefetch_campus_meta_keys, batch_size,
+                           dialect=meta_dialect, build_id=build_id)
         if lazy_meta
         else {}
     )
@@ -1282,16 +1430,8 @@ def import_dataengine(
         with session.execute(statement(DistrictRecord)) as rows:
             for d in rows.mappings():
                 meta = (
-                    LazyMetaDict(
-                        _meta_loader(
-                            session,
-                            meta_session_factory,
-                            DistrictRecord,
-                            d["id"],
-                            build_id,
-                        ),
-                        seed=district_seed.pop(d["id"], None),
-                    )
+                    _lazy_meta(session, meta_session_factory, DistrictRecord, d["id"],
+                               build_id, meta_dialect, district_seed.pop(d["id"], None))
                     if lazy_meta
                     else dict(d["meta"] or {})
                 )
@@ -1311,16 +1451,8 @@ def import_dataengine(
         with session.execute(statement(CampusRecord)) as rows:
             for c in rows.mappings():
                 meta = (
-                    LazyMetaDict(
-                        _meta_loader(
-                            session,
-                            meta_session_factory,
-                            CampusRecord,
-                            c["id"],
-                            build_id,
-                        ),
-                        seed=campus_seed.pop(c["id"], None),
-                    )
+                    _lazy_meta(session, meta_session_factory, CampusRecord, c["id"],
+                               build_id, meta_dialect, campus_seed.pop(c["id"], None))
                     if lazy_meta
                     else dict(c["meta"] or {})
                 )

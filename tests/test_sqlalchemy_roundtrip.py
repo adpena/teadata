@@ -34,6 +34,7 @@ from teadata.persistence import (
     export_dataengine,
     import_dataengine,
 )
+from teadata.persistence.sqlalchemy_store import _meta_projection, _point_meta_dialect
 
 
 @pytest.fixture
@@ -236,6 +237,102 @@ def test_lazy_prefetch_preserves_nested_raw_types_and_refuses_later_release(
     assert not district.meta._loaded
 
 
+def _assert_lazy_metadata_projection(engine, factory, catalog):
+    repo = graph(catalog, 1)
+    district_id = uuid.UUID(int=1)
+    campus_id = uuid.UUID(int=10001)
+    repo._campuses[campus_id].meta = {"overall_rating": "Not Rated: Minimum Size rules", "nullable": None}
+    with factory.begin() as session:
+        export_dataengine(repo, session, replace=True, include_meta_entries=False)
+
+    statements = []
+
+    def capture(connection, cursor, statement, parameters, context, executemany):
+        if "JOIN teadata_catalog" in statement:
+            statements.append(statement)
+
+    event.listen(engine, "before_cursor_execute", capture)
+    try:
+        with factory() as session:
+            restored = import_dataengine(session, prefetch_district_meta_keys=["zero"])
+        district = restored._districts[district_id]
+        campus = restored._campuses[campus_id]
+        assert len(statements) == 1 and " -> " in statements[0]
+        assert math.copysign(1, district.zero) == -1
+        assert len(statements) == 1
+        assert district.huge == 10**500
+        assert district.meta["huge"] == 10**500
+        assert len(statements) == 2 and " -> " in statements[-1]
+        assert campus.nullable is None and "nullable" in campus.meta
+        assert not hasattr(campus, "absent_meta_key")
+        value = restored.catalog.measurement(campus, "overall_rating")
+        assert value.value == "Not Rated: Minimum Size rules"
+        assert value.source["build_id"] == catalog.build_id
+        assert value.source["input_binding"] == "release_entity"
+        assert not district.meta._loaded and not campus.meta._loaded
+        assert all(" -> " in sql for sql in statements)
+        district.structured[0]["extra"] = 42
+        assert dict(district.meta)["structured"] == [{"count": 2**53 + 1, "extra": 42}]
+    finally:
+        event.remove(engine, "before_cursor_execute", capture)
+
+    with factory.begin() as session:
+        restored = import_dataengine(session)
+        orm_row = session.get(DistrictRecord, district_id)
+        orm_row.meta = dict(orm_row.meta, pending_value="uncommitted")
+        district = restored._districts[district_id]
+        with session.no_autoflush:
+            assert not hasattr(district, "pending_value")
+        assert district.pending_value == "uncommitted"
+        assert not district.meta._loaded
+
+    with engine.begin() as connection:
+        ordinary = select(*_meta_projection(DistrictRecord.meta, ("huge", "missing"), engine.dialect.name))
+        assert connection.execute(ordinary).one() == (str(10**500), None, None)
+        json_document = r'{"plain":1,"plain":2,"plain\u0000":3,"other":"a\u0000b","odd.key":[null,-0.0]}'
+        assignment = "CAST(:document AS JSON)" if engine.dialect.name == "postgresql" else ":document"
+        connection.execute(text(f"UPDATE districts SET meta = {assignment}"), {"document": json_document})
+    with factory() as session:
+        district = import_dataengine(session, prefetch_district_meta_keys=["plain"])._districts[district_id]
+        assert district.plain == 2
+        assert district.meta["plain\0"] == 3
+        assert district.other == "a\0b"
+        assert district.meta["odd.key"][0] is None
+        assert math.copysign(1, district.meta["odd.key"][1]) == -1
+
+
+def test_lazy_sqlite_projects_point_reads_and_prefetch(database, catalog):
+    engine, factory = database
+    with engine.connect() as connection:
+        if _point_meta_dialect(connection) is None:
+            pytest.skip("SQLite JSON point projection is unavailable on this build")
+    _assert_lazy_metadata_projection(engine, factory, catalog)
+
+
+def test_deferred_session_uses_its_own_json_decoder(tmp_path, catalog):
+    url = f"sqlite:///{tmp_path / 'meta.sqlite'}"
+    engine = create_engine(url)
+
+    def decode(text):
+        value = json.loads(text)
+        if isinstance(value, dict) and "huge" in value:
+            value["huge"] = 17
+        return value
+
+    deferred_engine = create_engine(url, json_deserializer=decode)
+    try:
+        ensure_schema(engine)
+        factory = create_sessionmaker(engine)
+        with factory.begin() as session:
+            export_dataengine(graph(catalog, 1), session)
+        with factory() as session:
+            repo = import_dataengine(session, meta_session_factory=create_sessionmaker(deferred_engine))
+        assert repo._districts[uuid.UUID(int=1)].huge == 17
+    finally:
+        deferred_engine.dispose()
+        engine.dispose()
+
+
 @pytest.mark.parametrize("size", [0, -1, True, 1.5])
 def test_invalid_batch_size_has_no_writes(database, catalog, size):
     _, factory = database
@@ -379,6 +476,38 @@ def test_postgresql_roundtrip_preserves_full_publisher_rating(catalog):
                 assert value.status.value == "observed"
                 assert value.source["period"] == {"kind": "calendar_year", "year": 2025}
                 assert value.source["build_id"] == catalog.build_id
+        with engine.connect() as connection:
+            project_metadata = _point_meta_dialect(connection) == "postgresql"
+        if project_metadata:
+            from psycopg import Cursor
+            from psycopg.types.json import set_json_loads
+
+            def decode(payload):
+                value = json.loads(payload)
+                if isinstance(value, dict) and "overall_rating" in value:
+                    value["overall_rating"] = "driver-decoded"
+                return value
+
+            with factory() as session:
+                restored = import_dataengine(session)
+                set_json_loads(decode, session.connection().connection.driver_connection)
+                assert restored._campuses[campus.id].overall_rating == "driver-decoded"
+            engine.dispose()
+
+            class DecodingCursor(Cursor):
+                def __init__(self, *args, **kwargs):
+                    super().__init__(*args, **kwargs)
+                    set_json_loads(decode, self)
+
+            custom_engine = create_engine(url, connect_args={"cursor_factory": DecodingCursor})
+            try:
+                with create_sessionmaker(custom_engine)() as session:
+                    restored = import_dataengine(session)
+                    assert restored._campuses[campus.id].overall_rating == "driver-decoded"
+            finally:
+                custom_engine.dispose()
+
+            _assert_lazy_metadata_projection(engine, factory, catalog)
     finally:
         engine.dispose()
 

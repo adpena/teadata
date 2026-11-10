@@ -286,7 +286,7 @@ from teadata.persistence import import_dataengine
 with Session() as session:
     repo_from_db = import_dataengine(
         session,
-        lazy_meta=True,  # defer meta JSON until accessed (saves RAM per request)
+        lazy_meta=True,  # defer metadata and project individual keys where supported
         prefetch_campus_meta_keys=["source_field_name"],  # optional exact raw key
         batch_size=256,
     )
@@ -294,13 +294,25 @@ with Session() as session:
 
 `import_dataengine` streams database mappings directly into the returned graph
 without building a second full ORM graph. Eager metadata is read with each entity;
-lazy metadata loads when needed and refuses a changed source release or deleted
-entity. Prefetch preserves complete nested raw values; flattened metadata index
-keys are a separate query API. The caller controls transaction isolation for a
-consistent import while other clients write. Lazy reads observe the current rows
-of the bound release and do not retain a database snapshot indefinitely.
+lazy metadata refuses a changed source release or deleted entity on deferred reads.
+Dot access and bracket access both use the same mapping. For ASCII identifier
+keys, SQLite 3.38 or later with JSON support and UTF-8 PostgreSQL with the
+default psycopg 3 cursors and JSON loader can return just the selected JSON
+value. Prefetch projects up to 16 such keys in one bounded query per entity
+type. Both paths preserve JSON null, large integers and nested
+values. Compatibility paths read the original document for unusual keys,
+unsupported engines or encodings, custom JSON decoders, or rows where native
+extraction cannot preserve the original value. Deferred sessions from a
+different bind also use the original reader. The flattened index remains a
+separate query API. The caller controls transaction isolation for a consistent
+import while other clients write. Lazy reads observe the bound release's rows
+at query time. Previously read values can already be in memory.
 Lazy metadata is a standard mutable mapping. Use `dict(entity.meta)` or
-`entity.to_dict()` at a JSON boundary; a custom JSON encoder is unnecessary.
+`entity.to_dict()` at a JSON boundary. Whole-mapping operations still materialize
+the document. Use `repo_from_db.catalog.measurement(entity, metric)` for an
+interpreted value and its catalog provenance when the metric has a binding.
+The metric lookup stays sparse. The catalog may also check source, scope, and
+population attributes before interpreting it.
 An active caller Session is reused for lazy reads, including uncommitted writes.
 After that transaction ends, each deferred read owns and closes its new Session.
 The catalog document remains authoritative; a validated 64-byte build ID column

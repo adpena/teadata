@@ -1469,10 +1469,11 @@ class DatasetCatalog:
         scope = scope or ("campus" if hasattr(entity, "campus_number") else "district")
         known_build = self._entity_build_id(entity)
         binding, dataset, key, definition = self._resolve_metric(metric, scope)
-        meta = getattr(entity, "meta", {}) or {}
-        raw = meta.get(key)
-        if key not in meta and binding.attribute is not None:
-            raw = getattr(entity, binding.attribute, None)
+        meta = getattr(entity, "meta", None)
+        absent = object()
+        raw = meta.get(key, absent) if meta is not None else absent
+        if raw is absent:
+            raw = getattr(entity, binding.attribute, None) if binding.attribute is not None else None
         return self._contextual_measurement(raw, binding, dataset, key, definition, entity=entity,
                                    input_binding="release_entity" if known_build is not None else "caller_supplied")
 
