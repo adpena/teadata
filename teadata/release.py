@@ -637,13 +637,25 @@ class DataRelease:
             raise ValueError("Native source access requires an entity number and explicit edition")
         return EntitySources(self, scope, identifier, edition)
 
-    def table(self, edition: EditionKey) -> SourceTable:
-        """Start a lazy scan bound to a native edition without opening its table."""
-        from .source_views import SourceTable
-
+    def _native_edition_release(self, edition: EditionKey) -> DataRelease:
         if not isinstance(edition, EditionKey):
             raise TypeError("Native table selection requires an exact EditionKey")
-        return SourceTable(self, edition)
+        if self._v3:
+            return self
+        for ref in self.catalog.native_sources:
+            if edition in ref.editions:
+                parent = self.source if self.remote else self.path
+                return _open_native_source(ref, parent, offline=self.offline, cache_dir=getattr(self, "_cache_dir", None))
+        raise ContractError(
+            f"Exact native edition {edition.dataset}/{edition.scope}/{edition.edition}/{edition.table} "
+            f"with revision {edition.revision_sha256} is not attached. See release.catalog.native_sources."
+        )
+
+    def table(self, edition: EditionKey) -> SourceTable:
+        """Start a lazy scan bound to an exact standalone or attached native edition."""
+        from .source_views import SourceTable
+
+        return SourceTable(self._native_edition_release(edition), edition)
 
     def tprs_student_campus_index(self, *, edition: str) -> TPRSStudentCampusIndex:
         """Prepare reusable point routes for one literal TPRS Student report edition."""
@@ -973,30 +985,34 @@ class DataRelease:
         """Stream one native table to a CSV path or writable binary stream."""
         from .source_views import prepare_export, write_csv
 
-        table = prepare_export(self, edition, restore_original_headers=restore_original_headers)
+        table = prepare_export(self._native_edition_release(edition), edition,
+                               restore_original_headers=restore_original_headers)
         write_csv(table, path_or_buf)
 
     def provenance(self, edition: EditionKey, *, restore_original_headers: bool = False) -> ExportProvenance:
         """Describe the direct table export without opening the data leaf."""
         from .source_views import _plan_export
 
-        selection = _plan_export(self, edition, restore_original_headers=restore_original_headers,
+        release = self._native_edition_release(edition)
+        selection = _plan_export(release, edition, restore_original_headers=restore_original_headers,
                                  selected_fields=None, include_support=False, period=None)
-        return selection.provenance(self, period=None, entity_build=None, entity_ids=None, opaque_filter=False)
+        return selection.provenance(release, period=None, entity_build=None, entity_ids=None, opaque_filter=False)
 
     def to_excel(self, edition: EditionKey, path_or_buf: str | Path | BinaryIO, *,
                  restore_original_headers: bool = False) -> None:
         """Stream one native table to an XLSX path or writable binary stream."""
         from .source_views import prepare_export, write_excel
 
-        table = prepare_export(self, edition, restore_original_headers=restore_original_headers)
+        table = prepare_export(self._native_edition_release(edition), edition,
+                               restore_original_headers=restore_original_headers)
         write_excel(table, path_or_buf)
 
     def to_df(self, edition: EditionKey, *, restore_original_headers: bool = False):
         """Materialize one native table as a pandas DataFrame."""
         from .source_views import prepare_export
 
-        return prepare_export(self, edition, restore_original_headers=restore_original_headers).to_df()
+        return prepare_export(self._native_edition_release(edition), edition,
+                              restore_original_headers=restore_original_headers).to_df()
 
 
 @lru_cache(maxsize=4)

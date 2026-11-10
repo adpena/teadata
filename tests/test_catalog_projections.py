@@ -1776,24 +1776,74 @@ def make_observation_release(tmp_path, selected_catalog, year, amount):
     return attach_observation_child(selected_catalog, child), fixture["leaves"]["student"][2]
 
 
-def attach_observation_child(selected_catalog, child):
+def attach_observation_child(selected_catalog, child, *, analytical=False, additional_refs=()):
     from teadata.dataset_metadata import NativeSourceRef
-    from teadata.release import DataRelease, ROLES
+    from teadata.release import ANALYTICAL_RELEASE_ROLES, DataRelease, ROLES
 
     keys = tuple(EditionKey.from_dict({name: row[name] for name in EditionKey.__dataclass_fields__})
                  for row in child.catalog.editions(include_metadata=False))
     ref = NativeSourceRef(child.path.name, child.manifest_sha256, child.build_id, keys)
     catalog = selected_catalog.to_dict()
     catalog.pop("build_id")
-    catalog["native_sources"] = [ref.to_dict()]
+    catalog["native_sources"] = [ref.to_dict(), *(item.to_dict() for item in additional_refs)]
     catalog["build_id"] = sha256(canonical_json(catalog).encode()).hexdigest()
-    assets = {role: {"filename": role, "sha256": "0" * 64, "size_bytes": 1} for role in ROLES}
+    roles = ANALYTICAL_RELEASE_ROLES if analytical else ROLES
+    assets = {role: {"filename": role, "sha256": "0" * 64, "size_bytes": 1} for role in roles}
     record = {"kind": "processing", "parameters": {"build_id": catalog["build_id"],
-                "native_sources": [ref.to_dict()]}, "outputs": assets}
+                "native_sources": catalog["native_sources"]}, "outputs": assets}
     parent = child.path.with_name("release.json")
-    parent.write_text(canonical_json({"schema_version": 1, "catalog": catalog, "artifacts": assets,
+    parent.write_text(canonical_json({"schema_version": 2 if analytical else 1, "catalog": catalog, "artifacts": assets,
         "processing": {"record_id": sha256((canonical_json(record) + "\n").encode()).hexdigest(), "record": record}}))
     return DataRelease(parent, offline=True)
+
+
+def test_exact_native_exports_route_through_entity_release(tmp_path, selected_catalog, monkeypatch):
+    from openpyxl import load_workbook
+    from teadata.dataset_metadata import NativeSourceRef
+    from teadata.release import DataRelease
+
+    period = DataPeriod("fiscal_year", 2024, 2025)
+    fixture = make_edition_fixture(tmp_path, families=("student",), normalized=True,
+                                   amount_period=period.to_dict(), entity_grain=True)
+    key, _, _ = fixture["leaves"]["student"]
+    child = DataRelease(fixture["root"].rename(tmp_path / "native.json"), offline=True)
+    unavailable = replace(key, revision_sha256="f" * 64)
+    other = NativeSourceRef("unavailable.json", "e" * 64, "d" * 64, (unavailable,))
+    parent = attach_observation_child(selected_catalog, child, analytical=True, additional_refs=(other,))
+    # Older entity release pickles did not store a cache directory override.
+    del parent._cache_dir
+
+    with monkeypatch.context() as guarded:
+        guarded.setattr(DataRelease, "artifact", lambda *a, **k: pytest.fail("Metadata lookup opened a data artifact"))
+        view = parent.table(key).select("amount")
+        assert view.provenance().to_dict() == child.table(key).select("amount").provenance().to_dict()
+        direct = parent.provenance(key).to_dict()
+        assert direct == child.provenance(key).to_dict()
+        assert direct["release"]["manifest_sha256"] == child.manifest_sha256
+        with pytest.raises(ContractError, match="Exact native edition .* is not attached"):
+            parent.table(replace(key, revision_sha256="0" * 64))
+        with pytest.raises(FileNotFoundError, match="unavailable.json"):
+            parent.table(unavailable)
+
+    assert view.to_arrow().equals(child.table(key).select("amount").to_arrow())
+    frame = parent.to_df(key)
+    assert frame.equals(child.to_df(key))
+    parent_csv, child_csv = BytesIO(), BytesIO()
+    parent.to_csv(key, parent_csv)
+    child.to_csv(key, child_csv)
+    assert parent_csv.getvalue() == child_csv.getvalue()
+    parent_xlsx = BytesIO()
+    parent.to_excel(key, parent_xlsx)
+    workbook = load_workbook(parent_xlsx, read_only=True)
+    try:
+        assert tuple(next(workbook.worksheets[0].values)) == tuple(frame.columns)
+    finally:
+        workbook.close()
+
+    with child.path.open("ab") as stream:
+        stream.write(b"\n")
+    with pytest.raises(ContractError, match="checksum differs from its trusted pin"):
+        parent.table(key)
 
 
 def test_native_inventory_includes_verified_metadata_without_nofollow(edition_index_fixture, selected_catalog, monkeypatch):

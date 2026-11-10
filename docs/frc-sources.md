@@ -54,3 +54,21 @@ scope, then `catalog.resolve_artifacts()` for the desired fields. The read
 plan includes the identifier, raw value, status and source row needed to
 audit the selected value. This candidate is available for explicit native
 reads. Dataset activation and release publication are separate steps.
+
+When an entity release attaches this source, use the same exact edition key
+with the parent release. For example, select the Texas fiscal-year observation
+without opening the campus or district tables:
+
+```python
+(edition,) = [
+    key for source in release.catalog.native_sources for key in source.editions
+    if key.dataset == "frc_per_pupil_expenditure" and key.scope == "state"
+    and key.edition == "2025"
+]
+state = release.table(edition).select("all_sources_per_pupil")
+data = state.to_df()
+```
+
+Table selection verifies the attached manifest. Values, exports and their
+provenance come from that pinned source. The fiscal year is distinct from
+the school year used by the observations API.
