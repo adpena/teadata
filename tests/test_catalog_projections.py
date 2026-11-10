@@ -1798,8 +1798,11 @@ def attach_observation_child(selected_catalog, child, *, analytical=False, addit
 
 
 def test_exact_native_exports_route_through_entity_release(tmp_path, selected_catalog, monkeypatch):
+    from uuid import UUID
+
     from openpyxl import load_workbook
     from teadata.dataset_metadata import NativeSourceRef
+    from teadata.entities import Campus
     from teadata.release import DataRelease
 
     period = DataPeriod("fiscal_year", 2024, 2025)
@@ -1810,11 +1813,17 @@ def test_exact_native_exports_route_through_entity_release(tmp_path, selected_ca
     unavailable = replace(key, revision_sha256="f" * 64)
     other = NativeSourceRef("unavailable.json", "e" * 64, "d" * 64, (unavailable,))
     parent = attach_observation_child(selected_catalog, child, analytical=True, additional_refs=(other,))
+    campus = Campus(UUID(int=1), None, "Historical campus", "", False, campus_number="000000004")
+    sources = parent.for_entity(campus, edition=key.edition)
     # Older entity release pickles did not store a cache directory override.
     del parent._cache_dir
 
     with monkeypatch.context() as guarded:
         guarded.setattr(DataRelease, "artifact", lambda *a, **k: pytest.fail("Metadata lookup opened a data artifact"))
+        assert sources.datasets() == (key, unavailable)
+        with pytest.raises(ContractError, match="Source name is ambiguous"):
+            getattr(sources, key.dataset)
+        assert sources.dataset(key).release.manifest_sha256 == child.manifest_sha256
         view = parent.table(key).select("amount")
         assert view.provenance().to_dict() == child.table(key).select("amount").provenance().to_dict()
         direct = parent.provenance(key).to_dict()
@@ -1826,6 +1835,8 @@ def test_exact_native_exports_route_through_entity_release(tmp_path, selected_ca
             parent.table(unavailable)
 
     assert view.to_arrow().equals(child.table(key).select("amount").to_arrow())
+    assert sources.dataset(key).amount == 5
+    assert "amount" not in campus.meta
     frame = parent.to_df(key)
     assert frame.equals(child.to_df(key))
     parent_csv, child_csv = BytesIO(), BytesIO()
@@ -1844,6 +1855,8 @@ def test_exact_native_exports_route_through_entity_release(tmp_path, selected_ca
         stream.write(b"\n")
     with pytest.raises(ContractError, match="checksum differs from its trusted pin"):
         parent.table(key)
+    with pytest.raises(ContractError, match="checksum differs from its trusted pin"):
+        sources.dataset(key)
 
 
 def test_native_inventory_includes_verified_metadata_without_nofollow(edition_index_fixture, selected_catalog, monkeypatch):

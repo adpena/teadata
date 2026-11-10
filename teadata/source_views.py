@@ -354,6 +354,9 @@ class EntitySources:
 
     def datasets(self) -> tuple[EditionKey, ...]:
         """List exact source identities using only the release index."""
+        if attachments := self.release.catalog.native_sources:
+            return tuple(key for source in attachments for key in source.editions
+                         if key.scope == self.scope and key.edition == self.edition)
         return tuple(EditionKey.from_dict({name: row[name] for name in EditionKey.__dataclass_fields__})
                      for row in self.release.catalog.editions(scope=self.scope, include_metadata=False)
                      if row["edition"] == self.edition)
@@ -364,7 +367,8 @@ class EntitySources:
             raise KeyError(name)
         if len(choices) != 1:
             raise ContractError("Source name is ambiguous; select an exact EditionKey")
-        return SourceFields(self.release, choices[0], self.identifier)
+        (key,) = choices
+        return SourceFields(self.release.table(key).release, key, self.identifier)
 
     def __getitem__(self, name: str) -> SourceFields:
         return self.dataset(name)

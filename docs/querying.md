@@ -240,8 +240,9 @@ comparable. Inspect both source definitions before calculating change.
 
 ## Select an entity's published source fields
 
-An explicit native release can expose fields in dataset namespaces. Start
-with a public district or campus from the engine and an exact release edition.
+A native release or an entity release with attached native sources can expose
+fields in dataset namespaces. Start with a public district or campus and the
+publisher edition. The edition can describe a fiscal period.
 
 ```python
 sources = release.for_entity(district, edition="2026")
@@ -252,6 +253,7 @@ table = student.select(*(entry["field"] for entry in fields))
 ```
 
 `sources.datasets()` lists exact source identities without opening data files.
+Selecting a dataset verifies the attached release when applicable.
 `variables()` reads the chosen source's catalog metadata. `select()` reads a
 single native table and retains its keys and available raw and status columns.
 Use `student["field_name"]` when a field name conflicts with a method.
