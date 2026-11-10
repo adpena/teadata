@@ -67,6 +67,16 @@ and methodology references.
 
 ### TAPR and TPRS supplements
 
+The [2025–26 TPRS class-size manifest](https://github.com/adpena/teadata/releases/download/v0.0.147/tprs-class-size-2026.release.json)
+has SHA-256 `1512f0ef1a8b1df41f969c683c3ec1dab0d607499dddb589127c6f5a41b9af4e`.
+It provides 23 campus partitions, a district table and TEA's direct Texas
+report. It retains all 9,105 campus report rows, including 612 whose
+reports omit the class-size table, and 1,202 district report rows. The
+manifest leaves the default entity snapshot unchanged. Use the exact
+[Student Information campus index](#2026-entity-snapshot-and-tprs-student-data)
+to find the partition for a single campus. See the [query example](querying.md#campus-class-size-observations)
+and [source notes](source-coverage.md#202526-tprs-class-size).
+
 The [0.0.132 release assets](https://github.com/adpena/teadata/releases/tag/v0.0.132)
 provide three independently pinned manifests. Download a named manifest with
 its adjacent assets or open its versioned URL with `DataRelease` and the

@@ -365,8 +365,8 @@ Information report using its acquisition receipt and exact content SHA-256.
 It preserves the local class-size token and its HTML cell coordinates.
 A campus report can omit the table. The publisher's dash means no students
 and the question mark flags an improbable or out-of-range result. Use the
-direct Texas report for statewide values. The reader is an offline
-preparation step for a future queryable class-size attachment.
+direct Texas report for statewide values. The reader is the offline
+preparation step for the queryable class-size attachment.
 [TPRS glossary, p. 42](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/comprehensive-tprs-glossary.pdf#page=42).
 
 `class_size_projection` converts reports read through that receipt-verified
@@ -402,8 +402,8 @@ native table against its Arrow projection. The 2025–26 campus roster has
 9,105 reports, of which 612 omit the class-size table. Those reports still
 have a row with missing measurements and the reason `table_not_published`.
 
-Use [an exact campus edition key](querying.md#campus-class-size-candidates)
-for an offline query. Admission to a distributed release is separate.
+Use [an exact campus edition key](querying.md#campus-class-size-observations)
+with the stand-alone v0.0.147 manifest or a matching offline candidate.
 
 ## School FIRST financial accountability
 

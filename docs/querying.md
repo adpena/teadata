@@ -307,22 +307,32 @@ edition; it does not establish that the campus did not exist or that a
 measure was zero. An index belongs to one release hash; rebuild it when
 switching releases.
 
-#### Campus class-size candidates
+#### Campus class-size observations
 
-For an offline class-size candidate built with `--include-campus`, use the
-campus index of its pinned Student attachment. Convert the selected Student
-key to the matching class-size key. The conversion preserves the exact report
-revision and works with the ordinary native observations API.
+Use the campus index from the exact Student Information attachment behind
+the class-size release. Convert the selected Student key to its class-size
+key. This preserves the report revision and opens only the selected
+class-size partition through the native observations API.
 
 ```python
 import pyarrow.dataset as ds
 
+from teadata.release import DataRelease
 from teadata.tprs_class_size_native import class_size_campus_edition
 
+releases = "https://github.com/adpena/teadata/releases/download"
+student_attachment = DataRelease(
+    f"{releases}/v0.0.138/tprs-student-2026-campus-complete.release.json",
+    expected_sha256="c96effc9bcbfd01c7cd969082cf701a2dc4e1900b6d6973b23c0ed2d21559f9e",
+)
+class_sizes = DataRelease(
+    f"{releases}/v0.0.147/tprs-class-size-2026.release.json",
+    expected_sha256="1512f0ef1a8b1df41f969c683c3ec1dab0d607499dddb589127c6f5a41b9af4e",
+)
 campus_number = "057905286"
 student_key = student_attachment.tprs_student_campus_index(edition="2026").edition_for(campus_number)
 if student_key is not None:
-    view = class_size_candidate.observations(
+    view = class_sizes.observations(
         "tprs_class_size", "class_size_kindergarten_avg_size", school_year=2026,
         scope="campus", edition=class_size_campus_edition(student_key),
     )
@@ -330,10 +340,10 @@ if student_key is not None:
 ```
 
 A campus without an admitted Student report has no route. An admitted campus
-whose report omits the table still has a row with missing measurements. Use
-the candidate created from the same pinned Student attachment. Automatic
-campus partition routing in the entity Query API currently covers Student
-Information observations.
+whose report omits the table still has a row with missing measurements. For
+local builds, use the same pinned Student attachment used by the producer.
+Automatic campus partition routing in the entity Query API currently covers
+Student Information observations.
 
 These views leave existing entity properties and `meta` keys in place. A raw
 source field returns its published token. A typed field returns its published
