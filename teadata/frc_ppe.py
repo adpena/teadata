@@ -78,9 +78,11 @@ def _read_report(store: ProvenanceStore, receipt: str, scope: str, *, selected: 
             or not 0 < artifact["size_bytes"] <= _MAX_HTML_BYTES):
         raise ContractError(f"FRC PPE receipt does not bind the exact {scope} report")
     path = store.verify_artifact(artifact["sha256"])
-    if path.stat().st_size != artifact["size_bytes"]:
-        raise ContractError("FRC PPE source size differs from its receipt")
-    return path.read_text(encoding="utf-8")
+    with path.open("rb") as stream:
+        data = stream.read(_MAX_HTML_BYTES + 1)
+    if len(data) != artifact["size_bytes"] or sha256(data).hexdigest() != artifact["sha256"]:
+        raise ContractError("FRC PPE source bytes differ from its receipt")
+    return data.decode("utf-8")
 
 
 def _selected_row(text: str, entity: str = "") -> tuple[int, list[str]]:
@@ -182,17 +184,14 @@ def _admit(config: Config, canonical: Config, store: ProvenanceStore) -> tuple[R
     return source, tables, reader_options(source.reader, "source")
 
 
-def _build_leaf(recorder: BuildRecorder, target: ProvenanceStore, source: ResolvedDataset, mapping: dict[str, Any],
-                options: dict[str, Any], scope: str, stage: Path, config_receipt: str, toolchain: dict[str, str]) -> dict[str, Any]:
-    from .analytical import write_leaf_artifact
-
-    receipt = options["acquisition_ids"][scope]
-    record = target.read_record(receipt)
+def _scope_projection(store: ProvenanceStore, metadata: DatasetMetadata, mapping: dict[str, Any],
+                      scope: str, receipt: str, state_receipt: str,
+                      witness: str | None) -> tuple[pa.Table, dict[str, Any]]:
+    record = store.read_record(receipt)
     (digest,) = table_input_sha256s(mapping)
     if record["artifact"]["sha256"] != digest:
         raise ContractError("FRC PPE source bytes differ from the reviewed crosswalk")
-    references = [rid for ref in source.metadata.references for rid in ref.provenance_ids]
-    text = _read_report(target, receipt, scope, selected="" if scope == "state" else None)
+    text = _read_report(store, receipt, scope, selected="" if scope == "state" else None)
     rows = [_selected_row(text)] if scope == "state" else _bulk_rows(text, scope)
     fields = mapping["fields"]
     layout = mapping["layout"]
@@ -200,23 +199,36 @@ def _build_leaf(recorder: BuildRecorder, target: ProvenanceStore, source: Resolv
              for field in fields if field["disposition"] == "fact"}
     if (tuple(field["code"] for field in fields) != (*_IDENTITY[scope], *_PPE_HEAD)
             or mapping["header_identity"] != "position" or mapping["metric_period"] != PERIOD.to_dict()
-            or units != {name: metric.unit for name, metric in source.metadata.metrics.items()}
+            or units != {name: metric.unit for name, metric in metadata.metrics.items()}
             or not rows or [index for index, _ in rows] != list(range(layout["first_data_record"], layout["last_data_record"] + 1))):
         raise ContractError("FRC PPE positional mapping, units or reviewed record range differs")
-    witnesses = []
-    if scope != "state":
+    if scope == "state":
+        if witness is not None or receipt != state_receipt:
+            raise ContractError("FRC PPE statewide values require the direct report")
+    else:
         entity = _SELECTED_WITNESSES[scope]
-        witness = options["witness_ids"][scope]
-        if target.read_record(witness)["artifact"]["sha256"] == digest:
-            raise ContractError("FRC PPE witness is the same artifact as the bulk source")
-        if record["source_metadata"]["provenance_ids"] != [options["acquisition_ids"]["state"]]:
+        if witness is None or store.read_record(witness)["artifact"]["sha256"] == digest:
+            raise ContractError("FRC PPE requires an independent selected report")
+        if record["source_metadata"]["provenance_ids"] != [state_receipt]:
             raise ContractError("FRC PPE bulk report does not bind the published state source")
-        _, values = _selected_row(_read_report(target, witness, scope, selected=entity), entity)
+        _, values = _selected_row(_read_report(store, witness, scope, selected=entity), entity)
         matches = [row[-len(_PPE_HEAD):] for _, row in rows if row[0 if scope == "district" else 2] == entity]
         if matches != [values]:
             raise ContractError("FRC PPE selected report differs from the bulk observation")
-        witnesses.append(witness)
-    table, support = _projection(rows, fields)
+    return _projection(rows, fields)
+
+
+def _build_leaf(recorder: BuildRecorder, target: ProvenanceStore, source: ResolvedDataset, mapping: dict[str, Any],
+                options: dict[str, Any], scope: str, stage: Path, config_receipt: str, toolchain: dict[str, str]) -> dict[str, Any]:
+    from .analytical import write_leaf_artifact
+
+    receipt = options["acquisition_ids"][scope]
+    witness = options["witness_ids"].get(scope)
+    table, support = _scope_projection(target, source.metadata, mapping, scope, receipt,
+                                       options["acquisition_ids"]["state"], witness)
+    (digest,) = table_input_sha256s(mapping)
+    references = [rid for ref in source.metadata.references for rid in ref.provenance_ids]
+    witnesses = [witness] if witness is not None else []
     keys = _KEYS[scope]
     grain = STATEWIDE_SINGLETON_GRAIN if not keys else f"one row per {keys[0]}"
     edition = EditionKey(DATASET, str(YEAR), EditionKey.source_revision((digest,)), scope, scope, grain)

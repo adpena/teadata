@@ -699,6 +699,21 @@ That independent comparison covers Functions 11 and 95 and objects
 6100–6499. Reconciliation to signed audits or other actuals products requires
 separate evidence.
 
+The reviewed FY2025 Federal Report Card and 2024–25 TAPR Staff Information
+bundle uses the same command. Pass a single retained source store with the
+original processing closures, publisher bytes and independent reports from
+both constituents. Qualification replays all FRC values, raw tokens, statuses
+and source rows at Texas, district and campus scope. Texas comes from the
+direct state report. Separately selected district and campus reports check
+eight published cells each. The staff editions compare all raw CSV cells and
+original-header exports. Only the four campus and five district measures
+listed in the independent staff comparison receive semantic coverage. The
+other staff columns are retained for raw fidelity.
+An entity release can attach this exact reviewed bundle through its native
+catalog. Keep the child manifest and its provenance store adjacent for the
+offline entity release check. That check replays both constituents and its
+receipt is bound to the retained source bytes.
+
 All modes verify the complete reviewed scope, manifest, metadata, leaf bytes
 and processing receipts, then require raw and typed parity and independently
 acquired TEA comparisons. Missing evidence or mismatches prevent qualification.
