@@ -382,5 +382,12 @@ To replay the exact retained acquisitions into a new unpublished directory,
 run `uv run --locked python -m teadata.scripts.refresh_first_ratings --store
 <retained-store> --output <new-directory>`. The producer checks the archived
 workbooks, roster pages and scoped newsroom counts offline, then verifies
-both leaf artifacts and their Arrow readback. Production release admission
-and application activation are separate steps.
+both leaf artifacts and their Arrow readback.
+
+The production verification command admits the exact reviewed candidate
+through `--native-release` with its manifest SHA-256 and adjacent
+`provenance` store. It uses the same checks when that candidate is attached
+to an entity release. Verification replays the archived configuration,
+crosswalk, workbooks, roster pages, and newsroom controls against the
+physical and public Arrow tables. The admitted child is currently
+unpublished.

@@ -8,6 +8,7 @@ from datetime import datetime
 from hashlib import sha256
 from html import unescape
 from importlib.metadata import version
+import json
 from pathlib import Path
 import platform
 import re
@@ -35,6 +36,7 @@ from .values import ValueStatus
 
 EDITION = "2026"
 PERIOD = DataPeriod("fiscal_year", 2024, 2025)
+REVIEWED_MANIFEST = "c631a058e264c70ea9e1a27a32a949aabf36d37b2f518d9f58d3e8378f460b27"
 _DATASET_PREFIX = "first_financial_accountability_"
 _CONFIG = Path(__file__).with_name("teadata_sources.yaml")
 _HEADERS = ("District#", "District_Name", "Status", "Rating", "Score", "Last Updated Date", "Region")
@@ -47,6 +49,7 @@ _DISTRICT_GRADES = {
 _PASS_FAIL = {"Pass": "Pass", "Fail": "Fail"}
 _VALUE_POLICY = "first_university_rating_2026"
 _SUMMARY = "first_statewide_summary"
+_SCHEMA_PATH = "schemas/first--2026--final-ratings-crosswalk.json"
 _SUPPORT = {
     "fields": {
         "district_number": {"raw": "first_raw_district_number"},
@@ -301,6 +304,84 @@ def _project(entries: dict[str, _Rating]) -> pa.Table:
              pa.int32(), pa.string(), pa.string(), pa.string(), pa.string(), pa.string(), pa.string())
     return pa.table(dict(zip(_Rating._fields,
         (pa.array(values, type=kind) for values, kind in zip(zip(*entries.values()), types, strict=True)), strict=True)))
+
+
+def _reviewed_first_leaves(release: DataRelease) -> dict[str, ArtifactRef]:
+    if release.manifest_sha256 != REVIEWED_MANIFEST or not release.offline:
+        raise ContractError("FIRST qualification requires the exact reviewed offline release")
+    index = release.catalog.to_dict()
+    leaves = [release.catalog.artifact_ref(identifier) for identifier in index["artifacts"]]
+    by_dataset = {ref.edition.dataset: ref for ref in leaves}
+    if (index["schema_version"] != 4 or len(index["editions"]) != len(_POPULATIONS)
+            or len(leaves) != len(_POPULATIONS) or by_dataset.keys() != {item.dataset for item in _POPULATIONS}):
+        raise ContractError("FIRST release must contain exactly the reviewed district and university charter editions")
+    return by_dataset
+
+
+def retained_first_evidence(release: DataRelease, store: ProvenanceStore) -> list[str]:
+    """Rehash the exact source closure before reusing a composed-release receipt."""
+    return sorted(store.verify_record_closure([ref.processing_id for ref in _reviewed_first_leaves(release).values()]))
+
+
+def qualify_first_ratings(release: DataRelease, store: ProvenanceStore) -> dict[str, Any]:
+    """Replay the reviewed workbook and roster observations against both release leaves."""
+    leaves = _reviewed_first_leaves(release)
+    release.verify()
+    catalog = release.catalog
+    seen: set[str] = set()
+    results = []
+    for population in _POPULATIONS:
+        ref = leaves[population.dataset]
+        key = ref.edition
+        graph = store.verify_record_closure([ref.processing_id])
+        processing = graph[ref.processing_id]
+        producer = ref.contract["producer"]
+        if (graph != json.loads(catalog.edition_metadata_bytes(key.identity))["provenance"]
+                or processing["processor"] != "teadata.first_ratings"
+                or processing["code_version"] != producer["code_sha256"]
+                or processing["parameters"]["toolchain"] != producer["toolchain"]):
+            raise ContractError(f"FIRST processing lineage differs for {key.dataset}")
+        configs = [identifier for identifier in processing["inputs"] if
+                   graph[identifier]["kind"] == "acquisition" and graph[identifier]["dataset"] == "reference:first:config"]
+        metadata = catalog.metadata(key.dataset, edition=key)
+        schemas = [reference for reference in metadata.references if reference.role == "schema"]
+        if len(configs) != 1 or len(schemas) != 1 or schemas[0].path != _SCHEMA_PATH or not schemas[0].reviewed_sha256:
+            raise ContractError(f"Missing exact FIRST configuration or crosswalk for {key.dataset}")
+        schema_hash = schemas[0].reviewed_sha256
+        schema = store.verify_artifact(schema_hash).read_bytes()
+        if schema != catalog.column_schema_bytes(schema_hash):
+            raise ContractError(f"FIRST archived crosswalk differs for {key.dataset}")
+        config_id = configs[0]
+        raw_config = store.verify_artifact(graph[config_id]["artifact"]["sha256"]).read_bytes()
+        with TemporaryDirectory(prefix="first-replay-") as directory:
+            root = Path(directory)
+            target = root / _SCHEMA_PATH
+            target.parent.mkdir()
+            target.write_bytes(schema)
+            config = load_config_bytes(raw_config, path=root / _CONFIG.name)
+            source, workbook_id, digest, roots, entries, counts = _admit(config, store, population)
+        expected_key = EditionKey(population.dataset, EDITION, EditionKey.source_revision((digest,)), "district",
+                                 population.sheet, "one publisher row per district number")
+        acquisitions = catalog.acquisitions(key.dataset, edition=key)
+        if (key != expected_key or metadata != source.metadata or ref.output != "leaf"
+                or acquisitions != [{"record_id": workbook_id, **graph[workbook_id]}]
+                or sorted(processing["inputs"]) != sorted({*roots, config_id})
+                or ref.contract["inputs"] != [digest] or ref.contract["column_support"] != _SUPPORT):
+            raise ContractError(f"FIRST edition bindings differ from publisher replay for {key.dataset}")
+        if population.university and catalog.policy(key.dataset, edition=key) != config.value_policies[_VALUE_POLICY]:
+            raise ContractError("FIRST university charter blank score policy differs from the reviewed source")
+        expected = _project(entries)
+        physical = release.analytical_dataset(ref.identity).to_table().replace_schema_metadata(None)
+        actual = release.table(key).to_arrow().replace_schema_metadata(None)
+        if (seen.intersection(entries) or set(actual.column_names) != set(expected.column_names)
+                or not physical.equals(expected, check_metadata=True)
+                or not actual.select(expected.column_names).equals(expected, check_metadata=True)):
+            raise ContractError(f"FIRST native rows, values or source status differ for {key.dataset}")
+        seen.update(entries)
+        results.append({"dataset": key.dataset, "edition_id": key.identity, "rows": expected.num_rows,
+                        "compared_cells": expected.num_rows * expected.num_columns, "ratings": counts})
+    return {"status": "PASS_REVIEWED_NATIVE", "build_id": release.build_id,
+            "manifest_sha256": release.manifest_sha256, "editions": results}
 
 
 def materialize_first_ratings(store: ProvenanceStore, output: Path) -> dict[str, Any]:

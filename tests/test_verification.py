@@ -464,6 +464,43 @@ def test_release_input_cannot_capture_an_artifact_outside_its_directory(project)
         run_checks(project, kind="library", checks=passing(), release="release.json")
 
 
+def test_composed_first_receipt_requires_retained_publisher_evidence(project, monkeypatch):
+    from types import SimpleNamespace
+
+    from teadata import first_ratings, release, verification
+
+    pin = first_ratings.REVIEWED_MANIFEST
+    asset = project / "entities.sqlite"
+    asset.write_bytes(b"snapshot")
+    manifest = project / "release.json"
+    manifest.write_text(json.dumps({
+        "artifacts": {"entities": {"filename": asset.name}},
+        "catalog": {"native_sources": [{}]},
+    }))
+    ref = SimpleNamespace(manifest_sha256=pin)
+    parent = SimpleNamespace(catalog=SimpleNamespace(native_sources=[ref]), verify_native_sources=lambda: {pin: {"asset": asset}})
+    child, store = object(), object()
+    monkeypatch.setattr(release, "DataRelease", lambda *a, **k: parent)
+    monkeypatch.setattr(verification, "_open_reviewed_native_evidence", lambda *a: (child, store))
+    seen = []
+
+    def evidence(received_release, received_store):
+        seen.append((received_release, received_store))
+        return ["publisher-record"]
+
+    monkeypatch.setattr(first_ratings, "retained_first_evidence", evidence)
+    captured = verification._input_identity(project, kind="library", paired_library=None, release=manifest.name)
+    assert captured["native_first_evidence"] == ["publisher-record"]
+    assert seen == [(child, store)]
+
+    def missing(*args):
+        raise FileNotFoundError("archived FIRST roster")
+
+    monkeypatch.setattr(first_ratings, "retained_first_evidence", missing)
+    with pytest.raises(ReceiptError, match="archived FIRST roster"):
+        verification._input_identity(project, kind="library", paired_library=None, release=manifest.name)
+
+
 def test_pytest_environment_cannot_silently_select_a_smaller_suite(project, monkeypatch):
     monkeypatch.setenv("PYTEST_ADDOPTS", "-k only_the_easy_test")
     monkeypatch.setenv("PYTEST_PLUGINS", "caller_injected_plugin")

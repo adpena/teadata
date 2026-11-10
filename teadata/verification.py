@@ -210,6 +210,7 @@ def _input_identity(root: Path, *, kind: str, paired_library: Path | None, relea
             identities[role] = {"filename": filename, "sha256": _digest(asset), "size_bytes": asset.stat().st_size}
         result["release_artifacts"] = identities
         if document.get("catalog", {}).get("native_sources"):
+            from teadata.first_ratings import REVIEWED_MANIFEST as FIRST_MANIFEST, retained_first_evidence
             from teadata.manifest import ContractError
             from teadata.native_finance_staff import REVIEWED_MANIFEST as FINANCE_STAFF_MANIFEST, retained_finance_staff_evidence
             from teadata.release import DataRelease
@@ -227,6 +228,9 @@ def _input_identity(root: Path, *, kind: str, paired_library: Path | None, relea
                     elif ref.manifest_sha256 == FINANCE_STAFF_MANIFEST:
                         child, store = _open_reviewed_native_evidence(parent, ref, "finance and staff")
                         result["native_finance_staff_evidence"] = retained_finance_staff_evidence(child, store)
+                    elif ref.manifest_sha256 == FIRST_MANIFEST:
+                        child, store = _open_reviewed_native_evidence(parent, ref, "FIRST")
+                        result["native_first_evidence"] = retained_first_evidence(child, store)
             except (ContractError, OSError, ValueError) as error:
                 raise ReceiptError(f"A release check requires verified retained native sources: {error}") from error
     return result
@@ -824,6 +828,7 @@ def _validate_tefa_cases(release: DataRelease) -> dict[str, Any]:
 
 
 def _validate_release(path: str, kind: str) -> None:
+    from teadata.first_ratings import REVIEWED_MANIFEST as FIRST_MANIFEST, qualify_first_ratings
     from teadata.native_finance_staff import REVIEWED_MANIFEST as FINANCE_STAFF_MANIFEST, qualify_finance_staff
     from teadata.release import DataRelease
     from teadata.tprs_statewide_intake import REVIEWED_STATEWIDE_TPRS_MANIFESTS, qualify_statewide_tprs
@@ -838,7 +843,7 @@ def _validate_release(path: str, kind: str) -> None:
         from teadata.manifest import processor_identity
         if release.catalog.to_dict()["processor_sha256"] != processor_identity():
             raise ReceiptError("Release was built from different processing code or lockfile; rebuild it")
-    reviewed = REVIEWED_STATEWIDE_TPRS_MANIFESTS | {FINANCE_STAFF_MANIFEST}
+    reviewed = REVIEWED_STATEWIDE_TPRS_MANIFESTS | {FINANCE_STAFF_MANIFEST, FIRST_MANIFEST}
     unsupported = [ref.manifest_sha256 for ref in release.catalog.native_sources if ref.manifest_sha256 not in reviewed]
     if unsupported:
         pins = ", ".join(unsupported)
@@ -847,6 +852,8 @@ def _validate_release(path: str, kind: str) -> None:
     for ref in release.catalog.native_sources:
         if ref.manifest_sha256 == FINANCE_STAFF_MANIFEST:
             label, qualify = "finance and staff", qualify_finance_staff
+        elif ref.manifest_sha256 == FIRST_MANIFEST:
+            label, qualify = "FIRST", qualify_first_ratings
         else:
             label, qualify = "TPRS", qualify_statewide_tprs
         child, store = _open_reviewed_native_evidence(release, ref, label)
@@ -879,6 +886,7 @@ def _open_reviewed_native_evidence(release, ref, label: str):
 
 def _validate_native_release(path: Path, pin: str, source_store: Path) -> dict[str, Any]:
     from teadata.dataset_metadata import EditionKey
+    from teadata.first_ratings import REVIEWED_MANIFEST as FIRST_MANIFEST, qualify_first_ratings
     from teadata.manifest import ContractError, canonical_json
     from teadata.native_finance_staff import REVIEWED_MANIFEST as FINANCE_STAFF_MANIFEST, qualify_finance_staff
     from teadata.native_financial_accounts import is_reviewed_budget, qualify_budget
@@ -896,6 +904,8 @@ def _validate_native_release(path: Path, pin: str, source_store: Path) -> dict[s
 
     try:
         release = DataRelease(path, expected_sha256=pin, offline=True)
+        if release.manifest_sha256 == FIRST_MANIFEST:
+            return qualify_first_ratings(release, _retained_store(source_store))
         if release.manifest_sha256 == FINANCE_STAFF_MANIFEST:
             return qualify_finance_staff(release, _retained_store(source_store))
         if release.manifest_sha256 in REVIEWED_STATEWIDE_TPRS_MANIFESTS:
