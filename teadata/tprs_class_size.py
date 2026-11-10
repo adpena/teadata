@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import lru_cache
 from hashlib import sha256
 import re
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
+
+import pyarrow as pa
 
 from .native_witnesses import _Rows
-from .tprs_students import PERIOD, _check_student_heading, _identifier, _need, _read_student_input, _student_html, definition
+from .tprs_students import PERIOD, _DIGEST, _check_student_heading, _identifier, _need, _read_student_input, _student_html, definition
 from .values import Measurement, TokenRule, ValuePolicy, ValueStatus, measure
 
 if TYPE_CHECKING:
@@ -33,6 +36,7 @@ _FIELDS = {
     },
 }
 _NUMERIC = re.compile(r"(?:0|[1-9][0-9]*)\.[0-9]")
+_FIELD_ORDER = tuple(field for group in _FIELDS.values() for field in group.values())
 CLASS_SIZE_UNIT = "students_per_class"
 CLASS_SIZE_POLICY = ValuePolicy("tprs_class_size_2026", {
     "-": TokenRule(ValueStatus.NOT_APPLICABLE, "no_students"),
@@ -183,3 +187,54 @@ def read_class_size_report(store: ProvenanceStore, receipt: str, *, scope: str, 
                                      expected_sha256=expected_sha256)
     cells = _class_size_cells(raw, scope, identifier)
     return ClassSizeReport(scope, identifier, receipt, expected_sha256, cells, notes)
+
+
+def class_size_projection(reports: Iterable[ClassSizeReport]) -> tuple[pa.Table, dict[str, Any]]:
+    """Project one receipt-bound scope into Arrow and native column-support descriptors."""
+    ordered = sorted(reports, key=lambda report: report.identifier)
+    _need(bool(ordered) and len({report.scope for report in ordered}) == 1,
+          "Class-size projection requires one nonempty scope")
+    scope = ordered[0].scope
+    _need(len({report.identifier for report in ordered}) == len(ordered),
+          "Duplicate class-size report entity")
+    support: dict[str, Any] = {"fields": {}, "context": []}
+    arrays: dict[str, pa.Array] = {}
+    if scope != "state":
+        key = scope + "_number"
+        arrays[key] = pa.array([report.identifier for report in ordered], type=pa.string())
+    arrays["tprs_report_receipt"] = pa.array([report.receipt for report in ordered], type=pa.string())
+    arrays["tprs_report_sha256"] = pa.array([report.sha256 for report in ordered], type=pa.string())
+    arrays["class_size_table_present"] = pa.array([bool(report.cells) for report in ordered], type=pa.bool_())
+    support["context"] = list(arrays)
+
+    index = []
+    expected = set(_FIELD_ORDER)
+    for report in ordered:
+        _identifier(scope, report.identifier)
+        _need(_DIGEST.fullmatch(report.receipt) is not None and _DIGEST.fullmatch(report.sha256) is not None,
+              "Class-size projection requires exact report receipt and content pins")
+        cells = {cell.field: cell for cell in report.cells}
+        _need(len(cells) == len(report.cells) and cells.keys() <= expected
+              and (scope == "campus" or cells.keys() == expected),
+              "Invalid class-size projection field coverage")
+        index.append(cells)
+
+    for field in _FIELD_ORDER:
+        cells = [row.get(field) for row in index]
+        measurements = [cell.measurement if cell else None for cell in cells]
+        arrays[field] = pa.array([value.numeric if value else None for value in measurements], type=pa.float64())
+        raw, status, row, column, reason = (
+            f"tprs_{kind}_{field}" for kind in ("raw", "status", "row", "column", "reason")
+        )
+        arrays[raw] = pa.array([value.raw if value else None for value in measurements], type=pa.string())
+        arrays[status] = pa.array(
+            [value.status.value if value else ValueStatus.MISSING.value for value in measurements], type=pa.string(),
+        )
+        arrays[row] = pa.array([cell.row if cell else None for cell in cells], type=pa.int64())
+        arrays[column] = pa.array([cell.column if cell else None for cell in cells], type=pa.int64())
+        arrays[reason] = pa.array([
+            value.reason if value else ("row_not_published" if report.cells else "table_not_published")
+            for value, report in zip(measurements, ordered, strict=True)
+        ], type=pa.string())
+        support["fields"][field] = {"raw": raw, "status": status, "auxiliary": [row, column, reason]}
+    return pa.table(arrays), support

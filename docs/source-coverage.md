@@ -369,6 +369,13 @@ direct Texas report for statewide values. The reader is an offline
 preparation step for a future queryable class-size attachment.
 [TPRS glossary, p. 42](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/comprehensive-tprs-glossary.pdf#page=42).
 
+`class_size_projection` converts reports read through that receipt-verified
+reader into a typed Arrow table for one geography. It keeps a campus row
+when the source report omits the table and distinguishes that case from a
+missing grade or subject within a table. The Texas table contains one
+direct statewide report. The Arrow projection is available offline.
+Querying it through a TEA Data release requires catalog and source admission.
+
 ## School FIRST financial accountability
 
 The final **2025–26** FIRST rating edition was released November 5, 2026 and

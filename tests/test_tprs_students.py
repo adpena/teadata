@@ -31,7 +31,7 @@ from teadata.release import DataRelease, _schema_publication_destinations, _stud
 from teadata.source_views import PartitionedSourceTable, SourceTable
 from teadata.scripts import verify_tprs_campus_coverage as campus_coverage
 from teadata.teadata_config import load_config, load_config_bytes
-from teadata.tprs_class_size import parse_class_size_report, read_class_size_report
+from teadata.tprs_class_size import class_size_projection, parse_class_size_report, read_class_size_report
 from teadata.values import ValueStatus
 
 from test_catalog_projections import attach_observation_child, selected_catalog  # noqa: F401
@@ -152,6 +152,39 @@ def test_class_size_reads_only_local_cells_from_exact_acquisition(grid, tmp_path
     assert invalid.measurement.raw == "?"
     assert invalid.measurement.numeric is None
     assert parse_class_size_report(html(source_rows), scope="campus", identifier=identifier).cells == ()
+
+    absent_id = "001902002"
+    absent_raw = html(report_rows(grid, "campus", absent_id))
+    absent = read_class_size_report(
+        store, receipt(store, tmp_path, absent_raw, identifier=absent_id, scope="campus"),
+        scope="campus", identifier=absent_id, expected_sha256=sha256(absent_raw).hexdigest(),
+    )
+    table, support = class_size_projection([absent, result])
+    assert table["campus_number"].to_pylist() == [identifier, absent_id]
+    assert table["class_size_table_present"].to_pylist() == [True, False]
+    field = observed.field
+    sources = support["fields"][field]
+    assert table[field].type == pa.float64()
+    assert table[field].to_pylist() == [20.7, None]
+    assert table[sources["raw"]].to_pylist() == ["20.7", None]
+    assert table[sources["status"]].to_pylist() == ["observed", "missing"]
+    row, column, reason = sources["auxiliary"]
+    assert table[row].to_pylist() == [observed.row, None]
+    assert table[column].to_pylist() == [2, None]
+    assert table[reason].to_pylist() == [None, "table_not_published"]
+    assert table["tprs_reason_class_size_grade_3_avg_size"].to_pylist() == [
+        "row_not_published", "table_not_published",
+    ]
+    for cell, token, status in ((no_students, "-", "not_applicable"), (invalid, "?", "invalid")):
+        pointers = support["fields"][cell.field]
+        assert table[cell.field].to_pylist() == [None, None]
+        assert table[pointers["raw"]].to_pylist() == [token, None]
+        assert table[pointers["status"]].to_pylist() == [status, "missing"]
+        assert table[pointers["auxiliary"][0]].to_pylist() == [cell.row, None]
+    with pytest.raises(ContractError, match="Duplicate"):
+        class_size_projection([result, result])
+    with pytest.raises(ContractError, match="receipt and content pins"):
+        class_size_projection([replace(result, receipt="")])
 
 
 @pytest.mark.parametrize("fault", [
