@@ -6,6 +6,7 @@ from contextvars import ContextVar
 from contextlib import closing
 from copy import deepcopy
 from dataclasses import replace
+from functools import lru_cache
 from hashlib import sha256
 from importlib.metadata import version
 import json
@@ -46,6 +47,12 @@ def canonical_json(value: Any) -> str:
     return json.dumps(
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False
     )
+
+
+@lru_cache(maxsize=128)
+def _period_json(period: DataPeriod) -> str:
+    """Reuse the serialized period without changing catalog cache keys."""
+    return canonical_json(period.to_dict())
 
 
 def schema_fingerprint(columns: Any) -> str:
@@ -1442,10 +1449,13 @@ class DatasetCatalog:
                      definition: MetricDefinition | None, *, input_binding="caller_supplied") -> Measurement:
         metadata = self._metadata[dataset]
         period = definition.period if definition and definition.period is not None else metadata.period
-        identity = (dataset, key, input_binding, canonical_json(period.to_dict()))
+        identity = (dataset, key, input_binding, _period_json(period))
         if identity not in self._origin_cache:
+            period_data = period.to_dict()
+            # Keep independent period strings in persisted keys, as before.
+            identity = (dataset, key, input_binding, canonical_json(period_data))
             self._origin_cache[identity] = canonical_json({
-                "dataset": dataset, "field": key, "period": period.to_dict(),
+                "dataset": dataset, "field": key, "period": period_data,
                 "catalog_year": self._sources[dataset].get("resolved_year"),
                 "build_id": self.build_id, "provenance_ids": list(metadata.provenance_ids),
                 "input_binding": input_binding,
