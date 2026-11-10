@@ -428,7 +428,11 @@ pinned editions. A wildcard selects the reviewed metrics for that year.
 A named metric must cover that same school year. An unavailable year
 raises `ContractError` before the comparison reads observation data.
 Omit the year or pass `None` to keep the reviewed periods of the selected
-metrics. The tuple form accepts the year after the dimensions argument.
+metrics. Use `period=DataPeriod("fiscal_year", 2024, 2025)` for an exact
+fiscal period. The period kind is part of the match. Supply at most one
+selector. The tuple form takes `school_year` after `dimensions`, then the
+optional `period`. For the source contract and retained citation fields,
+see [Federal Report Card spending per pupil](frc-sources.md#compare-with-texas).
 
 ```python
 result = districts >> ("compare_statewide", release, local, texas, "*", None, 2025)

@@ -1,11 +1,17 @@
 from html import escape
+from types import SimpleNamespace
+from uuid import uuid4
 
 import pytest
 
 from teadata.column_schema import crosswalk_dataset, parse_column_schema, reader_options
-from teadata.dataset_metadata import DataPeriod
-from teadata.frc_ppe import DATASET, SOURCE_ROW, UNIT, _BLANK_NOTE, _FOOTER, _FUND_HEAD, _PPE_HEAD, _TITLE, _bulk_rows, _projection, _selected_row
+from teadata.dataset_metadata import DataPeriod, EditionKey, NativeSourceRef
+from teadata.entities import District
+from teadata.frc_ppe import DATASET, PERIOD, SOURCE_ROW, UNIT, _BLANK_NOTE, _FOOTER, _FUND_HEAD, _PPE_HEAD, _TITLE, _bulk_rows, _projection, _selected_row
 from teadata.manifest import ContractError
+from teadata.query import Query
+from teadata.release import DataRelease
+from teadata.statewide import _frc_value
 from teadata.teadata_config import load_config
 from teadata.values import ValueStatus, measure
 
@@ -87,3 +93,55 @@ def test_frc_per_pupil_projection_preserves_blank_and_signed_zeros():
             _projection([(6, values)], fields)
     assert measure("$-117", unit=UNIT).value == -117
     assert measure("$1,000", unit=UNIT).display() == "$1,000 per pupil"
+
+
+def test_frc_comparison_requires_one_attachment_for_both_editions():
+    local = EditionKey(DATASET, "2025", "1" * 64, "district", "district", "one row per district_number")
+    state = EditionKey(DATASET, "2025", "2" * 64, "state", "state", "statewide total")
+    release = object.__new__(DataRelease)
+    release._v3 = False
+    release.catalog = SimpleNamespace(native_sources=(
+        NativeSourceRef("district.json", "a" * 64, "b" * 64, (local,)),
+        NativeSourceRef("state.json", "c" * 64, "d" * 64, (state,)),
+    ))
+    query = Query([District(uuid4(), "Example ISD", district_number="084908")], repo=None)
+    with pytest.raises(ContractError, match="both exact editions in one native attachment"):
+        query.compare_statewide(release=release, local=local, statewide=state, period=PERIOD)
+
+
+@pytest.mark.parametrize("attached", [False, True])
+def test_frc_comparison_rejects_repackaged_native_manifest_before_metadata(attached):
+    local = EditionKey(DATASET, "2025", "1" * 64, "district", "district", "one row per district_number")
+    state = EditionKey(DATASET, "2025", "2" * 64, "state", "state", "statewide total")
+    release = object.__new__(DataRelease)
+    release._v3 = not attached
+    if attached:
+        release.catalog = SimpleNamespace(native_sources=(
+            NativeSourceRef("unreviewed.json", "a" * 64, "b" * 64, (local, state)),
+        ))
+    else:
+        release._manifest_sha256 = "a" * 64
+    query = Query([District(uuid4(), "Example ISD", district_number="084908")], repo=None)
+    with pytest.raises(ContractError, match="exact qualified FY2025 native manifest"):
+        query.compare_statewide(release=release, local=local, statewide=state, period=PERIOD)
+
+
+@pytest.mark.parametrize("raw,status,value,unit,valid", [
+    ("", "missing", None, UNIT, True),
+    ("$-0", "observed", 0, UNIT, True),
+    ("$-117", "observed", -117, UNIT, True),
+    ("5,530,672", "observed", 5530672, "count", True),
+    ("$1000", "observed", 1000, UNIT, False),
+    ("$1,000", "observed", 1001, UNIT, False),
+    ("$0", "missing", None, UNIT, False),
+    ("", "missing", None, "count", False),
+    ("0", "observed", False, "count", False),
+])
+def test_frc_comparison_validates_published_token(raw, status, value, unit, valid):
+    plan = SimpleNamespace(support={"selected": ("raw", "status")})
+    row = {"selected": value, "raw": raw, "status": status}
+    if valid:
+        assert _frc_value(plan, row, "selected", unit) == (raw, status, value)
+    else:
+        with pytest.raises(ContractError, match="published token and status"):
+            _frc_value(plan, row, "selected", unit)

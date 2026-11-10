@@ -122,7 +122,7 @@ FORMS = {
 
 OBSERVATIONS = ("observations", "observations", "tuple", ("dataset", "school_year", "fields", "scope", "edition"))
 STATEWIDE = ("compare_statewide", "compare_statewide", "tuple", (
-    "release", "local", "statewide", "metric", "dimensions", "school_year"))
+    "release", "local", "statewide", "metric", "dimensions", "school_year", "period"))
 
 
 def test_every_discovered_form_has_a_literal_golden():

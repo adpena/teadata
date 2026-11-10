@@ -10,7 +10,7 @@ from uuid import uuid4
 import pytest
 
 from teadata.column_schema import source_schema_fingerprint
-from teadata.dataset_metadata import DatasetMetadata, EditionKey, ResolvedDataset
+from teadata.dataset_metadata import DataPeriod, DatasetMetadata, EditionKey, ResolvedDataset
 from teadata.entities import Campus, District
 from teadata.manifest import ContractError, canonical_json
 from teadata.peims_courses import DATASET as COURSES
@@ -311,11 +311,24 @@ def test_exact_comparison_year_projects_only_matching_vintage(comparison_release
 def test_comparison_does_not_treat_a_fiscal_year_as_a_school_year(comparison_release, monkeypatch):
     release, editions = comparison_release
     district = District(uuid4(), "Observed", district_number="227901")
+    query = Query([district], repo=None)
+    local, state = editions["district"], editions["state"]
+    metric = "membership_count"
+    fiscal = DataPeriod("fiscal_year", 2024, 2025)
+    row, = query >> ("compare_statewide", release, local, state, metric, None, None, fiscal)
+    assert row.period == fiscal and row.metric == metric
 
     def unexpected_leaf(_identity):
         raise AssertionError("A fiscal-year mismatch opened an observation leaf")
 
     monkeypatch.setattr(release, "analytical_dataset", unexpected_leaf)
+    with pytest.raises(ValueError, match="Choose school_year or period"):
+        query >> ("compare_statewide", release, local, state, metric, None, 2025, fiscal)
+    with pytest.raises(TypeError, match="period must be a DataPeriod"):
+        query.compare_statewide(release=release, local=local, statewide=state, period="2024-25")
+    with pytest.raises(ContractError, match=r"Available periods: 2024-2025 \(fiscal_year\)"):
+        query.compare_statewide(release=release, local=local, statewide=state, metric=metric,
+                                period=DataPeriod("school_year", 2024, 2025))
     with pytest.raises(ContractError, match=r"covers 2024-2025 \(fiscal_year\)"):
         Query([district], repo=None).compare_statewide(
             release=release, local=editions["district"], statewide=editions["state"],

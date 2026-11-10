@@ -72,3 +72,34 @@ data = state.to_df()
 Table selection verifies the attached manifest. Values, exports and their
 provenance come from that pinned source. The fiscal year is distinct from
 the school year used by the observations API.
+
+## Compare with Texas
+
+Pass two exact edition keys from the same native release to
+`compare_statewide()`. A parent release can select both keys from
+`catalog.native_sources`. The comparison requires both to belong to the
+same attachment. For a district cohort, use the district key as
+`local`. Use the campus key for a campus cohort.
+
+```python
+from teadata import DataPeriod
+
+comparison = districts.compare_statewide(
+    release=release,
+    local=district_edition,
+    statewide=state_edition,
+    metric="all_sources_per_pupil",
+    period=DataPeriod("fiscal_year", 2024, 2025),
+)
+```
+
+Each result includes both exact edition keys, the native manifest hash,
+the leaf artifact IDs, the publisher acquisition IDs and the source table
+rows. The metric identifies the field in each leaf. A missing or
+unavailable value has no difference. A blank publisher cell retains
+its source row. Private campuses have no local observation. Dollar
+differences use the publisher's displayed whole-dollar values.
+This comparison requires the exact qualified FY2025 native manifest
+published with v0.0.145. That manifest pins the leaf bytes and the
+processing receipts. Other builds remain available through the native
+Table API and require separate qualification for this comparison.

@@ -141,10 +141,13 @@ def test_discovery_identifies_positional_forms_and_terminal_results(monkeypatch)
         {"type": "EditionKey", "python_only": True},
         {"type": "EditionKey", "python_only": True},
     ]
-    comparison_year = comparison["forms"][0]["arguments"][-1]
+    comparison_year, comparison_period = comparison["forms"][0]["arguments"][-2:]
     assert comparison_year["name"] == "school_year" and comparison_year["types"] == [
         {"type": "integer", "python_only": False}, {"type": "string", "python_only": False}]
     assert comparison_year["optional"] and comparison_year["nullable"] and comparison_year["default"] is None
+    assert comparison_period["name"] == "period" and comparison_period["types"] == [
+        {"type": "DataPeriod", "python_only": True}]
+    assert comparison_period["optional"] and comparison_period["nullable"] and comparison_period["default"] is None
     nearest = operators["nearest_charter"]["forms"][0]["arguments"]
     assert [argument["name"] for argument in nearest] == ["seed", "limit", "max_miles"]
     assert [item["python_only"] for item in nearest[0]["types"]] == [False, True, True]

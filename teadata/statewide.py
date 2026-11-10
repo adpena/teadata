@@ -11,12 +11,13 @@ import json
 from math import isfinite
 from typing import TYPE_CHECKING, Any
 
-from .column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
+from .column_schema import crosswalk_dataset, parse_column_schema, reader_options, table_input_sha256s
 from .dataset_metadata import (
     STATEWIDE_SINGLETON_GRAIN, ArtifactRef, DataPeriod, DatasetMetadata, EditionKey,
     _EDITION_KEY_GUIDANCE, _parse_school_year,
 )
 from .entities import Campus, District
+from . import frc_ppe as frc
 from .identifiers import canonical_source_identifiers
 from .manifest import ContractError, canonical_json
 from .peims_courses import DATASET as COURSES, course_key_columns
@@ -43,6 +44,8 @@ _TAPR_STUDENT_POLICY = ValuePolicy("tapr_2025_reviewed_student_profile", {}, ref
 _NUMERIC_UNITS = frozenset(MeasurementUnit) - {MeasurementUnit.TEXT}
 _VALUE_STATUSES = frozenset(item.value for item in ValueStatus)
 _REGION_CODES = frozenset(f"{code:02d}" for code in range(1, 21))
+# The reviewed v0.0.145 attachment pins the FRC metadata, receipts and all three leaves.
+_FRC_MANIFEST_SHA256 = "1c5cc0185fafefca1304eb8c2d71e6c5f95819c672f1fd022c08b0d05a096065"
 Number = int | float
 
 
@@ -105,6 +108,17 @@ class StatewideComparison:
     def to_dict(self, *, include_meta: bool = True, include_geometry: bool = False) -> dict[str, Any]:
         return {**vars(self), "local_percent": self.local_percent, "statewide_percent": self.statewide_percent,
                 "difference_pp": self.difference_pp}
+
+
+@dataclass(frozen=True)
+class FrcStatewideComparison(StatewideComparison):
+    native_manifest_sha256: str
+    local_artifact_id: str
+    statewide_artifact_id: str
+    local_acquisition_id: str
+    statewide_acquisition_id: str
+    local_source_row: int | None
+    statewide_source_row: int
 
 
 @dataclass(frozen=True)
@@ -310,9 +324,79 @@ def _projection(release: DataRelease, key: EditionKey, fields: list[tuple[str, D
     return _Projection(artifact, columns, field_support, raw_policy, integer_rates, student)
 
 
+@dataclass(frozen=True)
+class _FrcReview:
+    metadata: DatasetMetadata
+    policy_sha256: str
+    tables: Mapping[str, dict[str, Any]]
+    acquisitions: Mapping[str, str]
+
+
+def _require_frc_manifest(digest: str) -> None:
+    if digest != _FRC_MANIFEST_SHA256:
+        raise ContractError("FRC comparison requires the exact qualified FY2025 native manifest")
+
+
+@lru_cache(maxsize=1)
+def _reviewed_frc() -> _FrcReview:
+    config = load_config()
+    source = config.resolve_dataset(frc.DATASET, frc.YEAR, exact=True, reader_profile="source")
+    resource = config.column_contract(frc.DATASET, frc.YEAR, reader_profile="source")
+    policy = config.value_policies.get(source.metadata.value_policy)
+    if resource is None or policy is None or not config.is_source_only(frc.DATASET, frc.YEAR):
+        raise ContractError("FRC comparison requires the reviewed source crosswalk and policy")
+    options = reader_options(source.reader, "source")
+    mapping = crosswalk_dataset(parse_column_schema(resource["text"].encode()), frc.DATASET, str(frc.YEAR))
+    return _FrcReview(source.metadata, sha256(canonical_json(policy.to_dict()).encode()).hexdigest(),
+                      {table["table"]: table for table in mapping["tables"]}, options["acquisition_ids"])
+
+
+def _frc_projection(release: DataRelease, key: EditionKey, fields: list[tuple[str, DataPeriod]],
+                    metadata: DatasetMetadata, review: _FrcReview) -> _Projection:
+    keys = frc._KEYS[key.scope]
+    grain = f"one row per {keys[0]}" if keys else STATEWIDE_SINGLETON_GRAIN
+    mapping = review.tables[key.scope]
+    inputs = table_input_sha256s(mapping)
+    if (key.edition != str(frc.YEAR) or key.table != key.scope or key.grain != grain
+            or key.revision_sha256 != EditionKey.source_revision(inputs) or metadata != review.metadata):
+        raise ContractError("FRC comparison requires the exact reviewed edition, metadata and grain")
+    catalog = release.catalog
+    acquisitions = catalog.acquisitions(frc.DATASET, edition=key)
+    receipt = review.acquisitions[key.scope]
+    if ([record["record_id"] for record in acquisitions] != [receipt]
+            or tuple(acquisitions[0]["source_metadata"].get("provenance_ids", ()))
+            != ((review.acquisitions["state"],) if keys else ())):
+        raise ContractError("FRC comparison requires the exact publisher acquisitions and direct Texas lineage")
+
+    return _projection(release, key, fields, keys=keys, mapping=sha256(canonical_json(mapping).encode()).hexdigest(),
+                       policy=review.policy_sha256, raw_policy=None)
+
+
+def _frc_value(plan: _Projection, row: dict[str, Any], field: str, unit: str) -> tuple[str, str, int | None]:
+    raw_field, status_field = plan.support[field]
+    raw, status, value = row[raw_field], row[status_field], row[field]
+    if unit == frc.UNIT and status == ValueStatus.MISSING and raw == "" and value is None:
+        return raw, status, None
+    if status == ValueStatus.OBSERVED and type(value) is int and -(2**63) <= value < 2**63:
+        if unit == frc.UNIT and (raw == f"${value:,}" or value == 0 and raw == "$-0"):
+            return raw, status, value
+        if unit == "count" and value >= 0 and raw == f"{value:,}":
+            return raw, status, value
+    raise ContractError("FRC comparison value differs from its published token and status")
+
+
+def _frc_row_number(row: dict[str, Any], review: _FrcReview, scope: str) -> int:
+    number = row[frc.SOURCE_ROW]
+    layout = review.tables[scope]["layout"]
+    if type(number) is not int or not layout["first_data_record"] <= number <= layout["last_data_record"]:
+        raise ContractError("FRC comparison row is outside the reviewed source range")
+    return number
+
+
 def _statistics(local: EditionKey, local_metadata: DatasetMetadata,
                 statewide_metadata: DatasetMetadata, local_review: DatasetMetadata,
-                statewide_review: DatasetMetadata, metric: str, school_year: int | None) -> list[_Statistic]:
+                statewide_review: DatasetMetadata, metric: str, school_year: int | None,
+                exact_period: DataPeriod | None = None) -> list[_Statistic]:
     common = local_review.metrics.keys() & statewide_review.metrics.keys()
     if local.dataset == PRIMARY_DISABILITY and int(local.edition) < 2025:
         common.discard("primary_developmental_delay_count")
@@ -336,6 +420,13 @@ def _statistics(local: EditionKey, local_metadata: DatasetMetadata,
         result.append(_Statistic(name, left.unit, period, left.field, right.field))
     if not result:
         raise ContractError("These editions have no reviewed common numeric metrics")
+    if exact_period is not None:
+        matches = [stat for stat in result if stat.period == exact_period]
+        if matches:
+            return matches
+        available = ", ".join(sorted({f"{stat.period.label} ({stat.period.kind})" for stat in result}))
+        raise ContractError(f"No reviewed comparison metrics for {exact_period.label} ({exact_period.kind}). "
+                            f"Available periods: {available}.")
     if school_year is None:
         return result
     selected = [stat for stat in result if stat.period.kind == "school_year" and stat.period.end_year == school_year]
@@ -352,7 +443,8 @@ def _statistics(local: EditionKey, local_metadata: DatasetMetadata,
 
 
 def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionKey, metric: str,
-                    dimensions: Mapping[str, str], school_year: int | None = None) -> tuple[list[_Statistic], _Projection, _Projection]:
+                    dimensions: Mapping[str, str], school_year: int | None = None,
+                    exact_period: DataPeriod | None = None) -> tuple[list[_Statistic], _Projection, _Projection]:
     key_column = f"{local.scope}_number"
     course_pair = local.dataset == statewide.dataset == COURSES
     if course_pair and local.scope != "district":
@@ -361,9 +453,22 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
 
     if not isinstance(release, DataRelease):
         raise TypeError("release must be a DataRelease opened from a release manifest.")
+    frc_pair = local.dataset == statewide.dataset == frc.DATASET
+    if frc_pair:
+        _require_frc_manifest(release.manifest_sha256)
     catalog = release.catalog
     local_metadata = catalog.metadata(local.dataset, edition=local)
     state_metadata = catalog.metadata(statewide.dataset, edition=statewide)
+    if frc_pair:
+        if local.scope not in {"campus", "district"} or dimensions:
+            raise ContractError("FRC comparison requires a district or campus and has no dimensions")
+        review = _reviewed_frc()
+        statistics = _statistics(local, local_metadata, state_metadata, review.metadata, review.metadata,
+                                 metric, school_year, exact_period)
+        return (statistics, _frc_projection(release, local, [(stat.local_field, stat.period) for stat in statistics],
+                                           local_metadata, review),
+                _frc_projection(release, statewide, [(stat.statewide_field, stat.period) for stat in statistics],
+                                state_metadata, review))
     raw_policy = None
     left_student = right_student = None
     staar = supports_staar_rates(local.table, local.edition) and local.table == statewide.table
@@ -430,7 +535,7 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
     if any((selected.value_policy, selected.references) != (review.value_policy, review.references)
            for selected, review in ((local_metadata, left_review), (state_metadata, right_review))):
         raise ContractError("Comparison requires the reviewed methodology and source references")
-    statistics = _statistics(local, local_metadata, state_metadata, left_review, right_review, metric, school_year)
+    statistics = _statistics(local, local_metadata, state_metadata, left_review, right_review, metric, school_year, exact_period)
     return (statistics, _projection(release, local, [(stat.local_field, stat.period) for stat in statistics],
                                     keys=local_keys, mapping=left_mapping, policy=left_policy, raw_policy=raw_policy,
                                     integer_rates=staar, student=left_student),
@@ -441,8 +546,16 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
 
 def compare_statewide(items: Sequence[object], *, release: DataRelease, local: EditionKey,
                       statewide: EditionKey, metric: str = "*",
-                      dimensions: Mapping[str, str] | None = None, school_year: int | str | None = None) -> list[StatewideComparison]:
+                      dimensions: Mapping[str, str] | None = None, school_year: int | str | None = None,
+                      period: DataPeriod | None = None) -> list[StatewideComparison]:
     """Compare reviewed metrics against the publisher's exact statewide values."""
+    if period is not None:
+        if school_year is not None:
+            raise ValueError("Choose school_year or period, not both.")
+        if not isinstance(period, DataPeriod):
+            raise TypeError("period must be a DataPeriod or None.")
+        if period.kind == "unknown":
+            raise ContractError("A comparison period must be known.")
     school_year = _parse_school_year(school_year)
     if not isinstance(local, EditionKey) or not isinstance(statewide, EditionKey):
         raise TypeError(f"local and statewide must be EditionKey objects. {_EDITION_KEY_GUIDANCE}")
@@ -464,9 +577,23 @@ def compare_statewide(items: Sequence[object], *, release: DataRelease, local: E
                                                   for key, value in dimensions.items()):
         raise ContractError("Comparison dimensions must use literal publisher strings in a mapping, "
                             "such as {'course_code': '03100500'}, or None when the source has no dimensions.")
-    statistics, local_plan, state_plan = _compare_source(release, local, statewide, metric, dimensions, school_year)
+    from .release import DataRelease
+
+    frc_pair = local.dataset == statewide.dataset == frc.DATASET
+    if frc_pair:
+        if not isinstance(release, DataRelease):
+            raise TypeError("release must be a DataRelease opened from a release manifest.")
+        if not release._v3:
+            sources = [source for source in release.catalog.native_sources
+                       if local in source.editions or statewide in source.editions]
+            if len(sources) != 1 or not {local, statewide} <= set(sources[0].editions):
+                raise ContractError("FRC comparison requires both exact editions in one native attachment")
+            _require_frc_manifest(sources[0].manifest_sha256)
+            release = release._native_edition_release(local)
+    statistics, local_plan, state_plan = _compare_source(release, local, statewide, metric, dimensions, school_year, period)
     if not items:
         return []
+    frc_review = _reviewed_frc() if frc_pair else None
 
     import pyarrow as pa
     import pyarrow.compute as arrow_compute
@@ -482,12 +609,17 @@ def compare_statewide(items: Sequence[object], *, release: DataRelease, local: E
     if state_rows.num_rows != 1:
         raise ContractError("Select exactly one published statewide observation")
     state_row, = state_rows.to_pylist()
-    state_values = [state_plan.value(state_row, stat.statewide_field, stat.unit) for stat in statistics]
+    if frc_review is not None:
+        state_row_number = _frc_row_number(state_row, frc_review, "state")
+        state_values = [_frc_value(state_plan, state_row, stat.statewide_field, stat.unit) for stat in statistics]
+    else:
+        state_row_number = None
+        state_values = [state_plan.value(state_row, stat.statewide_field, stat.unit) for stat in statistics]
 
     identifiers = [item if regional and isinstance(item, str) else item.lookup_key if isinstance(item, Campus) else item.district_number_canon
                    if isinstance(item, District) else None for item in items]
     applicable = [not (isinstance(item, Campus) and item.is_private) for item in items]
-    key_prefix = "" if regional else "'"
+    key_prefix = "" if regional or frc_review is not None else "'"
     wanted = {key_prefix + identifier for identifier, applies in zip(identifiers, applicable, strict=True) if applies and identifier}
     roster_student = local_plan.student if local_plan.student is not None and local_plan.student.roster_bound else None
     raw_by_key = {}
@@ -497,15 +629,26 @@ def compare_statewide(items: Sequence[object], *, release: DataRelease, local: E
         if roster_student is not None:
             # This leaf has already committed to exact unquoted publisher IDs.
             local_filter = ds.field(key_column).isin([key[1:] for key in sorted(wanted)])
+        if frc_review is not None:
+            local_filter = ds.field(key_column).isin(sorted(wanted))
         source_rows = release.analytical_dataset(local_plan.artifact.identity).to_table(
             columns=list(local_plan.columns), filter=local_filter)
-        keys = (tapr_source_identifiers(source_rows[key_column], key_field=key_column) if regional else
-                canonical_source_identifiers(source_rows[key_column], width=9 if local.scope == "campus" else 6))
+        if frc_review is not None:
+            keys = source_rows[key_column]
+        elif regional:
+            keys = tapr_source_identifiers(source_rows[key_column], key_field=key_column)
+        else:
+            keys = canonical_source_identifiers(source_rows[key_column], width=9 if local.scope == "campus" else 6)
         selected = pc.is_in(keys, value_set=pa.array(sorted(wanted), type=pa.string()))
         selected_keys = pc.filter(keys, selected).to_pylist()
         if len(selected_keys) != len(set(selected_keys)):
             raise ContractError("Local source contains duplicate selected identifiers")
         raw_by_key = dict(zip(selected_keys, source_rows.filter(selected).to_pylist(), strict=True))
+    frc_rows = {}
+    if frc_review is not None:
+        frc_rows = {key: _frc_row_number(row, frc_review, local.scope) for key, row in raw_by_key.items()}
+        if len(set(frc_rows.values())) != len(frc_rows):
+            raise ContractError("FRC comparison repeats a selected publisher row")
 
     rows = []
     dimension_values = tuple(sorted(dimensions.items()))
@@ -516,12 +659,21 @@ def compare_statewide(items: Sequence[object], *, release: DataRelease, local: E
         for stat, (state_raw, state_status, state_value) in zip(statistics, state_values, strict=True):
             if local_row is None:
                 raw, status, value = None, "unavailable" if applies else "not_applicable", None
+            elif frc_review is not None:
+                raw, status, value = _frc_value(local_plan, local_row, stat.local_field, stat.unit)
             else:
                 raw, status, value = local_plan.value(local_row, stat.local_field, stat.unit)
             difference = None
             if value is not None and state_value is not None:
                 difference = (value - state_value if isinstance(value, int) and isinstance(state_value, int)
                               else float(Decimal(str(value)) - Decimal(str(state_value))))
-            rows.append(StatewideComparison(identifier or None, local.scope, stat.name, stat.period, local, statewide,
-                        stat.unit, dimension_values, raw, status, value, state_raw, state_status, state_value, difference))
+            arguments = (identifier or None, local.scope, stat.name, stat.period, local, statewide,
+                         stat.unit, dimension_values, raw, status, value, state_raw, state_status, state_value, difference)
+            if frc_review is not None and state_row_number is not None:
+                rows.append(FrcStatewideComparison(
+                    *arguments, release.manifest_sha256, local_plan.artifact.identity, state_plan.artifact.identity,
+                    frc_review.acquisitions[local.scope], frc_review.acquisitions["state"],
+                    frc_rows.get(identifier) if applies and identifier else None, state_row_number))
+            else:
+                rows.append(StatewideComparison(*arguments))
     return rows

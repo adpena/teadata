@@ -11,7 +11,7 @@ from typing import (
 )
 
 if TYPE_CHECKING:
-    from .dataset_metadata import EditionKey
+    from .dataset_metadata import DataPeriod, EditionKey
     from .engine import DataEngine
     from .release import DataRelease
     from .source_views import PartitionedSourceTable, SourceTable
@@ -616,19 +616,21 @@ class Query:
 
     def compare_statewide(self, *, release: DataRelease, local: EditionKey,
                           statewide: EditionKey, metric: str = "*",
-                          dimensions: Mapping[str, str] | None = None, school_year: int | str | None = None) -> Query:
+                          dimensions: Mapping[str, str] | None = None, school_year: int | str | None = None,
+                          period: DataPeriod | None = None) -> Query:
         """Project one or all reviewed statistics against publisher statewide values."""
         from .statewide import compare_statewide
 
         return Query(compare_statewide(self._items, release=release, local=local,
                                        statewide=statewide, metric=metric, dimensions=dimensions,
-                                       school_year=school_year), self._repo)
+                                       school_year=school_year, period=period), self._repo)
 
     def _op_compare_statewide(self, op: tuple):
         return self.compare_statewide(release=op[1], local=op[2], statewide=op[3],
                                       metric=op[4] if len(op) >= 5 else "*",
                                       dimensions=op[5] if len(op) >= 6 else None,
-                                      school_year=op[6] if len(op) == 7 else None)
+                                      school_year=op[6] if len(op) >= 7 else None,
+                                      period=op[7] if len(op) == 8 else None)
 
     def _op_filter_callable(self, predicate: Callable[[Any], bool]):
         self._items = [o for o in self._items if predicate(o)]
@@ -1042,12 +1044,14 @@ _register(
         _argument("metric", "string", default="*", description="Use * for all reviewed metrics."),
         _argument("dimensions", "mapping of string to string", default=None, nullable=True),
         _argument("school_year", "integer", "string", default=None, nullable=True,
-                  description=_SCHOOL_YEAR_INPUT + " Omit or pass None for every reviewed period in the pinned editions."),
+                  description=_SCHOOL_YEAR_INPUT + " Use either school_year or period."),
+        _argument("period", python_types=("DataPeriod",), default=None, nullable=True,
+                  description="Match one exact measurement period, including its kind. Omit both selectors for all reviewed periods."),
     ),),
     result={"type": "Query", "item_type": "StatewideComparison"},
     requires="Matching reviewed editions in one release. Use districts, campuses, or literal region codes for supported STAAR editions.",
-    errors=(("ValueError", "The school year or metric has an invalid form."),
-            ("TypeError", "The release or either edition has the wrong object type."),
+    errors=(("ValueError", "The school year or metric has an invalid form, or both selectors were supplied."),
+            ("TypeError", "The release, either edition or the exact period has the wrong object type."),
             ("ContractError", "The scope, editions, periods, metrics or selected publisher observations are incompatible.")),
 )
 _register(
