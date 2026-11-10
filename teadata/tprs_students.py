@@ -145,6 +145,22 @@ def semantic_fields(contract: Mapping[str, Any] | None = None) -> list[dict[str,
     return result
 
 
+def _student_html(raw: bytes) -> str:
+    _need(isinstance(raw, bytes) and 0 < len(raw) <= MAX_REPORT_BYTES, "Student report exceeds the bounded HTML size")
+    try:
+        return raw.decode("cp1252")
+    except UnicodeError as error:
+        raise ContractError("Student report encoding differs") from error
+
+
+def _check_student_heading(rows: Sequence[list[str]], scope: str, identifier: str) -> None:
+    _need(len(rows) > 10 and rows[0] == ["", "Texas Education Agency", ""]
+          and rows[1] == ["2025-26 Student Information"] and len(rows[2]) == 1,
+          "Student report title/edition differs")
+    _need(rows[2] == ["State"] if scope == "state" else re.findall(r"\(([0-9]+)\)", rows[2][0]) == [identifier],
+          "Student report geography differs")
+
+
 def parse_student_report(raw: bytes, *, scope: str, identifier: str, receipt: str = "") -> StudentReport:
     """Parse the complete current table and preserve unqualified/lagged cells.
 
@@ -153,17 +169,9 @@ def parse_student_report(raw: bytes, *, scope: str, identifier: str, receipt: st
     in the acquisition store.  Missing grade rows are never manufactured.
     """
     _identifier(scope, identifier)
-    _need(isinstance(raw, bytes) and 0 < len(raw) <= MAX_REPORT_BYTES, "Student report exceeds the bounded HTML size")
     grid = definition()
-    try:
-        rows = _Rows(raw.decode("cp1252")).rows
-    except UnicodeError as error:
-        raise ContractError("Student report encoding differs") from error
-    _need(len(rows) > 10 and rows[0] == ["", "Texas Education Agency", ""]
-          and rows[1] == ["2025-26 Student Information"] and len(rows[2]) == 1,
-          "Student report title/edition differs")
-    _need(rows[2] == ["State"] if scope == "state" else re.findall(r"\(([0-9]+)\)", rows[2][0]) == [identifier],
-          "Student report geography differs")
+    rows = _Rows(_student_html(raw)).rows
+    _check_student_heading(rows, scope, identifier)
     _need(rows[4] == ["", "Membership", "Enrollment"], "Student report population headers differ")
     header = 5 if scope == "state" else 6
     _need(rows[header] == grid["headers"][scope], "Student report quantity/benchmark headers differ")
@@ -237,8 +245,8 @@ def _validate_report_acquisition(record: Mapping[str, Any], *, scope: str, ident
           "Student report acquisition does not bind the exact public request")
 
 
-def read_student_report(store: ProvenanceStore, receipt: str, *, scope: str, identifier: str,
-                        expected_sha256: str) -> StudentReport:
+def _read_student_input(store: ProvenanceStore, receipt: str, *, scope: str, identifier: str,
+                        expected_sha256: str) -> tuple[bytes, tuple[str, ...]]:
     """Bind exact public request controls, receipt closure, bytes and geography."""
     _identifier(scope, identifier)
     _need(isinstance(receipt, str) and isinstance(expected_sha256, str)
@@ -255,14 +263,22 @@ def read_student_report(store: ProvenanceStore, receipt: str, *, scope: str, ide
     parameters = record["parameters"]
     path = store.verify_artifact(expected_sha256)
     _need(path.stat().st_size == size, "Student report size differs")
-    report = parse_student_report(_source_bytes(path, expected_sha256, size), scope=scope, identifier=identifier, receipt=receipt)
-    _need(report.sha256 == expected_sha256, "Student report bytes changed during the read")
+    raw = _source_bytes(path, expected_sha256, size)
     notes = []
     if record["source_metadata"].get("version") is None:
         notes.append("original_acquisition_edition_unspecified_verified_from_request_and_report_heading")
     if parameters.get("http_method") is None:
         notes.append("original_http_method_not_explicitly_recorded")
-    return StudentReport(report.scope, report.identifier, report.receipt, report.sha256, report.cells, tuple(notes))
+    return raw, tuple(notes)
+
+
+def read_student_report(store: ProvenanceStore, receipt: str, *, scope: str, identifier: str,
+                        expected_sha256: str) -> StudentReport:
+    """Read the current population table from the verified Student Information bytes."""
+    raw, notes = _read_student_input(store, receipt, scope=scope, identifier=identifier,
+                                     expected_sha256=expected_sha256)
+    report = parse_student_report(raw, scope=scope, identifier=identifier, receipt=receipt)
+    return replace(report, acquisition_notes=notes)
 
 
 def projection(reports: Sequence[StudentReport], policy: ValuePolicy, *, audit_raw: bool = False) -> tuple[pa.Table, dict[str, Any], dict[str, Any]]:

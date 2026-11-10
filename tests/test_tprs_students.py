@@ -31,6 +31,7 @@ from teadata.release import DataRelease, _schema_publication_destinations, _stud
 from teadata.source_views import PartitionedSourceTable, SourceTable
 from teadata.scripts import verify_tprs_campus_coverage as campus_coverage
 from teadata.teadata_config import load_config, load_config_bytes
+from teadata.tprs_class_size import parse_class_size_report, read_class_size_report
 from teadata.values import ValueStatus
 
 from test_catalog_projections import attach_observation_child, selected_catalog  # noqa: F401
@@ -120,6 +121,83 @@ def receipt(store, tmp_path, raw, *, identifier="001902", scope="district", over
     return store.record_acquisition(source, ResolvedDataset("reference:synthetic-student", "reference",
         None if legacy else 2026, None if legacy else 2026, "",
         DatasetMetadata(title="Synthetic student report", version=None if legacy else "2026", provenance_ids=parents)), **options)
+
+
+def test_class_size_reads_only_local_cells_from_exact_acquisition(grid, tmp_path):
+    identifier = "001902001"
+    source_rows = report_rows(grid, "campus", identifier)
+    table = [
+        ["Class Size Information", "Campus", "District", "State"],
+        ["Elementary"],
+        ["Kindergarten", "20.7", "16.5", "18.2"],
+        ["Grade 1", "-", "16.6", "18.6"],
+        ["Grade 2", "?", "16.3", "18.8"],
+    ]
+    raw = html(source_rows) + html(table)
+    store = ProvenanceStore(tmp_path / "provenance")
+    acquisition = receipt(store, tmp_path, raw, identifier=identifier, scope="campus")
+    digest = sha256(raw).hexdigest()
+    result = read_class_size_report(store, acquisition, scope="campus", identifier=identifier,
+                                    expected_sha256=digest)
+    assert (result.receipt, result.sha256, result.measurement_period) == (acquisition, digest, students.PERIOD)
+    observed, no_students, invalid = result.cells
+    assert (observed.field, observed.row, observed.column) == (
+        "class_size_kindergarten_avg_size", len(source_rows) + 3, 2,
+    )
+    assert observed.measurement.numeric == 20.7
+    assert observed.measurement.raw == "20.7"
+    assert no_students.measurement.status == ValueStatus.NOT_APPLICABLE
+    assert no_students.measurement.reason == "no_students"
+    assert invalid.measurement.status == ValueStatus.INVALID
+    assert invalid.measurement.raw == "?"
+    assert invalid.measurement.numeric is None
+    assert parse_class_size_report(html(source_rows), scope="campus", identifier=identifier).cells == ()
+
+
+@pytest.mark.parametrize("fault", [
+    "duplicate", "wrong_header", "changed_caption", "unknown", "zero", "truncated", "nested", "span",
+    "wrong_id", "changed_legend", "unclosed_row", "unclosed_cell", "unclosed_heading",
+])
+def test_class_size_rejects_malformed_tables_and_wrong_entity(grid, fault):
+    identifier = "001902001"
+    table = [
+        ["Class Size Information", "Campus", "District", "State"],
+        ["Elementary"],
+        ["Kindergarten", "20.7", "16.5", "18.2"],
+    ]
+    if fault == "wrong_header":
+        table[0][1] = "District"
+    elif fault == "changed_caption":
+        table[0][0] = "Class Size Information (revised)"
+    elif fault == "unknown":
+        table.append(["Unreviewed grade", "19.2", "15.1", "18.7"])
+    elif fault == "zero":
+        table[-1][1] = "0.0"
+    page = html(report_rows(grid, "campus", identifier))
+    if fault == "nested":
+        page += html(table[:2]).removesuffix(b"</table>") + html(table[2:]) + b"</table>"
+    else:
+        page += html(table)
+    if fault == "duplicate":
+        page += html(table)
+    elif fault == "truncated":
+        page = page.removesuffix(b"</table>")
+    elif fault == "span":
+        page = page.replace(b"<td>20.7</td>", b'<td colspan="2">20.7</td>')
+    elif fault == "unclosed_row":
+        page = page.removesuffix(b"</tr></table>") + html(
+            [["Grade 1", "21.5", "16.6", "18.6"]],
+        ).removeprefix(b"<table>")
+    elif fault == "unclosed_cell":
+        page = page.replace(b"<td>20.7</td>", b"<td>20.7<td>extra</td>")
+    elif fault == "unclosed_heading":
+        page = page.replace(b"<td>State</td></tr><tr><td>Elementary", b"<td>State</td><tr><td>Elementary")
+    elif fault == "wrong_id":
+        identifier = "001902002"
+    elif fault == "changed_legend":
+        page = page.replace(b"Indicates there are no students in the group.", b"Indicates the value is pending.")
+    with pytest.raises(ContractError, match="class-size|Class-size|geography"):
+        parse_class_size_report(page, scope="campus", identifier=identifier)
 
 
 def test_packaged_student_contract_is_explicit_and_source_only(grid):

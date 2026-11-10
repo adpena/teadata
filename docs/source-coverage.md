@@ -358,6 +358,17 @@ establish the date of any event. [AskTED reports](https://tealprod.tea.state.tx.
 
 [School-year selection and source identity](querying.md#school-years-and-source-editions)
 
+## 2025–26 TPRS class size
+
+`teadata.tprs_class_size.read_class_size_report` reads one retained Student
+Information report using its acquisition receipt and exact content SHA-256.
+It preserves the local class-size token and its HTML cell coordinates.
+A campus report can omit the table. The publisher's dash means no students
+and the question mark flags an improbable or out-of-range result. Use the
+direct Texas report for statewide values. The reader is an offline
+preparation step for a future queryable class-size attachment.
+[TPRS glossary, p. 42](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/comprehensive-tprs-glossary.pdf#page=42).
+
 ## School FIRST financial accountability
 
 The final **2025–26** FIRST rating edition was released November 5, 2026 and
@@ -371,7 +382,9 @@ and [TEA's explanation of the financial basis and indicators](https://tea.texas.
 | `first_financial_accountability_district` | District scope, 1,018 School FIRST districts | Final workbook and complete public roster. 840 A, 107 B, 60 C, 11 F. Scores are 0–100 points. TEA can assign F regardless of score. |
 | `first_financial_accountability_university_charter` | District scope, five charters operated by public higher education institutions | Final workbook and complete public roster. All five received Pass. Numeric score is not applicable. |
 
-Both editions are source-only candidates. Their workbook, public roster,
+Both populations are available as native district observations in
+[TEA Data v0.0.146](https://github.com/adpena/teadata/releases/tag/v0.0.146).
+Their workbook, public roster,
 and announcement controls were checked separately. The 165 graded
 non-university charters remain on hold. The final export, roster, and
 Charter FIRST statistics agree with one another, but the [TEA newsroom table](https://tea.texas.gov/about-tea/newsroom/tea-releases-final-2025-2026-financial-accountability-ratings)
