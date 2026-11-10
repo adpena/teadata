@@ -376,6 +376,14 @@ missing grade or subject within a table. The Texas table contains one
 direct statewide report. The Arrow projection is available offline.
 Querying it through a TEA Data release requires catalog and source admission.
 
+The offline producer can call
+`teadata.tprs_statewide_intake.project_reviewed_class_sizes(release, store, scope=...)`
+on the exact reviewed Student Information attachment. It reads only the
+selected scope's reports from the pinned ledgers and checks the complete
+publisher roster for campus scope. It requires the retained acquisition
+objects. This step produces a candidate table and its column support for
+the existing native source pipeline.
+
 ## School FIRST financial accountability
 
 The final **2025–26** FIRST rating edition was released November 5, 2026 and

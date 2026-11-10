@@ -187,6 +187,40 @@ def test_class_size_reads_only_local_cells_from_exact_acquisition(grid, tmp_path
         class_size_projection([replace(result, receipt="")])
 
 
+def test_class_size_replays_only_selected_reviewed_scope(grid, tmp_path, monkeypatch):
+    identifier = "001902001"
+    raw = html(report_rows(grid, "campus", identifier))
+    store = ProvenanceStore(tmp_path / "provenance")
+    pin = receipt(store, tmp_path, raw, identifier=identifier, scope="campus")
+    digest = sha256(raw).hexdigest()
+    campus = SimpleNamespace(
+        artifact=SimpleNamespace(edition=SimpleNamespace(scope="campus")),
+        reports=(SimpleNamespace(identifier=identifier, receipt=pin, sha256=digest),),
+    )
+    state = SimpleNamespace(artifact=SimpleNamespace(edition=SimpleNamespace(scope="state")))
+    release = object()
+    checked = []
+    monkeypatch.setattr(tprs_statewide_intake, "_reviewed_leaves", lambda candidate: (state, campus))
+    monkeypatch.setattr(tprs_statewide_intake, "_verify_campus_census",
+                        lambda leaves, retained: checked.append((leaves, retained)))
+    project = tprs_statewide_intake.project_reviewed_class_sizes
+    table, _ = project(release, store, scope="campus")
+    assert checked == [((campus,), store)]
+    assert table["campus_number"].to_pylist() == [identifier]
+    assert table["class_size_table_present"].to_pylist() == [False]
+    with pytest.raises(ContractError, match="does not cover district"):
+        project(release, store, scope="district")
+    with pytest.raises(ContractError, match="scope must be"):
+        project(release, store, scope="region")
+    artifact = store.root / "objects" / digest
+    artifact.write_bytes(b"X" * len(raw))
+    with pytest.raises(ContractError, match=f"{identifier} .*{pin}"):
+        project(release, store, scope="campus")
+    artifact.unlink()
+    with pytest.raises(ContractError, match=f"{identifier} .*{pin}"):
+        project(release, store, scope="campus")
+
+
 @pytest.mark.parametrize("fault", [
     "duplicate", "wrong_header", "changed_caption", "unknown", "zero", "truncated", "nested", "span",
     "wrong_id", "changed_legend", "unclosed_row", "unclosed_cell", "unclosed_heading",
