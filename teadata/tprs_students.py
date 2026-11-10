@@ -375,63 +375,69 @@ def _workbook_headers(cells: Mapping[tuple[int, str], str], grid: Mapping[str, A
         _need(row(6) == geography, "Student workbook geography role headers differ")
 
 
+def _student_workbook_cells(store: ProvenanceStore, scope: str, witness: Mapping[str, str]) -> dict[tuple[int, str], str]:
+    """Read independently acquired Student Information workbook cells."""
+    from .financial_leaves import NS, _package, _xml
+    from zipfile import ZipFile
+
+    record = store.verify_record_closure([witness["xlsx_receipt"]])[witness["xlsx_receipt"]]
+    url = urlsplit(record["requested_url"])
+    pairs = parse_qsl(url.query, keep_blank_values=True)
+    query = dict(pairs)
+    expected = {"_debug": "0", "_program": "perfrept.perfmast.sas", "_service": "marykay",
+                "ccyy": "2026", "id": witness["identifier"], "lev": SCOPES[scope],
+                "prgopt": "reports/tapr/student.sas", "dest": "E"}
+    _need(record["kind"] == "acquisition" and record["method"] == "download"
+          and record["section"] == "reference"
+          and (record["requested_year"], record["resolved_year"]) == (EDITION, EDITION)
+          and record["source_metadata"].get("version") == "2026"
+          and record["artifact"]["sha256"] == witness["xlsx_sha256"]
+          and record["source_metadata"].get("provenance_ids") == [witness["html_receipt"]]
+          and url.scheme == "https" and url.netloc == "rptsvr1.tea.texas.gov"
+          and url.path == "/cgi/sas/broker" and not url.fragment
+          and record["resolved_url"] == record["requested_url"]
+          and len(pairs) == len(query) and query == expected
+          and record["parameters"].get("http_method") == "GET"
+          and record["parameters"].get("http_status") == 200 and bool(record["downloaded_at"])
+          and record["response_headers"].get("content-type") == "application/ms-excel",
+          "Student workbook witness is not the exact separately requested export")
+    path = store.verify_artifact(witness["xlsx_sha256"])
+    _need(path.stat().st_size == record["artifact"]["size_bytes"] and path.stat().st_size <= MAX_REPORT_BYTES,
+          "Student workbook witness exceeds its bounded exact size")
+    with ZipFile(BytesIO(_source_bytes(path, witness["xlsx_sha256"], record["artifact"]["size_bytes"]))) as archive:
+        sheets, strings = _package(archive)
+        _need(set(sheets) == {"Student Information"}, "Student workbook sheets differ")
+        sheet = _xml(archive, sheets["Student Information"])
+    cells: dict[tuple[int, str], str] = {}
+    addresses = set()
+    for row in sheet.findall(NS + "sheetData/" + NS + "row"):
+        for cell in row.findall(NS + "c"):
+            address = re.fullmatch(r"([A-Z]+)([0-9]+)", cell.attrib["r"])
+            _need(address is not None and cell.find(NS + "f") is None, "Student workbook cell differs")
+            assert address is not None
+            key = int(address[2]), address[1]
+            _need(key not in addresses and cell.get("t", "n") in {"n", "s"}, "Student workbook cell identity/type differs")
+            addresses.add(key)
+            raw = cell.findtext(NS + "v")
+            if raw is not None:
+                text = strings[int(raw)] if cell.get("t", "n") == "s" else raw
+                cells[key] = " ".join(text.split())
+    _workbook_headers(cells, definition(), scope, witness["identifier"])
+    return cells
+
+
 def verify_workbook_witnesses(store: ProvenanceStore) -> dict[str, Any]:
     """Independently decode the publisher's OOXML for the complete current grid.
 
     This is presentation agreement for three named exports, not a census of
     every selected report. Malformed numeric-typed dot cells remain text.
     """
-    from .financial_leaves import NS, _package, _xml
-    from zipfile import ZipFile
-
     grid = definition()
     comparisons = []
     for scope, witness in grid["witnesses"].items():
         report = read_student_report(store, witness["html_receipt"], scope=scope,
             identifier=witness["identifier"], expected_sha256=witness["html_sha256"])
-        record = store.verify_record_closure([witness["xlsx_receipt"]])[witness["xlsx_receipt"]]
-        url = urlsplit(record["requested_url"])
-        pairs = parse_qsl(url.query, keep_blank_values=True)
-        query = dict(pairs)
-        expected = {"_debug": "0", "_program": "perfrept.perfmast.sas", "_service": "marykay",
-                    "ccyy": "2026", "id": witness["identifier"], "lev": SCOPES[scope],
-                    "prgopt": "reports/tapr/student.sas", "dest": "E"}
-        _need(record["kind"] == "acquisition" and record["method"] == "download"
-              and record["section"] == "reference"
-              and (record["requested_year"], record["resolved_year"]) == (EDITION, EDITION)
-              and record["source_metadata"].get("version") == "2026"
-              and record["artifact"]["sha256"] == witness["xlsx_sha256"]
-              and record["source_metadata"].get("provenance_ids") == [witness["html_receipt"]]
-              and url.scheme == "https" and url.netloc == "rptsvr1.tea.texas.gov"
-              and url.path == "/cgi/sas/broker" and not url.fragment
-              and record["resolved_url"] == record["requested_url"]
-              and len(pairs) == len(query) and query == expected
-              and record["parameters"].get("http_method") == "GET"
-              and record["parameters"].get("http_status") == 200 and bool(record["downloaded_at"])
-              and record["response_headers"].get("content-type") == "application/ms-excel",
-              "Student workbook witness is not the exact separately requested export")
-        path = store.verify_artifact(witness["xlsx_sha256"])
-        _need(path.stat().st_size == record["artifact"]["size_bytes"] and path.stat().st_size <= MAX_REPORT_BYTES,
-              "Student workbook witness exceeds its bounded exact size")
-        with ZipFile(BytesIO(_source_bytes(path, witness["xlsx_sha256"], record["artifact"]["size_bytes"]))) as archive:
-            sheets, strings = _package(archive)
-            _need(set(sheets) == {"Student Information"}, "Student workbook sheets differ")
-            sheet = _xml(archive, sheets["Student Information"])
-        cells: dict[tuple[int, str], str] = {}
-        addresses = set()
-        for row in sheet.findall(NS + "sheetData/" + NS + "row"):
-            for cell in row.findall(NS + "c"):
-                address = re.fullmatch(r"([A-Z]+)([0-9]+)", cell.attrib["r"])
-                _need(address is not None and cell.find(NS + "f") is None, "Student workbook cell differs")
-                assert address is not None
-                key = int(address[2]), address[1]
-                _need(key not in addresses and cell.get("t", "n") in {"n", "s"}, "Student workbook cell identity/type differs")
-                addresses.add(key)
-                raw = cell.findtext(NS + "v")
-                if raw is not None:
-                    text = strings[int(raw)] if cell.get("t", "n") == "s" else raw
-                    cells[key] = " ".join(text.split())
-        _workbook_headers(cells, grid, scope, witness["identifier"])
+        cells = _student_workbook_cells(store, scope, witness)
         labels: dict[tuple[str, str], int] = {}
         expected_rows = {(cell.section, cell.label) for cell in report.cells}
         section = ""

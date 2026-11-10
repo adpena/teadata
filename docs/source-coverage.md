@@ -405,6 +405,28 @@ have a row with missing measurements and the reason `table_not_published`.
 Use [an exact campus edition key](querying.md#campus-class-size-observations)
 with the stand-alone v0.0.147 manifest or a matching offline candidate.
 
+To qualify the published v0.0.147 child offline, stage its manifest and
+assets together with the reviewed `tprs-student-2026-campus-complete.release.json`
+from v0.0.138 and its edition metadata and roster descriptors. The Student
+descriptors supply the report census and partition boundaries. The retained
+provenance store must contain the class-size processing closures, including
+the original Student HTML and roster responses, and the three named Student
+Information workbook acquisition closures from `teadata.tprs_students.definition()`.
+
+```sh
+uv run --locked --offline python -m teadata.verification --kind library \
+  --native-release /path/to/stage/tprs-class-size-2026.release.json \
+  --native-pin 1512f0ef1a8b1df41f969c683c3ec1dab0d607499dddb589127c6f5a41b9af4e \
+  --source-store /path/to/stage/provenance
+```
+
+The gate compares all class-size leaves with the retained HTML and checks
+local class-size cells from three independent workbook exports. For an
+entity release that attaches this child, stage the same evidence beside the
+local child manifest, with its store named `provenance`. The composed release
+check uses the same qualification and rechecks the evidence when verifying
+an existing receipt.
+
 ## School FIRST financial accountability
 
 The final **2025–26** FIRST rating edition was released November 5, 2026 and

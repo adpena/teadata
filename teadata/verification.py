@@ -214,6 +214,7 @@ def _input_identity(root: Path, *, kind: str, paired_library: Path | None, relea
             from teadata.manifest import ContractError
             from teadata.native_finance_staff import REVIEWED_MANIFEST as FINANCE_STAFF_MANIFEST, retained_finance_staff_evidence
             from teadata.release import DataRelease
+            from teadata.tprs_class_size_native import REVIEWED_CLASS_SIZE_MANIFEST, retained_class_size_evidence
             from teadata.tprs_statewide_intake import REVIEWED_STATEWIDE_TPRS_MANIFESTS, retained_tprs_evidence
 
             try:
@@ -231,6 +232,9 @@ def _input_identity(root: Path, *, kind: str, paired_library: Path | None, relea
                     elif ref.manifest_sha256 == FIRST_MANIFEST:
                         child, store = _open_reviewed_native_evidence(parent, ref, "FIRST")
                         result["native_first_evidence"] = retained_first_evidence(child, store)
+                    elif ref.manifest_sha256 == REVIEWED_CLASS_SIZE_MANIFEST:
+                        child, store = _open_reviewed_native_evidence(parent, ref, "class size")
+                        result["native_class_size_evidence"] = retained_class_size_evidence(child, store)
             except (ContractError, OSError, ValueError) as error:
                 raise ReceiptError(f"A release check requires verified retained native sources: {error}") from error
     return result
@@ -831,6 +835,7 @@ def _validate_release(path: str, kind: str) -> None:
     from teadata.first_ratings import REVIEWED_MANIFEST as FIRST_MANIFEST, qualify_first_ratings
     from teadata.native_finance_staff import REVIEWED_MANIFEST as FINANCE_STAFF_MANIFEST, qualify_finance_staff
     from teadata.release import DataRelease
+    from teadata.tprs_class_size_native import REVIEWED_CLASS_SIZE_MANIFEST, qualify_class_sizes
     from teadata.tprs_statewide_intake import REVIEWED_STATEWIDE_TPRS_MANIFESTS, qualify_statewide_tprs
     release = DataRelease(Path(path).expanduser(), offline=True)
     if release.catalog.to_dict()["schema_version"] != 2:
@@ -843,7 +848,7 @@ def _validate_release(path: str, kind: str) -> None:
         from teadata.manifest import processor_identity
         if release.catalog.to_dict()["processor_sha256"] != processor_identity():
             raise ReceiptError("Release was built from different processing code or lockfile; rebuild it")
-    reviewed = REVIEWED_STATEWIDE_TPRS_MANIFESTS | {FINANCE_STAFF_MANIFEST, FIRST_MANIFEST}
+    reviewed = REVIEWED_STATEWIDE_TPRS_MANIFESTS | {FINANCE_STAFF_MANIFEST, FIRST_MANIFEST, REVIEWED_CLASS_SIZE_MANIFEST}
     unsupported = [ref.manifest_sha256 for ref in release.catalog.native_sources if ref.manifest_sha256 not in reviewed]
     if unsupported:
         pins = ", ".join(unsupported)
@@ -854,6 +859,8 @@ def _validate_release(path: str, kind: str) -> None:
             label, qualify = "finance and staff", qualify_finance_staff
         elif ref.manifest_sha256 == FIRST_MANIFEST:
             label, qualify = "FIRST", qualify_first_ratings
+        elif ref.manifest_sha256 == REVIEWED_CLASS_SIZE_MANIFEST:
+            label, qualify = "class size", qualify_class_sizes
         else:
             label, qualify = "TPRS", qualify_statewide_tprs
         child, store = _open_reviewed_native_evidence(release, ref, label)
@@ -900,6 +907,7 @@ def _validate_native_release(path: Path, pin: str, source_store: Path) -> dict[s
     )
     from teadata.release import DataRelease
     from teadata.source_parity import validate_source_parity
+    from teadata.tprs_class_size_native import REVIEWED_CLASS_SIZE_MANIFEST, qualify_class_sizes
     from teadata.tprs_statewide_intake import REVIEWED_STATEWIDE_TPRS_MANIFESTS, qualify_statewide_tprs
 
     try:
@@ -910,6 +918,8 @@ def _validate_native_release(path: Path, pin: str, source_store: Path) -> dict[s
             return qualify_finance_staff(release, _retained_store(source_store))
         if release.manifest_sha256 in REVIEWED_STATEWIDE_TPRS_MANIFESTS:
             return qualify_statewide_tprs(release, _retained_store(source_store))
+        if release.manifest_sha256 == REVIEWED_CLASS_SIZE_MANIFEST:
+            return qualify_class_sizes(release, _retained_store(source_store))
         if is_reviewed_budget(release.manifest_sha256):
             return qualify_budget(release, _retained_store(release.path.parent / "provenance"),
                                   _retained_store(source_store))

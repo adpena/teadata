@@ -21,18 +21,21 @@ from .manifest import BuildRecorder, ContractError, canonical_json
 from .provenance import ProvenanceStore
 from .release import DataRelease, _install_candidate, publish_release
 from .teadata_config import load_config_bytes
-from .tprs_class_size import CLASS_SIZE_POLICY, CLASS_SIZE_UNIT, _FIELDS
+from .tprs_class_size import CLASS_SIZE_POLICY, CLASS_SIZE_UNIT, _COLUMNS, _FIELDS, _TITLE, read_class_size_report
 from .tprs_statewide_intake import (
     DATASET as STUDENT_DATASET,
     REVIEWED_CAMPUS_STUDENT_MANIFEST,
+    ReportSelection,
     _project_class_size_reports,
     _reviewed_leaves,
     _verify_campus_census,
 )
-from .tprs_students import EDITION, PERIOD
+from .tprs_students import EDITION, PERIOD, _student_workbook_cells, definition
 
 
 DATASET = "tprs_class_size"
+REVIEWED_CLASS_SIZE_MANIFEST = "1512f0ef1a8b1df41f969c683c3ec1dab0d607499dddb589127c6f5a41b9af4e"
+_STUDENT_MANIFEST_NAME = "tprs-student-2026-campus-complete.release.json"
 _SCOPES = ("district", "state")
 
 
@@ -63,6 +66,118 @@ def class_size_campus_edition(student: EditionKey) -> EditionKey:
     return replace(student, dataset=DATASET, table=f"campus-{student.identity}")
 
 
+def _class_size_edition(student: EditionKey) -> EditionKey:
+    return class_size_campus_edition(student) if student.scope == "campus" else replace(student, dataset=DATASET)
+
+
+def _reviewed_class_size_inputs(release: DataRelease, store: ProvenanceStore):
+    if not release.offline or release.remote or release.manifest_sha256 != REVIEWED_CLASS_SIZE_MANIFEST:
+        raise ContractError("Class-size qualification requires the exact reviewed local release")
+    index = release.catalog.to_dict()
+    if index["schema_version"] != 4:
+        raise ContractError("Class-size qualification requires the reviewed native edition catalog")
+    student = DataRelease(release.path.with_name(_STUDENT_MANIFEST_NAME),
+                          expected_sha256=REVIEWED_CAMPUS_STUDENT_MANIFEST, offline=True)
+    leaves = _reviewed_leaves(student)
+    _verify_campus_census(leaves, store)
+    expected = {_class_size_edition(leaf.artifact.edition): leaf for leaf in leaves}
+    artifacts = [release.catalog.artifact_ref(identifier) for identifier in index["artifacts"]]
+    if len(artifacts) != len(expected) or {artifact.edition for artifact in artifacts} != expected.keys():
+        raise ContractError("Class-size editions differ from the exact Student Information partitions")
+    bindings = {}
+    roots = {witness["xlsx_receipt"] for witness in definition()["witnesses"].values()}
+    for artifact in artifacts:
+        key = artifact.edition
+        leaf = expected[key]
+        reports = sorted(leaf.reports, key=lambda item: item.identifier)
+        metadata = release.catalog.metadata(key.dataset, edition=key)
+        schemas = [ref for ref in metadata.references if ref.reference_id == "columns"]
+        if len(schemas) != 1 or len(schemas[0].provenance_ids) != 1 or not schemas[0].reviewed_sha256:
+            raise ContractError("Class-size leaf lacks its retained field bindings")
+        schema_receipt, = schemas[0].provenance_ids
+        roots.update({artifact.processing_id, *(record for ref in metadata.references for record in ref.provenance_ids)})
+        bindings[key] = artifact, leaf, reports, schema_receipt, schemas[0].reviewed_sha256
+    graph = store.verify_record_closure(sorted(roots))
+    for key, (artifact, leaf, reports, schema_receipt, schema_sha256) in bindings.items():
+        record = graph[artifact.processing_id]
+        schema = graph[schema_receipt]
+        manifest_ids = schema["source_metadata"]["provenance_ids"]
+        if (len(manifest_ids) != 1 or graph[manifest_ids[0]]["dataset"] != "reference:tprs_class_size_student_attachment"
+                or graph[manifest_ids[0]]["artifact"]["sha256"] != student.manifest_sha256
+                or schema["dataset"] != "reference:tprs_class_size_crosswalk"
+                or schema["artifact"]["sha256"] != schema_sha256
+                or record != release.catalog._processing_record(artifact)
+                or record["processor"] != "teadata.tprs_class_size_native" or artifact.output != "leaf"
+                or record["parameters"]["recipe"] != {"operation": "tprs_class_size",
+                    "student_attachment": student.manifest_sha256, "student_edition": leaf.artifact.edition.identity}
+                or record["inputs"] != [*(item.receipt for item in reports), schema_receipt,
+                                         *(receipt for _, receipt in leaf.campus_rosters)]
+                or artifact.contract["inputs"] != [item.sha256 for item in reports]):
+            raise ContractError(f"Class-size processing lineage differs for {key.identity}")
+    return {key: (artifact, reports) for key, (artifact, _, reports, _, _) in bindings.items()}, sorted(graph)
+
+
+def retained_class_size_evidence(release: DataRelease, store: ProvenanceStore) -> list[str]:
+    """Verify the exact census, processing and workbook evidence before receipt reuse."""
+    return _reviewed_class_size_inputs(release, store)[1]
+
+
+def _verify_class_size_workbooks(store: ProvenanceStore, reports: Mapping[tuple[str, str], ReportSelection]) -> dict[str, Any]:
+    results = {}
+    for scope, witness in definition()["witnesses"].items():
+        identifier = witness["identifier"]
+        selected = reports.get((scope, identifier))
+        if selected is None:
+            raise ContractError(f"Class-size census lacks the named {scope} workbook witness")
+        report = read_class_size_report(store, selected.receipt, scope=scope, identifier=identifier,
+                                        expected_sha256=selected.sha256)
+        cells = _student_workbook_cells(store, scope, witness)
+        headings = [row for (row, column), value in cells.items() if column == "A" and value == _TITLE]
+        if len(headings) != 1 or [cells.get((headings[0], chr(ord("B") + index)))
+                                  for index in range(len(_COLUMNS[scope]))] != _COLUMNS[scope]:
+            raise ContractError(f"Class-size workbook headings differ for {scope} {identifier}")
+        workbook = {}
+        section = ""
+        for row in sorted(row for row, column in cells if column == "A" and row > headings[0]):
+            label = cells[row, "A"]
+            if label in _FIELDS:
+                section = label
+                continue
+            field = _FIELDS.get(section, {}).get(label)
+            if field is None or field in workbook or (row, "B") not in cells:
+                raise ContractError(f"Class-size workbook row differs for {scope} {identifier}")
+            workbook[field] = cells[row, "B"]
+        if workbook != {cell.field: cell.measurement.raw for cell in report.cells}:
+            raise ContractError(f"Class-size workbook differs from the census report for {scope} {identifier}")
+        results[scope] = {"identifier": identifier, "local_cells": len(workbook),
+                          "report_receipt": report.receipt, "workbook_receipt": witness["xlsx_receipt"]}
+    return results
+
+
+def qualify_class_sizes(release: DataRelease, store: ProvenanceStore) -> dict[str, Any]:
+    """Replay every reviewed class-size leaf and compare named publisher workbook cells."""
+    bindings, evidence = _reviewed_class_size_inputs(release, store)
+    release.verify()
+    selected = {(report.scope, report.identifier): report for _, reports in bindings.values() for report in reports}
+    witnesses = _verify_class_size_workbooks(store, selected)
+    scopes: dict[str, dict[str, int]] = {}
+    for key, (artifact, reports) in bindings.items():
+        expected, support = _project_class_size_reports(store, reports)
+        physical = release.analytical_dataset(artifact.identity).to_table().replace_schema_metadata(None)
+        actual = release.table(key).to_arrow().replace_schema_metadata(None)
+        if (artifact.contract["column_support"] != support or not physical.equals(expected, check_metadata=True)
+                or not actual.select(expected.column_names).equals(expected, check_metadata=True)):
+            raise ContractError(f"Class-size native rows, values, statuses or lineage differ for {key.identity}")
+        summary = scopes.setdefault(key.scope, {"leaves": 0, "reports": 0, "tables": 0})
+        summary["leaves"] += 1
+        summary["reports"] += expected.num_rows
+        summary["tables"] += sum(expected["class_size_table_present"].to_pylist())
+    return {"status": "PASS_REVIEWED_NATIVE", "manifest_sha256": release.manifest_sha256,
+            "build_id": release.build_id, "structural_integrity": True,
+            "student_attachment": REVIEWED_CAMPUS_STUDENT_MANIFEST, "retained_records": len(evidence),
+            "html_replay": scopes, "publisher_workbook_witnesses": witnesses}
+
+
 def materialize_class_sizes(
     release: DataRelease, store: ProvenanceStore, output: Path, *, include_campus: bool = False,
 ) -> dict[str, Any]:
@@ -80,7 +195,7 @@ def materialize_class_sizes(
         student = leaf.artifact.edition
         if student.scope not in _SCOPES and not include_campus:
             continue
-        key = class_size_campus_edition(student) if student.scope == "campus" else replace(student, dataset=DATASET)
+        key = _class_size_edition(student)
         reports = sorted(leaf.reports, key=lambda report: report.identifier)
         hashes = [item.sha256 for item in reports]
         if key.revision_sha256 != EditionKey.source_revision(tuple(hashes)) or key.table in inputs:

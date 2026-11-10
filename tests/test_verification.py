@@ -501,6 +501,52 @@ def test_composed_first_receipt_requires_retained_publisher_evidence(project, mo
         verification._input_identity(project, kind="library", paired_library=None, release=manifest.name)
 
 
+def test_composed_class_size_gate_requires_reviewed_pin_and_evidence(project, monkeypatch, capsys):
+    from types import SimpleNamespace
+
+    from teadata import release, tprs_class_size_native, verification
+
+    pin = tprs_class_size_native.REVIEWED_CLASS_SIZE_MANIFEST
+    asset = project / "entities.sqlite"
+    asset.write_bytes(b"snapshot")
+    manifest = project / "release.json"
+    manifest.write_text(json.dumps({
+        "artifacts": {"entities": {"filename": asset.name}}, "catalog": {"native_sources": [{}]},
+    }))
+    ref = SimpleNamespace(manifest_sha256=pin)
+    parent = SimpleNamespace(build_id="parent", catalog=SimpleNamespace(
+        native_sources=[ref], to_dict=lambda: {"schema_version": 2}),
+        verify=lambda: None, verify_native_sources=lambda: {pin: {"asset": asset}})
+    child, store = object(), object()
+    monkeypatch.setattr(release, "DataRelease", lambda *a, **k: parent)
+    monkeypatch.setattr(verification, "_validate_release_provenance", lambda *args: 1)
+    monkeypatch.setattr(verification, "_validate_publisher_cases", lambda *args: {})
+    monkeypatch.setattr(verification, "_validate_tefa_cases", lambda *args: {})
+
+    def open_child(selected_parent, selected_ref, label):
+        assert (selected_parent, selected_ref, label) == (parent, ref, "class size")
+        return child, store
+
+    monkeypatch.setattr(verification, "_open_reviewed_native_evidence", open_child)
+    monkeypatch.setattr(tprs_class_size_native, "retained_class_size_evidence", lambda *args: ["workbook-record"])
+    captured = verification._input_identity(project, kind="app", paired_library=None, release=manifest.name)
+    assert captured["native_class_size_evidence"] == ["workbook-record"]
+
+    def qualify(selected_child, selected_store):
+        assert (selected_child, selected_store) == (child, store)
+        return {"status": "PASS_REVIEWED_NATIVE"}
+
+    monkeypatch.setattr(tprs_class_size_native, "qualify_class_sizes", qualify)
+    verification._validate_release(str(manifest), "app")
+    assert "Attached class size qualification" in capsys.readouterr().out
+    monkeypatch.setattr(tprs_class_size_native, "qualify_class_sizes", lambda *args: {"status": "HOLD"})
+    with pytest.raises(ReceiptError, match="Attached class size source did not pass qualification"):
+        verification._validate_release(str(manifest), "app")
+    ref.manifest_sha256 = "f" * 64
+    with pytest.raises(ReceiptError, match="requires reviewed source evidence"):
+        verification._validate_release(str(manifest), "app")
+
+
 def test_pytest_environment_cannot_silently_select_a_smaller_suite(project, monkeypatch):
     monkeypatch.setenv("PYTEST_ADDOPTS", "-k only_the_easy_test")
     monkeypatch.setenv("PYTEST_PLUGINS", "caller_injected_plugin")

@@ -297,6 +297,45 @@ def test_native_class_size_build_keeps_campus_partitions_opt_in(grid, tmp_path, 
             candidate.observations("tprs_class_size", field, school_year=2026, scope="campus",
                                    edition=replace(key, revision_sha256="f" * 64))
 
+    native = tprs_class_size_native
+    archive = ProvenanceStore(candidate.path.parent / "provenance")
+    with pytest.raises(ContractError, match="exact reviewed local release"):
+        native.qualify_class_sizes(candidate, archive)
+    monkeypatch.setattr(native, "REVIEWED_CLASS_SIZE_MANIFEST", candidate.manifest_sha256)
+
+    def load_student(manifest, *, expected_sha256, offline):
+        assert manifest == candidate.path.with_name("tprs-student-2026-campus-complete.release.json")
+        assert expected_sha256 == digest and offline
+        return release
+
+    monkeypatch.setattr(native, "DataRelease", load_student)
+    workbook_id = archive.record_acquisition(legend_file, ResolvedDataset("reference:workbook", "reference", None, None, "",
+                                                                          DatasetMetadata()))
+    witnesses = {leaf.reports[0].scope: {"identifier": leaf.reports[0].identifier, "xlsx_receipt": workbook_id}
+                 for leaf in leaves[:3]}
+    monkeypatch.setattr(native, "definition", lambda: {"witnesses": witnesses})
+
+    def workbook_cells(_store, scope, _witness):
+        rows = [[_TITLE, *_COLUMNS[scope]]]
+        for group, fields in _FIELDS.items():
+            rows.append([group])
+            rows.extend([label, "20.7"] for label in fields)
+        return {(row, chr(ord("A") + column)): value for row, cells in enumerate(rows, 1)
+                for column, value in enumerate(cells)}
+
+    monkeypatch.setattr(native, "_student_workbook_cells", workbook_cells)
+    report = native.qualify_class_sizes(candidate, archive)
+    assert report["status"] == "PASS_REVIEWED_NATIVE"
+    assert report["html_replay"]["campus"] == {"leaves": 2, "reports": 2, "tables": 1}
+    assert report["publisher_workbook_witnesses"]["campus"]["local_cells"] == 12
+    assert workbook_id in native.retained_class_size_evidence(candidate, archive)
+    monkeypatch.setattr(native, "_student_workbook_cells", lambda *args: {**workbook_cells(*args), (3, "B"): "99.9"})
+    with pytest.raises(ContractError, match="workbook differs from the census report"):
+        native.qualify_class_sizes(candidate, archive)
+    (archive.root / "records" / f"{workbook_id}.json").unlink()
+    with pytest.raises(FileNotFoundError):
+        native.retained_class_size_evidence(candidate, archive)
+
 
 @pytest.mark.parametrize("fault", [
     "duplicate", "wrong_header", "changed_caption", "unknown", "zero", "truncated", "nested", "span",
