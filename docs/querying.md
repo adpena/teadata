@@ -256,6 +256,9 @@ table = student.select(*(entry["field"] for entry in fields))
 Selecting a dataset verifies the attached release when applicable.
 `variables()` reads the chosen source's catalog metadata. `select()` reads a
 single native table and retains its keys and available raw and status columns.
+Use the dataset namespace for source variables. It reads through the same
+source table as the query and export APIs and does not populate the entity's
+`meta` dictionary. Canonical entity properties remain available directly.
 Use `student["field_name"]` when a field name conflicts with a method.
 Pass an exact key from `sources.datasets()` to `sources.dataset(key)` when a
 name resolves to more than one table or revision. Scalar access requires one published row for

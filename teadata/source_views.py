@@ -319,13 +319,10 @@ class SourceFields:
 
     def select(self, *fields: str, where: Expression | None = None) -> pa.Table:
         """Project selected fields, native keys and their available source support."""
-        artifact, columns = _projection(self.release, self.edition, fields)
-        entity_key = _entity_key(artifact)
-        native = self.release.analytical_dataset(artifact.identity)
-        predicate = _entity_predicate(native, entity_key, (self.identifier,))
+        table = SourceTable(self.release, self.edition, _entity_ids=(self.identifier,)).select(*fields)
         if where is not None:
-            predicate = predicate & where
-        return native.to_table(columns=list(columns), filter=predicate)
+            table = table.where(where)
+        return table.to_arrow()
 
     def __getitem__(self, name: str):
         metadata = self.release.catalog.field_metadata(name, scope=self.edition.scope, edition=self.edition)
@@ -476,10 +473,6 @@ def _plan_export(release: DataRelease, edition: EditionKey, *, restore_original_
                  period: DataPeriod | None) -> _ExportSelection:
     import pyarrow as pa
 
-    from .analytical import _leaf_schema
-    from .peims_course_sources import DATASET as course_dataset
-    from .tapr import TAPR_SOURCE_KEYS, qualified_tapr_family
-
     if type(restore_original_headers) is not bool:
         raise ValueError("Original headers must be explicitly enabled or disabled")
 
@@ -494,8 +487,11 @@ def _plan_export(release: DataRelease, edition: EditionKey, *, restore_original_
     header_kinds = ()
     publisher_columns = None
     if restore_original_headers:
+        from .analytical import _leaf_schema
         from .peims_college_credit import DATASET as credit_dataset
+        from .peims_course_sources import DATASET as course_dataset
         from .rda_native import NATIVE_DATASET as rda_dataset
+        from .tapr import TAPR_SOURCE_KEYS, qualified_tapr_family
 
         if edition.dataset in {course_dataset, credit_dataset}:
             scope = edition.scope
