@@ -14,7 +14,7 @@ from pathlib import Path
 import tempfile
 from typing import Any, Callable, Mapping, Sequence
 
-from .dataset_metadata import DatasetMetadata, ResolvedDataset, validate_http_url
+from .dataset_metadata import DatasetMetadata, ResolvedDataset, _SHA256_TEXT, validate_http_url
 
 
 def _timestamp(value: datetime | None = None) -> str:
@@ -31,11 +31,7 @@ def _canonical(value: Any) -> bytes:
 
 
 def _identifier(value: str) -> str:
-    if (
-        not isinstance(value, str)
-        or len(value) != 64
-        or any(c not in "0123456789abcdef" for c in value)
-    ):
+    if not isinstance(value, str) or _SHA256_TEXT.fullmatch(value) is None:
         raise ValueError("Expected a SHA-256 identifier")
     return value
 

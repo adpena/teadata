@@ -5,11 +5,20 @@ from pathlib import Path
 
 import pytest
 
-from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset
-from teadata.provenance import ProvenanceStore
+from teadata.dataset_metadata import DatasetMetadata, ResolvedDataset, _digest_text
+from teadata.provenance import ProvenanceStore, _identifier
 
 
 NOW = datetime(2026, 1, 1, 12, tzinfo=timezone.utc)
+
+
+@pytest.mark.parametrize("validate", [_digest_text, _identifier])
+def test_digest_validation_requires_exact_lowercase_ascii(validate):
+    digest = "0123456789abcdef" * 4
+    assert validate(digest) == digest
+    for malformed in (digest[:-1], digest + "\n", digest.upper(), "０" + digest[1:], digest.encode(), None):
+        with pytest.raises(ValueError, match="Expected a SHA-256"):
+            validate(malformed)
 
 
 def test_copy_selected_record_closure_retains_nested_reference_history_only(tmp_path):

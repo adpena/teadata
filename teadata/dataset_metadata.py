@@ -54,8 +54,11 @@ def validate_http_url(value: str | None) -> None:
         raise ValueError("Source URLs must use HTTP(S) without credentials")
 
 
+_SHA256_TEXT = re.compile(r"[0-9a-f]{64}")
+
+
 def _digest_text(value: Any) -> str:
-    if not isinstance(value, str) or len(value) != 64 or any(c not in "0123456789abcdef" for c in value):
+    if not isinstance(value, str) or _SHA256_TEXT.fullmatch(value) is None:
         raise ValueError("Expected a SHA-256 identity")
     return value
 
