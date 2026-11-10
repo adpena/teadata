@@ -535,9 +535,8 @@ def _watched_value_token(value: Any) -> Any:
 class LazyMetaDict(UserDict[str, Any]):
     """A standard mutable mapping with one source-bound lazy data boundary.
 
-    Point reads may use the seed or project a single key. Whole-mapping operations and
-    mutation first loads the complete current payload. UserDict supplies mapping
-    equality, unions, updates, deletion, and copying without dict C fast paths.
+    Supported SQL point reads and writes can stay deferred. Whole-mapping
+    operations load the complete current payload and apply local edits.
     """
 
     def __init__(
@@ -550,6 +549,7 @@ class LazyMetaDict(UserDict[str, Any]):
         read_key: Callable[[str], Mapping[str, Any] | None] | None = None,
         read_keys: Callable[[], Iterable[str]] | None = None,
         _sql_origin: _SQLMetadataOrigin | None = None,
+        _validate_write: Callable[[], Any] | None = None,
     ):
         self._sql_origin = _sql_origin
         self._replaced = False
@@ -558,7 +558,10 @@ class LazyMetaDict(UserDict[str, Any]):
         self._exposed_keys: frozenset[str] | None = None
         self._read_key = read_key
         self._read_keys = read_keys
+        self._validate_write = _validate_write
         self._point_keys: set[str] | None = None
+        self._overrides: dict[str, Any] | None = None
+        self._removed: set[str] | None = None
         if callable(loader):
             self._loader: Callable[[], Mapping[str, Any] | None] | None = loader
             self._loaded = False
@@ -592,13 +595,23 @@ class LazyMetaDict(UserDict[str, Any]):
                             payload[key] = self._payload[key]
                         else:
                             self._watched[key] = token
-            self._payload = payload
-            self._loaded = True
-            self._loader = None
-            self._read_key = None
-            self._read_keys = None
-            self._point_keys = None
+            for key in self._removed or ():
+                payload.pop(key, None)
+            if self._overrides is not None:
+                payload.update(self._overrides)
+            self._set_materialized(payload)
         return self._payload
+
+    def _set_materialized(self, payload: dict[str, Any]) -> None:
+        self._payload = payload
+        self._loaded = True
+        self._loader = None
+        self._read_key = None
+        self._read_keys = None
+        self._validate_write = None
+        self._point_keys = None
+        self._overrides = None
+        self._removed = None
 
     @property
     def data(self) -> dict[str, Any]:
@@ -615,14 +628,13 @@ class LazyMetaDict(UserDict[str, Any]):
             return
         if self._sql_origin is not None:
             self._replaced = True
-        self._payload = payload
-        self._loaded = True
-        self._loader = None
-        self._read_key = None
-        self._read_keys = None
-        self._point_keys = None
+        self._set_materialized(payload)
 
     def __getitem__(self, key: str) -> Any:
+        if self._overrides is not None and key in self._overrides:
+            return self._overrides[key]
+        if self._removed is not None and key in self._removed:
+            raise KeyError(key)
         if key in self._payload:
             value = self._payload[key]
         elif self._read_key is not None and isinstance(key, str):
@@ -640,12 +652,42 @@ class LazyMetaDict(UserDict[str, Any]):
         return value
 
     def __setitem__(self, key: str, value: Any) -> None:
-        self._materialize()[key] = value
+        if self._validate_write is not None and type(key) is str and _point_meta_key(key):
+            if self._overrides is None:
+                self._validate_write()
+                self._overrides = {}
+            self._overrides[key] = value
+            self._discard_source_key(key)
+        else:
+            self._materialize()[key] = value
         self._record_edits((key,))
 
     def __delitem__(self, key: str) -> None:
-        del self._materialize()[key]
+        if self._validate_write is not None and self._read_key is not None and type(key) is str and _point_meta_key(key):
+            if self._overrides is not None and key in self._overrides:
+                del self._overrides[key]
+            else:
+                if self._removed is not None and key in self._removed:
+                    raise KeyError(key)
+                values = self._read_key(key)
+                if (values is None or key not in values) and not (key in self._payload and self._was_edited(key)):
+                    raise KeyError(key)
+                if self._overrides is None:
+                    self._overrides = {}
+            if self._removed is None:
+                self._removed = set()
+            self._removed.add(key)
+            self._discard_source_key(key)
+        else:
+            del self._materialize()[key]
         self._record_edits((key,))
+
+    def _discard_source_key(self, key: str) -> None:
+        self._payload.pop(key, None)
+        if self._point_keys is not None:
+            self._point_keys.discard(key)
+        if self._watched is not None:
+            self._watched.pop(key, None)
 
     def __iter__(self) -> Iterator[str]:
         return iter(self._materialize())
@@ -657,6 +699,10 @@ class LazyMetaDict(UserDict[str, Any]):
         return repr(self._materialize())
 
     def __contains__(self, key: object) -> bool:
+        if self._overrides is not None and key in self._overrides:
+            return True
+        if self._removed is not None and key in self._removed:
+            return False
         if key in self._payload:
             return True
         if self._read_key is None or not isinstance(key, str):
@@ -672,7 +718,16 @@ class LazyMetaDict(UserDict[str, Any]):
         names = tuple(self._read_keys() if not self._loaded and self._read_keys is not None else self._materialize())
         if not all(isinstance(name, str) for name in names):
             raise TypeError("iter_keys() requires string metadata keys. Use ordinary mapping iteration for mixed keys.")
-        return iter(sorted(names))
+        if self._loaded or self._overrides is None and self._watched is None:
+            return iter(sorted(names))
+        current = set(names)
+        if self._watched is not None:
+            # Full hydration also retains edited aliases removed from the live row.
+            current.update(key for key in self._watched
+                           if key not in current and key in self._payload and self._was_edited(key))
+        current.difference_update(self._removed or ())
+        current.update(self._overrides or ())
+        return iter(sorted(current))
 
     def pop(self, key: str, *default) -> Any:
         payload = self._materialize()
@@ -788,6 +843,11 @@ class LazyMetaDict(UserDict[str, Any]):
             return self.copy()
         copied = type(self)(self._loader, seed=self._payload, read_key=self._read_key)
         copied._read_keys = self._read_keys
+        copied._validate_write = self._validate_write
+        if self._overrides is not None:
+            copied._overrides = self._overrides.copy()
+        if self._removed is not None:
+            copied._removed = self._removed.copy()
         if self._sql_origin is None and self._point_keys is not None:
             copied._point_keys = self._point_keys.copy()
         return self._copy_origin(copied)
@@ -941,7 +1001,7 @@ def _lazy_meta(
 ) -> LazyMetaDict:
     projection_bind = default_session.get_bind() if dialect is not None else None
 
-    def _load(key: str | None = None, *, names_only: bool = False) -> Mapping[str, Any]:
+    def _load(key: str | None = None, *, names_only: bool = False, check_only: bool = False) -> Mapping[str, Any]:
         # Reuse an active caller transaction, including its uncommitted writes.
         # Closing a second Session on SQLite's shared in-memory connection would
         # roll that transaction back. Only factory-created Sessions are owned.
@@ -958,7 +1018,7 @@ def _lazy_meta(
                 connection = active.connection(bind_arguments={"mapper": record_cls})
                 projected = (_default_postgresql_json(connection) if dialect == "postgresql"
                              else _default_sqlite_text(connection))
-            columns = (record_cls.meta,)
+            columns = (literal(1),) if check_only else (record_cls.meta,)
             if projected and dialect is not None:
                 if names_only:
                     columns = _meta_names_projection(record_cls.meta, dialect)
@@ -974,6 +1034,8 @@ def _lazy_meta(
                 raise ContractError(
                     "Lazy metadata source was deleted or its dataset catalog changed"
                 )
+            if check_only:
+                return {}
             if projected and key is not None:
                 return _decode_meta_projection((key,), row)
             if projected and names_only:
@@ -993,7 +1055,7 @@ def _lazy_meta(
 
     return LazyMetaDict(_load, seed=seed, read_key=_load if dialect is not None else None,
                         read_keys=partial(_load, names_only=True) if dialect is not None else None,
-                        _sql_origin=origin)
+                        _sql_origin=origin, _validate_write=partial(_load, check_only=True) if dialect is not None else None)
 
 
 def _meta_value_payload(value: Any) -> dict[str, Any]:

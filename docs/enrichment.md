@@ -332,6 +332,16 @@ On a lazy SQL import, mapping writes and deletions are local edits. Measurements
 of edited fields carry `input_binding="caller_supplied"` while keeping the
 catalog's interpretation rules. A deleted field stays caller-supplied when a
 named metric uses its fallback. Unchanged fields retain their release binding.
+With a supported SQL point reader, the first edit to an ASCII identifier
+checks the source row and build. Assignment uses a scalar query. Deleting a
+source key checks its current presence instead of using a prefetched value.
+Later assignments to that mapping need no database read. A failed delete leaves a stale
+prefetch alone until a full read. The active reader can fall back to raw JSON
+when it cannot project that key exactly. Full conversion uses the source row
+visible at that read, keeps its surviving key order, and appends local keys
+that are new or were deleted and reinserted. Use a consistent transaction for
+a fixed source view across reads. Public copies and operations such as
+`popitem()` still materialize the mapping.
 Copies and pickle round trips keep known edits. Changes made through the
 backing dict or a nested value are detected by comparing their current content
 with the value before it was shared. Eager SQL imports retain their ordinary

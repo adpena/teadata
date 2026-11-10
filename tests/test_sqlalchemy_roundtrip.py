@@ -378,6 +378,117 @@ def test_lazy_sqlite_projects_point_reads_and_prefetch(database, catalog):
     _assert_lazy_metadata_projection(engine, factory, catalog)
 
 
+def _assert_sparse_sql_edits(engine, factory, catalog):
+    repo = graph(catalog, 1)
+    district_id = uuid.UUID(int=1)
+    _, enrollment = catalog.source_for_metric("enrollment", "district")
+    repo._districts[district_id].meta = {
+        "first": "kept", "removed": None, "last": "old", enrollment: "10", "stale": "cached",
+        "nested": [1],
+    }
+    with factory.begin() as session:
+        export_dataengine(repo, session, replace=True, include_meta_entries=False)
+
+    def unexpected_factory():
+        raise AssertionError("Caller transaction must be reused")
+
+    with factory() as session:
+        restored = import_dataengine(session, prefetch_district_meta_keys=["removed", "stale", "nested"],
+                                     meta_session_factory=unexpected_factory)
+        district = restored._districts[district_id]
+        meta = district.meta
+        # The cached presence is stale for two keys. Only the edited alias is local.
+        alias = meta["nested"]
+        alias.append(2)
+        assert "nested" in meta.iter_keys()
+        alias.pop()
+        assert not meta._was_edited("nested")
+        alias.append(2)
+        row = session.get(DistrictRecord, district_id)
+        row.meta = {key: value for key, value in row.meta.items() if key not in {"stale", "nested"}}
+        session.flush()
+        statements = []
+
+        def capture(connection, cursor, statement, parameters, context, executemany):
+            if "JOIN teadata_catalog" in statement:
+                statements.append(statement)
+
+        event.listen(engine, "before_cursor_execute", capture)
+        try:
+            with pytest.raises(KeyError, match="stale"):
+                del meta["stale"]
+            assert meta["stale"] == "cached" and not meta._was_edited("stale")
+            assert len(statements) == 1 and " -> " in statements[-1]
+            assert meta._overrides is None
+
+            meta[enrollment] = "12"
+            meta |= {"last": "edited", "new": None}
+            assert not meta._loaded and len(statements) == 2 and "districts.meta" not in statements[-1]
+            measurement = restored.catalog.field_measurement(district, enrollment)
+            assert measurement.numeric == 12 and measurement.source["input_binding"] == "caller_supplied"
+            assert len(statements) == 2 and meta["new"] is None and row.meta[enrollment] == "10"
+            assert list(meta.iter_keys()) == sorted(["first", "removed", "last", enrollment, "nested", "new"])
+            assert len(statements) == 3 and ("json_each(" in statements[-1] or "json_object_keys(" in statements[-1])
+
+            del meta["nested"]
+            del meta["removed"]
+            assert len(statements) == 5 and all(" -> " in sql for sql in statements[3:])
+            del meta["new"]
+            assert "nested" not in meta and "removed" not in meta and "new" not in meta
+            meta.update({"removed": "reinserted", "new": "fresh"})
+            assert len(statements) == 5 and not meta._loaded
+            copied = (restored | DataEngine())._districts[district_id].meta
+            del copied["new"]
+            copied["removed"] = "only copy"
+            assert copied["removed"] == "only copy" and meta["removed"] == "reinserted"
+            assert "new" not in copied and meta["new"] == "fresh"
+            assert len(statements) == 5
+
+            expected = {"first": "kept", "last": "edited", enrollment: "12", "removed": "reinserted", "new": "fresh"}
+            assert list(meta.iter_keys()) == sorted(expected)
+            assert len(statements) == 6 and ("json_each(" in statements[-1] or "json_object_keys(" in statements[-1])
+            assert list(dict(meta).items()) == list(expected.items())
+            assert len(statements) == 7 and " -> " not in statements[-1]
+            with pytest.raises(ContractError, match="Reload the original release"):
+                export_dataengine(restored, session, replace=True)
+            assert len(statements) == 7
+        finally:
+            event.remove(engine, "before_cursor_execute", capture)
+        session.rollback()
+
+    with factory() as session:
+        restored = import_dataengine(session)
+        meta = restored._districts[district_id].meta
+        unwritten = import_dataengine(session)._districts[district_id].meta
+        meta[enrollment] = "13"
+        session.delete(session.get(DistrictRecord, district_id))
+        session.flush()
+        with pytest.raises(ContractError, match="source was deleted"):
+            unwritten[enrollment] = "14"
+        assert unwritten._overrides is None and not unwritten._was_edited(enrollment)
+        with pytest.raises(ContractError, match="source was deleted"):
+            del meta["first"]
+        assert not meta._was_edited("first")
+        with pytest.raises(ContractError, match="source was deleted"):
+            dict(meta)
+        assert meta[enrollment] == "13" and not meta._loaded
+        session.rollback()
+
+    with factory() as session:
+        restored = import_dataengine(session)
+        meta = restored._districts[district_id].meta
+        meta["odd.key"] = "fallback"
+        assert meta._loaded and meta["odd.key"] == "fallback"
+
+
+def test_sqlite_sparse_assignments_and_deletions(database, catalog):
+    engine, factory = database
+    with engine.connect() as connection:
+        if _point_meta_dialect(connection) is None:
+            pytest.skip("SQLite JSON point projection is unavailable on this build")
+    _assert_sparse_sql_edits(engine, factory, catalog)
+
+
 def test_key_discovery_accepts_a_one_shot_reader_and_reports_mixed_keys():
     meta = LazyMetaDict(lambda: pytest.fail("whole metadata read"), read_keys=lambda: iter(("b", "a")))
     assert tuple(meta.iter_keys()) == ("a", "b")
@@ -765,6 +876,7 @@ def test_postgresql_roundtrip_preserves_full_publisher_rating(catalog):
                 custom_engine.dispose()
 
             _assert_lazy_metadata_projection(engine, factory, catalog)
+            _assert_sparse_sql_edits(engine, factory, catalog)
         edited = _assert_lazy_sql_edit_origin(factory, catalog)
         with factory() as session, pytest.raises(ContractError, match="Reload the original release"):
             export_dataengine(edited, session, replace=True)
