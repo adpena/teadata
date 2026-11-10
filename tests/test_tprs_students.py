@@ -19,9 +19,11 @@ import pyarrow.dataset as ds
 import pytest
 import yaml
 
-from teadata import tprs_statewide_intake, tprs_students as students
+from teadata import tprs_class_size_native, tprs_statewide_intake, tprs_students as students
 from teadata.column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
-from teadata.dataset_metadata import DatasetMetadata, EditionKey, MetricDefinition, ResolvedDataset
+from teadata.dataset_metadata import (
+    STATEWIDE_SINGLETON_GRAIN, DatasetMetadata, EditionKey, MetricDefinition, ReferenceDocument, ResolvedDataset,
+)
 from teadata.engine import DataEngine
 from teadata.entities import Campus
 from teadata.manifest import ContractError, DatasetCatalog, canonical_json
@@ -32,6 +34,7 @@ from teadata.source_views import PartitionedSourceTable, SourceTable
 from teadata.scripts import verify_tprs_campus_coverage as campus_coverage
 from teadata.teadata_config import load_config, load_config_bytes
 from teadata.tprs_class_size import CLASS_SIZE_UNIT, class_size_projection, parse_class_size_report, read_class_size_report
+from teadata.tprs_class_size_native import class_size_campus_edition, materialize_class_sizes
 from teadata.values import ValueStatus
 
 from test_catalog_projections import attach_observation_child, selected_catalog  # noqa: F401
@@ -201,7 +204,7 @@ def test_class_size_replays_only_selected_reviewed_scope(grid, tmp_path, monkeyp
     digest = sha256(raw).hexdigest()
     campus = SimpleNamespace(
         artifact=SimpleNamespace(edition=SimpleNamespace(scope="campus")),
-        reports=(SimpleNamespace(identifier=identifier, receipt=pin, sha256=digest),),
+        reports=(tprs_statewide_intake.ReportSelection("campus", identifier, pin, digest),),
     )
     state = SimpleNamespace(artifact=SimpleNamespace(edition=SimpleNamespace(scope="state")))
     release = object()
@@ -225,6 +228,74 @@ def test_class_size_replays_only_selected_reviewed_scope(grid, tmp_path, monkeyp
     artifact.unlink()
     with pytest.raises(ContractError, match=f"{identifier} .*{pin}"):
         project(release, store, scope="campus")
+
+
+def test_campus_class_size_keys_preserve_distinct_student_partitions(tmp_path):
+    student = EditionKey(students.DATASET, "2026", "1" * 64, "campus", "campus", "one row per campus_number")
+    other = replace(student, revision_sha256="2" * 64)
+    key = class_size_campus_edition(student)
+    assert key == replace(student, dataset="tprs_class_size", table=f"campus-{student.identity}")
+    assert class_size_campus_edition(other).table != key.table
+    with pytest.raises(ValueError, match="Student campus edition"):
+        class_size_campus_edition(replace(student, scope="district"))
+    release = SimpleNamespace(manifest_sha256=tprs_statewide_intake.REVIEWED_DISTRICT_STATE_MANIFEST)
+    output = tmp_path / "candidate"
+    with pytest.raises(ContractError, match="complete reviewed Student campus attachment"):
+        materialize_class_sizes(release, ProvenanceStore(tmp_path / "store"), output, include_campus=True)
+    assert not output.exists()
+
+
+def test_native_class_size_build_keeps_campus_partitions_opt_in(grid, tmp_path, monkeypatch):
+    from teadata.tprs_class_size import _COLUMNS, _FIELDS, _TITLE
+
+    store = ProvenanceStore(tmp_path / "provenance")
+    path = tmp_path / "student-manifest.json"
+    path.write_text("synthetic Student attachment")
+    digest = sha256(path.read_bytes()).hexdigest()
+    legend_url = "https://example.invalid/legend"
+    legend_file = tmp_path / "legend.txt"
+    legend_file.write_text("Synthetic disclosure legend")
+    legend_receipt = store.record_acquisition(legend_file, ResolvedDataset(
+        "reference:legend", "reference", None, None, "", DatasetMetadata(source_url=legend_url),
+    ))
+    legend = ReferenceDocument("legend", "masking_methodology", url=legend_url, provenance_ids=(legend_receipt,),
+                               reviewed_sha256=sha256(legend_file.read_bytes()).hexdigest())
+    release = SimpleNamespace(path=path, manifest_sha256=digest, catalog=SimpleNamespace(
+        metadata=lambda *args, **kwargs: DatasetMetadata(title="Synthetic", references=(legend,)),
+    ))
+    leaves = []
+    for scope, identifier in (("district", "001902"), ("state", "S"),
+                              ("campus", "001902001"), ("campus", "001902002")):
+        raw = html(report_rows(grid, scope, identifier))
+        if identifier != "001902002":
+            rows = [[_TITLE, *_COLUMNS[scope]]]
+            for group, fields in _FIELDS.items():
+                rows.append([group])
+                rows.extend([label, *(["20.7"] * len(_COLUMNS[scope]))] for label in fields)
+            raw += html(rows)
+        source = receipt(store, tmp_path, raw, identifier=identifier, scope=scope)
+        content = sha256(raw).hexdigest()
+        key = EditionKey(students.DATASET, "2026", EditionKey.source_revision((content,)), scope, scope,
+                         STATEWIDE_SINGLETON_GRAIN if scope == "state" else f"one row per {scope}_number")
+        report = tprs_statewide_intake.ReportSelection(scope, identifier, source, content)
+        leaves.append(SimpleNamespace(artifact=SimpleNamespace(edition=key), reports=(report,), campus_rosters=()))
+    monkeypatch.setattr(tprs_class_size_native, "REVIEWED_CAMPUS_STUDENT_MANIFEST", digest)
+    monkeypatch.setattr(tprs_class_size_native, "_reviewed_leaves", lambda selected: tuple(leaves))
+    monkeypatch.setattr(tprs_class_size_native, "_verify_campus_census", lambda selected, retained: None)
+    default = materialize_class_sizes(release, store, tmp_path / "default")
+    assert default["scopes"] == {"district": 1, "state": 1}
+    complete = materialize_class_sizes(release, store, tmp_path / "complete", include_campus=True)
+    assert complete["scopes"] == {"district": 1, "state": 1, "campus": 2}
+    candidate = DataRelease(tmp_path / "complete" / "release.json", offline=True)
+    for leaf, value in zip(leaves[-2:], (20.7, None), strict=True):
+        key = class_size_campus_edition(leaf.artifact.edition)
+        field = "class_size_kindergarten_avg_size"
+        observations = candidate.observations("tprs_class_size", field, school_year=2026, scope="campus", edition=key)
+        assert observations.to_arrow()[field].to_pylist() == [value]
+        assert candidate.table(key).to_arrow()["class_size_table_present"].to_pylist() == [value is not None]
+        with pytest.raises(ContractError, match="unavailable"):
+            candidate.observations("tprs_class_size", field, school_year=2026, scope="campus",
+                                   edition=replace(key, revision_sha256="f" * 64))
 
 
 @pytest.mark.parametrize("fault", [

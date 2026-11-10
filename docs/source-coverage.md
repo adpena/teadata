@@ -393,11 +393,17 @@ uv run --locked python -m teadata.scripts.refresh_tprs_class_sizes \
   --store /path/to/provenance --output /path/to/new-candidate
 ```
 
-The candidate can be opened locally with `DataRelease`. Its dataset
-`tprs_class_size` provides two 2025–26 editions and uses the direct Texas
-report for state values. The command verifies the native readback. Admission
-to a distributed release is separate. The campus projection remains offline
-while the native catalog needs partition-aware routing.
+The candidate can be opened locally with `DataRelease`. The default build
+provides district and Texas editions and uses the direct Texas report for
+state values. Add `--include-campus` with the exact reviewed complete Student
+Information attachment to also build the campus partitions. The producer
+keeps the attachment's original partition boundaries and verifies each
+native table against its Arrow projection. The 2025–26 campus roster has
+9,105 reports, of which 612 omit the class-size table. Those reports still
+have a row with missing measurements and the reason `table_not_published`.
+
+Use [an exact campus edition key](querying.md#campus-class-size-candidates)
+for an offline query. Admission to a distributed release is separate.
 
 ## School FIRST financial accountability
 

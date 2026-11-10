@@ -131,6 +131,25 @@ the 2026 election, applies from that instant under the reviewed schedule.
 The constitutional start of the new terms is separate from the House’s
 swearing-in schedule. [Texas Redistricting current districts](https://redistricting.capitol.texas.gov/Current-districts) · [Twentieth Amendment](https://www.archives.gov/founding-docs/amendments-11-27#amend20)
 
+### Boundary sources retained for profiles
+
+The retained [2026 Census TIGER/Line county layer](https://www.census.gov/geographies/mapping-files/2026/geo/tiger-line-file.html)
+has all 254 Texas county polygons. The county-name reconciliation matches
+all 254 Census GEOIDs to the Comptroller codes in the 2025 Final property
+value study. The polygon and taxable-property relationship remain separate.
+
+The [TEA School District Locator ESC layer](https://services2.arcgis.com/5MVN2jsqIrNZD4tP/arcgis/rest/services/ESC2024/FeatureServer/0)
+has all 20 region polygons. Its region IDs match the served-region codes in
+the spring 2026 AskTED archive. Served-region membership still comes from the
+directory. The polygon only establishes map geography.
+
+The [Texas Legislative Council shapefiles](https://redistricting.capitol.texas.gov/Current-districts)
+for PLANH2316, PLANS2168, PLANE2106, PLANC2193, and PLANC2333 match the
+constituency IDs in the corresponding Red-160 rosters. Together they have
+272 plan-specific polygons. These checks establish boundary coverage and
+identifier alignment. They do not assign school districts or campuses by
+overlay. Profile deployment requires a separately pinned projection.
+
 ### Published school district rosters for legislative plans
 
 The Texas Legislative Council's Red-160 workbooks list school district

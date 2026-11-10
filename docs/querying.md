@@ -307,6 +307,34 @@ edition; it does not establish that the campus did not exist or that a
 measure was zero. An index belongs to one release hash; rebuild it when
 switching releases.
 
+#### Campus class-size candidates
+
+For an offline class-size candidate built with `--include-campus`, use the
+campus index of its pinned Student attachment. Convert the selected Student
+key to the matching class-size key. The conversion preserves the exact report
+revision and works with the ordinary native observations API.
+
+```python
+import pyarrow.dataset as ds
+
+from teadata.tprs_class_size_native import class_size_campus_edition
+
+campus_number = "057905286"
+student_key = student_attachment.tprs_student_campus_index(edition="2026").edition_for(campus_number)
+if student_key is not None:
+    view = class_size_candidate.observations(
+        "tprs_class_size", "class_size_kindergarten_avg_size", school_year=2026,
+        scope="campus", edition=class_size_campus_edition(student_key),
+    )
+    rows = view.where(ds.field("campus_number") == campus_number).to_arrow()
+```
+
+A campus without an admitted Student report has no route. An admitted campus
+whose report omits the table still has a row with missing measurements. Use
+the candidate created from the same pinned Student attachment. Automatic
+campus partition routing in the entity Query API currently covers Student
+Information observations.
+
 These views leave existing entity properties and `meta` keys in place. A raw
 source field returns its published token. A typed field returns its published
 projection, with missing or masked values represented by `None`. Select its

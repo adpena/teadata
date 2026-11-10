@@ -243,12 +243,28 @@ def retained_tprs_evidence(release: DataRelease, store: ProvenanceStore) -> list
     return _retained_replay_records(_reviewed_leaves(release), store)
 
 
+def _project_class_size_reports(
+    store: ProvenanceStore, reports: Iterable[ReportSelection],
+) -> tuple[Table, dict[str, Any]]:
+    from .tprs_class_size import class_size_projection, read_class_size_report
+
+    def read_reports() -> Iterator[ClassSizeReport]:
+        for item in reports:
+            try:
+                yield read_class_size_report(store, item.receipt, scope=item.scope, identifier=item.identifier,
+                                             expected_sha256=item.sha256)
+            except (ContractError, OSError, ValueError) as error:
+                raise ContractError(
+                    f"Cannot replay {item.scope} class sizes for {item.identifier} (receipt {item.receipt}): {error}"
+                ) from error
+
+    return class_size_projection(read_reports())
+
+
 def project_reviewed_class_sizes(
     release: DataRelease, store: ProvenanceStore, *, scope: str,
 ) -> tuple[Table, dict[str, Any]]:
     """Replay one scope from the reviewed Student Information attachment's exact ledgers."""
-    from .tprs_class_size import class_size_projection, read_class_size_report
-
     _need(scope in ("campus", "district", "state"), "Class-size scope must be campus, district, or state")
     leaves = _reviewed_leaves(release)
     selected = tuple(leaf for leaf in leaves if leaf.artifact.edition.scope == scope)
@@ -256,18 +272,7 @@ def project_reviewed_class_sizes(
     if scope == "campus":
         _verify_campus_census(selected, store)
 
-    def read_reports() -> Iterator[ClassSizeReport]:
-        for leaf in selected:
-            for item in leaf.reports:
-                try:
-                    yield read_class_size_report(store, item.receipt, scope=scope, identifier=item.identifier,
-                                                 expected_sha256=item.sha256)
-                except (ContractError, OSError, ValueError) as error:
-                    raise ContractError(
-                        f"Cannot replay {scope} class sizes for {item.identifier} (receipt {item.receipt}): {error}"
-                    ) from error
-
-    return class_size_projection(read_reports())
+    return _project_class_size_reports(store, (item for leaf in selected for item in leaf.reports))
 
 
 def qualify_statewide_tprs(release: DataRelease, store: ProvenanceStore) -> dict[str, Any]:
