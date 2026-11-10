@@ -5,7 +5,7 @@ from __future__ import annotations
 from contextvars import ContextVar
 from contextlib import closing
 from copy import deepcopy
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from functools import lru_cache
 from hashlib import sha256
 from importlib.metadata import version
@@ -17,6 +17,7 @@ import sqlite3
 import sys
 import unicodedata
 from typing import Any, Callable, Iterable, Mapping
+from uuid import UUID
 
 from ._sqlite import readonly_connection
 from .dataset_metadata import ArtifactRef, ColumnSchemaRef, DataPeriod, DatasetMetadata, EditionKey, EditionMetadataRef, FieldBinding, LeafColumnSupport, MetricDefinition, ResolvedDataset
@@ -52,6 +53,47 @@ class FieldMeasurementError(ContractError):
         self.field, self.scope, self.reason = field, scope, reason
         self.alternatives = alternatives
         super().__init__(f"Cannot interpret {scope} field {field!r}. {guidance}")
+
+
+@dataclass(frozen=True, slots=True)
+class _SQLMetadataOrigin:
+    build_id: str
+    scope: str
+    entity_id: UUID
+    enrollment: int | None
+    rating: str | None
+    import_id: UUID
+
+    def matches_fallback(self, attribute: str, raw: Any) -> bool:
+        if attribute == "enrollment":
+            original = self.enrollment
+        elif attribute == "rating":
+            original = self.rating
+        else:
+            return False
+        return type(raw) is type(original) and raw == original
+
+
+def _native_entity_registry(entity: Any) -> Mapping | None:
+    scope = _native_entity_scope(type(entity))
+    if scope is None:
+        return None
+    return getattr(entity._repo, "_districts" if scope == "district" else "_campuses", None)
+
+
+def _entity_sql_metadata_origin(entity: Any) -> _SQLMetadataOrigin | None:
+    try:
+        origin = object.__getattribute__(entity, "_sql_metadata_origin")
+    except AttributeError:
+        registry = _native_entity_registry(entity)
+        if registry is None:
+            return None
+        # Dataclass replace creates a new instance and preserves its repository
+        # field, but does not copy slots that are outside the dataclass fields.
+        registered = registry.get(entity.id)
+        return (_entity_sql_metadata_origin(registered)
+                if registered is not None and registered is not entity else None)
+    return origin if isinstance(origin, _SQLMetadataOrigin) else None
 
 
 def canonical_json(value: Any) -> str:
@@ -1453,6 +1495,9 @@ class DatasetCatalog:
         return unit
 
     def _entity_build_id(self, entity: Any) -> str | None:
+        return self._validate_entity_build_id(entity, _entity_sql_metadata_origin(entity))
+
+    def _validate_entity_build_id(self, entity: Any, sql_origin: _SQLMetadataOrigin | None) -> str | None:
         repo_catalog = getattr(getattr(entity, "_repo", None), "catalog", None)
         if _native_entity_scope(type(entity)) is not None:
             try:
@@ -1462,6 +1507,8 @@ class DatasetCatalog:
         else:
             declared = getattr(entity, "source_build_id", None)
         origins = [declared, repo_catalog.build_id if repo_catalog is not None else None]
+        if sql_origin is not None:
+            origins.append(sql_origin.build_id)
         if any(origin is not None and origin != self.build_id for origin in origins):
             raise ContractError("Entity belongs to another data release")
         return next((origin for origin in origins if origin is not None), None)
@@ -1499,8 +1546,9 @@ class DatasetCatalog:
     ) -> Measurement:
         self._require_scalar_interpretation()
         scope = scope or _native_entity_scope(type(entity)) or ("campus" if hasattr(entity, "campus_number") else "district")
-        known_build = self._entity_build_id(entity)
-        return self._read_entity_measurement(entity, self._resolve_metric(metric, scope), known_build)
+        sql_origin = _entity_sql_metadata_origin(entity)
+        known_build = self._validate_entity_build_id(entity, sql_origin)
+        return self._read_entity_measurement(entity, self._resolve_metric(metric, scope), known_build, sql_origin)
 
     def field_measurement(
         self, entity: Any, field: str, *, scope: str | None = None
@@ -1520,20 +1568,35 @@ class DatasetCatalog:
         resolved = self._resolve_field(field, scope, require_unique=True)
         if resolved is None:
             raise self._unbound_field_error(field, scope)
-        return self._read_entity_measurement(entity, resolved, self._entity_build_id(entity), fallback_attribute=False)
+        sql_origin = _entity_sql_metadata_origin(entity)
+        return self._read_entity_measurement(entity, resolved, self._validate_entity_build_id(entity, sql_origin),
+                                             sql_origin, fallback_attribute=False)
 
     def _read_entity_measurement(
         self, entity: Any, resolved: tuple[MetricBinding, str, str, MetricDefinition | None],
-        known_build: str | None, *, fallback_attribute: bool = True,
+        known_build: str | None, sql_origin: _SQLMetadataOrigin | None, *, fallback_attribute: bool = True,
     ) -> Measurement:
         binding, dataset, key, definition = resolved
         meta = getattr(entity, "meta", None)
         absent = object()
         raw = meta.get(key, absent) if meta is not None else absent
+        fallback = binding.attribute if raw is absent and fallback_attribute else None
         if raw is absent:
-            raw = getattr(entity, binding.attribute, None) if fallback_attribute and binding.attribute is not None else None
+            raw = getattr(entity, fallback, None) if fallback is not None else None
+        input_binding = "release_entity" if known_build is not None else "caller_supplied"
+        meta_origin = getattr(meta, "_sql_origin", None)
+        if sql_origin is not None:
+            if (meta is None or meta_origin != sql_origin or sql_origin.entity_id != entity.id or meta._was_edited(key)
+                    or fallback is not None and not sql_origin.matches_fallback(fallback, raw)):
+                input_binding = "caller_supplied"
+        elif meta_origin is not None:
+            input_binding = "caller_supplied"
+        elif known_build is not None and getattr(getattr(entity, "_repo", None), "_lazy_sql_import", False):
+            registry = _native_entity_registry(entity)
+            if registry is not None and entity.id not in registry:
+                input_binding = "caller_supplied"
         return self._contextual_measurement(raw, binding, dataset, key, definition, entity=entity,
-                                   input_binding="release_entity" if known_build is not None else "caller_supplied")
+                                            input_binding=input_binding)
 
     @staticmethod
     def _exact_field_suffixes(binding: MetricBinding, targets: Iterable[str]) -> Iterable[str]:

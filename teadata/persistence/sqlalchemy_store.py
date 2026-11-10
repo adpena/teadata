@@ -26,12 +26,14 @@ Python application that can provide a SQLAlchemy engine/Session.
 
 from __future__ import annotations
 
-from collections import UserDict, defaultdict
+from collections import OrderedDict, UserDict, defaultdict
 from datetime import date, datetime, timezone
+from decimal import Decimal
 from functools import partial
-from itertools import islice
+from itertools import chain, islice
 import json
 import math
+from struct import pack
 import uuid
 from typing import (
     Any,
@@ -108,6 +110,8 @@ from ..manifest import (
     CATALOG_TABLE_DDL,
     ContractError,
     DatasetCatalog,
+    _SQLMetadataOrigin,
+    _entity_sql_metadata_origin,
     canonical_json,
 )
 
@@ -410,6 +414,8 @@ def _validate_storage(connection) -> None:
 def _clean_meta(meta: Mapping[str, Any] | None) -> dict[str, Any] | None:
     if not isinstance(meta, Mapping):
         return None
+    if isinstance(meta, LazyMetaDict):
+        meta = meta._materialize()
 
     def _coerce(value: Any) -> Any:
         if value is None or isinstance(value, (bool, int, float, str)):
@@ -501,6 +507,31 @@ def _flatten_meta(meta: Mapping[str, Any] | None) -> list[tuple[str, int, Any]]:
     return flattened
 
 
+_UNVERIFIABLE_META = object()
+
+
+def _meta_value_token(value: Any) -> Any:
+    kind = type(value)
+    if kind in (str, int, bool) or value is None:
+        return kind, value
+    if kind is float:
+        return pack("!d", value)
+    if kind is Decimal:
+        return Decimal, value.as_tuple()
+    if kind is list:
+        return list, tuple(_meta_value_token(item) for item in value)
+    if kind in (dict, OrderedDict):
+        return kind, tuple((_meta_value_token(key), _meta_value_token(item)) for key, item in value.items())
+    raise TypeError("Value is outside the raw JSON contract")
+
+
+def _watched_value_token(value: Any) -> Any:
+    try:
+        return _meta_value_token(value)
+    except (TypeError, RecursionError):
+        return _UNVERIFIABLE_META
+
+
 class LazyMetaDict(UserDict[str, Any]):
     """A standard mutable mapping with one source-bound lazy data boundary.
 
@@ -518,7 +549,13 @@ class LazyMetaDict(UserDict[str, Any]):
         seed: Mapping[str, Any] | None = None,
         read_key: Callable[[str], Mapping[str, Any] | None] | None = None,
         read_keys: Callable[[], Iterable[str]] | None = None,
+        _sql_origin: _SQLMetadataOrigin | None = None,
     ):
+        self._sql_origin = _sql_origin
+        self._replaced = False
+        self._edited: set[str] | None = None
+        self._watched: dict[str, Any] | None = None
+        self._exposed_keys: frozenset[str] | None = None
         self._read_key = read_key
         self._read_keys = read_keys
         self._point_keys: set[str] | None = None
@@ -531,16 +568,30 @@ class LazyMetaDict(UserDict[str, Any]):
             self._loaded = True
             self._payload = dict(loader or {})
 
-    @property
-    def data(self) -> dict[str, Any]:
+    def _materialize(self) -> dict[str, Any]:
         if not self._loaded:
             assert self._loader is not None
+            changed = self._edited_keys() if self._watched is not None else ()
             # Replace, rather than merge: a prefetched key may have been deleted.
             payload = dict(self._loader() or {})
-            for key in self._point_keys or ():
+            observed = self._point_keys or ()
+            for key in observed:
                 if key in payload:
                     # Preserve the object already returned by an explicit point read.
                     payload[key] = self._payload[key]
+            if changed:
+                payload.update((key, value) for key, value in self._payload.items() if key in changed)
+            if self._watched is not None:
+                for key in tuple(self._watched):
+                    if key not in payload:
+                        del self._watched[key]
+                    elif key not in observed and key not in changed:
+                        # Refresh stale seeds without detaching an identical live alias.
+                        token = _watched_value_token(payload[key])
+                        if token == self._watched[key] and key in self._payload:
+                            payload[key] = self._payload[key]
+                        else:
+                            self._watched[key] = token
             self._payload = payload
             self._loaded = True
             self._loader = None
@@ -549,8 +600,21 @@ class LazyMetaDict(UserDict[str, Any]):
             self._point_keys = None
         return self._payload
 
+    @property
+    def data(self) -> dict[str, Any]:
+        payload = self._materialize()
+        if self._sql_origin is not None and self._exposed_keys is None:
+            self._exposed_keys = frozenset(payload)
+            for key, value in payload.items():
+                self._watch(key, value)
+        return payload
+
     @data.setter
     def data(self, payload: dict[str, Any]) -> None:
+        if self._loaded and payload is self._payload:
+            return
+        if self._sql_origin is not None:
+            self._replaced = True
         self._payload = payload
         self._loaded = True
         self._loader = None
@@ -560,8 +624,8 @@ class LazyMetaDict(UserDict[str, Any]):
 
     def __getitem__(self, key: str) -> Any:
         if key in self._payload:
-            return self._payload[key]
-        if self._read_key is not None and isinstance(key, str):
+            value = self._payload[key]
+        elif self._read_key is not None and isinstance(key, str):
             values = self._read_key(key)
             if values is None or key not in values:
                 raise KeyError(key)
@@ -569,14 +633,34 @@ class LazyMetaDict(UserDict[str, Any]):
             if self._point_keys is None:
                 self._point_keys = set()
             self._point_keys.add(key)
-            return value
-        return self.data[key]
+        else:
+            value = self._materialize()[key]
+        if self._sql_origin is not None:
+            self._watch_mutable(key, value)
+        return value
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self._materialize()[key] = value
+        self._record_edits((key,))
+
+    def __delitem__(self, key: str) -> None:
+        del self._materialize()[key]
+        self._record_edits((key,))
+
+    def __iter__(self) -> Iterator[str]:
+        return iter(self._materialize())
+
+    def __len__(self) -> int:
+        return len(self._materialize())
+
+    def __repr__(self) -> str:
+        return repr(self._materialize())
 
     def __contains__(self, key: object) -> bool:
         if key in self._payload:
             return True
         if self._read_key is None or not isinstance(key, str):
-            return key in self.data
+            return key in self._materialize()
         try:
             self[key]
         except KeyError:
@@ -585,37 +669,140 @@ class LazyMetaDict(UserDict[str, Any]):
 
     def iter_keys(self) -> Iterator[str]:
         """List exact top-level string names in lexical order, without value hydration when supported."""
-        names = tuple(self._read_keys() if not self._loaded and self._read_keys is not None else self.data)
+        names = tuple(self._read_keys() if not self._loaded and self._read_keys is not None else self._materialize())
         if not all(isinstance(name, str) for name in names):
             raise TypeError("iter_keys() requires string metadata keys. Use ordinary mapping iteration for mixed keys.")
         return iter(sorted(names))
 
     def pop(self, key: str, *default) -> Any:
-        return self.data.pop(key, *default)
+        payload = self._materialize()
+        present = key in payload
+        result = payload.pop(key, *default)
+        if present:
+            self._record_edits((key,))
+        return result
 
     def popitem(self) -> tuple[str, Any]:
-        return self.data.popitem()
+        key, value = self._materialize().popitem()
+        self._record_edits((key,))
+        return key, value
 
     def setdefault(self, key: str, default: Any = None) -> Any:
-        return self.data.setdefault(key, default)
+        if key not in self._materialize():
+            self[key] = default
+        return self[key]
+
+    def clear(self) -> None:
+        payload = self._materialize()
+        self._record_edits(payload)
+        payload.clear()
+
+    def __or__(self, other):
+        if not isinstance(other, (dict, UserDict)):
+            return NotImplemented
+        result = self.copy()
+        result.update(other)
+        return result
+
+    def __ror__(self, other):
+        if not isinstance(other, (dict, UserDict)):
+            return NotImplemented
+        result = self.copy()
+        supplied = dict(other)
+        result._record_edits(supplied.keys() - result._payload.keys())
+        supplied.update(result._payload)
+        result._payload = supplied
+        return result
+
+    def __ior__(self, other):
+        if other is not self:
+            self.update(other)
+        return self
+
+    def _record_edits(self, keys: Iterable[str]) -> None:
+        if self._sql_origin is not None:
+            if self._edited is None:
+                self._edited = set(keys)
+            else:
+                self._edited.update(keys)
+
+    def _watch(self, key: str, value: Any) -> None:
+        if self._edited is not None and key in self._edited:
+            return
+        if self._watched is None:
+            self._watched = {}
+        if key not in self._watched:
+            self._watched[key] = _watched_value_token(value)
+
+    def _watch_mutable(self, key: str, value: Any) -> None:
+        if type(value) not in (str, int, bool, float, type(None)):
+            self._watch(key, value)
+
+    def _was_edited(self, key: str) -> bool:
+        if self._replaced or self._edited is not None and key in self._edited:
+            return True
+        if self._watched is not None and key in self._watched:
+            original = self._watched[key]
+            changed = (original is _UNVERIFIABLE_META or key not in self._payload
+                       or _watched_value_token(self._payload[key]) != original)
+        else:
+            changed = (self._exposed_keys is not None and key not in self._exposed_keys
+                       and key in self._payload)
+        if changed:
+            self._record_edits((key,))
+        return changed
+
+    def _edited_keys(self) -> set[str]:
+        changed = set(self._edited or ())
+        if self._watched is not None:
+            changed.update(key for key in self._watched if self._was_edited(key))
+        if self._exposed_keys is not None:
+            changed.update(self._payload.keys() - self._exposed_keys)
+        if changed:
+            self._record_edits(changed)
+        return changed
+
+    def _copy_origin(self, copied: LazyMetaDict) -> LazyMetaDict:
+        if self._sql_origin is not None:
+            copied._sql_origin = self._sql_origin
+            for key, value in self._payload.items():
+                self._watch_mutable(key, value)
+            if self._point_keys is not None:
+                copied._point_keys = self._point_keys.copy()
+            copied._replaced = self._replaced
+            copied._edited = self._edited_keys()
+            copied._watched = self._watched.copy() if self._watched is not None else None
+        return copied
+
+    def copy(self) -> LazyMetaDict:
+        payload = self._materialize()
+        return self._copy_origin(type(self)(payload))
 
     def __copy__(self):
         # A public whole-mapping copy has the same authoritative view as dict().
-        return type(self)(self.data.copy())
+        return self.copy()
 
     def _copy_deferred(self):
         """Give an engine union independent metadata without preloading rows."""
         if self._loader is None:
-            return type(self)(self._payload)
+            return self.copy()
         copied = type(self)(self._loader, seed=self._payload, read_key=self._read_key)
         copied._read_keys = self._read_keys
-        if self._point_keys is not None:
+        if self._sql_origin is None and self._point_keys is not None:
             copied._point_keys = self._point_keys.copy()
-        return copied
+        return self._copy_origin(copied)
 
     def __reduce__(self):
         # A persisted graph must contain values, never Session/loader closures.
-        return type(self), (dict(self.data),)
+        payload = self._materialize()
+        if self._sql_origin is None:
+            return type(self), (payload,)
+        return type(self), (payload,), (self._sql_origin, self._edited_keys(), self._replaced)
+
+    def __setstate__(self, state: tuple[_SQLMetadataOrigin, set[str], bool]) -> None:
+        self._sql_origin, self._edited, self._replaced = state
+        for key, value in self._payload.items():
+            self._watch_mutable(key, value)
 
 
 def _default_postgresql_json(connection) -> bool:
@@ -750,6 +937,7 @@ def _lazy_meta(
     build_id: str,
     dialect: str | None,
     seed: Mapping[str, Any] | None,
+    origin: _SQLMetadataOrigin,
 ) -> LazyMetaDict:
     projection_bind = default_session.get_bind() if dialect is not None else None
 
@@ -804,7 +992,8 @@ def _lazy_meta(
                 active.close()
 
     return LazyMetaDict(_load, seed=seed, read_key=_load if dialect is not None else None,
-                        read_keys=partial(_load, names_only=True) if dialect is not None else None)
+                        read_keys=partial(_load, names_only=True) if dialect is not None else None,
+                        _sql_origin=origin)
 
 
 def _meta_value_payload(value: Any) -> dict[str, Any]:
@@ -1317,6 +1506,22 @@ def export_dataengine(
     batch_size = _checked_batch_size(batch_size)
     if type(replace) is not bool:
         raise TypeError("replace must be an explicit boolean")
+    for entity in chain(repo._districts.values(), repo._campuses.values()):
+        meta = entity.meta
+        origin = _entity_sql_metadata_origin(entity)
+        meta_origin = meta._sql_origin if isinstance(meta, LazyMetaDict) else None
+        if origin is None and meta_origin is None:
+            continue
+        if (origin is None or not isinstance(meta, LazyMetaDict) or meta_origin != origin
+                or origin.entity_id != entity.id or meta._replaced
+                or meta._edited_keys() or not origin.matches_fallback("enrollment", entity.enrollment)
+                or not origin.matches_fallback("rating", entity.rating)
+                or repo.catalog is None or repo.catalog.build_id != origin.build_id):
+            raise ContractError(
+                f"Cannot export entity {entity.id} as release data. "
+                "Its SQL-bound metadata, fallback values, or catalog were changed or could not be verified. "
+                "Reload the original release for SQL export or export caller data separately."
+            )
     if not replace and session.get_bind().dialect.name not in {"sqlite", "postgresql"}:
         raise NotImplementedError(
             "Partial database exports support SQLite and PostgreSQL"
@@ -1468,6 +1673,9 @@ def import_dataengine(
     meta_dialect = _point_meta_dialect(session.connection()) if lazy_meta else None
     repo = DataEngine()
     repo.catalog = catalog
+    import_id = uuid.uuid4() if lazy_meta else None
+    if import_id is not None:
+        repo._lazy_sql_import = True
     if lazy_meta and meta_session_factory is None:
         meta_session_factory = sessionmaker(
             bind=session.get_bind(), expire_on_commit=False
@@ -1498,31 +1706,36 @@ def import_dataengine(
     with repo.bulk():
         with session.execute(statement(DistrictRecord)) as rows:
             for d in rows.mappings():
+                origin = (_SQLMetadataOrigin(build_id, "district", d["id"], d["enrollment"], d["rating"], import_id)
+                          if import_id is not None else None)
                 meta = (
                     _lazy_meta(session, meta_session_factory, DistrictRecord, d["id"],
-                               build_id, meta_dialect, district_seed.pop(d["id"], None))
-                    if lazy_meta
+                               build_id, meta_dialect, district_seed.pop(d["id"], None), origin)
+                    if origin is not None
                     else dict(d["meta"] or {})
                 )
-                repo.add_district(
-                    District(
-                        id=d["id"],
-                        name=d["name"],
-                        enrollment=d["enrollment"],
-                        district_number=stored_district_number(d["district_number"], d["district_number_canon"]) or "",
-                        aea=d["aea"],
-                        aea_raw=d["aea_raw"],
-                        rating=d["rating"],
-                        boundary=_load_polygon(d["polygon_wkb"], d["polygon_geojson"]),
-                        meta=meta,
-                    )
+                district = District(
+                    id=d["id"],
+                    name=d["name"],
+                    enrollment=d["enrollment"],
+                    district_number=stored_district_number(d["district_number"], d["district_number_canon"]) or "",
+                    aea=d["aea"],
+                    aea_raw=d["aea_raw"],
+                    rating=d["rating"],
+                    boundary=_load_polygon(d["polygon_wkb"], d["polygon_geojson"]),
+                    meta=meta,
                 )
+                if origin is not None:
+                    district._sql_metadata_origin = origin
+                repo.add_district(district)
         with session.execute(statement(CampusRecord)) as rows:
             for c in rows.mappings():
+                origin = (_SQLMetadataOrigin(build_id, "campus", c["id"], c["enrollment"], c["rating"], import_id)
+                          if import_id is not None else None)
                 meta = (
                     _lazy_meta(session, meta_session_factory, CampusRecord, c["id"],
-                               build_id, meta_dialect, campus_seed.pop(c["id"], None))
-                    if lazy_meta
+                               build_id, meta_dialect, campus_seed.pop(c["id"], None), origin)
+                    if origin is not None
                     else dict(c["meta"] or {})
                 )
                 campus = Campus(
@@ -1559,6 +1772,8 @@ def import_dataengine(
                         low, high = _spans_to_bounds(spans)
                         object.__setattr__(campus, "grade_range_low_code", low)
                         object.__setattr__(campus, "grade_range_high_code", high)
+                if origin is not None:
+                    campus._sql_metadata_origin = origin
                 repo.add_campus(campus)
     repo._xfers_out = defaultdict(list)
     repo._xfers_in = defaultdict(list)

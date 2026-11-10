@@ -638,6 +638,8 @@ class DataEngine:
     def __or__(self, other: "DataEngine") -> "DataEngine":
         """Build a separate engine from disjoint entity identities."""
         r = DataEngine()
+        if getattr(self, "_lazy_sql_import", False) or getattr(other, "_lazy_sql_import", False):
+            r._lazy_sql_import = True
         with r.bulk():
             for repo in (self, other):
                 for entity in repo:

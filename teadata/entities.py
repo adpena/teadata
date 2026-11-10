@@ -6,7 +6,7 @@ from collections.abc import Mapping, MutableMapping
 from dataclasses import dataclass, field
 from datetime import date
 from functools import cached_property, singledispatchmethod
-from typing import Any, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional, Tuple
 import sys
 import uuid
 
@@ -27,6 +27,9 @@ from .geometry import (
 )
 from .grades import coerce_grade_spans, spans_to_bounds
 from .identifiers import EntityIdentityError, campus_lookup_key, canonical_source_identifier
+
+if TYPE_CHECKING:
+    from .manifest import _SQLMetadataOrigin
 
 __all__ = [
     "District",
@@ -96,9 +99,15 @@ _is_charter = is_charter
 _is_private = is_private
 
 
+class _SQLMetadataOwner:
+    # An unset slot keeps ordinary release entities' pickle and dataclass state.
+    __slots__ = ("_sql_metadata_origin",)
+    _sql_metadata_origin: _SQLMetadataOrigin
+
+
 @validate_non_empty_str("name")
 @dataclass(slots=True)
-class District:
+class District(_SQLMetadataOwner):
     id: uuid.UUID
     name: str
     enrollment: Optional[int] = None
@@ -218,6 +227,8 @@ class District:
         return self._prepared
 
     def __getattr__(self, name: str):
+        if name == "_sql_metadata_origin":
+            raise AttributeError(name)
         meta = object.__getattribute__(self, "meta")
         if isinstance(meta, Mapping) and name in meta:
             return meta[name]
@@ -263,7 +274,7 @@ class District:
 
 @validate_non_empty_str("name")
 @dataclass(slots=True)
-class Campus:
+class Campus(_SQLMetadataOwner):
     id: uuid.UUID
     district_id: uuid.UUID | None
     name: str
@@ -363,6 +374,8 @@ class Campus:
             self.campus_number = None
 
     def __getattr__(self, name: str):
+        if name == "_sql_metadata_origin":
+            raise AttributeError(name)
         if name in {"lookup_key", "source_namespace", "source_id", "campus_number", "district_id", "district_number", "district_name"}:
             raise AttributeError(f"Missing explicit campus identity field: {name}")
         meta = object.__getattribute__(self, "meta")

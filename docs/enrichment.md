@@ -327,6 +327,21 @@ a family wildcard. Use the metric form to choose between conflicting
 interpretations at the same precedence.
 The metric lookup stays sparse. The catalog may also check source, scope, and
 population attributes before interpreting it.
+
+On a lazy SQL import, mapping writes and deletions are local edits. Measurements
+of edited fields carry `input_binding="caller_supplied"` while keeping the
+catalog's interpretation rules. A deleted field stays caller-supplied when a
+named metric uses its fallback. Unchanged fields retain their release binding.
+Copies and pickle round trips keep known edits. Changes made through the
+backing dict or a nested value are detected by comparing their current content
+with the value before it was shared. Eager SQL imports retain their ordinary
+dict interface and do not track caller edits.
+
+The catalog-bound SQL writer rejects edited lazy imports before touching the
+destination. Reload the original release for a release export. Use
+`entity.to_dict()` to export your working data separately. For same-database
+replacement, read the source eagerly before beginning the replacement.
+
 An active caller Session is reused for lazy reads, including uncommitted writes.
 After that transaction ends, each deferred read owns and closes its new Session.
 The catalog document remains authoritative; a validated 64-byte build ID column

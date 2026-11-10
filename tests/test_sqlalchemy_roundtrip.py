@@ -1,10 +1,15 @@
 """Lossless source custody and bounded database I/O for the graph bridge."""
 
+from copy import copy, deepcopy
+from collections import OrderedDict
+from dataclasses import replace as replace_dataclass
+from decimal import Decimal
 from hashlib import sha256
 from importlib.resources import files
 import json
 import math
 import os
+import pickle
 import sqlite3
 import uuid
 
@@ -382,6 +387,181 @@ def test_key_discovery_accepts_a_one_shot_reader_and_reports_mixed_keys():
         tuple(mixed.iter_keys())
 
 
+def _assert_lazy_sql_edit_origin(factory, catalog):
+    repo = graph(catalog, 1)
+    campus_id = uuid.UUID(int=10001)
+    _, enrollment = catalog.source_for_metric("enrollment", "campus")
+    campus = repo._campuses[campus_id]
+    campus.enrollment = 120
+    campus.meta.update({enrollment: "150", "overall_rating": "A"})
+    with factory.begin() as session:
+        export_dataengine(repo, session, replace=True, include_meta_entries=False)
+
+    with factory() as session:
+        imported = import_dataengine(session)
+    campus = imported._campuses[campus_id]
+    active = imported.catalog
+    value = active.field_measurement(campus, enrollment)
+    assert value.numeric == 150 and value.source["input_binding"] == "release_entity"
+    assert active.field_measurement(campus, "overall_rating").source["input_binding"] == "release_entity"
+    assert active.measurement(replace_dataclass(campus, name="Copy"), "enrollment").source["input_binding"] == "release_entity"
+    replaced = replace_dataclass(campus, meta={enrollment: 999})
+    assert active.measurement(replaced, "enrollment").source["input_binding"] == "caller_supplied"
+    campus.meta[enrollment] = "150"
+    assert active.measurement(campus, "enrollment").source["input_binding"] == "caller_supplied"
+    assert active.measurement(campus, "overall_rating").source["input_binding"] == "release_entity"
+    del campus.meta[enrollment]
+    fallback = active.measurement(campus, "enrollment")
+    assert fallback.numeric == 120 and fallback.source["input_binding"] == "caller_supplied"
+    exact = active.field_measurement(campus, enrollment)
+    assert exact.status == "missing" and exact.source["input_binding"] == "caller_supplied"
+
+    for meta in (campus.meta.copy(), copy(campus.meta), deepcopy(campus.meta),
+                 campus.meta | {"other": 3}, {"other": 4} | campus.meta,
+                 pickle.loads(pickle.dumps(campus.meta))):
+        copied_campus = copy(campus)
+        copied_campus.meta = meta
+        assert active.measurement(copied_campus, "enrollment").source["input_binding"] == "caller_supplied"
+        assert active.measurement(copied_campus, "overall_rating").source["input_binding"] == "release_entity"
+    derived = imported | DataEngine()
+    detached = derived._campuses[campus_id]
+    assert active.measurement(detached, "enrollment").source["input_binding"] == "caller_supplied"
+    derived.catalog = active
+    for replacement in (replace_dataclass(detached, meta={enrollment: 200}),
+                        replace_dataclass(detached, id=uuid.uuid4(), meta={enrollment: 201})):
+        assert active.measurement(replacement, "enrollment").source["input_binding"] == "caller_supplied"
+    with pytest.raises(ContractError, match="another data release"):
+        changed_catalog(catalog).field_measurement(detached, enrollment)
+    return imported
+
+
+def test_lazy_edit_origin_blocks_export_before_destination_io(database, catalog):
+    engine, factory = database
+    edited = _assert_lazy_sql_edit_origin(factory, catalog)
+    statements = []
+
+    def observe(connection, cursor, statement, parameters, context, executemany):
+        statements.append(statement)
+
+    with factory() as session:
+        pending = DistrictRecord(id=uuid.UUID(int=99), name="Caller pending district")
+        session.add(pending)
+        event.listen(engine, "before_cursor_execute", observe)
+        try:
+            for replace in (False, True):
+                with pytest.raises(ContractError, match="Reload the original release"):
+                    export_dataengine(edited, session, replace=replace)
+        finally:
+            event.remove(engine, "before_cursor_execute", observe)
+        assert statements == [] and pending in session.new
+    with factory() as session:
+        unchanged = import_dataengine(session)
+    target = create_engine("sqlite:///:memory:")
+    try:
+        ensure_schema(target)
+        target_factory = create_sessionmaker(target)
+        with target_factory.begin() as session:
+            export_dataengine(unchanged, session, replace=True)
+        with target_factory() as session:
+            fresh = import_dataengine(session, lazy_meta=False)
+        campus = fresh._campuses[uuid.UUID(int=10001)]
+        assert isinstance(campus.meta, dict)
+        assert fresh.catalog.measurement(campus, "enrollment").numeric == 150
+    finally:
+        target.dispose()
+
+
+@pytest.mark.parametrize("operation", ["dict", "nested", "prefetch_copy", "pickle_alias", "replace", "data_replace", "union", "fallback"])
+def test_lazy_edits_through_aliases_and_mutators_keep_caller_origin(database, catalog, operation):
+    _, factory = database
+    repo = graph(catalog, 1)
+    district_id = uuid.UUID(int=1)
+    district = repo._districts[district_id]
+    _, field = catalog.source_for_metric("enrollment", "district")
+    district.enrollment = 120
+    if operation != "fallback":
+        district.meta[field] = [1] if operation in ("nested", "prefetch_copy", "pickle_alias") else 150
+    with factory.begin() as session:
+        export_dataengine(repo, session, include_meta_entries=False)
+    with factory() as session:
+        prefetch = None if operation == "pickle_alias" else [field]
+        imported = import_dataengine(session, prefetch_district_meta_keys=prefetch)
+    district = imported._districts[district_id]
+    if operation == "dict":
+        district.meta.data |= {field: 150.0}
+        assert not district.meta._was_edited("zero")
+    elif operation == "nested":
+        alias = district.meta[field]
+        assert dict(district.meta)[field] is alias
+        alias.append(2)
+    elif operation == "prefetch_copy":
+        derived = imported | DataEngine()
+        assert not district.meta._loaded
+        derived._districts[district_id].meta[field].append(2)
+        assert dict(district.meta)[field] == [1, 2]
+    elif operation == "pickle_alias":
+        district.meta, aliased = pickle.loads(pickle.dumps((district.meta, district.meta[field])))
+        assert district.meta[field] is aliased
+        aliased.append(2)
+    elif operation == "replace":
+        district.meta = dict(district.meta)
+    elif operation == "data_replace":
+        district.meta.data = {}
+    elif operation == "union":
+        district.meta |= {field: 155}
+    else:
+        assert imported.catalog.measurement(district, "enrollment").source["input_binding"] == "release_entity"
+        district.enrollment = 123
+    value = imported.catalog.measurement(district, "enrollment")
+    assert value.source["input_binding"] == "caller_supplied"
+    with factory() as session, pytest.raises(ContractError, match="Cannot export entity"):
+        export_dataengine(imported, session)
+
+
+def test_lazy_copies_refresh_unedited_prefetch_and_refuse_foreign_wrappers(database, catalog):
+    _, factory = database
+    repo = graph(catalog, 1)
+    district_id = uuid.UUID(int=1)
+    _, field = catalog.source_for_metric("enrollment", "district")
+    repo._districts[district_id].meta[field] = [1]
+    with factory.begin() as session:
+        export_dataengine(repo, session, include_meta_entries=False)
+    with factory() as session:
+        first = import_dataengine(session, prefetch_district_meta_keys=[field])
+    _ = first | DataEngine()
+    repo._districts[district_id].meta[field] = [2]
+    with factory.begin() as session:
+        export_dataengine(repo, session, include_meta_entries=False)
+    with factory() as session:
+        second = import_dataengine(session)
+    district = first._districts[district_id]
+    assert dict(district.meta)[field] == [2]
+    assert first.catalog.field_measurement(district, field).source["input_binding"] == "release_entity"
+    district.meta = second._districts[district_id].meta
+    assert first.catalog.field_measurement(district, field).source["input_binding"] == "caller_supplied"
+    with factory() as session, pytest.raises(ContractError, match="Cannot export entity"):
+        export_dataengine(first, session)
+
+
+def test_custom_decoder_read_is_not_a_lazy_edit(catalog):
+    engine = create_engine("sqlite:///:memory:", json_deserializer=lambda raw: json.loads(
+        raw, parse_float=Decimal, object_pairs_hook=OrderedDict,
+    ))
+    try:
+        ensure_schema(engine)
+        factory = create_sessionmaker(engine)
+        with factory.begin() as session:
+            export_dataengine(graph(catalog, 1), session, include_meta_entries=False)
+        with factory() as session:
+            imported = import_dataengine(session)
+        district = imported._districts[uuid.UUID(int=1)]
+        assert district.meta["zero"].as_tuple() == Decimal("-0.0").as_tuple()
+        assert type(district.meta["structured"][0]) is OrderedDict
+        assert not district.meta._edited_keys()
+    finally:
+        engine.dispose()
+
+
 def test_deferred_session_uses_its_own_json_decoder(tmp_path, catalog):
     url = f"sqlite:///{tmp_path / 'meta.sqlite'}"
     engine = create_engine(url)
@@ -585,6 +765,9 @@ def test_postgresql_roundtrip_preserves_full_publisher_rating(catalog):
                 custom_engine.dispose()
 
             _assert_lazy_metadata_projection(engine, factory, catalog)
+        edited = _assert_lazy_sql_edit_origin(factory, catalog)
+        with factory() as session, pytest.raises(ContractError, match="Reload the original release"):
+            export_dataengine(edited, session, replace=True)
     finally:
         engine.dispose()
 
