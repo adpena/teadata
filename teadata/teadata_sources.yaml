@@ -982,6 +982,12 @@ value_policies:
       '':
         status: missing
         reason: unreported_follow_up_horizon
+  first_university_rating_2026:
+    reference_id: first_statewide_summary
+    tokens:
+      '':
+        status: not_applicable
+        reason: university_charter_pass_fail_has_no_score
   frc_ppe_published:
     reference_id: frc_ppe_blank_note
     tokens:
@@ -17917,6 +17923,133 @@ data_sources:
               - 874a060ca3fd0298d84129621279da2ce1b46cd0d044cb77caabd9daff2cb07c
               - e38833e65b38f431378666165534f973960e490cd60c8a604442ae82fe27344e
               - f364ff137b9f0bafb3fa8ea3a462f9ac3b3134faa2570332923bf1d2b183df93
+  first_financial_accountability_district:
+    2026:
+      path: data/first/2026/district.xlsx
+      metadata:
+        title: TEA final 2025–26 School FIRST district ratings
+        publisher: Texas Education Agency
+        version: '2026'
+        period:
+          kind: fiscal_year
+          start_year: 2024
+          end_year: 2025
+        source_url: https://tealprod.tea.state.tx.us/First/forms/Main.aspx
+        published_at: '2026-11-05'
+        identifiers:
+        - district_number
+        metrics: &first_2026_metrics
+          first_status:
+            field: first_status
+            unit: text
+          first_rating:
+            field: first_rating
+            unit: text
+          first_score:
+            field: first_score
+          first_row_updated:
+            field: first_row_updated
+          first_region:
+            field: first_region
+        notes: Financial accountability for fiscal year 2025, ending June 30 or August 31 depending on the LEA. Publisher
+          row update timestamps are distinct from the final release date. Score is published in points from 0 to 100.
+          The publisher can assign F for critical indicator failure regardless of score.
+        references: &first_2026_references
+        - reference_id: first_crosswalk
+          role: schema
+          path: schemas/first--2026--final-ratings-crosswalk.json
+          reviewed_sha256: da35dca4cfc52651fbe7e5474d1090ad62f1a9d9515a5a655094d6bc0bbb3f17
+          provenance_ids:
+          - 44f7fbe1ba175f638e1a78d3c7e1d154b137f8bbd6b4e482da272a74292479b4
+        - reference_id: first_final_notice
+          role: source_notes
+          title: Official Release of Final 2025–2026 FIRST Ratings
+          url: https://tea.texas.gov/taa-letters/official-release-final-2025-2026-first-ratings
+          reviewed_sha256: bc343c25fff435828001e667e5a52db14a3ce5e6f1dfe2ce50d9194d7c52df89
+          provenance_ids:
+          - 1f97be3b7c3658f6910f7e96aa505bb0803872236bfd39486fb7dfa9f6f2cb5e
+        - reference_id: first_statewide_summary
+          role: source_notes
+          title: TEA Releases Final 2025–2026 Financial Accountability Ratings
+          url: https://tea2.tea.texas.gov/about-tea/newsroom/tea-releases-final-2025-2026-financial-accountability-ratings
+          reviewed_sha256: 798d8be863ae54deb8722c10ccd825ddda06fbe3f3623073b3ec71404be37e7b
+          provenance_ids:
+          - f36769c9718b5cd4f30a02c3e159c8fde9a363914958a5a09b680f5efbd2a858
+        - reference_id: first_basis_and_rules
+          role: methodology
+          title: Preliminary 2025-26 FIRST Ratings
+          url: https://tea.texas.gov/taa-letters/preliminary-2025-26-first-ratings
+          reviewed_sha256: bf174303b240dbb81dcf65b6de955e9a2b7de29a5c92b0cc310619da465ba2b8
+          provenance_ids:
+          - 0dc339e6e197060bb3060b33df070f790a534a8622a48ab867fdb9cea5e207b5
+        provenance_ids:
+        - f491d32f6a94e335269602a75fadeab880f490be6a6933587186865ea6a036df
+        source_qualifiers:
+          family: accountability
+          reference_id: first_final_notice
+          publisher_release_status: Final
+      reader:
+        profiles:
+          source:
+            worksheet: FIRST Ratings
+            column_schema: schemas/first--2026--final-ratings-crosswalk.json
+            roster_receipts:
+            - 1ca13eeee59dd68228f98eb96d4caab139943a1b259ba769e76c431a9df803fe
+            - 5f65057efdd7ff5a33295006b017987518698339a49826854c3d6a6fd56fc22a
+            - 91869ca85e16947442232f9a90bce3a8e0b01dfda0e6aa099d45ebeda33edbfa
+            - 4e76b688219b7548aafec924e31eb57f73487b83ffd25a18b6f5f105557ae3aa
+            - 19bd4a3ed553bce1142e8f8a61607e27e305cf44c7cac9c7aa9fc5cf029a53c1
+            - ce00c1a117e1df1984a2867ad89fa3fdc30c8baf882d4d7e6e8284b786767656
+            - d11a8fe41a1a54e66b293a7342216794ee888f1bb7284f67caff55d1584ca17a
+            - 999aba51f5474c96b46c14308c289f0da8c88bef1bb6729d2809fb7ef6172747
+            - 79a85bab72e30ef210f686d0f947af712417ef851f9da1865700085e5ce08903
+            - 66025a141634ecd48d5cd284bf747649a215951527b9e95e0c46a82bbf413a01
+            - f984f2da9a3774e48f83b9d77ef75c482f861da10425bdb8552fafe4b3bc0c81
+            - 663d0c800d8e6c32bc83c3b831226927172c43d2df2898385547a668ae562c15
+            - dd823f7e3a7c69ac890e8f7cd512d7db1a467b691c2256d6758df130afc7987e
+            - 9e4d4ed499148cd4d3ff47f5ef0c405c4e638e5f444a0236484dc26d6d8545dc
+            - f777a37323de1c7da5f31f32996aa6f9a924223b0935e5806c29c59c2d628eab
+            - a9560831ce694769a7a984d052350c700bf466639bb45d492216ee0f69d12a8a
+            - 6687300f88de0114b42f92d1e2d22344ee3173caa0336554eecd7de2b4890a2c
+            - 99bb0470d967b00f44eec5f50ec0266413b252dc263330c8bce180ae35524241
+            - ac104e06f3b00202ff9153b0f0bd5b9d6c63b5ce81f3db1dddb6c4dbb59d46bd
+            - 229ca846b1b13dcaf02f4ab981b4825d84276aa05c2b657b0f46d09f68c1213b
+            - 127d5942af2c46d70593e98e70a0a9b90b9eb1b0fbe135cb3e56940b07d489fc
+  first_financial_accountability_university_charter:
+    2026:
+      path: data/first/2026/university_charter.xlsx
+      metadata:
+        title: TEA final 2025–26 University Charter FIRST ratings
+        publisher: Texas Education Agency
+        version: '2026'
+        period:
+          kind: fiscal_year
+          start_year: 2024
+          end_year: 2025
+        source_url: https://pryor.tea.state.tx.us/Tea.CharterFirst.Web/Public/District.aspx?UniversityCharters=true
+        published_at: '2026-11-05'
+        identifiers:
+        - district_number
+        metrics: *first_2026_metrics
+        notes: Financial accountability for fiscal year 2025, ending June 30 or August 31 depending on the LEA. Publisher
+          row update timestamps are distinct from the final release date. This population uses pass/fail only. The
+          published score cell is not applicable.
+        references: *first_2026_references
+        provenance_ids:
+        - 689bd7e9e53e261ea2e6ffe5e632e3e6fe5596a991e361157bfadde5486e1f19
+        source_qualifiers:
+          family: accountability
+          reference_id: first_final_notice
+          publisher_release_status: Final
+        value_policy: first_university_rating_2026
+      reader:
+        profiles:
+          source:
+            worksheet: CharterFIRST Ratings
+            column_schema: schemas/first--2026--final-ratings-crosswalk.json
+            roster_receipts:
+            - a391a8c5c9f6997dead0fede36c26910b2b3a9fdac98f8ea6a9d8fd60dd49097
+
   frc_per_pupil_expenditure:
     2025:
       path: data/frc/2025/per-pupil-expenditure.html

@@ -122,16 +122,47 @@ def test_entity_sources_discover_without_leaf_io_and_keep_entity_values_separate
         fields = sources.tprs_student_membership_enrollment_reports
         variables = fields.variables(r'^membership_total_students_(?:count|percent)$')
         assert {value['field'] for value in variables} == {'membership_total_students_count', 'membership_total_students_percent'}
+        with pytest.raises(AttributeError, match="Did you mean .*tprs_student_membership_enrollment_reports"):
+            _ = sources.tprs_student_membership_enrolment_reports
+        with pytest.raises(AttributeError, match="Did you mean .*membership_total_students_count"):
+            _ = fields.membership_total_students_cout
+        with pytest.raises(KeyError, match=r"See variables\(\)"):
+            _ = fields['membership_total_students_cout']
         with pytest.raises(ContractError, match='complete raw TAPR table'):
             release.to_csv(editions['district'], BytesIO(), restore_original_headers=True)
     assert fields.membership_total_students_count == 0
+    assert sources[students.DATASET.upper()]['MEMBERSHIP_TOTAL_STUDENTS_COUNT'] == 0
     assert entity.membership_total_students_count == 999
     selected = fields.select(*(row['field'] for row in variables)).to_pylist()
     assert selected[0]['tprs_raw_membership_total_students_count'] == '0'
     with pytest.raises(AttributeError):
         _ = fields.unpublished
-    with pytest.raises(ContractError, match='exactly one published row'):
+    with pytest.raises(ContractError, match='No published row for district 001903.*edition 2026'):
         release.for_entity(district('001903'), edition='2026')[students.DATASET]['membership_total_students_count']
+
+
+def test_entity_source_namespace_does_not_hide_binding_or_row_errors(comparison, monkeypatch):
+    import pyarrow as pa
+
+    release, _ = comparison
+    fields = release.for_entity(district(), edition='2026')[students.DATASET]
+    metric = 'membership_total_students_count'
+    names = release.catalog._edition_field_names(fields.edition)
+    monkeypatch.setattr(release.catalog, '_edition_field_names', lambda edition: (*names, metric.upper()))
+    assert fields[metric] == 0
+    with pytest.raises(ContractError, match='Ambiguous source field'):
+        _ = fields[metric.capitalize()]
+    with monkeypatch.context() as guard:
+        guard.setattr(type(fields), 'select', lambda *args: pa.table({metric: [0, 1]}))
+        with pytest.raises(ContractError, match='Multiple published rows for district 001902'):
+            _ = fields.membership_total_students_count
+
+    def missing_bound_column(*args):
+        raise KeyError('bound column')
+
+    monkeypatch.setattr(type(fields), 'select', missing_bound_column)
+    with pytest.raises(KeyError, match='bound column'):
+        hasattr(fields, metric)
 
 
 def test_all_168_fields_use_the_direct_texas_leaf_and_exact_population(comparison):

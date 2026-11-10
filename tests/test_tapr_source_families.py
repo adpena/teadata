@@ -627,6 +627,19 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     budgets = 'peims_financial_single_file_budgets'
     assert list(current['data_sources'].pop(budgets)) == [2026]
     assert current['schema']['data_sources'].pop(budgets) == ['zip']
+    source_config = load_config()
+    for population in ('district', 'university_charter'):
+        dataset = f'first_financial_accountability_{population}'
+        versions = current['data_sources'].pop(dataset)
+        assert list(versions) == [2026]
+        assert list(versions[2026]['reader']['profiles']) == ['source']
+        assert dataset not in current['schema']['data_sources']
+        assert source_config.is_source_only(dataset, 2026)
+    first_score = current['value_policies'].pop('first_university_rating_2026')
+    assert first_score['reference_id'] == 'first_statewide_summary'
+    assert first_score['tokens'] == {
+        '': {'status': 'not_applicable', 'reason': 'university_charter_pass_fail_has_no_score'},
+    }
     per_pupil = 'frc_per_pupil_expenditure'
     assert list(current['data_sources'].pop(per_pupil)) == [2025]
     assert current['schema']['data_sources'].pop(per_pupil) == ['html']

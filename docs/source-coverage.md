@@ -357,3 +357,30 @@ January 1, 1800 date remains unresolved. The report print date does not
 establish the date of any event. [AskTED reports](https://tealprod.tea.state.tx.us/Tea.AskTed.Web/Forms/ReportSelection.aspx)
 
 [School-year selection and source identity](querying.md#school-years-and-source-editions)
+
+## School FIRST financial accountability
+
+The final **2025–26** FIRST rating edition was released November 5, 2026 and
+measures **fiscal year 2024–25**. It is separate from academic accountability.
+A worksheet's last-updated column records the publisher's row update, which
+can predate the final release. See the [final release notice](https://tea.texas.gov/taa-letters/official-release-final-2025-2026-first-ratings)
+and [TEA's explanation of the financial basis and indicators](https://tea.texas.gov/taa-letters/preliminary-2025-26-first-ratings).
+
+| Source ID | Geographic scope and population | Offline qualification |
+| --- | --- | --- |
+| `first_financial_accountability_district` | District scope, 1,018 School FIRST districts | Final workbook and complete public roster. 840 A, 107 B, 60 C, 11 F. Scores are 0–100 points. TEA can assign F regardless of score. |
+| `first_financial_accountability_university_charter` | District scope, five charters operated by public higher education institutions | Final workbook and complete public roster. All five received Pass. Numeric score is not applicable. |
+
+Both editions are source-only candidates. Their workbook, public roster,
+and announcement controls were checked separately. The 165 graded
+non-university charters remain on hold. The final export, roster, and
+Charter FIRST statistics agree with one another, but the [TEA newsroom table](https://tea.texas.gov/about-tea/newsroom/tea-releases-final-2025-2026-financial-accountability-ratings)
+reports one fewer B and one more C. The reason for that discrepancy remains
+unverified. No combined total or campus rating is admitted.
+
+To replay the exact retained acquisitions into a new unpublished directory,
+run `uv run --locked python -m teadata.scripts.refresh_first_ratings --store
+<retained-store> --output <new-directory>`. The producer checks the archived
+workbooks, roster pages and scoped newsroom counts offline, then verifies
+both leaf artifacts and their Arrow readback. Production release admission
+and application activation are separate steps.

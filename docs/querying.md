@@ -261,8 +261,11 @@ source table as the query and export APIs and does not populate the entity's
 `meta` dictionary. Canonical entity properties remain available directly.
 Use `student["field_name"]` when a field name conflicts with a method.
 Pass an exact key from `sources.datasets()` to `sources.dataset(key)` when a
-name resolves to more than one table or revision. Scalar access requires one published row for
-the entity. For a table with more than one row per entity, pass a PyArrow
+name resolves to more than one table or revision. Dataset and scalar field
+names match exact spelling first and then a unique case-insensitive name.
+Spelling suggestions come from the selected scope and edition.
+Scalar access distinguishes no published row for the entity in that edition
+from multiple matching rows. For the latter, pass a PyArrow
 expression to `select(..., where=...)` to narrow its grain.
 
 An entity query routes partitioned TPRS Student reports automatically. For example,

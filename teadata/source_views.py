@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import csv
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from decimal import Decimal
@@ -305,6 +305,18 @@ class PartitionedExportProvenance:
             partition._append_sheet(workbook, sheet=sheet)
 
 
+class _UnknownSourceName(KeyError):
+    """Only a missing namespace name becomes an AttributeError."""
+
+
+def _unknown_source_name(name: str, names: Iterable[str], context: str, discovery: str) -> _UnknownSourceName:
+    from .selectors import _field_suggestions
+
+    matches = _field_suggestions(name, names) if len(name) <= 256 else ()
+    hint = f" Did you mean {', '.join(map(repr, matches))}?" if matches else ""
+    return _UnknownSourceName(f"Unknown {context} {name!r}.{hint} See {discovery} for exact names.")
+
+
 @dataclass(frozen=True, slots=True)
 class SourceFields:
     release: DataRelease
@@ -325,12 +337,24 @@ class SourceFields:
         return table.to_arrow()
 
     def __getitem__(self, name: str):
-        metadata = self.release.catalog.field_metadata(name, scope=self.edition.scope, edition=self.edition)
+        if not isinstance(name, str):
+            raise TypeError("Source field selection requires a field name")
+        catalog = self.release.catalog
+        metadata = catalog.field_metadata(name, scope=self.edition.scope, edition=self.edition)
         if metadata is None:
-            raise KeyError(name)
+            matches = catalog._observation_fields(self.edition, (name,))
+            if not matches:
+                raise _unknown_source_name(name, catalog._edition_field_names(self.edition), "source field", "variables()")
+            name = matches[name]
+            metadata = catalog.field_metadata(name, scope=self.edition.scope, edition=self.edition)
+            if metadata is None:
+                raise ContractError(f"Source field {name!r} is missing its catalog binding")
         table = self.select(name)
         if table.num_rows != 1:
-            raise ContractError("Scalar access requires exactly one published row for this entity")
+            selection = f"{self.edition.scope} {self.identifier} in {self.edition.dataset}, edition {self.edition.edition}"
+            if table.num_rows == 0:
+                raise ContractError(f"No published row for {selection}. Check the publisher roster.")
+            raise ContractError(f"Multiple published rows for {selection}. Use select() with a row filter.")
         return table[metadata["column"]][0].as_py()
 
     def __getattr__(self, name: str):
@@ -338,8 +362,8 @@ class SourceFields:
             raise AttributeError(name)
         try:
             return self[name]
-        except KeyError as error:
-            raise AttributeError(name) from error
+        except _UnknownSourceName as error:
+            raise AttributeError(*error.args) from error
 
 
 @dataclass(frozen=True, slots=True)
@@ -359,9 +383,20 @@ class EntitySources:
                      if row["edition"] == self.edition)
 
     def dataset(self, name: str | EditionKey) -> SourceFields:
-        choices = [key for key in self.datasets() if key == name or key.dataset == name]
-        if not choices:
-            raise KeyError(name)
+        keys = self.datasets()
+        if isinstance(name, str):
+            choices = [key for key in keys if key.dataset == name]
+            if not choices:
+                folded = name.casefold()
+                choices = [key for key in keys if key.dataset.casefold() == folded]
+            if not choices:
+                raise _unknown_source_name(name, (key.dataset for key in keys), "source dataset", "datasets()")
+        elif isinstance(name, EditionKey):
+            choices = [key for key in keys if key == name]
+            if not choices:
+                raise _UnknownSourceName(f"Exact source edition {name.identity} is unavailable. See datasets().")
+        else:
+            raise TypeError("Source dataset selection requires a name or exact EditionKey")
         if len(choices) != 1:
             raise ContractError("Source name is ambiguous; select an exact EditionKey")
         (key,) = choices
@@ -375,8 +410,8 @@ class EntitySources:
             raise AttributeError(name)
         try:
             return self.dataset(name)
-        except KeyError as error:
-            raise AttributeError(name) from error
+        except _UnknownSourceName as error:
+            raise AttributeError(*error.args) from error
 
 
 @dataclass(frozen=True, slots=True)
