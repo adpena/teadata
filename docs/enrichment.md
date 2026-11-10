@@ -296,7 +296,8 @@ with Session() as session:
 without building a second full ORM graph. Eager metadata is read with each entity;
 lazy metadata refuses a changed source release or deleted entity on deferred reads.
 Dot access and bracket access both use the same mapping. For ASCII identifier
-keys, SQLite 3.38 or later with JSON support and UTF-8 PostgreSQL with the
+keys, SQLite 3.38 or later with JSON support and PostgreSQL with UTF-8 server
+and client encodings and the
 default psycopg 3 cursors and JSON loader can return just the selected JSON
 value. Prefetch projects up to 16 such keys in one bounded query per entity
 type. Both paths preserve JSON null, large integers and nested
@@ -309,8 +310,21 @@ import while other clients write. Lazy reads observe the bound release's rows
 at query time. Previously read values can already be in memory.
 Lazy metadata is a standard mutable mapping. Use `dict(entity.meta)` or
 `entity.to_dict()` at a JSON boundary. Whole-mapping operations still materialize
-the document. Use `repo_from_db.catalog.measurement(entity, metric)` for an
-interpreted value and its catalog provenance when the metric has a binding.
+the document. For names alone, `entity.meta.iter_keys()` on a lazy mapping lists
+exact top-level names in lexical order. A supported SQL reader returns just
+the names. It uses the original reader for documents or decoders that need it.
+Use `repo_from_db.catalog.measurement(entity, metric)` for an interpreted value
+and its catalog provenance by metric name, or
+`repo_from_db.catalog.field_measurement(entity, field)` by exact field name.
+The field form raises `teadata.manifest.FieldMeasurementError` when the catalog
+cannot interpret the key. The exception gives a reason and available alternatives,
+including spelling suggestions for unknown fields. A bound field with a missing
+observation instead returns a `Measurement` with status `missing`. The exact
+field method reads the requested field alone. A named metric may have a
+catalog-declared fallback to an entity attribute.
+Within one dataset, an explicit metric binding takes precedence over
+a family wildcard. Use the metric form to choose between conflicting
+interpretations at the same precedence.
 The metric lookup stays sparse. The catalog may also check source, scope, and
 population attributes before interpreting it.
 An active caller Session is reused for lazy reads, including uncommitted writes.

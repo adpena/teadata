@@ -14,6 +14,7 @@ from pathlib import Path
 import platform
 import os
 import sqlite3
+import sys
 import unicodedata
 from typing import Any, Callable, Iterable, Mapping
 
@@ -43,6 +44,16 @@ class ContractError(RuntimeError):
     """An artifact or source does not satisfy the dataset contract."""
 
 
+class FieldMeasurementError(ContractError):
+    """An exact entity field cannot be interpreted in the selected release."""
+
+    def __init__(self, field: str, scope: str, reason: str, guidance: str,
+                 *, alternatives: tuple[str, ...] = ()) -> None:
+        self.field, self.scope, self.reason = field, scope, reason
+        self.alternatives = alternatives
+        super().__init__(f"Cannot interpret {scope} field {field!r}. {guidance}")
+
+
 def canonical_json(value: Any) -> str:
     return json.dumps(
         value, sort_keys=True, separators=(",", ":"), ensure_ascii=True, allow_nan=False
@@ -53,6 +64,19 @@ def canonical_json(value: Any) -> str:
 def _period_json(period: DataPeriod) -> str:
     """Reuse the serialized period without changing catalog cache keys."""
     return canonical_json(period.to_dict())
+
+
+def _native_entity_scope(entity_type: type) -> str | None:
+    # A native instance already has its classes loaded. Keep DTO measurements
+    # and catalog discovery independent of the entity and geometry stack.
+    module = sys.modules.get("teadata.entities")
+    if module is None:
+        return None
+    if (campus := getattr(module, "Campus", None)) is not None and issubclass(entity_type, campus):
+        return "campus"
+    if (district := getattr(module, "District", None)) is not None and issubclass(entity_type, district):
+        return "district"
+    return None
 
 
 def schema_fingerprint(columns: Any) -> str:
@@ -327,7 +351,7 @@ class DatasetCatalog:
             for dataset, source in sources.items()
         }
         self._field_resolutions: dict[
-            tuple[str, str],
+            tuple[str, str, bool],
             tuple[MetricBinding, str, str, MetricDefinition | None] | None,
         ] = {}
         if "metric_bindings" not in document:
@@ -1430,7 +1454,14 @@ class DatasetCatalog:
 
     def _entity_build_id(self, entity: Any) -> str | None:
         repo_catalog = getattr(getattr(entity, "_repo", None), "catalog", None)
-        origins = [getattr(entity, "source_build_id", None), repo_catalog.build_id if repo_catalog is not None else None]
+        if _native_entity_scope(type(entity)) is not None:
+            try:
+                declared = object.__getattribute__(entity, "source_build_id")
+            except AttributeError:
+                declared = None
+        else:
+            declared = getattr(entity, "source_build_id", None)
+        origins = [declared, repo_catalog.build_id if repo_catalog is not None else None]
         if any(origin is not None and origin != self.build_id for origin in origins):
             raise ContractError("Entity belongs to another data release")
         return next((origin for origin in origins if origin is not None), None)
@@ -1438,11 +1469,12 @@ class DatasetCatalog:
     def _contextual_measurement(self, raw: Any, binding: MetricBinding, dataset: str, key: str,
                                definition: MetricDefinition | None, *, entity=None,
                                input_binding="caller_supplied") -> Measurement:
-        private = bool(getattr(entity, "is_private", False))
-        if entity is not None and ((binding.population == "public" and private) or (binding.population == "private" and not private)):
-            return self._with_origin(Measurement(None, ValueStatus.NOT_APPLICABLE,
-                reason="outside_metric_population", unit=self._metric_unit(binding, key, definition)),
-                dataset, key, definition, input_binding=input_binding)
+        if entity is not None and binding.population != "all":
+            private = _native_entity_scope(type(entity)) != "district" and bool(getattr(entity, "is_private", False))
+            if (binding.population == "private") != private:
+                return self._with_origin(Measurement(None, ValueStatus.NOT_APPLICABLE,
+                    reason="outside_metric_population", unit=self._metric_unit(binding, key, definition)),
+                    dataset, key, definition, input_binding=input_binding)
         return self._measure_bound(raw, binding, dataset, key, definition, input_binding=input_binding)
 
     def _with_origin(self, value: Measurement, dataset: str, key: str,
@@ -1466,23 +1498,105 @@ class DatasetCatalog:
         self, entity: Any, metric: str, *, scope: str | None = None
     ) -> Measurement:
         self._require_scalar_interpretation()
-        scope = scope or ("campus" if hasattr(entity, "campus_number") else "district")
+        scope = scope or _native_entity_scope(type(entity)) or ("campus" if hasattr(entity, "campus_number") else "district")
         known_build = self._entity_build_id(entity)
-        binding, dataset, key, definition = self._resolve_metric(metric, scope)
+        return self._read_entity_measurement(entity, self._resolve_metric(metric, scope), known_build)
+
+    def field_measurement(
+        self, entity: Any, field: str, *, scope: str | None = None
+    ) -> Measurement:
+        """Read and interpret an exact entity field with an unambiguous catalog binding."""
+        entity_scope = _native_entity_scope(type(entity))
+        if scope is None:
+            scope = entity_scope or ("campus" if hasattr(entity, "campus_number") else "district")
+        if scope not in ("campus", "district"):
+            raise FieldMeasurementError(field, scope, "invalid_scope", "Use scope='campus' or scope='district'.",
+                                        alternatives=("campus", "district"))
+        if entity_scope is not None and scope != entity_scope:
+            raise FieldMeasurementError(field, scope, "wrong_scope", f"Use scope={entity_scope!r} for this entity.",
+                                        alternatives=(entity_scope,))
+        if not isinstance(field, str) or not field.strip():
+            raise FieldMeasurementError(field, scope, "invalid_field", "Pass a nonblank metadata field name.")
+        resolved = self._resolve_field(field, scope, require_unique=True)
+        if resolved is None:
+            raise self._unbound_field_error(field, scope)
+        return self._read_entity_measurement(entity, resolved, self._entity_build_id(entity), fallback_attribute=False)
+
+    def _read_entity_measurement(
+        self, entity: Any, resolved: tuple[MetricBinding, str, str, MetricDefinition | None],
+        known_build: str | None, *, fallback_attribute: bool = True,
+    ) -> Measurement:
+        binding, dataset, key, definition = resolved
         meta = getattr(entity, "meta", None)
         absent = object()
         raw = meta.get(key, absent) if meta is not None else absent
         if raw is absent:
-            raw = getattr(entity, binding.attribute, None) if binding.attribute is not None else None
+            raw = getattr(entity, binding.attribute, None) if fallback_attribute and binding.attribute is not None else None
         return self._contextual_measurement(raw, binding, dataset, key, definition, entity=entity,
                                    input_binding="release_entity" if known_build is not None else "caller_supplied")
 
-    def _resolve_field(self, field: str, scope: str) -> tuple[MetricBinding, str, str, MetricDefinition | None] | None:
+    @staticmethod
+    def _exact_field_suffixes(binding: MetricBinding, targets: Iterable[str]) -> Iterable[str]:
+        parts = binding.field.split("{metric}")
+        count = len(parts) - 1
+        if not count:
+            if binding.field in targets:
+                yield ""
+            return
+        fixed_length = sum(map(len, parts))
+        for target in targets:
+            width, remainder = divmod(len(target) - fixed_length, count)
+            if width >= 0 and remainder == 0:
+                start = len(parts[0])
+                suffix = target[start:start + width]
+                if binding.field.replace("{metric}", suffix) == target:
+                    yield suffix
+
+    def _unbound_field_error(self, field: str, scope: str) -> FieldMeasurementError:
+        from .selectors import _field_suggestions
+
+        if field in {"campus_number", "district_number", "campus_name", "district_name"}:
+            return FieldMeasurementError(field, scope, "identity_field", "Read the identifier or name directly on the entity.")
+        if field in self._bindings or any(name.endswith(".*") and field.startswith(name[:-1]) for name in self._bindings):
+            try:
+                self._resolve_metric(field, scope)
+            except ContractError:
+                pass
+            else:
+                return FieldMeasurementError(field, scope, "metric_name",
+                                             f"Use catalog.measurement(entity, {field!r}) for this metric name.",
+                                             alternatives=(field,))
+        if any(field in columns for columns in self._read_columns.values()):
+            return FieldMeasurementError(field, scope, "unbound_field",
+                                         "The release declares this field but has no reviewed binding for this scope. "
+                                         "Use a named metric or consult its source table for the raw value.")
+        datasets = set()
+        for name in self._bindings:
+            binding, _ = self._metric_selection(name)
+            if scope in binding.scopes:
+                datasets.add(binding.dataset.replace("{scope}", scope))
+        possible = (column for dataset in datasets for column in self._read_columns[dataset])
+
+        def eligible(alternative: str) -> bool:
+            try:
+                return self._resolve_field(alternative, scope, require_unique=True) is not None
+            except FieldMeasurementError:
+                return False  # An ambiguous match would fail again in this scope.
+
+        alternatives = _field_suggestions(field, possible, eligible=eligible)
+        guidance = f"Did you mean {', '.join(map(repr, alternatives))}? " if alternatives else ""
+        return FieldMeasurementError(field, scope, "unknown_field",
+                                     f"{guidance}Choose a bound field from the release catalog or read local keys via entity.meta.",
+                                     alternatives=alternatives)
+
+    def _resolve_field(
+        self, field: str, scope: str, *, require_unique: bool = False,
+    ) -> tuple[MetricBinding, str, str, MetricDefinition | None] | None:
         """Compile only release-invariant interpretation, including opaque fields."""
         self._require_scalar_interpretation()
         if scope not in {"campus", "district"}:
             raise ContractError("Unknown field scope")
-        identity = (scope, field)
+        identity = (scope, field, require_unique)
         if identity in self._field_resolutions:
             return self._field_resolutions[identity]
         if field in {"campus_number", "district_number", "campus_name", "district_name"}:
@@ -1495,28 +1609,72 @@ class DatasetCatalog:
             metadata = self._metadata[dataset]
             definition_items = [(name, definition) for name, definition in metadata.metrics.items() if definition.field == field]
             for name, binding in self._bindings.items():
+                if require_unique and isinstance(binding, str):
+                    binding, _ = self._metric_selection(name)
                 if not isinstance(binding, MetricBinding) or scope not in binding.scopes or binding.dataset.replace("{scope}", scope) != dataset:
                     continue
-                if name.endswith(".*"):
+                wildcard = name.endswith(".*")
+                if wildcard and require_unique:
+                    if binding.field_mode == "literal":
+                        targets = [field]
+                    else:
+                        targets = [label for label, _ in definition_items]
+                        prefix = f"{scope}_{metadata.field_year}_"
+                        if metadata.field_year is not None and field.startswith(prefix):
+                            targets.append(field[len(prefix):])
+                    selectors = self._exact_field_suffixes(binding, targets)
+                    metric_names = (name[:-1] + suffix if "{metric}" in binding.field else name for suffix in selectors)
+                elif wildcard:
                     selector = definition_items[0][0] if definition_items else field
                     prefix = f"{scope}_{metadata.field_year}_"
                     if binding.field_mode == "metric" and not definition_items:
                         if not field.startswith(prefix):
                             continue
                         selector = field[len(prefix):]
-                    metric = name[:-1] + selector
+                    metric_names = (name[:-1] + selector,)
                 else:
-                    metric = name
-                resolved_binding, suffix = self._metric_selection(metric)
-                if scope not in resolved_binding.scopes or resolved_binding.dataset.replace("{scope}", scope) != dataset:
-                    continue
-                resolved_field, definition = self._metric_target(resolved_binding, dataset, scope, suffix)
-                if resolved_field == field:
-                    candidates.append((dataset, resolved_binding, definition, not name.endswith(".*")))
-        if len({item[0] for item in candidates}) != 1:
+                    metric_names = (name,)
+                for metric in metric_names:
+                    resolved_binding, suffix = self._metric_selection(metric)
+                    if scope not in resolved_binding.scopes or resolved_binding.dataset.replace("{scope}", scope) != dataset:
+                        continue
+                    resolved_field, definition = self._metric_target(resolved_binding, dataset, scope, suffix)
+                    if resolved_field != field:
+                        continue
+                    if (require_unique and resolved_binding.field_mode == "literal"
+                            and field not in metadata.metrics and definition_items):
+                        candidates.extend((dataset, resolved_binding, detail, not wildcard, metric)
+                                          for _, detail in definition_items)
+                    else:
+                        candidates.append((dataset, resolved_binding, definition, not wildcard, metric))
+        if not candidates:
             self._field_resolutions[identity] = None
             return None
-        dataset, binding, definition, _ = max(candidates, key=lambda item: item[3])
+        datasets = {item[0] for item in candidates}
+        dataset, binding, definition, explicit, _ = max(candidates, key=lambda item: item[3])
+        if require_unique:
+            preferred = [item for item in candidates if len(datasets) > 1 or item[3] == explicit]
+            interpretations_by_metric: dict[str, set[tuple]] = {}
+            for source, candidate, detail, _, metric in preferred:
+                unit = self._metric_unit(candidate, field, detail)
+                period = detail.period if detail and detail.period is not None else self._metadata[source].period
+                interpretations_by_metric.setdefault(metric, set()).add(
+                    (source, candidate.population, unit, candidate.bounds(unit), period)
+                )
+            interpretations = set().union(*interpretations_by_metric.values())
+            if len(interpretations) > 1:
+                alternatives = tuple(sorted(metric for metric, options in interpretations_by_metric.items() if len(options) == 1))
+                if len(alternatives) == len(interpretations_by_metric):
+                    guidance = ("Multiple reviewed bindings apply. Choose a named metric with "
+                                f"catalog.measurement(entity, metric) from {', '.join(map(repr, alternatives))}.")
+                else:
+                    guidance = ("The source definitions conflict. Consult the publisher's source dictionary "
+                                "or use a separately reviewed named metric for the intended definition.")
+                raise FieldMeasurementError(field, scope, "ambiguous_field",
+                                             guidance, alternatives=alternatives)
+        elif len(datasets) > 1:
+            self._field_resolutions[identity] = None
+            return None
         resolved = (binding, dataset, field, definition)
         self._field_resolutions[identity] = resolved
         return resolved

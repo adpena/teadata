@@ -28,6 +28,7 @@ from __future__ import annotations
 
 from collections import UserDict, defaultdict
 from datetime import date, datetime, timezone
+from functools import partial
 from itertools import islice
 import json
 import math
@@ -516,8 +517,10 @@ class LazyMetaDict(UserDict[str, Any]):
         *,
         seed: Mapping[str, Any] | None = None,
         read_key: Callable[[str], Mapping[str, Any] | None] | None = None,
+        read_keys: Callable[[], Iterable[str]] | None = None,
     ):
         self._read_key = read_key
+        self._read_keys = read_keys
         self._point_keys: set[str] | None = None
         if callable(loader):
             self._loader: Callable[[], Mapping[str, Any] | None] | None = loader
@@ -542,6 +545,7 @@ class LazyMetaDict(UserDict[str, Any]):
             self._loaded = True
             self._loader = None
             self._read_key = None
+            self._read_keys = None
             self._point_keys = None
         return self._payload
 
@@ -551,6 +555,7 @@ class LazyMetaDict(UserDict[str, Any]):
         self._loaded = True
         self._loader = None
         self._read_key = None
+        self._read_keys = None
         self._point_keys = None
 
     def __getitem__(self, key: str) -> Any:
@@ -578,6 +583,13 @@ class LazyMetaDict(UserDict[str, Any]):
             return False
         return True
 
+    def iter_keys(self) -> Iterator[str]:
+        """List exact top-level string names in lexical order, without value hydration when supported."""
+        names = tuple(self._read_keys() if not self._loaded and self._read_keys is not None else self.data)
+        if not all(isinstance(name, str) for name in names):
+            raise TypeError("iter_keys() requires string metadata keys. Use ordinary mapping iteration for mixed keys.")
+        return iter(sorted(names))
+
     def pop(self, key: str, *default) -> Any:
         return self.data.pop(key, *default)
 
@@ -596,6 +608,7 @@ class LazyMetaDict(UserDict[str, Any]):
         if self._loader is None:
             return type(self)(self._payload)
         copied = type(self)(self._loader, seed=self._payload, read_key=self._read_key)
+        copied._read_keys = self._read_keys
         if self._point_keys is not None:
             copied._point_keys = self._point_keys.copy()
         return copied
@@ -608,20 +621,32 @@ class LazyMetaDict(UserDict[str, Any]):
 def _default_postgresql_json(connection) -> bool:
     if connection.dialect.driver != "psycopg":
         return False
-    from psycopg import Cursor, ServerCursor
+    from psycopg import Cursor, ServerCursor, _cmodule
     from psycopg.pq import Format
     from psycopg.types.json import JsonBinaryLoader, JsonLoader
+    from psycopg.types.string import TextBinaryLoader, TextLoader
 
     driver = connection.connection.driver_connection
     adapters = driver.adapters
     json_oid = adapters.types["json"].oid
+    native = _cmodule._psycopg
+    # The CASE result can be varchar even when the JSON token is cast to text.
+    text_loaders = ((Format.TEXT, TextLoader, getattr(native, "TextLoader", None)),
+                    (Format.BINARY, TextBinaryLoader, getattr(native, "TextBinaryLoader", None)))
     return (driver.info.parameter_status("server_encoding") == "UTF8"
+            and driver.info.parameter_status("client_encoding") == "UTF8"
             and driver.cursor_factory is Cursor
             and driver.server_cursor_factory is ServerCursor
             and adapters.get_loader(json_oid, Format.TEXT) is JsonLoader
             and adapters.get_loader(json_oid, Format.BINARY) is JsonBinaryLoader
             and getattr(JsonLoader, "_loads", None) is json.loads
-            and getattr(JsonBinaryLoader, "_loads", None) is json.loads)
+            and getattr(JsonBinaryLoader, "_loads", None) is json.loads
+            and all(adapters.get_loader(adapters.types[name].oid, mode) in (python_loader, native_loader or python_loader)
+                    for name in ("text", "varchar") for mode, python_loader, native_loader in text_loaders))
+
+
+def _default_sqlite_text(connection) -> bool:
+    return getattr(connection.connection.driver_connection, "text_factory", None) is str
 
 
 def _point_meta_dialect(connection) -> str | None:
@@ -630,7 +655,8 @@ def _point_meta_dialect(connection) -> str | None:
         return None
     if dialect.name == "postgresql" and _default_postgresql_json(connection):
         return "postgresql"
-    if dialect.name == "sqlite" and (dialect.server_version_info or ()) >= (3, 38, 0):
+    if (dialect.name == "sqlite" and (dialect.server_version_info or ()) >= (3, 38, 0)
+            and _default_sqlite_text(connection)):
         try:
             connection.exec_driver_sql("SELECT json_valid('{}'), '{}' -> '$.x' FROM json_each('{}')").close()
         except OperationalError as error:
@@ -646,6 +672,16 @@ def _point_meta_key(key: str) -> bool:
     return isinstance(key, str) and key.isascii() and key.isidentifier()
 
 
+def _unsafe_postgresql_meta(raw):
+    # PostgreSQL's JSON type accepts escapes its extractors cannot decode.
+    return raw.op("~")(r"\\u(?:0000|[dD][89a-fA-F][0-9a-fA-F]{2})")
+
+
+def _unsafe_sqlite_meta(meta, raw):
+    return or_(func.typeof(meta) != "text", func.instr(raw, func.char(0)) > 0,
+               func.instr(raw, r"\u0000") > 0, func.json_valid(meta) != 1)
+
+
 def _projected_meta_token(meta, key: str, dialect: str):
     """Project JSON text. SQL NULL means absent; empty text requests a whole read."""
     raw = sql_cast(meta, Text)
@@ -653,7 +689,7 @@ def _projected_meta_token(meta, key: str, dialect: str):
         # JSON can store escapes that native extraction cannot decode even in
         # unrelated keys. Keep such documents on the typed JSON reader.
         return case(
-            (raw.op("~")(r"\\u(?:0000|[dD][89a-fA-F][0-9a-fA-F]{2})"), ""),
+            (_unsafe_postgresql_meta(raw), ""),
             (func.json_typeof(meta) == "object", sql_cast(meta.op("->")(literal(key, Text)), Text)),
             else_=None,
         )
@@ -666,8 +702,7 @@ def _projected_meta_token(meta, key: str, dialect: str):
     # original decoder. JSON -> text preserves big integers and signed zero.
     return case(
         (meta.is_(None), None),
-        (or_(func.typeof(meta) != "text", func.instr(raw, func.char(0)) > 0,
-             func.instr(raw, r"\u0000") > 0, func.json_valid(meta) != 1), ""),
+        (_unsafe_sqlite_meta(meta, raw), ""),
         (func.json_type(meta) != "object", None),
         (count == 1, func.coalesce(value, "")),
         (and_(count == 0, value.is_(None)), None),
@@ -678,6 +713,26 @@ def _projected_meta_token(meta, key: str, dialect: str):
 def _meta_projection(meta, keys: tuple[str, ...], dialect: str):
     tokens = tuple(_projected_meta_token(meta, key, dialect) for key in keys)
     return (*tokens, case((or_(*(token == "" for token in tokens)), meta), else_=None))
+
+
+def _meta_names_projection(meta, dialect: str):
+    raw = sql_cast(meta, Text)
+    if dialect == "postgresql":
+        unsafe = _unsafe_postgresql_meta(raw)
+        keys = func.json_object_keys(meta).table_valued("name").render_derived()
+        names = select(func.json_agg(keys.c.name)).scalar_subquery()
+        token = case((unsafe, ""), (func.json_typeof(meta) == "object", sql_cast(names, Text)),
+                     else_=None)
+    else:
+        keys = func.json_each(meta).table_valued("key")
+        names = select(func.json_group_array(keys.c.key)).scalar_subquery()
+        # A lone surrogate can be valid JSON text but invalid UTF-8 after
+        # SQLite decodes a key. The original JSON codec preserves that key.
+        unsafe = or_(_unsafe_sqlite_meta(meta, raw), raw.op("GLOB")(r"*\u[dD][89a-fA-F][0-9a-fA-F][0-9a-fA-F]*"))
+        token = case((meta.is_(None), None), (unsafe, ""),
+                     (func.json_type(meta) == "object", sql_cast(names, Text)),
+                     else_=None)
+    return token, case((unsafe, meta), else_=None)
 
 
 def _decode_meta_projection(keys: tuple[str, ...], values) -> Mapping[str, Any]:
@@ -698,7 +753,7 @@ def _lazy_meta(
 ) -> LazyMetaDict:
     projection_bind = default_session.get_bind() if dialect is not None else None
 
-    def _load(key: str | None = None) -> Mapping[str, Any]:
+    def _load(key: str | None = None, *, names_only: bool = False) -> Mapping[str, Any]:
         # Reuse an active caller transaction, including its uncommitted writes.
         # Closing a second Session on SQLite's shared in-memory connection would
         # roll that transaction back. Only factory-created Sessions are owned.
@@ -709,12 +764,18 @@ def _lazy_meta(
             active = default_session
             close_after = False
         try:
-            projected = (key is not None and dialect is not None and _point_meta_key(key)
+            projected = (dialect is not None and (names_only or key is not None and _point_meta_key(key))
                          and active.get_bind(mapper=record_cls) is projection_bind)
-            if projected and dialect == "postgresql":
-                projected = _default_postgresql_json(active.connection(bind_arguments={"mapper": record_cls}))
-            columns = (_meta_projection(record_cls.meta, (key,), dialect)
-                       if projected and key is not None and dialect is not None else (record_cls.meta,))
+            if projected:
+                connection = active.connection(bind_arguments={"mapper": record_cls})
+                projected = (_default_postgresql_json(connection) if dialect == "postgresql"
+                             else _default_sqlite_text(connection))
+            columns = (record_cls.meta,)
+            if projected and dialect is not None:
+                if names_only:
+                    columns = _meta_names_projection(record_cls.meta, dialect)
+                elif key is not None:
+                    columns = _meta_projection(record_cls.meta, (key,), dialect)
             row = active.execute(
                 select(*columns)
                 .select_from(record_cls)
@@ -727,15 +788,23 @@ def _lazy_meta(
                 )
             if projected and key is not None:
                 return _decode_meta_projection((key,), row)
-            raw = row[0]
+            if projected and names_only:
+                if row[0] != "":
+                    return dict.fromkeys(json.loads(row[0])) if row[0] is not None else {}
+                raw = row[-1]
+            else:
+                raw = row[0]
             if not isinstance(raw, Mapping):
                 return {}
+            if names_only:
+                return dict.fromkeys(raw)
             return raw if key is None else {key: raw[key]} if key in raw else {}
         finally:
             if close_after:
                 active.close()
 
-    return LazyMetaDict(_load, seed=seed, read_key=_load if dialect is not None else None)
+    return LazyMetaDict(_load, seed=seed, read_key=_load if dialect is not None else None,
+                        read_keys=partial(_load, names_only=True) if dialect is not None else None)
 
 
 def _meta_value_payload(value: Any) -> dict[str, Any]:

@@ -16,8 +16,8 @@ _HIGH_SCHOOL_SUFFIX = re.compile(r"\b(?:h s|hs)$")
 _NUMBER_TOKEN = re.compile(r"[0-9]+")
 
 
-def _suggest(value: str, options: Iterable[str]) -> tuple[str, ...]:
-    return tuple(get_close_matches(value.casefold(), sorted(set(options)), n=_SUGGESTION_LIMIT))
+def _suggest(value: str, options: Iterable[str], *, limit: int = _SUGGESTION_LIMIT) -> tuple[str, ...]:
+    return tuple(get_close_matches(value.casefold(), sorted(set(options)), n=limit))
 
 
 def _name_tokens(name: str) -> tuple[str, ...]:
@@ -160,11 +160,14 @@ def _live_name(name: str, scope: str, entities: Iterable[T], *, label: Callable[
     return _EntityNames(((label(item), item) for item in matches or entities), identifier).resolve(name, scope=scope)
 
 
-def _field_suggestions(field: str, choices: Iterable[str]) -> tuple[str, ...]:
+def _field_suggestions(field: str, choices: Iterable[str], *,
+                       eligible: Callable[[str], bool] | None = None) -> tuple[str, ...]:
     by_fold: dict[str, list[str]] = {}
     for choice in sorted(set(choices)):
         by_fold.setdefault(choice.casefold(), []).append(choice)
-    return tuple(label for key in _suggest(field, by_fold) for label in by_fold[key])[:5]
+    limit = max(1, len(by_fold)) if eligible is not None else _SUGGESTION_LIMIT
+    ranked = (label for key in _suggest(field, by_fold, limit=limit) for label in by_fold[key])
+    return tuple(islice(filter(eligible, ranked) if eligible is not None else ranked, _SUGGESTION_LIMIT))
 
 
 def _folded_field_names(fields: tuple[str, ...], names: Iterable[str]) -> Mapping[str, tuple[str, ...]]:

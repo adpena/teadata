@@ -1,14 +1,18 @@
 from copy import deepcopy
 from hashlib import sha256
+import subprocess
+import sys
 from types import SimpleNamespace
+from uuid import uuid4
 
 import pandas as pd
 import pytest
 
 from teadata import DataEngine
 from teadata.dataset_metadata import MetricDefinition
+from teadata.entities import District
 from teadata.load_data import _add_reporting_entities
-from teadata.manifest import ContractError, DatasetCatalog, canonical_json
+from teadata.manifest import ContractError, DatasetCatalog, FieldMeasurementError, canonical_json
 from teadata.metric_bindings import parse_bindings
 from teadata.values import ValueStatus, measure
 
@@ -323,6 +327,164 @@ def test_physical_field_contract_is_resolved_once_for_repeated_values(catalog, m
     assert catalog.measure_field(None, field).status == ValueStatus.MISSING
     assert catalog.measure_field(1.5, field).status == ValueStatus.INVALID
     assert len(calls) == first_calls
+
+
+@pytest.mark.parametrize("conflict", [False, True])
+def test_exact_field_measurement_compares_effective_bindings_and_names_conflicts(catalog, conflict):
+    def change(document):
+        bindings = document["metric_bindings"]
+        bindings["alternate_enrollment"] = {**bindings["enrollment"], "scopes": ["campus"]}
+        if conflict:
+            bindings["alternate_enrollment"]["population"] = "private"
+
+    modified = revised(catalog, change)
+    _, field = modified.source_for_metric("enrollment", "campus")
+    campus = entity(modified, "150")
+    observed = modified.measurement(campus, "enrollment")
+    if conflict:
+        with pytest.raises(FieldMeasurementError, match="Choose a named metric") as error:
+            modified.field_measurement(campus, field)
+        assert error.value.reason == "ambiguous_field"
+        assert error.value.alternatives == ("alternate_enrollment", "enrollment")
+        assert modified.measurement(campus, "alternate_enrollment").status == ValueStatus.NOT_APPLICABLE
+    else:
+        assert modified.field_measurement(campus, field) == observed
+
+
+@pytest.mark.parametrize("shadow", [False, True])
+def test_exact_field_measurement_follows_literal_wildcard_and_its_alias(catalog, shadow):
+    field = "operating_payroll_gf"
+
+    def change(document):
+        metadata = document["datasets"]["campus_peims_financials"]["metadata"]
+        metadata.setdefault("metrics", {})["a_named_definition"] = {"field": field, "unit": "currency"}
+        if shadow:
+            document["metric_bindings"].update({
+                "alternate_financials.*": "financials.*",
+                f"financials.{field}": "overall_rating",
+            })
+
+    modified = revised(catalog, change)
+    prefix = "alternate_financials" if shadow else "financials"
+    campus = entity(modified, "100", metric=f"{prefix}.{field}")
+    exact = modified.field_measurement(campus, field)
+    assert exact == modified.measurement(campus, f"{prefix}.{field}")
+    assert exact.numeric == 100 and exact.source["field"] == field
+
+
+def test_exact_field_measurement_explains_conflicting_definitions(catalog):
+    field = "operating_payroll_gf"
+
+    def change(document):
+        metadata = document["datasets"]["campus_peims_financials"]["metadata"]
+        metadata.setdefault("metrics", {}).update({
+            "a_count_definition": {"field": field, "unit": "count"},
+            "a_currency_definition": {"field": field, "unit": "currency"},
+        })
+
+    modified = revised(catalog, change)
+    campus = entity(modified, "100", metric=f"financials.{field}")
+    with pytest.raises(FieldMeasurementError, match="source definitions conflict") as error:
+        modified.field_measurement(campus, field)
+    assert error.value.alternatives == ()
+
+
+def test_scalar_dto_measurements_need_neither_entity_imports_nor_hashable_types(catalog):
+    code = """
+import importlib.abc
+import json
+import sys
+
+class ImportTrap(importlib.abc.MetaPathFinder):
+    def find_spec(self, fullname, path=None, target=None):
+        if fullname in {'teadata.entities', 'teadata.geometry'}:
+            raise AssertionError(f'Unexpected import: {fullname}')
+
+sys.meta_path.insert(0, ImportTrap())
+from teadata import DatasetCatalog
+
+class UnhashableType(type):
+    __hash__ = None
+
+class CampusRecord(metaclass=UnhashableType):
+    campus_number = '123456001'
+    is_private = False
+
+catalog = DatasetCatalog(json.load(sys.stdin))
+_, field = catalog.source_for_metric('enrollment', 'campus')
+entity = CampusRecord()
+entity.meta = {field: '12'}
+assert catalog.measure_field('12', field, entity=entity).numeric == 12
+assert catalog.measurement(entity, 'enrollment').numeric == 12
+assert catalog.field_measurement(entity, field).numeric == 12
+"""
+    result = subprocess.run([sys.executable, "-B", "-c", code], input=canonical_json(catalog.to_dict()),
+                            capture_output=True, text=True)
+    assert result.returncode == 0, result.stdout + result.stderr
+
+
+def test_exact_field_suggestions_rank_past_unbound_spellings(catalog):
+    field = "TRANSFERS_IN_OR_OUT"
+
+    def change(document):
+        columns = document["datasets"]["campus_transfer_reports"]["reads"][0]["columns"]
+        if field not in columns:
+            columns.append(field)
+        columns.extend(f"{field}x{suffix}" for suffix in range(5))
+
+    modified = revised(catalog, change)
+    campus = SimpleNamespace(campus_number="123456001", meta={field: "12"})
+    assert modified.field_measurement(campus, field).numeric == 12
+    with pytest.raises(FieldMeasurementError, match="Did you mean") as typo:
+        modified.field_measurement(campus, f"{field}x")
+    assert typo.value.alternatives == (field,)
+
+
+def test_exact_field_measurement_suggests_spelling_and_respects_entity_scope(catalog):
+    _, field = catalog.source_for_metric("enrollment", "campus")
+    _, district_field = catalog.source_for_metric("enrollment", "district")
+    district = District(uuid4(), "District", meta={field: "150", district_field: "250",
+                                                    "campus_number": "123456001", "source_build_id": "annotation",
+                                                    "is_private": "False"})
+    exact = catalog.field_measurement(district, district_field)
+    assert exact.numeric == 250 and exact.source["input_binding"] == "caller_supplied"
+    del district.meta[district_field]
+    district.enrollment = 300
+    assert catalog.field_measurement(district, district_field).status == ValueStatus.MISSING
+    assert catalog.measurement(district, "enrollment").numeric == 300
+    with pytest.raises(FieldMeasurementError, match="no reviewed binding") as unbound:
+        catalog.field_measurement(district, field)
+    assert unbound.value.reason == "unbound_field" and unbound.value.scope == "district"
+    with pytest.raises(FieldMeasurementError, match="Use scope='district'"):
+        catalog.field_measurement(district, field, scope="campus")
+    with pytest.raises(FieldMeasurementError, match="Did you mean") as typo:
+        catalog.field_measurement(district, district_field[:-1])
+    assert typo.value.reason == "unknown_field" and district_field in typo.value.alternatives
+    with pytest.raises(FieldMeasurementError, match=r"Use catalog\.measurement") as metric_name:
+        catalog.field_measurement(district, "enrollment")
+    assert metric_name.value.alternatives == ("enrollment",)
+    campus = entity(catalog, "150")
+    with pytest.raises(FieldMeasurementError, match=r"Use catalog\.measurement") as metric_name:
+        catalog.field_measurement(campus, "financials.operating_payroll_gf")
+    assert metric_name.value.alternatives == ("financials.operating_payroll_gf",)
+    with pytest.raises(FieldMeasurementError) as wrong_scope_typo:
+        catalog.field_measurement(campus, district_field[:-1])
+    assert district_field not in wrong_scope_typo.value.alternatives
+
+    class Proxy(SimpleNamespace):
+        def __getattr__(self, attribute):
+            if attribute == "source_build_id":
+                return "f" * 64
+            raise AttributeError(attribute)
+
+    with pytest.raises(ContractError, match="another data release"):
+        catalog.measurement(Proxy(**vars(campus)), "enrollment")
+
+    class CampusProxy:
+        def __getattr__(self, attribute):
+            return getattr(campus, attribute)
+
+    assert catalog.field_measurement(CampusProxy(), field).numeric == 150
 
 
 def test_field_contract_reuse_does_not_cache_opaque_raw_values(catalog):

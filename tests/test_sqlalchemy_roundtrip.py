@@ -18,6 +18,7 @@ from teadata.manifest import (
     CATALOG_TABLE,
     ContractError,
     DatasetCatalog,
+    FieldMeasurementError,
     canonical_json,
     read_sqlite_catalog,
     write_sqlite_catalog,
@@ -34,7 +35,7 @@ from teadata.persistence import (
     export_dataengine,
     import_dataengine,
 )
-from teadata.persistence.sqlalchemy_store import _meta_projection, _point_meta_dialect
+from teadata.persistence.sqlalchemy_store import LazyMetaDict, _meta_names_projection, _meta_projection, _point_meta_dialect
 
 
 @pytest.fixture
@@ -234,6 +235,8 @@ def test_lazy_prefetch_preserves_nested_raw_types_and_refuses_later_release(
         export_dataengine(graph(changed_catalog(catalog), 1), session, replace=True)
     with pytest.raises(ContractError, match="catalog changed"):
         district.meta["zero"]
+    with pytest.raises(ContractError, match="catalog changed"):
+        tuple(district.meta.iter_keys())
     assert not district.meta._loaded
 
 
@@ -241,7 +244,13 @@ def _assert_lazy_metadata_projection(engine, factory, catalog):
     repo = graph(catalog, 1)
     district_id = uuid.UUID(int=1)
     campus_id = uuid.UUID(int=10001)
-    repo._campuses[campus_id].meta = {"overall_rating": "Not Rated: Minimum Size rules", "nullable": None}
+    exact_field = "campus_2025_student_enrollment_african_american_count"
+    nullable_field = "campus_2025_student_enrollment_all_students_count"
+    repo._campuses[campus_id].enrollment = 120
+    repo._campuses[campus_id].meta = {
+        "overall_rating": "Not Rated: Minimum Size rules", "nullable": None,
+        exact_field: "14", nullable_field: None,
+    }
     with factory.begin() as session:
         export_dataengine(repo, session, replace=True, include_meta_entries=False)
 
@@ -269,10 +278,25 @@ def _assert_lazy_metadata_projection(engine, factory, catalog):
         assert value.value == "Not Rated: Minimum Size rules"
         assert value.source["build_id"] == catalog.build_id
         assert value.source["input_binding"] == "release_entity"
+        exact = restored.catalog.field_measurement(campus, exact_field)
+        assert exact.value == 14 and exact.raw == "14"
+        assert exact.source["field"] == exact_field and exact.source["build_id"] == catalog.build_id
+        assert restored.catalog.field_measurement(campus, nullable_field).status == "missing"
+        with pytest.raises(FieldMeasurementError) as unknown:
+            restored.catalog.field_measurement(campus, "nullable")
+        assert unknown.value.reason == "unknown_field"
+        with pytest.raises(ContractError, match="another data release"):
+            changed_catalog(catalog).field_measurement(campus, exact_field)
         assert not district.meta._loaded and not campus.meta._loaded
         assert all(" -> " in sql for sql in statements)
+        statements.clear()
+        assert tuple(district.meta.iter_keys()) == ("huge", "structured", "zero")
+        assert len(statements) == 1 and ("json_each(" in statements[0] or "json_object_keys(" in statements[0])
+        assert not district.meta._loaded
         district.structured[0]["extra"] = 42
+        statements.clear()
         assert dict(district.meta)["structured"] == [{"count": 2**53 + 1, "extra": 42}]
+        assert len(statements) == 1 and " -> " not in statements[0]
     finally:
         event.remove(engine, "before_cursor_execute", capture)
 
@@ -289,16 +313,56 @@ def _assert_lazy_metadata_projection(engine, factory, catalog):
     with engine.begin() as connection:
         ordinary = select(*_meta_projection(DistrictRecord.meta, ("huge", "missing"), engine.dialect.name))
         assert connection.execute(ordinary).one() == (str(10**500), None, None)
-        json_document = r'{"plain":1,"plain":2,"plain\u0000":3,"other":"a\u0000b","odd.key":[null,-0.0]}'
+        discovery = select(*_meta_names_projection(DistrictRecord.meta, engine.dialect.name))
+        names, fallback = connection.execute(discovery).one()
+        assert sorted(json.loads(names)) == ["huge", "pending_value", "structured", "zero"] and fallback is None
+        json_document = r'{"plain":1,"plain":2,"plain\u0000":3,"other":"a\u0000b","odd.key":[null,-0.0],"\ud800":4}'
         assignment = "CAST(:document AS JSON)" if engine.dialect.name == "postgresql" else ":document"
         connection.execute(text(f"UPDATE districts SET meta = {assignment}"), {"document": json_document})
     with factory() as session:
         district = import_dataengine(session, prefetch_district_meta_keys=["plain"])._districts[district_id]
+        assert tuple(district.meta.iter_keys()) == ("odd.key", "other", "plain", "plain\0", "\ud800")
         assert district.plain == 2
         assert district.meta["plain\0"] == 3
         assert district.other == "a\0b"
         assert district.meta["odd.key"][0] is None
         assert math.copysign(1, district.meta["odd.key"][1]) == -1
+    if engine.dialect.name == "postgresql":
+        from psycopg.types.string import TextLoader
+
+        class UppercaseLoader(TextLoader):
+            def load(self, data):
+                return super().load(data).upper()
+
+        with engine.begin() as connection:
+            connection.execute(text("UPDATE districts SET meta = CAST(:document AS JSON)"),
+                               {"document": r'{"\u96ea":1,"plain":"CaseSensitive"}'})
+        with factory() as session:
+            district = import_dataengine(session)._districts[district_id]
+            session.execute(text("SET LOCAL client_encoding TO 'LATIN1'"))
+            assert tuple(district.meta.iter_keys()) == ("plain", "雪")
+        with engine.connect() as connection, factory(bind=connection) as session:
+            district = import_dataengine(session)._districts[district_id]
+            driver = connection.connection.driver_connection
+            original_adapters = driver.adapters
+            varchar_oid = original_adapters.types["varchar"].oid
+            original_loader = original_adapters.get_loader(varchar_oid, UppercaseLoader.format)
+            original_adapters.register_loader(varchar_oid, UppercaseLoader)
+            try:
+                assert tuple(district.meta.iter_keys()) == ("plain", "雪")
+                assert district.plain == "CaseSensitive"
+            finally:
+                original_adapters.register_loader(varchar_oid, original_loader)
+    else:
+        with factory() as session:
+            district = import_dataengine(session)._districts[district_id]
+            driver = session.connection().connection.driver_connection
+            driver.text_factory = bytes
+            try:
+                assert tuple(district.meta.iter_keys()) == ("odd.key", "other", "plain", "plain\0", "\ud800")
+                assert district.plain == 2
+            finally:
+                driver.text_factory = str
 
 
 def test_lazy_sqlite_projects_point_reads_and_prefetch(database, catalog):
@@ -309,6 +373,15 @@ def test_lazy_sqlite_projects_point_reads_and_prefetch(database, catalog):
     _assert_lazy_metadata_projection(engine, factory, catalog)
 
 
+def test_key_discovery_accepts_a_one_shot_reader_and_reports_mixed_keys():
+    meta = LazyMetaDict(lambda: pytest.fail("whole metadata read"), read_keys=lambda: iter(("b", "a")))
+    assert tuple(meta.iter_keys()) == ("a", "b")
+    mixed = LazyMetaDict({"a": 1})
+    mixed.data[2] = 3
+    with pytest.raises(TypeError, match="Use ordinary mapping iteration"):
+        tuple(mixed.iter_keys())
+
+
 def test_deferred_session_uses_its_own_json_decoder(tmp_path, catalog):
     url = f"sqlite:///{tmp_path / 'meta.sqlite'}"
     engine = create_engine(url)
@@ -317,6 +390,8 @@ def test_deferred_session_uses_its_own_json_decoder(tmp_path, catalog):
         value = json.loads(text)
         if isinstance(value, dict) and "huge" in value:
             value["huge"] = 17
+            value["decoder_added"] = True
+            del value["structured"]
         return value
 
     deferred_engine = create_engine(url, json_deserializer=decode)
@@ -327,7 +402,9 @@ def test_deferred_session_uses_its_own_json_decoder(tmp_path, catalog):
             export_dataengine(graph(catalog, 1), session)
         with factory() as session:
             repo = import_dataengine(session, meta_session_factory=create_sessionmaker(deferred_engine))
-        assert repo._districts[uuid.UUID(int=1)].huge == 17
+        district = repo._districts[uuid.UUID(int=1)]
+        assert tuple(district.meta.iter_keys()) == ("decoder_added", "huge", "zero")
+        assert district.huge == 17
     finally:
         deferred_engine.dispose()
         engine.dispose()
