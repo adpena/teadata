@@ -10,6 +10,7 @@ from teadata.legislative_rosters import (
     LegislativeSchoolRoster,
     RosterSource,
     _parse_rows,
+    congressional_representation_plan,
     read_legislative_school_rosters,
 )
 from teadata.provenance import ProvenanceStore
@@ -19,6 +20,23 @@ PLAN = LegislativePlan.STATE_BOARD_OF_EDUCATION
 NAMES = {"chapel hill isd (smith)": "212909", "chapel hill isd (titus)": "225906"}
 SMITH = "Chapel Hill ISD (Smith) (80%)"
 TITUS = "Chapel Hill ISD (Titus) (100%)"
+
+
+@pytest.mark.parametrize(("instant", "plan"), [
+    ("2023-01-03T17:00:00Z", LegislativePlan.US_HOUSE_C2193),
+    ("2027-01-03T16:59:59Z", LegislativePlan.US_HOUSE_C2193),
+    ("2027-01-03T17:00:00Z", LegislativePlan.US_HOUSE_C2333),
+    ("2027-01-03T11:00:00-06:00", LegislativePlan.US_HOUSE_C2333),
+])
+def test_congressional_plan_changes_at_the_start_of_the_new_term(instant, plan):
+    assert congressional_representation_plan(datetime.fromisoformat(instant)) is plan
+
+
+def test_congressional_plan_rejects_an_ambiguous_or_earlier_date():
+    with pytest.raises(ValueError, match="timezone-aware"):
+        congressional_representation_plan(datetime(2027, 1, 3))
+    with pytest.raises(ValueError, match="No reviewed"):
+        congressional_representation_plan(datetime(2023, 1, 3, 16, 59, 59, tzinfo=timezone.utc))
 
 
 def _rows():

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from enum import StrEnum
 import json
 from pathlib import Path
@@ -20,6 +21,21 @@ class LegislativePlan(StrEnum):
     US_HOUSE_C2193 = "PLANC2193"
     US_HOUSE_C2333 = "PLANC2333"
     STATE_BOARD_OF_EDUCATION = "PLANE2106"
+
+
+_C2193_START = datetime(2023, 1, 3, 17, tzinfo=timezone.utc)
+CONGRESSIONAL_REPRESENTATION_CHANGE = datetime(2027, 1, 3, 17, tzinfo=timezone.utc)
+
+
+def congressional_representation_plan(at: datetime) -> LegislativePlan:
+    """Select from the reviewed Texas congressional plans by representation time."""
+    if not isinstance(at, datetime) or at.utcoffset() is None:
+        raise ValueError("Congressional representation requires a timezone-aware datetime")
+    instant = at.astimezone(timezone.utc)
+    if instant < _C2193_START:
+        raise ValueError("No reviewed Texas congressional representation plan for this date")
+    return (LegislativePlan.US_HOUSE_C2193 if instant < CONGRESSIONAL_REPRESENTATION_CHANGE
+            else LegislativePlan.US_HOUSE_C2333)
 
 
 _PLANS = {

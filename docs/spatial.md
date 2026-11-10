@@ -117,6 +117,20 @@ boundary-overlap summaries and use official geography-level totals when
 available. Area overlap cannot allocate student counts or establish where
 students live.
 
+Default each profile relationship to its latest qualified publisher edition
+and show its date. Keep the property-tax county roster, site locations,
+positive-area boundary overlap and the different AskTED ESC assignments
+separate. A fresh edition for one relationship does not update the others.
+
+Use `congressional_representation_plan(at)` with a timezone-aware datetime
+when selecting from the two reviewed U.S. House plans. The suggested profile
+note is “These boundaries reflect current representation. Texas’s new
+congressional map takes effect for representation at noon Eastern on
+January 3, 2027.” PLANC2193 applies before that instant. PLANC2333, used in
+the 2026 election, applies from that instant under the reviewed schedule.
+The constitutional start of the new terms is separate from the House’s
+swearing-in schedule. [Texas Redistricting current districts](https://redistricting.capitol.texas.gov/Current-districts) · [Twentieth Amendment](https://www.archives.gov/founding-docs/amendments-11-27#amend20)
+
 ### Published school district rosters for legislative plans
 
 The Texas Legislative Council's Red-160 workbooks list school district
