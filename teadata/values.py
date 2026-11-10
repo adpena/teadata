@@ -30,6 +30,7 @@ class MeasurementUnit(StrEnum):
     FTE = "fte"
     CREDIT_HOURS = "credit_hours"
     CREDIT_HOURS_PER_STUDENT = "credit_hours_per_student"
+    STUDENTS_PER_CLASS = "students_per_class"
 
 
 class ValueStatus(str, Enum):

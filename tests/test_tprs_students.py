@@ -21,7 +21,7 @@ import yaml
 
 from teadata import tprs_statewide_intake, tprs_students as students
 from teadata.column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
-from teadata.dataset_metadata import DatasetMetadata, EditionKey, ResolvedDataset
+from teadata.dataset_metadata import DatasetMetadata, EditionKey, MetricDefinition, ResolvedDataset
 from teadata.engine import DataEngine
 from teadata.entities import Campus
 from teadata.manifest import ContractError, DatasetCatalog, canonical_json
@@ -31,12 +31,18 @@ from teadata.release import DataRelease, _schema_publication_destinations, _stud
 from teadata.source_views import PartitionedSourceTable, SourceTable
 from teadata.scripts import verify_tprs_campus_coverage as campus_coverage
 from teadata.teadata_config import load_config, load_config_bytes
-from teadata.tprs_class_size import class_size_projection, parse_class_size_report, read_class_size_report
+from teadata.tprs_class_size import CLASS_SIZE_UNIT, class_size_projection, parse_class_size_report, read_class_size_report
 from teadata.values import ValueStatus
 
 from test_catalog_projections import attach_observation_child, selected_catalog  # noqa: F401
 
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_class_size_unit_round_trips_through_catalog_metadata():
+    field = "class_size_kindergarten_avg_size"
+    definition = MetricDefinition.from_dict({"field": field, "unit": CLASS_SIZE_UNIT})
+    assert definition.to_dict() == {"field": field, "unit": "students_per_class"}
 
 
 @pytest.mark.parametrize("fault", [None, "missing_campus", "duplicate_campus", "conflicting_region", "missing_region"])

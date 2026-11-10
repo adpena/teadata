@@ -384,6 +384,21 @@ publisher roster for campus scope. It requires the retained acquisition
 objects. This step produces a candidate table and its column support for
 the existing native source pipeline.
 
+Build an unpublished district and Texas native candidate with the original
+report acquisitions and the retained source references:
+
+```sh
+uv run --locked python -m teadata.scripts.refresh_tprs_class_sizes \
+  --student-attachment /path/to/reviewed-student-release.json \
+  --store /path/to/provenance --output /path/to/new-candidate
+```
+
+The candidate can be opened locally with `DataRelease`. Its dataset
+`tprs_class_size` provides two 2025–26 editions and uses the direct Texas
+report for state values. The command verifies the native readback. Admission
+to a distributed release is separate. The campus projection remains offline
+while the native catalog needs partition-aware routing.
+
 ## School FIRST financial accountability
 
 The final **2025–26** FIRST rating edition was released November 5, 2026 and

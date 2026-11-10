@@ -13,7 +13,7 @@ import pyarrow as pa
 
 from .native_witnesses import _Rows
 from .tprs_students import PERIOD, _DIGEST, _check_student_heading, _identifier, _need, _read_student_input, _student_html, definition
-from .values import Measurement, TokenRule, ValuePolicy, ValueStatus, measure
+from .values import Measurement, MeasurementUnit, TokenRule, ValuePolicy, ValueStatus, measure
 
 if TYPE_CHECKING:
     from .dataset_metadata import DataPeriod
@@ -37,7 +37,7 @@ _FIELDS = {
 }
 _NUMERIC = re.compile(r"(?:0|[1-9][0-9]*)\.[0-9]")
 _FIELD_ORDER = tuple(field for group in _FIELDS.values() for field in group.values())
-CLASS_SIZE_UNIT = "students_per_class"
+CLASS_SIZE_UNIT = MeasurementUnit.STUDENTS_PER_CLASS.value
 CLASS_SIZE_POLICY = ValuePolicy("tprs_class_size_2026", {
     "-": TokenRule(ValueStatus.NOT_APPLICABLE, "no_students"),
     "?": TokenRule(ValueStatus.INVALID, "improbable_or_outside_reporting_range"),
