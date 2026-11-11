@@ -487,12 +487,19 @@ class DataRelease:
         parent = self.source if self.remote else self.path
         for ref in self.catalog.native_sources:
             child = _open_native_source(ref, parent, offline=self.offline, cache_dir=getattr(self, "_cache_dir", None))
-            child.verify(discard_cached_reads=discard_cached_reads)
-            verified[ref.manifest_sha256] = {
-                "manifest": child.path,
-                **{digest: path for digest, (path, _) in child._verified_bytes.items()},
-                **{digest: path for digest, (path, _, _) in child._column_schema_data.items()},
-            }
+            try:
+                child.verify(discard_cached_reads=discard_cached_reads)
+                verified[ref.manifest_sha256] = {
+                    "manifest": child.path,
+                    **{digest: path for digest, (path, _) in child._verified_bytes.items()},
+                    **{digest: path for digest, (path, _, _) in child._column_schema_data.items()},
+                }
+            finally:
+                # The child is local to this pass. Its catalog holds bound
+                # loaders, so waiting for cyclic GC can retain every parsed
+                # edition while the next child is being verified.
+                child.catalog._clear_edition_caches()
+                child._column_schema_data.clear()
         return verified
 
     def verified_cache_inventory(self) -> dict[str, dict[str, str | int]]:

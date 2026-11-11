@@ -861,6 +861,13 @@ class DatasetCatalog:
             else:
                 self._ensure_edition(identifier)
 
+    def _clear_edition_caches(self) -> None:
+        """Release transient edition data when its owning verifier is done."""
+        if getattr(self, "_v4", False):
+            self._edition_views.clear()
+            self._edition_children.clear()
+            self._edition_buffers.clear()
+
     def _require_index(self) -> None:
         if not getattr(self, "_v3", False):
             raise ContractError("Complete edition index unavailable in this schema2 catalog")
