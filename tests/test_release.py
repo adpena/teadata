@@ -1,5 +1,6 @@
 from dataclasses import replace
 from contextlib import closing
+from copy import deepcopy
 import errno
 import gzip
 from hashlib import sha256
@@ -7,8 +8,11 @@ from io import BytesIO
 import json
 import os
 import pickle
+import signal
 import sqlite3
 import sys
+from threading import Barrier, Event, Thread
+from types import SimpleNamespace
 from unittest.mock import Mock
 from uuid import UUID
 
@@ -31,6 +35,30 @@ from teadata.manifest import (
 from teadata.release import DataRelease, publish_release, SNAPSHOT_MAGIC
 from teadata.persistence.sqlalchemy_store import create_engine, create_sessionmaker, ensure_schema, export_dataengine
 from teadata.teadata_config import Config
+
+
+def _threaded_artifacts(selected, roles):
+    start = Barrier(len(roles) + 1)
+    results, errors = [], []
+
+    def read(role):
+        try:
+            start.wait(timeout=5)
+            results.append(selected.artifact(role))
+        except BaseException as error:
+            errors.append(error)
+
+    threads = [Thread(target=read, args=(role,), daemon=True) for role in roles]
+    for thread in threads:
+        thread.start()
+    start.wait(timeout=5)
+    return threads, results, errors
+
+
+def _finish_artifact_threads(threads):
+    for thread in threads:
+        thread.join(timeout=5)
+    assert not any(thread.is_alive() for thread in threads), "Artifact verification stranded a caller"
 
 
 @pytest.fixture
@@ -380,6 +408,215 @@ def test_tampered_artifact_is_rejected_even_after_a_successful_read(release):
         stream.write(b"corruption")
     with pytest.raises(ContractError, match="checksum or size"):
         selected.artifact("entities")
+
+
+def test_concurrent_same_release_verifies_one_artifact_once(release, monkeypatch):
+    selected = DataRelease(release)
+    entered, finish, duplicate = Event(), Event(), Event()
+    calls = []
+
+    def identify(path, **options):
+        calls.append(path)
+        if len(calls) > 1:
+            duplicate.set()
+        entered.set()
+        assert finish.wait(5)
+        return file_identity(path, **options)
+
+    semantic = Mock(wraps=release_module.read_sqlite_catalog)
+    monkeypatch.setattr(release_module, "file_identity", identify)
+    monkeypatch.setattr(release_module, "read_sqlite_catalog", semantic)
+    threads, results, errors = _threaded_artifacts(selected, ("maps", "maps"))
+    try:
+        assert entered.wait(5)
+        assert not duplicate.wait(.05)
+    finally:
+        finish.set()
+        _finish_artifact_threads(threads)
+    assert not errors and results[0] == results[1]
+    assert len(calls) == semantic.call_count == 1
+    assert selected.artifact("maps") == results[0]
+    assert len(calls) == semantic.call_count == 1
+
+
+def test_different_artifacts_do_not_share_a_verification_gate(release, monkeypatch):
+    selected = DataRelease(release)
+    both_hashing = Barrier(2)
+
+    def identify(path, **options):
+        both_hashing.wait(timeout=5)
+        return file_identity(path, **options)
+
+    monkeypatch.setattr(release_module, "file_identity", identify)
+    threads, results, errors = _threaded_artifacts(selected, ("maps", "entities"))
+    _finish_artifact_threads(threads)
+    assert not errors and len(set(results)) == 2
+
+
+def test_waiting_caller_restats_changed_file_after_acquiring_gate(release, monkeypatch):
+    selected = DataRelease(release)
+    path = selected.artifact("maps")
+    original_lock = selected._artifact_lock
+    gate = original_lock(selected._artifacts["maps"]["sha256"])
+    requested = Event()
+
+    def request(digest):
+        requested.set()
+        return original_lock(digest)
+
+    monkeypatch.setattr(selected, "_artifact_lock", request)
+    with gate:
+        threads, results, errors = _threaded_artifacts(selected, ("maps",))
+        assert requested.wait(5)
+        with path.open("ab") as stream:
+            stream.write(b"changed while waiting")
+    _finish_artifact_threads(threads)
+    assert not results and len(errors) == 1
+    assert isinstance(errors[0], ContractError) and "checksum or size" in str(errors[0])
+
+
+@pytest.mark.parametrize("phase", ["hash", "semantic"])
+def test_artifact_changed_during_verification_is_not_admitted(release, monkeypatch, phase):
+    selected = DataRelease(release)
+
+    def changed_hash(path, **options):
+        result = file_identity(path, **options)
+        path.touch()
+        os.utime(path, ns=(path.stat().st_atime_ns, path.stat().st_mtime_ns + 1_000_000_000))
+        return result
+
+    def changed_catalog(path, **options):
+        result = read_sqlite_catalog(path, **options)
+        os.utime(path, ns=(path.stat().st_atime_ns, path.stat().st_mtime_ns + 1_000_000_000))
+        return result
+
+    monkeypatch.setattr(release_module, "file_identity" if phase == "hash" else "read_sqlite_catalog",
+                        changed_hash if phase == "hash" else changed_catalog)
+    with pytest.raises(ContractError, match="changed during verification"):
+        selected.artifact("maps")
+    assert "maps" not in selected._verified
+
+
+def test_failed_verification_releases_gate_and_retries(release, monkeypatch):
+    selected = DataRelease(release)
+    # Use the manifest's actual portable name rather than depending on its spelling.
+    path = selected.path.parent / selected._artifacts["maps"]["filename"]
+    identify = Mock(side_effect=[OSError("temporary read failure"), file_identity(path)])
+    monkeypatch.setattr(release_module, "file_identity", identify)
+    with pytest.raises(OSError, match="temporary read failure"):
+        selected.artifact("maps")
+    threads, results, errors = _threaded_artifacts(selected, ("maps",))
+    _finish_artifact_threads(threads)
+    assert not errors and results == [path] and identify.call_count == 2
+
+
+@pytest.mark.parametrize("schema_version", [3, 4])
+def test_native_leaf_verification_coalesces_and_survives_pickle(tmp_path, monkeypatch, schema_version):
+    from test_source_parity import fixture_release
+
+    selected, _, edition, _ = fixture_release(tmp_path, schema_version=schema_version)
+    descriptor = selected.catalog.resolve_artifacts([(edition, "membership")])[0]["artifact"]
+    identify = Mock(wraps=file_identity)
+    semantic = Mock(wraps=release_module.validate_leaf_artifact)
+    monkeypatch.setattr(release_module, "file_identity", identify)
+    monkeypatch.setattr(release_module, "validate_leaf_artifact", semantic)
+    threads, results, errors = _threaded_artifacts(selected, (descriptor.identity, descriptor.identity))
+    _finish_artifact_threads(threads)
+    assert not errors and results[0] == results[1]
+    assert identify.call_count == semantic.call_count == 1
+    for restored in (pickle.loads(pickle.dumps(selected)), deepcopy(selected)):
+        assert restored.artifact(descriptor.identity) == results[0]
+        assert not {"_artifact_locks", "_artifact_lock_pid"}.intersection(restored.__getstate__())
+
+
+@pytest.mark.parametrize("separate_path", [False, True])
+def test_native_aliases_share_gate_but_keep_path_and_descriptor_checks(tmp_path, monkeypatch, separate_path):
+    from test_source_parity import fixture_release
+
+    selected, _, edition, _ = fixture_release(tmp_path)
+    ref = selected.catalog.resolve_artifacts([(edition, "membership")])[0]["artifact"]
+    alias = replace(ref, output="alias", location="alias.parquet" if separate_path else ref.location)
+    if separate_path:
+        (tmp_path / alias.location).write_bytes((tmp_path / ref.location).read_bytes())
+    monkeypatch.setattr(selected.catalog, "artifact_ref", lambda role: alias if role == "alias" else ref)
+    identify = Mock(wraps=file_identity)
+    semantic = Mock(wraps=release_module.validate_leaf_artifact)
+    monkeypatch.setattr(release_module, "file_identity", identify)
+    monkeypatch.setattr(release_module, "validate_leaf_artifact", semantic)
+    first, second = selected.artifact(ref.identity), selected.artifact("alias")
+    assert (first != second) is separate_path
+    assert identify.call_count == (2 if separate_path else 1)
+    assert [call.args[1] for call in semantic.call_args_list] == [ref, alias]
+
+
+def test_legacy_release_state_excludes_locks_and_loads_old_state(release):
+    selected = DataRelease(release)
+    selected.artifact("maps")
+    state = selected.__getstate__()
+    assert not {"_artifact_locks", "_artifact_lock_pid"}.intersection(state)
+    for restored in (pickle.loads(pickle.dumps(selected)), deepcopy(selected)):
+        assert restored.artifact("maps") == selected.artifact("maps")
+    old = DataRelease.__new__(DataRelease)
+    old.__setstate__(state)
+    assert old.artifact("maps") == selected.artifact("maps")
+
+
+def test_windows_311_does_not_reuse_artifact_stat_cache(release, monkeypatch):
+    selected = DataRelease(release)
+    identify = Mock(wraps=file_identity)
+    semantic = Mock(wraps=release_module.read_sqlite_catalog)
+    monkeypatch.setattr(release_module, "_artifact_cache_reusable", lambda: False)
+    monkeypatch.setattr(release_module, "file_identity", identify)
+    monkeypatch.setattr(release_module, "read_sqlite_catalog", semantic)
+    assert selected.artifact("maps") == selected.artifact("maps")
+    assert identify.call_count == semantic.call_count == 2
+
+
+@pytest.mark.parametrize("platform_name,python,expected", [
+    ("nt", (3, 11), False), ("nt", (3, 12), True), ("posix", (3, 11), True),
+])
+def test_artifact_stat_reuse_follows_supported_platform_policy(monkeypatch, platform_name, python, expected):
+    monkeypatch.setattr(release_module, "os", SimpleNamespace(name=platform_name))
+    monkeypatch.setattr(release_module, "sys", SimpleNamespace(version_info=python))
+    assert release_module._artifact_cache_reusable() is expected
+
+
+@pytest.mark.skipif(not hasattr(os, "fork"), reason="POSIX fork is unavailable")
+@pytest.mark.filterwarnings("ignore:This process .*multi-threaded:DeprecationWarning")
+def test_forked_release_replaces_locks_owned_by_vanished_parent_thread(release):
+    selected = DataRelease(release)
+    gate = selected._artifact_lock(selected._artifacts["maps"]["sha256"])
+    held, release_parent = Event(), Event()
+
+    def hold():
+        with gate, release_module._ARTIFACT_LOCK_REGISTRY:
+            held.set()
+            release_parent.wait(10)
+
+    thread = Thread(target=hold, daemon=True)
+    thread.start()
+    assert held.wait(5)
+    reader, writer = os.pipe()
+    pid = None
+    try:
+        pid = os.fork()
+        if pid == 0:
+            os.close(reader)
+            signal.alarm(5)
+            try:
+                selected.artifact("maps")
+                os.write(writer, b"verified")
+            finally:
+                os._exit(0)
+        os.close(writer)
+        assert os.read(reader, 64) == b"verified"
+    finally:
+        if pid != 0:
+            os.close(reader)
+            release_parent.set()
+            thread.join(timeout=5)
+            if pid is not None:
+                os.waitpid(pid, 0)
 
 
 @pytest.mark.parametrize("reader", ["discover", "campus", "district"])

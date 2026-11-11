@@ -924,4 +924,21 @@ identity of the loaded manifest to a background job. When reopening a saved
 release, `teadata.release.release_offline()` provides the scoped or configured
 offline policy without opening the active manifest.
 
+Concurrent callers sharing one `DataRelease` verify each artifact under a
+process-local content-hash lock. Successful verification is reused only while
+the artifact path and file signature still match; other artifacts can verify
+concurrently. Leaf descriptors retain independent semantic checks even when
+they reference the same bytes. Failures release the lock and remain retryable.
+These locks are transient: copying, pickling and POSIX forking recreate them,
+and separate release instances do not share verification results.
+
+The reader rechecks the file signature after hashing and semantic validation
+before accepting an artifact. On Windows with Python 3.11, file metadata cannot
+reliably identify a same-size rewrite with a restored modification time, so
+every access hashes and validates again. That platform fallback does not
+guarantee detection of every modification during a read. These checks also do
+not make a returned pathname immune to subsequent external changes. Offline
+access still uses only retained verified cache files; locking never enables a
+network fallback.
+
 The application requires the coordinated library version, schema migrations, and release manifest. Publish and pin those together before deployment. Never merge the app against an older library tag. Preserve the previous deployed code and data bundle for rollback. The migration's missing joins, unreviewed documentation, unknown original download dates, and incomplete upstream lineage must remain visible; they prevent claiming this baseline has completed researcher-grade dataset certification.

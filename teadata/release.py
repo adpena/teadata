@@ -15,6 +15,7 @@ from pathlib import Path
 import stat
 import sys
 import tempfile
+from threading import Lock, RLock
 from typing import TYPE_CHECKING, BinaryIO
 import unicodedata
 from urllib.parse import urljoin
@@ -45,6 +46,19 @@ _ManifestStamp = tuple[int, int, int, int, int]
 _LocalManifest = tuple[Path, _ManifestStamp]
 _MetadataStamp = tuple[Path, tuple[int, ...]]
 _VerifiedMetadata = tuple[Path, tuple[int, ...], bytes | None]
+_ArtifactStamp = tuple[int, int, int, int]
+_ARTIFACT_LOCK_REGISTRY = Lock()
+
+
+def _reset_artifact_lock_registry() -> None:
+    # A parent thread may own this short-held lock at fork. Never acquire its
+    # inherited copy; instance PID checks replace inherited artifact locks too.
+    global _ARTIFACT_LOCK_REGISTRY
+    _ARTIFACT_LOCK_REGISTRY = Lock()
+
+
+if hasattr(os, "register_at_fork"):
+    os.register_at_fork(after_in_child=_reset_artifact_lock_registry)
 
 
 ROLES = frozenset({"snapshot", "entities", "maps", "boundaries"})
@@ -251,6 +265,22 @@ def _local_manifest_stamp(path: Path) -> _ManifestStamp:
     return _manifest_stamp(path.stat())
 
 
+def _artifact_stamp(path: Path) -> _ArtifactStamp:
+    _, inode, size, modified, changed = _local_manifest_stamp(path)
+    return inode, size, modified, changed
+
+
+def _artifact_cache_reusable() -> bool:
+    # Match the manifest policy below. Windows/Python 3.11 reports creation
+    # time even from fstat, so a preserved-mtime rewrite cannot invalidate it.
+    return not (os.name == "nt" and sys.version_info < (3, 12))
+
+
+def _require_unchanged_artifact(path: Path, signature: _ArtifactStamp) -> None:
+    if _artifact_stamp(path) != signature:
+        raise ContractError("Release artifact changed during verification")
+
+
 class DataRelease:
     """A complete bundle with one catalog and content hashes for every artifact."""
 
@@ -258,6 +288,7 @@ class DataRelease:
 
     def __init__(self, manifest: str | Path, *, expected_sha256: str | None = None, offline: bool = False,
                  cache_dir: Path | None = None, _local_manifest: _LocalManifest | None = None):
+        self._reset_artifact_locks()
         self.source = str(manifest)
         self.remote = "://" in self.source
         self._cache_dir = cache_dir.expanduser().resolve() if cache_dir is not None else None
@@ -400,7 +431,8 @@ class DataRelease:
             return {"_v3": True, "source": self.source, "pin": self.manifest_sha256, "offline": self.offline,
                     "cache_dir": self._cache_dir}
         return {key: value for key, value in self.__dict__.items()
-                if key not in {"_campus_observation_routes", "_campus_observation_plan"}}
+                if key not in {"_campus_observation_routes", "_campus_observation_plan",
+                               "_artifact_locks", "_artifact_lock_pid"}}
 
     def __setstate__(self, state: dict) -> None:
         if state.get("_v3") is True:
@@ -408,29 +440,53 @@ class DataRelease:
                           cache_dir=state.get("cache_dir"))
         else:
             self.__dict__.update(state)
+            self._reset_artifact_locks()
+
+    def _reset_artifact_locks(self) -> None:
+        self._artifact_locks: dict[str, RLock] = {}
+        self._artifact_lock_pid = os.getpid()
+
+    def _artifact_lock(self, digest: str) -> RLock:
+        with _ARTIFACT_LOCK_REGISTRY:
+            if self._artifact_lock_pid != os.getpid():
+                self._reset_artifact_locks()
+            lock = self._artifact_locks.get(digest)
+            if lock is None:
+                lock = self._artifact_locks[digest] = RLock()
+            return lock
 
     def artifact(self, role: str, *, discard_cached_reads: bool = False) -> Path:
+        if self._v3:
+            digest = self.catalog.artifact_ref(role).sha256
+        else:
+            if role not in ANALYTICAL_RELEASE_ROLES:
+                raise ContractError(f"Unknown artifact role: {role}")
+            if role not in self._artifacts:
+                raise ContractError("This release has no analytical read model; select a rebuilt release")
+            digest = self._artifacts[role]["sha256"]
+        with self._artifact_lock(digest):
+            return self._artifact(role, discard_cached_reads=discard_cached_reads)
+
+    def _artifact(self, role: str, *, discard_cached_reads: bool = False) -> Path:
         identify = partial(file_identity, discard_cached_reads=True) if discard_cached_reads else file_identity
+        reusable = _artifact_cache_reusable()
         if self._v3:
             descriptor = self.catalog.artifact_ref(role)
             path = self._resource_path(descriptor.location, descriptor.sha256, descriptor.size_bytes)
-            state = path.stat()
-            signature = (state.st_ino, state.st_size, state.st_mtime_ns, state.st_ctime_ns)
-            if self._verified_bytes.get(descriptor.sha256) != (path, signature):
+            signature = _artifact_stamp(path)
+            if not reusable or self._verified_bytes.get(descriptor.sha256) != (path, signature):
                 observed = identify(path)
                 if observed["sha256"] != descriptor.sha256 or observed["size_bytes"] != descriptor.size_bytes:
                     raise ContractError("Selected leaf checksum or size mismatch")
+                _require_unchanged_artifact(path, signature)
                 self._verified_bytes[descriptor.sha256] = path, signature
             # Acceptance includes the full immutable descriptor, not merely SHA or a role.
             semantic = sha256(canonical_json(descriptor.to_dict()).encode()).hexdigest()
-            if self._verified.get(semantic) != (path, signature):
+            if not reusable or self._verified.get(semantic) != (path, signature):
                 validate_leaf_artifact(path, descriptor)
+                _require_unchanged_artifact(path, signature)
                 self._verified[semantic] = path, signature
             return path
-        if role not in ANALYTICAL_RELEASE_ROLES:
-            raise ContractError(f"Unknown artifact role: {role}")
-        if role not in self._artifacts:
-            raise ContractError("This release has no analytical read model; select a rebuilt release")
         expected = self._artifacts[role]
         if self.remote:
             path = self.cache / "objects" / expected["sha256"]
@@ -444,19 +500,20 @@ class DataRelease:
                 )
         else:
             path = self.path.parent / expected["filename"]
-        stat = path.stat()
-        signature = (stat.st_ino, stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
-        if self._verified.get(role) == (path, signature):
+        signature = _artifact_stamp(path)
+        if reusable and self._verified.get(role) == (path, signature):
             return path
         identity = identify(path)
         if any(identity[key] != expected[key] for key in ("sha256", "size_bytes")):
             raise ContractError(f"Release artifact checksum or size mismatch: {role}")
+        _require_unchanged_artifact(path, signature)
         if role in ROLES - {"snapshot"} and read_sqlite_catalog(path, immutable=True).build_id != self.build_id:
             raise ContractError(f"Artifact belongs to a different data build: {role}")
         if role in ANALYTICAL_ROLES:
             validate_artifact(path, self.catalog, role, entities_sha256=self._artifacts["entities"]["sha256"])
         if role == "snapshot" and snapshot_build_id(path) != self.build_id:
             raise ContractError("Snapshot belongs to a different data build")
+        _require_unchanged_artifact(path, signature)
         self._verified[role] = (path, signature)
         return path
 
