@@ -290,6 +290,11 @@ replacing the full-policy pointer used by `--verify-latest` and the push guard.
 Each Python runtime and selected release has a separate pointer. An earlier
 receipt from the same check scope still needs to match the current inputs.
 
+The app's JavaScript check uses Node 22 or later's native glob discovery in
+`static/js/tests/**/*.test.cjs` and `frontend/tests/**/*.test.mjs`. New matching
+tests join the canonical check automatically. Patterns are passed directly as
+arguments; shell expansion is not required.
+
 After rebuilding changed serialized data, also verify the retained release:
 
 ```bash

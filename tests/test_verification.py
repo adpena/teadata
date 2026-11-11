@@ -13,6 +13,15 @@ from teadata.verification import Check, GIT_LFS_PRE_PUSH, ReceiptError, install_
 from teadata.verification import _controller_python_version, _environment_identity, _test_environment, main
 
 
+def test_app_javascript_policy_discovers_both_test_trees_without_shell_expansion():
+    from teadata.verification import default_checks
+
+    javascript, = (check for check in default_checks("app") if check.name == "frontend-javascript")
+    assert javascript.argv == (
+        "node", "--test", "static/js/tests/**/*.test.cjs", "frontend/tests/**/*.test.mjs",
+    )
+
+
 @pytest.fixture
 def project(tmp_path, monkeypatch):
     # Keep receipt-policy tests independent of concurrent package development.
