@@ -1,5 +1,10 @@
 # Entity enrichment sources and years
 
+For the current registration-to-release gap, see the dated
+[source integration inventory](source-integration-status.md) and its
+[machine-readable edition/scope comparison](source-integration-status.json).
+The v0.0.128 table below remains a historical release description.
+
 This table describes the [v0.0.128 entity release](https://github.com/adpena/teadata/releases/tag/v0.0.128) used in the Quick Start, build ID `17061ef34da36b4c968e0d162cfeb2ba0dfddd64fe4fd8067a785b3dd2bca685`. It includes all 13 recorded inputs, including roster, boundary, and reference inputs used alongside enrichment. The catalog for each selected release records the requested and resolved edition, source period, and provenance.
 
 | Source ID | Use in the entity build | Period in v0.0.128 | Editions in the tracked source configuration |

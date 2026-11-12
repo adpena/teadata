@@ -1,0 +1,4306 @@
+{
+  "schema_version": 1,
+  "observed_at": "2026-11-12T14:45:04.777351+00:00",
+  "code_commit": "2705e2d85158fd22fd3f0614fd8c89bcb60d6092",
+  "config_sha256": "305c932090bb1e386fdc5f155c28f76ff937a5a2a2a66dfe416bf3318315a9d6",
+  "selected_release": {
+    "tag": "v0.0.148",
+    "manifest_sha256": "e485c94e68242a466533b5b94203ca91834f1149de1b49d0ea70c6b52be8a308",
+    "build_id": "3cd260bfec6c75e22788ba019a5aa8a6bca358cce538db3a433de56f0673abf3",
+    "base_datasets": [
+      "accountability",
+      "all_districts_reference",
+      "all_districts_reference2",
+      "campus_peims_financials",
+      "campus_planned_closures",
+      "campus_tapr_historical_enrollment",
+      "campus_tapr_student_staff_profile",
+      "campus_transfer_reports",
+      "campuses",
+      "charter_reference",
+      "district_tapr_student_staff_profile",
+      "districts",
+      "tefa"
+    ],
+    "native_sources": [
+      {
+        "sha256": "c96effc9bcbfd01c7cd969082cf701a2dc4e1900b6d6973b23c0ed2d21559f9e",
+        "editions": [
+          {
+            "edition_id": "10ce4160182787d4cda7f4020fdff4456285f8c9df9a9467b808cf12844f214b",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "273b0ee7a9b0a301db2cc0856f119681cd301fb634548ba08da643b7b969cb39",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "1a8482ee42cb91d3176793c5c91da97d231e700212d5bcfbb31fb3c21952bef3",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "b16c1ecb1e083e10ce96de044c1c2d60b34965e5f2a5341e9383cc817a933521",
+            "scope": "state",
+            "table": "state",
+            "grain": "one statewide observation"
+          },
+          {
+            "edition_id": "1ed739262ad170b289854a3162c89bc3b5294126fba334db6af277f5391d3c2c",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "bce66df28462b82850ff6f81e44a953eae1297243703f116a0fa3fb259118d99",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "1faf11c9f7c1d852f2f9fba3e62cffda010a60e4470f3ecbddea158f586ae4ac",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "78f7956aa15c6842b540ba73f3e57f24c3d22f86cd39e797644ef463a15e6504",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "2aa6b75ef94cdb9699cd1d435009555642a0bb321fda290b6f89459536054feb",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "d8605b8a209a8710cbc6fb7af735f9ab35738314fba33f796d3783432bc74eb3",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "2c7690e6f8ca8722c068c20eeb5f372242ee5a9a1dc6ed3fc4991f6c1a05e504",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "d23d023eaf3c96b7b12ccc2bc2ff52b9dbb9fefaa39df7806423a61a183bbf31",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "41943807a32722a291d3dd5d4a9de064eefb08c3c3cc9e211c6cbf929c39a7dd",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "a83d629f34f1427a2abccb6953a28f0f2070b5e393589d4a6f8204f65c6d0664",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "45f12ac990129e287ccbdb065dff6f166556b315e7738f8f8c5022df3f32acac",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "7e897d2e27652bd6b6428594d90e38fc3990302deebb9325e3aaad7b1735c206",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "7b135d070acdff2193cad4b3992490ec1f49eb017ebbcc65778ccee07b46f2df",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "77043f9df20ebc79516de2355b46369317282b4267f6d3f7132a94f3bacdb102",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "7d334f02277f7bfc7ef46e40e951456aa8549d072def34a551de15d9a876ebec",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "239e03fa5ead73cb539a2ca7ffe739dcf97578908877eceb5a5b22ccca4f7cee",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "8255bad948b5fd2a587336820f393e3f91f33d62f1988422bf83af62b40fa81d",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "9230bdf47af9996500e3631e2b3b48cfd8a135bb401669a347af1f4aae1822fc",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "8795087b4036a501a0219991a4c2056e852285b8133d30e420da5c11dbc15f6c",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "7cc01e7030e264f521f954b923a1cb6cc7ce34e184d7876389957a141fb87427",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "884efda675555c51ca4f6e6e34af1d721abc4bc0664347217a53654babacb05f",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "77d3e7c012321696105fd4d7f504ee0bc0efba972d1c398531614004c7c1ef09",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "8d0d94c703d39eefb3b339c773cb47ff157791f3fd6016d50be9ba16a193e418",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "509de5e86fc974cdc5ce25c14db9545ccf2b092a19ca76e570428f719d62c256",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "93672a72957c7a111847e7c00afc8f04ae991c1bfa235e1c02ba2d26c4eba748",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "b8e377fc5263a71759f6b3ac1f4c1a9cfd586a28b82aa8d7a234e5d50c09f6be",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "93f790bf1742137d441d87a1d757084928115ebcb55251ae7c30058c359232a5",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "519bdb143a8647a829c27fa9f92ff20aa1c07b59bfb602959abad5f770077392",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "b5b766a2f9c15e889df8c4b379f286032bc499f7cc08ebfab9b2ff6985326791",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "8f705348358c2cd601589059a7ccc41692480de4e5fd81ba2f1d01ab6224fa8d",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "ccd555aca0428dc8325e2d554fbb8f0ed913637eb9977c466644edfbd82dd7f6",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "a21fc42e93302e92a22889e0d3312eacee51ceb83101a6c6101debe046b33a43",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "d3fa6a0ef31ac953b35838a371778f3142dd17f4a6435576731300b3ba840cb6",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "28b493f9d1a6cab495a36dd0dd3bd61b65754fa3b3ec290e13b4d1112125583c",
+            "scope": "district",
+            "table": "district",
+            "grain": "one row per district_number"
+          },
+          {
+            "edition_id": "e47421fee896f6891f74096c95c0c931271e4cbbdaf231e3a596a638af2220c6",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "c578f4c176aa702e4d634194b755cd21bf7bc85e9bc48a52e80d8c8a858ca79a",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "ea529bc6b28574eee4a8d7273563a98397286eb860ac1c56e6fa916689c9cd51",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "9748c6f26df5e4e404b6b102ba7bcb21808dbaf9b4203660e3faba24110fbda7",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "efde17423d7bbcf7bc8f500999edf11fd4f5ef707d4cf84b275c4790c9ab587d",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "848fa011ec76015ad2aab867701f45c458ee8fb1feb50f09ac157b2ad71658d7",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "f48b824774d88690e25cd591c3334e18bee2e1cf38fe2c7491d71ab9adddfaec",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "e8533516c2629d05f1aa76c1302e7063e6978c4ae3632c528e523138e65b1dbf",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "fcafa83812ab3f499783ae8d30fb0ffdabe5c82d489d57d14d5fcb412fdded0d",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "22896e479f3a829f9f4fa34621397ee112e6033abf92244dd0f4fbaa0f8da8d2",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "fcb44a16f94d7c1dd665051ee2518eac6eb8de8124f25f313dabafb41c430b0e",
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "a100f05d332d80d7f084534ba44d092ba7756b15cd7b97ad00fa8c3113baaa71",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          }
+        ]
+      },
+      {
+        "sha256": "1c5cc0185fafefca1304eb8c2d71e6c5f95819c672f1fd022c08b0d05a096065",
+        "editions": [
+          {
+            "edition_id": "6e0245ea87630988e049e5ffa45829396f54c6984019b43f0f756b71fc2a58b4",
+            "dataset": "frc_per_pupil_expenditure",
+            "edition": "2025",
+            "revision_sha256": "bb218afa97e8ab27f9eef6edc2a5aff08cbcc5de19b6d93c422b76b79077ef0b",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "94812813afa945c5f0e75b2baa502e40f67c6162bb2d572ecccc54b8f265f529",
+            "dataset": "frc_per_pupil_expenditure",
+            "edition": "2025",
+            "revision_sha256": "622d911d3c5905965861f8f6a92fd158892f37195daae8dd7f4976261cfd1252",
+            "scope": "state",
+            "table": "state",
+            "grain": "one statewide observation"
+          },
+          {
+            "edition_id": "a6fa862d30c42f7f62d3e59c1727e1d0bb4283812d57c4ea4bdb87fe4f566f49",
+            "dataset": "district_tapr_staff_profile",
+            "edition": "2025",
+            "revision_sha256": "fcaeca43ee6dbe7f37c6114786e26dded07afce49d219e3ba68265defd252ebe",
+            "scope": "district",
+            "table": "staff_profile",
+            "grain": "one row per district_number"
+          },
+          {
+            "edition_id": "ae5ed2117cedb7d28d2ecccf2fb69dc68eab0f1cc1e724d3def92f6986e4a405",
+            "dataset": "frc_per_pupil_expenditure",
+            "edition": "2025",
+            "revision_sha256": "8ebc78c1cb2f1c5a3433f18f74917a11942b10bf9b799d9a6337180fb07e2423",
+            "scope": "district",
+            "table": "district",
+            "grain": "one row per district_number"
+          },
+          {
+            "edition_id": "c8952832ad28d056b66c49062d99ebaf5bd57a4659cdb483b9cf88920a84de19",
+            "dataset": "campus_tapr_staff_profile",
+            "edition": "2025",
+            "revision_sha256": "663500fefd2a9ed3a44a650fee8082868ddb12b90e48fab99b7404802b40aafd",
+            "scope": "campus",
+            "table": "staff_profile",
+            "grain": "one row per campus_number"
+          }
+        ]
+      },
+      {
+        "sha256": "c631a058e264c70ea9e1a27a32a949aabf36d37b2f518d9f58d3e8378f460b27",
+        "editions": [
+          {
+            "edition_id": "081c7d87676b345007cd056bc39e6a7fa763d8f5ec85c1847e974d9ce51c000a",
+            "dataset": "first_financial_accountability_district",
+            "edition": "2026",
+            "revision_sha256": "daf3eee25acb68ec00310708e94e95b12177b521541178db6758a804d6a9abdf",
+            "scope": "district",
+            "table": "FIRST Ratings",
+            "grain": "one publisher row per district number"
+          },
+          {
+            "edition_id": "b172d70627a23753e5d3e7046cc2be4a95efd5bdb0ab71ad2be69a542ffc205d",
+            "dataset": "first_financial_accountability_university_charter",
+            "edition": "2026",
+            "revision_sha256": "2249249ce27875bf047a321f599fa8683a6e9a06170f955d02b440718b1136b4",
+            "scope": "district",
+            "table": "CharterFIRST Ratings",
+            "grain": "one publisher row per district number"
+          }
+        ]
+      },
+      {
+        "sha256": "1512f0ef1a8b1df41f969c683c3ec1dab0d607499dddb589127c6f5a41b9af4e",
+        "editions": [
+          {
+            "edition_id": "07a7f4244c98581fde2f9a117e9723730afc4f6c1bab5bdc3ae15a7b6c51a8f1",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "7cc01e7030e264f521f954b923a1cb6cc7ce34e184d7876389957a141fb87427",
+            "scope": "campus",
+            "table": "campus-8795087b4036a501a0219991a4c2056e852285b8133d30e420da5c11dbc15f6c",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "0ceba761568d5bfe4970e9323616ba38fa98f3f5c1927ad135b87ba06e99e52e",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "273b0ee7a9b0a301db2cc0856f119681cd301fb634548ba08da643b7b969cb39",
+            "scope": "campus",
+            "table": "campus-10ce4160182787d4cda7f4020fdff4456285f8c9df9a9467b808cf12844f214b",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "183d20d4f2336cbfb545ff7b2696dcf6ff94edf0edc36907433422601173afc1",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "239e03fa5ead73cb539a2ca7ffe739dcf97578908877eceb5a5b22ccca4f7cee",
+            "scope": "campus",
+            "table": "campus-7d334f02277f7bfc7ef46e40e951456aa8549d072def34a551de15d9a876ebec",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "276b377de040ab0e36aaf02467edaf02bf01e7feebc3fce211a4fc528500b6fc",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "8f705348358c2cd601589059a7ccc41692480de4e5fd81ba2f1d01ab6224fa8d",
+            "scope": "campus",
+            "table": "campus-b5b766a2f9c15e889df8c4b379f286032bc499f7cc08ebfab9b2ff6985326791",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "2e7437e5f0f9e86899f31fc544ef1416deabfb7146b7d40f8b7981b5f2f8543d",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "bce66df28462b82850ff6f81e44a953eae1297243703f116a0fa3fb259118d99",
+            "scope": "campus",
+            "table": "campus-1ed739262ad170b289854a3162c89bc3b5294126fba334db6af277f5391d3c2c",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "47a710e9d7a89ed52ec2624c734bc4cbc115a90eb3e799835b32b6dd64a77b20",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "9230bdf47af9996500e3631e2b3b48cfd8a135bb401669a347af1f4aae1822fc",
+            "scope": "campus",
+            "table": "campus-8255bad948b5fd2a587336820f393e3f91f33d62f1988422bf83af62b40fa81d",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "49744411f4d0049bc0675687f08af10ee535942df42e5c2065269041be174345",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "9748c6f26df5e4e404b6b102ba7bcb21808dbaf9b4203660e3faba24110fbda7",
+            "scope": "campus",
+            "table": "campus-ea529bc6b28574eee4a8d7273563a98397286eb860ac1c56e6fa916689c9cd51",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "53c3c9bafee3ab7b2b3588be4cf0d17d89ddc0deee131714e69d36f41d71f3a5",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "77043f9df20ebc79516de2355b46369317282b4267f6d3f7132a94f3bacdb102",
+            "scope": "campus",
+            "table": "campus-7b135d070acdff2193cad4b3992490ec1f49eb017ebbcc65778ccee07b46f2df",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "55579962877f7ca079742f6147d9b18d27edd2b6344be91bcd1d79e82f6196bf",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "509de5e86fc974cdc5ce25c14db9545ccf2b092a19ca76e570428f719d62c256",
+            "scope": "campus",
+            "table": "campus-8d0d94c703d39eefb3b339c773cb47ff157791f3fd6016d50be9ba16a193e418",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "5887c820c4c10322e738d71c66dc23f303a1614dc9341c46cde9d7c20d36f00f",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "d8605b8a209a8710cbc6fb7af735f9ab35738314fba33f796d3783432bc74eb3",
+            "scope": "campus",
+            "table": "campus-2aa6b75ef94cdb9699cd1d435009555642a0bb321fda290b6f89459536054feb",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "81127b1acc334bee8ad4fe8a0f2515c49685021484276d26bc6207a9bd25f8cd",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "a83d629f34f1427a2abccb6953a28f0f2070b5e393589d4a6f8204f65c6d0664",
+            "scope": "campus",
+            "table": "campus-41943807a32722a291d3dd5d4a9de064eefb08c3c3cc9e211c6cbf929c39a7dd",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "8434dfd39780f0af87ec2d5f330c6d6b444b44e6c87768048dcb8a93e915e79e",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "77d3e7c012321696105fd4d7f504ee0bc0efba972d1c398531614004c7c1ef09",
+            "scope": "campus",
+            "table": "campus-884efda675555c51ca4f6e6e34af1d721abc4bc0664347217a53654babacb05f",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "ac11dd794c21f903663d3e7102ef27fe838e867ce7a5be774ec9d6d03d2df6a4",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "28b493f9d1a6cab495a36dd0dd3bd61b65754fa3b3ec290e13b4d1112125583c",
+            "scope": "district",
+            "table": "district",
+            "grain": "one row per district_number"
+          },
+          {
+            "edition_id": "af1e4a060ea29a290b882f21c9cc46260e6087330ff5230eefcef2b85525a9bd",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "519bdb143a8647a829c27fa9f92ff20aa1c07b59bfb602959abad5f770077392",
+            "scope": "campus",
+            "table": "campus-93f790bf1742137d441d87a1d757084928115ebcb55251ae7c30058c359232a5",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "ba1a33e0d9d6d14b180124c8970fc37b2cd691f57cc93c269d8847d5ebb63a78",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "b8e377fc5263a71759f6b3ac1f4c1a9cfd586a28b82aa8d7a234e5d50c09f6be",
+            "scope": "campus",
+            "table": "campus-93672a72957c7a111847e7c00afc8f04ae991c1bfa235e1c02ba2d26c4eba748",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "bb419d555c0a5099a8e4640e619a15948bf4f69e703463f1f969addcfab094b4",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "848fa011ec76015ad2aab867701f45c458ee8fb1feb50f09ac157b2ad71658d7",
+            "scope": "campus",
+            "table": "campus-efde17423d7bbcf7bc8f500999edf11fd4f5ef707d4cf84b275c4790c9ab587d",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "bba3bf699e28c2a82f7791342b73b3c42414d67009aaaf4a8a39bf254508faae",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "a100f05d332d80d7f084534ba44d092ba7756b15cd7b97ad00fa8c3113baaa71",
+            "scope": "campus",
+            "table": "campus-fcb44a16f94d7c1dd665051ee2518eac6eb8de8124f25f313dabafb41c430b0e",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "be214e226dd92181f313ed56071ffe8a4395eccf033b20e720c3330a84dbe2ee",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "d23d023eaf3c96b7b12ccc2bc2ff52b9dbb9fefaa39df7806423a61a183bbf31",
+            "scope": "campus",
+            "table": "campus-2c7690e6f8ca8722c068c20eeb5f372242ee5a9a1dc6ed3fc4991f6c1a05e504",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "c1eef851801fc0ed51c796d969734e9f5a96e405e389d01f41a7f99c55c5454b",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "78f7956aa15c6842b540ba73f3e57f24c3d22f86cd39e797644ef463a15e6504",
+            "scope": "campus",
+            "table": "campus-1faf11c9f7c1d852f2f9fba3e62cffda010a60e4470f3ecbddea158f586ae4ac",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "d4412c9d5dacc88b1f676bf7616783caf06fc0044e74a9bf711f599eea6210f3",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "7e897d2e27652bd6b6428594d90e38fc3990302deebb9325e3aaad7b1735c206",
+            "scope": "campus",
+            "table": "campus-45f12ac990129e287ccbdb065dff6f166556b315e7738f8f8c5022df3f32acac",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "d8785e5d11f9c78fb1c753ae496d490346220c8d99806ad794a55585e8bb92c9",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "e8533516c2629d05f1aa76c1302e7063e6978c4ae3632c528e523138e65b1dbf",
+            "scope": "campus",
+            "table": "campus-f48b824774d88690e25cd591c3334e18bee2e1cf38fe2c7491d71ab9adddfaec",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "df9a7bf5f26fe6d13051bd890274bbec1409da50b3f2b55ffa851d92a47a2901",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "a21fc42e93302e92a22889e0d3312eacee51ceb83101a6c6101debe046b33a43",
+            "scope": "campus",
+            "table": "campus-ccd555aca0428dc8325e2d554fbb8f0ed913637eb9977c466644edfbd82dd7f6",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "e17ce6f668839405e45b381ebdb7c18fe5eb4a70bec1de21a941717c062c1765",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "22896e479f3a829f9f4fa34621397ee112e6033abf92244dd0f4fbaa0f8da8d2",
+            "scope": "campus",
+            "table": "campus-fcafa83812ab3f499783ae8d30fb0ffdabe5c82d489d57d14d5fcb412fdded0d",
+            "grain": "one row per campus_number"
+          },
+          {
+            "edition_id": "e641b549496d1ebe5b9f171f37e53573a7f4880dd23bf96dfbdd6c48c7e1bbf4",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "b16c1ecb1e083e10ce96de044c1c2d60b34965e5f2a5341e9383cc817a933521",
+            "scope": "state",
+            "table": "state",
+            "grain": "one statewide observation"
+          },
+          {
+            "edition_id": "fc715d183b331d775289893e3734e281cf1efe5a278c54c4b8d62b9d17d46d97",
+            "dataset": "tprs_class_size",
+            "edition": "2026",
+            "revision_sha256": "c578f4c176aa702e4d634194b755cd21bf7bc85e9bc48a52e80d8c8a858ca79a",
+            "scope": "campus",
+            "table": "campus-e47421fee896f6891f74096c95c0c931271e4cbbdaf231e3a596a638af2220c6",
+            "grain": "one row per campus_number"
+          }
+        ]
+      }
+    ]
+  },
+  "counts": {
+    "configured_dataset_ids": 124,
+    "configured_editions": 276,
+    "source_only_dataset_ids": 111,
+    "source_only_dataset_ids_not_attached": 105
+  },
+  "limits": [
+    "Metadata inventory only; no raw rows, publisher reports or qualification gates rechecked.",
+    "A missing dataset ID does not prove all its measures are absent from other sources.",
+    "Registered edition keys are not necessarily measurement years.",
+    "Attachment does not certify every field or direct entity/DSL access.",
+    "Standalone readers outside the default YAML are outside these counts."
+  ],
+  "registered": [
+    {
+      "dataset": "accountability",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "calendar_year",
+        "year": 2025
+      },
+      "profiles": [
+        "population",
+        "ratings"
+      ],
+      "source_only": false
+    },
+    {
+      "dataset": "accountability_research_annual_dropout",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "accountability_research_four_year_graduation",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "all_districts_reference",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [],
+      "source_only": false
+    },
+    {
+      "dataset": "all_districts_reference2",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [],
+      "source_only": false
+    },
+    {
+      "dataset": "campus_peims_financials",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "fiscal_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [],
+      "source_only": false
+    },
+    {
+      "dataset": "campus_planned_closures",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "as_of",
+        "as_of": "2025-10-03"
+      },
+      "profiles": [],
+      "source_only": false
+    },
+    {
+      "dataset": "campus_tapr_5_year_extended_longitudinal_rate",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_6_year_extended_longitudinal_rate",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_annual_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_college_career_military_readiness",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_college_readiness_components",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_dropout_attendance",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_dropout_attendance",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_four_year_longitudinal_rate",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_four_year_longitudinal_rate",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_graduation_profile",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2022,
+        "end_year": 2023
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_graduation_profile",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_historical_enrollment",
+      "section": "data_sources",
+      "year": 2015,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2014,
+        "end_year": 2015
+      },
+      "profiles": [],
+      "source_only": false
+    },
+    {
+      "dataset": "campus_tapr_longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_reference",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_all_grades",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_all_grades",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_bilingual_esl_growth",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_bilingual_esl_performance",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_end_of_course",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_end_of_course",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_end_of_course",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_grades_3_to_8",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_participation",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_participation",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_participation",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_school_progress",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_school_progress",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_school_progress",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_tested_grade_3",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_tested_grade_3",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_tested_grade_3",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_tested_grade_4",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_tested_grade_4",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_tested_grade_4",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_tested_grade_5",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_tested_grade_5",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_tested_grade_5",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_tested_grade_6",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_tested_grade_6",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_tested_grade_6",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_tested_grade_7",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_tested_grade_7",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_tested_grade_7",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_tested_grade_8",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_tested_grade_8",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staar_tested_grade_8",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staff_profile",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_staff_profile",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_student_profile",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_student_profile",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campus_tapr_student_staff_profile",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": false
+    },
+    {
+      "dataset": "campus_tapr_student_staff_profile",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": false
+    },
+    {
+      "dataset": "campus_transfer_reports",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": false
+    },
+    {
+      "dataset": "charter_reference",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "as_of",
+        "as_of": "2025-09-30"
+      },
+      "profiles": [],
+      "source_only": false
+    },
+    {
+      "dataset": "district_tapr_5_year_extended_longitudinal_rate",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_6_year_extended_longitudinal_rate",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_annual_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_college_career_military_readiness",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_college_readiness_components",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_dropout_attendance",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_dropout_attendance",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_four_year_longitudinal_rate",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_four_year_longitudinal_rate",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_graduation_profile",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2022,
+        "end_year": 2023
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_graduation_profile",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_longitudinal_rhsp_dap_fhsp_e_fhsp_dla_texas_first_dla",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_reference",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_all_grades",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_all_grades",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_bilingual_esl_growth",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_bilingual_esl_performance",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_end_of_course",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_end_of_course",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_end_of_course",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_grades_3_to_8",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_participation",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_participation",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_participation",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_school_progress",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_school_progress",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_school_progress",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_tested_grade_3",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_tested_grade_3",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_tested_grade_3",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_tested_grade_4",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_tested_grade_4",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_tested_grade_4",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_tested_grade_5",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_tested_grade_5",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_tested_grade_5",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_tested_grade_6",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_tested_grade_6",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_tested_grade_6",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_tested_grade_7",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_tested_grade_7",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_tested_grade_7",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_tested_grade_8",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_tested_grade_8",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staar_tested_grade_8",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staff_profile",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_staff_profile",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_student_profile",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_student_profile",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_tapr_student_staff_profile",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": false
+    },
+    {
+      "dataset": "district_tapr_student_staff_profile",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": false
+    },
+    {
+      "dataset": "district_transfer_reports",
+      "section": "data_sources",
+      "year": 2013,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2012,
+        "end_year": 2013
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_transfer_reports",
+      "section": "data_sources",
+      "year": 2014,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2013,
+        "end_year": 2014
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_transfer_reports",
+      "section": "data_sources",
+      "year": 2015,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2014,
+        "end_year": 2015
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_transfer_reports",
+      "section": "data_sources",
+      "year": 2016,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2015,
+        "end_year": 2016
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_transfer_reports",
+      "section": "data_sources",
+      "year": 2017,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2016,
+        "end_year": 2017
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_transfer_reports",
+      "section": "data_sources",
+      "year": 2018,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2017,
+        "end_year": 2018
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_transfer_reports",
+      "section": "data_sources",
+      "year": 2019,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2018,
+        "end_year": 2019
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_transfer_reports",
+      "section": "data_sources",
+      "year": 2020,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2019,
+        "end_year": 2020
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_transfer_reports",
+      "section": "data_sources",
+      "year": 2021,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2020,
+        "end_year": 2021
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_transfer_reports",
+      "section": "data_sources",
+      "year": 2022,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2021,
+        "end_year": 2022
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_transfer_reports",
+      "section": "data_sources",
+      "year": 2023,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2022,
+        "end_year": 2023
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_transfer_reports",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_transfer_reports",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "district_transfer_reports",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "educator_district_new_hires",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "educator_district_new_hires_by_epp",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "educator_state_initial_certification_principal",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "educator_state_initial_certification_superintendent",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "educator_state_initial_certification_teacher",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "educator_state_new_hires",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "educator_state_retention_by_demographic_group",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "educator_state_retention_by_gender",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "educator_state_retention_by_preparation_route",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "first_financial_accountability_district",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "fiscal_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "first_financial_accountability_university_charter",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "fiscal_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "frc_per_pupil_expenditure",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "fiscal_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_college_credit",
+      "section": "data_sources",
+      "year": 2022,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2021,
+        "end_year": 2022
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_college_credit",
+      "section": "data_sources",
+      "year": 2023,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2022,
+        "end_year": 2023
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_college_credit",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_college_credit",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_college_credit",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_financial_single_file_actuals",
+      "section": "data_sources",
+      "year": 2013,
+      "source_period": {
+        "kind": "fiscal_year",
+        "start_year": 2012,
+        "end_year": 2013
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_financial_single_file_actuals",
+      "section": "data_sources",
+      "year": 2014,
+      "source_period": {
+        "kind": "fiscal_year",
+        "start_year": 2013,
+        "end_year": 2014
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_financial_single_file_actuals",
+      "section": "data_sources",
+      "year": 2015,
+      "source_period": {
+        "kind": "fiscal_year",
+        "start_year": 2014,
+        "end_year": 2015
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_financial_single_file_actuals",
+      "section": "data_sources",
+      "year": 2016,
+      "source_period": {
+        "kind": "fiscal_year",
+        "start_year": 2015,
+        "end_year": 2016
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_financial_single_file_actuals",
+      "section": "data_sources",
+      "year": 2017,
+      "source_period": {
+        "kind": "fiscal_year",
+        "start_year": 2016,
+        "end_year": 2017
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_financial_single_file_actuals",
+      "section": "data_sources",
+      "year": 2018,
+      "source_period": {
+        "kind": "fiscal_year",
+        "start_year": 2017,
+        "end_year": 2018
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_financial_single_file_actuals",
+      "section": "data_sources",
+      "year": 2019,
+      "source_period": {
+        "kind": "fiscal_year",
+        "start_year": 2018,
+        "end_year": 2019
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_financial_single_file_actuals",
+      "section": "data_sources",
+      "year": 2020,
+      "source_period": {
+        "kind": "fiscal_year",
+        "start_year": 2019,
+        "end_year": 2020
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_financial_single_file_actuals",
+      "section": "data_sources",
+      "year": 2021,
+      "source_period": {
+        "kind": "fiscal_year",
+        "start_year": 2020,
+        "end_year": 2021
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_financial_single_file_actuals",
+      "section": "data_sources",
+      "year": 2022,
+      "source_period": {
+        "kind": "fiscal_year",
+        "start_year": 2021,
+        "end_year": 2022
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_financial_single_file_actuals",
+      "section": "data_sources",
+      "year": 2023,
+      "source_period": {
+        "kind": "fiscal_year",
+        "start_year": 2022,
+        "end_year": 2023
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_financial_single_file_actuals",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "fiscal_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_financial_single_file_actuals",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "fiscal_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_financial_single_file_budgets",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "fiscal_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_special_education_by_primary_disability",
+      "section": "data_sources",
+      "year": 2013,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2012,
+        "end_year": 2013
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_special_education_by_primary_disability",
+      "section": "data_sources",
+      "year": 2014,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2013,
+        "end_year": 2014
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_special_education_by_primary_disability",
+      "section": "data_sources",
+      "year": 2015,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2014,
+        "end_year": 2015
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_special_education_by_primary_disability",
+      "section": "data_sources",
+      "year": 2016,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2015,
+        "end_year": 2016
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_special_education_by_primary_disability",
+      "section": "data_sources",
+      "year": 2017,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2016,
+        "end_year": 2017
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_special_education_by_primary_disability",
+      "section": "data_sources",
+      "year": 2018,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2017,
+        "end_year": 2018
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_special_education_by_primary_disability",
+      "section": "data_sources",
+      "year": 2019,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2018,
+        "end_year": 2019
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_special_education_by_primary_disability",
+      "section": "data_sources",
+      "year": 2020,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2019,
+        "end_year": 2020
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_special_education_by_primary_disability",
+      "section": "data_sources",
+      "year": 2021,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2020,
+        "end_year": 2021
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_special_education_by_primary_disability",
+      "section": "data_sources",
+      "year": 2022,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2021,
+        "end_year": 2022
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_special_education_by_primary_disability",
+      "section": "data_sources",
+      "year": 2023,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2022,
+        "end_year": 2023
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_special_education_by_primary_disability",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_special_education_by_primary_disability",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_special_education_by_primary_disability",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_staff_fte_and_salary",
+      "section": "data_sources",
+      "year": 2023,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2022,
+        "end_year": 2023
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_staff_fte_and_salary",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_staff_fte_and_salary",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_staff_fte_and_salary",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_student_enrollment_by_ethnicity",
+      "section": "data_sources",
+      "year": 2019,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2018,
+        "end_year": 2019
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_student_enrollment_by_ethnicity",
+      "section": "data_sources",
+      "year": 2020,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2019,
+        "end_year": 2020
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_student_enrollment_by_ethnicity",
+      "section": "data_sources",
+      "year": 2021,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2020,
+        "end_year": 2021
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_student_enrollment_by_ethnicity",
+      "section": "data_sources",
+      "year": 2022,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2021,
+        "end_year": 2022
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_student_enrollment_by_ethnicity",
+      "section": "data_sources",
+      "year": 2023,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2022,
+        "end_year": 2023
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_student_enrollment_by_ethnicity",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_student_enrollment_by_ethnicity",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_student_enrollment_by_ethnicity",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_student_programs_and_special_populations",
+      "section": "data_sources",
+      "year": 2023,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2022,
+        "end_year": 2023
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_student_programs_and_special_populations",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_student_programs_and_special_populations",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_student_programs_and_special_populations",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_teacher_course_enrollment",
+      "section": "data_sources",
+      "year": 2023,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2022,
+        "end_year": 2023
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_teacher_course_enrollment",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_teacher_course_enrollment",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "peims_teacher_course_enrollment",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "rda_special_education_indicator1",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_dropout_attendance",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_dropout_attendance",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_all_grades",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_all_grades",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_bilingual_esl_growth",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_bilingual_esl_performance",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_end_of_course",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_end_of_course",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_end_of_course",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_grades_3_to_8",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_participation",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_participation",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_participation",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_school_progress",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_school_progress",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_school_progress",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_tested_grade_3",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_tested_grade_3",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_tested_grade_3",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_tested_grade_4",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_tested_grade_4",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_tested_grade_4",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_tested_grade_5",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_tested_grade_5",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_tested_grade_5",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_tested_grade_6",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_tested_grade_6",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_tested_grade_6",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_tested_grade_7",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_tested_grade_7",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_tested_grade_7",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_tested_grade_8",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_tested_grade_8",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staar_tested_grade_8",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_staff_profile",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "region_tapr_student_profile",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "spp_timely_initial_evaluation",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "spp_timely_initial_evaluation",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_college_career_military_readiness",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_college_readiness_components",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_dropout_attendance",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_dropout_attendance",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_four_year_longitudinal_rate",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_all_grades",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_all_grades",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_bilingual_esl_growth",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_bilingual_esl_performance",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_end_of_course",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_end_of_course",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_end_of_course",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_grades_3_to_8",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_participation",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_participation",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_participation",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_school_progress",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_school_progress",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_school_progress",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_tested_grade_3",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_tested_grade_3",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_tested_grade_3",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_tested_grade_4",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_tested_grade_4",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_tested_grade_4",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_tested_grade_5",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_tested_grade_5",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_tested_grade_5",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_tested_grade_6",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_tested_grade_6",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_tested_grade_6",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_tested_grade_7",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_tested_grade_7",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_tested_grade_7",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_tested_grade_8",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2023,
+        "end_year": 2024
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_tested_grade_8",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staar_tested_grade_8",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_staff_profile",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_student_profile",
+      "section": "data_sources",
+      "year": 2024,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "state_tapr_student_profile",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "tefa",
+      "section": "data_sources",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": false
+    },
+    {
+      "dataset": "tefa",
+      "section": "data_sources",
+      "year": 2027,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2026,
+        "end_year": 2027
+      },
+      "profiles": [],
+      "source_only": false
+    },
+    {
+      "dataset": "tprs_student_membership_enrollment_reports",
+      "section": "data_sources",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [
+        "source"
+      ],
+      "source_only": true
+    },
+    {
+      "dataset": "campuses",
+      "section": "spatial",
+      "year": 2025,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2024,
+        "end_year": 2025
+      },
+      "profiles": [],
+      "source_only": false
+    },
+    {
+      "dataset": "districts",
+      "section": "spatial",
+      "year": 2025,
+      "source_period": {
+        "kind": "unknown"
+      },
+      "profiles": [],
+      "source_only": false
+    },
+    {
+      "dataset": "districts",
+      "section": "spatial",
+      "year": 2026,
+      "source_period": {
+        "kind": "school_year",
+        "start_year": 2025,
+        "end_year": 2026
+      },
+      "profiles": [],
+      "source_only": false
+    }
+  ]
+}

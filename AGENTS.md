@@ -66,6 +66,13 @@ Python 3.14 and 3.15 are required compatibility targets alongside supported earl
 ## Downstream Dependencies
 - `teadata-app` consumes the public `DataEngine`/`Query` APIs and snapshot loading behavior directly; avoid breaking signatures, return types, or query semantics, and coordinate any behavioral changes with that app before merging.
 
+## Completing Source Integration
+
+- Registration, acquisition, a standalone candidate and a separate source release are intermediate stages. Report them separately from qualified fields available through the selected normal entity release and DSL. Use the dated [integration inventory](docs/source-integration-status.md) as an audit record; recompute its comparison when configuration or the selected release changes.
+- Feed qualified source contracts through the normal ingestion/enrichment and release-composition path. Reuse the catalog, field bindings and lazy metadata mapping for direct fields, dataset namespaces, discovery, queries and provenance. Avoid per-dataset copies of entity properties, query logic, storage or export mappings when the existing contract can drive them.
+- Preserve source-specific parsing and semantic qualification where needed. Registration must not automatically qualify or publish unreviewed values. Keep multi-row source dimensions explicit; do not flatten them into conflicting scalars, infer suppressed values, or substitute another population/year.
+- Close a source tranche with representative publisher-grounded checks through its released normal access and applicable exports, including missing/suppressed/zero states. State the exact remaining integration gate if blocked. Do not count an unconnected bundle as completion, repeat unchanged downloads, or accumulate more candidates instead of finishing a ready source family.
+
 ## Landing Review Gate
 
 Use the [Elephant & Goldfish Model](https://github.com/google/elephant-goldfish-model) for every planned change before implementation. Scale the design to the change. Give one fresh Goldfish the draft, applicable standards, and the context needed to challenge it. Record the decisions and use the acceptance criteria to choose checks. Run reviewers one at a time.
