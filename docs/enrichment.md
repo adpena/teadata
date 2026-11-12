@@ -46,6 +46,63 @@ suppression status. An entity query filters those rows by selected TEA numbers.
 The historical population and geography still require their own dated sources.
 See [school-year selection](querying.md#school-years-and-source-editions).
 
+### Lazy dataset access on entities
+
+An entity in a release-bound engine discovers attached, qualified dataset names
+without opening data leaves. Registration alone does not add a dataset here.
+Names are case insensitive; unknown names give suggestions, never fuzzy selection.
+
+```python
+district.available_datasets()
+staff = district.dataset("peims_staff_fte_and_salary")
+# The same view, when no metadata key conflicts:
+staff = district.peims_staff_fte_and_salary
+staff.variables(r"^staff_")
+staff.years("staff_fte")
+selected = staff.at(26).select("staff_fte", "staff_average_base_pay").query(
+    "staff_category == 'TEACHING STAFF' and staff_role == 'TOTAL TEACHING STAFF'",
+    record=True,
+)
+selected.to_df()  # Raw tokens, value statuses and provenance are retained.
+selected.provenance()
+```
+
+These are immutable views over the same observation planner and artifacts used
+by `Query.observations`, not copies in `meta`. `.tprs` remains a compatible facade
+over its reviewed Student Information and class-size families. Single-row fields
+support `entity.<dataset>.<field>` and `view[field]`; multiple rows require explicit
+selection and filtering. They are never silently summed or reduced to one row.
+An absent entity row is an error rather than an older observation. Private school
+entities cannot acquire public campus observations through this interface.
+
+The default resolves the latest eligible measurement school year for all selected
+fields together; `.at(25)` requests 2024–25 exactly. An unavailable year lists the
+available years. Fiscal and calendar periods currently require the existing exact
+`release.for_entity(entity, edition=publisher_edition).dataset(edition_key)` path;
+the convenience facade reports that limitation before opening data leaves.
+Publisher edition must never stand in for measurement year.
+
+`entity.available_datasets()` reads parent descriptors only. `view.variables()`
+reads verified metadata for that dataset, with bounded runtime caches excluded
+from snapshots. Scalar access reads the selected source artifact; this is not a
+promise of remote row-level transfers or an indexed point lookup. Regular
+`dir(entity)` and whole-mapping operations retain their existing mapping behavior.
+`describe_operators()["entity_access"]` documents this interface without opening
+a release; available dataset names and fields come from the selected release.
+
+Existing direct metadata attributes and local edits remain supported. Native
+fields do not automatically become unqualified scalar aliases. A metadata key
+that conflicts with a dataset namespace remains accessible through
+`entity.meta[key]`; explicit `entity.dataset(name)` bypasses the collision. A cold
+`LazyMetaDict` without a safe keys-only reader also requires that explicit form,
+including instead of implicit `.tprs` access. SQL keys-only discovery refuses
+unsupported encodings or projections rather than hydrating the full payload.
+Arbitrary third-party mappings retain their own key-iteration behavior.
+
+DataFrame attributes and the Excel provenance worksheet carry export lineage.
+CSV carries the selected values; retain `selected.provenance().to_dict()` beside
+it to preserve the same source and query identity.
+
 ## Districts
 
 ```python

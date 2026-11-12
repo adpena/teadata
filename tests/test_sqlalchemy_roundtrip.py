@@ -492,10 +492,46 @@ def test_sqlite_sparse_assignments_and_deletions(database, catalog):
 def test_key_discovery_accepts_a_one_shot_reader_and_reports_mixed_keys():
     meta = LazyMetaDict(lambda: pytest.fail("whole metadata read"), read_keys=lambda: iter(("b", "a")))
     assert tuple(meta.iter_keys()) == ("a", "b")
+    assert tuple(meta.iter_keys(require_lazy=True)) == ("a", "b")
     mixed = LazyMetaDict({"a": 1})
     mixed.data[2] = 3
     with pytest.raises(TypeError, match="Use ordinary mapping iteration"):
         tuple(mixed.iter_keys())
+
+
+def test_strict_sql_key_discovery_refuses_payload_fallbacks(database, catalog, monkeypatch):
+    import teadata.persistence.sqlalchemy_store as store
+
+    engine, factory = database
+    with factory.begin() as session:
+        export_dataengine(graph(catalog, 1), session)
+    with factory() as session:
+        district = next(iter(import_dataengine(session).districts.values()))
+        with monkeypatch.context() as blocked:
+            blocked.setattr(store, "_default_sqlite_text", lambda connection: False)
+            blocked.setattr(session, "execute", lambda *a, **k: pytest.fail("Unsupported projection executed SQL"))
+            with pytest.raises(ContractError, match="Keys-only SQL metadata projection is unavailable"):
+                tuple(district.meta.iter_keys(require_lazy=True))
+        assert not district.meta._loaded
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE districts SET meta = :document"),
+                           {"document": r'{"plain\u0000":3,"payload":"unused"}'})
+    with factory() as session:
+        district = next(iter(import_dataengine(session).districts.values()))
+        statements = []
+
+        def capture(connection, cursor, statement, parameters, context, executemany):
+            statements.append(statement)
+
+        event.listen(engine, "before_cursor_execute", capture)
+        try:
+            with pytest.raises(ContractError, match="unsupported by keys-only projection"):
+                tuple(district.meta.iter_keys(require_lazy=True))
+        finally:
+            event.remove(engine, "before_cursor_execute", capture)
+        assert len(statements) == 1 and "json_each(" in statements[0]
+        assert "THEN districts.meta" not in statements[0]
+        assert not district.meta._loaded
 
 
 def _assert_lazy_sql_edit_origin(factory, catalog):

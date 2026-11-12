@@ -57,7 +57,7 @@ from .selectors import _live_name
 if TYPE_CHECKING:
     from .observations import _ObservationModel
     from .release import DataRelease
-    from .source_views import TPRSFields
+    from .source_views import DatasetFields, TPRSFields
 
 _NUMBER_SELECTOR = re.compile(r"'?\s*[0-9]+(?:\.0+)?")
 _DISTRICT_SELECTOR = re.compile(r"['’`]?\s*[0-9]+(?:\.0+|-[0-9]{3})?")
@@ -400,9 +400,7 @@ class DataEngine:
         self._source_release = release
         return self
 
-    def _entity_tprs(self, entity: District | Campus) -> TPRSFields:
-        from .source_views import TPRSFields
-
+    def _entity_source_context(self, entity: District | Campus) -> tuple[DataRelease, str, str]:
         if isinstance(entity, District):
             scope, identifier = "district", entity.district_number_canon
             registered = self._districts.get(entity.id) is entity and self._districts_by_number_norm.get(identifier) == entity.id
@@ -410,13 +408,48 @@ class DataEngine:
             scope, identifier = "campus", entity.lookup_key
             registered = self._campuses.get(entity.id) is entity and self._campus_by_key.get(identifier) == entity.id
         else:
-            raise ContractError("TPRS native sources require a public district or campus, not a private school")
+            raise ContractError("Native sources require a public district or campus, not a private school")
         release = getattr(self, "_source_release", None)
         if release is None:
             raise ContractError("This engine has no pinned source release. Call engine.bind_release(release) with its matching parent release.")
         if not registered or not identifier or self.catalog._entity_build_id(entity) != release.build_id:
-            raise ContractError("TPRS access requires the exact registered entity and its matching data build")
+            raise ContractError("Source access requires the exact registered entity and its matching data build")
+        return release, scope, identifier
+
+    def _entity_tprs(self, entity: District | Campus) -> TPRSFields:
+        from .source_views import TPRSFields
+
+        release, scope, identifier = self._entity_source_context(entity)
         return TPRSFields(release, scope, identifier)
+
+    def _entity_datasets(self, entity: District | Campus) -> tuple[str, ...]:
+        release, scope, _ = self._entity_source_context(entity)
+        return tuple(sorted({key.dataset for source in release.catalog.native_sources
+                             for key in source.editions if key.scope == scope}))
+
+    def _entity_dataset(self, entity: District | Campus, name: str) -> DatasetFields:
+        from .source_views import DatasetFields, _unknown_source_name
+
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError("Dataset selection requires a nonempty name. See entity.available_datasets().")
+        release, scope, identifier = self._entity_source_context(entity)
+        scopes: dict[str, set[str]] = {}
+        for source in release.catalog.native_sources:
+            for key in source.editions:
+                scopes.setdefault(key.dataset, set()).add(key.scope)
+        matches = [candidate for candidate in scopes if candidate.casefold() == name.casefold()]
+        if name in matches:
+            selected = name
+        elif len(matches) == 1:
+            selected = matches[0]
+        elif matches:
+            raise ContractError(f"Ambiguous source dataset {name!r}. Use exact spelling: {sorted(matches)}.")
+        else:
+            raise _unknown_source_name(name, scopes, "source dataset", "entity.available_datasets()")
+        if scope not in scopes[selected]:
+            raise ContractError(f"Dataset {selected!r} is unavailable for {scope}. "
+                                f"Available scopes: {sorted(scopes[selected])}. See entity.available_datasets().")
+        return DatasetFields(release, scope, identifier, dataset=selected)
 
     def _observation_model(self, sources: Iterable[DataRelease]) -> _ObservationModel:
         from .observations import _ObservationModel

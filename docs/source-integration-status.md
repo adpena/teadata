@@ -7,6 +7,15 @@ Software 0.0.150 is separate from that data release. The installed package's
 configuration matched the checkout's SHA-256. No raw data or qualification
 suite was reacquired or rerun for this metadata audit.
 
+Source-only follow-through on November 12 adds generic lazy entity namespaces
+(`entity.dataset(name)` and `entity.<dataset>`) over the existing observation
+planner. A retained normal parent candidate composes all four original attached
+bundles plus reviewed PEIMS staff district/Texas editions for 2022–23 through
+2025–26. It has not replaced the published app-selected v0.0.148 parent. The inventory
+below remains pinned to that published parent; API implementation, candidate
+qualification and public release activation are separate milestones. Campus
+staff observations are not supplied by the district/Texas staff attachment.
+
 The configuration contains **124 dataset IDs and 276 editions**. Of these,
 **111 IDs are preparation/source-only contracts**; **105 are absent as named
 native sources from the selected parent**. These include scope and domain
@@ -26,7 +35,7 @@ configuration digest and parent hash pin this comparison; it is not a live feed.
 
 | Group not attached under its registered source IDs | Registered edition keys | What needs finishing |
 | --- | --- | --- |
-| PEIMS staff FTE and salary | 2023–2026 | Attach the reviewed district/Texas leaves and exercise generic entity, filtered-role and export access. Four years of retained parity and eight publisher-report witnesses exist; that is not release activation. |
+| PEIMS staff FTE and salary | 2023–2026 | A qualified normal parent candidate now attaches district/Texas leaves. Generic entity namespaces reuse filtered-role and export access. Four years of retained parity and eight publisher-report witnesses exist; public/default release activation remains pending. |
 | PEIMS primary disability | 2013–2026 | Integrate the detailed district/Texas series, retaining suppression and classification transitions. Existing TAPR special education figures remain a distinct population. |
 | PEIMS enrollment by ethnicity; programs and special populations | 2019–2026; 2023–2026 | Complete year/scope-specific qualification and release integration; preserve Enrollment versus Membership and all publisher tokens. |
 | PEIMS teacher/course enrollment; college credit | 2023–2026; 2022–2026 | Preserve the course/program row dimensions and denominators through normal lazy access. |
@@ -88,8 +97,9 @@ only four native groups while standalone qualification supported more reviewed
 families. The subsequent verifier consolidation makes both paths select the
 same reviewed source plan and binds receipt evidence separately to each child
 manifest. It adds no attachments, published data years or entity fields, so the
-inventory counts above remain unchanged. Normal release composition and a shared
-lazy entity resolver still need finishing. Preserve publisher evidence and the
+inventory counts above remain unchanged. The subsequent composition and shared
+lazy entity facade are implemented; remaining work is source-by-source qualification
+and activation in a published parent. Preserve publisher evidence and the
 approval boundary; an unreviewed registration must not become an automatic
 publication merely to clear this inventory.
 

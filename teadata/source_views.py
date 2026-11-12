@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 import re
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any, BinaryIO, Generator, Iterator, overload
+from typing import TYPE_CHECKING, Any, BinaryIO, Generator, Iterator, Self, overload
 
 from .dataset_metadata import ArtifactRef, DataPeriod, EditionKey
 from .identifiers import canonical_source_identifiers
@@ -431,7 +431,7 @@ _TPRS_DATASETS = frozenset({"tprs_student_membership_enrollment_reports", "tprs_
 
 
 @dataclass(frozen=True, slots=True)
-class _TPRSNameIndex:
+class _SourceNameIndex:
     context: tuple[Any, ...]
     names: tuple[tuple[str, tuple[str, ...]], ...]
     files: tuple[tuple[Path, str, int, tuple[int, ...]], ...]
@@ -458,31 +458,44 @@ class _TPRSNameIndex:
 
 
 @dataclass(frozen=True, slots=True)
-class TPRSFields:
-    """An entity's lazy TPRS view over the release's qualified native sources."""
+class _EntityFields:
+    """Shared metadata and observation resolver; no entity payload copies."""
 
     release: DataRelease
     scope: str
     identifier: str
     school_year: int | None = None
 
+    @property
+    def _datasets(self) -> frozenset[str]:
+        raise NotImplementedError
+
+    @property
+    def _label(self) -> str:
+        return "source"
+
     def _indexes(self) -> dict[str, set[str]]:
-        context = (self.scope, tuple(sorted(_TPRS_DATASETS)), self.release.manifest_sha256,
+        selected = tuple(sorted(self._datasets))
+        cache_key = self.scope, selected
+        context = (self.scope, selected, self.release.manifest_sha256,
                    self.release.catalog.build_id, self.release.source, self.release.path,
                    self.release.cache, getattr(self.release, "_cache_dir", None), self.release.offline)
-        cached = getattr(self.release, "_tprs_name_indexes", {}).get(self.scope)
+        cached = getattr(self.release, "_source_name_indexes", {}).get(cache_key)
         if cached is not None and cached.context == context and cached.matches_files():
             return cached.projection()
         index = self._read_indexes(context)
         if index.files and not index.matches_files():
-            raise ContractError("TPRS metadata changed while discovering fields. Retry with verified source artifacts.")
+            raise ContractError("Source metadata changed while discovering fields. Retry with verified source artifacts.")
         if self.scope in {"district", "campus"} and index.files and len(index.files) <= 256:
-            entries = dict(getattr(self.release, "_tprs_name_indexes", {}))
-            entries[self.scope] = index
-            self.release._tprs_name_indexes = entries
+            entries = dict(getattr(self.release, "_source_name_indexes", {}))
+            entries.pop(cache_key, None)
+            entries[cache_key] = index
+            while len(entries) > 8:
+                entries.pop(next(iter(entries)))
+            self.release._source_name_indexes = entries
         return index.projection()
 
-    def _read_indexes(self, context: tuple[Any, ...]) -> _TPRSNameIndex:
+    def _read_indexes(self, context: tuple[Any, ...]) -> _SourceNameIndex:
         from .dataset_metadata import ColumnSchemaRef
         from .release import _capture_column_schema
 
@@ -490,10 +503,10 @@ class TPRSFields:
         if self.release._v3:
             groups.append(tuple(EditionKey.from_dict({name: row[name] for name in EditionKey.__dataclass_fields__})
                                 for row in self.release.catalog.editions(scope=self.scope, include_metadata=False)
-                                if row["dataset"] in _TPRS_DATASETS))
+                                if row["dataset"] in self._datasets))
         else:
             groups.extend(tuple(key for key in source.editions
-                                if key.scope == self.scope and key.dataset in _TPRS_DATASETS)
+                                if key.scope == self.scope and key.dataset in self._datasets)
                           for source in self.release.catalog.native_sources)
         names: dict[str, set[str]] = {}
         files: dict[Path, tuple[str, int, tuple[int, ...]]] = {}
@@ -512,7 +525,7 @@ class TPRSFields:
                     resources.append((child.path, child.manifest_sha256, size, stamp))
                 for path, digest, size, stamp in resources:
                     if path in files and files[path][:2] != (digest, size):
-                        raise ContractError("TPRS source metadata routes conflicting identities to one file")
+                        raise ContractError("Source metadata routes conflicting identities to one file")
                     files[path] = digest, size, stamp
             finally:
                 if child is not self.release:
@@ -520,7 +533,7 @@ class TPRSFields:
                     # otherwise retain large parsed graphs until cyclic GC.
                     child.catalog._clear_edition_caches()
                     child._column_schema_data.clear()
-        return _TPRSNameIndex(context, tuple((dataset, tuple(sorted(values))) for dataset, values in sorted(names.items())),
+        return _SourceNameIndex(context, tuple((dataset, tuple(sorted(values))) for dataset, values in sorted(names.items())),
                               tuple((path, *identity) for path, identity in sorted(files.items())))
 
     def variables(self, pattern: str | re.Pattern[str] | None = None) -> tuple[str, ...]:
@@ -533,11 +546,11 @@ class TPRSFields:
         from .dataset_metadata import _validate_observation_selection
         from .selectors import _folded_field_names
 
-        _validate_observation_selection("tprs", fields, self.scope, None)
+        _validate_observation_selection(self._label, fields, self.scope, None)
         indexes = self._indexes()
         if not indexes:
             raise ContractError(
-                f"No qualified TPRS native families are attached for {self.scope}. "
+                f"No qualified {self._label} native families are attached for {self.scope}. "
                 "Inspect release.catalog.native_sources; configured sources are not automatically admitted."
             )
         names = {name for values in indexes.values() for name in values}
@@ -548,27 +561,27 @@ class TPRSFields:
             elif len(matches) == 1:
                 resolved.append(matches[0])
             elif matches:
-                raise ContractError(f"Ambiguous TPRS field {name!r}. Use exact spelling: {matches}.")
+                raise ContractError(f"Ambiguous {self._label} field {name!r}. Use exact spelling: {matches}.")
             else:
-                raise _unknown_source_name(name, names, "TPRS field", "tprs.variables()")
+                raise _unknown_source_name(name, names, f"{self._label} field", f"{self._label.lower()}.variables()")
         if len(set(resolved)) != len(resolved):
-            raise ValueError("TPRS fields must resolve to distinct canonical names")
+            raise ValueError(f"{self._label} fields must resolve to distinct canonical names")
         owners = {name: [dataset for dataset, values in indexes.items() if name in values] for name in resolved}
         ambiguous = {name: datasets for name, datasets in owners.items() if len(datasets) > 1}
         if ambiguous:
             raise ContractError(
-                f"TPRS fields require one unambiguous native family; conflicting names: {ambiguous}. "
+                f"{self._label} fields require one unambiguous native family; conflicting names: {ambiguous}. "
                 "Use release.for_entity(..., edition=...).dataset(exact_key) to choose a source explicitly."
             )
         choices = [dataset for dataset, values in indexes.items() if all(name in values for name in resolved)]
         if len(choices) != 1:
             raise ContractError(
-                f"TPRS fields require one unambiguous native family; matching families: {choices}. "
+                f"{self._label} fields require one unambiguous native family; matching families: {choices}. "
                 "Select fields from one family, or use release.for_entity(..., edition=...).dataset(exact_key)."
             )
         return choices[0], tuple(resolved)
 
-    def at(self, school_year: int | str | None) -> TPRSFields:
+    def at(self, school_year: int | str | None) -> Self:
         """Select a measurement school year; None selects the latest eligible year."""
         from .dataset_metadata import _parse_school_year
 
@@ -577,7 +590,10 @@ class TPRSFields:
     def years(self, field: str) -> tuple[int, ...]:
         """List admitted measurement years for a field, separately from row presence."""
         dataset, (name,) = self._resolve((field,))
-        return self.release.observation_years(dataset, name, scope=self.scope)[name]
+        years = self.release.observation_years(dataset, name, scope=self.scope)[name]
+        if not years:
+            self.release.observations(dataset, name, scope=self.scope)
+        return years
 
     def select(self, *fields: str, school_year: int | str | None = None) -> SourceTable:
         """Plan an entity projection with its original raw/status/provenance support."""
@@ -588,7 +604,7 @@ class TPRSFields:
         table = self.release._entity_observations(dataset, names, school_year=year, scope=self.scope,
                                                    edition=None, identifiers=(self.identifier,))
         if not isinstance(table, SourceTable):
-            raise ContractError("One entity cannot resolve to multiple TPRS partitions")
+            raise ContractError("One entity cannot resolve to multiple source partitions")
         return table
 
     def provenance(self, *fields: str) -> ExportProvenance:
@@ -600,13 +616,14 @@ class TPRSFields:
         assert view._fields is not None
         metadata = view.release.catalog.field_metadata(view._fields[0], scope=self.scope, edition=view.edition)
         if metadata is None:
-            raise ContractError(f"TPRS field {name!r} is missing its catalog binding")
+            raise ContractError(f"{self._label} field {name!r} is missing its catalog binding")
         table = view.to_arrow()
         if table.num_rows != 1:
             kind = "No" if table.num_rows == 0 else "Multiple"
             raise ContractError(
                 f"{kind} published rows for {self.scope} {self.identifier} in {view.edition.dataset}, "
-                f"measurement period {view.measurement_period}. Check the publisher roster."
+                f"measurement period {view.measurement_period}. "
+                "Use select(...).query(...) to select source rows explicitly; check the publisher roster for absent rows."
             )
         return table[metadata["column"]][0].as_py()
 
@@ -620,6 +637,38 @@ class TPRSFields:
 
     def __dir__(self) -> list[str]:
         return sorted(set(object.__dir__(self)) | set(self.variables()))
+
+
+@dataclass(frozen=True, slots=True)
+class TPRSFields(_EntityFields):
+    """Compatible TPRS facade over the shared catalog-bound resolver."""
+
+    @property
+    def _datasets(self) -> frozenset[str]:
+        return _TPRS_DATASETS
+
+    @property
+    def _label(self) -> str:
+        return "TPRS"
+
+
+@dataclass(frozen=True, slots=True)
+class DatasetFields(_EntityFields):
+    """One attached source dataset; measurement school years remain explicit."""
+
+    dataset: str = ""
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.dataset, str) or not self.dataset.strip():
+            raise ValueError("DatasetFields requires an exact attached dataset name")
+
+    @property
+    def _datasets(self) -> frozenset[str]:
+        return frozenset({self.dataset})
+
+    @property
+    def _label(self) -> str:
+        return self.dataset
 
 
 @dataclass(frozen=True, slots=True)

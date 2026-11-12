@@ -30,7 +30,7 @@ from .identifiers import EntityIdentityError, campus_lookup_key, canonical_sourc
 
 if TYPE_CHECKING:
     from .manifest import _SQLMetadataOrigin
-    from .source_views import TPRSFields
+    from .source_views import DatasetFields, TPRSFields
 
 __all__ = [
     "District",
@@ -105,22 +105,66 @@ class _SQLMetadataOwner:
     __slots__ = ("_sql_metadata_origin",)
     _sql_metadata_origin: _SQLMetadataOrigin
 
-    @property
-    def tprs(self) -> TPRSFields:
-        """Access qualified TPRS fields through the owning engine's pinned release."""
+    def _source_owner(self):
         from .engine import DataEngine
         from .manifest import ContractError
 
-        meta = object.__getattribute__(self, "meta")
-        if isinstance(meta, Mapping) and "tprs" in meta:
-            raise ContractError("Metadata key 'tprs' conflicts with the source namespace. Access it with entity.meta['tprs'].")
         repo = object.__getattribute__(self, "_repo")
         if not isinstance(self, (District, Campus)) or not isinstance(repo, DataEngine):
             raise ContractError(
-                "Direct .tprs access requires an entity registered in a release-bound DataEngine. "
+                "Dataset access requires an entity registered in a release-bound DataEngine. "
                 "Use DataEngine.from_snapshot() or engine.bind_release(release); "
                 "for standalone or SQL entities, use release.for_entity(entity, edition=...)."
             )
+        return repo
+
+    def available_datasets(self) -> tuple[str, ...]:
+        """List attached source names for this scope without opening source data."""
+        return self._source_owner()._entity_datasets(self)
+
+    def dataset(self, name: str) -> DatasetFields:
+        """Select a lazy source namespace explicitly, bypassing metadata name collisions."""
+        return self._source_owner()._entity_dataset(self, name)
+
+    def _check_namespace_collision(self, name: str) -> None:
+        from .manifest import ContractError
+
+        meta = object.__getattribute__(self, "meta")
+        if not isinstance(meta, Mapping):
+            return
+        # LazyMetaDict's ordinary membership may fetch a value or the full row.
+        iter_keys = getattr(meta, "iter_keys", None)
+        keys = (iter_keys(require_lazy=True)
+                if getattr(type(meta), "_supports_lazy_keys", False) is True
+                and getattr(meta, "_loaded", False) is False and callable(iter_keys) else meta.keys())
+        collision = next((key for key in keys if isinstance(key, str) and key.casefold() == name.casefold()), None)
+        if collision is not None:
+            raise ContractError(f"Metadata key {collision!r} conflicts with the source namespace. "
+                                f"Use entity.meta[{collision!r}] for the metadata value "
+                                f"or entity.dataset({name!r}) for source data.")
+
+    def _dataset_attribute(self, name: str) -> DatasetFields | None:
+        if name.startswith("_"):
+            return None
+        try:
+            repo = object.__getattribute__(self, "_repo")
+        except AttributeError:
+            return None
+        catalog = getattr(repo, "catalog", None) if repo is not None else None
+        if catalog is None:
+            return None
+        # Only attached descriptor names are inspected; no unrelated field payloads.
+        if not any(key.dataset.casefold() == name.casefold()
+                   for source in catalog.native_sources for key in source.editions):
+            return None
+        self._check_namespace_collision(name)
+        return self.dataset(name)
+
+    @property
+    def tprs(self) -> TPRSFields:
+        """Access qualified TPRS fields through the owning engine's pinned release."""
+        self._check_namespace_collision("tprs")
+        repo = self._source_owner()
         return repo._entity_tprs(self)
 
 
@@ -248,6 +292,8 @@ class District(_SQLMetadataOwner):
     def __getattr__(self, name: str):
         if name == "_sql_metadata_origin":
             raise AttributeError(name)
+        if namespace := self._dataset_attribute(name):
+            return namespace
         meta = object.__getattribute__(self, "meta")
         if isinstance(meta, Mapping) and name in meta:
             return meta[name]
@@ -397,6 +443,8 @@ class Campus(_SQLMetadataOwner):
             raise AttributeError(name)
         if name in {"lookup_key", "source_namespace", "source_id", "campus_number", "district_id", "district_number", "district_name"}:
             raise AttributeError(f"Missing explicit campus identity field: {name}")
+        if namespace := self._dataset_attribute(name):
+            return namespace
         meta = object.__getattribute__(self, "meta")
         if isinstance(meta, Mapping) and name in meta:
             return meta[name]

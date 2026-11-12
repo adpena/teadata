@@ -539,6 +539,8 @@ class LazyMetaDict(UserDict[str, Any]):
     operations load the complete current payload and apply local edits.
     """
 
+    _supports_lazy_keys = True
+
     def __init__(
         self,
         loader: Callable[[], Mapping[str, Any] | None]
@@ -548,6 +550,7 @@ class LazyMetaDict(UserDict[str, Any]):
         seed: Mapping[str, Any] | None = None,
         read_key: Callable[[str], Mapping[str, Any] | None] | None = None,
         read_keys: Callable[[], Iterable[str]] | None = None,
+        _strict_read_keys: Callable[[], Iterable[str]] | None = None,
         _sql_origin: _SQLMetadataOrigin | None = None,
         _validate_write: Callable[[], Any] | None = None,
     ):
@@ -558,6 +561,7 @@ class LazyMetaDict(UserDict[str, Any]):
         self._exposed_keys: frozenset[str] | None = None
         self._read_key = read_key
         self._read_keys = read_keys
+        self._strict_read_keys = _strict_read_keys
         self._validate_write = _validate_write
         self._point_keys: set[str] | None = None
         self._overrides: dict[str, Any] | None = None
@@ -713,9 +717,15 @@ class LazyMetaDict(UserDict[str, Any]):
             return False
         return True
 
-    def iter_keys(self) -> Iterator[str]:
+    def iter_keys(self, *, require_lazy: bool = False) -> Iterator[str]:
         """List exact top-level string names in lexical order, without value hydration when supported."""
-        names = tuple(self._read_keys() if not self._loaded and self._read_keys is not None else self._materialize())
+        reader = self._strict_read_keys or self._read_keys
+        if require_lazy and not self._loaded and reader is None:
+            raise ContractError("This metadata mapping cannot list keys without loading its values. "
+                                "Use entity.dataset(name) for explicit source access.")
+        if not require_lazy:
+            reader = self._read_keys
+        names = tuple(reader() if not self._loaded and reader is not None else self._materialize())
         if not all(isinstance(name, str) for name in names):
             raise TypeError("iter_keys() requires string metadata keys. Use ordinary mapping iteration for mixed keys.")
         if self._loaded or self._overrides is None and self._watched is None:
@@ -843,6 +853,7 @@ class LazyMetaDict(UserDict[str, Any]):
             return self.copy()
         copied = type(self)(self._loader, seed=self._payload, read_key=self._read_key)
         copied._read_keys = self._read_keys
+        copied._strict_read_keys = self._strict_read_keys
         copied._validate_write = self._validate_write
         if self._overrides is not None:
             copied._overrides = self._overrides.copy()
@@ -1001,7 +1012,8 @@ def _lazy_meta(
 ) -> LazyMetaDict:
     projection_bind = default_session.get_bind() if dialect is not None else None
 
-    def _load(key: str | None = None, *, names_only: bool = False, check_only: bool = False) -> Mapping[str, Any]:
+    def _load(key: str | None = None, *, names_only: bool = False, check_only: bool = False,
+              strict: bool = False) -> Mapping[str, Any]:
         # Reuse an active caller transaction, including its uncommitted writes.
         # Closing a second Session on SQLite's shared in-memory connection would
         # roll that transaction back. Only factory-created Sessions are owned.
@@ -1018,10 +1030,15 @@ def _lazy_meta(
                 connection = active.connection(bind_arguments={"mapper": record_cls})
                 projected = (_default_postgresql_json(connection) if dialect == "postgresql"
                              else _default_sqlite_text(connection))
+            if strict and not projected:
+                raise ContractError("Keys-only SQL metadata projection is unavailable. "
+                                    "Use entity.dataset(name) for explicit source access.")
             columns = (literal(1),) if check_only else (record_cls.meta,)
             if projected and dialect is not None:
                 if names_only:
                     columns = _meta_names_projection(record_cls.meta, dialect)
+                    if strict:
+                        columns = columns[:1]  # Never select the full-payload fallback.
                 elif key is not None:
                     columns = _meta_projection(record_cls.meta, (key,), dialect)
             row = active.execute(
@@ -1041,6 +1058,9 @@ def _lazy_meta(
             if projected and names_only:
                 if row[0] != "":
                     return dict.fromkeys(json.loads(row[0])) if row[0] is not None else {}
+                if strict:
+                    raise ContractError("SQL metadata contains keys unsupported by keys-only projection. "
+                                        "Use entity.dataset(name) for explicit source access.")
                 raw = row[-1]
             else:
                 raw = row[0]
@@ -1055,6 +1075,7 @@ def _lazy_meta(
 
     return LazyMetaDict(_load, seed=seed, read_key=_load if dialect is not None else None,
                         read_keys=partial(_load, names_only=True) if dialect is not None else None,
+                        _strict_read_keys=partial(_load, names_only=True, strict=True),
                         _sql_origin=origin, _validate_write=partial(_load, check_only=True) if dialect is not None else None)
 
 

@@ -35,7 +35,7 @@ from .manifest import (
 )
 
 if TYPE_CHECKING:
-    from .source_views import _TPRSNameIndex
+    from .source_views import _SourceNameIndex
     from .source_series import ObservationSeries
     from .export_provenance import ExportProvenance
     from .entities import Campus, District
@@ -290,7 +290,7 @@ class DataRelease:
     """A complete bundle with one catalog and content hashes for every artifact."""
 
     _metadata_trace: set[_MetadataStamp] | None = None
-    _tprs_name_indexes: dict[str, _TPRSNameIndex]
+    _source_name_indexes: dict[tuple[str, tuple[str, ...]], _SourceNameIndex]
 
     def __init__(self, manifest: str | Path, *, expected_sha256: str | None = None, offline: bool = False,
                  cache_dir: Path | None = None, _local_manifest: _LocalManifest | None = None):
@@ -455,7 +455,7 @@ class DataRelease:
                     "cache_dir": self._cache_dir}
         return {key: value for key, value in self.__dict__.items()
                 if key not in {"_campus_observation_routes", "_campus_observation_plan",
-                               "_campus_class_size_plan", "_tprs_name_indexes",
+                               "_campus_class_size_plan", "_tprs_name_indexes", "_source_name_indexes",
                                "_artifact_locks", "_artifact_lock_pid"}}
 
     def __setstate__(self, state: dict) -> None:
@@ -917,6 +917,20 @@ class DataRelease:
                 raise ContractError(
                     f"Unknown source field for {scope}. Did you mean: {unknown}? "
                     "See catalog.variables() for exact names."
+                )
+            unsupported = {
+                field: sorted({period.kind for child, key, _ in options
+                               for name in child.catalog._observation_fields(key, (field,)).values()
+                               for period in child.catalog._field_periods(key, (name,)).values()
+                               if period.kind not in {"school_year", "unknown"}})
+                for field, years in available.items() if not years
+            }
+            if any(unsupported.values()):
+                raise ContractError(
+                    f"School-year selection does not support these measurement period kinds: {unsupported}. "
+                    "Do not substitute the publisher edition for the measurement year. "
+                    "Use release.for_entity(entity, edition=publisher_edition).dataset(exact_key) "
+                    "with an exact EditionKey from datasets() for these sources."
                 )
         if school_year is None:
             latest = {years[-1] for years in available.values() if years}

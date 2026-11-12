@@ -152,7 +152,7 @@ def test_name_index_reuses_only_verified_detached_names_including_hash_fallback(
     _, release, _, district, _ = bound
     namespace = district.tprs
     names = namespace.variables()
-    assert release._tprs_name_indexes["district"].files
+    assert release._source_name_indexes[("district", tuple(sorted(namespace._datasets)))].files
     projection = namespace._indexes()
     projection[DATASET].clear()
     with monkeypatch.context() as warm:
@@ -170,6 +170,7 @@ def test_name_index_reuses_only_verified_detached_names_including_hash_fallback(
             fallback.setattr(transport, "_capture_column_schema", capture)
             assert namespace.variables() == names and reads
     assert "_tprs_name_indexes" not in release.__getstate__()
+    assert "_source_name_indexes" not in release.__getstate__()
 
 
 def test_name_index_context_changes_rebuild_instead_of_reusing_another_policy(bound, monkeypatch):

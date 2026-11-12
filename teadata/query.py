@@ -103,11 +103,22 @@ class _ReleaseMethod(TypedDict):
     discovery: list[str]
 
 
+class _EntityAccess(TypedDict):
+    receivers: list[str]
+    discovery: str
+    selection: str
+    dot_path: str
+    methods: list[str]
+    year_policy: str
+    errors: list[str]
+
+
 class _Discovery(TypedDict):
     schema_version: Literal[1]
     receiver: Literal["Query"]
     operators: list[_Operator]
     release_methods: list[_ReleaseMethod]
+    entity_access: _EntityAccess
 
 
 class _ExportPreset(TypedDict):
@@ -173,6 +184,19 @@ def describe_operators() -> _Discovery:
         "receiver": "Query",
         "operators": [deepcopy(operator.description) for operator in _OPERATORS.values()],
         "release_methods": deepcopy(_RELEASE_METHODS),
+        "entity_access": {
+            "receivers": ["District", "Campus (public)"],
+            "discovery": "entity.available_datasets()",
+            "selection": "entity.dataset(name)",
+            "dot_path": "entity.<attached_dataset>.<field>; entity.tprs.<field>",
+            "methods": ["at", "variables", "years", "select", "provenance"],
+            "year_policy": "Latest eligible shared measurement school year; explicit unavailable years never fall back. "
+                           "Fiscal/calendar periods require exact release.for_entity(..., edition=...).dataset(EditionKey).",
+            "errors": ["Unknown names include suggestions; no automatic fuzzy selection.",
+                       "Unavailable scopes and years report available choices.",
+                       "Multiple source rows require select(...).query(...); no implicit aggregation.",
+                       "Metadata collisions or incapable lazy key readers require explicit entity.dataset(name)."],
+        },
     }
 
 
