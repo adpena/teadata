@@ -14,19 +14,31 @@ annual dropout has separate rows for grade span and reporting calculation. A
 single value in an entity's metadata cannot represent those distinctions.
 
 An entity build can attach native releases through `options.native_sources` in
-its build configuration. Each entry supplies `location`, `manifest_sha256`,
-`build_id`, and `editions`. The editions are the complete list of `EditionKey`
-dictionaries from the selected native release. Use an immutable HTTP(S) URL or
-a distinct JSON filename adjacent to the entity manifest. Stage the complete
-native bundle before building. The builder verifies it offline and includes the
-pins in the entity build ID and processing receipt.
+its build configuration. A pinned selection needs only its manifest location
+and SHA-256:
 
-The release gate can qualify the exact reviewed 2025–26 district and Texas
-TPRS attachment. Keep its retained `provenance` store next to the attached
-manifest. The gate replays the published reports and raw audit, checks the
-independent workbook witnesses, and records the source evidence in its local
-verification receipt. Other attachments remain on hold until they have a
-reviewed qualification path.
+```yaml
+options:
+  native_sources:
+    - location: staff-native.json
+      manifest_sha256: <exact SHA-256 of the retained manifest bytes>
+```
+
+The builder derives the build ID and complete edition keys from that exact
+manifest. Existing four-field entries (`location`, `manifest_sha256`, `build_id`,
+`editions`) remain supported and must match the manifest. Use an immutable
+HTTP(S) URL or a distinct JSON filename adjacent to the entity manifest. Stage
+the complete native bundle before building; HTTP inputs must already be cached.
+The builder verifies it offline and includes the expanded pins and edition keys
+in the entity build ID and processing receipt. Selection does not download data
+or confer semantic qualification.
+
+The final release gate selects the same reviewed qualification plan used for a
+standalone native release. Keep the retained `provenance` store next to each
+attached manifest, including its independent publisher witnesses. The builder's
+structural checks do not replace that semantic replay. See the
+[reviewed source families and evidence requirements](data-releases.md#qualifying-reviewed-native-bundles).
+Other attachments remain on hold until they have a reviewed qualification path.
 
 The observation planner resolves selected fields by measurement period before
 opening a data file. Execution retains the native row keys, raw values and

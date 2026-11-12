@@ -97,7 +97,7 @@ class _ReleaseMethod(TypedDict):
     receiver: Literal["DataRelease"]
     description: str
     arguments: list[_MethodArgument]
-    result: Literal["ObservationSeries"]
+    result: Literal["ObservationSeries", "NativeSourceRef"]
     result_methods: list[str]
     result_operations: list[_SeriesMethod]
     discovery: list[str]
@@ -1035,6 +1035,17 @@ _RELEASE_METHODS: list[_ReleaseMethod] = [{
     }],
     "discovery": ["catalog.editions", "catalog.variables", "observation_years",
                   "DataEngine.district_named", "DataEngine.campus_named"],
+}, {
+    "name": "native_source_ref",
+    "receiver": "DataRelease",
+    "description": "Derive an exact native attachment descriptor from manifest metadata without reading observations; "
+                   "this does not qualify, stage or publish data.",
+    "arguments": [{"kind": "keyword_only", **_argument("location", "string",
+        description="Distinct adjacent JSON manifest filename or immutable HTTP(S) URL in the destination entity release.")}],
+    "result": "NativeSourceRef",
+    "result_methods": ["to_dict"],
+    "result_operations": [],
+    "discovery": ["catalog.editions"],
 }]
 
 _register(

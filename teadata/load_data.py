@@ -20,8 +20,8 @@ from teadata.manifest import ACTIVE_BUILD, BuildRecorder, ContractError, write_s
 from teadata.enrichment import EnrichmentOutcome, _record_outcome
 from teadata.provenance import ProvenanceStore
 from teadata.identifiers import canonical_source_identifier, campus_lookup_key, normalize_campus_lookup_key
-from teadata.dataset_metadata import parse_native_sources
-from teadata.release import _open_native_source, publish_release, SNAPSHOT_MAGIC
+from teadata.dataset_metadata import NativeSourceRef, _digest_text, _native_manifest_location, parse_native_sources
+from teadata.release import DataRelease, _open_native_source, publish_release, SNAPSHOT_MAGIC
 from teadata.transfer_summary import transfer_measurement, normalized_transfer_measurement
 
 from datetime import datetime, date
@@ -2683,6 +2683,39 @@ def _build_repo(districts_fp: str, campuses_fp: str, *, cfg_obj: _cfg_mod.Config
     return repo
 
 
+def _native_sources_for_build(raw: object, output: Path) -> tuple[NativeSourceRef, ...]:
+    """Expand pinned source selections and verify the existing offline input contract."""
+    if not isinstance(raw, list):
+        raise ContractError("options.native_sources must be a list of pinned native source selections")
+    expanded = []
+    for position, item in enumerate(raw):
+        if isinstance(item, dict) and set(item) == {"location", "manifest_sha256"}:
+            try:
+                location = _native_manifest_location(item["location"])
+                pin = _digest_text(item["manifest_sha256"])
+                manifest = location if "://" in location else str(output / location)
+                source = DataRelease(manifest, expected_sha256=pin, offline=True)
+                expanded.append(source.native_source_ref(location=location).to_dict())
+            except (ValueError, OSError, ContractError) as error:
+                raise ContractError(f"Cannot resolve options.native_sources[{position}]: {error}") from error
+        else:
+            expanded.append(item)
+    try:
+        sources = parse_native_sources(expanded)
+    except ValueError as error:
+        raise ContractError(f"Invalid options.native_sources: {error}") from error
+    for ref in sources:
+        child = _open_native_source(ref, output / "release.json", offline=True)
+        try:
+            child.verify()
+        finally:
+            # Match DataRelease.verify_native_sources: bound catalog loaders
+            # form cycles; release edition payloads before opening another child.
+            child.catalog._clear_edition_caches()
+            child._column_schema_data.clear()
+    return sources
+
+
 def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
     if os.environ.get("PYTHONHASHSEED") != "0" or sys.flags.hash_randomization != 0:
         raise ContractError(
@@ -2705,9 +2738,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
         .resolve()
     )
     output.mkdir(exist_ok=True)
-    native_sources = parse_native_sources(cfg.options.get("native_sources", []))
-    for ref in native_sources:
-        _open_native_source(ref, output / "release.json", offline=True).verify()
+    native_sources = _native_sources_for_build(cfg.options.get("native_sources", []), output)
     store = ProvenanceStore(
         os.environ.get("TEADATA_PROVENANCE_DIR", str(Path.cwd() / "provenance"))
     )

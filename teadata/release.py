@@ -409,6 +409,23 @@ class DataRelease:
         """SHA-256 of the manifest bytes parsed by this release."""
         return self._manifest_sha256
 
+    def native_source_ref(self, *, location: str) -> NativeSourceRef:
+        """Describe this exact native source for an entity build, without reading observations.
+
+        This derives metadata only; it does not qualify, stage or publish data.
+        The location is the child's adjacent manifest filename or pinned URL in
+        the destination entity release, not a new source selection.
+        """
+        if not self._v3:
+            raise ContractError("native_source_ref requires a native schema3/schema4 source release; "
+                                "use catalog.native_sources to inspect an entity release's attachments")
+        from .dataset_metadata import _native_manifest_location
+
+        _native_manifest_location(location)
+        editions = tuple(EditionKey.from_dict({name: row[name] for name in EditionKey.__dataclass_fields__})
+                         for row in self.catalog.editions(include_metadata=False))
+        return NativeSourceRef(location, self.manifest_sha256, self.build_id, editions)
+
     def _resource_path(self, location: str, digest: str, size: int) -> Path:
         """One location/cache/download path for selected v3 bytes."""
         if "://" in location or self.remote:

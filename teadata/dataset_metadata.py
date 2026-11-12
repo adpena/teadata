@@ -161,6 +161,18 @@ class EditionKey:
         return sha256(_record_json(self.to_dict()).encode()).hexdigest()
 
 
+def _native_manifest_location(location: object) -> str:
+    if not isinstance(location, str) or not location or any(c.isspace() or ord(c) < 32 for c in location):
+        raise ValueError("Native manifest location is required")
+    if any(c in location for c in "\\?#"):
+        raise ValueError("Native manifest location cannot contain a query, fragment or backslash")
+    if "://" in location:
+        validate_http_url(location)
+    elif not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*\.json", location) or location.lower() == "release.json":
+        raise ValueError("Native manifest requires a distinct adjacent JSON filename or an immutable HTTP(S) URL")
+    return location
+
+
 @dataclass(frozen=True, slots=True)
 class NativeSourceRef:
     """A native release and its admitted editions in an entity build."""
@@ -173,15 +185,7 @@ class NativeSourceRef:
     def __post_init__(self) -> None:
         _digest_text(self.manifest_sha256)
         _digest_text(self.build_id)
-        location = self.location
-        if not isinstance(location, str) or not location or any(c.isspace() or ord(c) < 32 for c in location):
-            raise ValueError("Native manifest location is required")
-        if any(c in location for c in "\\?#"):
-            raise ValueError("Native manifest location cannot contain a query, fragment or backslash")
-        if "://" in location:
-            validate_http_url(location)
-        elif not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*\.json", location) or location.lower() == "release.json":
-            raise ValueError("Native manifest requires a distinct adjacent JSON filename or an immutable HTTP(S) URL")
+        _native_manifest_location(self.location)
         if (not isinstance(self.editions, tuple) or not self.editions
                 or any(not isinstance(edition, EditionKey) for edition in self.editions)
                 or len(set(self.editions)) != len(self.editions)):

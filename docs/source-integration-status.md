@@ -93,6 +93,14 @@ lazy entity resolver still need finishing. Preserve publisher evidence and the
 approval boundary; an unreviewed registration must not become an automatic
 publication merely to clear this inventory.
 
+Normal builds now accept an exact manifest location and SHA-256 and derive the
+complete source descriptor from its catalog index. This removes manual copying
+of build IDs and edition lists; it does not change this frozen inventory or
+activate any source in an existing release. The offline builder checks structural
+integrity before constructing entities. Semantic qualification remains at the
+final shared release gate, and publication is a separate decision. See
+[normal source composition](enrichment.md#observations-across-school-years).
+
 Standalone/programmatic producers outside the default YAML, such as additional
 finance and AskTED workflows, require a separate coverage check. The counts here
 do not establish their absence from the repository or their publisher availability.

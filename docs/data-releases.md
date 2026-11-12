@@ -643,6 +643,24 @@ uv run --locked python -m teadata.scripts.refresh_peims_budgets \
 
 ### Qualifying reviewed native bundles
 
+For normal entity builds, `options.native_sources` accepts pinned two-field
+selections as described in [the enrichment guide](enrichment.md#observations-across-school-years).
+To obtain the equivalent complete descriptor programmatically:
+
+```python
+source = DataRelease("/path/to/native/release.json", offline=True,
+                     expected_sha256=trusted_manifest_sha256)
+ref = source.native_source_ref(location="staff-native.json")
+print(ref.to_dict())
+```
+
+This metadata-only method reads the already opened catalog index, not observation
+leaves or edition/schema payloads. It preserves all exact edition, scope, grain
+and revision identities. It does not stage files, qualify values or publish data.
+Entity releases already expose their attached descriptors as
+`release.catalog.native_sources`; they cannot themselves become native inputs.
+The expanded descriptor contract and ordinary lazy query paths remain unchanged.
+
 The offline gate admits the reviewed native profile supplement, the separate
 PEIMS primary-disability candidates, and the exact schema-4 profile
 composition. Supply the trusted manifest SHA-256 for the bundle and its retained

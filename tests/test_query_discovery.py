@@ -60,7 +60,7 @@ def test_series_discovery_matches_the_release_method_signature():
     from teadata.release import DataRelease
     from teadata.source_series import ObservationSeries
 
-    method, = describe_operators()["release_methods"]
+    method, = (method for method in describe_operators()["release_methods"] if method["name"] == "series")
     assert method["name"] == "series" and method["receiver"] == "DataRelease"
     assert method["result"] == "ObservationSeries"
     assert {"to_arrow", "to_df", "provenance", "iter_batches"} <= set(method["result_methods"])
@@ -83,6 +83,25 @@ def test_series_discovery_matches_the_release_method_signature():
         assert item["optional"] is (parameter.default is not Parameter.empty)
         if item["optional"]:
             assert item["default"] == parameter.default
+
+
+def test_native_source_ref_discovery_matches_its_metadata_only_signature():
+    from inspect import Parameter, signature
+
+    from teadata.release import DataRelease
+
+    methods = describe_operators()["release_methods"]
+    assert [method["name"] for method in methods] == ["series", "native_source_ref"]
+    method = methods[1]
+    assert method["receiver"] == "DataRelease" and method["result"] == "NativeSourceRef"
+    assert method["result_methods"] == ["to_dict"] and method["result_operations"] == []
+    assert method["discovery"] == ["catalog.editions"]
+    argument, = method["arguments"]
+    parameter, = list(signature(DataRelease.native_source_ref).parameters.values())[1:]
+    assert argument["name"] == parameter.name == "location"
+    assert argument["kind"] == "keyword_only" and parameter.kind is Parameter.KEYWORD_ONLY
+    assert not argument["optional"] and parameter.default is Parameter.empty
+    assert "without reading observations" in method["description"]
 
 
 
