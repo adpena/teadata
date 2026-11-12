@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "observed_at": "2026-11-12T14:45:04.777351+00:00",
-  "code_commit": "2705e2d85158fd22fd3f0614fd8c89bcb60d6092",
+  "observed_at": "2026-11-12T23:15:03.318933+00:00",
+  "code_commit": "cc2802cb19df7077d9579ea7817586eaba82fd62",
   "config_sha256": "305c932090bb1e386fdc5f155c28f76ff937a5a2a2a66dfe416bf3318315a9d6",
   "selected_release": {
-    "tag": "v0.0.148",
-    "manifest_sha256": "e485c94e68242a466533b5b94203ca91834f1149de1b49d0ea70c6b52be8a308",
-    "build_id": "3cd260bfec6c75e22788ba019a5aa8a6bca358cce538db3a433de56f0673abf3",
+    "tag": "v0.0.151",
+    "manifest_sha256": "9d9b28cd993b9c8f764b1592fe6b765c4e26495447969ec14bcc493c8062501c",
+    "build_id": "f6037b3f5178e3f4ebae69dad84c5c0fefa43c02ef0348d10664e9f3432b76ff",
     "base_datasets": [
       "accountability",
       "all_districts_reference",
@@ -555,6 +555,345 @@
             "grain": "one row per campus_number"
           }
         ]
+      },
+      {
+        "sha256": "8cd071e5cfaac027a43895aa2335206d87eb5bf19a9001b2cc42797c5b0c9325",
+        "editions": [
+          {
+            "edition_id": "1ce988cd6ec239bc5a9f22f7dec3a03cd9702cba2166254ecff470ea598ffe3c",
+            "dataset": "peims_staff_fte_and_salary",
+            "edition": "2023",
+            "revision_sha256": "b8e1ca697e33b5be25e5354bc5be5f8057e93cf2d950e53e2dca5eba03e15ddb",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per district_number and staff_category and staff_role"
+          },
+          {
+            "edition_id": "21ad98867072e82941dc4a9508c33763962e14db8e0875921cc63a3901e4b433",
+            "dataset": "peims_staff_fte_and_salary",
+            "edition": "2024",
+            "revision_sha256": "971c4516b5baed6212af3e3fef53a23f23c2c7915c83a090a5c73cd1a843f10f",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per staff_category and staff_role"
+          },
+          {
+            "edition_id": "36538cff107e754743093fc022482e7e33405352212d37202a8aff2b50b7b6c8",
+            "dataset": "peims_staff_fte_and_salary",
+            "edition": "2025",
+            "revision_sha256": "975959c227d486561e7fe7cb6bb2c0e392b98da84bf828d78d89433437978afd",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per district_number and staff_category and staff_role"
+          },
+          {
+            "edition_id": "377e4fe5bf3f049713df3084e1c74b36643f5828c95b06a100e2679a1677c6a1",
+            "dataset": "peims_staff_fte_and_salary",
+            "edition": "2026",
+            "revision_sha256": "d82d608f2d050639f6a40c053f1bad63ff1fb1c8900e8a3c94369ef0962398bf",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per district_number and staff_category and staff_role"
+          },
+          {
+            "edition_id": "5d2a87e7278d80815365d53329a36674a5b554df8242637a491c6748f55dc220",
+            "dataset": "peims_staff_fte_and_salary",
+            "edition": "2026",
+            "revision_sha256": "67b7e50f17b7df927bfcc6f99ca9eebe5470a17f57ba10bd40057a12792596d9",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per staff_category and staff_role"
+          },
+          {
+            "edition_id": "779360519f69bc9ddaaf1dc8f8958e063573c8ecf8c2f7d7274d8bd633193d5e",
+            "dataset": "peims_staff_fte_and_salary",
+            "edition": "2024",
+            "revision_sha256": "4fd0551984ab16e9c93d4950c075b9495ee892f634efb4842f1b4c2cecd14cb4",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per district_number and staff_category and staff_role"
+          },
+          {
+            "edition_id": "b1d0bde36a39826774897c69a93d461b5fd4c4a132a540bace1b4f88eaaf849e",
+            "dataset": "peims_staff_fte_and_salary",
+            "edition": "2023",
+            "revision_sha256": "423b6d61c152d3d716f2a2eb76860989e492aa0fbc67aa823caaf668bc74f5a6",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per staff_category and staff_role"
+          },
+          {
+            "edition_id": "d511efe3d822e65c0b1e88092a48de1a39f4c7f2cbbcebd3179bb3d11fcda89d",
+            "dataset": "peims_staff_fte_and_salary",
+            "edition": "2025",
+            "revision_sha256": "6cd4ed1cba5e49fc8bdf4f2045f7322117fb0c7c975d9f8d600cdf52be025e7d",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per staff_category and staff_role"
+          }
+        ]
+      },
+      {
+        "sha256": "c157679fc6a8d33fb135ac6b67f102500d9f17a7346270d52dcbdbb934e372ce",
+        "editions": [
+          {
+            "edition_id": "0a6eb5b4ae4bb8007f2358d3cc67c61eb2d7a75b690a74a7067835baef37c8ca",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2020",
+            "revision_sha256": "1e34be7bd0e66d1473c634ec7764f1ad935864b1eb3c41eb78a2e03b238d1198",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year"
+          },
+          {
+            "edition_id": "207ca0275e27452ff632c156457ca7eec985b7085e425a4b748a6fec8ad15dcb",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2014",
+            "revision_sha256": "f06c6e09d0b39bb6e8991805295d54c9570ccb47bf533dabb415304e384d92d5",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number"
+          },
+          {
+            "edition_id": "46b942695917c919480c402988d5f8df08aa697e380ec059fee59279501204c4",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2018",
+            "revision_sha256": "be48561441602a67126713b8e0b22847b8fb70236df23ed0efa4ab589acb2b76",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number"
+          },
+          {
+            "edition_id": "4d2a2ddb5c74164bb537941d83f9306ba592aba89718fe29f2b932e0fd3c3c87",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2022",
+            "revision_sha256": "b283652fab0c115db4e2ff384b18f24aaf33483f76fb8d9d930b8ffe567ada04",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number"
+          },
+          {
+            "edition_id": "5386adca48e5392b7acdb9b12efe9dd37f2ca372361d75e4abcee9804747dc6a",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2017",
+            "revision_sha256": "675cd098a76983a38ae40a3fb34725803bca4d4515a43d8de69708c2eca24f37",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number"
+          },
+          {
+            "edition_id": "69a25393450fd28d339c0891f44810ea3f43eca90e94fd1ee6df6f38542e4604",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2013",
+            "revision_sha256": "3035b3fcd901408d3df7a5c078ce42e7af2f8fb82cc753b9b6a4e6b90cda61d8",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number"
+          },
+          {
+            "edition_id": "7c49ab09df47b5617630756b3b4f349dfd3183bbcbaa7fbae3806df7f85c2608",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2015",
+            "revision_sha256": "a413f3c71b30339179bdf51dbd63c77e0186d1c58ba7319059088a798c79576a",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year"
+          },
+          {
+            "edition_id": "80ba20048b33306d051b3193b2c58555d8d54afd3686d2295c71e7ffbe12f4e7",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2016",
+            "revision_sha256": "d6e96d8820aa34b0d44f20d26d65325d3dbf31ddbac45fa17f41851c0aab3bef",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year"
+          },
+          {
+            "edition_id": "8dc539fcf5eef94315e5f197eb918055d166a7d0e4f134cf0fc10c14e40d0cfd",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2014",
+            "revision_sha256": "ba002a5dec1ba2a9be86153067b802d2eacf9212704d17e174607d149135a6c6",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year"
+          },
+          {
+            "edition_id": "8e39a14c23bd28cda72ccb81a2d1734dde6ba631719e329f5083c811ab061594",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2019",
+            "revision_sha256": "56b892a7076d71572e9e9f6540b07669ed3f90e33b83f272316116443c93c794",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year"
+          },
+          {
+            "edition_id": "a1a03b91bd6b4d7fea1030af7385970a0a46ca3c7feb1de12723b34e240260c3",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2019",
+            "revision_sha256": "04c668accf0569bf0e15acf25233e1ab2b1139105bb73b4de50d92f42945db88",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number"
+          },
+          {
+            "edition_id": "a9a86f552cac0fc47df5a407bcaa1d4ba9445d80fe904f1d0f74f2b6f63c3ea7",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2017",
+            "revision_sha256": "ae2efb85a36be5c9a9529f0214783c5f118e002925050491078089600c0c3cf8",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year"
+          },
+          {
+            "edition_id": "ba948b1f745eab30838170e043bc3a7e9c3e25d1f49d405637b3c12dbea50029",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2022",
+            "revision_sha256": "5e10a2b523dd2b79a618d7286f3f8f0db1d41773439bf2f2e18f7e0775cdc440",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year"
+          },
+          {
+            "edition_id": "c12ed3f6d2e16afb56b92e4db94f829a3964661bfe6586db948a7135724ebd7e",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2018",
+            "revision_sha256": "3d0f077f7fa606a41a1268bac0b2a61d87574d050f4cb7502bac1be6e17b866e",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year"
+          },
+          {
+            "edition_id": "c777ba50e6efb761c2a00cd7f0feba8b0694f175fe379d1f721ce167fb3262ce",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2016",
+            "revision_sha256": "8c21033c117ba8aa12b9229f1dfe39d4954d04073e90b6393d5feaa59a6a957d",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number"
+          },
+          {
+            "edition_id": "d036413a1f1b2183490b92f8202ee536a33d569224205081a60c1a7c64c579e5",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2013",
+            "revision_sha256": "94ce512dbc1ac70e87c459440c792550237865cd890778e98a2a05dd8daaafcd",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year"
+          },
+          {
+            "edition_id": "da08f4117e360a71bdb956ed7d9ea2e99102538c28c22bed9d0f245f45baaf84",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2021",
+            "revision_sha256": "9bc4469ad0795fc58ffc40588508b98e42132c317afe90952d223309f99173db",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number"
+          },
+          {
+            "edition_id": "e3ce2fc2bdf64ccd3d31eb9d7c922763fa580c4814e3cd6bbe813a31833ca1ca",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2021",
+            "revision_sha256": "7a923c2e40dd7c8d0cad66243d0f289c445b35004f9661eebb9ed8356892a69c",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year"
+          },
+          {
+            "edition_id": "f1ccc32a70d00fe2ac61c49d522dbb53338c6f8e211c89537cb30b1aad50d754",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2015",
+            "revision_sha256": "70eb1ac425d3594cbd2b83377987e36831c0f5e3c34be88e9d9e727e0e9e0b00",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number"
+          },
+          {
+            "edition_id": "f8fe2c15980b1e12cb9ebb9c18743300a8fef2a9c2c5a68120b1349139ac9954",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2020",
+            "revision_sha256": "ee2e2f81401636ade22f2e026efcf83a0bd817f01155bd40be4d53ab4ef076f2",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number"
+          }
+        ]
+      },
+      {
+        "sha256": "6f2cc32a7b9cc1b43d8b0ed84f2870d3dd75ddcfef58e9e8508e37f34c41cd37",
+        "editions": [
+          {
+            "edition_id": "15a018ad3da9df4470dccc9249d92838b121673782c2794070fbc8a77cb6e1a0",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2026",
+            "revision_sha256": "7d755b52d756c531791cb34946c2c3f03e2bb8bdb33dbc61700cb78f77bfcc1c",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year"
+          },
+          {
+            "edition_id": "76b0ec23b190a14d510e92fc09b65fa2659f85e3ef041bc7a8dcad0b8208ab18",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2024",
+            "revision_sha256": "310f37a7fc987a8377153c0fe73f47efcc99e687a07ddddb8a62cb6a6a1f96ca",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number"
+          },
+          {
+            "edition_id": "7ced8e76ea491e737630fc7d52db70f77b37ff358c86e93362a11c9eb343a53a",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2023",
+            "revision_sha256": "445c98736a28ffdcbb787e2762f6b40fd9d4b3ed9a37b2573fee67e3856c6a0e",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year"
+          },
+          {
+            "edition_id": "9037ca417765843372e9da14388a1dd4eb39068aa5f139f17f3eb2ef71dfa585",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2025",
+            "revision_sha256": "b3c9ce938c03b12970184a13897e7b8daef0d12be4c8d65174faddd853b1a4be",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year"
+          },
+          {
+            "edition_id": "ac1cd141cc0d8ab7e85e7bcd168a4e119d25cc8446d0bf6cee5e9b23257a1b88",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2025",
+            "revision_sha256": "5fcc5443c310bfc4374d0e08c68c2b754c2dc88cbeb239710fc3fec9e008d102",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number"
+          },
+          {
+            "edition_id": "b402ac1278464c3675cb5dbfe7c766f814d72d46b3f92d766a9e5a20520de5d7",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2026",
+            "revision_sha256": "c997f55056bd0adbcdab53ea4223152a5990bebeb48181475c5b26b444d9c30e",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number"
+          },
+          {
+            "edition_id": "c59cf8ad204d9355cf9675c6cf0001fa63c2b464f97645df9d460f17f1f0bd4a",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2024",
+            "revision_sha256": "bb2f33c7bc66975ef76a051f6219e8e67304ca68db33d5445c3ed3728083f2bb",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year"
+          },
+          {
+            "edition_id": "d0c4d1d0b08cc78194f8f2fc8764d75bdcaaa0bbea4a874492d13ba67b031c0f",
+            "dataset": "peims_special_education_by_primary_disability",
+            "edition": "2023",
+            "revision_sha256": "61dd6be5bb9112e9eca51aa92144d358fc30eba8294ff82066b86f4ea44cb1d7",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number"
+          }
+        ]
       }
     ]
   },
@@ -562,10 +901,10 @@
     "configured_dataset_ids": 124,
     "configured_editions": 276,
     "source_only_dataset_ids": 111,
-    "source_only_dataset_ids_not_attached": 105
+    "source_only_dataset_ids_not_attached": 103
   },
   "limits": [
-    "Metadata inventory only; no raw rows, publisher reports or qualification gates rechecked.",
+    "Metadata inventory, not an independent value audit. Consult the matching release qualification and source-specific limits.",
     "A missing dataset ID does not prove all its measures are absent from other sources.",
     "Registered edition keys are not necessarily measurement years.",
     "Attachment does not certify every field or direct entity/DSL access.",

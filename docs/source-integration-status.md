@@ -1,42 +1,44 @@
 # Source integration status — November 12, 2026
 
 This is a dated inventory of the tracked source configuration at code commit
-`2705e2d85158fd22fd3f0614fd8c89bcb60d6092`, compared with the app-selected
-[v0.0.148 parent release](https://github.com/adpena/teadata/releases/download/v0.0.148/release.json).
-Software 0.0.150 is separate from that data release. The installed package's
-configuration matched the checkout's SHA-256. No raw data or qualification
-suite was reacquired or rerun for this metadata audit.
+`cc2802cb19df7077d9579ea7817586eaba82fd62`, compared with the
+[v0.0.151 parent release](https://github.com/adpena/teadata/releases/download/v0.0.151/release.json),
+manifest SHA-256 `9d9b28cd993b9c8f764b1592fe6b765c4e26495447969ec14bcc493c8062501c`.
+The configuration matches the recorded SHA-256. This metadata comparison does
+not itself establish field qualification; matching release gates and publisher
+evidence remain separate. No new source acquisition is claimed.
 
 Source-only follow-through on November 12 adds generic lazy entity namespaces
 (`entity.dataset(name)` and `entity.<dataset>`) over the existing observation
-planner. A retained normal parent candidate composes all four original attached
-bundles plus reviewed PEIMS staff district/Texas editions for 2022–23 through
-2025–26. It has not replaced the published app-selected v0.0.148 parent. The inventory
-below remains pinned to that published parent; API implementation, candidate
-qualification and public release activation are separate milestones. Campus
-staff observations are not supplied by the district/Texas staff attachment.
+planner. The v0.0.151 normal parent composes seven attached bundles, including
+PEIMS staff district/Texas editions for 2022–23 through 2025–26 and primary
+disability district/Texas editions for 2012–13 through 2025–26. It does not change
+the app-selected v0.0.148 parent. Library publication, explicit release selection
+and application activation are separate milestones. Campus staff observations
+are not supplied by the district/Texas staff attachment; primary disability has
+no campus scope.
 
 The configuration contains **124 dataset IDs and 276 editions**. Of these,
-**111 IDs are preparation/source-only contracts**; **105 are absent as named
+**111 IDs are preparation/source-only contracts**; **103 are absent as named
 native sources from the selected parent**. These include scope and domain
-variants, not 105 independent TEA systems. Some measures already occur in the
+variants, not 103 independent TEA systems. Some measures already occur in the
 combined TAPR entity profiles. Absence of a separate source ID does not establish
 that every corresponding measure is missing. Conversely, registration does not
 establish acquisition, interpretation, qualification or availability in a release.
 
-The parent has 13 base inputs and four attached bundles exposing seven native
-dataset IDs. Six of those IDs are in the preparation-only configuration; the
-seventh, class size, is derived from retained TPRS reports. The complete
+The parent has 13 base inputs and seven attached bundles exposing nine native
+dataset IDs across 93 editions. Eight IDs are in the preparation-only configuration; the
+remaining ID, class size, is derived from retained TPRS reports. The complete
 [machine-readable inventory](source-integration-status.json) records exact
 registered periods, source flags and attached edition/scope identities. Its
 configuration digest and parent hash pin this comparison; it is not a live feed.
 
 ## Consequential integration gaps
 
-| Group not attached under its registered source IDs | Registered edition keys | What needs finishing |
+| Source family and remaining scope gaps | Registered edition keys | Delivery and next work |
 | --- | --- | --- |
-| PEIMS staff FTE and salary | 2023–2026 | A qualified normal parent candidate now attaches district/Texas leaves. Generic entity namespaces reuse filtered-role and export access. Four years of retained parity and eight publisher-report witnesses exist; public/default release activation remains pending. |
-| PEIMS primary disability | 2013–2026 | Integrate the detailed district/Texas series, retaining suppression and classification transitions. Existing TAPR special education figures remain a distinct population. |
+| PEIMS staff FTE and salary | 2023–2026 | Delivered in the selected normal parent for district/Texas, through generic namespaces and explicit category/role selection. Campus observations remain absent. |
+| PEIMS primary disability | 2013–2026 | Delivered in the selected normal parent for district/Texas, with raw masks and classification-transition limits. County/region integration remains absent; this product has no campus scope. Existing TAPR special education figures remain a distinct population. |
 | PEIMS enrollment by ethnicity; programs and special populations | 2019–2026; 2023–2026 | Complete year/scope-specific qualification and release integration; preserve Enrollment versus Membership and all publisher tokens. |
 | PEIMS teacher/course enrollment; college credit | 2023–2026; 2022–2026 | Preserve the course/program row dimensions and denominators through normal lazy access. |
 | PEIMS single-file financial actuals; budgets | 2013–2025; 2026 | Resolve field/unit qualification and formula changes; retain fiscal years, sectors, actual/budget basis and account grain. These are not the already attached FRC per-pupil table. |
@@ -62,6 +64,8 @@ from Staff FTE and Salary or initial-certification counts.
 | FRC per-pupil expenditure | 2025 report edition: campus, district and direct Texas; inspect fiscal period per measure |
 | School FIRST | 2026 district and university-charter editions; financial accountability is distinct from academic accountability |
 | TPRS class size | 2026: district, direct Texas and 23 campus partitions |
+| PEIMS staff FTE and salary | 2023–2026: district and direct Texas, with category/role keys retained |
+| PEIMS primary disability | 2013–2026: district and direct Texas; no campus product |
 
 This table establishes attachment from manifest/catalog metadata. It does not
 claim every source column has qualified semantics or that every direct entity
@@ -91,17 +95,14 @@ of entity properties, query operators or export special cases per dataset.
 Multi-row sources retain their dimensions and explicit selection; automatic
 integration must not silently aggregate or overwrite scalar attributes.
 
-At the audited code revision, normal builds deliberately excluded `source_only`
-inputs unless separately attached, and the parent-release verifier dispatched
-only four native groups while standalone qualification supported more reviewed
-families. The subsequent verifier consolidation makes both paths select the
-same reviewed source plan and binds receipt evidence separately to each child
-manifest. It adds no attachments, published data years or entity fields, so the
-inventory counts above remain unchanged. The subsequent composition and shared
-lazy entity facade are implemented; remaining work is source-by-source qualification
-and activation in a published parent. Preserve publisher evidence and the
-approval boundary; an unreviewed registration must not become an automatic
-publication merely to clear this inventory.
+Normal builds exclude `source_only` inputs unless explicitly attached. Parent
+and standalone verification select the same reviewed source plan and bind
+receipt evidence separately to each exact child manifest. The shared lazy entity
+facade consumes the attached catalogs without a second mapping or store. The
+inventory above reflects the current seven-child selection; other families still
+require their own source qualification and normal integration. Preserve publisher
+evidence and the approval boundary: registration alone must not automatically
+qualify or publish a source merely to clear this inventory.
 
 Normal builds now accept an exact manifest location and SHA-256 and derive the
 complete source descriptor from its catalog index. This removes manual copying
@@ -117,7 +118,7 @@ do not establish their absence from the repository or their publisher availabili
 
 ## Reproduce the metadata comparison
 
-Use the inspected code/configuration and a retained v0.0.148 manifest with its
+Use the inspected code/configuration and a retained v0.0.151 manifest with its
 assets. This reads source contracts and attachment descriptors, not observations:
 
 ```python
@@ -133,13 +134,13 @@ source_only = {
            for year in editions.available_years())
 }
 release = DataRelease("/path/to/retained/release.json", offline=True,
-    expected_sha256="e485c94e68242a466533b5b94203ca91834f1149de1b49d0ea70c6b52be8a308")
+    expected_sha256="9d9b28cd993b9c8f764b1592fe6b765c4e26495447969ec14bcc493c8062501c")
 attached = {key.dataset for ref in release.catalog.native_sources for key in ref.editions}
 print(len(configured), sum(len(item.available_years()) for item in configured.values()))
 print(len(source_only), len(source_only - attached))
 ```
 
-The expected counts for this frozen comparison are `124, 276` and `111, 105`.
+The expected counts for this frozen comparison are `124, 276` and `111, 103`.
 The machine inventory's configuration hash must match before reusing those
 numbers. Recompute them after changing configuration or the selected release.
 

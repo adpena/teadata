@@ -1,5 +1,30 @@
 # Entity enrichment sources and years
 
+The [v0.0.151 normal release](https://github.com/adpena/teadata/releases/tag/v0.0.151)
+adds the complete retained primary-disability district/Texas family from
+2012–13 through 2025–26 (28 editions), and staff FTE/salary for 2022–23 through
+2025–26 (eight editions). Its seven native bundles expose nine dataset IDs and
+93 editions alongside 13 unchanged base inputs. The
+[integration inventory](source-integration-status.json) pins this exact selection.
+The app remains separately pinned; publishing a library does not change deployed
+profiles or an unconfigured wheel's default data.
+
+Use `entity.peims_special_education_by_primary_disability` or
+`entity.dataset("peims_special_education_by_primary_disability")` for lazy field
+discovery and exact-year selection. Historical IDs absent from the current entity
+snapshot remain accessible through `release.series(..., ids=[...], years=[...])`;
+current names and geometry do not become historical facts. These are October
+primary-disability enrollment snapshots, distinct from program enrollment and
+TAPR Membership. Older Developmental Delay interpretation remains held; preserved
+counts do not establish comparability, diagnoses, service intensity or cost.
+The product has district, county, region and state reports; this release attaches
+district and direct Texas only, and no campus product is implied.
+
+Staff data retain category and role rows, decimals, observed zeros and missing
+values. Select those dimensions explicitly; overlapping categories cannot be
+summed as unique staff. See [series exports](enrichment.md#observations-across-school-years)
+for CSV, DataFrame and Excel provenance and original-header behavior.
+
 For the current registration-to-release gap, see the dated
 [source integration inventory](source-integration-status.md) and its
 [machine-readable edition/scope comparison](source-integration-status.json).
