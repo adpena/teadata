@@ -1,3 +1,6 @@
+from base64 import b64decode
+import csv
+from io import BytesIO, StringIO
 import json
 
 import pytest
@@ -34,6 +37,83 @@ def use_children(parent, children, monkeypatch):
 
     monkeypatch.setattr(parent, "_observation_year_options", options)
     return calls
+
+
+def excel_export(series, target):
+    from openpyxl import load_workbook
+
+    series.to_excel(target)
+    book = load_workbook(target, read_only=True, data_only=True)
+    try:
+        assert book.sheetnames == ["Data", "Provenance"]
+        data, provenance = list(book["Data"].values), list(book["Provenance"].values)
+        chunks = [row[3] for row in provenance
+                  if len(row) >= 4 and row[0] == "Series selection record" and type(row[1]) is int]
+        assert json.loads(b64decode("".join(chunks))) == series.provenance()
+        cells = {str(cell) for row in provenance for cell in row if cell is not None}
+        for source in series.provenance()["sources"]:
+            assert source["provenance"]["release"]["manifest_sha256"] in cells
+            assert source["provenance"]["citation"] in cells
+        # Write-only XLSX omits trailing blank cells; its header fixes the width.
+        width = len(data[0])
+        return [row + (None,) * (width - len(row)) for row in data]
+    finally:
+        book.close()
+
+
+def test_series_csv_and_excel_stream_raw_values_statuses_and_selection(tmp_path, monkeypatch):
+    from teadata.source_series import ObservationSeries
+
+    children = releases(tmp_path)
+    parent = children[2023]
+    use_children(parent, children, monkeypatch)
+    series = parent.series("campus_student", "amount", scope="campus", years=[25, 23, 24], ids=[2, 4])
+    expected = series.to_arrow().to_pylist()
+    monkeypatch.setattr(ObservationSeries, "to_arrow", lambda *_: pytest.fail("Export collected the series"))
+    monkeypatch.setattr(ObservationSeries, "to_df", lambda *_: pytest.fail("Export collected a DataFrame"))
+    stream = BytesIO()
+    series.to_csv(stream)
+    assert not stream.closed
+    rows = list(csv.DictReader(StringIO(stream.getvalue().decode())))
+    assert rows == [{key: "" if value is None else str(value) for key, value in row.items()} for row in expected]
+    data = excel_export(series, tmp_path / "series.xlsx")
+    header, *rows = data
+    assert list(header) == series.schema.names
+    assert rows == [tuple(row[name] for name in header) for row in expected]
+
+
+def test_series_empty_exports_and_failed_paths_are_atomic(tmp_path, monkeypatch):
+    from teadata.source_series import ObservationSeries
+
+    children = releases(tmp_path)
+    parent = children[2023]
+    use_children(parent, children, monkeypatch)
+    empty = parent.series("campus_student", "amount", scope="campus", years=[23, 24], ids=[999])
+    stream = BytesIO()
+    empty.to_csv(stream)
+    assert list(csv.reader(StringIO(stream.getvalue().decode()))) == [empty.schema.names]
+    excel = BytesIO()
+    assert excel_export(empty, excel) == [tuple(empty.schema.names)]
+    assert not excel.closed
+
+    series = parent.series("campus_student", "amount", scope="campus", years=[23], ids=[4])
+    original = ObservationSeries.iter_batches
+
+    def fail_after_first(self):
+        yield next(original(self))
+        raise RuntimeError("interrupted source")
+
+    monkeypatch.setattr(ObservationSeries, "iter_batches", fail_after_first)
+    for method, extension in (("to_csv", "csv"), ("to_excel", "xlsx")):
+        path = tmp_path / f"failed.{extension}"
+        with pytest.raises(RuntimeError, match="interrupted source"):
+            getattr(series, method)(path)
+        assert not path.exists()
+        path.write_bytes(b"existing result")
+        with pytest.raises(FileExistsError):
+            getattr(series, method)(path)
+        assert path.read_bytes() == b"existing result"
+    assert not list(tmp_path.glob(".teadata-export-*"))
 
 
 def test_series_plans_once_and_streams_selected_years_with_provenance(tmp_path, monkeypatch):
@@ -201,6 +281,14 @@ def test_series_preserves_multiple_fields_and_nullable_context_from_real_catalog
     assert [row["early_context"] for row in rows] == [None, "retained context", None]
     assert [row["later_context"] for row in rows] == [None, None, "retained context"]
     assert all(row["NAME"] == "Observed" and row["amount_status"] == "observed" for row in rows)
+    output = BytesIO()
+    view.to_csv(output)
+    csv_rows = list(csv.DictReader(StringIO(output.getvalue().decode())))
+    assert [int(row["measurement_school_year"]) for row in csv_rows] == [2024, 2023, 2025]
+    assert [row["early_context"] for row in csv_rows] == ["", "retained context", ""]
+    assert [row["later_context"] for row in csv_rows] == ["", "", "retained context"]
+    header, *excel_rows = excel_export(view, tmp_path / "nullable-context.xlsx")
+    assert excel_rows == [tuple(row[name] for name in header) for row in rows]
 
 
 def test_series_distinguishes_unknown_fields_from_unavailable_years(tmp_path, monkeypatch):
@@ -238,6 +326,7 @@ def test_series_names_pin_the_registry_separately_from_observations(tmp_path, mo
         "manifest_sha256": registry.manifest_sha256, "build_id": registry.build_id,
         "resolved": [{"name": "oBseRved", "id": "000000004"}],
     }
+    excel_export(series, tmp_path / "named-series.xlsx")
     with pytest.raises(EntitySelectionError, match="Did you mean"):
         parent.series("campus_student", "amount", names=["Observd"], **args)
 

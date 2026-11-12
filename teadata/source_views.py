@@ -14,7 +14,7 @@ import os
 from pathlib import Path
 import re
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any, BinaryIO, Generator, Iterator, Self, overload
+from typing import TYPE_CHECKING, Any, BinaryIO, Generator, Iterator, Protocol, Self, overload
 
 from .dataset_metadata import ArtifactRef, DataPeriod, EditionKey
 from .identifiers import canonical_source_identifiers
@@ -896,7 +896,29 @@ def _bind_queries(predicate: Expression | None, queries: tuple[PreparedPredicate
     return predicate
 
 
-def write_csv(table: _TableExport, path_or_buf: str | Path | BinaryIO) -> None:
+class _WriterProvenance(Protocol):
+    def _append_sheet(self, workbook: Workbook, *, rows: int | None = None) -> None: ...
+
+
+class _StreamingExport(Protocol):
+    @property
+    def schema(self) -> pa.Schema: ...
+
+    @property
+    def headers(self) -> tuple[tuple[str, ...], ...]: ...
+
+    @property
+    def restore_original_headers(self) -> bool: ...
+
+    @property
+    def rows_hint(self) -> int | None: ...
+
+    def batches(self) -> Iterator[pa.RecordBatch]: ...
+
+    def provenance(self) -> _WriterProvenance: ...
+
+
+def write_csv(table: _StreamingExport, path_or_buf: str | Path | BinaryIO) -> None:
     from pyarrow.csv import CSVWriter, WriteOptions
 
     with _export_stream(path_or_buf) as stream:
@@ -970,7 +992,7 @@ def _excel_workbook(path_or_buf: str | Path | BinaryIO) -> Generator[Workbook, N
             workbook.close()
 
 
-def write_excel(table: _TableExport, path_or_buf: str | Path | BinaryIO) -> None:
+def write_excel(table: _StreamingExport, path_or_buf: str | Path | BinaryIO) -> None:
     from openpyxl.cell import WriteOnlyCell
 
     max_rows = 1_048_576 - len(table.headers)

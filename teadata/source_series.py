@@ -5,17 +5,19 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
 from numbers import Integral
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, BinaryIO
 
 from .dataset_metadata import EditionKey, _parse_school_year, _validate_observation_selection
 from .identifiers import canonical_source_identifier, canonical_source_identifiers
 from .manifest import ContractError, canonical_json
 from .selectors import _EntityNames
-from .source_views import SourceTable, _entity_key, _open_export, _plan_export
+from .source_views import SourceTable, _entity_key, _open_export, _plan_export, write_csv, write_excel
 
 if TYPE_CHECKING:
     import pandas as pd
     import pyarrow as pa
+    from openpyxl import Workbook
+    from pathlib import Path
     from sqlalchemy import Connection, Table
 
     from .export_provenance import ExportProvenance
@@ -283,6 +285,14 @@ class ObservationSeries:
         frame.attrs["teadata_provenance"] = json.loads((table.schema.metadata or {})[_PROVENANCE_KEY])
         return frame
 
+    def to_csv(self, path_or_buf: str | Path | BinaryIO) -> None:
+        """Stream selected years to CSV; save provenance() as a JSON sidecar."""
+        write_csv(_SeriesExport(self), path_or_buf)
+
+    def to_excel(self, path_or_buf: str | Path | BinaryIO) -> None:
+        """Stream selected years to Data and canonical Provenance worksheets."""
+        write_excel(_SeriesExport(self), path_or_buf)
+
     def to_sql(self, connection: Connection, observations: Table, *, receipts: Table,
                require_complete: bool = True) -> SeriesSqlExport:
         """Stream into caller-defined SQLAlchemy tables with a pinned JSON receipt.
@@ -318,6 +328,54 @@ class ObservationSeries:
             if len(set(selected)) != len(selected) or not set(selected) <= set(self.years):
                 raise ValueError(f"Select distinct years from {self.years}.")
         return _read_series(self, connection, observations, receipts=receipts, import_id=import_id, years=selected)
+
+
+@dataclass(frozen=True, slots=True)
+class _SeriesExport:
+    series: ObservationSeries
+
+    @property
+    def schema(self) -> pa.Schema:
+        return self.series.schema
+
+    @property
+    def headers(self) -> tuple[tuple[str, ...], ...]:
+        return (tuple(self.schema.names),)
+
+    @property
+    def restore_original_headers(self) -> bool:
+        return False
+
+    @property
+    def rows_hint(self) -> int | None:
+        return None
+
+    def batches(self) -> Iterator[pa.RecordBatch]:
+        return self.series.iter_batches()
+
+    def provenance(self) -> _SeriesExport:
+        return self
+
+    def _append_sheet(self, workbook: Workbook, *, rows: int | None = None) -> None:
+        from base64 import b64encode
+
+        from .export_provenance import _provenance_sheet
+
+        sheet = _provenance_sheet(workbook)
+        sheet.append(("TEA Data school-year series export provenance",))
+        if rows is not None:
+            sheet.append(("Total rows exported", rows))
+        sheet.append(("Measurement year column", _YEAR_COLUMN))
+        sheet.append(("Cross-year comparability", "Unassessed; inspect each source's definitions and periods."))
+        sheet.append(("Series selection record", "Part", "Parts", "Base64-encoded UTF-8 JSON"))
+        encoded = b64encode(canonical_json(self.series.provenance()).encode()).decode("ascii")
+        parts = range(0, len(encoded), 12_000)
+        for number, offset in enumerate(parts, 1):
+            sheet.append(("Series selection record", number, len(parts), encoded[offset:offset + 12_000]))
+        for year, _, _, source in self.series._sources:
+            sheet.append(())
+            sheet.append(("Measurement school year ending", year))
+            source._append_sheet(workbook, sheet=sheet)
 
 
 @dataclass(frozen=True, slots=True, eq=False)

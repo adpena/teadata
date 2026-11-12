@@ -46,6 +46,32 @@ suppression status. An entity query filters those rows by selected TEA numbers.
 The historical population and geography still require their own dated sources.
 See [school-year selection](querying.md#school-years-and-source-editions).
 
+`series.to_csv(path)` and `series.to_excel(path)` stream one selected year at a
+time through the same writers as source tables. They retain the measurement-year
+column, publisher raw tokens, normalized values and statuses. Excel includes the
+complete series selection and each year's citations and source pins in its
+Provenance worksheet. CSV needs the existing JSON sidecar:
+
+```python
+import json
+from pathlib import Path
+
+series.to_csv("observations.csv")
+Path("observations.provenance.json").write_text(
+    json.dumps(series.provenance(), indent=2), encoding="utf-8"
+)
+series.to_excel("observations.xlsx")
+```
+
+Exports do not establish cross-year comparability. Series use a common schema,
+including null context columns absent from individual editions. For a publisher's
+original header layout, select one exact year, for example
+`series.for_year(25).to_csv("publisher.csv", restore_original_headers=True)`.
+The same option applies to that source table's DataFrame and Excel exports.
+Writers preserve decimal precision (as text in Excel when necessary), reject
+existing destination paths and publish files atomically. Caller-owned binary
+streams remain open; a stream can contain partial output if writing fails.
+
 ### Lazy dataset access on entities
 
 An entity in a release-bound engine discovers attached, qualified dataset names
