@@ -1088,11 +1088,11 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(
             engine.add_campus(Campus(UUID(int=number), None, identifier, "", False, campus_number=identifier))
         cohort = Query([engine.campus_by_number(identifier) for identifier in (first_id, last_id)], engine)
         route_calls = []
-        original = DataRelease._build_student_campus_index
+        build_campus_index = DataRelease._build_student_campus_index
 
         def route(instance, edition, trace=None, *, reuse_catalog=False):
             route_calls.append((edition, id(instance), reuse_catalog))
-            return original(instance, edition, trace, reuse_catalog=reuse_catalog)
+            return build_campus_index(instance, edition, trace, reuse_catalog=reuse_catalog)
 
         ledger_calls = []
 
@@ -1320,6 +1320,22 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(
             altered_refs.append({**selected, "reviewed_sha256": decoy_digest})
             with pytest.raises(ContractError, match="exact selected schema observation"):
                 tprs_statewide_intake.student_report_ledger(altered, key, roster.read_bytes(), processing)
+    if partitioned:
+        previous_key, = DataRelease(previous / "release.json", offline=True).catalog._edition_keys.values()
+        for facade in (composed, parent):
+            fresh = DataRelease(facade.path, offline=True)
+            for identifier, expected in ((first_id, previous_key), (last_id, key)):
+                entity = engine.campus_by_number(identifier)
+                with monkeypatch.context() as discovery:
+                    discovery.setattr(DataRelease, "artifact", lambda *a, **k: pytest.fail("Namespace routing opened a leaf"))
+                    namespace = fresh.for_entity(entity, edition="2026")
+                    fields = namespace[students.DATASET.upper()]
+                    assert fields.edition == expected and fields.identifier == identifier
+                    assert namespace.dataset(key).edition == key  # Explicit keys bypass automatic routing.
+                assert fields.membership_total_students_count == 1
+            absent = Campus(UUID(int=99), None, "Absent report", "", False, campus_number="999999999")
+            with pytest.raises(ContractError, match="No admitted .* report for campus 999999999 .*2026"):
+                fresh.for_entity(absent, edition="2026")[students.DATASET]
     audit, = output.glob("tprs-raw_audit-*.jsonl.gz")
     audit.write_bytes(b"tampered")
     with pytest.raises(ContractError):

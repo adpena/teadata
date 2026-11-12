@@ -268,6 +268,13 @@ Scalar access distinguishes no published row for the entity in that edition
 from multiple matching rows. For the latter, pass a PyArrow
 expression to `select(..., where=...)` to narrow its grain.
 
+Campus TPRS Student namespaces use the release-pinned report index to select
+the campus's physical partition. Routing reads metadata before field access
+opens the selected source table. A campus without an admitted report receives
+an error identifying the campus and publisher edition. Explicit `EditionKey`
+selection remains available; competing revisions and other ambiguous datasets
+still require an exact key.
+
 An entity query routes partitioned TPRS Student reports automatically. For example,
 `(engine >> ("campus", "001902103")).observations(dataset, field, school_year=26)`
 uses the selected campus and exact measurement year. A cohort spanning

@@ -397,6 +397,19 @@ class EntitySources:
                 raise _UnknownSourceName(f"Exact source edition {name.identity} is unavailable. See datasets().")
         else:
             raise TypeError("Source dataset selection requires a name or exact EditionKey")
+        if len(choices) > 1 and isinstance(name, str) and self.scope == "campus":
+            from .tprs_statewide_intake import DATASET
+
+            if all(key.dataset == DATASET for key in choices):
+                routed = self.release.tprs_student_campus_index(edition=self.edition).edition_for(self.identifier)
+                if routed is None:
+                    raise ContractError(
+                        f"No admitted {DATASET} report for campus {self.identifier} in publisher edition "
+                        f"{self.edition}. Check that edition's publisher roster; see datasets() for source choices."
+                    )
+                if routed not in choices:
+                    raise ContractError("Campus report route is outside the selected dataset editions")
+                choices = [routed]
         if len(choices) != 1:
             raise ContractError("Source name is ambiguous; select an exact EditionKey")
         (key,) = choices
