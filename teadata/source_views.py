@@ -431,6 +431,33 @@ _TPRS_DATASETS = frozenset({"tprs_student_membership_enrollment_reports", "tprs_
 
 
 @dataclass(frozen=True, slots=True)
+class _TPRSNameIndex:
+    context: tuple[Any, ...]
+    names: tuple[tuple[str, tuple[str, ...]], ...]
+    files: tuple[tuple[Path, str, int, tuple[int, ...]], ...]
+
+    def matches_files(self) -> bool:
+        from .dataset_metadata import ColumnSchemaRef
+        from .release import _capture_column_schema, _matches_metadata_files
+
+        if not self.files:
+            return False
+        try:
+            if getattr(os, "O_NOFOLLOW", 0):
+                return _matches_metadata_files(tuple((path, stamp) for path, _, _, stamp in self.files))
+            for path, digest, size, _ in self.files:
+                # Without POSIX identity guarantees, verify bytes instead of
+                # treating Windows pathname timestamps as a content identity.
+                _capture_column_schema(path, ColumnSchemaRef(digest, size, path.name))
+            return True
+        except (ContractError, OSError):
+            return False
+
+    def projection(self) -> dict[str, set[str]]:
+        return {dataset: set(names) for dataset, names in self.names}
+
+
+@dataclass(frozen=True, slots=True)
 class TPRSFields:
     """An entity's lazy TPRS view over the release's qualified native sources."""
 
@@ -440,23 +467,61 @@ class TPRSFields:
     school_year: int | None = None
 
     def _indexes(self) -> dict[str, set[str]]:
-        keys = (key for source in self.release.catalog.native_sources for key in source.editions)
+        context = (self.scope, tuple(sorted(_TPRS_DATASETS)), self.release.manifest_sha256,
+                   self.release.catalog.build_id, self.release.source, self.release.path,
+                   self.release.cache, getattr(self.release, "_cache_dir", None), self.release.offline)
+        cached = getattr(self.release, "_tprs_name_indexes", {}).get(self.scope)
+        if cached is not None and cached.context == context and cached.matches_files():
+            return cached.projection()
+        index = self._read_indexes(context)
+        if index.files and not index.matches_files():
+            raise ContractError("TPRS metadata changed while discovering fields. Retry with verified source artifacts.")
+        if self.scope in {"district", "campus"} and index.files and len(index.files) <= 256:
+            entries = dict(getattr(self.release, "_tprs_name_indexes", {}))
+            entries[self.scope] = index
+            self.release._tprs_name_indexes = entries
+        return index.projection()
+
+    def _read_indexes(self, context: tuple[Any, ...]) -> _TPRSNameIndex:
+        from .dataset_metadata import ColumnSchemaRef
+        from .release import _capture_column_schema
+
+        groups = []
         if self.release._v3:
-            keys = (EditionKey.from_dict({name: row[name] for name in EditionKey.__dataclass_fields__})
-                    for row in self.release.catalog.editions(scope=self.scope, include_metadata=False))
-        children: dict[EditionKey, DataRelease] = {}
+            groups.append(tuple(EditionKey.from_dict({name: row[name] for name in EditionKey.__dataclass_fields__})
+                                for row in self.release.catalog.editions(scope=self.scope, include_metadata=False)
+                                if row["dataset"] in _TPRS_DATASETS))
+        else:
+            groups.extend(tuple(key for key in source.editions
+                                if key.scope == self.scope and key.dataset in _TPRS_DATASETS)
+                          for source in self.release.catalog.native_sources)
         names: dict[str, set[str]] = {}
-        for key in keys:
-            if key.scope != self.scope or key.dataset not in _TPRS_DATASETS:
+        files: dict[Path, tuple[str, int, tuple[int, ...]]] = {}
+        for keys in groups:
+            if not keys:
                 continue
-            child = children.get(key)
-            if child is None:
-                child = self.release._native_edition_release(key)
-                for row in child.catalog.editions(include_metadata=False):
-                    sibling = EditionKey.from_dict({name: row[name] for name in EditionKey.__dataclass_fields__})
-                    children[sibling] = child
-            names.setdefault(key.dataset, set()).update(child.catalog._edition_field_names(key))
-        return names
+            child = self.release if self.release._v3 else self.release._native_edition_release(keys[0])
+            try:
+                for key in keys:
+                    names.setdefault(key.dataset, set()).update(child.catalog._edition_field_names(key))
+                resources = [(path, digest, stamp[4], stamp)
+                             for digest, (path, stamp, _) in child._column_schema_data.items()]
+                if child is not self.release:
+                    size = child.path.stat().st_size
+                    _, stamp = _capture_column_schema(child.path, ColumnSchemaRef(child.manifest_sha256, size, child.path.name))
+                    resources.append((child.path, child.manifest_sha256, size, stamp))
+                for path, digest, size, stamp in resources:
+                    if path in files and files[path][:2] != (digest, size):
+                        raise ContractError("TPRS source metadata routes conflicting identities to one file")
+                    files[path] = digest, size, stamp
+            finally:
+                if child is not self.release:
+                    # These children belong only to discovery. Bound loaders
+                    # otherwise retain large parsed graphs until cyclic GC.
+                    child.catalog._clear_edition_caches()
+                    child._column_schema_data.clear()
+        return _TPRSNameIndex(context, tuple((dataset, tuple(sorted(values))) for dataset, values in sorted(names.items())),
+                              tuple((path, *identity) for path, identity in sorted(files.items())))
 
     def variables(self, pattern: str | re.Pattern[str] | None = None) -> tuple[str, ...]:
         """List canonical names from metadata indexes, without opening data leaves."""

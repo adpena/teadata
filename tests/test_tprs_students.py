@@ -325,6 +325,24 @@ def test_native_class_size_build_keeps_campus_partitions_opt_in(grid, tmp_path, 
         engine.add_campus(absent)
         with pytest.raises(ContractError, match="Class Size.*incomplete.*2026"):
             absent.tprs.select(field)
+        contexts = []
+        original_view = DataRelease._observation_view
+
+        def fail_second(instance, fields, year, child, key):
+            contexts.append(child)
+            if len(contexts) == 2:
+                raise ContractError("Later class partition failed")
+            return original_view(instance, fields, year, child, key)
+
+        caller_views = set(candidate.catalog._edition_views)
+        with monkeypatch.context() as failure:
+            failure.setattr(DataRelease, "_observation_view", fail_second)
+            with pytest.raises(ContractError, match="Later class partition failed"):
+                parent._entity_observations("tprs_class_size", (field,), school_year=None, scope="campus", edition=None,
+                                            identifiers=tuple(leaf.reports[0].identifier for leaf in leaves[-2:]))
+        assert len(contexts) == 2 and contexts[0] is contexts[1]
+        assert not contexts[0]._column_schema_data and not contexts[0].catalog._edition_views
+        assert set(candidate.catalog._edition_views) == caller_views
 
     native = tprs_class_size_native
     archive = ProvenanceStore(candidate.path.parent / "provenance")

@@ -35,6 +35,7 @@ from .manifest import (
 )
 
 if TYPE_CHECKING:
+    from .source_views import _TPRSNameIndex
     from .source_series import ObservationSeries
     from .export_provenance import ExportProvenance
     from .entities import Campus, District
@@ -87,9 +88,13 @@ class _CampusObservationPlan:
     keys: frozenset[EditionKey]
     route: _CampusRouteAdmission
     files: tuple[_MetadataStamp, ...]
+    route_source: NativeSourceRef | None = None
+    location: tuple[Path, Path] | None = None
 
-    def matches_files(self, child: DataRelease) -> bool:
-        return self.route.matches_files(child) and _matches_metadata_files(self.files)
+    def matches_files(self, child: DataRelease, route_child: DataRelease | None = None) -> bool:
+        return ((self.location is None or (child.path, child.cache) == self.location)
+                and self.route.matches_files(child if route_child is None else route_child)
+                and _matches_metadata_files(self.files))
 
 
 def _matches_metadata_files(files: tuple[_MetadataStamp, ...]) -> bool:
@@ -285,6 +290,7 @@ class DataRelease:
     """A complete bundle with one catalog and content hashes for every artifact."""
 
     _metadata_trace: set[_MetadataStamp] | None = None
+    _tprs_name_indexes: dict[str, _TPRSNameIndex]
 
     def __init__(self, manifest: str | Path, *, expected_sha256: str | None = None, offline: bool = False,
                  cache_dir: Path | None = None, _local_manifest: _LocalManifest | None = None):
@@ -432,6 +438,7 @@ class DataRelease:
                     "cache_dir": self._cache_dir}
         return {key: value for key, value in self.__dict__.items()
                 if key not in {"_campus_observation_routes", "_campus_observation_plan",
+                               "_campus_class_size_plan", "_tprs_name_indexes",
                                "_artifact_locks", "_artifact_lock_pid"}}
 
     def __setstate__(self, state: dict) -> None:
@@ -803,7 +810,7 @@ class DataRelease:
 
     def _observation_year_options(
         self, dataset: str, fields: tuple[str, ...], scope: str, edition: EditionKey | None,
-        trace_metadata: bool = False,
+        trace_metadata: bool = False, *, cleanup_on_error: bool = False,
     ) -> Iterator[tuple[DataRelease, EditionKey, dict[str, int]]]:
         _validate_observation_selection(dataset, fields, scope, edition)
 
@@ -826,16 +833,23 @@ class DataRelease:
                     yield child, keys
 
         for child, keys in sources():
-            for key in keys:
-                if edition is not None and key != edition:
-                    continue
-                resolved = child.catalog._observation_fields(key, fields)
-                periods = child.catalog._field_periods(key, tuple(resolved.values()))
-                yield child, key, {
-                    field: period.end_year
-                    for field, canonical in resolved.items()
-                    if (period := periods[canonical]).kind == "school_year" and period.end_year is not None
-                }
+            complete = False
+            try:
+                for key in keys:
+                    if edition is not None and key != edition:
+                        continue
+                    resolved = child.catalog._observation_fields(key, fields)
+                    periods = child.catalog._field_periods(key, tuple(resolved.values()))
+                    yield child, key, {
+                        field: period.end_year
+                        for field, canonical in resolved.items()
+                        if (period := periods[canonical]).kind == "school_year" and period.end_year is not None
+                    }
+                complete = True
+            finally:
+                if cleanup_on_error and not complete and child is not self:
+                    child.catalog._clear_edition_caches()
+                    child._column_schema_data.clear()
 
     @staticmethod
     def _years_by_field(
@@ -923,29 +937,53 @@ class DataRelease:
         from .tprs_statewide_intake import DATASET
 
         route_campuses = dataset == DATASET and scope == "campus" and edition is None and bool(identifiers)
-        memoize = (route_campuses and not self._v3 and bool(getattr(os, "O_NOFOLLOW", 0))
+        route_class_size = dataset == "tprs_class_size" and scope == "campus" and edition is None and bool(identifiers)
+        memoize = ((route_campuses or route_class_size) and not self._v3 and bool(getattr(os, "O_NOFOLLOW", 0))
                    and 0 < len(fields) <= 32 and all(isinstance(name, str) and len(name) <= 256 for name in fields))
         request = (fields, school_year)
         parent = self.source if self.remote else self.path
         cache_dir = getattr(self, "_cache_dir", None)
+        memo_name = "_campus_class_size_plan" if route_class_size else "_campus_observation_plan"
         if memoize:
-            memo: _CampusObservationPlan | None = getattr(self, "_campus_observation_plan", None)
+            memo: _CampusObservationPlan | None = getattr(self, memo_name, None)
             if memo is not None and memo.request == request:
                 child = _open_native_source(memo.source, parent, offline=self.offline, cache_dir=cache_dir)
-                if memo.matches_files(child):
-                    return self._routed_student_campuses(fields, memo.year, child, memo.keys, memo.route.index, identifiers)
-                self.__dict__.pop("_campus_observation_plan", None)
-        selected_options = (self._observation_year_options(dataset, fields, scope, edition, True) if memoize else
+                route_child = (_open_native_source(memo.route_source, parent, offline=self.offline, cache_dir=cache_dir)
+                               if memo.route_source is not None else None)
+                if memo.matches_files(child, route_child):
+                    if route_class_size:
+                        returned = False
+                        try:
+                            result = self._routed_student_campuses(fields, memo.year, child, memo.keys, memo.route.index,
+                                                                   identifiers, class_size=True)
+                            returned = True
+                            return result
+                        finally:
+                            if not returned:
+                                child.catalog._clear_edition_caches()
+                                child._column_schema_data.clear()
+                            if route_child is not None:
+                                route_child.catalog._clear_edition_caches()
+                                route_child._column_schema_data.clear()
+                    return self._routed_student_campuses(fields, memo.year, child, memo.keys, memo.route.index,
+                                                         identifiers)
+                self.__dict__.pop(memo_name, None)
+        selected_options = (self._observation_year_options(dataset, fields, scope, edition, memoize, cleanup_on_error=True)
+                            if route_class_size else
+                            self._observation_year_options(dataset, fields, scope, edition, True) if memoize else
                             self._observation_year_options(dataset, fields, scope, edition))
-        options = list(selected_options)
-        if dataset == "tprs_class_size" and scope == "campus" and edition is None and identifiers:
-            year, matches = self._observation_matches(fields, scope, school_year, options)
-            child, first = matches[0]
-            if all((source.manifest_sha256, key.edition) == (child.manifest_sha256, first.edition)
-                   for source, key in matches):
-                index = self.tprs_student_campus_index(edition=first.edition)
-                return self._routed_student_campuses(fields, year, child, frozenset(key for _, key in matches),
-                                                     index, identifiers, class_size=True)
+        options = []
+        try:
+            for option in selected_options:
+                options.append(option)
+        except BaseException:
+            if route_class_size:
+                for source in {source for source, _, _ in options if source is not self}:
+                    source.catalog._clear_edition_caches()
+                    source._column_schema_data.clear()
+            raise
+        if route_class_size:
+            return self._class_size_campus_observations(fields, school_year, options, identifiers, memoize=memoize)
         if route_campuses:
             year, matches = self._observation_matches(fields, scope, school_year, options)
             child, first = matches[0]
@@ -976,6 +1014,73 @@ class DataRelease:
                         return result
                 return self._routed_student_campuses(fields, year, child, matching_keys, route.index, identifiers)
         return self._select_observation_view(fields, scope, school_year, options)._for_entity_ids(identifiers)
+
+    def _class_size_campus_observations(
+        self, fields: tuple[str, ...], school_year: int | None,
+        options: Sequence[tuple[DataRelease, EditionKey, dict[str, int]]], identifiers: tuple[str, ...], *,
+        memoize: bool,
+    ) -> SourceTable | PartitionedSourceTable:
+        from .tprs_statewide_intake import DATASET
+
+        parent = self.source if self.remote else self.path
+        cache_dir = getattr(self, "_cache_dir", None)
+        request = (fields, school_year)
+        selected, student_child = None, None
+        returned = False
+        try:
+            year, matches = self._observation_matches(fields, "campus", school_year, options)
+            child, first = matches[0]
+            if not all((source.manifest_sha256, key.edition) == (child.manifest_sha256, first.edition)
+                       for source, key in matches):
+                view = self._select_observation_view(fields, "campus", year, options)
+                selected = view.release
+                result = view._for_entity_ids(identifiers)
+                returned = True
+                return result
+            route, route_source = None, None
+            refs = [ref for ref in self.catalog.native_sources if any(
+                (key.dataset, key.scope, key.edition) == (DATASET, "campus", first.edition) for key in ref.editions)]
+            if memoize and len(refs) == 1:
+                route_source = refs[0]
+                student_child = _open_native_source(route_source, parent, offline=self.offline, cache_dir=cache_dir)
+                route = self._automatic_student_campus_index(student_child, first.edition,
+                    reuse_catalog=bool(getattr(student_child.catalog, "_v4", False)))
+                if route is not None and not route.files:
+                    # A declined admission can represent a failed final guard,
+                    # not only an unavailable memo. Discard its index and build
+                    # the canonical Student route afresh, once, below.
+                    route = None
+            index = route.index if route is not None else self.tprs_student_campus_index(edition=first.edition)
+            matching_keys = frozenset(key for _, key in matches)
+            class_refs = [ref for ref in self.catalog.native_sources if ref.manifest_sha256 == child.manifest_sha256]
+            selected = (_open_native_source(class_refs[0], parent, offline=self.offline, cache_dir=cache_dir)
+                        if len(class_refs) == 1 else child)
+            trace = getattr(child, "_metadata_trace", None)
+            candidate = None
+            if (memoize and route is not None and route.files and route_source is not None
+                    and len(class_refs) == 1 and trace and len(trace) <= 256 and len(options) <= 64
+                    and all(len(str(path)) <= 4096 for path, _ in trace)
+                    and all(source is child for source, _, _ in options)):
+                candidate = _CampusObservationPlan(request, year, class_refs[0], matching_keys, route, tuple(trace),
+                                                   route_source=route_source, location=(child.path, child.cache))
+                if not candidate.matches_files(selected, student_child):
+                    self.__dict__.pop("_campus_class_size_plan", None)
+                    raise ContractError("Class-size metadata changed during planning; retry with verified source artifacts")
+            result = self._routed_student_campuses(fields, year, selected, matching_keys, index,
+                                                   identifiers, class_size=True)
+            if candidate is not None:
+                self._campus_class_size_plan = candidate
+            returned = True
+            return result
+        finally:
+            discovery = {source for source, _, _ in options if source is not self and source is not selected}
+            if student_child is not None:
+                discovery.add(student_child)
+            if selected is not None and selected is not self and not returned:
+                discovery.add(selected)
+            for source in discovery:
+                source.catalog._clear_edition_caches()
+                source._column_schema_data.clear()
 
     def _routed_student_campuses(
         self, fields: tuple[str, ...], year: int, child: DataRelease, matching_keys: frozenset[EditionKey],

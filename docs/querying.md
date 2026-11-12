@@ -297,10 +297,20 @@ existing metadata keys and flat dot access remain available. A literal
 
 Unregistered, private school, or SQL-only entities cannot infer a parent
 release from their ID. Use the explicit release interface below for a
-standalone or SQL public entity. Metadata discovery on `.tprs` reads selected
-edition indexes on each operation; it does not reuse the app's separate
-workspace variable cache or promise that warm observation planning removes
-discovery cost.
+standalone or SQL public entity. Initial `.tprs` discovery reads selected
+edition indexes, then retains a small immutable name index per scope. Each
+reuse checks its manifest, metadata files and access context. POSIX uses the
+existing file-identity checks; platforms without `O_NOFOLLOW` reverify file
+hashes. A changed or missing resource rebuilds through the canonical verifier
+and can raise an integrity or offline error. Private discovery buffers are
+released after use. This cache holds no observation values and is separate
+from the app's workspace variable cache. It is excluded from pickle.
+
+Repeated campus class-size planning also reuses the existing guarded Student
+route and a separate class-size plan, retaining both source identities. That
+plan optimization requires the existing POSIX file-identity guarantees;
+other platforms retain canonical uncached planning. No change in cache state
+changes the selected year or converts missing values to older observations.
 
 A native release or an entity release with attached native sources can expose
 fields in dataset namespaces. Start with a public district or campus and the

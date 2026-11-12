@@ -2,6 +2,7 @@ from copy import copy
 from hashlib import sha256
 from pathlib import Path
 import json
+import os
 import pickle
 import shutil
 from uuid import uuid4
@@ -143,6 +144,90 @@ def test_entity_namespace_rejects_name_and_family_collisions(bound, monkeypatch)
     assert namespace.variables() == ()
     with pytest.raises(ContractError, match="No qualified TPRS native families.*district"):
         namespace.select(FIELD)
+
+
+def test_name_index_reuses_only_verified_detached_names_including_hash_fallback(bound, monkeypatch):
+    import teadata.release as transport
+
+    _, release, _, district, _ = bound
+    namespace = district.tprs
+    names = namespace.variables()
+    assert release._tprs_name_indexes["district"].files
+    projection = namespace._indexes()
+    projection[DATASET].clear()
+    with monkeypatch.context() as warm:
+        warm.setattr(TPRSFields, "_read_indexes", lambda *a: pytest.fail("Warm names reparsed metadata"))
+        assert namespace.variables() == names and FIELD in dir(namespace)
+        capture_metadata = transport._capture_column_schema
+        reads = []
+
+        def capture(path, descriptor, **kwargs):
+            reads.append(path)
+            return capture_metadata(path, descriptor, **kwargs)
+
+        with monkeypatch.context() as fallback:
+            fallback.setattr(os, "O_NOFOLLOW", 0, raising=False)
+            fallback.setattr(transport, "_capture_column_schema", capture)
+            assert namespace.variables() == names and reads
+    assert "_tprs_name_indexes" not in release.__getstate__()
+
+
+def test_name_index_context_changes_rebuild_instead_of_reusing_another_policy(bound, monkeypatch):
+    _, release, _, district, _ = bound
+    before = district.tprs.variables()
+    read_index = TPRSFields._read_indexes
+    contexts = []
+
+    def observe(namespace, context):
+        contexts.append(context)
+        return read_index(namespace, context)
+
+    monkeypatch.setattr(TPRSFields, "_read_indexes", observe)
+    release.offline = False
+    assert district.tprs.variables() == before and len(contexts) == 1
+    release.offline = True
+    assert district.tprs.variables() == before and len(contexts) == 2
+
+
+def test_class_discovery_failure_clears_already_yielded_contexts(bound, monkeypatch):
+    _, release, keys, _, _ = bound
+    child = release._native_edition_release(keys["campus"])
+    child.catalog._edition_field_names(keys["campus"])
+    assert child._column_schema_data
+
+    def fail_after_option(*args, **kwargs):
+        yield child, keys["campus"], {FIELD: 2026}
+        raise ContractError("Discovery failed after an option")
+
+    monkeypatch.setattr(release, "_observation_year_options", fail_after_option)
+    with pytest.raises(ContractError, match="Discovery failed after an option"):
+        release._entity_observations("tprs_class_size", (FIELD,), school_year=None, scope="campus",
+                                     edition=None, identifiers=("001902001",))
+    assert not child._column_schema_data and not child.catalog._edition_views
+    assert release.catalog.native_sources
+
+
+def test_discovery_generator_clears_its_current_private_context_on_failure(bound, monkeypatch):
+    import teadata.release as transport
+
+    _, release, _, _, _ = bound
+    open_source = transport._open_native_source
+    children = []
+
+    def observe_open(*args, **kwargs):
+        child = open_source(*args, **kwargs)
+        children.append(child)
+
+        def fail_period(*args):
+            raise ContractError("Period interpretation failed")
+
+        monkeypatch.setattr(child.catalog, "_field_periods", fail_period)
+        return child
+
+    monkeypatch.setattr(transport, "_open_native_source", observe_open)
+    with pytest.raises(ContractError, match="Period interpretation failed"):
+        list(release._observation_year_options(DATASET, (FIELD,), "campus", None, cleanup_on_error=True))
+    assert children and all(not child._column_schema_data and not child.catalog._edition_views for child in children)
 
 
 def test_entity_namespace_requires_registered_public_identity_and_preserves_meta(bound):
