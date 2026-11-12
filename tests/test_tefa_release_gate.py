@@ -288,7 +288,10 @@ def test_composed_release_holds_until_attached_sources_are_qualified(monkeypatch
     monkeypatch.setattr("teadata.release.DataRelease", lambda path, *, offline: release)
     for name in ("_validate_release_provenance", "_validate_publisher_cases", "_validate_tefa_cases"):
         monkeypatch.setattr(verification, name, lambda value: None)
-    with pytest.raises(verification.ReceiptError, match="structural verification only.*" + pin):
+    child = SimpleNamespace(manifest_sha256=pin, catalog=SimpleNamespace(
+        to_dict=lambda: {"schema_version": 4, "editions": {}, "artifacts": {}}))
+    monkeypatch.setattr(verification, "_open_reviewed_native_evidence", lambda *args: (child, None))
+    with pytest.raises(verification.ReceiptError, match=pin + ".*requires reviewed source evidence"):
         verification._validate_release("candidate.json", "app")
 
 
@@ -300,7 +303,7 @@ def test_composed_release_replays_exact_tprs_attachment(monkeypatch, tmp_path, c
     ref = SimpleNamespace(manifest_sha256=pin)
     catalog = SimpleNamespace(to_dict=lambda: {"schema_version": 2}, native_sources=[ref])
     parent = SimpleNamespace(catalog=catalog, verify=lambda: None, path=tmp_path / "parent.json", build_id="parent")
-    child = SimpleNamespace(path=tmp_path / "child" / "release.json", remote=False)
+    child = SimpleNamespace(path=tmp_path / "child" / "release.json", remote=False, manifest_sha256=pin)
     monkeypatch.setattr("teadata.release.DataRelease", lambda path, *, offline: parent)
     monkeypatch.setattr("teadata.release._open_native_source", lambda *args, **kwargs: child)
     for name in ("_validate_release_provenance", "_validate_publisher_cases", "_validate_tefa_cases"):
@@ -317,7 +320,7 @@ def test_composed_release_replays_exact_tprs_attachment(monkeypatch, tmp_path, c
     assert seen == [(child, child.path.parent / "provenance")]
     assert "PASS_REVIEWED_NATIVE" in capsys.readouterr().out
     child.remote = True
-    with pytest.raises(verification.ReceiptError, match="Stage the exact reviewed TPRS attachment locally"):
+    with pytest.raises(verification.ReceiptError, match="Stage the exact reviewed native attachment locally"):
         verification._validate_release("candidate.json", "app")
 
 
@@ -328,7 +331,7 @@ def test_composed_release_requires_finance_staff_source_replay(monkeypatch, tmp_
     ref = SimpleNamespace(manifest_sha256=REVIEWED_MANIFEST)
     catalog = SimpleNamespace(to_dict=lambda: {"schema_version": 2}, native_sources=[ref])
     parent = SimpleNamespace(catalog=catalog, verify=lambda: None, path=tmp_path / "parent.json", build_id="parent")
-    child = SimpleNamespace(path=tmp_path / "finance-and-staff.json", remote=False)
+    child = SimpleNamespace(path=tmp_path / "finance-and-staff.json", remote=False, manifest_sha256=REVIEWED_MANIFEST)
     monkeypatch.setattr("teadata.release.DataRelease", lambda path, *, offline: parent)
     monkeypatch.setattr("teadata.release._open_native_source", lambda *args, **kwargs: child)
     monkeypatch.setattr(verification, "_retained_store", lambda path: path)

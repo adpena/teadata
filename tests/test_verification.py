@@ -488,7 +488,7 @@ def test_composed_first_receipt_requires_retained_publisher_evidence(project, mo
     }))
     ref = SimpleNamespace(manifest_sha256=pin)
     parent = SimpleNamespace(catalog=SimpleNamespace(native_sources=[ref]), verify_native_sources=lambda: {pin: {"asset": asset}})
-    child, store = object(), object()
+    child, store = SimpleNamespace(manifest_sha256=pin), object()
     monkeypatch.setattr(release, "DataRelease", lambda *a, **k: parent)
     monkeypatch.setattr(verification, "_open_reviewed_native_evidence", lambda *a: (child, store))
     seen = []
@@ -499,7 +499,7 @@ def test_composed_first_receipt_requires_retained_publisher_evidence(project, mo
 
     monkeypatch.setattr(first_ratings, "retained_first_evidence", evidence)
     captured = verification._input_identity(project, kind="library", paired_library=None, release=manifest.name)
-    assert captured["native_first_evidence"] == ["publisher-record"]
+    assert captured["native_evidence"][pin] == {"family": "FIRST", "records": ["publisher-record"]}
     assert seen == [(child, store)]
 
     def missing(*args):
@@ -526,20 +526,20 @@ def test_composed_class_size_gate_requires_reviewed_pin_and_evidence(project, mo
     parent = SimpleNamespace(build_id="parent", catalog=SimpleNamespace(
         native_sources=[ref], to_dict=lambda: {"schema_version": 2}),
         verify=lambda: None, verify_native_sources=lambda: {pin: {"asset": asset}})
-    child, store = object(), object()
+    child, store = SimpleNamespace(manifest_sha256=pin), object()
     monkeypatch.setattr(release, "DataRelease", lambda *a, **k: parent)
     monkeypatch.setattr(verification, "_validate_release_provenance", lambda *args: 1)
     monkeypatch.setattr(verification, "_validate_publisher_cases", lambda *args: {})
     monkeypatch.setattr(verification, "_validate_tefa_cases", lambda *args: {})
 
     def open_child(selected_parent, selected_ref, label):
-        assert (selected_parent, selected_ref, label) == (parent, ref, "class size")
+        assert (selected_parent, selected_ref, label) == (parent, ref, "native")
         return child, store
 
     monkeypatch.setattr(verification, "_open_reviewed_native_evidence", open_child)
     monkeypatch.setattr(tprs_class_size_native, "retained_class_size_evidence", lambda *args: ["workbook-record"])
     captured = verification._input_identity(project, kind="app", paired_library=None, release=manifest.name)
-    assert captured["native_class_size_evidence"] == ["workbook-record"]
+    assert captured["native_evidence"][pin] == {"family": "class size", "records": ["workbook-record"]}
 
     def qualify(selected_child, selected_store):
         assert (selected_child, selected_store) == (child, store)
@@ -552,6 +552,8 @@ def test_composed_class_size_gate_requires_reviewed_pin_and_evidence(project, mo
     with pytest.raises(ReceiptError, match="Attached class size source did not pass qualification"):
         verification._validate_release(str(manifest), "app")
     ref.manifest_sha256 = "f" * 64
+    child.manifest_sha256 = ref.manifest_sha256
+    child.catalog = SimpleNamespace(to_dict=lambda: {"schema_version": 4, "editions": {}, "artifacts": {}})
     with pytest.raises(ReceiptError, match="requires reviewed source evidence"):
         verification._validate_release(str(manifest), "app")
 

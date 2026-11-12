@@ -9,6 +9,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from functools import partial
 from hashlib import sha256
 import json
 from math import isfinite
@@ -19,10 +20,11 @@ import subprocess
 import sys
 import tempfile
 import time
-from typing import TYPE_CHECKING, Any, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence
 import uuid
 
 if TYPE_CHECKING:
+    from teadata.provenance import ProvenanceStore
     from teadata.release import DataRelease
 
 
@@ -208,31 +210,20 @@ def _input_identity(root: Path, *, kind: str, paired_library: Path | None, relea
             identities[role] = {"filename": filename, "sha256": _digest(asset), "size_bytes": asset.stat().st_size}
         result["release_artifacts"] = identities
         if document.get("catalog", {}).get("native_sources"):
-            from teadata.first_ratings import REVIEWED_MANIFEST as FIRST_MANIFEST, retained_first_evidence
             from teadata.manifest import ContractError
-            from teadata.native_finance_staff import REVIEWED_MANIFEST as FINANCE_STAFF_MANIFEST, retained_finance_staff_evidence
             from teadata.release import DataRelease
-            from teadata.tprs_class_size_native import REVIEWED_CLASS_SIZE_MANIFEST, retained_class_size_evidence
-            from teadata.tprs_statewide_intake import REVIEWED_STATEWIDE_TPRS_MANIFESTS, retained_tprs_evidence
 
             try:
                 parent = DataRelease(path, expected_sha256=result["release_manifest_sha256"], offline=True)
                 sources = parent.verify_native_sources()
                 result["native_sources"] = {pin: {name: _digest(asset) for name, asset in files.items()}
                                             for pin, files in sources.items()}
+                evidence = {}
                 for ref in parent.catalog.native_sources:
-                    if ref.manifest_sha256 in REVIEWED_STATEWIDE_TPRS_MANIFESTS:
-                        child, store = _open_reviewed_native_evidence(parent, ref, "TPRS")
-                        result["native_tprs_evidence"] = retained_tprs_evidence(child, store)
-                    elif ref.manifest_sha256 == FINANCE_STAFF_MANIFEST:
-                        child, store = _open_reviewed_native_evidence(parent, ref, "finance and staff")
-                        result["native_finance_staff_evidence"] = retained_finance_staff_evidence(child, store)
-                    elif ref.manifest_sha256 == FIRST_MANIFEST:
-                        child, store = _open_reviewed_native_evidence(parent, ref, "FIRST")
-                        result["native_first_evidence"] = retained_first_evidence(child, store)
-                    elif ref.manifest_sha256 == REVIEWED_CLASS_SIZE_MANIFEST:
-                        child, store = _open_reviewed_native_evidence(parent, ref, "class size")
-                        result["native_class_size_evidence"] = retained_class_size_evidence(child, store)
+                    child, store = _open_reviewed_native_evidence(parent, ref, "native")
+                    review = _native_review(child, store)
+                    evidence[ref.manifest_sha256] = {"family": review.label, "records": review.evidence()}
+                result["native_evidence"] = evidence
             except (ContractError, OSError, ValueError) as error:
                 raise ReceiptError(f"A release check requires verified retained native sources: {error}") from error
     return result
@@ -830,11 +821,8 @@ def _validate_tefa_cases(release: DataRelease) -> dict[str, Any]:
 
 
 def _validate_release(path: str, kind: str) -> None:
-    from teadata.first_ratings import REVIEWED_MANIFEST as FIRST_MANIFEST, qualify_first_ratings
-    from teadata.native_finance_staff import REVIEWED_MANIFEST as FINANCE_STAFF_MANIFEST, qualify_finance_staff
+    from teadata.manifest import ContractError
     from teadata.release import DataRelease
-    from teadata.tprs_class_size_native import REVIEWED_CLASS_SIZE_MANIFEST, qualify_class_sizes
-    from teadata.tprs_statewide_intake import REVIEWED_STATEWIDE_TPRS_MANIFESTS, qualify_statewide_tprs
     release = DataRelease(Path(path).expanduser(), offline=True)
     if release.catalog.to_dict()["schema_version"] != 2:
         raise ReceiptError("Edition catalogs require --native-release with an exact pin and retained source store")
@@ -846,26 +834,16 @@ def _validate_release(path: str, kind: str) -> None:
         from teadata.manifest import processor_identity
         if release.catalog.to_dict()["processor_sha256"] != processor_identity():
             raise ReceiptError("Release was built from different processing code or lockfile; rebuild it")
-    reviewed = REVIEWED_STATEWIDE_TPRS_MANIFESTS | {FINANCE_STAFF_MANIFEST, FIRST_MANIFEST, REVIEWED_CLASS_SIZE_MANIFEST}
-    unsupported = [ref.manifest_sha256 for ref in release.catalog.native_sources if ref.manifest_sha256 not in reviewed]
-    if unsupported:
-        pins = ", ".join(unsupported)
-        raise ReceiptError(f"Attached native sources passed structural verification only. "
-                           f"Release qualification requires reviewed source evidence for {pins}")
     for ref in release.catalog.native_sources:
-        if ref.manifest_sha256 == FINANCE_STAFF_MANIFEST:
-            label, qualify = "finance and staff", qualify_finance_staff
-        elif ref.manifest_sha256 == FIRST_MANIFEST:
-            label, qualify = "FIRST", qualify_first_ratings
-        elif ref.manifest_sha256 == REVIEWED_CLASS_SIZE_MANIFEST:
-            label, qualify = "class size", qualify_class_sizes
-        else:
-            label, qualify = "TPRS", qualify_statewide_tprs
-        child, store = _open_reviewed_native_evidence(release, ref, label)
-        report = qualify(child, store)
+        try:
+            child, store = _open_reviewed_native_evidence(release, ref, "native")
+            review = _native_review(child, store)
+            report = review.qualify()
+        except (ContractError, ReceiptError) as error:
+            raise ReceiptError(f"Attached native source {ref.manifest_sha256} requires reviewed source evidence: {error}") from error
         if report["status"] != "PASS_REVIEWED_NATIVE":
-            raise ReceiptError(f"Attached {label} source did not pass qualification")
-        print(f"Attached {label} qualification: " + json.dumps(report, sort_keys=True))
+            raise ReceiptError(f"Attached {review.label} source did not pass qualification")
+        print(f"Attached {review.label} qualification: " + json.dumps(report, sort_keys=True))
     print(f"Verified data release {release.build_id}")
     print(f"Verified provenance record graph: {provenance_records} records")
     print("Publisher example coverage: " + json.dumps(publisher_checks, sort_keys=True))
@@ -889,11 +867,28 @@ def _open_reviewed_native_evidence(release, ref, label: str):
     return child, _retained_store(child.path.parent / "provenance")
 
 
-def _validate_native_release(path: Path, pin: str, source_store: Path) -> dict[str, Any]:
+@dataclass(frozen=True)
+class _NativeReview:
+    label: str
+    qualify: Callable[[], dict[str, Any]]
+    evidence: Callable[[], list[str] | dict[str, list[str]]]
+
+
+def _native_record_evidence(release: DataRelease, processing_store: ProvenanceStore,
+                            publisher_store: ProvenanceStore, publisher_roots: Sequence[str]) -> dict[str, list[str]]:
+    """Rehash retained bytes without running parity or semantic qualification."""
+    roots = [release.catalog.artifact_ref(identifier).processing_id
+             for identifier in release.catalog.to_dict()["artifacts"]]
+    return {"processing": sorted(processing_store.verify_record_closure(roots)),
+            "publisher": sorted(publisher_store.verify_record_closure(publisher_roots))}
+
+
+def _native_review(release: DataRelease, store: ProvenanceStore) -> _NativeReview:
+    """Select one reviewed plan for standalone, parent and receipt-reuse gates."""
     from teadata.dataset_metadata import EditionKey
-    from teadata.first_ratings import REVIEWED_MANIFEST as FIRST_MANIFEST, qualify_first_ratings
-    from teadata.manifest import ContractError, canonical_json
-    from teadata.native_finance_staff import REVIEWED_MANIFEST as FINANCE_STAFF_MANIFEST, qualify_finance_staff
+    from teadata.first_ratings import REVIEWED_MANIFEST as FIRST_MANIFEST, qualify_first_ratings, retained_first_evidence
+    from teadata.manifest import canonical_json
+    from teadata.native_finance_staff import REVIEWED_MANIFEST as FINANCE_STAFF_MANIFEST, qualify_finance_staff, retained_finance_staff_evidence
     from teadata.native_financial_accounts import is_reviewed_budget, qualify_budget
     from teadata.native_staff_spp import qualify_staff_spp, reviewed_staff_spp
     from teadata.native_witnesses import (
@@ -903,68 +898,94 @@ def _validate_native_release(path: Path, pin: str, source_store: Path) -> dict[s
         reviewed_primary_disability_references,
         validate_native_witnesses,
     )
-    from teadata.release import DataRelease
     from teadata.source_parity import validate_source_parity
-    from teadata.tprs_class_size_native import REVIEWED_CLASS_SIZE_MANIFEST, qualify_class_sizes
-    from teadata.tprs_statewide_intake import REVIEWED_STATEWIDE_TPRS_MANIFESTS, qualify_statewide_tprs
+    from teadata.tprs_class_size_native import REVIEWED_CLASS_SIZE_MANIFEST, qualify_class_sizes, retained_class_size_evidence
+    from teadata.tprs_statewide_intake import REVIEWED_STATEWIDE_TPRS_MANIFESTS, qualify_statewide_tprs, retained_tprs_evidence
 
-    try:
-        release = DataRelease(path, expected_sha256=pin, offline=True)
-        if release.manifest_sha256 == FIRST_MANIFEST:
-            return qualify_first_ratings(release, _retained_store(source_store))
-        if release.manifest_sha256 == FINANCE_STAFF_MANIFEST:
-            return qualify_finance_staff(release, _retained_store(source_store))
-        if release.manifest_sha256 in REVIEWED_STATEWIDE_TPRS_MANIFESTS:
-            return qualify_statewide_tprs(release, _retained_store(source_store))
-        if release.manifest_sha256 == REVIEWED_CLASS_SIZE_MANIFEST:
-            return qualify_class_sizes(release, _retained_store(source_store))
-        if is_reviewed_budget(release.manifest_sha256):
-            return qualify_budget(release, _retained_store(release.path.parent / "provenance"),
-                                  _retained_store(source_store))
-        staffing_or_evaluation = reviewed_staff_spp(release.manifest_sha256)
-        if staffing_or_evaluation is not None:
-            return qualify_staff_spp(release, _retained_store(release.path.parent / "provenance"),
-                                     _retained_store(source_store), staffing_or_evaluation)
-        primary_disability = reviewed_primary_disability_references(release.manifest_sha256)
-        historical_peims = reviewed_historical_peims_references(release.manifest_sha256)
-        inline_references = primary_disability if historical_peims is None else historical_peims
-        references = reviewed_native_references() if inline_references is None else inline_references
-        inline_catalog = inline_references is not None
-        composed_disability = {} if inline_catalog else reviewed_composed_disability_references(release.manifest_sha256)
-        if references.keys() & composed_disability.keys():
-            raise ReceiptError("Reviewed native profile constituents have overlapping editions")
-        references = references | composed_disability
-        index = release.catalog.to_dict()
-        if index["schema_version"] != (3 if inline_catalog else 4) or index["editions"].keys() != references.keys():
-            raise ReceiptError("Native release does not contain exactly the reviewed editions and leaves")
-        routes = ({identifier: EditionKey.from_dict(value["edition"]).identity
-                   for identifier, value in index["artifacts"].items()} if inline_catalog else index["artifacts"])
-        if routes != {entry["artifact"]: edition for edition, entry in references.items()}:
-            raise ReceiptError("Native release does not contain exactly the reviewed editions and leaves")
-        for edition, entry in references.items():
-            artifact = release.catalog.artifact_ref(entry["artifact"])
-            metadata = index["editions"][edition]["metadata"]
-            if edition in composed_disability:
-                # Externalization changes the descriptor identity while preserving the reviewed metadata.
-                key = artifact.edition
-                metadata = release.catalog.metadata(key.dataset, edition=key).to_dict()
-            metadata_sha256 = (sha256(canonical_json(metadata).encode()).hexdigest()
-                               if inline_catalog or edition in composed_disability else metadata["sha256"])
-            if (artifact.sha256 != entry["sha256"] or artifact.processing_id != entry["processing_id"]
-                    or metadata_sha256 != entry["metadata_sha256"]):
-                raise ReceiptError("Native leaf, metadata or processing receipt differs from the reviewed identity")
+    for pins, label, qualify, evidence in (
+        ({FIRST_MANIFEST}, "FIRST", qualify_first_ratings, retained_first_evidence),
+        ({FINANCE_STAFF_MANIFEST}, "finance and staff", qualify_finance_staff, retained_finance_staff_evidence),
+        (REVIEWED_STATEWIDE_TPRS_MANIFESTS, "TPRS", qualify_statewide_tprs, retained_tprs_evidence),
+        ({REVIEWED_CLASS_SIZE_MANIFEST}, "class size", qualify_class_sizes, retained_class_size_evidence),
+    ):
+        if release.manifest_sha256 in pins:
+            return _NativeReview(label, partial(qualify, release, store), partial(evidence, release, store))
+    if is_reviewed_budget(release.manifest_sha256):
+        processing_store = _retained_store(release.path.parent / "provenance")
+
+        def budget_evidence() -> dict[str, list[str]]:
+            roots = []
+            for identifier in release.catalog.to_dict()["artifacts"]:
+                key = release.catalog.artifact_ref(identifier).edition
+                metadata = release.catalog.metadata(key.dataset, edition=key)
+                roots.extend(receipt for reference in metadata.references if reference.reference_id == "budget_pwr"
+                             for receipt in reference.provenance_ids)
+            return _native_record_evidence(release, processing_store, store, roots)
+
+        return _NativeReview("financial budget", partial(qualify_budget, release, processing_store, store), budget_evidence)
+    staffing_or_evaluation = reviewed_staff_spp(release.manifest_sha256)
+    if staffing_or_evaluation is not None:
+        processing_store = _retained_store(release.path.parent / "provenance")
+        roots = [witness["receipt"] for cases in staffing_or_evaluation[2].values() for witness in cases]
+        return _NativeReview(staffing_or_evaluation[0],
+            partial(qualify_staff_spp, release, processing_store, store, staffing_or_evaluation),
+            partial(_native_record_evidence, release, processing_store, store, roots))
+    primary_disability = reviewed_primary_disability_references(release.manifest_sha256)
+    historical_peims = reviewed_historical_peims_references(release.manifest_sha256)
+    inline_references = primary_disability if historical_peims is None else historical_peims
+    references = reviewed_native_references() if inline_references is None else inline_references
+    inline_catalog = inline_references is not None
+    composed_disability = {} if inline_catalog else reviewed_composed_disability_references(release.manifest_sha256)
+    if references.keys() & composed_disability.keys():
+        raise ReceiptError("Reviewed native profile constituents have overlapping editions")
+    references = references | composed_disability
+    index = release.catalog.to_dict()
+    if index["schema_version"] != (3 if inline_catalog else 4) or index["editions"].keys() != references.keys():
+        raise ReceiptError("Native release does not contain exactly the reviewed editions and leaves")
+    routes = ({identifier: EditionKey.from_dict(value["edition"]).identity
+               for identifier, value in index["artifacts"].items()} if inline_catalog else index["artifacts"])
+    if routes != {entry["artifact"]: edition for edition, entry in references.items()}:
+        raise ReceiptError("Native release does not contain exactly the reviewed editions and leaves")
+    for edition, entry in references.items():
+        artifact = release.catalog.artifact_ref(entry["artifact"])
+        metadata = index["editions"][edition]["metadata"]
+        if edition in composed_disability:
+            # Externalization changes the descriptor identity while preserving the reviewed metadata.
+            key = artifact.edition
+            metadata = release.catalog.metadata(key.dataset, edition=key).to_dict()
+        metadata_sha256 = (sha256(canonical_json(metadata).encode()).hexdigest()
+                           if inline_catalog or edition in composed_disability else metadata["sha256"])
+        if (artifact.sha256 != entry["sha256"] or artifact.processing_id != entry["processing_id"]
+                or metadata_sha256 != entry["metadata_sha256"]):
+            raise ReceiptError("Native leaf, metadata or processing receipt differs from the reviewed identity")
+    parity_store = _retained_store(release.path.parent / "provenance") if inline_catalog else store
+
+    def qualify_witnesses() -> dict[str, Any]:
         release.verify()
-        store = _retained_store(source_store)
-        parity_store = _retained_store(release.path.parent / "provenance") if inline_catalog else store
         parity = validate_source_parity(release, parity_store, edition_ids=sorted(references))
         if parity["status"] != "PASS_RAW_PARITY":
             return {"status": "HOLD", "build_id": release.build_id, "manifest_sha256": release.manifest_sha256,
                     "structural_integrity": True, "parity": parity, "publisher_witnesses": None}
         witnesses = validate_native_witnesses(release, store, references)
+        return {"status": "PASS_REVIEWED_NATIVE", "build_id": release.build_id, "manifest_sha256": release.manifest_sha256,
+                "structural_integrity": True, "parity": parity, "publisher_witnesses": witnesses}
+
+    def witness_evidence() -> dict[str, list[str]]:
+        roots = [witness["receipt"] for case in references.values() for witness in case["reports"]]
+        return _native_record_evidence(release, parity_store, store, roots)
+
+    return _NativeReview("PEIMS and transfers", qualify_witnesses, witness_evidence)
+
+
+def _validate_native_release(path: Path, pin: str, source_store: Path) -> dict[str, Any]:
+    from teadata.manifest import ContractError
+    from teadata.release import DataRelease
+
+    try:
+        release = DataRelease(path, expected_sha256=pin, offline=True)
+        return _native_review(release, _retained_store(source_store)).qualify()
     except ContractError as error:
         raise ReceiptError(str(error)) from error
-    return {"status": "PASS_REVIEWED_NATIVE", "build_id": release.build_id, "manifest_sha256": release.manifest_sha256,
-            "structural_integrity": True, "parity": parity, "publisher_witnesses": witnesses}
 
 
 def _validate_actual_pwr_controls(path: Path, pin: str, source_store: Path) -> dict[str, Any]:

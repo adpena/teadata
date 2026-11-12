@@ -82,12 +82,15 @@ of entity properties, query operators or export special cases per dataset.
 Multi-row sources retain their dimensions and explicit selection; automatic
 integration must not silently aggregate or overwrite scalar attributes.
 
-Two implementation gaps need closing: normal builds deliberately exclude
-`source_only` inputs unless separately attached, and the parent-release verifier
-currently dispatches only four named native source groups while the standalone
-qualifier supports more reviewed families. Consolidate that qualification
-dispatch and finish release composition; preserve publisher evidence and the
-approval boundary. Do not turn an unreviewed registration into an automatic
+At the audited code revision, normal builds deliberately excluded `source_only`
+inputs unless separately attached, and the parent-release verifier dispatched
+only four native groups while standalone qualification supported more reviewed
+families. The subsequent verifier consolidation makes both paths select the
+same reviewed source plan and binds receipt evidence separately to each child
+manifest. It adds no attachments, published data years or entity fields, so the
+inventory counts above remain unchanged. Normal release composition and a shared
+lazy entity resolver still need finishing. Preserve publisher evidence and the
+approval boundary; an unreviewed registration must not become an automatic
 publication merely to clear this inventory.
 
 Standalone/programmatic producers outside the default YAML, such as additional

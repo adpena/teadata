@@ -730,6 +730,21 @@ acquired TEA comparisons. Missing evidence or mismatches prevent qualification.
 The result records each check separately. Publication and profile activation
 remain separate operations.
 
+Standalone qualification and the normal entity release gate select the same
+reviewed source plan. An attached staffing, evaluation, budget or PEIMS/transfer
+candidate therefore receives its existing exact source checks rather than a
+separate parent allowlist. This does not attach a candidate or make its fields
+available in a previously published release. Actual PWR and course control-only
+checks remain separate; passing those checks is not full native qualification.
+
+For a composed release, retain each child locally with an adjacent `provenance`
+store containing its complete processing evidence and independent publisher
+reports. The gate does not search other directories or fetch missing evidence.
+Check receipts record evidence separately under each child manifest pin, including
+multiple children of the same family. Capturing or reusing a receipt rehashes the
+required retained records and bytes; it does not rerun semantic replay. Missing
+or changed raw data, processing outputs or publisher witnesses invalidate reuse.
+
 ## File organization and names
 
 TEA Data uses the following project conventions. They apply the consistency,
