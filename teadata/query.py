@@ -601,7 +601,9 @@ class Query:
             raise ContractError("The query's entity build has no attached native sources")
         if any(catalog._entity_build_id(item) != catalog.build_id for item in self._items):
             raise ContractError("Observation queries require entities bound to the snapshot")
-        parent = release if release is not None else current_release()
+        parent = release if release is not None else getattr(self._repo, "_source_release", None)
+        if parent is None:
+            parent = current_release()
         if parent.build_id != catalog.build_id:
             raise ContractError("Observation queries require the release for their entity build")
         return parent._entity_observations(dataset, fields, school_year=year, scope=scope, edition=edition,

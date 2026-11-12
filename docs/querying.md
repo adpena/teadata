@@ -240,6 +240,68 @@ comparable. Inspect both source definitions before calculating change.
 
 ## Select an entity's published source fields
 
+Public districts and campuses in a release-bound engine expose qualified
+Student Information and class-size fields through `.tprs`:
+
+```python
+from teadata import DataEngine
+
+engine = DataEngine.from_snapshot()
+district = (engine >> ("district", 227901)).first()
+campus = (engine >> ("campus", "227901001")).first()
+count = district.tprs.membership_total_students_count
+names = campus.tprs.variables(r"^membership_total_students_")
+years = district.tprs.years("membership_total_students_count")
+selected = district.tprs.select("membership_total_students_count", school_year="2025-26")
+frame = selected.to_df()
+provenance = selected.provenance()
+```
+
+The namespace itself opens no native files. `variables()` and `dir()` enumerate
+canonical names from metadata indexes, without loading observation values.
+They list the fields admitted for that scope, not a guarantee that the entity
+has a row for every year. `years(name)` lists measurement years; report editions
+remain separate. Names match exactly first, then case insensitively, and
+unknown names suggest alternatives. Ambiguous names and mixed source families
+raise errors instead of choosing one. Use `tprs["field"]` when a name conflicts
+with a method.
+
+The default is the latest eligible measurement year in this pinned release.
+Use `district.tprs.at(25)` for 2024–25 or `.at(None)` to return to latest.
+`select()` plans a lazy, single-family projection; its measurement period is
+visible before reading values. An explicit unavailable year raises an error
+with available years. Multiple selected fields must share the same latest
+year, or require an explicit common year. Missing or suppressed values never
+cause a fallback to older observations. Scalar access returns the normalized
+value, including zero or null; `select()` keeps the raw tokens, available
+status columns, source identities and export provenance.
+
+Both access paths use the existing observation resolver. Campus Student
+Information routes through its admitted report index. Campus class size uses
+that same Student index and the exact class-size partition identity, so its
+parent release must include the corresponding Student attachment. The
+namespace includes only qualified `tprs_student_membership_enrollment_reports`
+and `tprs_class_size` sources attached for that scope; it does not expose every
+TPRS domain just because another domain is configured or being acquired.
+
+Default snapshot loading pins native access to the selected release. Changing
+the global release afterward does not change `.tprs` or the default native
+observation queries on that engine. For an explicit trusted snapshot path,
+call `engine.bind_release(release)` with its matching parent entity release.
+An engine cannot be rebound to a different manifest. Rebinding an equivalent
+manifest retains the first offline/cache context. This runtime reference is
+excluded from pickle: explicit deserialization, including copying through
+pickle, requires binding again. No native values are added to `meta`, and
+existing metadata keys and flat dot access remain available. A literal
+`meta["tprs"]` collision is reported and remains accessible explicitly.
+
+Unregistered, private school, or SQL-only entities cannot infer a parent
+release from their ID. Use the explicit release interface below for a
+standalone or SQL public entity. Metadata discovery on `.tprs` reads selected
+edition indexes on each operation; it does not reuse the app's separate
+workspace variable cache or promise that warm observation planning removes
+discovery cost.
+
 A native release or an entity release with attached native sources can expose
 fields in dataset namespaces. Start with a public district or campus and the
 publisher edition. The edition can describe a fiscal period.

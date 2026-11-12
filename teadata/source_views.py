@@ -427,6 +427,136 @@ class EntitySources:
             raise AttributeError(*error.args) from error
 
 
+_TPRS_DATASETS = frozenset({"tprs_student_membership_enrollment_reports", "tprs_class_size"})
+
+
+@dataclass(frozen=True, slots=True)
+class TPRSFields:
+    """An entity's lazy TPRS view over the release's qualified native sources."""
+
+    release: DataRelease
+    scope: str
+    identifier: str
+    school_year: int | None = None
+
+    def _indexes(self) -> dict[str, set[str]]:
+        keys = (key for source in self.release.catalog.native_sources for key in source.editions)
+        if self.release._v3:
+            keys = (EditionKey.from_dict({name: row[name] for name in EditionKey.__dataclass_fields__})
+                    for row in self.release.catalog.editions(scope=self.scope, include_metadata=False))
+        children: dict[EditionKey, DataRelease] = {}
+        names: dict[str, set[str]] = {}
+        for key in keys:
+            if key.scope != self.scope or key.dataset not in _TPRS_DATASETS:
+                continue
+            child = children.get(key)
+            if child is None:
+                child = self.release._native_edition_release(key)
+                for row in child.catalog.editions(include_metadata=False):
+                    sibling = EditionKey.from_dict({name: row[name] for name in EditionKey.__dataclass_fields__})
+                    children[sibling] = child
+            names.setdefault(key.dataset, set()).update(child.catalog._edition_field_names(key))
+        return names
+
+    def variables(self, pattern: str | re.Pattern[str] | None = None) -> tuple[str, ...]:
+        """List canonical names from metadata indexes, without opening data leaves."""
+        match = re.compile(pattern) if pattern is not None else None
+        return tuple(sorted({name for names in self._indexes().values() for name in names
+                             if match is None or match.search(name)}))
+
+    def _resolve(self, fields: tuple[str, ...]) -> tuple[str, tuple[str, ...]]:
+        from .dataset_metadata import _validate_observation_selection
+        from .selectors import _folded_field_names
+
+        _validate_observation_selection("tprs", fields, self.scope, None)
+        indexes = self._indexes()
+        if not indexes:
+            raise ContractError(
+                f"No qualified TPRS native families are attached for {self.scope}. "
+                "Inspect release.catalog.native_sources; configured sources are not automatically admitted."
+            )
+        names = {name for values in indexes.values() for name in values}
+        resolved = []
+        for name, matches in _folded_field_names(fields, names).items():
+            if name in matches:
+                resolved.append(name)
+            elif len(matches) == 1:
+                resolved.append(matches[0])
+            elif matches:
+                raise ContractError(f"Ambiguous TPRS field {name!r}. Use exact spelling: {matches}.")
+            else:
+                raise _unknown_source_name(name, names, "TPRS field", "tprs.variables()")
+        if len(set(resolved)) != len(resolved):
+            raise ValueError("TPRS fields must resolve to distinct canonical names")
+        owners = {name: [dataset for dataset, values in indexes.items() if name in values] for name in resolved}
+        ambiguous = {name: datasets for name, datasets in owners.items() if len(datasets) > 1}
+        if ambiguous:
+            raise ContractError(
+                f"TPRS fields require one unambiguous native family; conflicting names: {ambiguous}. "
+                "Use release.for_entity(..., edition=...).dataset(exact_key) to choose a source explicitly."
+            )
+        choices = [dataset for dataset, values in indexes.items() if all(name in values for name in resolved)]
+        if len(choices) != 1:
+            raise ContractError(
+                f"TPRS fields require one unambiguous native family; matching families: {choices}. "
+                "Select fields from one family, or use release.for_entity(..., edition=...).dataset(exact_key)."
+            )
+        return choices[0], tuple(resolved)
+
+    def at(self, school_year: int | str | None) -> TPRSFields:
+        """Select a measurement school year; None selects the latest eligible year."""
+        from .dataset_metadata import _parse_school_year
+
+        return replace(self, school_year=_parse_school_year(school_year))
+
+    def years(self, field: str) -> tuple[int, ...]:
+        """List admitted measurement years for a field, separately from row presence."""
+        dataset, (name,) = self._resolve((field,))
+        return self.release.observation_years(dataset, name, scope=self.scope)[name]
+
+    def select(self, *fields: str, school_year: int | str | None = None) -> SourceTable:
+        """Plan an entity projection with its original raw/status/provenance support."""
+        from .dataset_metadata import _parse_school_year
+
+        year = self.school_year if school_year is None else _parse_school_year(school_year)
+        dataset, names = self._resolve(fields)
+        table = self.release._entity_observations(dataset, names, school_year=year, scope=self.scope,
+                                                   edition=None, identifiers=(self.identifier,))
+        if not isinstance(table, SourceTable):
+            raise ContractError("One entity cannot resolve to multiple TPRS partitions")
+        return table
+
+    def provenance(self, *fields: str) -> ExportProvenance:
+        """Describe the pinned selection without opening its data leaf."""
+        return self.select(*fields).provenance()
+
+    def __getitem__(self, name: str):
+        view = self.select(name)
+        assert view._fields is not None
+        metadata = view.release.catalog.field_metadata(view._fields[0], scope=self.scope, edition=view.edition)
+        if metadata is None:
+            raise ContractError(f"TPRS field {name!r} is missing its catalog binding")
+        table = view.to_arrow()
+        if table.num_rows != 1:
+            kind = "No" if table.num_rows == 0 else "Multiple"
+            raise ContractError(
+                f"{kind} published rows for {self.scope} {self.identifier} in {view.edition.dataset}, "
+                f"measurement period {view.measurement_period}. Check the publisher roster."
+            )
+        return table[metadata["column"]][0].as_py()
+
+    def __getattr__(self, name: str):
+        if name.startswith("_"):
+            raise AttributeError(name)
+        try:
+            return self[name]
+        except _UnknownSourceName as error:
+            raise AttributeError(*error.args) from error
+
+    def __dir__(self) -> list[str]:
+        return sorted(set(object.__dir__(self)) | set(self.variables()))
+
+
 @dataclass(frozen=True, slots=True)
 class _TableExport:
     scanner: Scanner | _PartitionScan

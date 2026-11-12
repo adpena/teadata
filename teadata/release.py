@@ -938,6 +938,14 @@ class DataRelease:
         selected_options = (self._observation_year_options(dataset, fields, scope, edition, True) if memoize else
                             self._observation_year_options(dataset, fields, scope, edition))
         options = list(selected_options)
+        if dataset == "tprs_class_size" and scope == "campus" and edition is None and identifiers:
+            year, matches = self._observation_matches(fields, scope, school_year, options)
+            child, first = matches[0]
+            if all((source.manifest_sha256, key.edition) == (child.manifest_sha256, first.edition)
+                   for source, key in matches):
+                index = self.tprs_student_campus_index(edition=first.edition)
+                return self._routed_student_campuses(fields, year, child, frozenset(key for _, key in matches),
+                                                     index, identifiers, class_size=True)
         if route_campuses:
             year, matches = self._observation_matches(fields, scope, school_year, options)
             child, first = matches[0]
@@ -971,7 +979,7 @@ class DataRelease:
 
     def _routed_student_campuses(
         self, fields: tuple[str, ...], year: int, child: DataRelease, matching_keys: frozenset[EditionKey],
-        index: TPRSStudentCampusIndex, identifiers: tuple[str, ...],
+        index: TPRSStudentCampusIndex, identifiers: tuple[str, ...], *, class_size: bool = False,
     ) -> SourceTable | PartitionedSourceTable:
         from .source_views import PartitionedSourceTable
 
@@ -981,13 +989,19 @@ class DataRelease:
             key = index.edition_for(identifier)
             if key is None:
                 missing.append(identifier)
-            elif key not in matching_keys:
-                unavailable.append(identifier)
             else:
-                groups.setdefault(key, []).append(identifier)
+                if class_size:
+                    from .tprs_class_size_native import class_size_campus_edition
+
+                    key = class_size_campus_edition(key)
+                if key not in matching_keys:
+                    unavailable.append(identifier)
+                else:
+                    groups.setdefault(key, []).append(identifier)
         if missing or unavailable:
+            topic = "Class Size" if class_size else "Student Information"
             raise ContractError(
-                f"Campus Student Information is incomplete for school year {year} "
+                f"Campus {topic} is incomplete for school year {year} "
                 f"in report edition {index.edition}. "
                 f"No report for {len(missing)} campus IDs: {missing[:5]}. "
                 f"Selected fields unavailable for {len(unavailable)} campus IDs: {unavailable[:5]}."

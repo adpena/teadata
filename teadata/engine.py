@@ -57,6 +57,7 @@ from .selectors import _live_name
 if TYPE_CHECKING:
     from .observations import _ObservationModel
     from .release import DataRelease
+    from .source_views import TPRSFields
 
 _NUMBER_SELECTOR = re.compile(r"'?\s*[0-9]+(?:\.0+)?")
 _DISTRICT_SELECTOR = re.compile(r"['’`]?\s*[0-9]+(?:\.0+|-[0-9]{3})?")
@@ -380,6 +381,43 @@ def _campus_point(campus: Campus) -> tuple[float, float] | None:
 class DataEngine:
     catalog: DatasetCatalog
 
+    def bind_release(self, release: DataRelease) -> DataEngine:
+        """Pin native source access to this engine's exact parent release context."""
+        from .release import DataRelease
+
+        if not isinstance(release, DataRelease):
+            raise TypeError("release must be a DataRelease opened from a parent entity manifest")
+        if release._v3:
+            raise ContractError("Bind the parent entity release, not a standalone native source release")
+        catalog = getattr(self, "catalog", None)
+        if not isinstance(catalog, DatasetCatalog) or catalog.build_id != release.build_id:
+            raise ContractError("Source binding requires the release for this engine's entity build")
+        previous = getattr(self, "_source_release", None)
+        if previous is not None:
+            if previous.manifest_sha256 != release.manifest_sha256:
+                raise ContractError("This engine is pinned to a different release manifest. Load another engine for that release.")
+            return self  # Retain the original offline/cache context even for an equivalent manifest.
+        self._source_release = release
+        return self
+
+    def _entity_tprs(self, entity: District | Campus) -> TPRSFields:
+        from .source_views import TPRSFields
+
+        if isinstance(entity, District):
+            scope, identifier = "district", entity.district_number_canon
+            registered = self._districts.get(entity.id) is entity and self._districts_by_number_norm.get(identifier) == entity.id
+        elif isinstance(entity, Campus) and not entity.is_private:
+            scope, identifier = "campus", entity.lookup_key
+            registered = self._campuses.get(entity.id) is entity and self._campus_by_key.get(identifier) == entity.id
+        else:
+            raise ContractError("TPRS native sources require a public district or campus, not a private school")
+        release = getattr(self, "_source_release", None)
+        if release is None:
+            raise ContractError("This engine has no pinned source release. Call engine.bind_release(release) with its matching parent release.")
+        if not registered or not identifier or self.catalog._entity_build_id(entity) != release.build_id:
+            raise ContractError("TPRS access requires the exact registered entity and its matching data build")
+        return TPRSFields(release, scope, identifier)
+
     def _observation_model(self, sources: Iterable[DataRelease]) -> _ObservationModel:
         from .observations import _ObservationModel
 
@@ -439,6 +477,7 @@ class DataEngine:
             obj.warm_indexes()
         if release:
             obj.attach_boundary_store(release.artifact("boundaries"))
+            obj.bind_release(release)
         return obj
 
     @classmethod
@@ -917,6 +956,7 @@ class DataEngine:
     def __getstate__(self) -> dict[str, Any]:
         state = self.__dict__.copy()
         state.pop("_campus_spatial_caches", None)
+        state.pop("_source_release", None)
         state["_district_cover_index"] = None
         return state
 

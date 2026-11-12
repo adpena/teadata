@@ -245,7 +245,7 @@ def test_campus_class_size_keys_preserve_distinct_student_partitions(tmp_path):
     assert not output.exists()
 
 
-def test_native_class_size_build_keeps_campus_partitions_opt_in(grid, tmp_path, monkeypatch):
+def test_native_class_size_build_keeps_campus_partitions_opt_in(grid, tmp_path, monkeypatch, request):
     from teadata.tprs_class_size import _COLUMNS, _FIELDS, _TITLE
 
     store = ProvenanceStore(tmp_path / "provenance")
@@ -296,6 +296,35 @@ def test_native_class_size_build_keeps_campus_partitions_opt_in(grid, tmp_path, 
         with pytest.raises(ContractError, match="unavailable"):
             candidate.observations("tprs_class_size", field, school_year=2026, scope="campus",
                                    edition=replace(key, revision_sha256="f" * 64))
+
+    # Actual class-size leaves, with a deliberately explicit Student route double.
+    # Real ledger-backed Student routes are exercised by the campus cohort test.
+    candidate = DataRelease(candidate.path.rename(candidate.path.with_name("class-size-native.json")), offline=True)
+    parent = attach_observation_child(request.getfixturevalue("selected_catalog"), candidate)
+    index = tprs_statewide_intake.TPRSStudentCampusIndex(digest, "2026", {
+        leaf.reports[0].identifier: leaf.artifact.edition for leaf in leaves[-2:]
+    })
+    engine = DataEngine()
+    engine.catalog = parent.catalog
+    engine.bind_release(parent)
+    with monkeypatch.context() as routing:
+        routing.setattr(DataRelease, "tprs_student_campus_index", lambda self, *, edition: index)
+        for number, (leaf, value) in enumerate(zip(leaves[-2:], (20.7, None), strict=True), 1):
+            identifier = leaf.reports[0].identifier
+            entity = Campus(UUID(int=number), None, identifier, "", False, campus_number=identifier)
+            engine.add_campus(entity)
+            with monkeypatch.context() as metadata:
+                metadata.setattr(DataRelease, "artifact", lambda *a, **k: pytest.fail("Class-size planning opened a leaf"))
+                view = entity.tprs.select(field)
+                assert view.edition == class_size_campus_edition(leaf.artifact.edition)
+                assert entity.tprs.provenance(field).to_dict() == view.provenance().to_dict()
+            assert entity.tprs.class_size_kindergarten_avg_size == value
+            row, = view.to_arrow().to_pylist()
+            assert row["class_size_table_present"] is (value is not None)
+        absent = Campus(UUID(int=99), None, "No report", "", False, campus_number="999999999")
+        engine.add_campus(absent)
+        with pytest.raises(ContractError, match="Class Size.*incomplete.*2026"):
+            absent.tprs.select(field)
 
     native = tprs_class_size_native
     archive = ProvenanceStore(candidate.path.parent / "provenance")
@@ -1336,6 +1365,13 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(
             absent = Campus(UUID(int=99), None, "Absent report", "", False, campus_number="999999999")
             with pytest.raises(ContractError, match="No admitted .* report for campus 999999999 .*2026"):
                 fresh.for_entity(absent, edition="2026")[students.DATASET]
+        engine.bind_release(DataRelease(parent.path, offline=True))
+        for identifier, expected in ((first_id, previous_key), (last_id, key)):
+            entity = engine.campus_by_number(identifier)
+            with monkeypatch.context() as discovery:
+                discovery.setattr(DataRelease, "artifact", lambda *a, **k: pytest.fail("Entity planning opened a leaf"))
+                assert entity.tprs.select("membership_total_students_count").edition == expected
+            assert entity.tprs.membership_total_students_count == 1
     audit, = output.glob("tprs-raw_audit-*.jsonl.gz")
     audit.write_bytes(b"tampered")
     with pytest.raises(ContractError):

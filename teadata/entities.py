@@ -30,6 +30,7 @@ from .identifiers import EntityIdentityError, campus_lookup_key, canonical_sourc
 
 if TYPE_CHECKING:
     from .manifest import _SQLMetadataOrigin
+    from .source_views import TPRSFields
 
 __all__ = [
     "District",
@@ -103,6 +104,24 @@ class _SQLMetadataOwner:
     # An unset slot keeps ordinary release entities' pickle and dataclass state.
     __slots__ = ("_sql_metadata_origin",)
     _sql_metadata_origin: _SQLMetadataOrigin
+
+    @property
+    def tprs(self) -> TPRSFields:
+        """Access qualified TPRS fields through the owning engine's pinned release."""
+        from .engine import DataEngine
+        from .manifest import ContractError
+
+        meta = object.__getattribute__(self, "meta")
+        if isinstance(meta, Mapping) and "tprs" in meta:
+            raise ContractError("Metadata key 'tprs' conflicts with the source namespace. Access it with entity.meta['tprs'].")
+        repo = object.__getattribute__(self, "_repo")
+        if not isinstance(self, (District, Campus)) or not isinstance(repo, DataEngine):
+            raise ContractError(
+                "Direct .tprs access requires an entity registered in a release-bound DataEngine. "
+                "Use DataEngine.from_snapshot() or engine.bind_release(release); "
+                "for standalone or SQL entities, use release.for_entity(entity, edition=...)."
+            )
+        return repo._entity_tprs(self)
 
 
 @validate_non_empty_str("name")
