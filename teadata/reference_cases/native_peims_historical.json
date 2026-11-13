@@ -217,5 +217,270 @@
       "sha256": "b5c97b41cd1e24178da67558fca47e23e3531a49a5c63b8621a61e8803065d54"
     }
   },
+  "enrollment_only": {
+    "editions": {
+      "38a41921b5ccfb2f6c445b32a70dd271d2d53349c4c3d9b0f91469a9f830668f": {
+        "artifact": "6fc9e5c42d179e69251a6130fc99005871b8063e6e92f6e749644dca0802f0c1",
+        "metadata_sha256": "b81a0c016605ebe0bce227b81b3842becdca27fccc0e43ddb9118d98af1abeca",
+        "processing_id": "29e1d1dd92f65b42fea04945c347f615982c2767f93caae00b6811b2383892f2",
+        "reports": [
+          {
+            "entity": "057829001",
+            "kind": "enrollment_only_html",
+            "receipt": "a70f959ed3ba5d6a839b52739e148e8c87019111186dc4082167e7d5fd934dbd"
+          }
+        ],
+        "sha256": "ca23200c76faee6697254a977c0d9820aec965b9e98be1efe3bf70ef7d7ce9eb"
+      },
+      "3a49f394cdec2a5d015aab1b3b0f24bd13c46595a5ab22d05117e4b0b7af29c0": {
+        "artifact": "dad1480b83a51d00e8d30aa75986a353555e177cb282181afd9bd11422f6867d",
+        "metadata_sha256": "bff4db25bc5eefde4ba8a67a658533b3c65ad02f2c184c58c8284ae481d9f73f",
+        "processing_id": "5dbc92ef9b978fde9ea75ab4d06c95476e60145bd9e8999f4412a5123f415162",
+        "reports": [
+          {
+            "counts": {
+              "african american": 694302,
+              "american indian": 18028,
+              "asian": 261788,
+              "hispanic": 2860754,
+              "pacific islander": 8477,
+              "two or more races": 156780,
+              "white": 1427241
+            },
+            "entity": "state",
+            "kind": "reviewed_annual_report_table1",
+            "label_definition": "Publisher Multiracial means two or more races; independently reviewed in each report.",
+            "measurement_year": 2022,
+            "physical_page": 16,
+            "receipt": "3fc39b523ca916bca495a4d102ffbe3d3f8425b8ea1c536d6a3c83f3208d0b7a",
+            "requested_url": "https://tea.texas.gov/sites/default/files/enroll-2021-22.pdf",
+            "resolved_url": "https://tea.texas.gov/data-reports/school-performance/accountability-research/enroll-2021-22.pdf",
+            "sha256": "466e25c752612f2f718480c8ffae2f1fe1534917f4fe4f7daec66ef690603698",
+            "size_bytes": 1251325,
+            "source_labels": {
+              "african american": "Black or African American",
+              "american indian": "American Indian or Alaska Nat",
+              "asian": "Asian",
+              "hispanic": "Hispanic/Latino",
+              "pacific islander": "Native Hawaiian/Other Pacific",
+              "two or more races": "Two or more races",
+              "white": "White"
+            },
+            "table": "Table 1"
+          }
+        ],
+        "sha256": "b33fc2401702d59d9af7deb0e87af3945c338979d32e1c125a357078be2d2c16"
+      },
+      "44fb0efc961bf4351bc7241ee1e633e624c266e32c1f619432e6cc25ed03821f": {
+        "artifact": "375a9b08651e0ebcb11ff1fe5dadae875052e3744673bad6c909129fc0080f10",
+        "metadata_sha256": "b81a0c016605ebe0bce227b81b3842becdca27fccc0e43ddb9118d98af1abeca",
+        "processing_id": "d5c92fdb0db5280b6eb848d0b95a54fe3e4202947ea26953aaaeecb7dafac905",
+        "reports": [
+          {
+            "entity": "227901",
+            "kind": "enrollment_only_html",
+            "receipt": "513e4680e7463fb130e70bad1716bee45613c00a6e868b12c3c6078cbc920dc6"
+          }
+        ],
+        "sha256": "1ac358b39c1d1e9468dfd125ad400ca2dbd48bafac0aac3df429f9182c1f7a37"
+      },
+      "5176f41b9d9e2146f70fe5e226204efa6a2bc178a712465dbb5023de87d364b7": {
+        "artifact": "1e8ffa18f56abbdedac84669ae4c21a81ec8fdf9bfe99b0bdbb397dec431fb58",
+        "metadata_sha256": "bff4db25bc5eefde4ba8a67a658533b3c65ad02f2c184c58c8284ae481d9f73f",
+        "processing_id": "d63eb9a0429e5839625128fc105958ee81dff68dbb56ef19c404408f25dff788",
+        "reports": [
+          {
+            "entity": "227901",
+            "kind": "enrollment_only_html",
+            "receipt": "861cfae53fd9a580efc7daba06f086d006a117e1f6239a6ec9880b3d3e1b8f4b"
+          }
+        ],
+        "sha256": "8835017b56074c4dcd46c0d4db21f8affe76b5bebd88277fb8ae9e105836e409"
+      },
+      "622b1be6c169e90aaa553bd82cd1030b4f6b78f01c6570f27c8397f97cd45e41": {
+        "artifact": "c3ced1747c232d9bb45713b8f245c59270e3c8084abed47f4b92db559a4df8e3",
+        "metadata_sha256": "d583d95815f95a2a2b73b2ad17dc8b349fd9b25b32e5e10a3922d97433e7ed84",
+        "processing_id": "43d8bfd8e9b3169616ec992e30b80db8797eccbdb1aa82276ca3ede27b22c3fd",
+        "reports": [
+          {
+            "counts": {
+              "african american": 681401,
+              "american indian": 18755,
+              "asian": 254163,
+              "hispanic": 2840982,
+              "pacific islander": 8271,
+              "two or more races": 143763,
+              "white": 1424251
+            },
+            "entity": "state",
+            "kind": "reviewed_annual_report_table1",
+            "label_definition": "Publisher Multiracial means two or more races; independently reviewed in each report.",
+            "measurement_year": 2021,
+            "physical_page": 16,
+            "receipt": "b689e797c97b05c8ba5b4353dda169a876bd16f23134fe397ef9155cc7689f1a",
+            "requested_url": "https://tea.texas.gov/sites/default/files/enroll-2020-21.pdf",
+            "resolved_url": "https://tea.texas.gov/data-reports/school-performance/accountability-research/enroll-2020-21.pdf",
+            "sha256": "85bc459faae8ccd078de4fee5a2b9c5f4c5527e93377cb67202337b4ad47ce42",
+            "size_bytes": 1632344,
+            "source_labels": {
+              "african american": "Black or African American",
+              "american indian": "American Indian or Alaska Nat",
+              "asian": "Asian",
+              "hispanic": "Hispanic/Latino",
+              "pacific islander": "Native Hawaiian/Other Pacific",
+              "two or more races": "Two or more races",
+              "white": "White"
+            },
+            "table": "Table 1"
+          }
+        ],
+        "sha256": "6cd335bd4911e3730c76e4b2946ce71d1d44ab462c25c1a6416dfb206b3c8e71"
+      },
+      "84056bc81fef60186a1a7df719bd2bf835569ee69af022e9e4564d3a7149445f": {
+        "artifact": "48dc89925d95c3a03315cb3cbc356320221af5035c18db0109d0591c3819a876",
+        "metadata_sha256": "bff4db25bc5eefde4ba8a67a658533b3c65ad02f2c184c58c8284ae481d9f73f",
+        "processing_id": "32855ae71ff4b6a745cceae72a1d0844546bc43b4fb14820c55b787841d51a36",
+        "reports": [
+          {
+            "entity": "057829001",
+            "kind": "enrollment_only_html",
+            "receipt": "0183affaf59a4bed506785d6febf31e3095cea562ddbefd4dfe24866dd15755e"
+          }
+        ],
+        "sha256": "d9a6b0a1e707d940f8ed56bceaf195cde965bbac832732a091490459b79a513e"
+      },
+      "93d53f7a43aa9b0a494b33ea6abd0901c6c98906b1d0234e30fb3d376c1f8b8a": {
+        "artifact": "35460ba910d3c69cb292215cc22040113986ac83d9420ef1ff1f5ed7a6bda17a",
+        "metadata_sha256": "da9c1399760ca50c65be4724d69b948e2df199e4bacc13aeea5d8282d540a295",
+        "processing_id": "4338b08778f80261c087122b0428526a63efdd8a5b789472b0d56be3b5afb0fa",
+        "reports": [
+          {
+            "entity": "057829001",
+            "kind": "enrollment_only_html",
+            "receipt": "42aa6ff1c905226e978185a6c208a16b062eca1953acc1244baa5347f4250d70"
+          }
+        ],
+        "sha256": "a59a8e545589cb8c783ce707a89e640302e1a2e874153f4e8e3db9bef787ae58"
+      },
+      "baeb58cfa7c98e1c27819b7c9c2813a61badbe03a43383db6e53c3fcaeb18e5c": {
+        "artifact": "520a781039f12dbf2b065108843e0b4e8303f6dccbd96e5798f6d7b8547416a7",
+        "metadata_sha256": "da9c1399760ca50c65be4724d69b948e2df199e4bacc13aeea5d8282d540a295",
+        "processing_id": "7b5076526bbe6142e4d524681141fafcbf2137024ee0dfbf1d42393d627dee3e",
+        "reports": [
+          {
+            "counts": {
+              "african american": 685775,
+              "american indian": 20414,
+              "asian": 242657,
+              "hispanic": 2854590,
+              "pacific islander": 8271,
+              "two or more races": 129904,
+              "white": 1490299
+            },
+            "entity": "state",
+            "kind": "reviewed_annual_report_table1",
+            "label_definition": "Publisher Multiracial means two or more races; independently reviewed in each report.",
+            "measurement_year": 2019,
+            "physical_page": 16,
+            "receipt": "4f79dc719db03bf6da43ac561f3e66782b3f32d7c43de4ca581d3ca0dd3321c1",
+            "requested_url": "https://tea.texas.gov/sites/default/files/enroll_2018-19.pdf",
+            "resolved_url": "https://tea.texas.gov/data-reports/school-performance/accountability-research/enroll-2018-19.pdf",
+            "sha256": "3707d99233987d5458b89507bb0a78656b87f92266529dd861e8c2ab59a78d31",
+            "size_bytes": 1466499,
+            "source_labels": {
+              "african american": "Black or African American",
+              "american indian": "American Indian or Alaska Nat",
+              "asian": "Asian",
+              "hispanic": "Hispanic/Latino",
+              "pacific islander": "Native Hawaiian/Other Pacific",
+              "two or more races": "Two or more races",
+              "white": "White"
+            },
+            "table": "Table 1"
+          }
+        ],
+        "sha256": "f3207e7e856010c19c6ed6629d1a1f58a02d93f500fcec2943ed9d1308bba046"
+      },
+      "c75a9dc3a57a5b0f95bde86435d04ce7efd1e9c2bff3afd81752398d7d85453c": {
+        "artifact": "cac2afcb2934f4980ed23ceedfc271af94ffaa17a3f02ca2809ca4ae1455c5e7",
+        "metadata_sha256": "d583d95815f95a2a2b73b2ad17dc8b349fd9b25b32e5e10a3922d97433e7ed84",
+        "processing_id": "21977dca978d01c189aefec0a7fe63a84a4804fd11730880cfb334da94d70a6e",
+        "reports": [
+          {
+            "entity": "227901",
+            "kind": "enrollment_only_html",
+            "receipt": "6b1ed7eb3d9c9066aad0e91040badf0ed755500c940fd59731b8e3073cb5f48e"
+          }
+        ],
+        "sha256": "0812b5ca9b0ef13b594bce25c63a59ea425c29647d321f737304b1e6b527c5c5"
+      },
+      "d3adf17fc55226b2489157ac02e9a389480ebf5aa3eece87a85b50a248e00329": {
+        "artifact": "8adefe3b5b465990fb4899fec3aa9b0177567f10e7313272277880b251288b9e",
+        "metadata_sha256": "b81a0c016605ebe0bce227b81b3842becdca27fccc0e43ddb9118d98af1abeca",
+        "processing_id": "7d02f9eaa8991109b5f7b4e70f19f68ed6bda0a35121dd9998849c02dd1dab13",
+        "reports": [
+          {
+            "counts": {
+              "african american": 692925,
+              "american indian": 20062,
+              "asian": 250463,
+              "hispanic": 2899504,
+              "pacific islander": 8481,
+              "two or more races": 138817,
+              "white": 1483688
+            },
+            "entity": "state",
+            "kind": "reviewed_annual_report_table1",
+            "label_definition": "Publisher Multiracial means two or more races; independently reviewed in each report.",
+            "measurement_year": 2020,
+            "physical_page": 16,
+            "receipt": "f2ee5bb9cfb76e97434ca1daa8e025361ac8a4a04b2e2afc896aa6ea6799e9d9",
+            "requested_url": "https://tea.texas.gov/sites/default/files/enroll_2019-20.pdf",
+            "resolved_url": "https://tea.texas.gov/data-reports/school-performance/accountability-research/enroll-2019-20.pdf",
+            "sha256": "983f144de5b3c7bab8efcd97cae47e2a16218530f897964701b8d6751e50dcf9",
+            "size_bytes": 1463111,
+            "source_labels": {
+              "african american": "Black or African American",
+              "american indian": "American Indian or Alaska Nat",
+              "asian": "Asian",
+              "hispanic": "Hispanic/Latino",
+              "pacific islander": "Native Hawaiian/Other Pacific",
+              "two or more races": "Two or more races",
+              "white": "White"
+            },
+            "table": "Table 1"
+          }
+        ],
+        "sha256": "639757107876de5214472c154eed4e9bb462671868077a58e7d54ac674b4eb3c"
+      },
+      "f5a220f6f2bae546fbf864cfb8164e2accf13e66c72e338bc7761f09e0f93e61": {
+        "artifact": "916d1b0013fcf1f10eb62de72d4e22b4dc5c40be2fb4483bfd1405e60a7f8198",
+        "metadata_sha256": "da9c1399760ca50c65be4724d69b948e2df199e4bacc13aeea5d8282d540a295",
+        "processing_id": "0c57ddb30af89f825c93c812181d88c9117d3ee17bc5367b2cffc2be3fdbf8e0",
+        "reports": [
+          {
+            "entity": "227901",
+            "kind": "enrollment_only_html",
+            "receipt": "d2be4dd212210612205f74ccb72699e84494f8a8072e472f13e1c53dca529c65"
+          }
+        ],
+        "sha256": "f5d1d967f345ead59c80891ea50b395b95f2ff0af39cbd5395ba8697618973c3"
+      },
+      "fb2ef31cb2ffea5a5530994c45cde8842fdf3664cbe6f68062ee6e48d4f07c43": {
+        "artifact": "91e916388030b246099b4cb4ff21a39e6a0fe728ebbc12dd3f6a309e206337d3",
+        "metadata_sha256": "d583d95815f95a2a2b73b2ad17dc8b349fd9b25b32e5e10a3922d97433e7ed84",
+        "processing_id": "bc53c810122987a8ea82f0e354aa86ad6d0859440469aba0e84bc3cb8c7523c0",
+        "reports": [
+          {
+            "entity": "057829001",
+            "kind": "enrollment_only_html",
+            "receipt": "d8ba76b71d98a0e66c9abd217326bbf29c62e62b60dd5d606671824006f0a07b"
+          }
+        ],
+        "sha256": "1d7e782570d25e46f95d16877d8627155b987d1685201d4f0b5949a3d6de2f38"
+      }
+    },
+    "manifest_sha256": "fdd86b5bf8e5c4b1e2a97523e3f651cf41281cf0f94cae5cfc7e0a97f0300791"
+  },
   "manifest_sha256": "28123464cec8f1b64883be5573e34bc665dad739f29865c74d37532b4d60c3ff"
 }

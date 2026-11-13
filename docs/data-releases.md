@@ -111,6 +111,14 @@ the direct Texas tables for Texas ethnicity counts. The linked annual
 reports provide the statewide totals. See the
 [PEIMS source notes](peims-sources.md) for scope and masking details.
 
+The reviewed native gate admits this exact manifest separately from the newer
+programs/enrollment bundle. Its state witnesses are reviewed literal Table 1
+controls bound to four original annual-report PDF hashes and acquisition
+receipts, not an automatic PDF extraction or a sum of local counts. Local HTML
+witnesses check category cells without requiring an unavailable program total;
+the newer paired-family total checks remain strict. This source qualification
+does not by itself attach the historical years to an older normal parent.
+
 ### PEIMS College Credit in v0.0.142
 
 The [stand-alone College Credit manifest](https://github.com/adpena/teadata/releases/download/v0.0.142/peims-college-credit-2022-2026.json)

@@ -103,7 +103,15 @@ def reviewed_composed_disability_references(manifest_sha256: str) -> dict[str, A
 
 def reviewed_historical_peims_references(manifest_sha256: str) -> dict[str, Any] | None:
     review = json.loads(files("teadata").joinpath("reference_cases/native_peims_historical.json").read_text())
-    return review["editions"] if review["manifest_sha256"] == manifest_sha256 else None
+    for plan in (review, review["enrollment_only"]):
+        if plan["manifest_sha256"] == manifest_sha256:
+            return plan["editions"]
+    return None
+
+
+def _enrollment_only_manifest(manifest_sha256: str) -> bool:
+    review = json.loads(files("teadata").joinpath("reference_cases/native_peims_historical.json").read_text())
+    return review["enrollment_only"]["manifest_sha256"] == manifest_sha256
 
 
 def _label(value: str) -> str:
@@ -237,7 +245,13 @@ def _primary_disability(rows: list[list[str]], native: list[dict[str, Any]], key
     return len(codes), omitted
 
 
-def _ethnicity(rows: list[list[str]], native: list[dict[str, Any]], key: EditionKey, entity: str, total: int) -> int:
+def _ethnicity(rows: list[list[str]], native: list[dict[str, Any]], key: EditionKey, entity: str,
+               total: int | None, *, enrollment_only: bool = False) -> int:
+    if enrollment_only:
+        if key.dataset != _ETHNICITY or not 2019 <= int(key.edition) <= 2022 or key.scope not in ("campus", "district"):
+            raise ContractError("Enrollment-only HTML witness scope or edition differs")
+    elif total is None:
+        raise ContractError("Paired ethnicity witness requires its independent program total")
     header, = (index for index, row in enumerate(rows) if "Ethnicity" in row)
     data = {_label(row["ethnicity"]): row for row in native}
     if len(data) != len(native):
@@ -254,9 +268,45 @@ def _ethnicity(rows: list[list[str]], native: list[dict[str, Any]], key: Edition
     for row in report_rows[:-1] if has_total else report_rows:
         name, token = row[-2:]
         _compare_count(data.pop(_label(name)), "enrollment_by_ethnicity_count", token)
-    if data or (has_total and _count(report_rows[-1][-1]) != (total, "observed")):
+    if data or (has_total and (not enrollment_only and _count(report_rows[-1][-1]) != (total, "observed"))):
         raise ContractError("Ethnicity publisher categories or total differ")
-    return len(report_rows)
+    if has_total and enrollment_only and _count(report_rows[-1][-1])[1] != "observed":
+        raise ContractError("Enrollment-only publisher total is not observed")
+    # Without a separate program total, report only the checked category cells.
+    return len(report_rows) - int(has_total and enrollment_only)
+
+
+def _annual_enrollment_control(store: ProvenanceStore, witness: dict[str, Any], ref: ArtifactRef,
+                               native: list[dict[str, Any]]) -> int:
+    """Replay reviewed literal Table 1 controls, not an automatic PDF extraction."""
+    key = ref.edition
+    if (key.dataset != _ETHNICITY or key.scope != "state" or not 2019 <= int(key.edition) <= 2022
+            or witness["entity"] != "state" or witness["table"] != "Table 1"
+            or witness["physical_page"] != 16 or witness["measurement_year"] != int(key.edition)):
+        raise ContractError("Annual enrollment control scope or period differs")
+    record = store.read_record(witness["receipt"])
+    artifact = record["artifact"]
+    if (record["kind"] != "acquisition" or record["method"] != "download"
+            or record["section"] != "reference" or record["dataset"] != "reference:peims_enrollment_research_state"
+            or record["requested_year"] != int(key.edition) or record["resolved_year"] != int(key.edition)
+            or record["requested_url"] != witness["requested_url"] or record["resolved_url"] != witness["resolved_url"]
+            or record["response_headers"].get("content-type", "").split(";")[0].strip().lower() != "application/pdf"
+            or record["parameters"].get("http_method") != "GET" or record["parameters"].get("http_status") != 200
+            or artifact["sha256"] != witness["sha256"] or artifact["size_bytes"] != witness["size_bytes"]
+            or artifact["sha256"] in ref.contract["inputs"]
+            or store.verify_artifact(artifact["sha256"]).stat().st_size != artifact["size_bytes"]):
+        raise ContractError("Invalid reviewed annual enrollment acquisition")
+    data = {_label(row["ethnicity"]): row for row in native}
+    controls = witness["counts"]
+    source_labels = witness["source_labels"]
+    if (len(data) != len(native) or len(data) != 7 or len(controls) != 7 or set(source_labels) != set(controls)
+            or set(data) != {_label(label) for label in source_labels.values()}):
+        raise ContractError("Annual enrollment categories differ")
+    for label, count in controls.items():
+        if type(count) is not int or count < 0:
+            raise ContractError("Annual enrollment control must be an observed count")
+        _compare_count(data[_label(source_labels[label])], "enrollment_by_ethnicity_count", str(count))
+    return len(controls)
 
 
 def _transfer(path: Path, ref: ArtifactRef, district: str, table: Any) -> int:
@@ -365,6 +415,7 @@ def validate_native_witnesses(release: DataRelease, store: ProvenanceStore, refe
     cases = []
     peims_values = transfer_rows = 0
     totals: dict[tuple[str, str, str], int] = {}
+    enrollment_only = _enrollment_only_manifest(release.manifest_sha256)
     refs = [(release.catalog.artifact_ref(case["artifact"]), case) for case in references.values()]
     for ref, case in sorted(refs, key=lambda item: item[0].edition.dataset != _PROGRAM):
         key = ref.edition
@@ -378,9 +429,19 @@ def validate_native_witnesses(release: DataRelease, store: ProvenanceStore, refe
             total_key = (key.edition, key.scope, entity)
             omitted: list[str] = []
             try:
+                kind = witness.get("kind")
+                if kind not in (None, "enrollment_only_html", "reviewed_annual_report_table1"):
+                    raise ContractError("Unknown reviewed publisher witness kind")
+                if kind is not None and not enrollment_only:
+                    raise ContractError("Enrollment-only witness requires its exact reviewed manifest")
+                if kind == "enrollment_only_html" and key.dataset != _ETHNICITY:
+                    raise ContractError("Enrollment-only HTML witness requires the ethnicity dataset")
                 if "unreported_codes" in witness and key.dataset != PRIMARY_DISABILITY:
                     raise ContractError("Unreported codes require a primary disability witness")
-                if key.dataset == _TRANSFER and int(key.edition) in _HEADER_FIRST_DISTRICT_YEARS:
+                if kind == "reviewed_annual_report_table1":
+                    count = _annual_enrollment_control(store, witness, ref, table.to_table().to_pylist())
+                    peims_values += count
+                elif key.dataset == _TRANSFER and int(key.edition) in _HEADER_FIRST_DISTRICT_YEARS:
                     if entity != "Region 13":
                         raise ContractError("Historical transfer HTML witness must select Region 13")
                     count = _historical_transfer(release, store, ref, receipt, table)
@@ -402,11 +463,15 @@ def validate_native_witnesses(release: DataRelease, store: ProvenanceStore, refe
                         count, omitted = _primary_disability(rows, native, key, entity, columns,
                                                             witness.get("unreported_codes", []))
                     else:
-                        count = _ethnicity(rows, native, key, entity, totals[total_key])
+                        independent_total = None if kind == "enrollment_only_html" else totals[total_key]
+                        count = _ethnicity(rows, native, key, entity, independent_total,
+                                           enrollment_only=kind == "enrollment_only_html")
                     peims_values += count
             except (ValueError, KeyError, TypeError, IndexError, OSError, csv.Error, ContractError) as error:
                 raise ContractError(f"Publisher witness {receipt} failed for {key.dataset} {entity}: {error}") from error
             cases.append({"edition_id": key.identity, "entity": entity, "receipt": receipt,
                           "rows" if key.dataset == _TRANSFER else "values": count,
+                          **({"kind": kind, "physical_page": witness["physical_page"]}
+                             if kind == "reviewed_annual_report_table1" else {"kind": kind} if kind else {}),
                           **({"unreported_codes": omitted} if omitted else {})})
     return {"reports": cases, "peims_values": peims_values, "transfer_rows": transfer_rows}

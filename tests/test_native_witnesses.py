@@ -1,4 +1,5 @@
 import csv
+from copy import deepcopy
 from hashlib import sha256
 from pathlib import Path
 from types import SimpleNamespace
@@ -203,6 +204,99 @@ def test_historical_peims_review_pins_each_year_scope_and_family():
     assert {witness["entity"] for witness in witnesses} == {"state", "227901", "057829001"}
 
 
+def test_enrollment_only_review_pins_twelve_historical_editions_and_independent_sources():
+    pin = "fdd86b5bf8e5c4b1e2a97523e3f651cf41281cf0f94cae5cfc7e0a97f0300791"
+    editions = native_witnesses.reviewed_historical_peims_references(pin)
+    assert editions is not None and len(editions) == 12
+    witnesses = [witness for case in editions.values() for witness in case["reports"]]
+    assert len({witness["receipt"] for witness in witnesses}) == 12
+    annual = [witness for witness in witnesses if witness["kind"] == "reviewed_annual_report_table1"]
+    assert {witness["measurement_year"] for witness in annual} == {2019, 2020, 2021, 2022}
+    assert all(len(witness["counts"]) == 7 and "all students" not in witness["counts"] for witness in annual)
+    assert sum(witness["kind"] == "enrollment_only_html" for witness in witnesses) == 8
+
+
+def test_enrollment_only_witness_checks_categories_without_claiming_a_program_total():
+    key = EditionKey(native_witnesses._ETHNICITY, "2022", "1" * 64, "district", "district", "school_year")
+    rows = [["District", "Ethnicity", "Count"], ["001902", "Asian", "<10"],
+            ["", "White", "17"], ["", "District Total", "999"]]
+    native = [{"ethnicity": "Asian", "enrollment_by_ethnicity_count": None,
+               "peims_status_enrollment_by_ethnicity_count": "suppressed",
+               "peims_raw_enrollment_by_ethnicity_count": "<10"},
+              {"ethnicity": "White", "enrollment_by_ethnicity_count": 17,
+               "peims_status_enrollment_by_ethnicity_count": "observed"}]
+    assert native_witnesses._ethnicity(rows, native, key, "001902", None, enrollment_only=True) == 2
+    with pytest.raises(ContractError, match="requires its independent program total"):
+        native_witnesses._ethnicity(rows, native, key, "001902", None)
+    with pytest.raises(ContractError, match="categories or total differ"):
+        native_witnesses._ethnicity(rows, native, key, "001902", 18)
+    rows[-1][-1] = "N/A"
+    with pytest.raises(ContractError, match="total is not observed"):
+        native_witnesses._ethnicity(rows, native, key, "001902", None, enrollment_only=True)
+    key = EditionKey(native_witnesses._ETHNICITY, "2023", "1" * 64, "district", "district", "school_year")
+    with pytest.raises(ContractError, match="scope or edition differs"):
+        native_witnesses._ethnicity(rows, native, key, "001902", None, enrollment_only=True)
+
+
+@pytest.mark.parametrize("damage", [None, "scope", "year", "url", "hash", "size", "input", "count", "status", "extra", "extra-control"])
+def test_annual_enrollment_control_requires_reviewed_pdf_identity_and_seven_observed_categories(damage):
+    pin = "fdd86b5bf8e5c4b1e2a97523e3f651cf41281cf0f94cae5cfc7e0a97f0300791"
+    references = native_witnesses.reviewed_historical_peims_references(pin)
+    assert references is not None
+    witness = deepcopy(next(case["reports"][0] for case in references.values()
+                            if case["reports"][0].get("measurement_year") == 2019))
+    record = {"kind": "acquisition", "method": "download", "section": "reference",
+              "dataset": "reference:peims_enrollment_research_state", "requested_year": 2019, "resolved_year": 2019,
+              "requested_url": witness["requested_url"], "resolved_url": witness["resolved_url"],
+              "response_headers": {"content-type": "application/pdf"},
+              "parameters": {"http_method": "GET", "http_status": 200},
+              "artifact": {"sha256": witness["sha256"], "size_bytes": witness["size_bytes"]}}
+    native = [{"ethnicity": witness["source_labels"][label], "enrollment_by_ethnicity_count": count,
+               "peims_status_enrollment_by_ethnicity_count": "observed"} for label, count in witness["counts"].items()]
+    key = EditionKey(native_witnesses._ETHNICITY, "2019", "1" * 64,
+                     "district" if damage == "scope" else "state", "state", "school_year")
+    if damage == "year":
+        witness["measurement_year"] = 2020
+    if damage == "url":
+        record["resolved_url"] = "https://example.invalid/report.pdf"
+    if damage == "hash":
+        record["artifact"]["sha256"] = "changed"
+    if damage == "size":
+        record["artifact"]["size_bytes"] += 1
+    if damage == "count":
+        native[0]["enrollment_by_ethnicity_count"] += 1
+    if damage == "status":
+        native[0]["peims_status_enrollment_by_ethnicity_count"] = "suppressed"
+    if damage == "extra":
+        native.append({"ethnicity": "All students"})
+    if damage == "extra-control":
+        label = next(iter(witness["counts"]))
+        witness["counts"]["duplicate"] = witness["counts"][label]
+        witness["source_labels"]["duplicate"] = witness["source_labels"][label]
+    path = Mock()
+    path.stat.return_value.st_size = witness["size_bytes"]
+    store = cast(ProvenanceStore, SimpleNamespace(read_record=lambda _: record,
+                                                verify_artifact=Mock(return_value=path)))
+    ref = cast(ArtifactRef, SimpleNamespace(edition=key,
+                         contract={"inputs": [witness["sha256"]] if damage == "input" else []}))
+    if damage:
+        with pytest.raises(ContractError):
+            native_witnesses._annual_enrollment_control(store, witness, ref, native)
+    else:
+        assert native_witnesses._annual_enrollment_control(store, witness, ref, native) == 7
+
+
+@pytest.mark.parametrize("kind", ["enrollment_only_html", "reviewed_annual_report_table1", "unknown"])
+def test_enrollment_only_witness_kinds_cannot_weaken_an_unrelated_manifest(kind):
+    ref = SimpleNamespace(identity="leaf", edition=EditionKey(
+        native_witnesses._ETHNICITY, "2022", "1" * 64, "district", "district", "school_year"))
+    selected = SimpleNamespace(manifest_sha256="unreviewed", analytical_dataset=Mock(),
+                               catalog=SimpleNamespace(artifact_ref=lambda _: ref))
+    with pytest.raises(ContractError, match="Unknown reviewed|exact reviewed manifest"):
+        native_witnesses.validate_native_witnesses(selected, Mock(),
+            {"edition": {"artifact": "leaf", "reports": [{"entity": "001902", "receipt": "receipt", "kind": kind}]}})
+
+
 def test_historical_campus_ethnicity_witness_does_not_infer_an_unpublished_total():
     rows = [["Campus", "Ethnicity", "Count"], ["057829001", "Asian", "<10"]]
     native = [{
@@ -331,7 +425,8 @@ def test_primary_disability_gate_requires_exact_inline_edition_and_bundled_parit
 
 def test_native_witness_replay_rejects_an_edition_with_no_reports():
     artifact = SimpleNamespace(edition=SimpleNamespace(dataset=native_witnesses.PRIMARY_DISABILITY))
-    selected = SimpleNamespace(catalog=SimpleNamespace(artifact_ref=Mock(return_value=artifact)), analytical_dataset=Mock())
+    selected = SimpleNamespace(manifest_sha256="unreviewed",
+                               catalog=SimpleNamespace(artifact_ref=Mock(return_value=artifact)), analytical_dataset=Mock())
     with pytest.raises(ContractError, match="requires independent publisher witnesses"):
         native_witnesses.validate_native_witnesses(cast(release.DataRelease, selected), Mock(),
                                                    {"edition": {"artifact": "id", "reports": []}})

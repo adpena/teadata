@@ -46,8 +46,11 @@ Suppression produces a null value with status `suppressed`.
 The [v0.0.152 normal parent](source-integration-status.md) attaches both student
 families for school years 2022–23 through 2025–26, statewide by district and
 campus with separate direct Texas observations. The 2018–19 through 2021–22
-ethnicity candidate remains outside that parent. Registration and a separate
-candidate are not release integration.
+ethnicity source was published separately in v0.0.143 and remains outside the
+v0.0.152 parent. Its reviewed native gate replays all 217,122 rows against the
+retained CSVs, 49 local HTML category cells and 28 annual-report Table 1 controls.
+A subsequent normal parent must explicitly attach that exact pinned source;
+qualification of a separate source is not normal release integration.
 
 Use the same catalog-bound namespace and observation/series planner as other
 attached sources. This opens selected artifacts lazily; it does not put another
@@ -82,7 +85,13 @@ scope. An unavailable explicit year fails with available choices. Ethnicity has
 multiple rows: select/filter the source's ethnicity dimension before scalar access.
 Older individual campus reports may omit a total, and the selected A+ Academy
 reports list five categories rather than seven; absent categories are not zeros.
-Use the separate program total. All source dates, masks and denominator limits
+Use the separate program total where that source is available. For 2018–19
+through 2021–22, the annual reports provide contextual Texas totals; the native
+ethnicity tables contain only category rows. Their enrollment-only HTML checks
+do not invent a programs total or reconstruct masked counts. The annual-report
+controls preserve the literal CSV category labels, including truncated labels,
+through an explicit reviewed label map; the source rows remain unchanged.
+All source dates, masks and denominator limits
 remain attached to the selected edition. See [multi-year exports](enrichment.md#observations-across-school-years)
 for CSV sidecars, per-year metadata and original-header limitations.
 
