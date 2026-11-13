@@ -58,6 +58,17 @@ roster and exact edition, and report any gaps by scope. Use a direct Texas
 report for [statewide comparisons](querying.md#compare-a-published-measure-with-texas) when the
 measure, population definition, and measurement period match.
 
+### Facility usage: acquired, integration pending
+
+The [2025–26 facility usage review](facility-usage.md) documents TEA's statewide
+district collection: 17,763 facility records from 946 submitting districts and
+71 status-only district rows. TEA says charter schools are not currently required
+to report. The data are facility records, with some publisher-supplied campus links,
+not a campus enrollment or capacity series. Source bytes and definitions have
+been inspected; this source is not yet registered, qualified, or attached to
+v0.0.151. Unresolved correction lineage, mixed enrollment populations and shared
+facilities constrain the next normal-pipeline integration.
+
 ### Historical archive routes
 
 The historical backfill targets all 14 school years from 2012–13 through
