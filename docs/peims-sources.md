@@ -41,6 +41,51 @@ publisher token, normalized value, status, and source record locator. The
 per-report policy preserves true zero and tokens such as `<2,790` and `-999`.
 Suppression produces a null value with status `suppressed`.
 
+## Normal release and lazy access
+
+The [v0.0.152 normal parent](source-integration-status.md) attaches both student
+families for school years 2022–23 through 2025–26, statewide by district and
+campus with separate direct Texas observations. The 2018–19 through 2021–22
+ethnicity candidate remains outside that parent. Registration and a separate
+candidate are not release integration.
+
+Use the same catalog-bound namespace and observation/series planner as other
+attached sources. This opens selected artifacts lazily; it does not put another
+copy of all observations in each entity's metadata.
+
+```python
+programs = district.peims_student_programs_and_special_populations
+programs.variables(r"special_education|total_enrollment")
+programs.years("special_education_program_count")
+selected = programs.at(26).select(
+    "total_enrollment_count", "special_education_program_count",
+)
+frame = selected.to_df()  # Includes publisher tokens, statuses and provenance.
+
+trend = release.series(
+    "peims_student_programs_and_special_populations",
+    "total_enrollment_count", "special_education_program_count",
+    scope="district", years=[23, 24, 25, 26], ids=[101902],
+)
+trend.to_excel("district-programs.xlsx")  # Includes the provenance worksheet.
+# Obtain the matching published Texas observations separately; do not sum masks.
+texas = release.series(
+    "peims_student_programs_and_special_populations",
+    "total_enrollment_count", "special_education_program_count",
+    scope="state", years=[23, 24, 25, 26],
+)
+```
+
+`district` and `release` above must refer to that same explicitly selected parent.
+No year means the latest eligible measurement year for the selected source and
+scope. An unavailable explicit year fails with available choices. Ethnicity has
+multiple rows: select/filter the source's ethnicity dimension before scalar access.
+Older individual campus reports may omit a total, and the selected A+ Academy
+reports list five categories rather than seven; absent categories are not zeros.
+Use the separate program total. All source dates, masks and denominator limits
+remain attached to the selected edition. See [multi-year exports](enrichment.md#observations-across-school-years)
+for CSV sidecars, per-year metadata and original-header limitations.
+
 ## Build and read a candidate
 
 Materialization is offline. `TEADATA_PROVENANCE_DIR` must contain the Config's

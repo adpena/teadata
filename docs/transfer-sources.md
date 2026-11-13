@@ -1,5 +1,24 @@
 # Transfer source intake
 
+The [v0.0.152 normal parent](source-integration-status.md) attaches the reviewed
+2023–24, 2024–25 and 2025–26 district-report editions through the existing lazy
+`release.observations("district_transfer_reports", ...)` planner.
+This is a district-report source, separate from campus edges and TEFA data.
+All acquired regional originals are retained; that does not establish coverage
+of every LEA. Earlier transfer candidates and historical classification holds
+remain outside this parent. Keep published totals, pair details, directions and
+masking states separate. No suppressed count is reconstructed.
+
+The table identifies reporting and partner districts separately; neither is the
+unique source-row key. The current entity/ID-cohort shortcut requires the ordinary
+`district_number` key and therefore does not bind this table automatically. Read
+it through the same canonical source-table API and explicitly filter the intended
+role, for example `reporting_district_number`. Inspect the returned schema and
+raw/support columns before filtering. A reviewed typed role binding is still
+needed for the per-entity shortcut; attachment does not establish that capability.
+Do not rename the partner district to the reporter or infer a direction from it.
+
+
 `teadata.scripts.refresh_transfers acquire` retains original TEA regional district
 transfer CSVs through `AcquisitionClient`, ordered `acquire_form` controls, and
 `ProvenanceStore`. It does not activate configuration, prepare a table, change an

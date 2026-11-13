@@ -1,33 +1,33 @@
-# Source integration status — November 12, 2026
+# Source integration status — November 13, 2026
 
 This is a dated inventory of the tracked source configuration at code commit
-`cc2802cb19df7077d9579ea7817586eaba82fd62`, compared with the
-[v0.0.151 parent release](https://github.com/adpena/teadata/releases/download/v0.0.151/release.json),
-manifest SHA-256 `9d9b28cd993b9c8f764b1592fe6b765c4e26495447969ec14bcc493c8062501c`.
+`f4d0ee0cd997acd9a6acb123eac7099fab91ac5a`, compared with the
+[v0.0.152 parent release](https://github.com/adpena/teadata/releases/download/v0.0.152/release.json),
+manifest SHA-256 `f2966b6beb041fbfb395716b89f89c92ef018a183c96870b225b7e7e7dc69706`.
 The configuration matches the recorded SHA-256. This metadata comparison does
 not itself establish field qualification; matching release gates and publisher
 evidence remain separate. No new source acquisition is claimed.
 
-Source-only follow-through on November 12 adds generic lazy entity namespaces
-(`entity.dataset(name)` and `entity.<dataset>`) over the existing observation
-planner. The v0.0.151 normal parent composes seven attached bundles, including
-PEIMS staff district/Texas editions for 2022–23 through 2025–26 and primary
-disability district/Texas editions for 2012–13 through 2025–26. It does not change
-the app-selected v0.0.148 parent. Library publication, explicit release selection
-and application activation are separate milestones. Campus staff observations
-are not supplied by the district/Texas staff attachment; primary disability has
-no campus scope.
+Generic lazy entity namespaces (`entity.dataset(name)` and `entity.<dataset>`)
+use the existing observation planner. The v0.0.152 normal parent composes nine
+attached bundles, including PEIMS enrollment by ethnicity and programs for
+2022–23 through 2025–26 at district, campus and direct Texas scopes, plus district
+transfer reports for 2023–24 through 2025–26. It preserves the prior primary
+disability and staff families. This does not change the app-selected v0.0.148
+parent. Explicit release selection, library publication and app activation remain
+separate milestones. Campus staff observations remain absent, and primary
+disability has no campus product.
 
 The configuration contains **124 dataset IDs and 276 editions**. Of these,
-**111 IDs are preparation/source-only contracts**; **103 are absent as named
+**111 IDs are preparation/source-only contracts**; **100 are absent as named
 native sources from the selected parent**. These include scope and domain
-variants, not 103 independent TEA systems. Some measures already occur in the
+variants, not 100 independent TEA systems. Some measures already occur in the
 combined TAPR entity profiles. Absence of a separate source ID does not establish
 that every corresponding measure is missing. Conversely, registration does not
 establish acquisition, interpretation, qualification or availability in a release.
 
-The parent has 13 base inputs and seven attached bundles exposing nine native
-dataset IDs across 93 editions. Eight IDs are in the preparation-only configuration; the
+The parent has 13 base inputs and nine attached bundles exposing 12 native
+dataset IDs across 120 editions. Eleven IDs are in the preparation-only configuration; the
 remaining ID, class size, is derived from retained TPRS reports. The complete
 [machine-readable inventory](source-integration-status.json) records exact
 registered periods, source flags and attached edition/scope identities. Its
@@ -39,10 +39,10 @@ configuration digest and parent hash pin this comparison; it is not a live feed.
 | --- | --- | --- |
 | PEIMS staff FTE and salary | 2023–2026 | Delivered in the selected normal parent for district/Texas, through generic namespaces and explicit category/role selection. Campus observations remain absent. |
 | PEIMS primary disability | 2013–2026 | Delivered in the selected normal parent for district/Texas, with raw masks and classification-transition limits. County/region integration remains absent; this product has no campus scope. Existing TAPR special education figures remain a distinct population. |
-| PEIMS enrollment by ethnicity; programs and special populations | 2019–2026; 2023–2026 | Complete year/scope-specific qualification and release integration; preserve Enrollment versus Membership and all publisher tokens. |
+| PEIMS enrollment by ethnicity; programs and special populations | 2019–2026; 2023–2026 | Delivered for 2023–2026 in district/campus/direct Texas. Older 2019–2022 enrollment remains outside this parent. Preserve Enrollment versus Membership and all publisher tokens. |
 | PEIMS teacher/course enrollment; college credit | 2023–2026; 2022–2026 | Preserve the course/program row dimensions and denominators through normal lazy access. |
 | PEIMS single-file financial actuals; budgets | 2013–2025; 2026 | Resolve field/unit qualification and formula changes; retain fiscal years, sectors, actual/budget basis and account grain. These are not the already attached FRC per-pupil table. |
-| District transfer reports | 2013–2026 | Finish the direct district-report path and historical classification holds. The entity release already has separate campus transfer edges. |
+| District transfer reports | 2013–2026 | Delivered for 2024–2026 as a canonical source table at district-report grain; per-entity/ID-cohort role binding remains unavailable. Earlier years remain outside this parent; older classification holds remain explicit. Campus transfer edges are a separate source and grain. |
 | STAAR domains across campus/district/region/Texas | 2024–2026, varying by domain | Complete qualified source binding and release delivery for performance, participation, growth, tested grades, EOC and bilingual/ESL domains. Edition is not necessarily assessment year. |
 | Graduation, dropout, readiness and college-readiness components | 2024/2025, varying by source | Preserve annual versus longitudinal populations, graduation exclusions, overlapping criteria and actual cohorts. |
 | Educator hiring, retention and initial certification | Registered 2026 editions containing source-specific historical series | Deliver the existing multi-row role, route, EPP, demographic and cohort contracts; do not interpret edition 2026 as a single observation year. |
@@ -66,6 +66,9 @@ from Staff FTE and Salary or initial-certification counts.
 | TPRS class size | 2026: district, direct Texas and 23 campus partitions |
 | PEIMS staff FTE and salary | 2023–2026: district and direct Texas, with category/role keys retained |
 | PEIMS primary disability | 2013–2026: district and direct Texas; no campus product |
+| PEIMS enrollment by ethnicity | 2023–2026: district, campus and direct Texas; preserve ethnicity rows |
+| PEIMS programs and special populations | 2023–2026: district, campus and direct Texas; overlapping groups |
+| District transfer reports | 2024–2026: district-report rows from all acquired regional products; direct published totals stay separate from pair rows |
 
 This table establishes attachment from manifest/catalog metadata. It does not
 claim every source column has qualified semantics or that every direct entity
@@ -99,7 +102,7 @@ Normal builds exclude `source_only` inputs unless explicitly attached. Parent
 and standalone verification select the same reviewed source plan and bind
 receipt evidence separately to each exact child manifest. The shared lazy entity
 facade consumes the attached catalogs without a second mapping or store. The
-inventory above reflects the current seven-child selection; other families still
+inventory above reflects the current nine-child selection; other families still
 require their own source qualification and normal integration. Preserve publisher
 evidence and the approval boundary: registration alone must not automatically
 qualify or publish a source merely to clear this inventory.
@@ -118,7 +121,7 @@ do not establish their absence from the repository or their publisher availabili
 
 ## Reproduce the metadata comparison
 
-Use the inspected code/configuration and a retained v0.0.151 manifest with its
+Use the inspected code/configuration and a retained v0.0.152 manifest with its
 assets. This reads source contracts and attachment descriptors, not observations:
 
 ```python
@@ -134,13 +137,13 @@ source_only = {
            for year in editions.available_years())
 }
 release = DataRelease("/path/to/retained/release.json", offline=True,
-    expected_sha256="9d9b28cd993b9c8f764b1592fe6b765c4e26495447969ec14bcc493c8062501c")
+    expected_sha256="f2966b6beb041fbfb395716b89f89c92ef018a183c96870b225b7e7e7dc69706")
 attached = {key.dataset for ref in release.catalog.native_sources for key in ref.editions}
 print(len(configured), sum(len(item.available_years()) for item in configured.values()))
 print(len(source_only), len(source_only - attached))
 ```
 
-The expected counts for this frozen comparison are `124, 276` and `111, 103`.
+The expected counts for this frozen comparison are `124, 276` and `111, 100`.
 The machine inventory's configuration hash must match before reusing those
 numbers. Recompute them after changing configuration or the selected release.
 
@@ -203,7 +206,7 @@ data for every cell. “Not attached” does not mean no standalone candidate ex
 | `district_tapr_staar_tested_grade_8` | 2024–2026 | Not attached |
 | `district_tapr_staff_profile` | 2024, 2025 | 2025: district |
 | `district_tapr_student_profile` | 2024, 2025 | Not attached |
-| `district_transfer_reports` | 2013–2026 | Not attached |
+| `district_transfer_reports` | 2013–2026 | 2024–2026: district |
 | `educator_district_new_hires` | 2026 | Not attached |
 | `educator_district_new_hires_by_epp` | 2026 | Not attached |
 | `educator_state_initial_certification_principal` | 2026 | Not attached |
@@ -219,10 +222,10 @@ data for every cell. “Not attached” does not mean no standalone candidate ex
 | `peims_college_credit` | 2022–2026 | Not attached |
 | `peims_financial_single_file_actuals` | 2013–2025 | Not attached |
 | `peims_financial_single_file_budgets` | 2026 | Not attached |
-| `peims_special_education_by_primary_disability` | 2013–2026 | Not attached |
-| `peims_staff_fte_and_salary` | 2023–2026 | Not attached |
-| `peims_student_enrollment_by_ethnicity` | 2019–2026 | Not attached |
-| `peims_student_programs_and_special_populations` | 2023–2026 | Not attached |
+| `peims_special_education_by_primary_disability` | 2013–2026 | District and direct Texas; no campus product |
+| `peims_staff_fte_and_salary` | 2023–2026 | District and direct Texas |
+| `peims_student_enrollment_by_ethnicity` | 2019–2026 | 2023–2026: district, campus, direct Texas |
+| `peims_student_programs_and_special_populations` | 2023–2026 | 2023–2026: district, campus, direct Texas |
 | `peims_teacher_course_enrollment` | 2023–2026 | Not attached |
 | `rda_special_education_indicator1` | 2025 | Not attached |
 | `region_tapr_dropout_attendance` | 2024, 2025 | Not attached |

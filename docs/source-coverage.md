@@ -1,13 +1,22 @@
 # Entity enrichment sources and years
 
-The [v0.0.151 normal release](https://github.com/adpena/teadata/releases/tag/v0.0.151)
-adds the complete retained primary-disability district/Texas family from
-2012–13 through 2025–26 (28 editions), and staff FTE/salary for 2022–23 through
-2025–26 (eight editions). Its seven native bundles expose nine dataset IDs and
-93 editions alongside 13 unchanged base inputs. The
-[integration inventory](source-integration-status.json) pins this exact selection.
-The app remains separately pinned; publishing a library does not change deployed
-profiles or an unconfigured wheel's default data.
+The [v0.0.152 normal release](https://github.com/adpena/teadata/releases/tag/v0.0.152)
+composes nine native bundles, 12 dataset IDs and 120 edition/scope/partition keys,
+alongside 13 unchanged base inputs. It adds PEIMS ethnicity and programs for
+2022–23 through 2025–26, statewide by district and campus plus direct Texas, and
+district transfer reports for 2023–24 through 2025–26. The primary-disability
+2012–13–2025–26 and staff FTE/salary 2022–23–2025–26 families remain available.
+The [integration inventory](source-integration-status.json) pins this exact
+selection. Library publication does not change deployed profiles or an
+unconfigured wheel's default data; select the release explicitly.
+
+PEIMS ethnicity preserves one row per reported group. Use the matching programs
+report's direct total rather than reconstructing it from masked categories.
+Program counts overlap. District transfer rows preserve direction, reporting
+geography, published totals and pair details; they are not campus transfer edges
+or TEFA participation. Their current per-entity shortcut lacks a reviewed role
+binding; use the canonical source table with an explicit reporting/partner filter.
+Inspect each source's roster and limitations before pooling.
 
 Use `entity.peims_special_education_by_primary_disability` or
 `entity.dataset("peims_special_education_by_primary_disability")` for lazy field
@@ -66,7 +75,7 @@ district collection: 17,763 facility records from 946 submitting districts and
 to report. The data are facility records, with some publisher-supplied campus links,
 not a campus enrollment or capacity series. Source bytes and definitions have
 been inspected; this source is not yet registered, qualified, or attached to
-v0.0.151. Unresolved correction lineage, mixed enrollment populations and shared
+v0.0.152. Unresolved correction lineage, mixed enrollment populations and shared
 facilities constrain the next normal-pipeline integration.
 
 ### Historical archive routes
