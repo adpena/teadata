@@ -43,14 +43,14 @@ Suppression produces a null value with status `suppressed`.
 
 ## Normal release and lazy access
 
-The [v0.0.152 normal parent](source-integration-status.md) attaches both student
-families for school years 2022–23 through 2025–26, statewide by district and
-campus with separate direct Texas observations. The 2018–19 through 2021–22
-ethnicity source was published separately in v0.0.143 and remains outside the
-v0.0.152 parent. Its reviewed native gate replays all 217,122 rows against the
-retained CSVs, 49 local HTML category cells and 28 annual-report Table 1 controls.
-A subsequent normal parent must explicitly attach that exact pinned source;
-qualification of a separate source is not normal release integration.
+The [v0.0.153 normal parent](source-integration-status.md) attaches ethnicity
+enrollment for 2018–19 through 2025–26 and programs for 2022–23 through
+2025–26, statewide by district and campus with separate direct Texas
+observations. The older ethnicity source remains independently pinned to its
+v0.0.143 published manifest. Its reviewed native gate replays all 217,122 rows
+against the retained CSVs, 49 local HTML category cells and 28 annual-report
+Table 1 controls. The composed parent passed eight-year access and export
+acceptance; source publication and application activation remain separate.
 
 Use the same catalog-bound namespace and observation/series planner as other
 attached sources. This opens selected artifacts lazily; it does not put another
@@ -76,6 +76,14 @@ texas = release.series(
     "peims_student_programs_and_special_populations",
     "total_enrollment_count", "special_education_program_count",
     scope="state", years=[23, 24, 25, 26],
+)
+
+# Ethnicity enrollment spans eight years; keep the ethnicity row dimension.
+ethnicity = district.peims_student_enrollment_by_ethnicity
+ethnicity.years("enrollment_by_ethnicity_count")  # 2019 through 2026
+ethnicity_trend = release.series(
+    "peims_student_enrollment_by_ethnicity", "enrollment_by_ethnicity_count",
+    scope="district", years=list(range(2019, 2027)), ids=[101902],
 )
 ```
 

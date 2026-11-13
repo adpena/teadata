@@ -118,6 +118,13 @@ receipts, not an automatic PDF extraction or a sum of local counts. Local HTML
 witnesses check category cells without requiring an unavailable program total;
 the newer paired-family total checks remain strict. This source qualification
 does not by itself attach the historical years to an older normal parent.
+The built v0.0.153 normal parent attaches this exact source alongside the newer
+editions, exposing all 24 year/scope keys for 2018–19 through 2025–26. Its
+manifest SHA-256 is `7d580b06a708167f692f6457342eb3c5e5c5eec22b6f97ec7351a4e9001c3c2c`;
+build ID is `3469016dad7684b0cdc489ec11637cb830cdd34d85ee6faceaae5a4f0c9d58b2`.
+Normal-parent acceptance checked eight-year campus/district/direct Texas access,
+latest-year resolution, explicit unavailable-year errors and DataFrame, CSV,
+Excel and SQL exports. The earlier v0.0.152 parent remains unchanged.
 
 ### PEIMS College Credit in v0.0.142
 

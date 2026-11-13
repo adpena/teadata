@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
-  "observed_at": "2026-11-13T09:32:50.860543+00:00",
-  "code_commit": "f4d0ee0cd997acd9a6acb123eac7099fab91ac5a",
+  "observed_at": "2026-11-13T17:48:44.047535+00:00",
+  "code_commit": "61f37609d3d878cbaf0c549ae213bea283dbd10b",
   "config_sha256": "305c932090bb1e386fdc5f155c28f76ff937a5a2a2a66dfe416bf3318315a9d6",
   "selected_release": {
-    "tag": "v0.0.152",
-    "manifest_sha256": "f2966b6beb041fbfb395716b89f89c92ef018a183c96870b225b7e7e7dc69706",
-    "build_id": "116e56b765a7106e8046e872ff5c79ad7ded948cfa2611b4894e8563f8bb35bd",
+    "tag": "v0.0.153",
+    "manifest_sha256": "7d580b06a708167f692f6457342eb3c5e5c5eec22b6f97ec7351a4e9001c3c2c",
+    "build_id": "3469016dad7684b0cdc489ec11637cb830cdd34d85ee6faceaae5a4f0c9d58b2",
     "base_datasets": [
       "accountability",
       "all_districts_reference",
@@ -1145,6 +1145,119 @@
             "scope": "district",
             "table": "report_rows",
             "grain": "one publisher table row per original source input and logical CSV record"
+          }
+        ]
+      },
+      {
+        "sha256": "fdd86b5bf8e5c4b1e2a97523e3f651cf41281cf0f94cae5cfc7e0a97f0300791",
+        "editions": [
+          {
+            "edition_id": "38a41921b5ccfb2f6c445b32a70dd271d2d53349c4c3d9b0f91469a9f830668f",
+            "dataset": "peims_student_enrollment_by_ethnicity",
+            "edition": "2020",
+            "revision_sha256": "bfc33b061135852e773467ea6f71bc0832ac2b539d9557c99d3448b2f8d5dc0a",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one publisher row per school_year and campus_number and ethnicity"
+          },
+          {
+            "edition_id": "3a49f394cdec2a5d015aab1b3b0f24bd13c46595a5ab22d05117e4b0b7af29c0",
+            "dataset": "peims_student_enrollment_by_ethnicity",
+            "edition": "2022",
+            "revision_sha256": "5a40fcb47817428887987cf73d6f8adc41b972c5f6fe4192a6566959f722ea7f",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year and ethnicity"
+          },
+          {
+            "edition_id": "44fb0efc961bf4351bc7241ee1e633e624c266e32c1f619432e6cc25ed03821f",
+            "dataset": "peims_student_enrollment_by_ethnicity",
+            "edition": "2020",
+            "revision_sha256": "e531a4184c661cc893420995139799adf49f1728142cc504edc5bf7606ac2782",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number and ethnicity"
+          },
+          {
+            "edition_id": "5176f41b9d9e2146f70fe5e226204efa6a2bc178a712465dbb5023de87d364b7",
+            "dataset": "peims_student_enrollment_by_ethnicity",
+            "edition": "2022",
+            "revision_sha256": "7da2cf2570b9317cd985469c00065bc664482e2c60f1fcf78afc720af5f787fb",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number and ethnicity"
+          },
+          {
+            "edition_id": "622b1be6c169e90aaa553bd82cd1030b4f6b78f01c6570f27c8397f97cd45e41",
+            "dataset": "peims_student_enrollment_by_ethnicity",
+            "edition": "2021",
+            "revision_sha256": "d0500bd34b4fdb87beb8a821bbaaf8a3b84a5326a3f462dbd72e87f721b5ff5a",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year and ethnicity"
+          },
+          {
+            "edition_id": "84056bc81fef60186a1a7df719bd2bf835569ee69af022e9e4564d3a7149445f",
+            "dataset": "peims_student_enrollment_by_ethnicity",
+            "edition": "2022",
+            "revision_sha256": "3096e003c8b2e186df7970ce7c58f3ec1c84e14286f7b646dd609c649a02f687",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one publisher row per school_year and campus_number and ethnicity"
+          },
+          {
+            "edition_id": "93d53f7a43aa9b0a494b33ea6abd0901c6c98906b1d0234e30fb3d376c1f8b8a",
+            "dataset": "peims_student_enrollment_by_ethnicity",
+            "edition": "2019",
+            "revision_sha256": "7c845c177bdf80a491a6e11d1a70fe1be89f467875792c06393998a7304b7b12",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one publisher row per school_year and campus_number and ethnicity"
+          },
+          {
+            "edition_id": "baeb58cfa7c98e1c27819b7c9c2813a61badbe03a43383db6e53c3fcaeb18e5c",
+            "dataset": "peims_student_enrollment_by_ethnicity",
+            "edition": "2019",
+            "revision_sha256": "d10fc3ba84e61008f54ab5624ecc46bab474f7b229dd59e73ae86f6d22bfd0cb",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year and ethnicity"
+          },
+          {
+            "edition_id": "c75a9dc3a57a5b0f95bde86435d04ce7efd1e9c2bff3afd81752398d7d85453c",
+            "dataset": "peims_student_enrollment_by_ethnicity",
+            "edition": "2021",
+            "revision_sha256": "35a149291d6dd02a8b23c3b403cbaa02f6928f2abcf53ddab51610f1255fd2ad",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number and ethnicity"
+          },
+          {
+            "edition_id": "d3adf17fc55226b2489157ac02e9a389480ebf5aa3eece87a85b50a248e00329",
+            "dataset": "peims_student_enrollment_by_ethnicity",
+            "edition": "2020",
+            "revision_sha256": "b2c632b8c989cfc18cd3ea4a53a9a6b34650aa29bb412454e0c43b382b6d9f64",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year and ethnicity"
+          },
+          {
+            "edition_id": "f5a220f6f2bae546fbf864cfb8164e2accf13e66c72e338bc7761f09e0f93e61",
+            "dataset": "peims_student_enrollment_by_ethnicity",
+            "edition": "2019",
+            "revision_sha256": "56a642cf198cdb9a000ca2bc088907a7d40bd3ad15f2ade5aae7b533ccec7339",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number and ethnicity"
+          },
+          {
+            "edition_id": "fb2ef31cb2ffea5a5530994c45cde8842fdf3664cbe6f68062ee6e48d4f07c43",
+            "dataset": "peims_student_enrollment_by_ethnicity",
+            "edition": "2021",
+            "revision_sha256": "5fa7bbf2afe1f4fad1ba1b1279dc70def00bce438fb423d94c49ac809e783c77",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one publisher row per school_year and campus_number and ethnicity"
           }
         ]
       }
