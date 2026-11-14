@@ -15,8 +15,9 @@ from uuid import UUID
 import pytest
 
 from teadata.entities import District
+from teadata.engine import DataEngine
 from teadata.manifest import ContractError
-from teadata.release import DataRelease, using_release
+from teadata.release import DataRelease
 
 
 _SPP = "spp_timely_initial_evaluation"
@@ -83,9 +84,12 @@ def test_publisher_spp_goldens_through_the_normal_lazy_release(tmp_path, monkeyp
         id=UUID(int=28903), name="Source golden identity",
         district_number=28903,  # ty: ignore[invalid-argument-type]
     )
-    with using_release(release):
-        observed = entity.dataset(_SPP).at("2023-24").select(_RATE).to_arrow().to_pylist()
-        assert len(observed) == 1 and observed[0][_RATE] == Decimal("0.00")
+    engine = DataEngine()
+    engine.catalog = release.catalog
+    engine.add_district(entity)
+    engine.bind_release(release)
+    observed = entity.dataset(_SPP).at("2023-24").select(_RATE).to_arrow().to_pylist()
+    assert len(observed) == 1 and observed[0][_RATE] == Decimal("0.00")
     direct = release.for_entity(entity, edition="2025").dataset(_SPP)
     assert direct.timely_initial_evaluation_reported_percent == Decimal("0.00")
 
