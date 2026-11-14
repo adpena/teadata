@@ -97,7 +97,7 @@ class _ReleaseMethod(TypedDict):
     receiver: Literal["DataRelease"]
     description: str
     arguments: list[_MethodArgument]
-    result: Literal["ObservationSeries", "NativeSourceRef"]
+    result: Literal["ObservationSeries", "NativeSourceRef", "CatalogInventory", "CatalogDiff"]
     result_methods: list[str]
     result_operations: list[_SeriesMethod]
     discovery: list[str]
@@ -1086,6 +1086,24 @@ _RELEASE_METHODS: list[_ReleaseMethod] = [{
     "result_methods": ["to_dict"],
     "result_operations": [],
     "discovery": ["catalog.editions"],
+}, {
+    "name": "catalog_inventory",
+    "receiver": "DataRelease",
+    "description": "Inspect the selected release index without observation reads; optionally inspect verified variable metadata.",
+    "arguments": [{"kind": "keyword_only", **_argument("include_variables", "boolean", default=False,
+        description="False reads only the opened root. True can fetch metadata under the release's offline policy; never observation leaves.")}],
+    "result": "CatalogInventory",
+    "result_methods": [], "result_operations": [],
+    "discovery": ["catalog.native_sources", "catalog.editions", "catalog.variables"],
+}, {
+    "name": "catalog_diff",
+    "receiver": "DataRelease",
+    "description": "Compare exact before/after catalog identities and metadata; this does not establish comparability or approve adoption.",
+    "arguments": [{"kind": "positional", **_argument("other", python_types=("DataRelease",))},
+                  {"kind": "keyword_only", **_argument("include_variables", "boolean", default=False)}],
+    "result": "CatalogDiff",
+    "result_methods": [], "result_operations": [],
+    "discovery": ["catalog_inventory"],
 }]
 
 _register(

@@ -1,13 +1,13 @@
 # Entity enrichment sources and years
 
-The [v0.0.153 normal release](https://github.com/adpena/teadata/releases/tag/v0.0.153)
-composes ten native bundles, 12 dataset IDs and 132 edition/scope/partition keys,
+The [v0.0.155 normal release](https://github.com/adpena/teadata/releases/tag/v0.0.155)
+composes thirteen native bundles, 15 dataset IDs and 142 edition/scope/partition keys,
 alongside 13 unchanged base inputs. It includes PEIMS ethnicity for
 2018–19 through 2025–26 and programs for 2022–23 through 2025–26,
 statewide by district and campus plus direct Texas, and
 district transfer reports for 2023–24 through 2025–26. The primary-disability
 2012–13–2025–26 and staff FTE/salary 2022–23–2025–26 families remain available.
-The [integration inventory](source-integration-status.json) pins this exact
+The [integration inventory](source-integration-status-0.0.155.json) pins this exact
 selection. Library publication does not change deployed profiles or an
 unconfigured wheel's default data; select the release explicitly.
 
@@ -15,21 +15,23 @@ PEIMS ethnicity preserves one row per reported group. Use the matching programs
 report's direct total rather than reconstructing it from masked categories.
 Program counts overlap. District transfer rows preserve direction, reporting
 geography, published totals and pair details; they are not campus transfer edges
-or TEFA participation. Their current per-entity shortcut lacks a reviewed role
-binding; use the canonical source table with an explicit reporting/partner filter.
+or TEFA participation. The normal namespace now has the explicit reporting-
+district role binding. Preserve direction, partner and total/detail dimensions;
+scalar access refuses multiple rows rather than guessing an aggregate.
 Inspect each source's roster and limitations before pooling.
 
-## Attendance source additions under qualification
+## Attendance and evaluation additions in the selected release
 
-The following November 14, 2026 additions have retained-source replay checks but
-are not part of the published v0.0.153 parent above. Standalone qualification,
+The following attendance additions entered v0.0.154 and remain in v0.0.155.
+The SPP evaluation family entered v0.0.155. Standalone qualification,
 normal-parent composition, publication and application activation are distinct.
 The current work does not imply complete TAPR/TPRS domain coverage.
 
-| Dataset | Actual measurement years | Publisher edition | Qualified candidate coverage | Remaining scope |
+| Dataset | Actual measurement years | Publisher edition | Attached coverage | Remaining scope |
 | --- | --- | --- | --- | --- |
 | `summary_of_finances_attendance` | 2025–26 | Run 47422, Near Final | 1,243 LEAs in each of input/output LPE and DPE tables; six exact-decimal attendance fields | Direct state/sector figures remain separate retained reports; no synthesized state total. Other finance fields remain unqualified. |
 | `tprs_attendance_chronic_absence` | 2023–24 and 2024–25 | Named report edition 2025 | Direct Texas and all 20 ESC regions; attendance and chronic-absence percentages for 11 published populations | Complete current district/campus corpus and its partitioned access remain held. Newer report editions do not establish newer measurement years. |
+| `spp_timely_initial_evaluation` | 2023–24 and 2024–25 | 2025 and 2026, respectively | 1,212 reported districts per edition; consent count, timely count, reported percentage and target flag | No campus or direct Texas product is attached. Rounded percentage and the reported target flag remain separate. |
 
 See the [attendance source contract](attendance-sources.md) for definitions,
 precision, missingness and exact acquisition versus observation dates. Enrollment,
@@ -53,7 +55,12 @@ for CSV, DataFrame and Excel provenance and original-header behavior.
 
 For the current registration-to-release gap, see the dated
 [source integration inventory](source-integration-status.md) and its
-[machine-readable edition/scope comparison](source-integration-status.json).
+[machine-readable edition/scope comparison](source-integration-status-0.0.155.json).
+Configuration still registers 124 IDs and 276 editions; 99 preparation-only IDs
+remain unattached. This is not proof of their publisher availability, acquisition
+or semantic qualification. The selected catalog's explicit per-field periods
+control actual observation years. Software v0.0.156 adds metadata-only catalog
+inspection/diff tools; it does not create a new data release or extend coverage.
 The v0.0.128 table below remains a historical release description.
 
 This table describes the [v0.0.128 entity release](https://github.com/adpena/teadata/releases/tag/v0.0.128) used in the Quick Start, build ID `17061ef34da36b4c968e0d162cfeb2ba0dfddd64fe4fd8067a785b3dd2bca685`. It includes all 13 recorded inputs, including roster, boundary, and reference inputs used alongside enrichment. The catalog for each selected release records the requested and resolved edition, source period, and provenance.

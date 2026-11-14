@@ -92,7 +92,7 @@ def test_native_source_ref_discovery_matches_its_metadata_only_signature():
     from teadata.release import DataRelease
 
     methods = describe_operators()["release_methods"]
-    assert [method["name"] for method in methods] == ["series", "native_source_ref"]
+    assert [method["name"] for method in methods] == ["series", "native_source_ref", "catalog_inventory", "catalog_diff"]
     method = methods[1]
     assert method["receiver"] == "DataRelease" and method["result"] == "NativeSourceRef"
     assert method["result_methods"] == ["to_dict"] and method["result_operations"] == []
@@ -104,6 +104,23 @@ def test_native_source_ref_discovery_matches_its_metadata_only_signature():
     assert not argument["optional"] and parameter.default is Parameter.empty
     assert "without reading observations" in method["description"]
 
+
+
+def test_catalog_discovery_matches_public_method_signatures():
+    from inspect import Parameter, signature
+
+    from teadata.release import DataRelease
+
+    methods = {item["name"]: item for item in describe_operators()["release_methods"]}
+    for name in ("catalog_inventory", "catalog_diff"):
+        contract = methods[name]
+        params = list(signature(getattr(DataRelease, name)).parameters.values())[1:]
+        assert [item["name"] for item in contract["arguments"]] == [item.name for item in params]
+        for declared, parameter in zip(contract["arguments"], params, strict=True):
+            assert declared["kind"] == ("keyword_only" if parameter.kind is Parameter.KEYWORD_ONLY else "positional")
+            assert declared["optional"] is (parameter.default is not Parameter.empty)
+        flag = contract["arguments"][-1]
+        assert flag["name"] == "include_variables" and flag["default"] is False
 
 
 def test_discovery_fresh_import_does_not_load_release_or_read_data():

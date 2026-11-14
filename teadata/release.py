@@ -35,6 +35,7 @@ from .manifest import (
 )
 
 if TYPE_CHECKING:
+    from .release_inventory import CatalogDiff, CatalogInventory
     from .source_views import _SourceNameIndex
     from .source_series import ObservationSeries
     from .export_provenance import ExportProvenance
@@ -408,6 +409,22 @@ class DataRelease:
     def manifest_sha256(self) -> str:
         """SHA-256 of the manifest bytes parsed by this release."""
         return self._manifest_sha256
+
+    def catalog_inventory(self, *, include_variables: bool = False) -> CatalogInventory:
+        """Describe this exact release without opening observation leaves.
+
+        Default index mode reads only the already opened root. Variable mode
+        explicitly reads verified source/schema metadata using disposable readers.
+        """
+        from .release_inventory import catalog_inventory
+
+        return catalog_inventory(self, include_variables=include_variables)
+
+    def catalog_diff(self, other: DataRelease, *, include_variables: bool = False) -> CatalogDiff:
+        """Compare this release to another exact release; never infer comparability."""
+        from .release_inventory import catalog_diff
+
+        return catalog_diff(self, other, include_variables=include_variables)
 
     def native_source_ref(self, *, location: str) -> NativeSourceRef:
         """Describe this exact native source for an entity build, without reading observations.

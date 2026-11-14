@@ -1,13 +1,13 @@
 # Source integration status — November 14, 2026
 
-This page freezes the comparison for **v0.0.154**. A later release has its own
-catalog and may attach additional sources; these dated counts must not be
-reused as that later release's inventory. The selected release, rather than
-the installed software version, controls available observations.
+The current published normal release is **v0.0.155**. The selected release,
+rather than the installed software version, controls available observations.
+The v0.0.154 sections below remain a dated baseline; their counts must not be
+reused as the current inventory.
 
-## Version 0.0.155 integration candidate
+## Published version 0.0.155
 
-The next normal composition selects the same thirteen base inputs and twelve
+The published normal composition selects the same thirteen base inputs and twelve
 v0.0.154 native children, plus the exact reviewed SPP timely initial evaluation
 child `c7a02280b6228040552cb895da02a6fb9f9773887fc96e7121a257dc40adf95b`.
 It contains report editions **2025** and **2026**, measuring school years
@@ -23,14 +23,36 @@ displayed `100.0%` does not override a reported `NO` target flag. Workbook and
 independent HTML rate precision can differ; the original workbook observation
 and its reviewed source notes remain intact.
 
-This is an integration candidate, not an assertion of publication, selection as
-the package default, production application activation or 2025–26 measurement
-coverage. The final release manifest and release notes identify successful
-promotion. The v0.0.154 inventory below stays frozen. The optional
+The [v0.0.155 release](https://github.com/adpena/teadata/releases/tag/v0.0.155)
+was published November 14, 2026. Its manifest SHA-256 is
+`26bff6163de7b4c77b02073147218edc408bdfc7343362d145f4311365ea1402`;
+build ID is `5e4f2af1a23f82029dfb318a3f579260b2818481c6bd3f1d035a9585721b47d6`.
+It has **13 base inputs, 13 native attachments, 15 native dataset IDs and 142
+edition/scope keys**, with the same 1,229 district and 12,593 campus entities.
+This is not 2025–26 measurement coverage for SPP. Publication, release selection
+and downstream application activation are separate events. The v0.0.154
+inventory below stays frozen. The optional
 `tests/test_normal_spp_integration.py` golden requires an explicitly pinned,
 complete retained normal release; a portable-suite skip is not publisher proof.
 
-## Published normal release
+The [v0.0.155 machine inventory](source-integration-status-0.0.155.json) was
+recomputed from the exact published catalog and retained metadata, with no
+observation reads, TEA reacquisition or qualification replay. It preserves
+field-specific periods and units, exact partition/revision keys, attached report
+editions and scopes. Configuration still registers **124 IDs and 276 editions**;
+**99 source-only IDs are not attached**. Registration is not publisher
+availability, acquisition, parsing, qualification or query accessibility.
+The older v153/v154 inventories remain unchanged.
+
+Software v0.0.156 introduces `DataRelease.catalog_inventory()` and
+`catalog_diff(other)` for repeatable metadata-only coverage and adoption review.
+These methods are absent from the v0.0.155 wheel; the data release inspected
+here remains v0.0.155. Default index mode opens no extra files or
+observations. Explicit variable mode reads verified metadata, never source rows,
+using temporary readers that leave the caller's caches unchanged. See
+[catalog inspection and comparison](data-releases.md#catalog-inspection-and-comparison).
+
+## Historical v0.0.154 baseline
 
 The November 14 [version 0.0.154 release](https://github.com/adpena/teadata/releases/tag/v0.0.154)
 was built through the official

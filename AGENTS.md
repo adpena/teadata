@@ -68,6 +68,13 @@ Python 3.14 and 3.15 are required compatibility targets alongside supported earl
 
 ## Completing Source Integration
 
+- Inspect exact release coverage with `DataRelease.catalog_inventory()` and
+  `catalog_diff(other)` where supported by the selected software. Default index
+  mode opens no additional files; explicit variable mode reads verified metadata,
+  not observations. Use `scripts/source_inventory.py` to regenerate a dated
+  configuration-versus-release report. Never treat registration, an empty index
+  diff, or a catalog attachment as new semantic qualification or deployment proof.
+
 - Registration, acquisition, a standalone candidate and a separate source release are intermediate stages. Report them separately from qualified fields available through the selected normal entity release and DSL. Use the dated [integration inventory](docs/source-integration-status.md) as an audit record; recompute its comparison when configuration or the selected release changes.
 - Feed qualified source contracts through the normal ingestion/enrichment and release-composition path. Reuse the catalog, field bindings and lazy metadata mapping for direct fields, dataset namespaces, discovery, queries and provenance. Avoid per-dataset copies of entity properties, query logic, storage or export mappings when the existing contract can drive them.
 - Preserve source-specific parsing and semantic qualification where needed. Registration must not automatically qualify or publish unreviewed values. Keep multi-row source dimensions explicit; do not flatten them into conflicting scalars, infer suppressed values, or substitute another population/year.

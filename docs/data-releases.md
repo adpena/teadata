@@ -990,3 +990,57 @@ access still uses only retained verified cache files; locking never enables a
 network fallback.
 
 The application requires the coordinated library version, schema migrations, and release manifest. Publish and pin those together before deployment. Never merge the app against an older library tag. Preserve the previous deployed code and data bundle for rollback. The migration's missing joins, unreviewed documentation, unknown original download dates, and incomplete upstream lineage must remain visible; they prevent claiming this baseline has completed researcher-grade dataset certification.
+# Catalog inspection and comparison
+
+The following methods are introduced in software v0.0.156; they are not in the
+v0.0.155 wheel. The immutable data release can remain v0.0.155. Open exact pinned releases, then
+inspect or compare their existing catalog without creating an engine:
+
+```python
+from teadata.release import DataRelease
+
+before = DataRelease("/retained/older/release.json", expected_sha256=older_sha, offline=True)
+after = DataRelease("/retained/newer/release.json", expected_sha256=newer_sha, offline=True)
+index = after.catalog_inventory()
+changes = before.catalog_diff(after)  # before -> after
+```
+
+Both return detached, JSON-ready dictionaries with schema version 1 and exact
+manifest/build identities. Default index mode uses only the already opened
+root: base inputs, native attachment descriptors, edition keys and root metadata
+resource descriptors. It performs no extra file or network reads. Partitions
+and revisions remain separate. Attachment changes are visible even when edition
+keys remain the same. A changed manifest is reported independently of the
+projected rows.
+
+Pass `include_variables=True` to inspect exact field metadata, periods, units,
+publisher headers and value-policy/support identities. This can fetch missing
+native manifests and metadata when the selected release permits online access.
+Offline releases refuse missing metadata. Neither mode opens observation leaves
+or a snapshot. Temporary readers bound the lifetime of decoded catalog metadata;
+they do not fill or clear the caller's caches. Returned metadata still occupies
+memory proportional to the requested result. Legacy scalar base inputs do not
+provide a complete native variable index through this method.
+
+`metadata_inspected=False` means semantic metadata was not inspected, including
+metadata inside attachments. An empty index diff does not prove its equality,
+value equality, scientific comparability or safe automatic adoption. Inspect
+field periods and source definitions before a trend; publisher report editions
+are not measurement years. The report does not confer acquisition, semantic
+qualification, publication or deployment approval. Local manifest paths can
+appear in the release identity; review a report before sharing it publicly.
+
+The source checkout's reproducible registration comparison is:
+
+```bash
+uv run --no-sync python scripts/source_inventory.py \
+  --release /retained/release.json --sha256 "$MANIFEST_SHA256" \
+  --config teadata/teadata_sources.yaml --include-variables
+```
+
+It is offline by default; `--online` explicitly permits metadata downloads.
+Configuration registration and attachment are reported separately by dataset,
+registered edition and attached scopes. Unestablished publisher availability,
+acquisition/qualification and downstream deployment stay explicit. The coverage
+file groups fields sharing identical period/unit metadata to avoid repeating
+the same objects for every field. Use the library inventory for full bindings.
