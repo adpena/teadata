@@ -747,6 +747,31 @@ class DataRelease:
 
     def tprs_student_campus_index(self, *, edition: str) -> TPRSStudentCampusIndex:
         """Prepare reusable point routes for one literal TPRS Student report edition."""
+        from .tprs_statewide_intake import DATASET, TPRSStudentCampusIndex
+
+        if not isinstance(edition, str) or len(edition) != 4 or not edition.isascii() or not edition.isdigit():
+            raise ValueError("Select a four-digit publisher edition, such as '2026'")
+        # Reuse the same verified routes as cohort observations. Discovery uses
+        # a disposable catalog, not the caller's potentially long-lived views.
+        child = None
+        if getattr(os, "O_NOFOLLOW", 0):
+            if self._v3 and getattr(self.catalog, "_v4", False):
+                child = DataRelease(self.source if self.remote else self.path, expected_sha256=self.manifest_sha256,
+                                    offline=self.offline, cache_dir=self._cache_dir)
+            elif not self._v3:
+                refs = [ref for ref in self.catalog.native_sources if any(
+                    (key.dataset, key.scope, key.edition) == (DATASET, "campus", edition) for key in ref.editions)]
+                if len(refs) == 1:
+                    child = _open_native_source(refs[0], self.source if self.remote else self.path,
+                                                offline=self.offline, cache_dir=self._cache_dir)
+        if child is not None:
+            try:
+                route = self._automatic_student_campus_index(child, edition, reuse_catalog=True, require_ledger=True)
+                if route is not None and route.files and route.matches_files(child):
+                    return TPRSStudentCampusIndex(self.manifest_sha256, edition, route.index._routes)
+            finally:
+                child.catalog._clear_edition_caches()
+                child._column_schema_data.clear()
         return self._build_student_campus_index(edition)
 
     def _build_student_campus_index(
@@ -964,12 +989,14 @@ class DataRelease:
     def _entity_observations(
         self, dataset: str, fields: tuple[str, ...], *, school_year: int | None, scope: str,
         edition: EditionKey | None, identifiers: tuple[str, ...],
+        _options: Sequence[tuple[DataRelease, EditionKey, dict[str, int]]] | None = None,
     ) -> SourceTable | PartitionedSourceTable:
         from .tprs_statewide_intake import DATASET
 
         route_campuses = dataset == DATASET and scope == "campus" and edition is None and bool(identifiers)
         route_class_size = dataset == "tprs_class_size" and scope == "campus" and edition is None and bool(identifiers)
-        memoize = ((route_campuses or route_class_size) and not self._v3 and bool(getattr(os, "O_NOFOLLOW", 0))
+        memoize = (_options is None and (route_campuses or route_class_size) and not self._v3
+                   and bool(getattr(os, "O_NOFOLLOW", 0))
                    and 0 < len(fields) <= 32 and all(isinstance(name, str) and len(name) <= 256 for name in fields))
         request = (fields, school_year)
         parent = self.source if self.remote else self.path
@@ -999,7 +1026,8 @@ class DataRelease:
                     return self._routed_student_campuses(fields, memo.year, child, memo.keys, memo.route.index,
                                                          identifiers)
                 self.__dict__.pop(memo_name, None)
-        selected_options = (self._observation_year_options(dataset, fields, scope, edition, memoize, cleanup_on_error=True)
+        selected_options = (_options if _options is not None else
+                            self._observation_year_options(dataset, fields, scope, edition, memoize, cleanup_on_error=True)
                             if route_class_size else
                             self._observation_year_options(dataset, fields, scope, edition, True) if memoize else
                             self._observation_year_options(dataset, fields, scope, edition))
@@ -1147,7 +1175,7 @@ class DataRelease:
         return parts[0] if len(parts) == 1 else PartitionedSourceTable(parts)
 
     def _automatic_student_campus_index(
-        self, child: DataRelease, edition: str, *, reuse_catalog: bool = False,
+        self, child: DataRelease, edition: str, *, reuse_catalog: bool = False, require_ledger: bool = False,
     ) -> _CampusRouteAdmission | None:
         from .tprs_statewide_intake import DATASET
 
@@ -1157,13 +1185,14 @@ class DataRelease:
             if cached.matches_files(child):
                 return cached
             indexes.pop(identity, None)
-        catalog = child.catalog
-        keys = {key.identity for key in catalog._edition_keys.values()
-                if (key.dataset, key.scope, key.edition) == (DATASET, "campus", edition)}
-        artifacts = [catalog.artifact_ref(identifier) for identifier, key in catalog._artifact_routes.items() if key in keys]
-        roster_backed = [_student_attachments(catalog, artifact) for artifact in artifacts]
-        if not all(roster_backed) or len(artifacts) != len(keys):
-            return None
+        if not require_ledger:
+            catalog = child.catalog
+            keys = {key.identity for key in catalog._edition_keys.values()
+                    if (key.dataset, key.scope, key.edition) == (DATASET, "campus", edition)}
+            artifacts = [catalog.artifact_ref(identifier) for identifier, key in catalog._artifact_routes.items() if key in keys]
+            roster_backed = [_student_attachments(catalog, artifact) for artifact in artifacts]
+            if not all(roster_backed) or len(artifacts) != len(keys):
+                return None
         trace: set[_MetadataStamp] | None = set() if getattr(os, "O_NOFOLLOW", 0) else None
         if reuse_catalog:
             discovery_trace = child._metadata_trace

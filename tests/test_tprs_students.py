@@ -1045,6 +1045,13 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(
             identifier = report["identifier"]
             assert index.edition_for("'" + identifier) == index.edition_for(int(identifier)) == key
         assert index.edition_for(excluded) is None
+        if getattr(os, "O_NOFOLLOW", 0):
+            with monkeypatch.context() as warm_route:
+                warm_route.setattr(DataRelease, "_build_student_campus_index",
+                                   lambda *a, **k: pytest.fail("Warm point lookup rebuilt the statewide route"))
+                again = release.tprs_student_campus_index(edition="2026")
+                assert again.manifest_sha256 == release.manifest_sha256
+                assert again.edition_for(intake["reports"][0]["identifier"]) == key
         assert len(release.tprs_student_campus_index(edition="2025")) == 0
         assert not release.catalog._edition_views and not release.catalog._edition_children
         for invalid in ("", "000000000", "12x", True, 123.0):
@@ -1060,7 +1067,7 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(
         with monkeypatch.context() as routing:
             routing.setattr("teadata.release._student_attachments", lambda *_: {})
             with pytest.raises(ContractError, match="admitted Student report ledger"):
-                release.tprs_student_campus_index(edition="2026")
+                DataRelease(release.path, offline=True).tprs_student_campus_index(edition="2026")
         read_artifact_ref = DatasetCatalog.artifact_ref
 
         def nonleaf(catalog, artifact_id):
@@ -1069,7 +1076,7 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(
         with monkeypatch.context() as routing:
             routing.setattr(DatasetCatalog, "artifact_ref", nonleaf)
             with pytest.raises(ContractError, match="analytical leaf processing output"):
-                release.tprs_student_campus_index(edition="2026")
+                DataRelease(release.path, offline=True).tprs_student_campus_index(edition="2026")
         read_ledger = DataRelease._student_report_ledger
 
         def overlapping(reader, artifact, refs):
@@ -1079,7 +1086,7 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(
         with monkeypatch.context() as routing:
             routing.setattr(DataRelease, "_student_report_ledger", overlapping)
             with pytest.raises(ContractError, match="Multiple Student editions contain campus"):
-                release.tprs_student_campus_index(edition="2026")
+                DataRelease(release.path, offline=True).tprs_student_campus_index(edition="2026")
         read_metadata = DatasetCatalog._edition_child
 
         def foreign(catalog, edition_id):
@@ -1091,7 +1098,7 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(
             routing.setattr(DatasetCatalog, "_edition_child", foreign)
             routing.setattr(DatasetCatalog, "artifact_ref", lambda *_: pytest.fail("routing followed a foreign binding"))
             with pytest.raises(ContractError, match="self-contained Student edition"):
-                release.tprs_student_campus_index(edition="2026")
+                DataRelease(release.path, offline=True).tprs_student_campus_index(edition="2026")
         metadata_ref, = release.catalog.edition_metadata_refs()
         metadata_path = output / metadata_ref.location
         original_metadata = metadata_path.read_bytes()
@@ -1243,7 +1250,9 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(
                         students.DATASET, (field,), identifiers=(last_id,), **options,
                     )
                 assert native_view.edition == key and direct.release._column_schema_data == direct_buffers
-                assert len(ledger_calls) == 4 and all(receiver != id(direct.release) for receiver, _, _ in ledger_calls)
+                # Public point access and cohort observations share the guarded
+                # route instead of validating the same two ledgers twice.
+                assert len(ledger_calls) == 2 and all(receiver != id(direct.release) for receiver, _, _ in ledger_calls)
 
                 manifest = composed.path.read_bytes()
 
@@ -1282,6 +1291,18 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(
             planning.setattr(uncached, "_observation_year_options", options_with_a_gap)
             legacy = cohort.observations(students.DATASET, field, school_year=26, release=uncached)
             assert isinstance(legacy, SourceTable) and legacy.edition != key
+        with monkeypatch.context() as series_plan:
+            series_plan.setattr(DataRelease, "artifact", lambda *a, **k: pytest.fail("Series planning opened a leaf"))
+            series = parent.series(students.DATASET, field, scope="campus", years=[26],
+                                   ids=[first_id, "'" + last_id])
+            assert series.years == (2026,)
+            assert isinstance(series.for_year(26), PartitionedSourceTable)
+            assert [part._entity_ids for part in series.for_year(26).partitions] == [(first_id,), (last_id,)]
+            public_index = parent.tprs_student_campus_index(edition="2026")
+            assert public_index.manifest_sha256 == parent.manifest_sha256
+            assert public_index.edition_for(last_id) == key
+        assert series.to_arrow()[field].to_pylist() == [1, 1]
+        assert len(series.provenance()["sources"]) == 2
         with monkeypatch.context() as filters:
             from teadata.analytical import _leaf_schema
 

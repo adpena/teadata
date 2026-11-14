@@ -1,13 +1,47 @@
 # Source integration status — November 14, 2026
 
-## New normal-parent candidate
+This page freezes the comparison for **v0.0.154**. A later release has its own
+catalog and may attach additional sources; these dated counts must not be
+reused as that later release's inventory. The selected release, rather than
+the installed software version, controls available observations.
 
-The November 14 version 0.0.154 candidate was built through the official
+## Version 0.0.155 integration candidate
+
+The next normal composition selects the same thirteen base inputs and twelve
+v0.0.154 native children, plus the exact reviewed SPP timely initial evaluation
+child `c7a02280b6228040552cb895da02a6fb9f9773887fc96e7121a257dc40adf95b`.
+It contains report editions **2025** and **2026**, measuring school years
+**2023–24** and **2024–25**, respectively, with **1,212 district rows** per
+edition. It has no campus or direct Texas product. Source-reported charter
+school districts remain in the district roster; current-entity joins must not
+drop historical publisher rows.
+
+Its four facts are initial-evaluation consent count, timely initial-evaluation
+count, reported percentage and met-target flag. Observed zero, `NR`, suppressed
+counts and rounded published percentages remain distinct. In particular, a
+displayed `100.0%` does not override a reported `NO` target flag. Workbook and
+independent HTML rate precision can differ; the original workbook observation
+and its reviewed source notes remain intact.
+
+This is an integration candidate, not an assertion of publication, selection as
+the package default, production application activation or 2025–26 measurement
+coverage. The final release manifest and release notes identify successful
+promotion. The v0.0.154 inventory below stays frozen. The optional
+`tests/test_normal_spp_integration.py` golden requires an explicitly pinned,
+complete retained normal release; a portable-suite skip is not publisher proof.
+
+## Published normal release
+
+The November 14 [version 0.0.154 release](https://github.com/adpena/teadata/releases/tag/v0.0.154)
+was built through the official
 `python -m teadata.load_data` pipeline from the same 13 retained base inputs,
 with 12 pinned native attachments and 140 source edition keys. Its manifest
 SHA-256 is `c6d3d8fa152e67d7b992a2ff73c56d4725abe7f0171f57fc40158b27337a8520`.
-It contains 1,229 district entities and 12,593 campus entities. This is a local
-candidate, not a new published default or production app activation.
+It contains 1,229 district entities and 12,593 campus entities. Its software and
+data assets were published on November 14. Select the immutable release
+explicitly; installing the package does not download the corpus or activate
+the production application. The application retains its separately qualified
+release until its cache and runtime gates pass.
 
 | New or revised family | Actual measurement years and scope | Qualification boundary |
 | --- | --- | --- |
@@ -15,24 +49,26 @@ candidate, not a new published default or production app activation.
 | Attendance and chronic absence | 2023–24 and 2024–25; direct Texas plus 20 ESCs | 22 population/measure fields per period. District/campus acquisition remains held; 2025 report edition is not 2025–26 measurement data. |
 | District transfer source binding | 2023–24 through 2025–26; district report rows | Explicit reporting-district identity supports entity filtering without flattening direction, partner or total/detail rows. Independent retained reports and masks remain unchanged. |
 
-The exact child qualification and raw/export checks are separate from candidate
+The exact child qualification and raw/export checks remain separate from
 normal-parent acceptance, package publication and application cache activation.
-See [attendance definitions and limitations](attendance-sources.md). The dated
-machine-readable inventory below continues to identify published 153; the
-candidate's own catalog exposes its new attachments and available periods.
+See [attendance definitions and limitations](attendance-sources.md). The
+[v0.0.154 machine-readable inventory](source-integration-status-0.0.154.json)
+records the current configuration comparison and actual attached periods.
+The [v0.0.153 inventory](source-integration-status.json) remains an unchanged,
+dated baseline. Neither inventory is a live publisher-availability feed.
 
-## Published baseline inventory
+## Selected-release inventory
 
 This is a dated inventory of the tracked source configuration at code commit
-`61f37609d3d878cbaf0c549ae213bea283dbd10b`, compared with the built and
-access-tested [v0.0.153 normal parent](https://github.com/adpena/teadata/releases/download/v0.0.153/release.json),
-manifest SHA-256 `7d580b06a708167f692f6457342eb3c5e5c5eec22b6f97ec7351a4e9001c3c2c`.
+`fb6b324ca6769f5945df263faf4ac571825fb333`, compared with the built and
+access-tested [v0.0.154 normal parent](https://github.com/adpena/teadata/releases/download/v0.0.154/release.json),
+manifest SHA-256 `c6d3d8fa152e67d7b992a2ff73c56d4725abe7f0171f57fc40158b27337a8520`.
 The configuration matches the recorded SHA-256. This metadata comparison does
 not itself establish field qualification; matching release gates and publisher
 evidence remain separate. No new source acquisition is claimed.
 
 Generic lazy entity namespaces (`entity.dataset(name)` and `entity.<dataset>`)
-use the existing observation planner. The v0.0.153 normal parent composes ten
+use the existing observation planner. The v0.0.154 normal parent composes twelve
 attached bundles, including PEIMS enrollment by ethnicity for 2018–19 through
 2025–26 and programs for 2022–23 through 2025–26 at district, campus and direct Texas scopes, plus district
 transfer reports for 2023–24 through 2025–26. It preserves the prior primary
@@ -48,10 +84,12 @@ combined TAPR entity profiles. Absence of a separate source ID does not establis
 that every corresponding measure is missing. Conversely, registration does not
 establish acquisition, interpretation, qualification or availability in a release.
 
-The parent has 13 base inputs and ten attached bundles exposing 12 native
-dataset IDs across 132 editions. Eleven IDs are in the preparation-only configuration; the
-remaining ID, class size, is derived from retained TPRS reports. The complete
-[machine-readable inventory](source-integration-status.json) records exact
+The parent has 13 base inputs and twelve attached bundles exposing 14 native
+dataset IDs across 140 edition/scope keys. Eleven IDs are in the preparation-only
+configuration. Class size, attendance/chronic absence and the SOF attendance
+projection have their own retained source contracts outside that configuration.
+The complete
+[machine-readable inventory](source-integration-status-0.0.154.json) records exact
 registered periods, source flags and attached edition/scope identities. Its
 configuration digest and parent hash pin this comparison; it is not a live feed.
 
@@ -64,11 +102,11 @@ configuration digest and parent hash pin this comparison; it is not a live feed.
 | PEIMS enrollment by ethnicity; programs and special populations | 2019–2026; 2023–2026 | All registered years delivered in district/campus/direct Texas: ethnicity enrollment 2019–2026; programs 2023–2026. Preserve Enrollment versus Membership and all publisher tokens. Earlier ethnicity and programs sources remain unqualified. |
 | PEIMS teacher/course enrollment; college credit | 2023–2026; 2022–2026 | Preserve the course/program row dimensions and denominators through normal lazy access. |
 | PEIMS single-file financial actuals; budgets | 2013–2025; 2026 | Resolve field/unit qualification and formula changes; retain fiscal years, sectors, actual/budget basis and account grain. These are not the already attached FRC per-pupil table. |
-| District transfer reports | 2013–2026 | Delivered for 2024–2026 as a canonical source table at district-report grain; per-entity/ID-cohort role binding remains unavailable. Earlier years remain outside this parent; older classification holds remain explicit. Campus transfer edges are a separate source and grain. |
+| District transfer reports | 2013–2026 | Delivered for 2024–2026 at district-report grain, including explicit reporting-district binding for entity and ID-cohort selection. Directions, partners and source total/detail rows remain separate; multi-row scalar access fails rather than flattening them. Earlier years remain outside this parent; older classification holds remain explicit. Campus transfer edges are a separate source and grain. |
 | STAAR domains across campus/district/region/Texas | 2024–2026, varying by domain | Complete qualified source binding and release delivery for performance, participation, growth, tested grades, EOC and bilingual/ESL domains. Edition is not necessarily assessment year. |
 | Graduation, dropout, readiness and college-readiness components | 2024/2025, varying by source | Preserve annual versus longitudinal populations, graduation exclusions, overlapping criteria and actual cohorts. |
 | Educator hiring, retention and initial certification | Registered 2026 editions containing source-specific historical series | Deliver the existing multi-row role, route, EPP, demographic and cohort contracts; do not interpret edition 2026 as a single observation year. |
-| SPP timely initial evaluation; RDA special education Indicator 1 | 2024–2025; 2025 | Integrate the exact reviewed scope/period variants, preserving pooled versus single-year rates. |
+| SPP timely initial evaluation; RDA special education Indicator 1 | SPP configuration years 2024–2025; RDA 2025 | The reviewed SPP child contains report editions 2025 and 2026 measuring school years 2023–24 and 2024–25, with 1,212 district rows each. It is qualified separately and absent from this selected v0.0.154 parent; normal composition remains a separate gate. RDA and pooled versus single-year rates remain separate products. |
 | Separate TAPR student, regional/state staff and reference profiles | Mostly 2024/2025 | Reconcile overlap with existing base fields and attach qualified additional periods/scopes without duplication. |
 
 The separate PEIMS Superintendent Salary product is **not registered** in this
@@ -91,6 +129,8 @@ from Staff FTE and Salary or initial-certification counts.
 | PEIMS enrollment by ethnicity | 2019–2026: district, campus and direct Texas; preserve ethnicity rows |
 | PEIMS programs and special populations | 2023–2026: district, campus and direct Texas; overlapping groups |
 | District transfer reports | 2024–2026: district-report rows from all acquired regional products; direct published totals stay separate from pair rows |
+| SOF attendance equivalents | 2025–26: six fields in four statewide district/charter LPE/DPE worksheets; run 47422 Near Final, not a direct Texas aggregate |
+| Attendance and chronic absence | Report edition 2025, actual measurement years 2023–24 and 2024–25: direct Texas and 20 ESC regions; district/campus scopes held |
 
 This table establishes attachment from manifest/catalog metadata. It does not
 claim every source column has qualified semantics or that every direct entity
@@ -133,7 +173,7 @@ Normal builds exclude `source_only` inputs unless explicitly attached. Parent
 and standalone verification select the same reviewed source plan and bind
 receipt evidence separately to each exact child manifest. The shared lazy entity
 facade consumes the attached catalogs without a second mapping or store. The
-inventory above reflects the current ten-child selection; other families still
+inventory above reflects the selected twelve-child release; other families still
 require their own source qualification and normal integration. Preserve publisher
 evidence and the approval boundary: registration alone must not automatically
 qualify or publish a source merely to clear this inventory.
@@ -152,7 +192,7 @@ do not establish their absence from the repository or their publisher availabili
 
 ## Reproduce the metadata comparison
 
-Use the inspected code/configuration and a retained v0.0.153 manifest with its
+Use the inspected code/configuration and a retained v0.0.154 manifest with its
 assets. This reads source contracts and attachment descriptors, not observations:
 
 ```python
@@ -168,7 +208,7 @@ source_only = {
            for year in editions.available_years())
 }
 release = DataRelease("/path/to/retained/release.json", offline=True,
-    expected_sha256="7d580b06a708167f692f6457342eb3c5e5c5eec22b6f97ec7351a4e9001c3c2c")
+    expected_sha256="c6d3d8fa152e67d7b992a2ff73c56d4725abe7f0171f57fc40158b27337a8520")
 attached = {key.dataset for ref in release.catalog.native_sources for key in ref.editions}
 print(len(configured), sum(len(item.available_years()) for item in configured.values()))
 print(len(source_only), len(source_only - attached))

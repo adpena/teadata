@@ -148,7 +148,8 @@ def edition_fixture(tmp_path):
 def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staff"), multiple_inputs=False, damage_inputs=None,
                          normalized=False, support_damage=None, source_qualifiers=None, row_runs=None,
                          qualifier_reference_damage=None, amount_period=None, observed_amount=5, entity_grain=False,
-                         name_period=None, extra_context=None, unique_entity_key=False, entity_binding=None):
+                         name_period=None, extra_context=None, unique_entity_key=False, entity_binding=None,
+                         dataset_name=None, identifiers=None):
     """The same tiny fixture, optionally widened without adding source rows."""
     import pyarrow as pa
     import pyarrow.csv as pacsv
@@ -159,13 +160,19 @@ def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staf
     store = ProvenanceStore(tmp_path / "provenance")
     specs, datasets, schemas = [], {}, {}
     for family in families:
-        dataset = "campus_" + family
+        dataset = dataset_name or "campus_" + family
         raw = tmp_path / (family + ".csv")
         extra_codes = [f"EXTRA{i:03d}" for i in range(extra_fields)]
         extra_names = [f"extra_{i:03d}" for i in range(extra_fields)]
         raw.write_text((f"ID,NAME,VALUE\n001,Zero,0\n002,Suppressed,-999\n003,Missing,.\n004,Observed,{observed_amount}\n") if normalized else
                        ",".join(["ID", "NAME", "VALUE", *extra_codes]) + "\n"
                        + ",".join(["001", "One", "5", *["1"] * extra_fields]) + "\n")
+        if identifiers is not None:
+            assert normalized and len(identifiers) == 4 and not multiple_inputs and row_runs is None
+            raw.write_text("ID,NAME,VALUE\n" + "".join(
+                f"{identifier},{name},{value}\n" for identifier, (name, value) in zip(identifiers,
+                    (("Zero", "0"), ("Suppressed", "-999"), ("Missing", "."), ("Observed", str(observed_amount))),
+                    strict=True)))
         if row_runs is not None:
             assert normalized and not extra_fields and len(row_runs) == 4
             raw.write_text("ID,NAME,VALUE,SOF_RUN_ID\n" + "".join(
