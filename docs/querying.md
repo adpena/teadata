@@ -127,6 +127,30 @@ build, pass its pinned `DataRelease` as `release=` or enter its `using_release`
 context. The DataFrame lineage records both the entity manifest and the native
 manifest, edition, artifact and measurement period.
 
+Source row identity and entity selection are separate. A district transfer
+report can contain many rows for its reporting district. Newly qualified
+contracts can declare that reporting role without changing the publisher's
+unique source-input/record keys. The normal namespace and observation query
+use that declaration; they do not add another transfer store or sum rows.
+
+```python
+transfers = district.dataset("district_transfer_reports").at(26).select(
+    "student_transfer_count", "transfer_direction", "partner_district_number",
+)
+outgoing = transfers.query("transfer_direction == @direction", params={"direction": "out"}, record=True)
+frame = outgoing.to_df()
+provenance = outgoing.provenance().to_dict()
+```
+
+This requires a release containing the explicit reporting-district binding.
+Earlier immutable releases retain their original source-table access; an
+unavailable entity binding raises an actionable error. The selected district
+is the district whose report is read. Direction identifies origin and
+destination; it is not automatically the district of residence. Retain detail
+versus publisher-total rows and raw suppression statuses explicitly. Scalar
+dot access refuses multiple published rows. Multi-year retrieval keeps those
+rows; `pair_years()` still requires one unique observation per entity/year.
+
 The same year selection works directly on a separately published native
 `DataRelease`. Filter its source keys to reach historical entities absent from
 the current snapshot. For several years, iterate the desired values from

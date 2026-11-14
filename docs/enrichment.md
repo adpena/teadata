@@ -256,6 +256,19 @@ and rollback to the caller. Let errors propagate out of
 `with engine.begin() as connection` to roll back an incomplete import.
 With SQLite's legacy transaction mode, use a top-level transaction.
 
+For Arrow Decimal facts, use SQLAlchemy `Text` or sufficiently wide `String`
+columns for a portable exact round trip. The writer stores the decimal spelling
+and the reader restores the pinned Arrow precision/scale; the original publisher
+token and status remain separate columns. Excel likewise retains decimals as
+text. SQLite `Numeric` and `Float` destinations are refused for decimal facts
+rather than silently losing precision. Native PostgreSQL/DuckDB `Numeric`
+requires sufficient precision/scale, `asdecimal=True`, and an actual raw-driver
+Decimal round-trip probe before rows or the import receipt are written. A driver
+that converts through float must use the text path. The receipt records the
+chosen decimal storage contract, and readback rejects incompatible types,
+nonfinite values, overflow and rounding. Existing nondecimal receipts keep their
+previous representation.
+
 The JSON receipt stores the exact root build and manifest checksum, edition
 and artifact identities, field definitions, publisher links, acquisition
 dates where known, selector, citations and observed row counts by year.

@@ -1,4 +1,27 @@
-# Source integration status — November 13, 2026
+# Source integration status — November 14, 2026
+
+## New normal-parent candidate
+
+The November 14 version 0.0.154 candidate was built through the official
+`python -m teadata.load_data` pipeline from the same 13 retained base inputs,
+with 12 pinned native attachments and 140 source edition keys. Its manifest
+SHA-256 is `c6d3d8fa152e67d7b992a2ff73c56d4725abe7f0171f57fc40158b27337a8520`.
+It contains 1,229 district entities and 12,593 campus entities. This is a local
+candidate, not a new published default or production app activation.
+
+| New or revised family | Actual measurement years and scope | Qualification boundary |
+| --- | --- | --- |
+| SOF attendance equivalents | 2025–26; 1,243 LEA rows in each of four LPE/DPE worksheets | Six selected fields; publication run 47422 Near Final, mixed row runs and exact decimal precision retained. Other finance fields remain unqualified. |
+| Attendance and chronic absence | 2023–24 and 2024–25; direct Texas plus 20 ESCs | 22 population/measure fields per period. District/campus acquisition remains held; 2025 report edition is not 2025–26 measurement data. |
+| District transfer source binding | 2023–24 through 2025–26; district report rows | Explicit reporting-district identity supports entity filtering without flattening direction, partner or total/detail rows. Independent retained reports and masks remain unchanged. |
+
+The exact child qualification and raw/export checks are separate from candidate
+normal-parent acceptance, package publication and application cache activation.
+See [attendance definitions and limitations](attendance-sources.md). The dated
+machine-readable inventory below continues to identify published 153; the
+candidate's own catalog exposes its new attachments and available periods.
+
+## Published baseline inventory
 
 This is a dated inventory of the tracked source configuration at code commit
 `61f37609d3d878cbaf0c549ae213bea283dbd10b`, compared with the built and

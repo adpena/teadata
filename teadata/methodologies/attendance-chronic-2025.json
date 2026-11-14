@@ -1,0 +1,24 @@
+{
+  "schema_version": 1,
+  "dataset": "tprs_attendance_chronic_absence",
+  "source_edition": "2025",
+  "measurement_years": [2025, 2024],
+  "sections": {"Attendance Rate": "attendance", "Chronic Absenteeism": "chronic_absence"},
+  "population_headers": ["AfricanAmerican", "Hispanic", "White", "AmericanIndian", "Asian", "PacificIslander", "Two orMoreRaces", "SpecialEd", "EconDisadv", "EB/EL"],
+  "populations": ["all_students", "african_american", "hispanic", "white", "american_indian", "asian", "pacific_islander", "two_or_more_races", "special_education", "economically_disadvantaged", "eb_el"],
+  "local_column": {"state": 1, "region": 2, "district": 3, "campus": 3},
+  "tokens": {"-": "not_applicable", "*": "suppressed", "?": "invalid"},
+  "unit": "percent",
+  "decimal_precision": 4,
+  "decimal_scale": 1,
+  "glossary_sha256": "8fb51b87853918759ab321d5522ab9f56b8ac318c7d856f5f6f43e947b8a80bb",
+  "glossary_receipt": "abffc32cf157ba60c18f407a05d045012269c906344cc33e41e4128c1d54a435",
+  "definition": "Chronic absence measures unduplicated K-12 students enrolled at least ten days who were absent at least ten percent of enrolled days. The published rate is retained without reconstructing its numerator or denominator.",
+  "attendance_definition": "Attendance Rate is the percentage of days students in grades 1-12 were present during the school year, divided by their days in membership. The published percentage is retained.",
+  "glossary_locator": "Comprehensive TPRS Glossary, page 9 of 57, Attendance and Graduation. The current retained definition describes reporting year2024-25; older published observations retain their exact period without an assertion of comparability.",
+  "goldens": [
+    {"scope": "state", "identifier": "S", "year": 2025, "field": "chronic_absence_all_students_percent", "raw": "18.0%"},
+    {"scope": "state", "identifier": "S", "year": 2024, "field": "chronic_absence_all_students_percent", "raw": "19.0%"},
+    {"scope": "region", "identifier": "04", "year": 2025, "field": "chronic_absence_all_students_percent", "raw": "17.8%"}
+  ]
+}

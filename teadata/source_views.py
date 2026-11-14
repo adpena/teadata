@@ -43,13 +43,16 @@ def _projection(release: DataRelease, edition: EditionKey, fields: tuple[str, ..
 
 def _entity_key(artifact: ArtifactRef) -> str:
     scope = artifact.edition.scope
+    if scope in {"district", "campus"} and (binding := artifact.entity_binding) is not None:
+        return binding.column
     key = scope + "_number"
     if scope not in {"district", "campus"} or key not in artifact.contract["key_columns"]:
-        raise ContractError("Source table has no matching entity key")
+        raise ContractError("Source table has no declared entity row binding or canonical entity key. "
+                            "Use release.observations(...) to inspect the source rows and their published identifiers.")
     return key
 
 
-def _entity_predicate(native: Dataset, entity_key: str, identifiers: tuple[str, ...]) -> Expression:
+def _entity_predicate(native: Dataset, entity_key: str, identifiers: tuple[str, ...], *, width: int) -> Expression:
     import pyarrow as pa
     import pyarrow.compute as arrow_compute
     from pyarrow.dataset import field, scalar
@@ -61,7 +64,6 @@ def _entity_predicate(native: Dataset, entity_key: str, identifiers: tuple[str, 
     if not (pa.types.is_string(key_type) or pa.types.is_large_string(key_type)):
         raise ValueError("Source identifier batches require Arrow strings")
     selected = pa.array(["'" + identifier for identifier in identifiers], type=key_type)
-    width = 6 if entity_key == "district_number" else 9
     aliases = set()
     for batch in native.to_batches(columns=[entity_key], batch_size=65_536, use_threads=False):
         keys = batch.column(0)
@@ -774,6 +776,8 @@ def _plan_export(release: DataRelease, edition: EditionKey, *, restore_original_
     requested = fields if selected_fields is None else selected_fields
     artifact, projected = _projection(release, edition, requested, period=period)
     columns = projected if include_support else fields
+    if include_support and not restore_original_headers and (binding := artifact.entity_binding) is not None:
+        columns = tuple(dict.fromkeys((*artifact.contract["key_columns"], binding.column, *columns)))
     original_error = ("Original headers require a complete raw TAPR table or reviewed code-only RDA district table"
                       " or reviewed PEIMS course or College Credit table")
     header_kinds = ()
@@ -868,7 +872,8 @@ def _open_export(
     entity_key = _entity_key(artifact) if entity_ids is not None else None
     native = release.analytical_dataset(artifact.identity)
     if entity_key is not None and entity_ids is not None:
-        expression = _entity_predicate(native, entity_key, entity_ids)
+        expression = _entity_predicate(native, entity_key, entity_ids,
+                                       width=6 if edition.scope == "district" else 9)
         predicate = expression if predicate is None else predicate & expression
     if queries:
         predicate = _bind_queries(predicate, queries, native.schema)

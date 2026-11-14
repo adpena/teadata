@@ -148,7 +148,7 @@ def edition_fixture(tmp_path):
 def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staff"), multiple_inputs=False, damage_inputs=None,
                          normalized=False, support_damage=None, source_qualifiers=None, row_runs=None,
                          qualifier_reference_damage=None, amount_period=None, observed_amount=5, entity_grain=False,
-                         name_period=None, extra_context=None, unique_entity_key=False):
+                         name_period=None, extra_context=None, unique_entity_key=False, entity_binding=None):
     """The same tiny fixture, optionally widened without adding source rows."""
     import pyarrow as pa
     import pyarrow.csv as pacsv
@@ -325,9 +325,14 @@ def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staf
             elif support_damage == "missing_count_support":
                 support["fields"].pop("amount")
                 support["context"].extend(["VALUE", "amount_status"])
+        if entity_binding is not None and entity_binding.column not in actual.column_names:
+            assert normalized and support is not None
+            actual = actual.append_column(entity_binding.column, actual["campus_number"])
+            native = actual.schema.remove_metadata()
+            support["context"].append(entity_binding.column)
         contract = recorder.leaf_contract(key, source, native_schema=native.serialize().to_pybytes(),
             columns=native.names, key_columns=keys, rows=actual.num_rows, inputs=selected_hashes, recipe=recipe, toolchain=toolchain,
-            column_support=support)
+            column_support=support, entity_binding=entity_binding)
         leaf_id = sha256(canonical_json(contract).encode()).hexdigest()
         leaf = tmp_path / (family + ".parquet")
         write_leaf_artifact(leaf, actual.to_batches(), contract=contract)

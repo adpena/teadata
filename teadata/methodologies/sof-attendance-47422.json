@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "dataset": "summary_of_finances_attendance",
+  "edition": "47422",
+  "school_year_end": 2026,
+  "publisher_release_status": "Near Final",
+  "workbook_sha256": "5026e6cb7533dfc157b2371108fd0ecfc54f3792bb63f5b3341acec90ccee715",
+  "workbook_receipt": "7ae46b2e1c15d1951ec80f02b98d05c105c59230b034cea37b5f49f5159f4c17",
+  "dictionary_sha256": "9d018f14dd81e2bed5f896b621c5e86f64caa61b8dbc48a7373fe4dbaa575db0",
+  "dictionary_origin_sha256": "04f742cba976e6751f4dea016441a39933f1d6a8211de624a951248f7b5d706c",
+  "index_receipt": "637db12ba3188a4f7e1c575f0785a50bdcd3d1dbb371fd63ffe43f5dd85cdec1",
+  "rows_per_table": 1243,
+  "row_run_counts": {"47223": 803, "47299": 259, "47242": 140, "45811": 4, "45777": 7, "47422": 26, "47224": 4},
+  "tables": {
+    "inputs_lpe": {"estimate_code": "2", "precision": 21, "scale": 15, "fields": ["ADA_TOT_REFINED", "ADA_ADJ_TOT_REFINED"]},
+    "inputs_dpe": {"estimate_code": "1", "precision": 21, "scale": 15, "fields": ["ADA_TOT_REFINED", "ADA_ADJ_TOT_REFINED"]},
+    "outputs_lpe": {"precision": 23, "scale": 17, "fields": ["ADJ_AVG_ADA"]},
+    "outputs_dpe": {"precision": 23, "scale": 17, "fields": ["ADJ_AVG_ADA"]}
+  },
+  "definitions": {
+    "ADA_TOT_REFINED": "Refined Average Daily Attendance (ADA)",
+    "ADA_ADJ_TOT_REFINED": "Adjusted Total Refined Average Daily Attendance (ADA)",
+    "ADJ_AVG_ADA": "House Bill 2 (HB2) 89th Texas Legislative Session (89R) §48.1581 Support Staff Retention Allotment (SSRA); the SAS-calculated adjusted average daily attendance (ADA)."
+  },
+  "unit": "attendance_equivalent",
+  "unit_definition": "An average daily attendance equivalent used for school funding. Fractional values are retained. This unit is distinct from Enrollment and Membership headcounts.",
+  "literal_goldens": [
+    {"table": "inputs_lpe", "district": "001902", "field": "inputs_lpe_ada_tot_refined", "source_cell": "G2", "raw": "543.68900000000008"},
+    {"table": "inputs_dpe", "district": "001902", "field": "inputs_dpe_ada_tot_refined", "source_cell": "G2", "raw": "542.82299999999998"},
+    {"table": "outputs_lpe", "district": "001902", "field": "outputs_lpe_adj_avg_ada", "source_cell": "L2", "raw": "689.13"},
+    {"table": "outputs_dpe", "district": "001902", "field": "outputs_dpe_adj_avg_ada", "source_cell": "L2", "raw": "687.88400000000001"}
+  ]
+}

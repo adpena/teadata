@@ -84,6 +84,25 @@ def reviewed_native_references() -> dict[str, Any]:
     return json.loads(files("teadata").joinpath("reference_cases/native_peims_transfers.json").read_text())
 
 
+def reviewed_source_additions(manifest_sha256: str) -> tuple[str, dict[str, Any]] | None:
+    """Select an exact later source review without rebinding published history."""
+    review = json.loads(files("teadata").joinpath("reference_cases/native_source_additions.json").read_text())
+    if (not isinstance(review, dict) or set(review) != {"schema_version", "releases"}
+            or type(review["schema_version"]) is not int or review["schema_version"] != 1
+            or not isinstance(review["releases"], dict)):
+        raise ContractError("Invalid reviewed source-addition registry")
+    entry = review["releases"].get(manifest_sha256)
+    if entry is None:
+        return None
+    if (not isinstance(entry, dict) or set(entry) != {"family", "references"}
+            or entry["family"] not in {"sof_attendance", "chronic_absence", "bound_transfers"}
+            or not isinstance(entry["references"], dict)
+            or (entry["family"] != "bound_transfers" and entry["references"])
+            or (entry["family"] == "bound_transfers" and not entry["references"])):
+        raise ContractError("Invalid exact source-addition review")
+    return entry["family"], entry["references"]
+
+
 def _primary_disability_review() -> dict[str, Any]:
     return json.loads(files("teadata").joinpath("reference_cases/native_primary_disability.json").read_text())
 

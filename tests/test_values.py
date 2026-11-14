@@ -1,4 +1,5 @@
 import json
+from decimal import Decimal
 
 import pandas as pd
 import pytest
@@ -40,6 +41,47 @@ def test_tapr_documented_codes(policies, token, status):
 def test_negative_financial_adjustment_is_observed(policies):
     value = measure("-1", policies["numeric"], unit="currency")
     assert value.numeric == -1 and value.status == ValueStatus.OBSERVED
+
+
+@pytest.mark.parametrize("raw", ["543.68900000000008", "-0.00000000000000001", "0.0000", "1E+1000"])
+def test_observed_decimal_measurement_numeric_preserves_finite_original(raw):
+    value = Decimal(raw)
+    measurement = Measurement(value, ValueStatus.OBSERVED, raw=raw, unit="attendance_equivalent")
+    assert measurement.numeric is value
+    assert measurement.numeric.as_tuple() == value.as_tuple()
+
+
+@pytest.mark.parametrize("raw", ["NaN", "sNaN", "Infinity", "-Infinity"])
+def test_nonfinite_decimal_measurement_has_no_numeric_value(raw):
+    assert Measurement(Decimal(raw), ValueStatus.OBSERVED).numeric is None
+
+
+@pytest.mark.parametrize("status", [ValueStatus.MISSING, ValueStatus.SUPPRESSED, ValueStatus.NOT_APPLICABLE, ValueStatus.INVALID])
+def test_unobserved_decimal_measurement_does_not_supply_a_numeric_value(status):
+    assert Measurement(Decimal("0"), status).numeric is None
+
+
+@pytest.mark.parametrize(("value", "expected"), [(0, 0), (-1, -1), (1.25, 1.25), (True, None), (float("inf"), None), (float("nan"), None)])
+def test_decimal_support_preserves_existing_numeric_measurements(value, expected):
+    assert Measurement(value, ValueStatus.OBSERVED).numeric == expected
+
+
+@pytest.mark.parametrize(("raw", "unit", "expected"), [
+    ("18.0", "percent", "18.0%"),
+    ("543.68900000000008", "currency", "$543.68900000000008"),
+    ("-0.00000000000000001", "currency_per_pupil", "$-0.00000000000000001 per pupil"),
+    ("0.0000", "attendance_equivalent", "0.0000"),
+    ("9007199254740993.0001", "currency", "$9,007,199,254,740,993.0001"),
+])
+def test_decimal_display_preserves_full_precision_and_unit(raw, unit, expected):
+    assert Measurement(Decimal(raw), ValueStatus.OBSERVED, unit=unit).display() == expected
+
+
+def test_decimal_display_rounds_only_when_explicitly_requested_without_float_conversion():
+    measurement = Measurement(Decimal("9007199254740993.0001"), ValueStatus.OBSERVED, unit="currency")
+    assert measurement.display(decimals=4) == "$9,007,199,254,740,993.0001"
+    assert measurement.display(decimals=2) == "$9,007,199,254,740,993.00"
+    assert Measurement(Decimal("-1.235"), ValueStatus.OBSERVED, unit="percent").display(decimals=2) == "-1.24%"
 
 
 def test_fractional_fte_is_observed_without_relaxing_integral_count():

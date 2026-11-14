@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
-from decimal import Decimal
+from decimal import Decimal, localcontext
 from functools import lru_cache
 from hashlib import sha256
 import json
@@ -46,7 +46,19 @@ _VALUE_STATUSES = frozenset(item.value for item in ValueStatus)
 _REGION_CODES = frozenset(f"{code:02d}" for code in range(1, 21))
 # The reviewed v0.0.145 attachment pins the FRC metadata, receipts and all three leaves.
 _FRC_MANIFEST_SHA256 = "1c5cc0185fafefca1304eb8c2d71e6c5f95819c672f1fd022c08b0d05a096065"
-Number = int | float
+Number = int | float | Decimal
+
+
+def _difference(local: Number, statewide: Number) -> Number:
+    if isinstance(local, Decimal) or isinstance(statewide, Decimal):
+        left, right = Decimal(str(local)), Decimal(str(statewide))
+        exponent = min(int(value.as_tuple().exponent) for value in (left, right))
+        with localcontext() as context:
+            context.prec = max(1, max(left.adjusted(), right.adjusted()) - exponent + 2)
+            return left - right
+    if isinstance(local, int) and isinstance(statewide, int):
+        return local - statewide
+    return float(Decimal(str(local)) - Decimal(str(statewide)))
 
 
 @lru_cache(maxsize=12)
@@ -284,12 +296,13 @@ class _Projection:
         raw_field, status_field = self.support[field]
         raw, status, value = row[raw_field], row[status_field], row[field]
         if status == ValueStatus.OBSERVED.value:
-            valid = type(value) in {int, float, Decimal} and isfinite(value)
+            valid = (type(value) in {int, float, Decimal}
+                     and (value.is_finite() if isinstance(value, Decimal) else isfinite(value)))
         else:
             valid = value is None
         if not isinstance(raw, str) or status not in _VALUE_STATUSES or not valid:
             raise ContractError("Typed PEIMS statistic does not match its retained raw/status contract")
-        return raw, status, float(value) if isinstance(value, Decimal) else value
+        return raw, status, value
 
 
 def _projection(release: DataRelease, key: EditionKey, fields: list[tuple[str, DataPeriod]], *,
@@ -665,8 +678,7 @@ def compare_statewide(items: Sequence[object], *, release: DataRelease, local: E
                 raw, status, value = local_plan.value(local_row, stat.local_field, stat.unit)
             difference = None
             if value is not None and state_value is not None:
-                difference = (value - state_value if isinstance(value, int) and isinstance(state_value, int)
-                              else float(Decimal(str(value)) - Decimal(str(state_value))))
+                difference = _difference(value, state_value)
             arguments = (identifier or None, local.scope, stat.name, stat.period, local, statewide,
                          stat.unit, dimension_values, raw, status, value, state_raw, state_status, state_value, difference)
             if frc_review is not None and state_row_number is not None:

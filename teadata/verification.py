@@ -896,6 +896,7 @@ def _native_review(release: DataRelease, store: ProvenanceStore) -> _NativeRevie
         reviewed_historical_peims_references,
         reviewed_native_references,
         reviewed_primary_disability_references,
+        reviewed_source_additions,
         validate_native_witnesses,
     )
     from teadata.source_parity import validate_source_parity
@@ -910,6 +911,15 @@ def _native_review(release: DataRelease, store: ProvenanceStore) -> _NativeRevie
     ):
         if release.manifest_sha256 in pins:
             return _NativeReview(label, partial(qualify, release, store), partial(evidence, release, store))
+    addition = reviewed_source_additions(release.manifest_sha256)
+    if addition is not None and addition[0] in {"sof_attendance", "chronic_absence"}:
+        if addition[0] == "sof_attendance":
+            from teadata.sof_attendance import qualify_sof_attendance as qualify, retained_sof_evidence as evidence
+        else:
+            from teadata.attendance_chronic import qualify_attendance_chronic as qualify, retained_attendance_evidence as evidence
+        processing_store = _retained_store(release.path.parent / "provenance")
+        return _NativeReview(addition[0], partial(qualify, release, processing_store),
+                             partial(evidence, release, processing_store))
     if is_reviewed_budget(release.manifest_sha256):
         processing_store = _retained_store(release.path.parent / "provenance")
 
@@ -933,7 +943,8 @@ def _native_review(release: DataRelease, store: ProvenanceStore) -> _NativeRevie
     primary_disability = reviewed_primary_disability_references(release.manifest_sha256)
     historical_peims = reviewed_historical_peims_references(release.manifest_sha256)
     inline_references = primary_disability if historical_peims is None else historical_peims
-    references = reviewed_native_references() if inline_references is None else inline_references
+    references = (addition[1] if addition is not None and addition[0] == "bound_transfers" else
+                  reviewed_native_references() if inline_references is None else inline_references)
     inline_catalog = inline_references is not None
     composed_disability = {} if inline_catalog else reviewed_composed_disability_references(release.manifest_sha256)
     if references.keys() & composed_disability.keys():

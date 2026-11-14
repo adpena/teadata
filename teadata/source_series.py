@@ -176,6 +176,7 @@ class ObservationSeries:
                 for column in source.to_dict()["columns"]
             }
             structure = (tuple(selected.artifact.contract["key_columns"]), view.edition.grain,
+                         selected.artifact.entity_binding,
                          {name: role for name, role in roles.items() if role[0] != "context"})
             if common_structure is None:
                 common_structure = structure

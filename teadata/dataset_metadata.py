@@ -296,6 +296,27 @@ class LeafColumnSupport:
 STATEWIDE_SINGLETON_GRAIN = "one statewide observation"
 
 
+@dataclass(frozen=True, slots=True)
+class EntityRowBinding:
+    """Select an entity's source rows without changing the publisher row grain."""
+
+    column: str
+    role: str
+
+    def __post_init__(self) -> None:
+        if any(not isinstance(value, str) or not value.strip() for value in (self.column, self.role)):
+            raise ValueError("Entity row binding requires a source column and an explicit role")
+
+    @classmethod
+    def from_dict(cls, raw: Mapping[str, Any]) -> EntityRowBinding:
+        if not isinstance(raw, Mapping) or set(raw) != {"column", "role"}:
+            raise ValueError("Entity row binding requires exactly column and role")
+        return cls(raw["column"], raw["role"])
+
+    def to_dict(self) -> dict[str, str]:
+        return {"column": self.column, "role": self.role}
+
+
 def validate_leaf_keys(contract: Mapping[str, Any]) -> None:
     """The statewide singleton is identified by its edition alone."""
     keys = contract["key_columns"]
@@ -341,7 +362,8 @@ class ArtifactRef:
         required = {"edition", "schema", "schema_sha256", "columns", "key_columns", "rows", "inputs", "mapping_sha256",
                     "recipe_sha256", "policy_sha256", "semantics_sha256", "producer"}
         if (not isinstance(contract, dict) or not required <= set(contract)
-                or set(contract) - required - {"column_support"} or contract["edition"] != self.edition.to_dict()):
+                or set(contract) - required - {"column_support", "entity_binding"}
+                or contract["edition"] != self.edition.to_dict()):
             raise ValueError("Leaf contract does not bind its exact edition")
         schema = base64.b64decode(contract["schema"], validate=True)
         if not schema or sha256(schema).hexdigest() != _digest_text(contract["schema_sha256"]):
@@ -352,6 +374,10 @@ class ArtifactRef:
             raise ValueError("Leaf contract requires ordered native columns")
         LeafColumnSupport.from_contract(contract)
         validate_leaf_keys(contract)
+        if "entity_binding" in contract:
+            binding = EntityRowBinding.from_dict(contract["entity_binding"])
+            if self.edition.scope not in {"district", "campus"} or binding.column not in columns:
+                raise ValueError("Entity row binding requires a district/campus scope and a declared source column")
         if type(contract["rows"]) is not int or contract["rows"] < 0:
             raise ValueError("Leaf row count must be a nonnegative integer")
         inputs = contract["inputs"]
@@ -380,6 +406,11 @@ class ArtifactRef:
     @property
     def contract(self) -> dict[str, Any]:
         return json.loads(self.contract_json)
+
+    @property
+    def entity_binding(self) -> EntityRowBinding | None:
+        raw = self.contract.get("entity_binding")
+        return EntityRowBinding.from_dict(raw) if raw is not None else None
 
     @cached_property
     def column_support(self) -> LeafColumnSupport | None:

@@ -1,9 +1,10 @@
 # Entity enrichment sources and years
 
-The [v0.0.152 normal release](https://github.com/adpena/teadata/releases/tag/v0.0.152)
-composes nine native bundles, 12 dataset IDs and 120 edition/scope/partition keys,
-alongside 13 unchanged base inputs. It adds PEIMS ethnicity and programs for
-2022–23 through 2025–26, statewide by district and campus plus direct Texas, and
+The [v0.0.153 normal release](https://github.com/adpena/teadata/releases/tag/v0.0.153)
+composes ten native bundles, 12 dataset IDs and 132 edition/scope/partition keys,
+alongside 13 unchanged base inputs. It includes PEIMS ethnicity for
+2018–19 through 2025–26 and programs for 2022–23 through 2025–26,
+statewide by district and campus plus direct Texas, and
 district transfer reports for 2023–24 through 2025–26. The primary-disability
 2012–13–2025–26 and staff FTE/salary 2022–23–2025–26 families remain available.
 The [integration inventory](source-integration-status.json) pins this exact
@@ -17,6 +18,22 @@ geography, published totals and pair details; they are not campus transfer edges
 or TEFA participation. Their current per-entity shortcut lacks a reviewed role
 binding; use the canonical source table with an explicit reporting/partner filter.
 Inspect each source's roster and limitations before pooling.
+
+## Attendance source additions under qualification
+
+The following November 14, 2026 additions have retained-source replay checks but
+are not part of the published v0.0.153 parent above. Standalone qualification,
+normal-parent composition, publication and application activation are distinct.
+The current work does not imply complete TAPR/TPRS domain coverage.
+
+| Dataset | Actual measurement years | Publisher edition | Qualified candidate coverage | Remaining scope |
+| --- | --- | --- | --- | --- |
+| `summary_of_finances_attendance` | 2025–26 | Run 47422, Near Final | 1,243 LEAs in each of input/output LPE and DPE tables; six exact-decimal attendance fields | Direct state/sector figures remain separate retained reports; no synthesized state total. Other finance fields remain unqualified. |
+| `tprs_attendance_chronic_absence` | 2023–24 and 2024–25 | Named report edition 2025 | Direct Texas and all 20 ESC regions; attendance and chronic-absence percentages for 11 published populations | Complete current district/campus corpus and its partitioned access remain held. Newer report editions do not establish newer measurement years. |
+
+See the [attendance source contract](attendance-sources.md) for definitions,
+precision, missingness and exact acquisition versus observation dates. Enrollment,
+Membership and funding attendance equivalents are separate populations and units.
 
 Use `entity.peims_special_education_by_primary_disability` or
 `entity.dataset("peims_special_education_by_primary_disability")` for lazy field

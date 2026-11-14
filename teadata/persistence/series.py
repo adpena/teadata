@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 from hashlib import sha256
 import sqlite3
 from typing import TYPE_CHECKING, Any
@@ -96,9 +97,72 @@ def _sql_tables(series: ObservationSeries, connection: Connection, observations:
         "table": observations.name,
         "columns": {key: observations.c[key].name for key in (*fields, "import_id")},
     }
+    if decimal_storage := _decimal_storage(series, connection, observations):
+        destination["decimal_storage"] = decimal_storage
     observation_options = {"schema_translate_map": {None: schema}} if observations.schema is None else {}
     receipt_options = {"schema_translate_map": {None: receipt_schema}} if receipts.schema is None else {}
     return destination, observation_options, receipt_options
+
+
+def _decimal_storage(series: ObservationSeries, connection: Connection, observations: Table) -> dict[str, Any]:
+    """Admit exact decimal transport, independently of SQLAlchemy's result conversion."""
+    import pyarrow as pa
+    from sqlalchemy import Float, Numeric, String
+
+    storage = {}
+    probed = set()
+    for field in series.schema:
+        if not pa.types.is_decimal(field.type):
+            continue
+        precision, scale = field.type.precision, field.type.scale
+        target = observations.c[field.name].type
+        hint = f"Exact decimal column {field.name!r} requires Text/String or a verified native Numeric destination."
+        implementation = target.dialect_impl(connection.dialect)
+        if implementation.bind_processor(connection.dialect) is not None:
+            raise ValueError(hint + " The selected SQL type converts bound values; use Text.")
+        if isinstance(target, String):
+            required = max(precision - scale, 1) + max(scale, 0) + int(scale > 0) + 1
+            if target.length is not None and (type(target.length) is not int or target.length < required):
+                raise ValueError(hint + f" String capacity must be at least {required} characters.")
+            mode = "text"
+            sql_precision = sql_scale = None
+        elif isinstance(target, Numeric) and not isinstance(target, Float):
+            sql_precision, sql_scale = target.precision, target.scale
+            unbounded = connection.dialect.name == "postgresql" and sql_precision is None and sql_scale is None
+            capacity = (type(sql_precision) is int and type(sql_scale) is int
+                        and sql_scale >= scale and sql_precision - sql_scale >= precision - scale)
+            if (connection.dialect.name not in {"postgresql", "duckdb"} or target.asdecimal is not True
+                    or not (unbounded or capacity)):
+                raise ValueError(hint + " Native Numeric must preserve the declared precision/scale and return Decimal.")
+            signature = (precision, scale, sql_precision, sql_scale)
+            if signature not in probed:
+                _probe_decimal(connection, target, precision, scale, hint)
+                probed.add(signature)
+            mode = "numeric"
+        else:
+            raise ValueError(hint)
+        storage[field.name] = {"mode": mode, "arrow_type": str(field.type),
+                               "sql_precision": sql_precision, "sql_scale": sql_scale}
+    return storage
+
+
+def _probe_decimal(connection: Connection, target: Any, precision: int, scale: int, hint: str) -> None:
+    from sqlalchemy import bindparam, cast, select
+
+    # Build the witness without the process Decimal context (which may have a
+    # precision below Arrow's). Include the least significant admitted digit.
+    expected = Decimal((1, (7,) * precision, -scale))
+    statement = select(cast(bindparam("teadata_decimal", expected, type_=target), target))
+    compiled = statement.compile(dialect=connection.dialect)
+    parameters = compiled.construct_params()
+    values = tuple(parameters[name] for name in compiled.positiontup) if compiled.positiontup else parameters
+    try:
+        with connection.exec_driver_sql(str(compiled), values) as result:
+            actual = result.scalar_one()
+    except Exception as error:
+        raise ValueError(hint + " Native Decimal capability could not be verified; use Text.") from error
+    if not isinstance(actual, Decimal) or not actual.is_finite() or actual != expected:
+        raise ValueError(hint + " The raw database driver did not round-trip Decimal exactly; use Text.")
 
 
 def _selection_without_citations(selection: dict[str, Any]) -> dict[str, Any]:
@@ -151,7 +215,10 @@ def _read_series(
     if canonical_json(selection) != canonical_json(_selection_without_citations(series.provenance())):
         raise ContractError("SQL import selection differs from the pinned series.")
 
-    columns = [observations.c[name] for name in series.schema.names]
+    from sqlalchemy import Text, cast
+
+    columns = [cast(observations.c[field.name], Text) if pa.types.is_decimal(field.type)
+               else observations.c[field.name] for field in series.schema]
     statement = select(*columns).where(observations.c.import_id == import_id)
     if years is not None:
         statement = statement.where(observations.c.measurement_school_year.in_(years))
@@ -167,8 +234,14 @@ def _read_series(
                             value not in allowed_years for value in values))):
                     raise ContractError(f"SQL observations differ from the expected type or year for {field.name!r}.")
                 try:
+                    if pa.types.is_decimal(field.type):
+                        if any(value is not None and not isinstance(value, str) for value in values):
+                            raise ValueError("Decimal SQL transport must return text")
+                        values = tuple(Decimal(value) if value is not None else None for value in values)
+                        if any(value is not None and not value.is_finite() for value in values):
+                            raise ValueError("Decimal SQL transport must return finite values")
                     arrays.append(pa.array(values, type=field.type))
-                except (pa.ArrowException, OverflowError, TypeError, ValueError) as error:
+                except (pa.ArrowException, InvalidOperation, OverflowError, TypeError, ValueError) as error:
                     raise ContractError(f"SQL observations cannot be decoded as {field.name!r} ({field.type}).") from error
             yield pa.RecordBatch.from_arrays(arrays, schema=series.schema)
 
@@ -227,7 +300,11 @@ def _export_series(
 
     rows_by_year = dict.fromkeys(series.years, 0)
     missing = {(year, identifier) for year in series.years for identifier in series.ids or ()}
-    entity_key = f"{series.scope}_number"
+    from ..source_views import _entity_key
+
+    entity_key = _entity_key(series._sources[0][2].artifact) if series.ids is not None else None
+    text_decimals = tuple(name for name, value in destination.get("decimal_storage", {}).items()
+                          if value["mode"] == "text")
     width = 6 if series.scope == "district" else 9
     insert = observations.insert()
     for batch in series.iter_batches():
@@ -237,11 +314,17 @@ def _export_series(
         year = rows[0]["measurement_school_year"]
         rows_by_year[year] += len(rows)
         if missing:
+            assert entity_key is not None
             for row in rows:
                 identifier = canonical_source_identifier(row[entity_key], width=width)
                 if identifier is not None:
                     missing.discard((year, identifier[1:]))
         for row in rows:
+            for name in text_decimals:
+                if row[name] is not None:
+                    if not isinstance(row[name], Decimal) or not row[name].is_finite():
+                        raise ContractError(f"Source decimal {name!r} is not a finite Decimal.")
+                    row[name] = format(row[name], "f")
             row["import_id"] = import_id
         connection.execute(insert, rows, execution_options=observation_options)
 

@@ -1,5 +1,14 @@
 # Financial workbook source candidates
 
+The narrowly qualified [SOF attendance projection](attendance-sources.md#sof-attendance-equivalents)
+is separate from the broad financial candidates described below. Its run 47422
+Near Final source has four original LPE/DPE input/output tables and six selected
+attendance fields. Literal OOXML decimals, mixed physical row runs, estimate
+roles, missing general adjusted ADA and SSRA-specific output ADA remain distinct.
+Qualifying those fields does not qualify the other finance fields or establish
+revenue, expenditures, audited costs or funding adequacy. Check the selected
+normal parent's coverage before assuming the new candidate is attached.
+
 The [PEIMS single-file archive](https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads)
 publishes separate district and charter account files. Historical packaging
 varies. The FY2014 and FY2018 district budget ZIPs include a charter CSV

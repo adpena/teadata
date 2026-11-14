@@ -76,6 +76,8 @@ def describe_export(release: DataRelease, artifact: ArtifactRef, fields: tuple[s
         if column not in output:
             continue
         support_for[column].append({"field": None, "role": "context"})
+    if (binding := artifact.entity_binding) is not None and binding.column in output:
+        support_for[binding.column].append({"field": None, "role": "entity_selector"})
     qualifiers = source.source_qualifiers
     if qualifiers is not None and qualifiers.row_run_column in output:
         support_for[qualifiers.row_run_column].append({"field": None, "role": "row_run_column"})
@@ -139,6 +141,8 @@ def describe_export(release: DataRelease, artifact: ArtifactRef, fields: tuple[s
     }
     if source.notes:
         document["source"]["notes"] = source.notes
+    if entity_ids is not None and artifact.entity_binding is not None:
+        document["selector"]["entity_binding"] = artifact.entity_binding.to_dict()
     if query_replay is not None:
         document["selector"]["query_replay"] = query_replay
     description_sha256 = sha256(canonical_json(document).encode()).hexdigest()
@@ -323,6 +327,8 @@ class ExportProvenance:
         append(("Description SHA-256", document["description_sha256"]))
         if rows is not None:
             append(("Rows exported", rows))
+        if binding := document["selector"].get("entity_binding"):
+            append(("Entity row selection", binding["role"], binding["column"]))
         append(("Citation", document["citation"]))
         download_summary = _download_summary(document["edition_acquisitions"])
         append(("Publisher data citation", _publisher_data_citation(document, download_summary)))

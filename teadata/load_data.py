@@ -2716,6 +2716,16 @@ def _native_sources_for_build(raw: object, output: Path) -> tuple[NativeSourceRe
     return sources
 
 
+def _expected_build_sources(cfg: _cfg_mod.Config, year: int) -> set[str]:
+    """Public periods and the independently selected private edition differ."""
+    return (
+        {name for name in cfg.data_sources
+         if name != "tefa" and not cfg.is_source_only(name, year)}
+        | {cfg.options["private_dataset"]}
+        | set(cfg.spatial)
+    )
+
+
 def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
     if os.environ.get("PYTHONHASHSEED") != "0" or sys.flags.hash_randomization != 0:
         raise ContractError(
@@ -2749,12 +2759,7 @@ def load_repo(districts_fp: str, campuses_fp: str) -> DataEngine:
         token = _BUILD_DIRECTORY.set(Path(temporary))
         try:
             repo = _build_repo(districts_fp, campuses_fp, cfg_obj=cfg)
-            expected = (
-                ({name for name in cfg.data_sources
-                  if not cfg.is_source_only(name, YEAR)} - {"tefa"})
-                | {cfg.options["private_dataset"]}
-                | set(cfg.spatial)
-            )
+            expected = _expected_build_sources(cfg, YEAR)
             if set(build.datasets) != expected:
                 raise ContractError(
                     f"Build source coverage mismatch: {sorted(expected - set(build.datasets))}"

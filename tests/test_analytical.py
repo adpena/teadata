@@ -397,3 +397,17 @@ def test_presentation_matches_json_scalar_subclass_payload_without_conversion_ov
     for value in (object(), (1,), np.int64(12), float("nan"), float("inf")):
         with pytest.raises((TypeError, ValueError)):
             presentation_record(value)
+
+
+def test_presentation_decimal_is_lossless_text_without_new_source_lane():
+    from decimal import Decimal
+
+    for text in ("123456.12345678901234567", "-1.00000000000000001", "0.000", "1E+20"):
+        value = Decimal(text)
+        record = presentation_record(value)
+        assert record["presentation_kind"] == "string"
+        assert presentation_from_row(record) == format(value, "f")
+        assert Decimal(presentation_from_row(record)) == value
+    for text in ("NaN", "Infinity", "-Infinity"):
+        with pytest.raises(ValueError, match="Non-finite"):
+            presentation_record(Decimal(text))

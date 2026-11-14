@@ -31,6 +31,7 @@ class MeasurementUnit(StrEnum):
     CREDIT_HOURS = "credit_hours"
     CREDIT_HOURS_PER_STUDENT = "credit_hours_per_student"
     STUDENTS_PER_CLASS = "students_per_class"
+    ATTENDANCE_EQUIVALENT = "attendance_equivalent"
 
 
 class ValueStatus(str, Enum):
@@ -42,6 +43,8 @@ class ValueStatus(str, Enum):
 
 
 def _finite_number(value: Any) -> bool:
+    if isinstance(value, Decimal):
+        return value.is_finite()
     try:
         return math.isfinite(value)
     except (OverflowError, TypeError, ValueError):
@@ -140,7 +143,7 @@ def _token(raw: Any) -> str:
 
 @dataclass(frozen=True)
 class Measurement:
-    value: int | float | str | None
+    value: int | float | Decimal | str | None
     status: ValueStatus
     raw: Any = None
     reason: str | None = None
@@ -156,7 +159,9 @@ class Measurement:
         return json.loads(self._source_json) if self._source_json is not None else None
 
     @property
-    def numeric(self) -> int | float | None:
+    def numeric(self) -> int | float | Decimal | None:
+        if isinstance(self.value, Decimal):
+            return self.value if self.status == ValueStatus.OBSERVED and self.value.is_finite() else None
         if (
             self.status == ValueStatus.OBSERVED
             and isinstance(self.value, numbers.Real)
@@ -182,12 +187,17 @@ class Measurement:
                 ValueStatus.NOT_APPLICABLE: "Not applicable",
                 ValueStatus.INVALID: "Invalid data",
             }[self.status]
-        if not isinstance(self.value, numbers.Real) or isinstance(self.value, bool):
-            return str(self.value)
-        value = float(self.value)
-        if decimals is None:
-            decimals = 0 if value.is_integer() else 1
-        text = f"{value:,.{decimals}f}"
+        if isinstance(self.value, Decimal):
+            if not self.value.is_finite():
+                return str(self.value)
+            text = format(self.value, ",f" if decimals is None else f",.{decimals}f")
+        else:
+            if not isinstance(self.value, numbers.Real) or isinstance(self.value, bool):
+                return str(self.value)
+            value = float(self.value)
+            if decimals is None:
+                decimals = 0 if value.is_integer() else 1
+            text = f"{value:,.{decimals}f}"
         if self.unit == "percent":
             return text + "%"
         if self.unit == "currency":

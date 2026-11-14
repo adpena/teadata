@@ -7,6 +7,7 @@ Imports are lazy so ordinary source/metadata users do not initialize Arrow.
 from __future__ import annotations
 
 from collections.abc import Mapping
+from decimal import Decimal
 import json
 import math
 import os
@@ -257,6 +258,12 @@ def presentation_record(value: Any) -> dict[str, Any]:
     """
     if isinstance(value, (dict, list)):
         value = canonical_json(value)
+    if isinstance(value, Decimal):
+        if not value.is_finite():
+            raise ValueError("Non-finite analytical presentation value")
+        # The format boundary transports exact text; do not extend source
+        # scalar lanes or coerce a high-precision observation through float.
+        value = format(value, "f")
     # Match stdlib JSON's base scalar payload, including Enum/numpy subclasses,
     # without invoking user-defined conversion overrides or rounding integers.
     if isinstance(value, str):

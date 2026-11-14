@@ -21,7 +21,7 @@ from uuid import UUID
 
 from ._sqlite import readonly_connection
 from .dataset_metadata import ArtifactRef, ColumnSchemaRef, DataPeriod, DatasetMetadata, EditionKey, EditionMetadataRef, FieldBinding, LeafColumnSupport, MetricDefinition, ResolvedDataset
-from .dataset_metadata import NativeSourceRef, parse_native_sources
+from .dataset_metadata import EntityRowBinding, NativeSourceRef, parse_native_sources
 from .metric_bindings import MetricBinding, parse_bindings
 from .provenance import ProvenanceStore, validate_record_graph, validate_reference_records
 from .values import Measurement, ValuePolicy, ValueStatus, measure
@@ -2031,7 +2031,8 @@ class BuildRecorder:
     def leaf_contract(self, key: EditionKey, source: ResolvedDataset, *, native_schema: bytes,
                       columns: Iterable[str], key_columns: Iterable[str], rows: int,
                       inputs: Iterable[str], recipe: Mapping[str, Any], toolchain: Mapping[str, str],
-                      column_support: Mapping[str, Any] | None = None) -> dict[str, Any]:
+                      column_support: Mapping[str, Any] | None = None,
+                      entity_binding: EntityRowBinding | None = None) -> dict[str, Any]:
         """Derive leaf meaning from the same Config/crosswalk and native writer.
 
         Writers supply metadata-free Arrow IPC bytes, not another type system.
@@ -2061,6 +2062,11 @@ class BuildRecorder:
         if column_support is not None:
             result["column_support"] = deepcopy(dict(column_support))
             _validate_leaf_support(result, field_rows, source.metadata)
+        if entity_binding is not None:
+            if (not isinstance(entity_binding, EntityRowBinding) or key.scope not in {"district", "campus"}
+                    or entity_binding.column not in result["columns"]):
+                raise ContractError("Entity row binding requires a declared district/campus source column")
+            result["entity_binding"] = entity_binding.to_dict()
         return result
 
     def catalog(self, *, schema_version: int = CATALOG_SCHEMA,

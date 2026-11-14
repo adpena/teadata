@@ -18,7 +18,7 @@ import tempfile
 from typing import TYPE_CHECKING, Any, Sequence
 
 from .column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
-from .dataset_metadata import ArtifactRef, DataPeriod, DatasetMetadata, EditionKey, ResolvedDataset
+from .dataset_metadata import ArtifactRef, DataPeriod, DatasetMetadata, EditionKey, EntityRowBinding, ResolvedDataset
 from .district_transfer_identity import CORRECTED, REVIEW_YEAR, reviewed_repair_receipt
 from .manifest import BuildRecorder, canonical_json, file_identity
 from .provenance import ProvenanceStore, _identifier, validate_reference_records
@@ -254,7 +254,8 @@ def materialize_district_transfers(store: ProvenanceStore, *, config: Path, conf
             contract = recorder.leaf_contract(key, source, native_schema=item["schema"].serialize().to_pybytes(),
                 columns=item["names"], key_columns=["transfer_source_input", "transfer_source_record"], rows=report["rows"],
                 inputs=[*raw_hashes, item["artifact"]["sha256"], *([item["witness_sha"]] if item["witness_sha"] else [])],
-                recipe=recipe, toolchain=toolchain, column_support=item["support"])
+                recipe=recipe, toolchain=toolchain, column_support=item["support"],
+                entity_binding=EntityRowBinding("transfer_reporting_district_number", "reporting district"))
             leaf_id = sha256(canonical_json(contract).encode()).hexdigest()
             leaf = stage / (leaf_id + ".parquet")
             prepared = target_store.verify_artifact(item["artifact"]["sha256"])
