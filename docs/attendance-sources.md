@@ -7,7 +7,7 @@ run is not a measurement year. The selected release's catalog records the exact
 fields, available scopes and source receipts; no source lookup falls back to an
 older nonmissing value.
 
-The local 0.0.154 normal-parent candidate now attaches both narrowly qualified
+The published 0.0.154 normal release attaches both narrowly qualified
 families below through the normal release and lazy entity/source machinery.
 Its manifest is recorded in [source integration status](source-integration-status.md).
 Candidate construction, publisher-source qualification, normal access/export
@@ -15,7 +15,7 @@ acceptance, publication and application activation remain separate stages.
 
 ## Current population
 
-The published v0.0.153 normal parent already contains 2025–26 TPRS Membership and
+The published v0.0.154 normal parent retains 2025–26 TPRS Membership and
 Enrollment at district, campus and direct Texas scopes, PEIMS programs for
 2022–23 through 2025–26 and ethnicity enrollment for 2018–19 through 2025–26.
 The TPRS acquisition contains 9,105 admitted campus reports in 23 partitions;
@@ -31,7 +31,7 @@ that every released record was freshly reacquired from TEA.
 
 ## Named attendance and chronic absence
 
-The new `tprs_attendance_chronic_absence` candidate uses TEA's named **2025**
+The qualified `tprs_attendance_chronic_absence` source uses TEA's named **2025**
 Attendance and Graduation reports, which explicitly publish **2024–25** and
 **2023–24** attendance/chronic-absence rows. The similarly named retained bulk
 fields for edition 2025 contain the older measurement year; they are not
@@ -63,7 +63,7 @@ absence for 2024–25; the adjacent Texas 2023–24 row is 19.0%.
 
 ## SOF attendance equivalents
 
-The new `summary_of_finances_attendance` candidate projects only six selected
+The qualified `summary_of_finances_attendance` source projects only six selected
 attendance fields from the statewide 2025–26 bulk workbook, publication run
 47422, **Near Final**. It retains all 1,243 LEA rows in each original worksheet
 `inputs_lpe`, `inputs_dpe`, `outputs_lpe` and `outputs_dpe`, including charter
@@ -114,9 +114,9 @@ uv run --extra scripts python -m teadata.scripts.refresh_attendance chronic \
 ```
 
 The normal enrichment build attaches exact, independently qualified child pins
-through `options.native_sources`. Until a selected normal parent includes them,
-the new candidates are not available on normal entities or in the published
-v0.0.153 release. Once included, use the same lazy `entity.dataset(name)`, dataset
+through `options.native_sources`. These two sources are included in the published
+v0.0.154 parent; they are absent from the older v0.0.153 parent. With v0.0.154
+selected, use the same lazy `entity.dataset(name)`, dataset
 dot path, `observations()` and `series()` planner as other sources. Explicit
 unavailable years fail; current chronic-absence latest is 2024–25 while SOF and
 population sources resolve to 2025–26. Region sources use their published region

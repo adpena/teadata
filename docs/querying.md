@@ -186,6 +186,31 @@ frame = series.to_df()
 one_year = series.for_year("2018–19")  # The same pinned SourceTable interface
 ```
 
+For partitioned TPRS campus Student Information and Class Size products, select
+an explicit campus cohort with `ids` or `names`. The same `series()` planner
+uses the publisher's verified report rosters to locate each selected campus;
+it reads only the required physical partitions when you collect or export.
+`for_year()` returns all selected partitions through the shared table interface.
+Every partition retains its own edition, artifact, selected IDs and provenance.
+Whole-file partition downloads are still required by the current storage format.
+Omitting a cohort does not silently combine independent same-year editions;
+select an exact edition when the source is ambiguous.
+
+```python
+campuses = release.series(
+    "tprs_student_membership_enrollment_reports",
+    "membership_total_students_count",
+    scope="campus", years=[26], ids=["057905286", "'227901001"],
+)
+frame = campuses.to_df()  # Missing report/year errors identify the coverage gap.
+```
+
+For multiple years, the selected release must contain compatible observations
+for every requested year. A later publisher edition is not substituted for a
+missing measurement year. Paired comparisons validate every selected source
+partition and reject duplicate normalized campus IDs across them. They do not
+establish longitudinal comparability or historical entity continuity.
+
 Use `names=["Austin ISD"]` in place of `ids` for case-insensitive exact
 name selection. An entity release uses its own directory by default.
 With a native-only release, pass a specific entity release as

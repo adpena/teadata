@@ -11,7 +11,7 @@ from .dataset_metadata import EditionKey, _parse_school_year, _validate_observat
 from .identifiers import canonical_source_identifier, canonical_source_identifiers
 from .manifest import ContractError, canonical_json
 from .selectors import _EntityNames
-from .source_views import SourceTable, _entity_key, _open_export, _plan_export, write_csv, write_excel
+from .source_views import PartitionedSourceTable, SourceTable, _entity_key, _open_export, _plan_export, write_csv, write_excel
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -138,6 +138,8 @@ class ObservationSeries:
                     raise ValueError(f"Edition pin for {year} must uniquely match a requested year, dataset and scope.")
                 pins[year] = key
 
+        if registry is not None:
+            cohort = _registry_ids(registry, selected_names, scope)
         options = list(release._observation_year_options(dataset, fields, scope, None)) if len(pins) < len(requested) else []
         views = []
         common_structure = None
@@ -148,13 +150,25 @@ class ObservationSeries:
         for year in requested:
             pin = pins.get(year)
             candidates = list(release._observation_year_options(dataset, fields, scope, pin)) if pin is not None else options
-            view = release._select_observation_view(fields, scope, year, candidates)
-            if planned and view._fields != planned[0][1]._fields:
-                raise ContractError(f"Source field names differ in school year {year}. "
-                                    "Read each year separately until a reviewed mapping is available.")
-            planned.append((year, view))
-        if registry is not None:
-            cohort = _registry_ids(registry, selected_names, scope)
+            if cohort is not None and pin is None and scope == "campus" and dataset in {
+                "tprs_student_membership_enrollment_reports", "tprs_class_size",
+            }:
+                _, matches = release._observation_matches(fields, scope, year, candidates)
+                if len(matches) > 1:
+                    routed = release._entity_observations(dataset, fields, school_year=year, scope=scope,
+                        edition=None, identifiers=cohort, _options=candidates)
+                    parts = routed.partitions if isinstance(routed, PartitionedSourceTable) else (routed,)
+                else:
+                    child, key = matches[0]
+                    parts = (replace(release._observation_view(fields, year, child, key), _entity_ids=cohort),)
+            else:
+                view = release._select_observation_view(fields, scope, year, candidates)
+                parts = (replace(view, _entity_ids=cohort),) if cohort is not None else (view,)
+            for view in parts:
+                if planned and view._fields != planned[0][1]._fields:
+                    raise ContractError(f"Source field names differ in school year {year}. "
+                                        "Read each year separately until a reviewed mapping is available.")
+                planned.append((year, view))
         for year, view in planned:
             selected = _plan_export(view.release, view.edition, restore_original_headers=False,
                                     selected_fields=view._fields, include_support=True,
@@ -164,9 +178,8 @@ class ObservationSeries:
                 key_type = native.field(_entity_key(selected.artifact)).type
                 if not (pa.types.is_string(key_type) or pa.types.is_large_string(key_type)):
                     raise ContractError(f"Series ID selection requires a string publisher key for school year {year}.")
-                view = replace(view, _entity_ids=cohort)
             source = selected.provenance(view.release, period=view.measurement_period, entity_build=view._entity_build,
-                                         entity_ids=cohort, opaque_filter=False)
+                                         entity_ids=view._entity_ids, opaque_filter=False)
             roles = {
                 column["column"]: (
                     column["role"],
@@ -198,7 +211,7 @@ class ObservationSeries:
             views.append((year, view, selected, source))
         schema = pa.schema([
             pa.field(_YEAR_COLUMN, pa.int32(), nullable=False),
-            *(field.with_nullable(True) if present[field.name] < len(requested) else field
+            *(field.with_nullable(True) if present[field.name] < len(planned) else field
               for field in output_fields.values()),
         ])
         registry_identity = None if registry is None else (registry.build_id, registry.manifest_sha256, selected_names)
@@ -214,14 +227,14 @@ class ObservationSeries:
     @property
     def years(self) -> tuple[int, ...]:
         """Canonical ending years in request order. Format as four digits for literal reuse."""
-        return tuple(year for year, *_ in self._sources)
+        return tuple(dict.fromkeys(year for year, *_ in self._sources))
 
-    def for_year(self, school_year: int | str) -> SourceTable:
+    def for_year(self, school_year: int | str) -> SourceTable | PartitionedSourceTable:
         """Return the pinned source view for one selected year."""
         target = _required_year(school_year)
-        for year, view, _, _ in self._sources:
-            if year == target:
-                return view
+        parts = tuple(view for year, view, _, _ in self._sources if year == target)
+        if parts:
+            return parts[0] if len(parts) == 1 else PartitionedSourceTable(parts)
         raise ContractError(f"School year {target} is outside this series. Selected years: {self.years}.")
 
     def pair_years(self, *, from_year: int | str, to_year: int | str) -> ObservationPair:
@@ -262,7 +275,7 @@ class ObservationSeries:
             scalar = pa.scalar(year, type=pa.int32())
             offsets = {name: position for position, name in enumerate(selected.columns)}
             export = _open_export(view.release, selected, period=view.measurement_period,
-                                  entity_build=view._entity_build, entity_ids=self.ids)
+                                  entity_build=view._entity_build, entity_ids=view._entity_ids)
             for batch in export.batches():
                 columns = [batch.column(offsets[field.name]) if field.name in offsets
                            else pa.nulls(batch.num_rows, type=field.type) for field in fields]
@@ -380,13 +393,29 @@ class _SeriesExport:
 
 
 @dataclass(frozen=True, slots=True, eq=False)
+class _SeriesEndpoint:
+    year: int
+    sources: tuple[tuple[int, SourceTable, _ExportSelection, ExportProvenance], ...]
+    columns: tuple[str, ...]
+
+    def provenance(self) -> dict[str, Any]:
+        if len(self.sources) == 1:
+            return self.sources[0][3].to_dict()
+        from .source_views import PartitionedExportProvenance
+
+        period = self.sources[0][1].measurement_period
+        assert period is not None
+        return PartitionedExportProvenance(period, tuple(source for _, _, _, source in self.sources)).to_dict()
+
+
+@dataclass(frozen=True, slots=True, eq=False)
 class ObservationPair:
     """Two exact school years aligned on public entity identifiers."""
 
     from_year: int
     to_year: int
     _series: ObservationSeries
-    _endpoints: tuple[tuple[int, SourceTable, _ExportSelection, ExportProvenance], ...]
+    _endpoints: tuple[_SeriesEndpoint, ...]
     _key: str
     schema: pa.Schema
 
@@ -398,27 +427,32 @@ class ObservationPair:
 
         if from_year >= to_year:
             raise ValueError("pair_years requires from_year earlier than to_year.")
-        by_year = {source[0]: source for source in series._sources}
+        by_year: dict[int, list[tuple[int, SourceTable, _ExportSelection, ExportProvenance]]] = {}
+        for source in series._sources:
+            by_year.setdefault(source[0], []).append(source)
         if from_year not in by_year or to_year not in by_year:
             raise ContractError(f"Both endpoints must be in this series. Selected years: {series.years}.")
         if series.scope not in {"district", "campus"}:
             raise ContractError("pair_years supports public district and campus observations.")
-        endpoints = (by_year[from_year], by_year[to_year])
+        endpoints = tuple(_SeriesEndpoint(year, tuple(by_year[year]),
+                          tuple(dict.fromkeys(name for _, _, selection, _ in by_year[year]
+                                              for name in selection.columns))) for year in (from_year, to_year))
         key = f"{series.scope}_number"
         fields = [pa.field(key, pa.string(), nullable=False)]
-        for prefix, (year, _, selection, _) in zip(("from", "to"), endpoints, strict=True):
-            keys = set(selection.artifact.contract["key_columns"])
-            if keys not in ({key}, {key, "school_year"}) or not keys <= set(selection.columns):
-                raise ContractError(f"pair_years requires one row per {series.scope} and school year. "
-                                    f"Publisher keys in {year}: {sorted(keys)}.")
-            native = _leaf_schema(selection.artifact.contract)
-            for name in keys:
-                dtype = native.field(name).type
-                if not (pa.types.is_string(dtype) or pa.types.is_large_string(dtype)):
-                    raise ContractError(f"pair_years requires a string {name} key in school year {year}.")
+        for prefix, endpoint in zip(("from", "to"), endpoints, strict=True):
+            for year, _, selection, _ in endpoint.sources:
+                keys = set(selection.artifact.contract["key_columns"])
+                if keys not in ({key}, {key, "school_year"}) or not keys <= set(selection.columns):
+                    raise ContractError(f"pair_years requires one row per {series.scope} and school year. "
+                                        f"Publisher keys in {year}: {sorted(keys)}.")
+                native = _leaf_schema(selection.artifact.contract)
+                for name in keys:
+                    dtype = native.field(name).type
+                    if not (pa.types.is_string(dtype) or pa.types.is_large_string(dtype)):
+                        raise ContractError(f"pair_years requires a string {name} key in school year {year}.")
             fields.append(pa.field(f"{prefix}_present", pa.bool_(), nullable=False))
-            fields.extend(native.field(name).with_name(f"{prefix}_{name}").with_nullable(True)
-                          for name in selection.columns)
+            fields.extend(series.schema.field(name).with_name(f"{prefix}_{name}").with_nullable(True)
+                          for name in endpoint.columns)
         names = [field.name for field in fields]
         if len(names) != len(set(names)):
             raise ContractError("pair_years output columns conflict with a publisher field.")
@@ -443,27 +477,39 @@ class ObservationPair:
             "cross_year_comparability": "unassessed",
             "historical_entity_continuity": "unassessed",
             "endpoints": {
-                prefix: {"school_year": year, "present_column": f"{prefix}_present",
-                         "columns": {name: f"{prefix}_{name}" for name in selection.columns},
-                         "provenance": source.to_dict()}
-                for prefix, (year, _, selection, source) in zip(("from", "to"), self._endpoints, strict=True)
+                prefix: {"school_year": endpoint.year, "present_column": f"{prefix}_present",
+                         "columns": {name: f"{prefix}_{name}" for name in endpoint.columns},
+                         "provenance": endpoint.provenance()}
+                for prefix, endpoint in zip(("from", "to"), self._endpoints, strict=True)
             },
         }
         if "name_selection" in selector:
             result["name_selection"] = selector["name_selection"]
         return result
 
-    def _read_endpoint(self, endpoint: tuple[int, SourceTable, _ExportSelection, ExportProvenance]
-                       ) -> tuple[pa.Table, pa.ChunkedArray]:
+    def _read_endpoint(self, endpoint: _SeriesEndpoint) -> tuple[pa.Table, pa.ChunkedArray]:
         import pyarrow as pa
         import pyarrow.compute as arrow_compute
 
         pc: Any = arrow_compute
-        year, view, selected, _ = endpoint
-        period = view.measurement_period
-        assert period is not None
-        # Read each complete endpoint once. A cohort may not hide invalid keys.
-        table = _open_export(view.release, selected, period=period, entity_build=view._entity_build).to_arrow()
+        year = endpoint.year
+        tables = []
+        for _, view, selected, _ in endpoint.sources:
+            period = view.measurement_period
+            assert period is not None
+            # Read each selected physical partition once. A cohort may not hide
+            # invalid publisher keys within any of those partitions.
+            table = _open_export(view.release, selected, period=period, entity_build=view._entity_build).to_arrow()
+            if "school_year" in selected.artifact.contract["key_columns"]:
+                published = table["school_year"]
+                if published.null_count or pc.any(pc.not_equal(published, period.label)).as_py():
+                    raise ContractError(f"Publisher school_year key does not match {period.label}.")
+            tables.append(pa.Table.from_arrays([
+                table[name] if name in table.column_names else
+                pa.nulls(table.num_rows, type=self._series.schema.field(name).type)
+                for name in endpoint.columns
+            ], names=endpoint.columns))
+        table = pa.concat_tables(tables)
         width = 6 if self._key == "district_number" else 9
         try:
             normalized = canonical_source_identifiers(table[self._key], width=width)
@@ -472,10 +518,6 @@ class ObservationPair:
         ids = pc.utf8_slice_codeunits(normalized, start=1).cast(pa.string())
         if ids.null_count or len(pc.unique(ids)) != table.num_rows:
             raise ContractError(f"Null or duplicate canonical {self._key} in school year {year}.")
-        if "school_year" in selected.artifact.contract["key_columns"]:
-            published = table["school_year"]
-            if published.null_count or pc.any(pc.not_equal(published, period.label)).as_py():
-                raise ContractError(f"Publisher school_year key does not match {period.label}.")
         return table, ids
 
     def to_arrow(self) -> pa.Table:
