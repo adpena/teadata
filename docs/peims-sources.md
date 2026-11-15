@@ -316,12 +316,15 @@ still require separate evidence.
 The source profile registers five school years, 2021–22 through 2025–26, for
 Texas, education service center regions and reporting districts, including
 reporting charters. TEA does not offer a campus report in this family. The
-offline producer builds a separate native candidate. The source profile does
-not automatically add College Credit to the default entity engine. The exact
-reviewed 15-edition candidate now has a reusable offline qualification gate in
-`native_college_credit`; this gate replays every CSV row and five independently
-requested Texas HTML reports. Normal release composition and publication remain
-separate steps. Data release 155 does not contain this attachment.
+offline producer builds a native source bundle. Normal data release 0.0.157
+attaches the exact qualified 15-table family alongside every prior native source.
+Use the [explicit pinned normal-release selection](data-releases.md#normal-release-00157-select-the-data-explicitly)
+to access it through the normal engine and DSL. Installing software alone does
+not select that release; data release 155 and the unconfigured source fixture do
+not contain this attachment. The reusable offline `native_college_credit` gate
+compares every CSV row and five independently requested Texas HTML reports.
+Source qualification, normal composition, publication and app adoption remain
+separate claims.
 
 The [TEA College Credit criteria](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/abt_cte_college_credit_reports.html)
 describe public school course completion reported in the summer PEIMS
@@ -343,7 +346,7 @@ require review of submission rules and eligibility. The 2025–26 TEDS reporting
 changes warrant care when interpreting changes in course credit. The reports
 do not independently identify the affected OnRamps records.
 
-The candidate retains zero, masked tokens, decimal precision, the literal
+The qualified tables retain zero, masked tokens, decimal precision, the literal
 publisher columns and the physical CSV record number. Use the data frame,
 CSV or Excel export with `restore_original_headers=True` for the publisher
 column names and tokens. The output is a table projection without the report
@@ -351,8 +354,8 @@ preamble, footer or blank separator rows. The empty publisher header is
 retained, and a field subset retains Service and Service Description so course
 and Total rows stay distinguishable.
 
-When a normal parent release explicitly attaches this qualified family, use the
-same lazy dataset namespace as other sources. Discovery reads metadata rather
+With the pinned normal release selected, use the same lazy dataset namespace
+as other sources. Discovery reads metadata rather
 than observations; selecting a field does not copy it into the entity's meta.
 Multi-row scalar access requires an explicit course or Total filter:
 

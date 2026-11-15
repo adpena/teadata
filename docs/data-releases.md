@@ -4,6 +4,65 @@ TEA Data keeps one source contract in `teadata/teadata_sources.yaml`. Each versi
 
 A build records the files it actually reads. The runtime catalog is embedded in the snapshot and SQLite sidecars. `release.json` selects the source and analytical artifacts by content hash and one build identity. Runtime consumers use the embedded catalog to interpret the snapshot. The default engine takes one manifest for the entity snapshot and its sidecars. Stand-alone data releases can be selected by their own pinned manifests.
 
+## Normal release 0.0.157: select the data explicitly
+
+Software 0.0.157 includes lazy entity dataset namespaces and their `series()`
+facade. The separately selected normal data release adds qualified PEIMS College
+Credit for 2021–22 through 2025–26 while preserving all 13 prior native sources.
+It has 14 native attachments, 16 dataset IDs and 157 edition/scope keys. College
+Credit has district, 20 ESC region and direct Texas reports; no campus report.
+See the [selected-release inventory](source-integration-status.md) and
+[College Credit definitions and limitations](peims-sources.md#peims-college-credit).
+
+Installing this software does not select a data release. An unconfigured source
+checkout retains its existing fixture, build `973bfac9a388ccf22670ffe64ced1b29adeea6060991c214f84885f3c8d8f8b7`,
+which has no native attachments. Wheels contain no data. Select one pinned root
+for the normal engine, entity namespaces, DSL and exports:
+
+```sh
+export TEADATA_RELEASE_URL=https://github.com/adpena/teadata/releases/download/v0.0.157/release.json
+export TEADATA_RELEASE_SHA256=17c65e26ef44c64ddb2ef63ce060fe389320776447e1716f88c1b355ca6e91bb
+export TEADATA_RELEASE_OFFLINE=0
+```
+
+Unset `TEADATA_RELEASE` when selecting a remote URL; a local manifest takes
+precedence. Online access fetches needed verified artifacts into the configured
+cache. Reuse the same URL, pin and cache with `TEADATA_RELEASE_OFFLINE=1` after
+population; missing cached bytes fail rather than falling back or downloading.
+A complete downloaded bundle can instead be selected with `TEADATA_RELEASE`.
+Explicit `DataRelease(..., expected_sha256=..., offline=...)` with
+`using_release()` supports scoped selection without changing process defaults.
+
+```python
+from teadata import DataEngine, current_release
+
+release = current_release()
+engine = DataEngine.load_default(indexes_enabled=False)
+district = (engine >> ("district", "057829")).first()
+assert district is not None, "District 057829 is absent from the selected entity snapshot."
+district.peims_college_credit.variables()  # Metadata discovery, not all values.
+trend = district.peims_college_credit.series(
+    "college_credit_hours", years=[22, 23, 24, 25, 26],
+)
+frame = trend.to_df()
+provenance = trend.provenance()
+```
+
+Course-service rows remain distinct. A reported Total is a sum of course-level
+counts, not unique students or an annual-graduate readiness rate. Keep each
+field's actual period, population, raw token, status and source download date;
+matching names across years do not prove comparability. Explicit unavailable
+years/scopes raise helpful errors and never substitute another year.
+
+The unchanged data manifest SHA-256 is
+`17c65e26ef44c64ddb2ef63ce060fe389320776447e1716f88c1b355ca6e91bb`;
+build ID is `995f23aef51106ff225b41d2ccee294fab151ab0a303d686038e5c706af97b52`.
+Its actual producer was software 0.0.156 at source
+`5c792f3a5f378e0ae06fb6b9aa96c4f4de756e08`. Software 0.0.157 is its
+consumer; distribution under the 157 URL does not rewrite the producer history.
+Cite the installed software and selected data build separately as described
+below. App cache adoption and deployment are separate from publication.
+
 ## Researcher API
 
 ```python

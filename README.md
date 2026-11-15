@@ -24,7 +24,7 @@ PyYAML's supported pure Python implementation is tested on 3.15.
 
 ```bash
 uv venv
-uv pip install teadata==0.0.132
+uv pip install teadata==0.0.157
 ```
 
 ### Development (recommended)
@@ -105,14 +105,24 @@ Python packages contain code and metadata; data bundles are distributed
 separately. Select an immutable bundle before running the example:
 
 ```bash
-export TEADATA_RELEASE_URL="https://github.com/adpena/teadata/releases/download/v0.0.128/release.json"
-export TEADATA_RELEASE_SHA256="9dd062128273cbb90f3b9c952b072d74a629de6ecbcff8065c4295b511eaa9aa"
+export TEADATA_RELEASE_URL="https://github.com/adpena/teadata/releases/download/v0.0.157/release.json"
+export TEADATA_RELEASE_SHA256="17c65e26ef44c64ddb2ef63ce060fe389320776447e1716f88c1b355ca6e91bb"
+export TEADATA_RELEASE_OFFLINE=0
 ```
 
-For a downloaded bundle, set `TEADATA_RELEASE` to its local `release.json`
-instead. The manifest binds the selected artifacts to their content hashes.
-Use the [TAPR and TPRS supplements](docs/data-releases.md#tapr-and-tprs-supplements)
-to access separately versioned assessment, attendance, dropout, and student profile tables.
+Unset `TEADATA_RELEASE` when using a URL: a configured local manifest takes
+precedence. For a complete downloaded bundle, set it to the local `release.json`
+instead. The manifest binds one normal engine release and its attached sources
+to exact content hashes. The [coverage inventory](docs/source-integration-status.md)
+and [release selection guide](docs/data-releases.md#normal-release-00157-select-the-data-explicitly)
+show its 14 native attachments, including district/region/Texas College Credit.
+The [TAPR and TPRS supplements](docs/data-releases.md#tapr-and-tprs-supplements)
+remain separately selectable sources.
+
+Installing software does not choose data. The unconfigured source checkout's
+tracked fixture remains unchanged and has no native attachments. Reuse the same
+URL, pin and populated cache with `TEADATA_RELEASE_OFFLINE=1` for offline work;
+missing bytes fail rather than triggering a download or silently changing years.
 
 ```python
 from teadata import DataEngine
