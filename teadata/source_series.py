@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Mapping, Sequence
+from collections.abc import Generator, Iterator, Mapping, Sequence
 from dataclasses import dataclass, replace
 from numbers import Integral
 from typing import TYPE_CHECKING, Any, BinaryIO
@@ -11,7 +11,8 @@ from .dataset_metadata import EditionKey, _parse_school_year, _validate_observat
 from .identifiers import canonical_source_identifier, canonical_source_identifiers
 from .manifest import ContractError, canonical_json
 from .selectors import _EntityNames
-from .source_views import PartitionedSourceTable, SourceTable, _entity_key, _open_export, _plan_export, write_csv, write_excel
+from .source_views import (PartitionedSourceTable, SourceTable, _entity_key, _open_export, _plan_export,
+                           _provenance_batches, write_csv, write_excel)
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -266,8 +267,15 @@ class ObservationSeries:
             }
         return result
 
-    def iter_batches(self) -> Iterator[pa.RecordBatch]:
-        """Scan one selected year at a time, with the measurement year on every row."""
+    def iter_batches(self) -> Generator[pa.RecordBatch, None, None]:
+        """Stream selected years with measurement years and pinned provenance.
+
+        No observation leaf opens before the first pull. Close the generator
+        when stopping early to avoid opening subsequent years or partitions.
+        """
+        yield from _provenance_batches(self._iter_batches(), self.provenance())
+
+    def _iter_batches(self) -> Generator[pa.RecordBatch, None, None]:
         import pyarrow as pa
 
         fields = tuple(self.schema)[1:]

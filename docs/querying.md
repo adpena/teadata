@@ -205,6 +205,36 @@ campuses = release.series(
 frame = campuses.to_df()  # Missing report/year errors identify the coverage gap.
 ```
 
+For large selections, `iter_batches()` provides the same lazy Arrow interface
+on a single-year view, a routed campus view, or a multi-year series. It retains
+the selected fields and their raw values, statuses, keys and source context.
+No observation artifact opens until the first batch is requested. The current
+storage format still requires whole artifact downloads; this is incremental
+processing, not row-level remote access. Release/catalog metadata can be read
+during planning, subject to the release's existing offline policy.
+
+```python
+from contextlib import closing
+import json
+import pyarrow.compute as pc
+
+with closing(campuses.iter_batches()) as batches:
+    for batch in batches:
+        provenance = json.loads(batch.schema.metadata[b"teadata_provenance"])
+        observed_total = pc.sum(batch["membership_total_students_count"])
+        # Consume this batch before pulling the next; no full DataFrame needed.
+```
+
+Each batch carries the complete pinned selection receipt in its Arrow schema
+metadata. `view.provenance()` also works independently of row scanning; keep
+that receipt for empty selections, which may emit no batches. Use `to_arrow()`
+when you need a typed empty table. Iterators are one-shot; call `iter_batches()`
+again for another scan. Use `closing` when stopping early, so later partitions
+and years are not opened. Source failures propagate when consumed, including
+failures after earlier batches have been yielded. Do not treat a partial stream
+as a completed export. Existing file writers provide atomic path creation.
+Batch processing does not establish longitudinal scientific comparability.
+
 For multiple years, the selected release must contain compatible observations
 for every requested year. A later publisher edition is not substituted for a
 missing measurement year. Paired comparisons validate every selected source

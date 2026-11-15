@@ -73,6 +73,23 @@ def _entity_predicate(native: Dataset, entity_key: str, identifiers: tuple[str, 
     return field(entity_key).isin(pa.array(sorted(aliases), type=key_type))
 
 
+def _provenance_batches(batches: Generator[pa.RecordBatch, None, None],
+                        provenance: Mapping[str, Any]) -> Generator[pa.RecordBatch, None, None]:
+    """Attach the pinned receipt without copying columns; forward early close."""
+    import pyarrow as pa
+
+    try:
+        encoded = canonical_json(provenance).encode()
+        original_schema, schema = None, None
+        for batch in batches:
+            if original_schema is None or not original_schema.equals(batch.schema, check_metadata=True):
+                original_schema = batch.schema
+                schema = original_schema.with_metadata({**(original_schema.metadata or {}), b"teadata_provenance": encoded})
+            yield pa.RecordBatch.from_arrays(batch.columns, schema=schema)
+    finally:
+        batches.close()
+
+
 @dataclass(frozen=True, slots=True, eq=False)
 class SourceTable:
     """A lazy projection and filter of one exact published edition."""
@@ -137,6 +154,15 @@ class SourceTable:
         artifact, _ = _projection(self.release, self.edition, self._fields or (), period=self._period)
         _entity_key(artifact)
         return replace(self, _entity_ids=identifiers)
+
+    def iter_batches(self) -> Generator[pa.RecordBatch, None, None]:
+        """Stream selected columns with provenance, opening the leaf on first pull.
+
+        Close the generator when stopping early. Empty streams have no batch
+        metadata; provenance() also provides the receipt without scanning rows.
+        """
+        export = self._prepare()
+        yield from _provenance_batches(export.batches(), export.provenance().to_dict())
 
     def to_arrow(self) -> pa.Table:
         """Materialize the filtered projection with its keys and source support."""
@@ -260,6 +286,14 @@ class PartitionedSourceTable:
         return _TableExport(scanner, first.headers, restore_original_headers, None,
                             {"measurement_period": self.measurement_period.to_dict(),
                              "editions": [key.to_dict() for key in self.editions]}, provenance)
+
+    def iter_batches(self) -> Generator[pa.RecordBatch, None, None]:
+        """Stream pinned partitions in order with the complete selection receipt.
+
+        Close the generator when stopping early to avoid opening later leaves.
+        """
+        export = self._prepare()
+        yield from _provenance_batches(export.batches(), export.provenance().to_dict())
 
     def to_arrow(self) -> pa.Table:
         return self._prepare().to_arrow()
@@ -697,7 +731,7 @@ class _TableExport:
     def schema(self) -> pa.Schema:
         return self.scanner.projected_schema
 
-    def batches(self) -> Iterator[pa.RecordBatch]:
+    def batches(self) -> Generator[pa.RecordBatch, None, None]:
         for batch in self.scanner.to_batches():
             if self.restore_original_headers and any(column.null_count for column in batch.columns):
                 raise ContractError("A publisher-header export cannot substitute blanks for null values")

@@ -83,11 +83,11 @@ class _MethodArgument(_Argument):
 
 
 class _SeriesMethod(TypedDict):
-    name: Literal["pair_years", "to_sql", "iter_sql_batches", "to_csv", "to_excel"]
+    name: Literal["pair_years", "to_sql", "iter_sql_batches", "to_csv", "to_excel", "iter_batches"]
     receiver: Literal["ObservationSeries"]
     description: str
     arguments: list[_MethodArgument]
-    result: Literal["ObservationPair", "SeriesSqlExport", "Iterator[RecordBatch]", "None"]
+    result: Literal["ObservationPair", "SeriesSqlExport", "Iterator[RecordBatch]", "Generator[pyarrow.RecordBatch, None, None]", "None"]
     result_methods: list[str]
     requires: NotRequired[str]
 
@@ -1019,6 +1019,14 @@ _RELEASE_METHODS: list[_ReleaseMethod] = [{
     "result_methods": ["for_year", "iter_batches", "to_arrow", "to_df", "to_csv", "to_excel", "provenance", "pair_years", "to_sql",
                        "iter_sql_batches"],
     "result_operations": [{
+        "name": "iter_batches",
+        "receiver": "ObservationSeries",
+        "description": "Lazily stream selected years as Arrow batches with pinned teadata_provenance schema metadata.",
+        "arguments": [],
+        "result": "Generator[pyarrow.RecordBatch, None, None]",
+        "result_methods": ["close"],
+        "requires": "Consume once. Close when stopping early. Artifact reads are deferred; comparability remains unassessed.",
+    }, {
         "name": "to_csv",
         "receiver": "ObservationSeries",
         "description": "Stream selected years with raw values, statuses and a measurement-year column to CSV.",
