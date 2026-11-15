@@ -317,7 +317,11 @@ The source profile registers five school years, 2021–22 through 2025–26, for
 Texas, education service center regions and reporting districts, including
 reporting charters. TEA does not offer a campus report in this family. The
 offline producer builds a separate native candidate. The source profile does
-not automatically add College Credit to the default entity engine.
+not automatically add College Credit to the default entity engine. The exact
+reviewed 15-edition candidate now has a reusable offline qualification gate in
+`native_college_credit`; this gate replays every CSV row and five independently
+requested Texas HTML reports. Normal release composition and publication remain
+separate steps. Data release 155 does not contain this attachment.
 
 The [TEA College Credit criteria](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/abt_cte_college_credit_reports.html)
 describe public school course completion reported in the summer PEIMS
@@ -346,6 +350,89 @@ column names and tokens. The output is a table projection without the report
 preamble, footer or blank separator rows. The empty publisher header is
 retained, and a field subset retains Service and Service Description so course
 and Total rows stay distinguishable.
+
+When a normal parent release explicitly attaches this qualified family, use the
+same lazy dataset namespace as other sources. Discovery reads metadata rather
+than observations; selecting a field does not copy it into the entity's meta.
+Multi-row scalar access requires an explicit course or Total filter:
+
+```python
+district.peims_college_credit.variables()
+district.peims_college_credit.years("college_credit_hours")
+totals = district.peims_college_credit.at("2025-26").select(
+    "students_earning_college_credit_count", "college_credit_hours"
+).query("college_credit_service_key == @service", params={"service": "Total"}, record=True)
+frame = totals.to_df(restore_original_headers=True)
+totals.to_excel("college-credit.xlsx", restore_original_headers=True)
+
+series = release.series(
+    "peims_college_credit", "college_credit_hours", scope="district",
+    years=[22, 23, 24, 25, 26], ids=[1902, "'057829"],
+)
+# Service rows remain separate in the structured multi-year result.
+table = series.to_arrow()
+provenance = series.provenance()
+```
+
+The latest admitted measurement year is the default. Explicit unavailable years,
+campus scope or a CTE population absent in a requested year raise helpful errors;
+they do not substitute another population/year. All-student fields are selectable
+across these years, but cross-year comparability remains unassessed. Keep source
+download dates, measurement periods and release identities with exported values.
+The original raw acquisition receipts have an unknown period; the qualified
+edition metadata and publisher report headings establish the school year. Those
+original receipts are preserved rather than retroactively rewritten.
+DataFrames carry `attrs["teadata_provenance"]`; Excel has a canonical Provenance
+worksheet. CSV needs a separate JSON sidecar containing the same descriptor.
+Existing series SQL exports retain raw/status columns and pinned import receipts;
+store Decimal columns as exact text or a compatible exact numeric type.
+
+The [reviewed publisher cases](../teadata/reference_cases/native_college_credit.json)
+include direct Texas totals, leading-zero ISD and charter IDs, observed zero,
+partially suppressed rows and historical HIGH POINT ACADEMY (220819) observations.
+That ID appears in the 2021–22/2022–23 source reports but is absent from the
+specific release 155 current district roster. No closure explanation is inferred;
+source rows remain accessible without a join to today's entity list. Texas 2025–26
+reports 711,356 course-level student counts and 2,905,389 credit hours. These are
+not counts of distinct people. The qualifier never reconstructs suppressed
+values or creates a Texas total by summing district/ESC reports.
+
+The normal-parent publisher golden test is opt-in with both
+`TEADATA_NORMAL_SOURCE_GOLDEN_MANIFEST` and
+`TEADATA_NORMAL_SOURCE_GOLDEN_SHA256`. It exercises the unchanged attachment
+through entity dot access, DSL cohorts, multi-year selection and DataFrame,
+CSV, Excel and SQL exports. The standalone full source gate separately requires
+`TEADATA_COLLEGE_CREDIT_MANIFEST` and
+`TEADATA_COLLEGE_CREDIT_WITNESS_STORE`; processing evidence comes from the
+child's adjacent provenance store and all five HTML witness closures from that
+supplied retained publisher store. Neither a successful import nor metadata
+registration confers semantic qualification or publication approval.
+
+Before attaching the unchanged child to a normal release, the release preparer
+must retain all five independent HTML closures in the child's adjacent
+`provenance` store. Normal verification and receipt reuse deliberately open that
+adjacent store; a standalone qualifier supplied with a separate witness store
+does not prove this handoff. Use the existing immutable closure copy API against
+the owned publication staging directory, preserving the child manifest and
+Parquet bytes:
+
+```python
+from teadata.native_college_credit import reviewed_college_credit
+from teadata.provenance import ProvenanceStore
+
+review = reviewed_college_credit(child.manifest_sha256)
+assert review is not None  # Explicitly refuse an unreviewed child.
+adjacent = ProvenanceStore(child.path.parent / "provenance")
+publisher = ProvenanceStore(retained_publisher_store)
+for witness in review["publisher_witnesses"]:
+    adjacent.copy_record_from(publisher, witness["receipt"])
+```
+
+This copies verified source records/objects, not another data projection, and
+does not rewrite original acquisitions. The opt-in normal test checks the actual
+parent opener and every witness closure. When both test input pairs are supplied,
+the full raw/HTML replay uses that normal parent route once instead of repeating
+the standalone replay.
 
 ```sh
 PEIMS_CONFIG=teadata/teadata_sources.yaml

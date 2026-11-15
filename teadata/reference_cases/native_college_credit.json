@@ -1,0 +1,2285 @@
+{
+  "schema_version": 1,
+  "dataset": "peims_college_credit",
+  "manifest_sha256": "19fffe1f8d481d3c08bb01fe7cb4f73ae9ca8393d523a0d973411500cc33e3b8",
+  "build_id": "3aaafccb36a0350d7b5e474bd3f80eb7d0300e88a362a8f53c5b1860f5fb96e3",
+  "catalog_schema_version": 4,
+  "editions": {
+    "0b6e3f6962ae26265798f8a6622c07d631fb9e086e2339cdca779f961f71fff0": {
+      "key": {
+        "dataset": "peims_college_credit",
+        "edition": "2025",
+        "grain": "one publisher row per region_number and college_credit_service_key",
+        "revision_sha256": "a99f875bef32b16fd48cd0ce1bd9b704361a1bce58ef72cf950f9cdf6c7694b7",
+        "scope": "region",
+        "table": "region"
+      },
+      "metadata": {
+        "location": "f79880584686a7eeadeb6680f98b3a6423bbf0a9d91e8edc175ae30e5465c70d.json",
+        "sha256": "f79880584686a7eeadeb6680f98b3a6423bbf0a9d91e8edc175ae30e5465c70d",
+        "size_bytes": 22543
+      },
+      "artifact_id": "0ba0e7fe62743a313b9827028fb8956082d571bb3b298a0b9103121373877fe6",
+      "leaf_sha256": "2c00e9599690d7d499da73fcd3ef8c967e2839c04a17f0675d8889543266f943",
+      "leaf_size_bytes": 222213,
+      "processing_id": "ab197ada635676a03ffd7a836387d84033b789481ff8b3e3a193fd94ce0832e6",
+      "rows": 4448,
+      "source": {
+        "artifact": {
+          "filename": "peims-college-credit-2025-region.csv",
+          "sha256": "f4f4d0915da8b49d1b6a684e7d43bd245624a96d0c762a283e21c81a72537dac",
+          "size_bytes": 428999
+        },
+        "blank_records_inside_data_window": 19,
+        "downloaded_at": "2026-11-09T08:19:11.427866+00:00",
+        "edition": 2025,
+        "first_data_record": 10,
+        "footer_sha256": "0b49b548161bfce4267287a42739f5dcf2a4fe961e2316beb757f3d5e677f7ba",
+        "header": [
+          "Region",
+          "Region Name",
+          "Service",
+          "Service Description",
+          "Total CTE Students Earning College Credit",
+          "Total CTE Students' College Credit Hours",
+          "Average Hours per CTE Student",
+          "",
+          "Total Students Earning College Credit",
+          "Total Students' College Credit Hours",
+          "Average Hours per Student"
+        ],
+        "header_record": 9,
+        "last_data_record": 4476,
+        "measurement_period": {
+          "end_year": 2025,
+          "kind": "school_year",
+          "start_year": 2024
+        },
+        "original_acquisition_id": "7a8950268270c666bc54c061ab5fc9b922d2526e8e3bca56778adf86934a7388",
+        "preamble_sha256": "cb84940c0944e1ddba236614d3bf999130d3e7bb352837e5998402c962b3ccc4",
+        "raw_cte_only": false,
+        "scope": "region",
+        "source_rows": 4448
+      }
+    },
+    "282e294d0e5299aefed03567fe37a411aa284a433ae0e33b16ad584ef77fb571": {
+      "key": {
+        "dataset": "peims_college_credit",
+        "edition": "2025",
+        "grain": "one publisher row per district_number and college_credit_service_key",
+        "revision_sha256": "2848fa5a2e98a647198fbbcc4132393b1318b5f5143166022f47e63820c48539",
+        "scope": "district",
+        "table": "district"
+      },
+      "metadata": {
+        "location": "1ead2c59e458ec07c508645df11bd0c58e33be6aaf6e65d4efc7b3ca06832eef.json",
+        "sha256": "1ead2c59e458ec07c508645df11bd0c58e33be6aaf6e65d4efc7b3ca06832eef",
+        "size_bytes": 23533
+      },
+      "artifact_id": "6344bc7f1c7a9627adc426582ef285cee523be5b475c3c2433d2bdc870f55bb3",
+      "leaf_sha256": "c4c2e83970c83d9d864738612eacee79c999225c0a812efbb48740db5f319a65",
+      "leaf_size_bytes": 898932,
+      "processing_id": "f3e1d4f8d27926b4acc7e71b09f4e8ffd48e56fabd8880d2d31ec6b4ede5208a",
+      "rows": 21745,
+      "source": {
+        "artifact": {
+          "filename": "peims-college-credit-2025-district.csv",
+          "sha256": "052c9afa33a29ee79802c83075f3c65dfeeb9c9dc360883e5bcc7f8da25c87d6",
+          "size_bytes": 3086313
+        },
+        "blank_records_inside_data_window": 1058,
+        "downloaded_at": "2026-11-09T08:18:51.519489+00:00",
+        "edition": 2025,
+        "first_data_record": 10,
+        "footer_sha256": "b5c7bf8e240dd33139c346d915820aa9ff5067744cc5e0ae7f9251835d18b757",
+        "header": [
+          "Region",
+          "Region Name",
+          "District",
+          "District Name",
+          "Charter Status",
+          "Service",
+          "Service Description",
+          "Total CTE Students Earning College Credit",
+          "Total CTE Students' College Credit Hours",
+          "Average Hours per CTE Student",
+          "",
+          "Total Students Earning College Credit",
+          "Total Students' College Credit Hours",
+          "Average Hours per Student"
+        ],
+        "header_record": 9,
+        "last_data_record": 22812,
+        "measurement_period": {
+          "end_year": 2025,
+          "kind": "school_year",
+          "start_year": 2024
+        },
+        "original_acquisition_id": "dc1c664817383c4bfd174b53acc52d59c832be3340087f165f5921ecccd7e9ff",
+        "preamble_sha256": "f96b7a5c97d8761f39efd48d4abc636a1f128b61c79786da53e15f75f4b7653f",
+        "raw_cte_only": false,
+        "scope": "district",
+        "source_rows": 21745
+      }
+    },
+    "53189de6f1558a3ed4c9b1d661f7b2252e8927992e6c9586cba03f52929b90d7": {
+      "key": {
+        "dataset": "peims_college_credit",
+        "edition": "2022",
+        "grain": "one publisher row per college_credit_service_key",
+        "revision_sha256": "26af3c03221530f74bafa316546aba1924fe1c1ad5916fbb757041056f51a5fd",
+        "scope": "state",
+        "table": "state"
+      },
+      "metadata": {
+        "location": "05357cc7aaac2d12aedc5e6340d44995e97b668c9dd232d1d9e9168e891eeac2.json",
+        "sha256": "05357cc7aaac2d12aedc5e6340d44995e97b668c9dd232d1d9e9168e891eeac2",
+        "size_bytes": 21988
+      },
+      "artifact_id": "6822b4b5471b29dfc5e283054b2ca376456cc86d3cbd0f4fe6e80edd9f4762b5",
+      "leaf_sha256": "6102fa502faf45a41952d9d58f126c9d30c34146170962073bdda8b26d030c9b",
+      "leaf_size_bytes": 45991,
+      "processing_id": "92340ac8e48516b7fcb59f4104671ed730a50c708e8ae952cdacd459d4d404b8",
+      "rows": 652,
+      "source": {
+        "artifact": {
+          "filename": "peims-college-credit-2022-state.csv",
+          "sha256": "dae3f99c22843a176627eea0d356258288a527965ad5b2f5243378d0cdbfe403",
+          "size_bytes": 41619
+        },
+        "blank_records_inside_data_window": 0,
+        "downloaded_at": "2026-11-09T08:23:34.656252+00:00",
+        "edition": 2022,
+        "first_data_record": 8,
+        "footer_sha256": "ff38e3e6ca3377d6a5b99923d68ccf0929677a16b0349f3372139fd541ff9488",
+        "header": [
+          "Service",
+          "Service Description",
+          "Total CTE Students Earning College Credit",
+          "Total CTE Students' College Credit Hours",
+          "Average Hours per CTE Student",
+          "",
+          "Total Students Earning College Credit",
+          "Total Students' College Credit Hours",
+          "Average Hours per Student"
+        ],
+        "header_record": 7,
+        "last_data_record": 659,
+        "measurement_period": {
+          "end_year": 2022,
+          "kind": "school_year",
+          "start_year": 2021
+        },
+        "original_acquisition_id": "156455b03c376b3e151c09d4477ec0658e1a35521bfb8ea98e1344a15990074f",
+        "preamble_sha256": "202c55ea791c9820bf5335d36e23db5b3a1a8483a56493aaa70f283c54b9fcdf",
+        "raw_cte_only": false,
+        "scope": "state",
+        "source_rows": 652
+      }
+    },
+    "55607fbd9e990657be18590835941302de1618d6a5e758ee26e54089cf231922": {
+      "key": {
+        "dataset": "peims_college_credit",
+        "edition": "2023",
+        "grain": "one publisher row per region_number and college_credit_service_key",
+        "revision_sha256": "48537a6e6ed89bcdf150eff4ea81d851dd21d9ee0bffd7d9d697338378860f89",
+        "scope": "region",
+        "table": "region"
+      },
+      "metadata": {
+        "location": "4dd0a76cdce1ddb3f9dfae0e23aeba2eb650a5692e2702aef63ff717d27c9c30.json",
+        "sha256": "4dd0a76cdce1ddb3f9dfae0e23aeba2eb650a5692e2702aef63ff717d27c9c30",
+        "size_bytes": 22543
+      },
+      "artifact_id": "75271f92e285294c19527bc50f28d186781873727b9bbaabe2f96f144d2e6055",
+      "leaf_sha256": "73c9bd8d2ca14e745ecf01c3ddbd15a5ad0ede9af775b054f4b472c215b25fb8",
+      "leaf_size_bytes": 194742,
+      "processing_id": "664eb7836df3edcdda55ac9e30dd8551fd8657513e36f0a758bb3c17d5b3462f",
+      "rows": 3972,
+      "source": {
+        "artifact": {
+          "filename": "peims-college-credit-2023-region.csv",
+          "sha256": "429651de4734122032f277189328c9165855707c024d28214763a316eb048c96",
+          "size_bytes": 383918
+        },
+        "blank_records_inside_data_window": 19,
+        "downloaded_at": "2026-11-09T08:22:54.665190+00:00",
+        "edition": 2023,
+        "first_data_record": 10,
+        "footer_sha256": "1249c74afff68ef07e9ead5f97718b38887a73038d0061666c503d304c8ece08",
+        "header": [
+          "Region",
+          "Region Name",
+          "Service",
+          "Service Description",
+          "Total CTE Students Earning College Credit",
+          "Total CTE Students' College Credit Hours",
+          "Average Hours per CTE Student",
+          "",
+          "Total Students Earning College Credit",
+          "Total Students' College Credit Hours",
+          "Average Hours per Student"
+        ],
+        "header_record": 9,
+        "last_data_record": 4000,
+        "measurement_period": {
+          "end_year": 2023,
+          "kind": "school_year",
+          "start_year": 2022
+        },
+        "original_acquisition_id": "4213e6f0c1f883d123d16e2e55ae42946588e4483d7d5a3fc2eb7d1202fd9e81",
+        "preamble_sha256": "71cea4db33029f2647de1e5f2b4e0249cc29dd2066d086c132ea4e82b946d43d",
+        "raw_cte_only": false,
+        "scope": "region",
+        "source_rows": 3972
+      }
+    },
+    "5854ebfbfdfa89b1893fd302d7be448d2c49518e68cc4c9c4e73b56c0ebf6bec": {
+      "key": {
+        "dataset": "peims_college_credit",
+        "edition": "2024",
+        "grain": "one publisher row per district_number and college_credit_service_key",
+        "revision_sha256": "d7181990c7f48374bf45f338f22f380b25c747d6c5608ac5e879807a0787107a",
+        "scope": "district",
+        "table": "district"
+      },
+      "metadata": {
+        "location": "dbe88c72bd346328b81a3d53ff01d916ef62f67f8e7409cfe4172da8b0eaa30a.json",
+        "sha256": "dbe88c72bd346328b81a3d53ff01d916ef62f67f8e7409cfe4172da8b0eaa30a",
+        "size_bytes": 23533
+      },
+      "artifact_id": "d76f9886fe9591d13fdf5067f3adaba7bb60418afbaaef43e098496a9fb7d62e",
+      "leaf_sha256": "5c70cbdb0dba4a06047d1f144fb5a9dbbe0660d33cc15bd557b555b10ced52a5",
+      "leaf_size_bytes": 816373,
+      "processing_id": "085def8ba2c2b70500adecf117d36dc27b46838fdfb59337a85802ab83d1bdc3",
+      "rows": 19757,
+      "source": {
+        "artifact": {
+          "filename": "peims-college-credit-2024-district.csv",
+          "sha256": "52d1a37b03275f71307efa5a66dacdbcde00a9c2d6cd75e7b0fd781a0e389494",
+          "size_bytes": 2803761
+        },
+        "blank_records_inside_data_window": 1052,
+        "downloaded_at": "2026-11-09T08:20:11.473279+00:00",
+        "edition": 2024,
+        "first_data_record": 10,
+        "footer_sha256": "aa9e85a178495acbded618808b36c7766e8a1041089cac836d9b6144fab5b716",
+        "header": [
+          "Region",
+          "Region Name",
+          "District",
+          "District Name",
+          "Charter Status",
+          "Service",
+          "Service Description",
+          "Total CTE Students Earning College Credit",
+          "Total CTE Students' College Credit Hours",
+          "Average Hours per CTE Student",
+          "",
+          "Total Students Earning College Credit",
+          "Total Students' College Credit Hours",
+          "Average Hours per Student"
+        ],
+        "header_record": 9,
+        "last_data_record": 20818,
+        "measurement_period": {
+          "end_year": 2024,
+          "kind": "school_year",
+          "start_year": 2023
+        },
+        "original_acquisition_id": "14583cf2a8f13380bc3d1ae71d9bdf58eefb3be2030abbe99564d4d3a4c329bd",
+        "preamble_sha256": "baaf5a9c137a8b357367019b4de29056e2d36873fe5eed5862940f60a24d8258",
+        "raw_cte_only": false,
+        "scope": "district",
+        "source_rows": 19757
+      }
+    },
+    "6ea705fc549e1e86d486eec925d932ae2fb7e55b666edf2d611d00cfc12a9549": {
+      "key": {
+        "dataset": "peims_college_credit",
+        "edition": "2026",
+        "grain": "one publisher row per region_number and college_credit_service_key",
+        "revision_sha256": "469f9278fe82bee44a3a2e466de7f245df15476a38ad02731b1971d5f2c2c952",
+        "scope": "region",
+        "table": "region"
+      },
+      "metadata": {
+        "location": "39605dcd8c348d192d6f736e6097f87356869707a9844a112cb8ff2a95f7f7c4.json",
+        "sha256": "39605dcd8c348d192d6f736e6097f87356869707a9844a112cb8ff2a95f7f7c4",
+        "size_bytes": 22567
+      },
+      "artifact_id": "8760772854fd0453381fb3c5f2156be6de8495ca6b0fdc06ebfb0c53608065dc",
+      "leaf_sha256": "988a8ed0e1c51f6af72452eef4c1d6e1691b086dde5bb9c13ba715fdacaab750",
+      "leaf_size_bytes": 238113,
+      "processing_id": "a8f96be15765dc37b71441620d186d9625cf5f20092bd4292fc786d17ba51bec",
+      "rows": 4698,
+      "source": {
+        "artifact": {
+          "filename": "peims-college-credit-2026-region.csv",
+          "sha256": "4f3fa3e3f26965c90808990962209091970c5246d2443c252a94ecab4b899899",
+          "size_bytes": 453385
+        },
+        "blank_records_inside_data_window": 19,
+        "downloaded_at": "2026-11-09T08:16:04.472865+00:00",
+        "edition": 2026,
+        "first_data_record": 10,
+        "footer_sha256": "40dbf71f7f34789034f25ec5b5d5fc451b6206986aa8c431d0974f27956ad64c",
+        "header": [
+          "Region",
+          "Region Name",
+          "Service",
+          "Service Description",
+          "Total CTE Students Earning College Credit",
+          "Total CTE Students' College Credit Hours",
+          "Average Hours per CTE Student",
+          "",
+          "Total Students Earning College Credit",
+          "Total Students' College Credit Hours",
+          "Average Hours per Student"
+        ],
+        "header_record": 9,
+        "last_data_record": 4726,
+        "measurement_period": {
+          "end_year": 2026,
+          "kind": "school_year",
+          "start_year": 2025
+        },
+        "original_acquisition_id": "fb60a97887c315e0aa1adce2e83b23fa0bbdd20092aebdd36679572d2a1448a5",
+        "preamble_sha256": "06b88328e52f2d6c61e42cc6a41a149dddd7247ef286b19d4dd78ec3201ef8b0",
+        "raw_cte_only": true,
+        "scope": "region",
+        "source_rows": 4698
+      }
+    },
+    "74c801fbc6b5f68d2281185e115c4db7dbda36c230baede2e3f45c9cd1d15d76": {
+      "key": {
+        "dataset": "peims_college_credit",
+        "edition": "2026",
+        "grain": "one publisher row per college_credit_service_key",
+        "revision_sha256": "1238908d65fc954507d13c930cf23a8b3c98f319474cc3aba74e2e3365cddf2c",
+        "scope": "state",
+        "table": "state"
+      },
+      "metadata": {
+        "location": "c2468d065487911bdf6836af0670a8e43760acbcf57d02030c19068e3f0d4c2a.json",
+        "sha256": "c2468d065487911bdf6836af0670a8e43760acbcf57d02030c19068e3f0d4c2a",
+        "size_bytes": 21851
+      },
+      "artifact_id": "7dffff257a7dc406c97afc16b587229a2b65f903859e5b9af9d8f857159ef1e2",
+      "leaf_sha256": "73d05d13673050dda454f871e686e61dded44ccd6692407e3a58d5e756d37cd8",
+      "leaf_size_bytes": 48652,
+      "processing_id": "2d37992811c277a213993a219a7263d650be0143d71d13a59ec9c182901fb5f2",
+      "rows": 696,
+      "source": {
+        "artifact": {
+          "filename": "peims-college-credit-2026-state.csv",
+          "sha256": "5998a6bb8393c94fe806f9ef9c40ba552ea9adb7ae00ead981628d90ed0494a5",
+          "size_bytes": 44490
+        },
+        "blank_records_inside_data_window": 0,
+        "downloaded_at": "2026-11-09T08:15:24.434390+00:00",
+        "edition": 2026,
+        "first_data_record": 8,
+        "footer_sha256": "563487248068940454b3272b097cac064b46ee327a0169d15064d661c885ca96",
+        "header": [
+          "Service",
+          "Service Description",
+          "Total CTE Students Earning College Credit",
+          "Total CTE Students' College Credit Hours",
+          "Average Hours per CTE Student",
+          "",
+          "Total Students Earning College Credit",
+          "Total Students' College Credit Hours",
+          "Average Hours per Student"
+        ],
+        "header_record": 7,
+        "last_data_record": 703,
+        "measurement_period": {
+          "end_year": 2026,
+          "kind": "school_year",
+          "start_year": 2025
+        },
+        "original_acquisition_id": "932b8f90fea5fdc7b70de0d79617699f4e913c74a63cf03f8d9bce598869cf41",
+        "preamble_sha256": "9d01ebfef2c3a738dcb27dd73d176c2f29da070b0069642e74518215a11e797c",
+        "raw_cte_only": true,
+        "scope": "state",
+        "source_rows": 696
+      }
+    },
+    "7a688703bc8b014373768319995140361a2808fc5f6ff30fac3c49aa4492076b": {
+      "key": {
+        "dataset": "peims_college_credit",
+        "edition": "2024",
+        "grain": "one publisher row per college_credit_service_key",
+        "revision_sha256": "1599c4cc28945ee655451d9d5126064978e64bccd586ad810eb37d7a8e09ecb0",
+        "scope": "state",
+        "table": "state"
+      },
+      "metadata": {
+        "location": "996764c1c15adccdcd9044e1028752411ad5a505b638d1aae0c9ea94edb62e9f.json",
+        "sha256": "996764c1c15adccdcd9044e1028752411ad5a505b638d1aae0c9ea94edb62e9f",
+        "size_bytes": 21831
+      },
+      "artifact_id": "d9e7a8e1dbf581048faa6ad796e87ede81812ed5e513595c015d51c1dfdaa924",
+      "leaf_sha256": "78570138fe588a68bc7307a2a232693ce5ad3dd4fd924fb2d580f01c5cfeda9c",
+      "leaf_size_bytes": 47542,
+      "processing_id": "bf8dfdb4eaa870f4b7e49e4d5fadc4a3a627cf7301c4bf210f4d00f9ad2a7bc1",
+      "rows": 686,
+      "source": {
+        "artifact": {
+          "filename": "peims-college-credit-2024-state.csv",
+          "sha256": "05e959fedea998adf52e0e538aa8c56ffeb000cf749ae44fbd457d38124d4677",
+          "size_bytes": 43919
+        },
+        "blank_records_inside_data_window": 0,
+        "downloaded_at": "2026-11-09T08:19:51.413390+00:00",
+        "edition": 2024,
+        "first_data_record": 8,
+        "footer_sha256": "797118eb3af7e5124b1900de1d696807841b92ffa9e483fc5acd97290902fec7",
+        "header": [
+          "Service",
+          "Service Description",
+          "Total CTE Students Earning College Credit",
+          "Total CTE Students' College Credit Hours",
+          "Average Hours per CTE Student",
+          "",
+          "Total Students Earning College Credit",
+          "Total Students' College Credit Hours",
+          "Average Hours per Student"
+        ],
+        "header_record": 7,
+        "last_data_record": 693,
+        "measurement_period": {
+          "end_year": 2024,
+          "kind": "school_year",
+          "start_year": 2023
+        },
+        "original_acquisition_id": "f8c8b95545a2836e5f78c686ed30015bc94d44e01ac8ef1736fa05ebc3182906",
+        "preamble_sha256": "4cd20c1a93b084e29f6b4c28199be2838eb0b787245b5d87cadb1ff278485391",
+        "raw_cte_only": false,
+        "scope": "state",
+        "source_rows": 686
+      }
+    },
+    "8560138f35d078c54d661b22b6ba11a676d586e4d8b4f5676258799752b05b35": {
+      "key": {
+        "dataset": "peims_college_credit",
+        "edition": "2024",
+        "grain": "one publisher row per region_number and college_credit_service_key",
+        "revision_sha256": "b5343bed682260354a67430b20118a0c015be4517dd35f09c9f595cfeaa371bc",
+        "scope": "region",
+        "table": "region"
+      },
+      "metadata": {
+        "location": "f3e8f10ad2b1fa28f153f2ba37f36921454c0693c2d54b333ce131bb7bfa8aac.json",
+        "sha256": "f3e8f10ad2b1fa28f153f2ba37f36921454c0693c2d54b333ce131bb7bfa8aac",
+        "size_bytes": 22543
+      },
+      "artifact_id": "c6581f0daeac90d49379023dde81cab7aaf5f88d50053de76fe32493fc834565",
+      "leaf_sha256": "e48e861b88578be692e44332a722af5a193e3b1403535ae1b99629acf7651725",
+      "leaf_size_bytes": 210447,
+      "processing_id": "aa36b1f3182635ad0604f9609a1f873a5fcdf7eab181ea14f172bdb114e4517f",
+      "rows": 4187,
+      "source": {
+        "artifact": {
+          "filename": "peims-college-credit-2024-region.csv",
+          "sha256": "1f0b3f72ddd75bfc849910e78857f321c78003fc3f4a35cafb344bc61d8260b2",
+          "size_bytes": 404233
+        },
+        "blank_records_inside_data_window": 19,
+        "downloaded_at": "2026-11-09T08:20:31.507467+00:00",
+        "edition": 2024,
+        "first_data_record": 10,
+        "footer_sha256": "1b56a9eab83c22772b0ec74954f918e73690a875046ffd6cbd4486779f015f95",
+        "header": [
+          "Region",
+          "Region Name",
+          "Service",
+          "Service Description",
+          "Total CTE Students Earning College Credit",
+          "Total CTE Students' College Credit Hours",
+          "Average Hours per CTE Student",
+          "",
+          "Total Students Earning College Credit",
+          "Total Students' College Credit Hours",
+          "Average Hours per Student"
+        ],
+        "header_record": 9,
+        "last_data_record": 4215,
+        "measurement_period": {
+          "end_year": 2024,
+          "kind": "school_year",
+          "start_year": 2023
+        },
+        "original_acquisition_id": "cd48bf3829247b363210bf16256eff208a0e78ea15cac43a195aefd24e2d276f",
+        "preamble_sha256": "cda59b8c87bec0a990067a11693e50ffb76975465233cdb0876fc1920bc95b2b",
+        "raw_cte_only": false,
+        "scope": "region",
+        "source_rows": 4187
+      }
+    },
+    "88bdd4a3e5bbc89b9e0731bcdc1ee870a17d52734d5cbeae2ad218c6d5e14412": {
+      "key": {
+        "dataset": "peims_college_credit",
+        "edition": "2022",
+        "grain": "one publisher row per district_number and college_credit_service_key",
+        "revision_sha256": "c059ef9934bd15e1052dda7e61e448ab05b56b9a16b402ec42df3c917be997d0",
+        "scope": "district",
+        "table": "district"
+      },
+      "metadata": {
+        "location": "d3585f3b9dd0b70f1062ea03562b53b9267a04617c04633c8544e67a2f712ae7.json",
+        "sha256": "d3585f3b9dd0b70f1062ea03562b53b9267a04617c04633c8544e67a2f712ae7",
+        "size_bytes": 23690
+      },
+      "artifact_id": "b7be253a61680515ad4d1df30a8dbf206385bec272fdf9626a62eca1f403312a",
+      "leaf_sha256": "d74bbd54b99755fb21cb4397c796f8c93f8ee04a6c7e6648d7e6f92f7903c29e",
+      "leaf_size_bytes": 721191,
+      "processing_id": "7cf422a463a9694a585b09e162d1d09b116974562cd0d768630112f2e4485807",
+      "rows": 17462,
+      "source": {
+        "artifact": {
+          "filename": "peims-college-credit-2022-district.csv",
+          "sha256": "3202708317d833ad1a0e5cb4f1e1c11402ae0e7436e363957ff21cb46a2c70f9",
+          "size_bytes": 2474800
+        },
+        "blank_records_inside_data_window": 1031,
+        "downloaded_at": "2026-11-09T08:23:54.712776+00:00",
+        "edition": 2022,
+        "first_data_record": 10,
+        "footer_sha256": "386d95f34a4f58151a0eea123eb1f2e9e03f5fe57df672874720d6f66da5e55d",
+        "header": [
+          "Region",
+          "Region Name",
+          "District",
+          "District Name",
+          "Charter Status",
+          "Service",
+          "Service Description",
+          "Total CTE Students Earning College Credit",
+          "Total CTE Students' College Credit Hours",
+          "Average Hours per CTE Student",
+          "",
+          "Total Students Earning College Credit",
+          "Total Students' College Credit Hours",
+          "Average Hours per Student"
+        ],
+        "header_record": 9,
+        "last_data_record": 18502,
+        "measurement_period": {
+          "end_year": 2022,
+          "kind": "school_year",
+          "start_year": 2021
+        },
+        "original_acquisition_id": "2b656ebf11549fa8b84ea741d7c1bb9ca72f51e21920eee39cb5775f9f391e66",
+        "preamble_sha256": "5486cac4be55bfe2b8767458a1fb2d2b360d0beab891cbe073a366c72ec8931e",
+        "raw_cte_only": false,
+        "scope": "district",
+        "source_rows": 17462
+      }
+    },
+    "b4b4c3d43d1f1e6d977c2e83871d93c28f4296b6ed249c393e5338cc10890faa": {
+      "key": {
+        "dataset": "peims_college_credit",
+        "edition": "2026",
+        "grain": "one publisher row per district_number and college_credit_service_key",
+        "revision_sha256": "9094d301fb4e93b381d0edb90ca0ad3f00712132058aaa2e242a85cc1a881755",
+        "scope": "district",
+        "table": "district"
+      },
+      "metadata": {
+        "location": "5244afc7ca462b0af317a01a7d6eb09c046c644c2be56b54fbe0a1813d06f197.json",
+        "sha256": "5244afc7ca462b0af317a01a7d6eb09c046c644c2be56b54fbe0a1813d06f197",
+        "size_bytes": 23557
+      },
+      "artifact_id": "e2922f895f209818979bedf966e527f59791e8dda10a3451630e8f6bec010667",
+      "leaf_sha256": "99cb75776acd2af8be4c2cf6d1014072df7ea622323c8d83699a16b4949ca890",
+      "leaf_size_bytes": 966875,
+      "processing_id": "a0e87d097ea3fed315cc88d60e33b57b938b03ce45d959f3baac23240b6f1e78",
+      "rows": 23488,
+      "source": {
+        "artifact": {
+          "filename": "peims-college-credit-2026-district.csv",
+          "sha256": "029e9abfe183090ebabf46bb5f1eda5271e81fc71640d8038e08bcf5c8c4e898",
+          "size_bytes": 3340608
+        },
+        "blank_records_inside_data_window": 1064,
+        "downloaded_at": "2026-11-09T08:15:44.552937+00:00",
+        "edition": 2026,
+        "first_data_record": 10,
+        "footer_sha256": "93f4e0a8f31d71bbf16903d8d819edf8c2f27f7a094c2a86f875d5c660b64c88",
+        "header": [
+          "Region",
+          "Region Name",
+          "District",
+          "District Name",
+          "Charter Status",
+          "Service",
+          "Service Description",
+          "Total CTE Students Earning College Credit",
+          "Total CTE Students' College Credit Hours",
+          "Average Hours per CTE Student",
+          "",
+          "Total Students Earning College Credit",
+          "Total Students' College Credit Hours",
+          "Average Hours per Student"
+        ],
+        "header_record": 9,
+        "last_data_record": 24561,
+        "measurement_period": {
+          "end_year": 2026,
+          "kind": "school_year",
+          "start_year": 2025
+        },
+        "original_acquisition_id": "ab212ca0d443bf6723cd4d01a1664eecb1c9f96fad31b89cf0e69e776c5ddda9",
+        "preamble_sha256": "b2cd69a2db062bdb8fdb627187eb69511517b3172870b8ce6eb91aa97bbbb68b",
+        "raw_cte_only": true,
+        "scope": "district",
+        "source_rows": 23488
+      }
+    },
+    "b6bdcf3e197684dc7d6265ac921df524e375653c4deb0c44a964f8371b366db9": {
+      "key": {
+        "dataset": "peims_college_credit",
+        "edition": "2023",
+        "grain": "one publisher row per district_number and college_credit_service_key",
+        "revision_sha256": "7d6a4e7b6113c8104f3062101ac7a1f32fa37307a92f5b0ae1894496b4d9c66d",
+        "scope": "district",
+        "table": "district"
+      },
+      "metadata": {
+        "location": "75f091af59a2c2c36f18a0c98c49de54444fc194d7e1ad4df9a4ac5d68f31ec1.json",
+        "sha256": "75f091af59a2c2c36f18a0c98c49de54444fc194d7e1ad4df9a4ac5d68f31ec1",
+        "size_bytes": 23533
+      },
+      "artifact_id": "f49ceb0f4debf9ea7b1c3267bd2f84860ce7487dfcb97d4cdb4970c2afd92f32",
+      "leaf_sha256": "25fc0d1434c14f365621acc397cb9578bc7474fc2ee45ee88c6bd2a8b7e7bd9e",
+      "leaf_size_bytes": 764993,
+      "processing_id": "1fda91d9db1f0a768d5211b930622abb1b52d714f6c6474272fea61036f64fb7",
+      "rows": 18535,
+      "source": {
+        "artifact": {
+          "filename": "peims-college-credit-2023-district.csv",
+          "sha256": "ec739ae3c9bb7ed4baea0509592018a1dd056698517e9e802aa477c9cb441e1b",
+          "size_bytes": 2630976
+        },
+        "blank_records_inside_data_window": 1045,
+        "downloaded_at": "2026-11-09T08:22:34.744699+00:00",
+        "edition": 2023,
+        "first_data_record": 10,
+        "footer_sha256": "cabecfed67b705983a687f991c1e3df4ea324e063209cb0c398f4d8fddbc064b",
+        "header": [
+          "Region",
+          "Region Name",
+          "District",
+          "District Name",
+          "Charter Status",
+          "Service",
+          "Service Description",
+          "Total CTE Students Earning College Credit",
+          "Total CTE Students' College Credit Hours",
+          "Average Hours per CTE Student",
+          "",
+          "Total Students Earning College Credit",
+          "Total Students' College Credit Hours",
+          "Average Hours per Student"
+        ],
+        "header_record": 9,
+        "last_data_record": 19589,
+        "measurement_period": {
+          "end_year": 2023,
+          "kind": "school_year",
+          "start_year": 2022
+        },
+        "original_acquisition_id": "99b60f1cdc3e5ae79863503d51af08a285ffbdd44909c1ba9e387e2dcba7ccb0",
+        "preamble_sha256": "52fca922ec296746b1392adc69ceb4a5f91f03234be015f100e482410d499809",
+        "raw_cte_only": false,
+        "scope": "district",
+        "source_rows": 18535
+      }
+    },
+    "ba812cf6f3f2e45994523a721487148c1e137b32915333d30952e4e215ee20a5": {
+      "key": {
+        "dataset": "peims_college_credit",
+        "edition": "2022",
+        "grain": "one publisher row per region_number and college_credit_service_key",
+        "revision_sha256": "b083b3adb00395c7e2f643d6d52c081869495e856251b6bd5bb95357330078d9",
+        "scope": "region",
+        "table": "region"
+      },
+      "metadata": {
+        "location": "525c487de4ceecbcdc706b3c5a1944d85fddd739f78d91df7c8667d0f67b6cef.json",
+        "sha256": "525c487de4ceecbcdc706b3c5a1944d85fddd739f78d91df7c8667d0f67b6cef",
+        "size_bytes": 22692
+      },
+      "artifact_id": "9d12565a80d98027c090488d5e1b8016b97b5d4c507eed5a45c6a466d5d90fd0",
+      "leaf_sha256": "6c2bf25b22dc8bd000d0e82e9cd60ae07f8475b313000a3f336df47eedaa8db6",
+      "leaf_size_bytes": 185211,
+      "processing_id": "561467b02027096c94d240a6655209cfe722a960d0dc092b7f2b9343a6a78df5",
+      "rows": 3736,
+      "source": {
+        "artifact": {
+          "filename": "peims-college-credit-2022-region.csv",
+          "sha256": "aea165d38cdd480f4dbdf3d327842154ac497513f812f506da39fa75d5d72104",
+          "size_bytes": 360044
+        },
+        "blank_records_inside_data_window": 19,
+        "downloaded_at": "2026-11-09T08:24:14.689614+00:00",
+        "edition": 2022,
+        "first_data_record": 10,
+        "footer_sha256": "185f7ede89a337a33dafac1475c70857c59c2aec1f85273b1fdafd4574a9dbf4",
+        "header": [
+          "Region",
+          "Region Name",
+          "Service",
+          "Service Description",
+          "Total CTE Students Earning College Credit",
+          "Total CTE Students' College Credit Hours",
+          "Average Hours per CTE Student",
+          "",
+          "Total Students Earning College Credit",
+          "Total Students' College Credit Hours",
+          "Average Hours per Student"
+        ],
+        "header_record": 9,
+        "last_data_record": 3764,
+        "measurement_period": {
+          "end_year": 2022,
+          "kind": "school_year",
+          "start_year": 2021
+        },
+        "original_acquisition_id": "c159316e546f53e99adff43c89aaf465f001eb9662b865930b3cae4f29a83492",
+        "preamble_sha256": "4c04e194825524c7d744d0b3a4cef22961b6ffe5107f088f9a4b31f54786c6a5",
+        "raw_cte_only": false,
+        "scope": "region",
+        "source_rows": 3736
+      }
+    },
+    "bd962c3b4d538925c2efbf869aee9e74864182c18f7ac018b23bacdb5c215c4f": {
+      "key": {
+        "dataset": "peims_college_credit",
+        "edition": "2025",
+        "grain": "one publisher row per college_credit_service_key",
+        "revision_sha256": "015067c281c1262270913d3b2162aee9da62f50b4ad31c2265fd9be9fe876659",
+        "scope": "state",
+        "table": "state"
+      },
+      "metadata": {
+        "location": "e886d8bc1471b9a51a7a60f3d55119ef133ec7d6ba4f2fe5e5bc595f62a2a250.json",
+        "sha256": "e886d8bc1471b9a51a7a60f3d55119ef133ec7d6ba4f2fe5e5bc595f62a2a250",
+        "size_bytes": 21831
+      },
+      "artifact_id": "4deaa29cae2a6d56c4066fcf540f635d62a7cd9582ec179b059a5b0d71afe8cd",
+      "leaf_sha256": "4a452bd18abdaec34692f64a935bf90b6e38bffd37c711468fc891de9a3c0e93",
+      "leaf_size_bytes": 48736,
+      "processing_id": "de75ba1a1be67e1abee2c1bdb73be31594aeda96e2b0d68a27ceaf003754dd41",
+      "rows": 705,
+      "source": {
+        "artifact": {
+          "filename": "peims-college-credit-2025-state.csv",
+          "sha256": "f1c2f022645f12dba47b858c8057e0a53cf416b90e29f100bb1de803ae04cd7b",
+          "size_bytes": 45276
+        },
+        "blank_records_inside_data_window": 0,
+        "downloaded_at": "2026-11-09T08:18:31.435157+00:00",
+        "edition": 2025,
+        "first_data_record": 8,
+        "footer_sha256": "3bf3e7b8e0bede8f643a547ad4867a373fc569b8e03e38a20c687696c2f41c71",
+        "header": [
+          "Service",
+          "Service Description",
+          "Total CTE Students Earning College Credit",
+          "Total CTE Students' College Credit Hours",
+          "Average Hours per CTE Student",
+          "",
+          "Total Students Earning College Credit",
+          "Total Students' College Credit Hours",
+          "Average Hours per Student"
+        ],
+        "header_record": 7,
+        "last_data_record": 712,
+        "measurement_period": {
+          "end_year": 2025,
+          "kind": "school_year",
+          "start_year": 2024
+        },
+        "original_acquisition_id": "35288443150985eef724f93dc87ae34447ba4dcc383ab2de329306d9cb47ee6d",
+        "preamble_sha256": "6a10c69656dd14d67a69e27ebef7497999f8db3837fad134d90957fbc8113860",
+        "raw_cte_only": false,
+        "scope": "state",
+        "source_rows": 705
+      }
+    },
+    "d428376fd3248e5f7eb6bcb3fca04e484ebc401eb99193490a4727b1813877fa": {
+      "key": {
+        "dataset": "peims_college_credit",
+        "edition": "2023",
+        "grain": "one publisher row per college_credit_service_key",
+        "revision_sha256": "d6f8aafe5a563ea0951da60a42056c02f6a3e7ea9aa5221cce1872383901c3ce",
+        "scope": "state",
+        "table": "state"
+      },
+      "metadata": {
+        "location": "e055895c6370b04ced71388e1623fa2287ea11f54f024d685fbd2c53dcfc7881.json",
+        "sha256": "e055895c6370b04ced71388e1623fa2287ea11f54f024d685fbd2c53dcfc7881",
+        "size_bytes": 21831
+      },
+      "artifact_id": "a0351159ac646a2380fb94638d57e1ccf75fae668ab377ad9d97d1aa982d5b8a",
+      "leaf_sha256": "9d7b39a10bcbacb002d885624d44efc068d03a75cff812df5cd7e1848b0749a5",
+      "leaf_size_bytes": 46686,
+      "processing_id": "f70b1436d2d23bda5cf4b575d076fabcce8d60275156986a0bfc6125c369452b",
+      "rows": 668,
+      "source": {
+        "artifact": {
+          "filename": "peims-college-credit-2023-state.csv",
+          "sha256": "ade8312077720db7deb77690159d5b94f95d6d84e6be92c18efeebe603f3ed7d",
+          "size_bytes": 42800
+        },
+        "blank_records_inside_data_window": 0,
+        "downloaded_at": "2026-11-09T08:22:14.602434+00:00",
+        "edition": 2023,
+        "first_data_record": 8,
+        "footer_sha256": "a2ababfb55f94da9ba57209163dd856ee47f334a19d5eac53e3919c089d65953",
+        "header": [
+          "Service",
+          "Service Description",
+          "Total CTE Students Earning College Credit",
+          "Total CTE Students' College Credit Hours",
+          "Average Hours per CTE Student",
+          "",
+          "Total Students Earning College Credit",
+          "Total Students' College Credit Hours",
+          "Average Hours per Student"
+        ],
+        "header_record": 7,
+        "last_data_record": 675,
+        "measurement_period": {
+          "end_year": 2023,
+          "kind": "school_year",
+          "start_year": 2022
+        },
+        "original_acquisition_id": "85f04bf65a27e0a6c0fc1b2c8aaac3c30b47aca38461587d60248607a17d09cd",
+        "preamble_sha256": "77a672460f8b3bc24517da9f09d0276aa4bffb9af983e32534efaa977784f528",
+        "raw_cte_only": false,
+        "scope": "state",
+        "source_rows": 668
+      }
+    }
+  },
+  "publisher_witnesses": [
+    {
+      "edition": 2022,
+      "scope": "state",
+      "receipt": "8995a944cc281b0710b8006f6c3089b9d499379b98c159fbe8e06cdf182efc12",
+      "artifact": {
+        "filename": "peims-college-credit-2022-state.html",
+        "sha256": "2537ac123a18fc64278e1cee0ae64cca7240b7e3ea1c305854ba00cfe8a61f77",
+        "size_bytes": 243913
+      },
+      "controls": [
+        [
+          "_service",
+          "marykay"
+        ],
+        [
+          "_program",
+          "adhoc.download_college_credit_report.sas"
+        ],
+        [
+          "RptClass",
+          "CollegeCred"
+        ],
+        [
+          "_debug",
+          "0"
+        ],
+        [
+          "school_year",
+          "2022"
+        ],
+        [
+          "report",
+          "State"
+        ],
+        [
+          "format",
+          "html"
+        ]
+      ],
+      "retrieved": "2026-11-09T08:24:34.674755+00:00"
+    },
+    {
+      "edition": 2023,
+      "scope": "state",
+      "receipt": "c3986c08d0652c3b24beb3622048096f41d85d4634054e6af324d9dbcb22e563",
+      "artifact": {
+        "filename": "peims-college-credit-2023-state.html",
+        "sha256": "be79b2c383c0ecfe60e294359f02f3b4e257d67294945562e869b6fe714fdbd8",
+        "size_bytes": 248726
+      },
+      "controls": [
+        [
+          "_service",
+          "marykay"
+        ],
+        [
+          "_program",
+          "adhoc.download_college_credit_report.sas"
+        ],
+        [
+          "RptClass",
+          "CollegeCred"
+        ],
+        [
+          "_debug",
+          "0"
+        ],
+        [
+          "school_year",
+          "2023"
+        ],
+        [
+          "report",
+          "State"
+        ],
+        [
+          "format",
+          "html"
+        ]
+      ],
+      "retrieved": "2026-11-09T08:23:14.675875+00:00"
+    },
+    {
+      "edition": 2024,
+      "scope": "state",
+      "receipt": "98a65257edd99ea6dd386b01c0cda5ac9faf8951fcdb2de571c4fa673b029490",
+      "artifact": {
+        "filename": "peims-college-credit-2024-state.html",
+        "sha256": "43dd2f0adda9f75a649163be5743035a62a724c276977f02259558df06eb3083",
+        "size_bytes": 254129
+      },
+      "controls": [
+        [
+          "_service",
+          "marykay"
+        ],
+        [
+          "_program",
+          "adhoc.download_college_credit_report.sas"
+        ],
+        [
+          "RptClass",
+          "CollegeCred"
+        ],
+        [
+          "_debug",
+          "0"
+        ],
+        [
+          "school_year",
+          "2024"
+        ],
+        [
+          "report",
+          "State"
+        ],
+        [
+          "format",
+          "html"
+        ]
+      ],
+      "retrieved": "2026-11-09T08:20:51.440094+00:00"
+    },
+    {
+      "edition": 2025,
+      "scope": "state",
+      "receipt": "882a6063a434c5cada74283eeae90c621eea114a9356dc29ae88245b638db942",
+      "artifact": {
+        "filename": "peims-college-credit-2025-state.html",
+        "sha256": "438c330ce33941b996a7b50eba80aec66ee14f2ff6cb72e516f57c0198eea4b5",
+        "size_bytes": 259459
+      },
+      "controls": [
+        [
+          "_service",
+          "marykay"
+        ],
+        [
+          "_program",
+          "adhoc.download_college_credit_report.sas"
+        ],
+        [
+          "RptClass",
+          "CollegeCred"
+        ],
+        [
+          "_debug",
+          "0"
+        ],
+        [
+          "school_year",
+          "2025"
+        ],
+        [
+          "report",
+          "State"
+        ],
+        [
+          "format",
+          "html"
+        ]
+      ],
+      "retrieved": "2026-11-09T08:19:31.504049+00:00"
+    },
+    {
+      "edition": 2026,
+      "scope": "state",
+      "receipt": "252545289371782322373507ad060494d94228f6e00603be815cddccfa00be35",
+      "artifact": {
+        "filename": "peims-college-credit-2026-state.html",
+        "sha256": "f9644d249502ba4b0f68f18fe09a3bdd5739eb22e9f0ccd364bb517fde63f6c8",
+        "size_bytes": 256003
+      },
+      "controls": [
+        [
+          "_service",
+          "marykay"
+        ],
+        [
+          "_program",
+          "adhoc.download_college_credit_report.sas"
+        ],
+        [
+          "RptClass",
+          "CollegeCred"
+        ],
+        [
+          "_debug",
+          "0"
+        ],
+        [
+          "school_year",
+          "2026"
+        ],
+        [
+          "report",
+          "State"
+        ],
+        [
+          "format",
+          "html"
+        ]
+      ],
+      "retrieved": "2026-11-09T08:16:24.561572+00:00"
+    }
+  ],
+  "goldens": [
+    {
+      "case_id": "2022-district-001902-03220300",
+      "edition": 2022,
+      "scope": "district",
+      "entity": "001902",
+      "service_key": "03220300",
+      "source_record": 2618,
+      "service_code": "03220300",
+      "service_description": "ENGLISH III (ENG 3)",
+      "entity_name": "CAYUGA ISD",
+      "charter_status": "TRADITIONAL ISD/CSD",
+      "acquisition_id": "2b656ebf11549fa8b84ea741d7c1bb9ca72f51e21920eee39cb5775f9f391e66",
+      "source_sha256": "3202708317d833ad1a0e5cb4f1e1c11402ae0e7436e363957ff21cb46a2c70f9",
+      "facts": {
+        "cte_excluding_participants_students_earning_college_credit_count": {
+          "raw": "13",
+          "status": "observed",
+          "value": 13,
+          "type": "int64"
+        },
+        "cte_excluding_participants_college_credit_hours": {
+          "raw": "75",
+          "status": "observed",
+          "value": 75,
+          "type": "int64"
+        },
+        "cte_excluding_participants_average_credit_hours_per_student": {
+          "raw": "5.8",
+          "status": "observed",
+          "value": "5.8",
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "13",
+          "status": "observed",
+          "value": 13,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "75",
+          "status": "observed",
+          "value": 75,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "5.8",
+          "status": "observed",
+          "value": "5.8",
+          "type": "decimal128(16,1)"
+        }
+      }
+    },
+    {
+      "case_id": "2022-district-001902-Total",
+      "edition": 2022,
+      "scope": "district",
+      "entity": "001902",
+      "service_key": "Total",
+      "source_record": 2627,
+      "service_code": "",
+      "service_description": "Total",
+      "entity_name": "CAYUGA ISD",
+      "charter_status": "TRADITIONAL ISD/CSD",
+      "acquisition_id": "2b656ebf11549fa8b84ea741d7c1bb9ca72f51e21920eee39cb5775f9f391e66",
+      "source_sha256": "3202708317d833ad1a0e5cb4f1e1c11402ae0e7436e363957ff21cb46a2c70f9",
+      "facts": {
+        "cte_excluding_participants_students_earning_college_credit_count": {
+          "raw": "87",
+          "status": "observed",
+          "value": 87,
+          "type": "int64"
+        },
+        "cte_excluding_participants_college_credit_hours": {
+          "raw": "424",
+          "status": "observed",
+          "value": 424,
+          "type": "int64"
+        },
+        "cte_excluding_participants_average_credit_hours_per_student": {
+          "raw": "4.9",
+          "status": "observed",
+          "value": "4.9",
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "87",
+          "status": "observed",
+          "value": 87,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "424",
+          "status": "observed",
+          "value": 424,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "4.9",
+          "status": "observed",
+          "value": "4.9",
+          "type": "decimal128(16,1)"
+        }
+      }
+    },
+    {
+      "case_id": "2022-district-057829-03102500",
+      "edition": 2022,
+      "scope": "district",
+      "entity": "057829",
+      "service_key": "03102500",
+      "source_record": 10,
+      "service_code": "03102500",
+      "service_description": "INDEP STUDY IN MATH (1ST TIME)",
+      "entity_name": "A+ ACADEMY",
+      "charter_status": "OPEN ENROLLMENT CHARTER",
+      "acquisition_id": "2b656ebf11549fa8b84ea741d7c1bb9ca72f51e21920eee39cb5775f9f391e66",
+      "source_sha256": "3202708317d833ad1a0e5cb4f1e1c11402ae0e7436e363957ff21cb46a2c70f9",
+      "facts": {
+        "cte_excluding_participants_students_earning_college_credit_count": {
+          "raw": "13",
+          "status": "observed",
+          "value": 13,
+          "type": "int64"
+        },
+        "cte_excluding_participants_college_credit_hours": {
+          "raw": "48",
+          "status": "observed",
+          "value": 48,
+          "type": "int64"
+        },
+        "cte_excluding_participants_average_credit_hours_per_student": {
+          "raw": "3.7",
+          "status": "observed",
+          "value": "3.7",
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "13",
+          "status": "observed",
+          "value": 13,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "48",
+          "status": "observed",
+          "value": 48,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "3.7",
+          "status": "observed",
+          "value": "3.7",
+          "type": "decimal128(16,1)"
+        }
+      }
+    },
+    {
+      "case_id": "2022-district-057829-Total",
+      "edition": 2022,
+      "scope": "district",
+      "entity": "057829",
+      "service_key": "Total",
+      "source_record": 27,
+      "service_code": "",
+      "service_description": "Total",
+      "entity_name": "A+ ACADEMY",
+      "charter_status": "OPEN ENROLLMENT CHARTER",
+      "acquisition_id": "2b656ebf11549fa8b84ea741d7c1bb9ca72f51e21920eee39cb5775f9f391e66",
+      "source_sha256": "3202708317d833ad1a0e5cb4f1e1c11402ae0e7436e363957ff21cb46a2c70f9",
+      "facts": {
+        "cte_excluding_participants_students_earning_college_credit_count": {
+          "raw": "321",
+          "status": "observed",
+          "value": 321,
+          "type": "int64"
+        },
+        "cte_excluding_participants_college_credit_hours": {
+          "raw": "1270",
+          "status": "observed",
+          "value": 1270,
+          "type": "int64"
+        },
+        "cte_excluding_participants_average_credit_hours_per_student": {
+          "raw": "4.0",
+          "status": "observed",
+          "value": "4.0",
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "353",
+          "status": "observed",
+          "value": 353,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "1342",
+          "status": "observed",
+          "value": 1342,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "3.8",
+          "status": "observed",
+          "value": "3.8",
+          "type": "decimal128(16,1)"
+        }
+      }
+    },
+    {
+      "case_id": "2022-district-220819-Total",
+      "edition": 2022,
+      "scope": "district",
+      "entity": "220819",
+      "service_key": "Total",
+      "source_record": 7690,
+      "service_code": "",
+      "service_description": "Total",
+      "entity_name": "HIGH POINT ACADEMY",
+      "charter_status": "OPEN ENROLLMENT CHARTER",
+      "acquisition_id": "2b656ebf11549fa8b84ea741d7c1bb9ca72f51e21920eee39cb5775f9f391e66",
+      "source_sha256": "3202708317d833ad1a0e5cb4f1e1c11402ae0e7436e363957ff21cb46a2c70f9",
+      "facts": {
+        "cte_excluding_participants_students_earning_college_credit_count": {
+          "raw": "97",
+          "status": "observed",
+          "value": 97,
+          "type": "int64"
+        },
+        "cte_excluding_participants_college_credit_hours": {
+          "raw": "305",
+          "status": "observed",
+          "value": 305,
+          "type": "int64"
+        },
+        "cte_excluding_participants_average_credit_hours_per_student": {
+          "raw": "3.1",
+          "status": "observed",
+          "value": "3.1",
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "120",
+          "status": "observed",
+          "value": 120,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "381",
+          "status": "observed",
+          "value": 381,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "3.2",
+          "status": "observed",
+          "value": "3.2",
+          "type": "decimal128(16,1)"
+        }
+      }
+    },
+    {
+      "case_id": "2022-state-Texas-Total",
+      "edition": 2022,
+      "scope": "state",
+      "entity": "Texas",
+      "service_key": "Total",
+      "source_record": 659,
+      "service_code": "Total",
+      "service_description": "",
+      "entity_name": "Texas",
+      "charter_status": null,
+      "acquisition_id": "156455b03c376b3e151c09d4477ec0658e1a35521bfb8ea98e1344a15990074f",
+      "source_sha256": "dae3f99c22843a176627eea0d356258288a527965ad5b2f5243378d0cdbfe403",
+      "facts": {
+        "cte_excluding_participants_students_earning_college_credit_count": {
+          "raw": "391740",
+          "status": "observed",
+          "value": 391740,
+          "type": "int64"
+        },
+        "cte_excluding_participants_college_credit_hours": {
+          "raw": "1645027",
+          "status": "observed",
+          "value": 1645027,
+          "type": "int64"
+        },
+        "cte_excluding_participants_average_credit_hours_per_student": {
+          "raw": "4.2",
+          "status": "observed",
+          "value": "4.2",
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "467704",
+          "status": "observed",
+          "value": 467704,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "1932247",
+          "status": "observed",
+          "value": 1932247,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "4.1",
+          "status": "observed",
+          "value": "4.1",
+          "type": "decimal128(16,1)"
+        }
+      }
+    },
+    {
+      "case_id": "2023-district-001902-Total",
+      "edition": 2023,
+      "scope": "district",
+      "entity": "001902",
+      "service_key": "Total",
+      "source_record": 2752,
+      "service_code": "",
+      "service_description": "Total",
+      "entity_name": "CAYUGA ISD",
+      "charter_status": "TRADITIONAL ISD/CSD",
+      "acquisition_id": "99b60f1cdc3e5ae79863503d51af08a285ffbdd44909c1ba9e387e2dcba7ccb0",
+      "source_sha256": "ec739ae3c9bb7ed4baea0509592018a1dd056698517e9e802aa477c9cb441e1b",
+      "facts": {
+        "cte_all_program_groups_students_earning_college_credit_count": {
+          "raw": "143",
+          "status": "observed",
+          "value": 143,
+          "type": "int64"
+        },
+        "cte_all_program_groups_college_credit_hours": {
+          "raw": "839",
+          "status": "observed",
+          "value": 839,
+          "type": "int64"
+        },
+        "cte_all_program_groups_average_credit_hours_per_student": {
+          "raw": "5.9",
+          "status": "observed",
+          "value": "5.9",
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "146",
+          "status": "observed",
+          "value": 146,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "849",
+          "status": "observed",
+          "value": 849,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "5.8",
+          "status": "observed",
+          "value": "5.8",
+          "type": "decimal128(16,1)"
+        }
+      }
+    },
+    {
+      "case_id": "2023-district-057829-Total",
+      "edition": 2023,
+      "scope": "district",
+      "entity": "057829",
+      "service_key": "Total",
+      "source_record": 31,
+      "service_code": "",
+      "service_description": "Total",
+      "entity_name": "A+ ACADEMY",
+      "charter_status": "OPEN ENROLLMENT CHARTER",
+      "acquisition_id": "99b60f1cdc3e5ae79863503d51af08a285ffbdd44909c1ba9e387e2dcba7ccb0",
+      "source_sha256": "ec739ae3c9bb7ed4baea0509592018a1dd056698517e9e802aa477c9cb441e1b",
+      "facts": {
+        "cte_all_program_groups_students_earning_college_credit_count": {
+          "raw": "427",
+          "status": "observed",
+          "value": 427,
+          "type": "int64"
+        },
+        "cte_all_program_groups_college_credit_hours": {
+          "raw": "1641",
+          "status": "observed",
+          "value": 1641,
+          "type": "int64"
+        },
+        "cte_all_program_groups_average_credit_hours_per_student": {
+          "raw": "3.8",
+          "status": "observed",
+          "value": "3.8",
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "434",
+          "status": "observed",
+          "value": 434,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "1663",
+          "status": "observed",
+          "value": 1663,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "3.8",
+          "status": "observed",
+          "value": "3.8",
+          "type": "decimal128(16,1)"
+        }
+      }
+    },
+    {
+      "case_id": "2023-district-220819-Total",
+      "edition": 2023,
+      "scope": "district",
+      "entity": "220819",
+      "service_key": "Total",
+      "source_record": 8222,
+      "service_code": "",
+      "service_description": "Total",
+      "entity_name": "HIGH POINT ACADEMY",
+      "charter_status": "OPEN ENROLLMENT CHARTER",
+      "acquisition_id": "99b60f1cdc3e5ae79863503d51af08a285ffbdd44909c1ba9e387e2dcba7ccb0",
+      "source_sha256": "ec739ae3c9bb7ed4baea0509592018a1dd056698517e9e802aa477c9cb441e1b",
+      "facts": {
+        "cte_all_program_groups_students_earning_college_credit_count": {
+          "raw": "233",
+          "status": "observed",
+          "value": 233,
+          "type": "int64"
+        },
+        "cte_all_program_groups_college_credit_hours": {
+          "raw": "795",
+          "status": "observed",
+          "value": 795,
+          "type": "int64"
+        },
+        "cte_all_program_groups_average_credit_hours_per_student": {
+          "raw": "3.4",
+          "status": "observed",
+          "value": "3.4",
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "233",
+          "status": "observed",
+          "value": 233,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "795",
+          "status": "observed",
+          "value": 795,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "3.4",
+          "status": "observed",
+          "value": "3.4",
+          "type": "decimal128(16,1)"
+        }
+      }
+    },
+    {
+      "case_id": "2023-state-Texas-Total",
+      "edition": 2023,
+      "scope": "state",
+      "entity": "Texas",
+      "service_key": "Total",
+      "source_record": 675,
+      "service_code": "Total",
+      "service_description": "",
+      "entity_name": "Texas",
+      "charter_status": null,
+      "acquisition_id": "85f04bf65a27e0a6c0fc1b2c8aaac3c30b47aca38461587d60248607a17d09cd",
+      "source_sha256": "ade8312077720db7deb77690159d5b94f95d6d84e6be92c18efeebe603f3ed7d",
+      "facts": {
+        "cte_all_program_groups_students_earning_college_credit_count": {
+          "raw": "494601",
+          "status": "observed",
+          "value": 494601,
+          "type": "int64"
+        },
+        "cte_all_program_groups_college_credit_hours": {
+          "raw": "2066205",
+          "status": "observed",
+          "value": 2066205,
+          "type": "int64"
+        },
+        "cte_all_program_groups_average_credit_hours_per_student": {
+          "raw": "4.2",
+          "status": "observed",
+          "value": "4.2",
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "514818",
+          "status": "observed",
+          "value": 514818,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "2141494",
+          "status": "observed",
+          "value": 2141494,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "4.2",
+          "status": "observed",
+          "value": "4.2",
+          "type": "decimal128(16,1)"
+        }
+      }
+    },
+    {
+      "case_id": "2024-district-001902-Total",
+      "edition": 2024,
+      "scope": "district",
+      "entity": "001902",
+      "service_key": "Total",
+      "source_record": 2843,
+      "service_code": "",
+      "service_description": "Total",
+      "entity_name": "CAYUGA ISD",
+      "charter_status": "TRADITIONAL ISD/CSD",
+      "acquisition_id": "14583cf2a8f13380bc3d1ae71d9bdf58eefb3be2030abbe99564d4d3a4c329bd",
+      "source_sha256": "52d1a37b03275f71307efa5a66dacdbcde00a9c2d6cd75e7b0fd781a0e389494",
+      "facts": {
+        "cte_all_program_groups_students_earning_college_credit_count": {
+          "raw": "157",
+          "status": "observed",
+          "value": 157,
+          "type": "int64"
+        },
+        "cte_all_program_groups_college_credit_hours": {
+          "raw": "831",
+          "status": "observed",
+          "value": 831,
+          "type": "int64"
+        },
+        "cte_all_program_groups_average_credit_hours_per_student": {
+          "raw": "5.3",
+          "status": "observed",
+          "value": "5.3",
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "159",
+          "status": "observed",
+          "value": 159,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "837",
+          "status": "observed",
+          "value": 837,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "5.3",
+          "status": "observed",
+          "value": "5.3",
+          "type": "decimal128(16,1)"
+        }
+      }
+    },
+    {
+      "case_id": "2024-district-057829-Total",
+      "edition": 2024,
+      "scope": "district",
+      "entity": "057829",
+      "service_key": "Total",
+      "source_record": 33,
+      "service_code": "",
+      "service_description": "Total",
+      "entity_name": "A+ ACADEMY",
+      "charter_status": "OPEN ENROLLMENT CHARTER",
+      "acquisition_id": "14583cf2a8f13380bc3d1ae71d9bdf58eefb3be2030abbe99564d4d3a4c329bd",
+      "source_sha256": "52d1a37b03275f71307efa5a66dacdbcde00a9c2d6cd75e7b0fd781a0e389494",
+      "facts": {
+        "cte_all_program_groups_students_earning_college_credit_count": {
+          "raw": "374",
+          "status": "observed",
+          "value": 374,
+          "type": "int64"
+        },
+        "cte_all_program_groups_college_credit_hours": {
+          "raw": "1376",
+          "status": "observed",
+          "value": 1376,
+          "type": "int64"
+        },
+        "cte_all_program_groups_average_credit_hours_per_student": {
+          "raw": "3.7",
+          "status": "observed",
+          "value": "3.7",
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "374",
+          "status": "observed",
+          "value": 374,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "1376",
+          "status": "observed",
+          "value": 1376,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "3.7",
+          "status": "observed",
+          "value": "3.7",
+          "type": "decimal128(16,1)"
+        }
+      }
+    },
+    {
+      "case_id": "2024-state-Texas-Total",
+      "edition": 2024,
+      "scope": "state",
+      "entity": "Texas",
+      "service_key": "Total",
+      "source_record": 693,
+      "service_code": "Total",
+      "service_description": "",
+      "entity_name": "Texas",
+      "charter_status": null,
+      "acquisition_id": "f8c8b95545a2836e5f78c686ed30015bc94d44e01ac8ef1736fa05ebc3182906",
+      "source_sha256": "05e959fedea998adf52e0e538aa8c56ffeb000cf749ae44fbd457d38124d4677",
+      "facts": {
+        "cte_all_program_groups_students_earning_college_credit_count": {
+          "raw": "558447",
+          "status": "observed",
+          "value": 558447,
+          "type": "int64"
+        },
+        "cte_all_program_groups_college_credit_hours": {
+          "raw": "2362218",
+          "status": "observed",
+          "value": 2362218,
+          "type": "int64"
+        },
+        "cte_all_program_groups_average_credit_hours_per_student": {
+          "raw": "4.2",
+          "status": "observed",
+          "value": "4.2",
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "580996",
+          "status": "observed",
+          "value": 580996,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "2445918",
+          "status": "observed",
+          "value": 2445918,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "4.2",
+          "status": "observed",
+          "value": "4.2",
+          "type": "decimal128(16,1)"
+        }
+      }
+    },
+    {
+      "case_id": "2025-district-001902-Total",
+      "edition": 2025,
+      "scope": "district",
+      "entity": "001902",
+      "service_key": "Total",
+      "source_record": 3139,
+      "service_code": "",
+      "service_description": "Total",
+      "entity_name": "CAYUGA ISD",
+      "charter_status": "TRADITIONAL ISD/CSD",
+      "acquisition_id": "dc1c664817383c4bfd174b53acc52d59c832be3340087f165f5921ecccd7e9ff",
+      "source_sha256": "052c9afa33a29ee79802c83075f3c65dfeeb9c9dc360883e5bcc7f8da25c87d6",
+      "facts": {
+        "cte_all_program_groups_students_earning_college_credit_count": {
+          "raw": "139",
+          "status": "observed",
+          "value": 139,
+          "type": "int64"
+        },
+        "cte_all_program_groups_college_credit_hours": {
+          "raw": "749",
+          "status": "observed",
+          "value": 749,
+          "type": "int64"
+        },
+        "cte_all_program_groups_average_credit_hours_per_student": {
+          "raw": "5.4",
+          "status": "observed",
+          "value": "5.4",
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "139",
+          "status": "observed",
+          "value": 139,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "749",
+          "status": "observed",
+          "value": 749,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "5.4",
+          "status": "observed",
+          "value": "5.4",
+          "type": "decimal128(16,1)"
+        }
+      }
+    },
+    {
+      "case_id": "2025-district-057829-Total",
+      "edition": 2025,
+      "scope": "district",
+      "entity": "057829",
+      "service_key": "Total",
+      "source_record": 49,
+      "service_code": "",
+      "service_description": "Total",
+      "entity_name": "A+ ACADEMY",
+      "charter_status": "OPEN ENROLLMENT CHARTER",
+      "acquisition_id": "dc1c664817383c4bfd174b53acc52d59c832be3340087f165f5921ecccd7e9ff",
+      "source_sha256": "052c9afa33a29ee79802c83075f3c65dfeeb9c9dc360883e5bcc7f8da25c87d6",
+      "facts": {
+        "cte_all_program_groups_students_earning_college_credit_count": {
+          "raw": "503",
+          "status": "observed",
+          "value": 503,
+          "type": "int64"
+        },
+        "cte_all_program_groups_college_credit_hours": {
+          "raw": "1836",
+          "status": "observed",
+          "value": 1836,
+          "type": "int64"
+        },
+        "cte_all_program_groups_average_credit_hours_per_student": {
+          "raw": "3.7",
+          "status": "observed",
+          "value": "3.7",
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "506",
+          "status": "observed",
+          "value": 506,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "1843",
+          "status": "observed",
+          "value": 1843,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "3.6",
+          "status": "observed",
+          "value": "3.6",
+          "type": "decimal128(16,1)"
+        }
+      }
+    },
+    {
+      "case_id": "2025-state-Texas-Total",
+      "edition": 2025,
+      "scope": "state",
+      "entity": "Texas",
+      "service_key": "Total",
+      "source_record": 712,
+      "service_code": "Total",
+      "service_description": "",
+      "entity_name": "Texas",
+      "charter_status": null,
+      "acquisition_id": "35288443150985eef724f93dc87ae34447ba4dcc383ab2de329306d9cb47ee6d",
+      "source_sha256": "f1c2f022645f12dba47b858c8057e0a53cf416b90e29f100bb1de803ae04cd7b",
+      "facts": {
+        "cte_all_program_groups_students_earning_college_credit_count": {
+          "raw": "624876",
+          "status": "observed",
+          "value": 624876,
+          "type": "int64"
+        },
+        "cte_all_program_groups_college_credit_hours": {
+          "raw": "2643838",
+          "status": "observed",
+          "value": 2643838,
+          "type": "int64"
+        },
+        "cte_all_program_groups_average_credit_hours_per_student": {
+          "raw": "4.2",
+          "status": "observed",
+          "value": "4.2",
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "646804",
+          "status": "observed",
+          "value": 646804,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "2722747",
+          "status": "observed",
+          "value": 2722747,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "4.2",
+          "status": "observed",
+          "value": "4.2",
+          "type": "decimal128(16,1)"
+        }
+      }
+    },
+    {
+      "case_id": "2026-district-001902-03220300",
+      "edition": 2026,
+      "scope": "district",
+      "entity": "001902",
+      "service_key": "03220300",
+      "source_record": 3429,
+      "service_code": "03220300",
+      "service_description": "ENGLISH III (ENG 3)",
+      "entity_name": "CAYUGA ISD",
+      "charter_status": "TRADITIONAL ISD/CSD",
+      "acquisition_id": "ab212ca0d443bf6723cd4d01a1664eecb1c9f96fad31b89cf0e69e776c5ddda9",
+      "source_sha256": "029e9abfe183090ebabf46bb5f1eda5271e81fc71640d8038e08bcf5c8c4e898",
+      "facts": {
+        "cte_excluding_explorers_students_earning_college_credit_count": {
+          "raw": "16",
+          "status": "observed",
+          "value": 16,
+          "type": "int64"
+        },
+        "cte_excluding_explorers_college_credit_hours": {
+          "raw": "93",
+          "status": "observed",
+          "value": 93,
+          "type": "int64"
+        },
+        "cte_excluding_explorers_average_credit_hours_per_student": {
+          "raw": "5.8",
+          "status": "observed",
+          "value": "5.8",
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "16",
+          "status": "observed",
+          "value": 16,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "93",
+          "status": "observed",
+          "value": 93,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "5.8",
+          "status": "observed",
+          "value": "5.8",
+          "type": "decimal128(16,1)"
+        }
+      }
+    },
+    {
+      "case_id": "2026-district-001902-Total",
+      "edition": 2026,
+      "scope": "district",
+      "entity": "001902",
+      "service_key": "Total",
+      "source_record": 3450,
+      "service_code": "",
+      "service_description": "Total",
+      "entity_name": "CAYUGA ISD",
+      "charter_status": "TRADITIONAL ISD/CSD",
+      "acquisition_id": "ab212ca0d443bf6723cd4d01a1664eecb1c9f96fad31b89cf0e69e776c5ddda9",
+      "source_sha256": "029e9abfe183090ebabf46bb5f1eda5271e81fc71640d8038e08bcf5c8c4e898",
+      "facts": {
+        "cte_excluding_explorers_students_earning_college_credit_count": {
+          "raw": "136",
+          "status": "observed",
+          "value": 136,
+          "type": "int64"
+        },
+        "cte_excluding_explorers_college_credit_hours": {
+          "raw": "676",
+          "status": "observed",
+          "value": 676,
+          "type": "int64"
+        },
+        "cte_excluding_explorers_average_credit_hours_per_student": {
+          "raw": "5.0",
+          "status": "observed",
+          "value": "5.0",
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "136",
+          "status": "observed",
+          "value": 136,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "676",
+          "status": "observed",
+          "value": 676,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "5.0",
+          "status": "observed",
+          "value": "5.0",
+          "type": "decimal128(16,1)"
+        }
+      }
+    },
+    {
+      "case_id": "2026-district-057829-03020000",
+      "edition": 2026,
+      "scope": "district",
+      "entity": "057829",
+      "service_key": "03020000",
+      "source_record": 10,
+      "service_code": "03020000",
+      "service_description": "ENVIRONMENTAL SYSTEMS-ENVIRSYS",
+      "entity_name": "A+ ACADEMY",
+      "charter_status": "OPEN ENROLLMENT CHARTER",
+      "acquisition_id": "ab212ca0d443bf6723cd4d01a1664eecb1c9f96fad31b89cf0e69e776c5ddda9",
+      "source_sha256": "029e9abfe183090ebabf46bb5f1eda5271e81fc71640d8038e08bcf5c8c4e898",
+      "facts": {
+        "cte_excluding_explorers_students_earning_college_credit_count": {
+          "raw": "-999",
+          "status": "suppressed",
+          "value": null,
+          "type": "int64"
+        },
+        "cte_excluding_explorers_college_credit_hours": {
+          "raw": "24",
+          "status": "observed",
+          "value": 24,
+          "type": "int64"
+        },
+        "cte_excluding_explorers_average_credit_hours_per_student": {
+          "raw": "-999.0",
+          "status": "suppressed",
+          "value": null,
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "-999",
+          "status": "suppressed",
+          "value": null,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "24",
+          "status": "observed",
+          "value": 24,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "-999.0",
+          "status": "suppressed",
+          "value": null,
+          "type": "decimal128(16,1)"
+        }
+      }
+    },
+    {
+      "case_id": "2026-district-057829-Total",
+      "edition": 2026,
+      "scope": "district",
+      "entity": "057829",
+      "service_key": "Total",
+      "source_record": 63,
+      "service_code": "",
+      "service_description": "Total",
+      "entity_name": "A+ ACADEMY",
+      "charter_status": "OPEN ENROLLMENT CHARTER",
+      "acquisition_id": "ab212ca0d443bf6723cd4d01a1664eecb1c9f96fad31b89cf0e69e776c5ddda9",
+      "source_sha256": "029e9abfe183090ebabf46bb5f1eda5271e81fc71640d8038e08bcf5c8c4e898",
+      "facts": {
+        "cte_excluding_explorers_students_earning_college_credit_count": {
+          "raw": "599",
+          "status": "observed",
+          "value": 599,
+          "type": "int64"
+        },
+        "cte_excluding_explorers_college_credit_hours": {
+          "raw": "2068",
+          "status": "observed",
+          "value": 2068,
+          "type": "int64"
+        },
+        "cte_excluding_explorers_average_credit_hours_per_student": {
+          "raw": "3.5",
+          "status": "observed",
+          "value": "3.5",
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "615",
+          "status": "observed",
+          "value": 615,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "2110",
+          "status": "observed",
+          "value": 2110,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "3.4",
+          "status": "observed",
+          "value": "3.4",
+          "type": "decimal128(16,1)"
+        }
+      }
+    },
+    {
+      "case_id": "2026-district-101903-03100500",
+      "edition": 2026,
+      "scope": "district",
+      "entity": "101903",
+      "service_key": "03100500",
+      "source_record": 397,
+      "service_code": "03100500",
+      "service_description": "ALGEBRA I (ALG 1)",
+      "entity_name": "ALIEF ISD",
+      "charter_status": "TRADITIONAL ISD/CSD",
+      "acquisition_id": "ab212ca0d443bf6723cd4d01a1664eecb1c9f96fad31b89cf0e69e776c5ddda9",
+      "source_sha256": "029e9abfe183090ebabf46bb5f1eda5271e81fc71640d8038e08bcf5c8c4e898",
+      "facts": {
+        "cte_excluding_explorers_students_earning_college_credit_count": {
+          "raw": "0",
+          "status": "observed",
+          "value": 0,
+          "type": "int64"
+        },
+        "cte_excluding_explorers_college_credit_hours": {
+          "raw": "0",
+          "status": "observed",
+          "value": 0,
+          "type": "int64"
+        },
+        "cte_excluding_explorers_average_credit_hours_per_student": {
+          "raw": "0",
+          "status": "observed",
+          "value": "0.0",
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "-999",
+          "status": "suppressed",
+          "value": null,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "-999",
+          "status": "suppressed",
+          "value": null,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "3.0",
+          "status": "observed",
+          "value": "3.0",
+          "type": "decimal128(16,1)"
+        }
+      }
+    },
+    {
+      "case_id": "2026-region-01-Total",
+      "edition": 2026,
+      "scope": "region",
+      "entity": "01",
+      "service_key": "Total",
+      "source_record": 294,
+      "service_code": "",
+      "service_description": "Total",
+      "entity_name": "REGION I            EDINBURG",
+      "charter_status": null,
+      "acquisition_id": "fb60a97887c315e0aa1adce2e83b23fa0bbdd20092aebdd36679572d2a1448a5",
+      "source_sha256": "4f3fa3e3f26965c90808990962209091970c5246d2443c252a94ecab4b899899",
+      "facts": {
+        "cte_excluding_explorers_students_earning_college_credit_count": {
+          "raw": "82649",
+          "status": "observed",
+          "value": 82649,
+          "type": "int64"
+        },
+        "cte_excluding_explorers_college_credit_hours": {
+          "raw": "318078",
+          "status": "observed",
+          "value": 318078,
+          "type": "int64"
+        },
+        "cte_excluding_explorers_average_credit_hours_per_student": {
+          "raw": "3.8",
+          "status": "observed",
+          "value": "3.8",
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "83262",
+          "status": "observed",
+          "value": 83262,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "320036",
+          "status": "observed",
+          "value": 320036,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "3.8",
+          "status": "observed",
+          "value": "3.8",
+          "type": "decimal128(16,1)"
+        }
+      }
+    },
+    {
+      "case_id": "2026-state-Texas-Total",
+      "edition": 2026,
+      "scope": "state",
+      "entity": "Texas",
+      "service_key": "Total",
+      "source_record": 703,
+      "service_code": "Total",
+      "service_description": "",
+      "entity_name": "Texas",
+      "charter_status": null,
+      "acquisition_id": "932b8f90fea5fdc7b70de0d79617699f4e913c74a63cf03f8d9bce598869cf41",
+      "source_sha256": "5998a6bb8393c94fe806f9ef9c40ba552ea9adb7ae00ead981628d90ed0494a5",
+      "facts": {
+        "cte_excluding_explorers_students_earning_college_credit_count": {
+          "raw": "690210",
+          "status": "observed",
+          "value": 690210,
+          "type": "int64"
+        },
+        "cte_excluding_explorers_college_credit_hours": {
+          "raw": "2832922",
+          "status": "observed",
+          "value": 2832922,
+          "type": "int64"
+        },
+        "cte_excluding_explorers_average_credit_hours_per_student": {
+          "raw": "4.1",
+          "status": "observed",
+          "value": "4.1",
+          "type": "decimal128(16,1)"
+        },
+        "students_earning_college_credit_count": {
+          "raw": "711356",
+          "status": "observed",
+          "value": 711356,
+          "type": "int64"
+        },
+        "college_credit_hours": {
+          "raw": "2905389",
+          "status": "observed",
+          "value": 2905389,
+          "type": "int64"
+        },
+        "average_credit_hours_per_student": {
+          "raw": "4.1",
+          "status": "observed",
+          "value": "4.1",
+          "type": "decimal128(16,1)"
+        }
+      }
+    }
+  ],
+  "historical_roster_baseline": {
+    "manifest_sha256": "26bff6163de7b4c77b02073147218edc408bdfc7343362d145f4311365ea1402",
+    "district_attributes_sha256": "a42ab025881a82d7d0ab2cca6cf6490af43ab1b4d9ee6e39109cf60f0a53db3f",
+    "unique_ids": 1229,
+    "source_id_absent_from_this_roster": "220819",
+    "source_years_with_rows": [
+      2022,
+      2023
+    ],
+    "no_cause_inferred": true
+  }
+}

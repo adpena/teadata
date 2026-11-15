@@ -888,6 +888,7 @@ def _native_review(release: DataRelease, store: ProvenanceStore) -> _NativeRevie
     from teadata.dataset_metadata import EditionKey
     from teadata.first_ratings import REVIEWED_MANIFEST as FIRST_MANIFEST, qualify_first_ratings, retained_first_evidence
     from teadata.manifest import canonical_json
+    from teadata.native_college_credit import qualify_college_credit, reviewed_college_credit, validate_college_credit_identity
     from teadata.native_finance_staff import REVIEWED_MANIFEST as FINANCE_STAFF_MANIFEST, qualify_finance_staff, retained_finance_staff_evidence
     from teadata.native_financial_accounts import is_reviewed_budget, qualify_budget
     from teadata.native_staff_spp import qualify_staff_spp, reviewed_staff_spp
@@ -933,6 +934,13 @@ def _native_review(release: DataRelease, store: ProvenanceStore) -> _NativeRevie
             return _native_record_evidence(release, processing_store, store, roots)
 
         return _NativeReview("financial budget", partial(qualify_budget, release, processing_store, store), budget_evidence)
+    college_credit = reviewed_college_credit(release.manifest_sha256)
+    if college_credit is not None:
+        processing_store = _retained_store(release.path.parent / "provenance")
+        validate_college_credit_identity(release, college_credit)
+        roots = [witness["receipt"] for witness in college_credit["publisher_witnesses"]]
+        return _NativeReview("College Credit", partial(qualify_college_credit, release, processing_store, store, college_credit),
+                             partial(_native_record_evidence, release, processing_store, store, roots))
     staffing_or_evaluation = reviewed_staff_spp(release.manifest_sha256)
     if staffing_or_evaluation is not None:
         processing_store = _retained_store(release.path.parent / "provenance")
