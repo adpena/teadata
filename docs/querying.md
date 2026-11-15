@@ -325,6 +325,25 @@ cause a fallback to older observations. Scalar access returns the normalized
 value, including zero or null; `select()` keeps the raw tokens, available
 status columns, source identities and export provenance.
 
+Keep the bound entity and source when retrieving multiple years:
+
+```python
+membership = district.tprs
+field = "membership_total_students_count"
+series = membership.series(field, years=membership.years(field))
+series.provenance()  # Inspect each source and measurement period before reading.
+frame = series.to_df()
+series.to_excel("district-membership.xlsx")
+```
+
+The requested years must actually be attached and available for the field. This
+is the same `ObservationSeries` as `release.series(...)`, filtered to this exact
+entity ID; generic dataset namespaces provide the same `.series()` method.
+Planning opens metadata rather than data leaves, and all existing series export
+and comparability limits apply. Years are explicit: remove any `.at(...)` pin
+with `.at(None)` before calling `.series(..., years=...)`. Use `tprs["series"]`
+if a source variable has the same name as this method.
+
 Both access paths use the existing observation resolver. Campus Student
 Information routes through its admitted report index. Campus class size uses
 that same Student index and the exact class-size partition identity, so its

@@ -189,8 +189,9 @@ def describe_operators() -> _Discovery:
             "discovery": "entity.available_datasets()",
             "selection": "entity.dataset(name)",
             "dot_path": "entity.<attached_dataset>.<field>; entity.tprs.<field>",
-            "methods": ["at", "variables", "years", "select", "provenance"],
+            "methods": ["at", "variables", "years", "select", "series", "provenance"],
             "year_policy": "Latest eligible shared measurement school year; explicit unavailable years never fall back. "
+                           "series(..., years=[...]) requires explicit years and an unpinned namespace; use .at(None) to remove a pin. "
                            "Fiscal/calendar periods require exact release.for_entity(..., edition=...).dataset(EditionKey).",
             "errors": ["Unknown names include suggestions; no automatic fuzzy selection.",
                        "Unavailable scopes and years report available choices.",

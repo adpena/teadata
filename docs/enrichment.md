@@ -101,6 +101,25 @@ selection and filtering. They are never silently summed or reduced to one row.
 An absent entity row is an error rather than an older observation. Private school
 entities cannot acquire public campus observations through this interface.
 
+Use the same namespace for explicit multi-year records:
+
+```python
+series = district.peims_staff_fte_and_salary.series("staff_fte", years=[23, 24, 25, 26])
+series.provenance()  # Source editions, measurement years and exact entity ID.
+series.to_df()       # Retains source categories, raw tokens and statuses.
+# All admitted measurement years for this field, without assuming row coverage:
+series = staff.series("staff_fte", years=staff.years("staff_fte"))
+```
+
+This returns the existing `ObservationSeries`, with its streaming CSV, Excel and
+SQL exports; it adds no entity data or separate storage. `.tprs.series(...)` uses
+the same implementation. Explicit years are required, and an `.at(...)` pin must
+first be removed with `.at(None)` so it cannot be silently ignored. Planning
+reads metadata, not observation leaves. Source dimensions remain separate rows,
+and missing or suppressed values never trigger an older-year fallback. A
+structurally valid series does not establish scientific comparability; inspect
+the period, population and definitions for each source before calculating trends.
+
 The default resolves the latest eligible measurement school year for all selected
 fields together; `.at(25)` requests 2024–25 exactly. An unavailable year lists the
 available years. Fiscal and calendar periods currently require the existing exact

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import csv
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from decimal import Decimal
@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from .export_provenance import ExportProvenance
     from .release import DataRelease
     from .source_predicates import PreparedPredicate
+    from .source_series import ObservationSeries
 
 
 def _projection(release: DataRelease, edition: EditionKey, fields: tuple[str, ...], *,
@@ -612,6 +613,16 @@ class _EntityFields:
     def provenance(self, *fields: str) -> ExportProvenance:
         """Describe the pinned selection without opening its data leaf."""
         return self.select(*fields).provenance()
+
+    def series(self, *fields: str, years: Sequence[int | str]) -> ObservationSeries:
+        """Plan explicit measurement years using the existing bound-source series."""
+        if self.school_year is not None:
+            raise ValueError(
+                f"This namespace is pinned to school year {self.school_year}. "
+                "Call .at(None).series(..., years=[...]) to select explicit series years."
+            )
+        dataset, names = self._resolve(fields)
+        return self.release.series(dataset, *names, scope=self.scope, years=years, ids=(self.identifier,))
 
     def __getitem__(self, name: str):
         view = self.select(name)
