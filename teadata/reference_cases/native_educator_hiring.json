@@ -1,0 +1,1313 @@
+{
+  "build_id": "a6bc2dd366d57884facf80c3d2ace9a96c194e53c665b14b9f8bcbee51c1c328",
+  "catalog_schema_version": 4,
+  "category_mapping": [
+    [
+      "Intern Certified",
+      "Intern Certified",
+      "intern_certified"
+    ],
+    [
+      "One Year OOS Certified",
+      "One Year, Out-of-State Certified",
+      "one_year_out_of_state_certified"
+    ],
+    [
+      "Standard OOS Certified",
+      "Standard, Out-of-State Certified",
+      "standard_out_of_state_certified"
+    ],
+    [
+      "Standard Direct Entry",
+      "Standard Certified, Direct Entry",
+      "standard_certified_direct_entry"
+    ],
+    [
+      "Standard Lagged Entry",
+      "Standard Certified, Lagged Entry",
+      "standard_certified_lagged_entry"
+    ],
+    [
+      "No TX Cert Permit",
+      "No Texas Certification/Permit",
+      "no_texas_certification_or_permit"
+    ],
+    [
+      "Emergency Permits",
+      "Emergency Permit",
+      "emergency_permit"
+    ],
+    [
+      "Reenterers",
+      "Re-enterer",
+      "reenterer"
+    ],
+    [
+      "Previously Part Time",
+      "Previously Part-Time",
+      "previously_part_time"
+    ]
+  ],
+  "editions": {
+    "0d087ab89f4744856abe9654caba2ec1ca00c404d919e2d8b99a18ad8ea2e1a6": {
+      "artifact_id": "b895840e7e902bb4f29a0cd5ec8ff4781c6d5e18947d7228b0dbafbca91785dc",
+      "key": {
+        "dataset": "educator_state_new_hires",
+        "edition": "2026-04",
+        "grain": "one statewide observation",
+        "revision_sha256": "e87e91ed04b1d4503f645de76c1ed7551bf8cd74c5933b08c579717a49112f63",
+        "scope": "state",
+        "table": "state_2019"
+      },
+      "leaf_sha256": "42220e1934937365d4577ee690811e992bb122d7ce7edd64c8a0d7867610343b",
+      "leaf_size_bytes": 22573,
+      "metadata": {
+        "location": "3d2a0cc5310296139cf89633a781c74340c4b27c1141fed7d8b90548013efb36.json",
+        "sha256": "3d2a0cc5310296139cf89633a781c74340c4b27c1141fed7d8b90548013efb36",
+        "size_bytes": 35104
+      },
+      "processing_id": "6e9234bfaab2a6860d3d943de7fa0c189d33605b5ef821d542c150190c35a044",
+      "rows": 1,
+      "school_year_end": 2019
+    },
+    "0d680de27ed854ec31017fd46f50062fffc77613b0ffe24a9d388675e3402543": {
+      "artifact_id": "cfce31e3985b2b724cca65c0b31e20cccb4627db30a52df487d90c88891e084d",
+      "key": {
+        "dataset": "educator_district_new_hires_by_epp",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category and publisher_epp_region and reported_epp_assignment",
+        "revision_sha256": "4bf3c8ef64a248bc93e96cef7d2198ecb659f11aa0fe18a0518f4570dad5c6f9",
+        "scope": "district",
+        "table": "district_2025"
+      },
+      "leaf_sha256": "88af03eadc9c1ef919a7d6cccb9fab3093ae8d19bd3cb4bc5b4aaa18f452f858",
+      "leaf_size_bytes": 170751,
+      "metadata": {
+        "location": "01d05e14a5795c0ec2e42e1dc385b72c1555d303978913e84b2739ddb19425f6.json",
+        "sha256": "01d05e14a5795c0ec2e42e1dc385b72c1555d303978913e84b2739ddb19425f6",
+        "size_bytes": 24347
+      },
+      "processing_id": "b315a5cec446de1b1c5b6469ca9464b1a505a8367214e8f468a1d71dbb501234",
+      "rows": 8617,
+      "school_year_end": 2025
+    },
+    "10088ce9a99bfdeca3e9227da5b44a627068d8dcea91dfb101aacb6d324b0f9e": {
+      "artifact_id": "67a912462f37cbd0fadd4337f44cbf0470c9d8d268d863779a0e8b9368ff13fc",
+      "key": {
+        "dataset": "educator_district_new_hires",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category",
+        "revision_sha256": "07688639ca4c66c7a771c9f3bf67c1ec5586146a4e4b1f514b37bd4293d68fe6",
+        "scope": "district",
+        "table": "district_2022"
+      },
+      "leaf_sha256": "77da18fb56b5cfa7fe34d953d4d761d57445a2caeb25373c37fecd59e3d6c74f",
+      "leaf_size_bytes": 84917,
+      "metadata": {
+        "location": "c6efbe8ccae58e7e7d5465028d33fa085fa74fd4678f20be38e6b62c627341c9.json",
+        "sha256": "c6efbe8ccae58e7e7d5465028d33fa085fa74fd4678f20be38e6b62c627341c9",
+        "size_bytes": 23288
+      },
+      "processing_id": "7d6af1e795841b5d66b3971df3ee489432f0e83ea87b3893b46c16933635edac",
+      "rows": 5102,
+      "school_year_end": 2022
+    },
+    "115597ac847ee27c52e6b5b77d5a4cd307cfaa48b61565bf03874d409aaf204d": {
+      "artifact_id": "5de085106c5385818c810bf44a2bcd874cd3e8829885467ad3e42390e4446d16",
+      "key": {
+        "dataset": "educator_district_new_hires_by_epp",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category and publisher_epp_region and reported_epp_assignment",
+        "revision_sha256": "4bf3c8ef64a248bc93e96cef7d2198ecb659f11aa0fe18a0518f4570dad5c6f9",
+        "scope": "district",
+        "table": "district_2012"
+      },
+      "leaf_sha256": "b320427eaef3e1d95c1118bf58d3993b75ae379d31fd6c91fe1b78341c39b104",
+      "leaf_size_bytes": 168802,
+      "metadata": {
+        "location": "1aa4d7073c84aeaa066273649b010d47bfb0ae1d60084b085b19f186dc508613.json",
+        "sha256": "1aa4d7073c84aeaa066273649b010d47bfb0ae1d60084b085b19f186dc508613",
+        "size_bytes": 24232
+      },
+      "processing_id": "4e1562dc7718f8fd41d108eaebc0f36e84f78fe3103a3577a84a770e0e066c6f",
+      "rows": 8238,
+      "school_year_end": 2012
+    },
+    "11749c9564055ed92c0c00442d8a526f8c14054f40e382a485e425b92166c5ab": {
+      "artifact_id": "cc025d02bc22d82e28e9dea8f2633a530e6f1a8a1c7299bc308c7cf0f4383d7a",
+      "key": {
+        "dataset": "educator_district_new_hires",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category",
+        "revision_sha256": "07688639ca4c66c7a771c9f3bf67c1ec5586146a4e4b1f514b37bd4293d68fe6",
+        "scope": "district",
+        "table": "district_2015"
+      },
+      "leaf_sha256": "ecd726e9e214708e83795b7b34c5ab7c2fa2aa97d4304ec8a2580f134e655b44",
+      "leaf_size_bytes": 90165,
+      "metadata": {
+        "location": "08f3875e0679aceb1be8069590bc46de2d75004507b83a92e03f312ff65e85c9.json",
+        "sha256": "08f3875e0679aceb1be8069590bc46de2d75004507b83a92e03f312ff65e85c9",
+        "size_bytes": 23173
+      },
+      "processing_id": "1e96c7c39103ea8bdc92149e58887b2a7add58031ac93410123cf9536865ce39",
+      "rows": 5154,
+      "school_year_end": 2015
+    },
+    "17a13380b9dbf3daaaeb08b5375abaaf07e28b537a0a545ebcf6488007c6e05c": {
+      "artifact_id": "f8603a73ddaa0c01236e3e6508544ba4957275536715825d1ac3fc4f2311c78d",
+      "key": {
+        "dataset": "educator_state_new_hires",
+        "edition": "2026-04",
+        "grain": "one statewide observation",
+        "revision_sha256": "e87e91ed04b1d4503f645de76c1ed7551bf8cd74c5933b08c579717a49112f63",
+        "scope": "state",
+        "table": "state"
+      },
+      "leaf_sha256": "49fc7784132da419d8dc0aa3eac7c62563fc86d000fc474ba308ed92ff70f0a6",
+      "leaf_size_bytes": 22578,
+      "metadata": {
+        "location": "6116cd0e63e65501532f3479e9c7cac0c6461473b6fc006598fe5bedb8297668.json",
+        "sha256": "6116cd0e63e65501532f3479e9c7cac0c6461473b6fc006598fe5bedb8297668",
+        "size_bytes": 35089
+      },
+      "processing_id": "9f1245650ef0e8794391f97a3c30edc823ba9713fab3b6aacae435535808a310",
+      "rows": 1,
+      "school_year_end": 2026
+    },
+    "1d26188d346d028c0ae3a0e0ace9f5d19dfb325162efcca0574362955ea2cc7a": {
+      "artifact_id": "836a0ed58ab6bceaf81fbc00e7180be7088a3114bf53ca9a27473dbce57a9e51",
+      "key": {
+        "dataset": "educator_state_new_hires",
+        "edition": "2026-04",
+        "grain": "one statewide observation",
+        "revision_sha256": "e87e91ed04b1d4503f645de76c1ed7551bf8cd74c5933b08c579717a49112f63",
+        "scope": "state",
+        "table": "state_2024"
+      },
+      "leaf_sha256": "bfaac9b1d3142c87529afa79c0ae6c8f669fe2035e86c697722c57ca59543c9e",
+      "leaf_size_bytes": 22594,
+      "metadata": {
+        "location": "f040dcb64d521a5769f2f4de290c15dc66663350b7af64e9fbc63cdebdb8ee83.json",
+        "sha256": "f040dcb64d521a5769f2f4de290c15dc66663350b7af64e9fbc63cdebdb8ee83",
+        "size_bytes": 35104
+      },
+      "processing_id": "1e48fe7c839c1e75939079ee33daf92baf4c6ac81eaa85be9ab9c147e1012d8e",
+      "rows": 1,
+      "school_year_end": 2024
+    },
+    "214443bfc563cfe252f1ed995cebbe45bcf877919803be64eb9ff645a53aa860": {
+      "artifact_id": "8df16ac87d75c0595ae440135ec2655d36469b502b4400554aed4e54ad31ec7d",
+      "key": {
+        "dataset": "educator_district_new_hires",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category",
+        "revision_sha256": "07688639ca4c66c7a771c9f3bf67c1ec5586146a4e4b1f514b37bd4293d68fe6",
+        "scope": "district",
+        "table": "district_2019"
+      },
+      "leaf_sha256": "bbc9913ee65be68e2f5419c56f1abd44571c10c65f32fc04aa6991491139ccef",
+      "leaf_size_bytes": 83276,
+      "metadata": {
+        "location": "798f2186f28d7541b170c7e993b19e371744a2a4c36c4cb5dd5e2f715cbf60ce.json",
+        "sha256": "798f2186f28d7541b170c7e993b19e371744a2a4c36c4cb5dd5e2f715cbf60ce",
+        "size_bytes": 23288
+      },
+      "processing_id": "f0de07626858f49eb6f5f71e83e6a9f327b856f0b005fa199c70d7e5ed4eba39",
+      "rows": 4972,
+      "school_year_end": 2019
+    },
+    "23189037b29100d23242bdb5b6cc4d378a59c75358186faaba0ada99735d08a3": {
+      "artifact_id": "63537170e876407862bf3063ae9f38d239d299a1650c7ff30d167c0cae0285a6",
+      "key": {
+        "dataset": "educator_district_new_hires",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category",
+        "revision_sha256": "07688639ca4c66c7a771c9f3bf67c1ec5586146a4e4b1f514b37bd4293d68fe6",
+        "scope": "district",
+        "table": "district_2025"
+      },
+      "leaf_sha256": "c36bbcea42f9a673de7552b7dd5500abc33d2eda95b5852845b19d683336a2d7",
+      "leaf_size_bytes": 82934,
+      "metadata": {
+        "location": "b4651d7d4c544336056a50ab78d2ec02b4deadfbdc05238c0d54f5f398782475.json",
+        "sha256": "b4651d7d4c544336056a50ab78d2ec02b4deadfbdc05238c0d54f5f398782475",
+        "size_bytes": 23288
+      },
+      "processing_id": "4bad55e9259499067f4696199ae3f7810abafcbb8911426a25cd3d2e62262a16",
+      "rows": 4657,
+      "school_year_end": 2025
+    },
+    "2a917b61ff4f7ac17c9f520ede65aa022f5a5ccaea0d822cfdaf491789f6f0ba": {
+      "artifact_id": "bd4baf598a3b452f5135e641df4099ec80416d53dfb1a601dce0eaa2d2b3244d",
+      "key": {
+        "dataset": "educator_district_new_hires_by_epp",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category and publisher_epp_region and reported_epp_assignment",
+        "revision_sha256": "4bf3c8ef64a248bc93e96cef7d2198ecb659f11aa0fe18a0518f4570dad5c6f9",
+        "scope": "district",
+        "table": "district_2011"
+      },
+      "leaf_sha256": "569e744994290fb0c186071ae6372b6ef928db7b0d7faa5420894f0219a57eef",
+      "leaf_size_bytes": 199456,
+      "metadata": {
+        "location": "ffd51fa2c949162111092428945f63c9f744057999ac31a5e31574981608acb3.json",
+        "sha256": "ffd51fa2c949162111092428945f63c9f744057999ac31a5e31574981608acb3",
+        "size_bytes": 24234
+      },
+      "processing_id": "ef21044c687d6ae37a36120732f1ddb399a15bb698150a63792d022ef7e831e1",
+      "rows": 10159,
+      "school_year_end": 2011
+    },
+    "2bf339aa6ca5754f7c842ed6ed1da41d92eaa95cf4cc3c73636f90ad871660b4": {
+      "artifact_id": "1047a885bc7b414df98f6b53d3e2732ee4bd5d5bc6e0090f2434a31986fa5b7f",
+      "key": {
+        "dataset": "educator_state_new_hires",
+        "edition": "2026-04",
+        "grain": "one statewide observation",
+        "revision_sha256": "e87e91ed04b1d4503f645de76c1ed7551bf8cd74c5933b08c579717a49112f63",
+        "scope": "state",
+        "table": "state_2021"
+      },
+      "leaf_sha256": "4463e94f532edc3e9e1353f0b27a3cbfeaa1c675a4fb8642f496910c0735b627",
+      "leaf_size_bytes": 22568,
+      "metadata": {
+        "location": "2ed213330f980a1e0fff01a7328a2df4cd83a341011da212e058470104fa0fe3.json",
+        "sha256": "2ed213330f980a1e0fff01a7328a2df4cd83a341011da212e058470104fa0fe3",
+        "size_bytes": 35104
+      },
+      "processing_id": "a28c78defcfdcc1797f58d438ce384f0c09d1276688d27fcb59ed350d435a45e",
+      "rows": 1,
+      "school_year_end": 2021
+    },
+    "2c0716538f3e2a343c88007e61be3e4c5befbb2fcb3398eb116e59e103a8987f": {
+      "artifact_id": "5f4ab2f0c1764d76d2e6e16b4e767f2906ea566f545520c9261037daf0f92783",
+      "key": {
+        "dataset": "educator_district_new_hires_by_epp",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category and publisher_epp_region and reported_epp_assignment",
+        "revision_sha256": "4bf3c8ef64a248bc93e96cef7d2198ecb659f11aa0fe18a0518f4570dad5c6f9",
+        "scope": "district",
+        "table": "district_2015"
+      },
+      "leaf_sha256": "bced95f8a7ea1b5810aae79136c42884551342a92a937dd3d23cc1518d24b52a",
+      "leaf_size_bytes": 215972,
+      "metadata": {
+        "location": "72773baff5343f200395793abd0508e1781f4390b5d7f13dd9c2feb9e57a88fa.json",
+        "sha256": "72773baff5343f200395793abd0508e1781f4390b5d7f13dd9c2feb9e57a88fa",
+        "size_bytes": 24234
+      },
+      "processing_id": "bfffe091ec982fd9f556c393014b1673bbe852c7d02ec608fcfdcbd19136dbe7",
+      "rows": 10991,
+      "school_year_end": 2015
+    },
+    "2c587dba5a705fb862929815ef5078bcb02d18d37ea16191dafeae32c537ce1b": {
+      "artifact_id": "f6fd45e11779c72b09da2d7410ef8e40b1ed657d94220102a6258de462eb8fe2",
+      "key": {
+        "dataset": "educator_district_new_hires_by_epp",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category and publisher_epp_region and reported_epp_assignment",
+        "revision_sha256": "4bf3c8ef64a248bc93e96cef7d2198ecb659f11aa0fe18a0518f4570dad5c6f9",
+        "scope": "district",
+        "table": "district_2023"
+      },
+      "leaf_sha256": "300a3e290343774103dded576e1b22511c5ef0d71d802a7058e4a673ff8722bb",
+      "leaf_size_bytes": 203120,
+      "metadata": {
+        "location": "4a9d0f25bd8418018d9bdd59bca8f3ab58656021f71d393a6af525d2e0b78abf.json",
+        "sha256": "4a9d0f25bd8418018d9bdd59bca8f3ab58656021f71d393a6af525d2e0b78abf",
+        "size_bytes": 24349
+      },
+      "processing_id": "c9e582bc21094fa481986dd349c9ee9d28b4e915013073b57847778c5af41644",
+      "rows": 10315,
+      "school_year_end": 2023
+    },
+    "30e76add8d841b631dee5bc8166023fe628163f18294f562fd220a3904fe4f64": {
+      "artifact_id": "70d201c497e62cf1cf84c58ab65d2d0d3df1951336f882c49b28a054ce0fdadf",
+      "key": {
+        "dataset": "educator_district_new_hires",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category",
+        "revision_sha256": "07688639ca4c66c7a771c9f3bf67c1ec5586146a4e4b1f514b37bd4293d68fe6",
+        "scope": "district",
+        "table": "district_2012"
+      },
+      "leaf_sha256": "c26a2ec95bb6f7f6c33d30c8099912dbf9a8f0640c0716695007dabb1fad1874",
+      "leaf_size_bytes": 75976,
+      "metadata": {
+        "location": "1c239dfd70b41ae52cd654704a380d9495c0177ad0751c4447ecaa01b45fb32c.json",
+        "sha256": "1c239dfd70b41ae52cd654704a380d9495c0177ad0751c4447ecaa01b45fb32c",
+        "size_bytes": 23173
+      },
+      "processing_id": "883436423b879fcaecb263f0459ec899e0c6b4d0d2509d501c5fed796743ea4f",
+      "rows": 4251,
+      "school_year_end": 2012
+    },
+    "33ddd331e51aa55671995fd6e21c648352d74bd9dcedc32d37a37a8ba1ba2acd": {
+      "artifact_id": "814387a2031ac84bb925a33dc20683bc2088f3ebd15333b166a572e812c95437",
+      "key": {
+        "dataset": "educator_district_new_hires",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category",
+        "revision_sha256": "07688639ca4c66c7a771c9f3bf67c1ec5586146a4e4b1f514b37bd4293d68fe6",
+        "scope": "district",
+        "table": "district_2017"
+      },
+      "leaf_sha256": "ea11a46149a5e5dddf92f61c88d1642a1de824f0d7ff07d935cf279f4b07016f",
+      "leaf_size_bytes": 85671,
+      "metadata": {
+        "location": "ba95449f1bc8291f1aa87b13012f2e57aba11a32ca91c2ae7fe95b2bd69a7f05.json",
+        "sha256": "ba95449f1bc8291f1aa87b13012f2e57aba11a32ca91c2ae7fe95b2bd69a7f05",
+        "size_bytes": 23288
+      },
+      "processing_id": "4aa8fdbb199582834d9b18c1f26a41db5c49e43c712aa969ac48abb6d41e8fe5",
+      "rows": 4972,
+      "school_year_end": 2017
+    },
+    "366c8197eb6651b4d09e9f60d96366d17d1bf80ee00fb0830fe5792f74307724": {
+      "artifact_id": "6f8cb4ab4503cbf8aede7bb646f4df31ee9ecfb116e82650470b3b54b1382ffe",
+      "key": {
+        "dataset": "educator_state_new_hires",
+        "edition": "2026-04",
+        "grain": "one statewide observation",
+        "revision_sha256": "e87e91ed04b1d4503f645de76c1ed7551bf8cd74c5933b08c579717a49112f63",
+        "scope": "state",
+        "table": "state_2017"
+      },
+      "leaf_sha256": "5de24515d9b8fbc8c92fb697bfd947313e961e83cb5f629df4d9316ba40b4da5",
+      "leaf_size_bytes": 22583,
+      "metadata": {
+        "location": "0eba99ec00195c30e401e903c48bd8cf8174f8ee475d6d64ffee39036b14adca.json",
+        "sha256": "0eba99ec00195c30e401e903c48bd8cf8174f8ee475d6d64ffee39036b14adca",
+        "size_bytes": 35104
+      },
+      "processing_id": "90a11890acd6f93e52ae81e0d3f83d5e024e685ec41540097c7d4640d48fd5f4",
+      "rows": 1,
+      "school_year_end": 2017
+    },
+    "3c2d0e60d771b01e8336553a2be585493beb243d7f4f294e538a61daae841aaa": {
+      "artifact_id": "a798144185077df1b343a026d198bf2b3cb8dc6a2eb5c9aef2282597b303f7bf",
+      "key": {
+        "dataset": "educator_district_new_hires_by_epp",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category and publisher_epp_region and reported_epp_assignment",
+        "revision_sha256": "4bf3c8ef64a248bc93e96cef7d2198ecb659f11aa0fe18a0518f4570dad5c6f9",
+        "scope": "district",
+        "table": "district_2016"
+      },
+      "leaf_sha256": "a24729e9e54ea2550f8c699bd8871aceee15e1b00a27ea85c58deebdb7eb0c5f",
+      "leaf_size_bytes": 206044,
+      "metadata": {
+        "location": "e93c2ce042f61f050269daf7265a3d06e0d8415425932ddc2185ee9de955bcfa.json",
+        "sha256": "e93c2ce042f61f050269daf7265a3d06e0d8415425932ddc2185ee9de955bcfa",
+        "size_bytes": 24349
+      },
+      "processing_id": "e77f1b3ab3a72599c304e6a77b30071bfae817e6eec88301dd9babb009b22fb7",
+      "rows": 10353,
+      "school_year_end": 2016
+    },
+    "422967e2ddb403defe8e3d753984e8e4f324fcc5747bf45d6455d343b49ec0c4": {
+      "artifact_id": "54920189eb3973959fdfc8ee313dddaa48a210940d49317df17ef3e8d66bd02c",
+      "key": {
+        "dataset": "educator_district_new_hires_by_epp",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category and publisher_epp_region and reported_epp_assignment",
+        "revision_sha256": "4bf3c8ef64a248bc93e96cef7d2198ecb659f11aa0fe18a0518f4570dad5c6f9",
+        "scope": "district",
+        "table": "district_2024"
+      },
+      "leaf_sha256": "13e57ad32d4930e47db71f0a94f0fd37bbe3cec57417fb53940898c10535e660",
+      "leaf_size_bytes": 187270,
+      "metadata": {
+        "location": "47397da1e66137ba37940a2a06ec4a0d39ccf6f4c8eb7255fee33b508ceaab84.json",
+        "sha256": "47397da1e66137ba37940a2a06ec4a0d39ccf6f4c8eb7255fee33b508ceaab84",
+        "size_bytes": 24347
+      },
+      "processing_id": "52814ac685066386566921e01f7d6a734b1447d51635a19bbd578a3d095dd70d",
+      "rows": 9506,
+      "school_year_end": 2024
+    },
+    "4aaa775e69da9c6be7bd3687bee347a2f3f1b29367f2dbdd4f9fc84a5adefc45": {
+      "artifact_id": "2d2ebd42cd32772f601299ff3e643f923a2b44ae0fa7adaef7119581890f27ca",
+      "key": {
+        "dataset": "educator_district_new_hires_by_epp",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category and publisher_epp_region and reported_epp_assignment",
+        "revision_sha256": "4bf3c8ef64a248bc93e96cef7d2198ecb659f11aa0fe18a0518f4570dad5c6f9",
+        "scope": "district",
+        "table": "district_2021"
+      },
+      "leaf_sha256": "06d383aa4c2c1c05fcaa419e01da031e39f891004741ba9d023b11d64b2a8ac0",
+      "leaf_size_bytes": 195067,
+      "metadata": {
+        "location": "f4f2fb547c0e4de2cf12a22438745c1b4cd7f250fa4b9277bb026c53a6e5ce69.json",
+        "sha256": "f4f2fb547c0e4de2cf12a22438745c1b4cd7f250fa4b9277bb026c53a6e5ce69",
+        "size_bytes": 24347
+      },
+      "processing_id": "0866ca47cdd384b8b8c35bf01dbcc9b68d1c0febd7c07fc45044bd05cbc48766",
+      "rows": 9888,
+      "school_year_end": 2021
+    },
+    "53ef57f014f005b706041d7633ce9a1241f0afed6b862779e8da625c91ae1862": {
+      "artifact_id": "54563f6519a8a208331d00d6717a988d0383ce335c8289f4e6aa094ee57586be",
+      "key": {
+        "dataset": "educator_state_new_hires",
+        "edition": "2026-04",
+        "grain": "one statewide observation",
+        "revision_sha256": "e87e91ed04b1d4503f645de76c1ed7551bf8cd74c5933b08c579717a49112f63",
+        "scope": "state",
+        "table": "state_2018"
+      },
+      "leaf_sha256": "6015f5ae516637fdfd99cf043d5443e800bad13de68e0c2e487896a43d1efcc5",
+      "leaf_size_bytes": 22578,
+      "metadata": {
+        "location": "2258ed207a32f32745702b7750e9c98b5cba5d1bb98cfa0cdaf2d082d54b97a3.json",
+        "sha256": "2258ed207a32f32745702b7750e9c98b5cba5d1bb98cfa0cdaf2d082d54b97a3",
+        "size_bytes": 35104
+      },
+      "processing_id": "32ffac4f8774cc97635800f212283589c36e1067f41bc217e9f8754bf786a36a",
+      "rows": 1,
+      "school_year_end": 2018
+    },
+    "5a2dee3c946f8904d1f3529bcfe645bee07b5af31032b1d96e1b70a271abf320": {
+      "artifact_id": "a8fea4239fd77a53abf571ddbddf381de4a5f8e577bdd3e04f0f34c093673b4b",
+      "key": {
+        "dataset": "educator_district_new_hires",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category",
+        "revision_sha256": "07688639ca4c66c7a771c9f3bf67c1ec5586146a4e4b1f514b37bd4293d68fe6",
+        "scope": "district",
+        "table": "district_2023"
+      },
+      "leaf_sha256": "a8beced2c244491e824d675b114f6ab743d7e666b5c17ab8c041c71cd282d5dc",
+      "leaf_size_bytes": 88791,
+      "metadata": {
+        "location": "7dd4c659f58bc5f22aa2a592074512f8e79e36be0249257723f5ffc10f6789ba.json",
+        "sha256": "7dd4c659f58bc5f22aa2a592074512f8e79e36be0249257723f5ffc10f6789ba",
+        "size_bytes": 23288
+      },
+      "processing_id": "7a6a4a5a3cdddb500810d0884d1634088655ae41b418caebc2fdb8c3c280ddd0",
+      "rows": 5129,
+      "school_year_end": 2023
+    },
+    "60511a7f82a6872c94846a7c863e8138fd45da326898c0466e0a52c37215d530": {
+      "artifact_id": "192636e5af79499fca7550b17d9f16ab21aff0e10fd5cf33d228eac73b98d093",
+      "key": {
+        "dataset": "educator_district_new_hires_by_epp",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category and publisher_epp_region and reported_epp_assignment",
+        "revision_sha256": "4bf3c8ef64a248bc93e96cef7d2198ecb659f11aa0fe18a0518f4570dad5c6f9",
+        "scope": "district",
+        "table": "district"
+      },
+      "leaf_sha256": "195698c1729a69941d58542d0170dc71c48f33ec5b5dcb95645ff44b6d1b0910",
+      "leaf_size_bytes": 162998,
+      "metadata": {
+        "location": "ac00d5414aabd99561c709e3eb9253fc213d4d1ec9a0f469b828a78ba813d472.json",
+        "sha256": "ac00d5414aabd99561c709e3eb9253fc213d4d1ec9a0f469b828a78ba813d472",
+        "size_bytes": 24332
+      },
+      "processing_id": "364dfb86ff227dc2a2ba01dcc3f662876a49731fe19741d79b45a23cc8dc2a27",
+      "rows": 8174,
+      "school_year_end": 2026
+    },
+    "60c5a727556efd8601d0c0856bbf63ec9d3f934034c488436e0fa94347d6aeff": {
+      "artifact_id": "21ebe33699e0512ccb73a297cedbac994bbaf5a1d235387076f98d35d8f7d79c",
+      "key": {
+        "dataset": "educator_district_new_hires_by_epp",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category and publisher_epp_region and reported_epp_assignment",
+        "revision_sha256": "4bf3c8ef64a248bc93e96cef7d2198ecb659f11aa0fe18a0518f4570dad5c6f9",
+        "scope": "district",
+        "table": "district_2014"
+      },
+      "leaf_sha256": "f4e1d85ff77d6b15b25a429b3516f7468ffb82759d3bdf0eb824d55623aa20f8",
+      "leaf_size_bytes": 216267,
+      "metadata": {
+        "location": "953b0db432b7141806d40ab37c046d907781875c21752fd1db7072d4e49fd147.json",
+        "sha256": "953b0db432b7141806d40ab37c046d907781875c21752fd1db7072d4e49fd147",
+        "size_bytes": 24234
+      },
+      "processing_id": "661de7ac9bbc07cad5290182eb1d464f3d2642264f97efc8bbc7b1ff95015e30",
+      "rows": 11097,
+      "school_year_end": 2014
+    },
+    "6733313a4d189e2ad92dc9882f2a77e75dd32c4b3b3970062d28f4c980c4f39b": {
+      "artifact_id": "1f479fd5d0435e81589c0140011f1c5663c31e8a83baff399d3320a24308601b",
+      "key": {
+        "dataset": "educator_state_new_hires",
+        "edition": "2026-04",
+        "grain": "one statewide observation",
+        "revision_sha256": "e87e91ed04b1d4503f645de76c1ed7551bf8cd74c5933b08c579717a49112f63",
+        "scope": "state",
+        "table": "state_2025"
+      },
+      "leaf_sha256": "6d9ac7420fda31446bfa70ced4baa9615da536e5bd5374e560a90e9ef8d9bb74",
+      "leaf_size_bytes": 22579,
+      "metadata": {
+        "location": "19f8b4c7a4e7f86a8e0e2ee07474c6024eff4104c7abbb3eca9fbb70d7af9349.json",
+        "sha256": "19f8b4c7a4e7f86a8e0e2ee07474c6024eff4104c7abbb3eca9fbb70d7af9349",
+        "size_bytes": 35104
+      },
+      "processing_id": "1720d3942f0c10a1ff76130a2eac14201c68eecbbaabcc3b5ef2f097a23cbc46",
+      "rows": 1,
+      "school_year_end": 2025
+    },
+    "6a889b6deb250eff743d8135be88e683ae9cb582cfaf7ebd23648da747079f06": {
+      "artifact_id": "d32f082f6ee8690615b290682b41747815f118c430ec54ea2a6be0e7c76a0359",
+      "key": {
+        "dataset": "educator_district_new_hires_by_epp",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category and publisher_epp_region and reported_epp_assignment",
+        "revision_sha256": "4bf3c8ef64a248bc93e96cef7d2198ecb659f11aa0fe18a0518f4570dad5c6f9",
+        "scope": "district",
+        "table": "district_2017"
+      },
+      "leaf_sha256": "1ed93e4e91723443aced7044170f25f4572e62cc513c0d860763bcf5a8c2e1d4",
+      "leaf_size_bytes": 203948,
+      "metadata": {
+        "location": "fb35ed79eb925824cad532b93ff3c51005fa11ba31e3e8cdf630e0da2a08f38f.json",
+        "sha256": "fb35ed79eb925824cad532b93ff3c51005fa11ba31e3e8cdf630e0da2a08f38f",
+        "size_bytes": 24349
+      },
+      "processing_id": "71ca51f3866f2768812651a21f3e0a6219b51afffa2d1e77d9aee19a450d4d08",
+      "rows": 10244,
+      "school_year_end": 2017
+    },
+    "6ea2bbe0b48bfe45b23aca247439814286d1e6b8354dd11ee7a0fcd7b3a91627": {
+      "artifact_id": "0074dd001e3870ceea90686e48597bbe67aa64db651e85e19ddb8a25dce86666",
+      "key": {
+        "dataset": "educator_state_new_hires",
+        "edition": "2026-04",
+        "grain": "one statewide observation",
+        "revision_sha256": "e87e91ed04b1d4503f645de76c1ed7551bf8cd74c5933b08c579717a49112f63",
+        "scope": "state",
+        "table": "state_2020"
+      },
+      "leaf_sha256": "e494855cb436fdca5dd68b2078cf2ce2a6812e19f098d71c09b80ac2fa80ef78",
+      "leaf_size_bytes": 22568,
+      "metadata": {
+        "location": "6179540a0d0deb0f7053b56dbf98d54c7e431a1515a6090febc2887da72cc761.json",
+        "sha256": "6179540a0d0deb0f7053b56dbf98d54c7e431a1515a6090febc2887da72cc761",
+        "size_bytes": 35104
+      },
+      "processing_id": "75e1605b8f2e5be79e5cb30d071b63724575cc8b2bdb0c1039c27d92598f8f2a",
+      "rows": 1,
+      "school_year_end": 2020
+    },
+    "6f1fb125d9203ddc98818899bec86decea71a9653961fe71409fb64e8bd377f0": {
+      "artifact_id": "09295efe93f1123516df9a6b9441cad0897d9cc6e7bd71803e4bec87d1ceaf20",
+      "key": {
+        "dataset": "educator_district_new_hires",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category",
+        "revision_sha256": "07688639ca4c66c7a771c9f3bf67c1ec5586146a4e4b1f514b37bd4293d68fe6",
+        "scope": "district",
+        "table": "district_2024"
+      },
+      "leaf_sha256": "1dae6d70121e7ac8097097b9f6fb5f2fbd4d9cc46e1c8d57730ad8ad0315bfe7",
+      "leaf_size_bytes": 85154,
+      "metadata": {
+        "location": "5c2f9538a274745fda72296cec7a285b8669166ca4ffe2de1a9112d267a30ae7.json",
+        "sha256": "5c2f9538a274745fda72296cec7a285b8669166ca4ffe2de1a9112d267a30ae7",
+        "size_bytes": 23288
+      },
+      "processing_id": "05a71d5d84a4e097b0e4d8a6576f6c1f49527acbec83af4e92660793d5c5f97d",
+      "rows": 4937,
+      "school_year_end": 2024
+    },
+    "80dff9e541486593a80bedad34c2708f6da4841e8015b6f1594401fb48147333": {
+      "artifact_id": "d825126895ebf53eeeb2c508d2dfcf56d9baa13dd5854c11e49f8b93c0558a43",
+      "key": {
+        "dataset": "educator_district_new_hires",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category",
+        "revision_sha256": "07688639ca4c66c7a771c9f3bf67c1ec5586146a4e4b1f514b37bd4293d68fe6",
+        "scope": "district",
+        "table": "district_2018"
+      },
+      "leaf_sha256": "e7583d3851e1418fa6c4d7763a4b13d6bcdc3ebc64c7ce72e77b3a5467d4c5b2",
+      "leaf_size_bytes": 83481,
+      "metadata": {
+        "location": "0e5c7ba8b4b39f93dbfd31d1da9c473e20ec9e497d47822f8d1650e9b0e3c63b.json",
+        "sha256": "0e5c7ba8b4b39f93dbfd31d1da9c473e20ec9e497d47822f8d1650e9b0e3c63b",
+        "size_bytes": 23288
+      },
+      "processing_id": "ee55df716b271d97e6181670517ead9adf7b9891c47b014c0d01ece13751fef7",
+      "rows": 4950,
+      "school_year_end": 2018
+    },
+    "87c420d049a0883627a01504e29fe1b0d3142f3b6f64c7d65b53cfc2e064782f": {
+      "artifact_id": "ff7b0c1d1b7ccdd3855f624fda297171dcd13a2bdbce9068a502b34f79ac5f1c",
+      "key": {
+        "dataset": "educator_district_new_hires",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category",
+        "revision_sha256": "07688639ca4c66c7a771c9f3bf67c1ec5586146a4e4b1f514b37bd4293d68fe6",
+        "scope": "district",
+        "table": "district_2014"
+      },
+      "leaf_sha256": "f0ff25e552f9e8927115a3175d71547c0b8dad285d2d99796269f55f20adf0bc",
+      "leaf_size_bytes": 88684,
+      "metadata": {
+        "location": "7b66dda703980acf9f556c979d57fea35bad9652c340f86fe203514c6d6ac2ac.json",
+        "sha256": "7b66dda703980acf9f556c979d57fea35bad9652c340f86fe203514c6d6ac2ac",
+        "size_bytes": 23173
+      },
+      "processing_id": "552dc5edee59db9a2858883a284a6e7131b2415a9f5de23eb0173a87cec68c3c",
+      "rows": 5177,
+      "school_year_end": 2014
+    },
+    "8bd8d3bbfffecc1dcaee350b8f53836092f271ae20165c8d8457c288709cdce9": {
+      "artifact_id": "d429659d48cce2895a9118026a2029e9338e98ceed2b500e94b405ac33241865",
+      "key": {
+        "dataset": "educator_state_new_hires",
+        "edition": "2026-04",
+        "grain": "one statewide observation",
+        "revision_sha256": "e87e91ed04b1d4503f645de76c1ed7551bf8cd74c5933b08c579717a49112f63",
+        "scope": "state",
+        "table": "state_2022"
+      },
+      "leaf_sha256": "f7ad68c556b7b98d44ab507ec2879fde713b20920961032ac7b780b6dc2df6ad",
+      "leaf_size_bytes": 22568,
+      "metadata": {
+        "location": "c59e2445b0fc3e942c93c1958b5a0c19b8c027ed35dac33a411f10409b173a98.json",
+        "sha256": "c59e2445b0fc3e942c93c1958b5a0c19b8c027ed35dac33a411f10409b173a98",
+        "size_bytes": 35104
+      },
+      "processing_id": "77a9fb85639e80766d164742f5beaac605e073a80990ff3fa6fd343f63e88ce5",
+      "rows": 1,
+      "school_year_end": 2022
+    },
+    "8c3e319edb46f150463c054857ab4c69d0b549bc014771332f88b9b935c371a7": {
+      "artifact_id": "d91f3b003fe80c5c42e984e592edd5ecf504a9fe74808e4049ad977c7d2145f1",
+      "key": {
+        "dataset": "educator_district_new_hires",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category",
+        "revision_sha256": "07688639ca4c66c7a771c9f3bf67c1ec5586146a4e4b1f514b37bd4293d68fe6",
+        "scope": "district",
+        "table": "district_2021"
+      },
+      "leaf_sha256": "f07048349bec6e57d02ef149588f75639a7f2816d3c5b1da3b41946b1bfc7130",
+      "leaf_size_bytes": 84013,
+      "metadata": {
+        "location": "b8ab8c5cff7d00f3c4e0313af74121f1299a57020248f8a87852939d8bf724b0.json",
+        "sha256": "b8ab8c5cff7d00f3c4e0313af74121f1299a57020248f8a87852939d8bf724b0",
+        "size_bytes": 23288
+      },
+      "processing_id": "58128234af098027bb404439a9ba1ff3eac989e1839f5604bd828b4478e480ec",
+      "rows": 4797,
+      "school_year_end": 2021
+    },
+    "a2001809aef9a59966f98f53145063e6a89843886d783ac1c5eacd4a013866d9": {
+      "artifact_id": "6a8fdc3befce0b5fed9c849a916455a74c70e5fa23b8e7777ee3278ca05fcafe",
+      "key": {
+        "dataset": "educator_district_new_hires",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category",
+        "revision_sha256": "07688639ca4c66c7a771c9f3bf67c1ec5586146a4e4b1f514b37bd4293d68fe6",
+        "scope": "district",
+        "table": "district_2013"
+      },
+      "leaf_sha256": "5b192427b1b2a2d91e2da672e69d7fb2a0798f3dcf1e0ef2b787ed4badd9742e",
+      "leaf_size_bytes": 85967,
+      "metadata": {
+        "location": "9ca45d9a4674336ee7974d4d517170d6efeacd7ea4540ed59b999d896d6a4015.json",
+        "sha256": "9ca45d9a4674336ee7974d4d517170d6efeacd7ea4540ed59b999d896d6a4015",
+        "size_bytes": 23173
+      },
+      "processing_id": "188aaf9e8ab56c77ed59929d18bfb6d549e71356b8ba043da38b99738cd92f98",
+      "rows": 4988,
+      "school_year_end": 2013
+    },
+    "b174bcc98628f9d46b0bc9f9c621eb49cb1bbfcc52a76a517790e930e84b64a3": {
+      "artifact_id": "5626cedfe11422547717df8d7f4662b92c74a61a50ca6aa661fe7608bfacc1e8",
+      "key": {
+        "dataset": "educator_district_new_hires_by_epp",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category and publisher_epp_region and reported_epp_assignment",
+        "revision_sha256": "4bf3c8ef64a248bc93e96cef7d2198ecb659f11aa0fe18a0518f4570dad5c6f9",
+        "scope": "district",
+        "table": "district_2020"
+      },
+      "leaf_sha256": "5beb27ab20015df4d855265b413016dee22e251fcdf379b6c240d902240ebf6d",
+      "leaf_size_bytes": 203376,
+      "metadata": {
+        "location": "3dd49667b2d10fe777fbd1fccbf9af0b4c6d723b789fc9fefb60555894a535ff.json",
+        "sha256": "3dd49667b2d10fe777fbd1fccbf9af0b4c6d723b789fc9fefb60555894a535ff",
+        "size_bytes": 24349
+      },
+      "processing_id": "d43ae5caae64017668035514b12c0b71ebcd028dc5175b4c8e15d3e471ab6f66",
+      "rows": 10248,
+      "school_year_end": 2020
+    },
+    "b3944bbaa1355a5e0ad8573ddc5250a178d336e3b6637fd29d800435ce9fe509": {
+      "artifact_id": "42c0d84e9ceca528044df4a7dcb0fa4f8d880e97b06c38e3ace038756113dbc3",
+      "key": {
+        "dataset": "educator_state_new_hires",
+        "edition": "2026-04",
+        "grain": "one statewide observation",
+        "revision_sha256": "e87e91ed04b1d4503f645de76c1ed7551bf8cd74c5933b08c579717a49112f63",
+        "scope": "state",
+        "table": "state_2023"
+      },
+      "leaf_sha256": "02441af6f38f8bdacffdcceb4a9600421670156de28f4134871ee364a55bf1ee",
+      "leaf_size_bytes": 22590,
+      "metadata": {
+        "location": "9b3a2a06bb9e5d570ccb42b637971562875b6db59eef21a35f783527493f9784.json",
+        "sha256": "9b3a2a06bb9e5d570ccb42b637971562875b6db59eef21a35f783527493f9784",
+        "size_bytes": 35104
+      },
+      "processing_id": "b3ccd706d6aafff185d9a9106ff98c2adb1196725feacc430405f6ab3e588872",
+      "rows": 1,
+      "school_year_end": 2023
+    },
+    "b51b5a8a4f3bc1efb0422d151a6ca2ac7c899221706f4d4bb02f568873179f4f": {
+      "artifact_id": "02c297745bd13e1aede33cfdf34e75470fc5b7d9d514a9f69bb03f56e9a3c421",
+      "key": {
+        "dataset": "educator_district_new_hires_by_epp",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category and publisher_epp_region and reported_epp_assignment",
+        "revision_sha256": "4bf3c8ef64a248bc93e96cef7d2198ecb659f11aa0fe18a0518f4570dad5c6f9",
+        "scope": "district",
+        "table": "district_2010"
+      },
+      "leaf_sha256": "6a44884f76fc838070a1f2adc5e479040ad0891a2473d0e05b4dd1e55e600153",
+      "leaf_size_bytes": 198259,
+      "metadata": {
+        "location": "b3cb7555a16620a82ef934de0a216977c8cf5bd3f925cf8bcd1574bc31dd7ebf.json",
+        "sha256": "b3cb7555a16620a82ef934de0a216977c8cf5bd3f925cf8bcd1574bc31dd7ebf",
+        "size_bytes": 24232
+      },
+      "processing_id": "551fbd07f99ed3fd47e2e0b58e7aa35e896db0bfe133aadaefe40dfe4e594c00",
+      "rows": 9995,
+      "school_year_end": 2010
+    },
+    "c2981058ff8228424a19e0c45d04da524a5659ca8a5ebbd1b679ab69ca5e420f": {
+      "artifact_id": "eb27b96ad38024a6cb79d06582e628b822392d40e15af747efbbfb9c84e112c6",
+      "key": {
+        "dataset": "educator_district_new_hires",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category",
+        "revision_sha256": "07688639ca4c66c7a771c9f3bf67c1ec5586146a4e4b1f514b37bd4293d68fe6",
+        "scope": "district",
+        "table": "district_2011"
+      },
+      "leaf_sha256": "5b377a294b9d7774aa3838cacc27d676bdf9662ddd9aae5e5b3be925af702f79",
+      "leaf_size_bytes": 81698,
+      "metadata": {
+        "location": "b96fc3fa3505133b480c2a5e0d62fd25eea8df3e7aafc6cca46055ec2bd938ec.json",
+        "sha256": "b96fc3fa3505133b480c2a5e0d62fd25eea8df3e7aafc6cca46055ec2bd938ec",
+        "size_bytes": 23173
+      },
+      "processing_id": "03ee3d4b57e08b7c22f7be35adbdf998814b115b404ff61cde7b784538a6c4c5",
+      "rows": 4766,
+      "school_year_end": 2011
+    },
+    "c9c6b47aac6ff2ee9249dcb1e88ee66543f827609922b7b38e29df198064e82c": {
+      "artifact_id": "4a23a9a88586bbb45845f1841d2763a0f7321d82a09f8706538cc7cd7c83faab",
+      "key": {
+        "dataset": "educator_district_new_hires",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category",
+        "revision_sha256": "07688639ca4c66c7a771c9f3bf67c1ec5586146a4e4b1f514b37bd4293d68fe6",
+        "scope": "district",
+        "table": "district"
+      },
+      "leaf_sha256": "651bf45cc5b39b90f9b1cb9929cc599ca74e8b7b45c32a1d314cdeed5918f238",
+      "leaf_size_bytes": 83407,
+      "metadata": {
+        "location": "d51acc47b49d01c46c744bc1a782da05290dc42ddb451262208d65b2dd09c90d.json",
+        "sha256": "d51acc47b49d01c46c744bc1a782da05290dc42ddb451262208d65b2dd09c90d",
+        "size_bytes": 23273
+      },
+      "processing_id": "4c511b3d0219276104856567db9f31a973cb581733858cf9929d5d61517de753",
+      "rows": 4724,
+      "school_year_end": 2026
+    },
+    "cb26083d83c191b52a989110cb48aa1651a8f475a2636516014e011e98c83ba7": {
+      "artifact_id": "d18af7e965f3bdd3f07ffee7d058b631c1df899e13d424a9ad66097f22890c38",
+      "key": {
+        "dataset": "educator_district_new_hires_by_epp",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category and publisher_epp_region and reported_epp_assignment",
+        "revision_sha256": "4bf3c8ef64a248bc93e96cef7d2198ecb659f11aa0fe18a0518f4570dad5c6f9",
+        "scope": "district",
+        "table": "district_2019"
+      },
+      "leaf_sha256": "227a6825409e642a0053188489df464697b679016561f54946c1cdcc5390c832",
+      "leaf_size_bytes": 196201,
+      "metadata": {
+        "location": "4d25e6174e4b684d337bea4fb0345104a66baf5d029d98b0d31e7331966dd970.json",
+        "sha256": "4d25e6174e4b684d337bea4fb0345104a66baf5d029d98b0d31e7331966dd970",
+        "size_bytes": 24347
+      },
+      "processing_id": "4aac420728f9284e6405a7ff744cc92bbdd10ba24ada55537479a451997a689b",
+      "rows": 9846,
+      "school_year_end": 2019
+    },
+    "db8f606100a83e3e56804816bc35d4e8e2edc49a1cd91978ab36b52278f51fc2": {
+      "artifact_id": "0bd1ec65bbb455f533e0ef5cbb7b7831edc34a6bded967a412851b10b7ef4c1b",
+      "key": {
+        "dataset": "educator_district_new_hires",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category",
+        "revision_sha256": "07688639ca4c66c7a771c9f3bf67c1ec5586146a4e4b1f514b37bd4293d68fe6",
+        "scope": "district",
+        "table": "district_2016"
+      },
+      "leaf_sha256": "78015d3d50fbeeb12dbadffe9c375765d028947d420acd2a525475983b7fba58",
+      "leaf_size_bytes": 83580,
+      "metadata": {
+        "location": "1fdd2e4f189d6151b90aed74c09e39591fed626856f215b88e221282d7067751.json",
+        "sha256": "1fdd2e4f189d6151b90aed74c09e39591fed626856f215b88e221282d7067751",
+        "size_bytes": 23288
+      },
+      "processing_id": "92a2238e2561323cd6cbbdb29385268217d40e5db7dba1a9e23bf6d5b1293fd6",
+      "rows": 4926,
+      "school_year_end": 2016
+    },
+    "ea24ec04e0ebe45cd6cafbd87a09aa6bea9cc66b5e20ee0cc60b0a105ef429d1": {
+      "artifact_id": "4595edca347bfa7317bd3898362469f9513118ba73ec235c0a3132c0039efc24",
+      "key": {
+        "dataset": "educator_state_new_hires",
+        "edition": "2026-04",
+        "grain": "one statewide observation",
+        "revision_sha256": "e87e91ed04b1d4503f645de76c1ed7551bf8cd74c5933b08c579717a49112f63",
+        "scope": "state",
+        "table": "state_2016"
+      },
+      "leaf_sha256": "704c001633c9fac7368e6abd89b5e8659b1fbbf4c3e655a872106089432db149",
+      "leaf_size_bytes": 22588,
+      "metadata": {
+        "location": "5ca60cd742c72d0ac7263387157ad44082a51a798557f03ae3eba5bb6e8f95cd.json",
+        "sha256": "5ca60cd742c72d0ac7263387157ad44082a51a798557f03ae3eba5bb6e8f95cd",
+        "size_bytes": 35104
+      },
+      "processing_id": "7990900ee2ab39ec04267feef3bdeb7a0b9575fe3479367b7e899c77fa1ba500",
+      "rows": 1,
+      "school_year_end": 2016
+    },
+    "f020134ba53723588e7bdc6e12a9f294712a760a6650361b030342b64621fb50": {
+      "artifact_id": "b123f34bc1f5b9a9a0b8b2c7ee9b31c876b4e46a0386e0b3dec804b958f2194c",
+      "key": {
+        "dataset": "educator_district_new_hires",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category",
+        "revision_sha256": "07688639ca4c66c7a771c9f3bf67c1ec5586146a4e4b1f514b37bd4293d68fe6",
+        "scope": "district",
+        "table": "district_2010"
+      },
+      "leaf_sha256": "c0c1098faf6bd33d8fe920dc94f45af64fe3528a5823b39012dbbe1d91f7095f",
+      "leaf_size_bytes": 84722,
+      "metadata": {
+        "location": "7a432a982475cd81da6f68e19f31152ce4cb15c3939c0826e5d1c3ee180d04af.json",
+        "sha256": "7a432a982475cd81da6f68e19f31152ce4cb15c3939c0826e5d1c3ee180d04af",
+        "size_bytes": 23173
+      },
+      "processing_id": "46a1defb315c4f913a596ddf684eddb80237ab7483c56ce5617515e119acd2ed",
+      "rows": 4877,
+      "school_year_end": 2010
+    },
+    "f5ecd122594bd390fb8e28f215b7a0541bef0a68fa0c3348983a5599a7450546": {
+      "artifact_id": "6943b040329278b3fcc47b1055157d4e34dc99481b5f1a6faf9c6c44c5d2bd20",
+      "key": {
+        "dataset": "educator_district_new_hires_by_epp",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category and publisher_epp_region and reported_epp_assignment",
+        "revision_sha256": "4bf3c8ef64a248bc93e96cef7d2198ecb659f11aa0fe18a0518f4570dad5c6f9",
+        "scope": "district",
+        "table": "district_2018"
+      },
+      "leaf_sha256": "22bcb4aa225ef0d0faf5ae5062e4dfd846cfeceedf4edb545259a02408dad0a0",
+      "leaf_size_bytes": 198308,
+      "metadata": {
+        "location": "9f4f3ffb1c13b7ce032601d8f3c9845ccf556e2fb2bdce0823602d903e5c5874.json",
+        "sha256": "9f4f3ffb1c13b7ce032601d8f3c9845ccf556e2fb2bdce0823602d903e5c5874",
+        "size_bytes": 24349
+      },
+      "processing_id": "253bf847bda880fe95456e7c26e77ff417bc4e734807c0808cb9251fee60098f",
+      "rows": 10080,
+      "school_year_end": 2018
+    },
+    "f854d7c7dc86a00341487b282f1d22052dec3913470ac5777a04aeb89e6f8924": {
+      "artifact_id": "09fafda70879dbde56bfa28714b32a068f7ed3fc256d5ebeae6a2beb4074f0c7",
+      "key": {
+        "dataset": "educator_district_new_hires",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category",
+        "revision_sha256": "07688639ca4c66c7a771c9f3bf67c1ec5586146a4e4b1f514b37bd4293d68fe6",
+        "scope": "district",
+        "table": "district_2020"
+      },
+      "leaf_sha256": "1f0b1185ec1d730e4a9d31fe56bc91378c97371fcb9f03cc0c2f57d26e97c425",
+      "leaf_size_bytes": 86846,
+      "metadata": {
+        "location": "73ea9559e711525b0911cc549ddaca9bd5703da2f6673d4a6314ab7ee2528898.json",
+        "sha256": "73ea9559e711525b0911cc549ddaca9bd5703da2f6673d4a6314ab7ee2528898",
+        "size_bytes": 23288
+      },
+      "processing_id": "bec39ca3d1264b7fecb0f45b2542378323d505a0dea14ec75d878adc97df71e4",
+      "rows": 5099,
+      "school_year_end": 2020
+    },
+    "f99c37a3705b7dce3c2471a754d9de7b807c3609b8d9c7290ed465db93e55324": {
+      "artifact_id": "d02cf43d84bf2979c9debde13276f0a8740e49ed48222becab667030e0cd0b17",
+      "key": {
+        "dataset": "educator_district_new_hires_by_epp",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category and publisher_epp_region and reported_epp_assignment",
+        "revision_sha256": "4bf3c8ef64a248bc93e96cef7d2198ecb659f11aa0fe18a0518f4570dad5c6f9",
+        "scope": "district",
+        "table": "district_2013"
+      },
+      "leaf_sha256": "d6b69290dc5b56709b63f8e611c2c0ca4e7d3eed43b6891a446a61758b94c9e4",
+      "leaf_size_bytes": 207168,
+      "metadata": {
+        "location": "76e9418187fdd396f2ec68d0cd03c2e2114e735093b8e56c6e9c387eba050554.json",
+        "sha256": "76e9418187fdd396f2ec68d0cd03c2e2114e735093b8e56c6e9c387eba050554",
+        "size_bytes": 24234
+      },
+      "processing_id": "ea524fae31b7d6f9b28b30480d7f16ce1d040428947a160d8ad3d246175e3cf0",
+      "rows": 10528,
+      "school_year_end": 2013
+    },
+    "ff10dd14419c29ce0eeeaa3f218aed6ec441068e22b8cdb50507f2c7606d88b6": {
+      "artifact_id": "db46a4733ad7f9b6d7f651f6da2fad936a22d63c72760321772531ac26fa7e47",
+      "key": {
+        "dataset": "educator_district_new_hires_by_epp",
+        "edition": "5",
+        "grain": "one publisher row per district_number and school_year_end and certification_at_hire_category and publisher_epp_region and reported_epp_assignment",
+        "revision_sha256": "4bf3c8ef64a248bc93e96cef7d2198ecb659f11aa0fe18a0518f4570dad5c6f9",
+        "scope": "district",
+        "table": "district_2022"
+      },
+      "leaf_sha256": "202b9bf743200ff0f30cfb12b006a9f1a7d2ac44d81b62c084472a751f0d0daa",
+      "leaf_size_bytes": 203345,
+      "metadata": {
+        "location": "1381432379c9732631c12c9cf4ef2720bb3010b3e643c67599e01b7d0ce1d7eb.json",
+        "sha256": "1381432379c9732631c12c9cf4ef2720bb3010b3e643c67599e01b7d0ce1d7eb",
+        "size_bytes": 24349
+      },
+      "processing_id": "3f2a4f27118ed026539074f16a612fee2e67fa655bc8811befd7730624aa0f58",
+      "rows": 10306,
+      "school_year_end": 2022
+    }
+  },
+  "goldens": [
+    {
+      "dataset": "educator_district_new_hires",
+      "facts": {
+        "certification_at_hire_category": "Standard Certified, Direct Entry",
+        "district_number": "001902",
+        "new_hires_count": 2,
+        "school_year_end": 2026
+      },
+      "worksheet_row": 78756
+    },
+    {
+      "dataset": "educator_district_new_hires",
+      "facts": {
+        "district_number": "001902",
+        "new_hires_count": 2,
+        "school_year_end": 2026
+      },
+      "worksheet_row": 78757
+    },
+    {
+      "dataset": "educator_district_new_hires",
+      "facts": {
+        "district_number": "001902",
+        "new_hires_count": 2,
+        "school_year_end": 2026
+      },
+      "worksheet_row": 78758
+    },
+    {
+      "dataset": "educator_district_new_hires",
+      "facts": {
+        "district_number": "014802",
+        "new_hires_count": 2,
+        "school_year_end": 2010
+      },
+      "worksheet_row": 150
+    },
+    {
+      "dataset": "educator_district_new_hires",
+      "facts": {
+        "district_name": "",
+        "district_number": "015950",
+        "new_hires_count": 1,
+        "school_year_end": 2013
+      },
+      "worksheet_row": 14332
+    },
+    {
+      "dataset": "educator_district_new_hires_by_epp",
+      "facts": {
+        "new_hires_count": 1,
+        "publisher_epp_region": "04",
+        "reported_epp_assignment": "NA-Previously Part-Time",
+        "school_year_end": 2026
+      },
+      "worksheet_row": 39
+    },
+    {
+      "dataset": "educator_district_new_hires_by_epp",
+      "facts": {
+        "new_hires_count": 1,
+        "publisher_epp_region": "07",
+        "reported_epp_assignment": "NA-Previously Part-Time",
+        "school_year_end": 2026
+      },
+      "worksheet_row": 40
+    },
+    {
+      "dataset": "educator_district_new_hires_by_epp",
+      "facts": {
+        "new_hires_count": 2,
+        "publisher_epp_region": "NA",
+        "reported_epp_assignment": "Na-Uncertified",
+        "school_year_end": 2026
+      },
+      "worksheet_row": 43
+    },
+    {
+      "dataset": "educator_state_new_hires",
+      "facts": {
+        "intern_certified_count": 4426,
+        "intern_certified_ratio": 0.10025823404158928,
+        "total_new_hires_count": 44146
+      },
+      "worksheet_row": 12
+    }
+  ],
+  "limits": [
+    "Retained publisher workbook reconciliation, not fresh official-source reacquisition.",
+    "Retrospective version5 district series, not original historical vintages or an all-time entity directory.",
+    "Certification-at-hire category differs from preparation route and reported EPP assignment; placeholders are observed labels.",
+    "No campus product or direct Texas EPP breakdown; direct Texas only2016\u20132026.",
+    "Dated dictionary/business-rule differences remain documented; no repaired or guessed aliases.",
+    "This plan qualifies only the exact standalone child; normal-parent integration and publication are separate."
+  ],
+  "manifest_sha256": "8989e9860aadd5d43bcb30bcc40aab2af59f230429638fb0723a1496ca821626",
+  "publisher_roots": [
+    "bec3aac823d68bc6600033955fc4b27b94124d8724cfb4932e3c13ed93f92e34",
+    "a8ef9adb5ea04c99e9a47d53fdb6a3abefda445a5dda084e5959343c643af924",
+    "33d7f3141db505a557bcfed8e16adf796131f7e1ecb2b0748b5635cf7f1f136f",
+    "75685e0bd643e8f5ecb607f5028bec3c45e98884f6880cc8d21f3dee7be93ff1",
+    "7556f3c4f2e144e7c5a3768b0789494f78fa3db75d29727f63bcf3972260fad8",
+    "0d8c7b9b574b5fce159e9f448f625cdd1a166708457ffb222131b4c3ae4468f8",
+    "792c5aa57758dde8613cc7c4a4a460684b45c5826f6167ad002a069e1bec7a7a"
+  ],
+  "schema_version": 1,
+  "sources": {
+    "educator_district_new_hires": {
+      "artifact": {
+        "filename": "edrs-new-hires-by-school-system-v5.xlsx",
+        "sha256": "87ef6bdd10d6045e663f3a7aaa6ba819e4bf67ab9067404ec540011f793ab1af",
+        "size_bytes": 3175000
+      },
+      "downloaded_at": "2026-11-07T03:10:23.308275+00:00",
+      "edition": "5",
+      "fields": [
+        "district_number",
+        "school_year_end",
+        "education_service_center",
+        "certification_at_hire_category",
+        "new_hires_count",
+        "district_name",
+        "district_geotype",
+        "education_service_center_label",
+        "school_year_label"
+      ],
+      "headers": [
+        "district",
+        "schyr",
+        "region",
+        "cert_cat",
+        "count",
+        "distname",
+        "geotypex",
+        "region_2",
+        "Year"
+      ],
+      "key_columns": [
+        "district_number",
+        "school_year_end",
+        "certification_at_hire_category"
+      ],
+      "method": "download",
+      "receipt": "bec3aac823d68bc6600033955fc4b27b94124d8724cfb4932e3c13ed93f92e34",
+      "recorded_at": "2026-11-07T03:10:23.308458+00:00",
+      "scope": "district",
+      "sha256": "87ef6bdd10d6045e663f3a7aaa6ba819e4bf67ab9067404ec540011f793ab1af",
+      "url": "https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/downloads/new-hires-by-school-system-view-3.xlsx",
+      "worksheet": "District Counts",
+      "years": [
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ]
+    },
+    "educator_district_new_hires_by_epp": {
+      "artifact": {
+        "filename": "edrs-new-hires-by-school-system-and-epp-v5.xlsx",
+        "sha256": "2ed577abc10c60f32d093228fbc685c9fbc5584dda1a7635e95907256ca7db98",
+        "size_bytes": 8301263
+      },
+      "downloaded_at": "2026-11-07T03:10:23.527917+00:00",
+      "edition": "5",
+      "fields": [
+        "district_number",
+        "school_year_end",
+        "education_service_center",
+        "district_name",
+        "district_geotype",
+        "publisher_epp_region",
+        "new_hires_count",
+        "reported_epp_assignment",
+        "certification_at_hire_category",
+        "education_service_center_label",
+        "school_year_label",
+        "publisher_epp_region_label"
+      ],
+      "headers": [
+        "district",
+        "schyr",
+        "region",
+        "distname",
+        "geotype",
+        "region_epp",
+        "total_new_hires",
+        "EPP_assigned",
+        "cert_cat",
+        "region_2",
+        "Year",
+        "region_epp2"
+      ],
+      "key_columns": [
+        "district_number",
+        "school_year_end",
+        "certification_at_hire_category",
+        "publisher_epp_region",
+        "reported_epp_assignment"
+      ],
+      "method": "download",
+      "receipt": "7556f3c4f2e144e7c5a3768b0789494f78fa3db75d29727f63bcf3972260fad8",
+      "recorded_at": "2026-11-07T03:10:23.528061+00:00",
+      "scope": "district",
+      "sha256": "2ed577abc10c60f32d093228fbc685c9fbc5584dda1a7635e95907256ca7db98",
+      "url": "https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/downloads/new-hires-by-school-system-and-epp-views-4-and-5.xlsx",
+      "worksheet": "District Counts Long",
+      "years": [
+        2010,
+        2011,
+        2012,
+        2013,
+        2014,
+        2015,
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ]
+    },
+    "educator_state_new_hires": {
+      "artifact": {
+        "filename": "edrs-attrition-new-hires-2026-04.xlsx",
+        "sha256": "fa02256f69a594e95a250b80d32bb3a43ecfe65f493857305ac4e54f0e1d77ee",
+        "size_bytes": 77923
+      },
+      "downloaded_at": "2026-11-06T15:11:39.968716+00:00",
+      "edition": "2026-04",
+      "fields": [
+        "school_year_label",
+        "total_new_hires_count",
+        "intern_certified_count",
+        "one_year_out_of_state_certified_count",
+        "standard_out_of_state_certified_count",
+        "standard_certified_direct_entry_count",
+        "standard_certified_lagged_entry_count",
+        "no_texas_certification_or_permit_count",
+        "emergency_permit_count",
+        "reenterer_count",
+        "previously_part_time_count",
+        "intern_certified_ratio",
+        "one_year_out_of_state_certified_ratio",
+        "standard_out_of_state_certified_ratio",
+        "standard_certified_direct_entry_ratio",
+        "standard_certified_lagged_entry_ratio",
+        "no_texas_certification_or_permit_ratio",
+        "emergency_permit_ratio",
+        "reenterer_ratio",
+        "previously_part_time_ratio"
+      ],
+      "headers": [
+        "Academic Year",
+        "Total New Hires",
+        "Intern Certified",
+        "One Year OOS Certified",
+        "Standard OOS Certified",
+        "Standard Direct Entry",
+        "Standard Lagged Entry",
+        "No TX Cert Permit",
+        "Emergency Permits",
+        "Reenterers",
+        "Previously Part Time",
+        "Pct Intern Certified",
+        "Pct One Year OOS Certified",
+        "Pct Standard OOS Certified",
+        "Pct Standard Direct Entry",
+        "Pct Standard Lagged Entry",
+        "Pct No TX Cert Permit",
+        "Pct Emergency Permits",
+        "Pct Reenterers",
+        "Pct Previously Part Time"
+      ],
+      "key_columns": [],
+      "method": "download",
+      "receipt": "792c5aa57758dde8613cc7c4a4a460684b45c5826f6167ad002a069e1bec7a7a",
+      "recorded_at": "2026-11-06T15:11:39.968973+00:00",
+      "scope": "state",
+      "sha256": "fa02256f69a594e95a250b80d32bb3a43ecfe65f493857305ac4e54f0e1d77ee",
+      "url": "https://tea4avcastro.tea.state.tx.us/oess/edrs/new-hire-and-attrition-dashboard/downloads/Attrition_New%20Hires_Workbook.xlsx",
+      "worksheet": "New Hires",
+      "years": [
+        2016,
+        2017,
+        2018,
+        2019,
+        2020,
+        2021,
+        2022,
+        2023,
+        2024,
+        2025,
+        2026
+      ]
+    }
+  }
+}

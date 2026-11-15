@@ -5,6 +5,44 @@ The source tables described here are not native attachments in the
 Examples require an explicitly selected matching native source release or
 candidate. TAPR staff fields in the entity snapshot are a different source.
 
+## Hiring qualification in unreleased source
+
+The November 15 source update adds the normal release gate for one exact
+standalone hiring candidate: **45 tables**, comprising district and reported
+EPP detail for school years ending **2010–2026**, and direct Texas for
+**2016–2026**. Retained-source replay checked all **83,478 district rows,
+168,585 EPP rows and 11 Texas rows**, their publisher fields, raw/status
+companions and worksheet coordinates. It also checked nine frozen publisher-row
+examples, exact district/EPP key sets including zeros, and direct Texas category
+counts and ratios. This is not fresh source reacquisition or independent
+confirmation of every historical definition.
+
+The candidate manifest is
+`8989e9860aadd5d43bcb30bcc40aab2af59f230429638fb0723a1496ca821626`.
+It is **unpublished and not attached to the normal v0.0.157 release**. The new
+gate is source-only until a subsequent software release. Neither qualification
+nor a successful producer run activates a normal parent or publishes data.
+An admitted executor must compose the normal successor with all prior sources;
+source review, canonical checks and release approval remain separate.
+
+With the retained candidate and source evidence available, run the existing
+offline gate from the updated source:
+
+```sh
+uv run --locked python -m teadata.verification --kind library \
+  --native-release "$EDUCATOR_HIRING_MANIFEST" \
+  --native-pin 8989e9860aadd5d43bcb30bcc40aab2af59f230429638fb0723a1496ca821626 \
+  --source-store "$TEADATA_PROVENANCE_DIR"
+```
+
+There is no campus hiring product in this candidate. Historical district rows
+remain accessible by ID even when absent from the latest reporting roster;
+publisher names in a retrospective workbook do not establish historical names
+or entity continuity. The dated dictionary limitations below remain in force.
+Retention and certification are separate families with their existing holds.
+
+## Reported EPP assignments
+
 The [TEA version 5 district-and-EPP workbook](https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/downloads/new-hires-by-school-system-and-epp-views-4-and-5.xlsx)
 contains the `District Counts Long` worksheet. The local native product is
 `educator_district_new_hires_by_epp`, with district measurement years ending

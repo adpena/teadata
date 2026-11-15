@@ -885,6 +885,17 @@ def _native_record_evidence(release: DataRelease, processing_store: ProvenanceSt
 
 def _native_review(release: DataRelease, store: ProvenanceStore) -> _NativeReview:
     """Select one reviewed plan for standalone, parent and receipt-reuse gates."""
+    from teadata.native_educator_hiring import (
+        qualify_educator_hiring, reviewed_educator_hiring, validate_educator_hiring_identity,
+    )
+
+    hiring = reviewed_educator_hiring(release.manifest_sha256)
+    if hiring is not None:
+        validate_educator_hiring_identity(release, hiring)
+        processing_store = _retained_store(release.path.parent / "provenance")
+        return _NativeReview("educator hiring", partial(qualify_educator_hiring, release, processing_store, store, hiring),
+                             partial(_native_record_evidence, release, processing_store, store, hiring["publisher_roots"]))
+
     from teadata.dataset_metadata import EditionKey
     from teadata.first_ratings import REVIEWED_MANIFEST as FIRST_MANIFEST, qualify_first_ratings, retained_first_evidence
     from teadata.manifest import canonical_json

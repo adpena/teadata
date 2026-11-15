@@ -191,6 +191,15 @@ configuration digest and parent hash pin this comparison; it is not a live feed.
 
 ## Consequential integration gaps
 
+The November 15 unreleased source adds an exact normal-gate qualification plan
+for educator hiring. Its standalone candidate contains 45 tables: district and
+EPP detail for measurement years ending 2010–2026, plus direct Texas 2016–2026.
+Full retained-workbook/native-row parity, cross-product counts/ratios and nine
+publisher-row examples passed locally. The candidate remains unpublished and
+**outside the normal v0.0.157 parent**; it does not change the current attachment
+counts above. See [scope, pinned identity and reproduction](educator-workforce-sources.md#hiring-qualification-in-unreleased-source).
+Do not include held retention or certification products under that result.
+
 | Source family and remaining scope gaps | Registered edition keys | Delivery and next work |
 | --- | --- | --- |
 | PEIMS staff FTE and salary | 2023–2026 | Delivered in the selected normal parent for district/Texas, through generic namespaces and explicit category/role selection. Campus observations remain absent. |
