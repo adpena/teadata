@@ -1,5 +1,10 @@
 # Educator workforce: reported EPP assignments
 
+The source tables described here are not native attachments in the
+[v0.0.157 normal release](source-integration-status.md#current-157-native-coverage).
+Examples require an explicitly selected matching native source release or
+candidate. TAPR staff fields in the entity snapshot are a different source.
+
 The [TEA version 5 district-and-EPP workbook](https://tea4avcastro.tea.state.tx.us/oess/edrs/regional-dashboards/downloads/new-hires-by-school-system-and-epp-views-4-and-5.xlsx)
 contains the `District Counts Long` worksheet. The local native product is
 `educator_district_new_hires_by_epp`, with district measurement years ending

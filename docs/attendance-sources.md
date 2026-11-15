@@ -7,15 +7,15 @@ run is not a measurement year. The selected release's catalog records the exact
 fields, available scopes and source receipts; no source lookup falls back to an
 older nonmissing value.
 
-The published 0.0.154 normal release attaches both narrowly qualified
-families below through the normal release and lazy entity/source machinery.
-Its manifest is recorded in [source integration status](source-integration-status.md).
+Both narrowly qualified families below entered the v0.0.154 normal release
+and remain attached in v0.0.157 through the shared lazy entity/source machinery.
+The current manifest is recorded in [source integration status](source-integration-status.md).
 Candidate construction, publisher-source qualification, normal access/export
 acceptance, publication and application activation remain separate stages.
 
 ## Current population
 
-The published v0.0.154 normal parent retains 2025–26 TPRS Membership and
+The selected v0.0.157 normal release retains 2025–26 TPRS Membership and
 Enrollment at district, campus and direct Texas scopes, PEIMS programs for
 2022–23 through 2025–26 and ethnicity enrollment for 2018–19 through 2025–26.
 The TPRS acquisition contains 9,105 admitted campus reports in 23 partitions;
@@ -114,9 +114,9 @@ uv run --extra scripts python -m teadata.scripts.refresh_attendance chronic \
 ```
 
 The normal enrichment build attaches exact, independently qualified child pins
-through `options.native_sources`. These two sources are included in the published
-v0.0.154 parent; they are absent from the older v0.0.153 parent. With v0.0.154
-selected, use the same lazy `entity.dataset(name)`, dataset
+through `options.native_sources`. These two sources first appeared in the
+v0.0.154 parent and remain in v0.0.157; they are absent from v0.0.153. With the
+current pinned release selected, use the same lazy `entity.dataset(name)`, dataset
 dot path, `observations()` and `series()` planner as other sources. Explicit
 unavailable years fail; current chronic-absence latest is 2024–25 while SOF and
 population sources resolve to 2025–26. Region sources use their published region

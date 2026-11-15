@@ -4,7 +4,9 @@ Bring in external datasets (accountability, finance, etc.) and attach fields dir
 
 The [source coverage table](source-coverage.md) lists the entity build inputs,
 their loaded periods, and their configured editions. The builder records its
-exact sources. Separate native source tables are available through `DataRelease`.
+exact sources. Qualified native attachments share the selected release's lazy
+entity namespaces and observation planner; standalone tables require their own
+explicit release selection. See the [current attachment inventory](source-integration-status.md#current-157-native-coverage).
 
 ## Observations across school years
 
