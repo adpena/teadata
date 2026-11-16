@@ -1,10 +1,12 @@
 # Facility usage: 2025–26 source review
 
 Source reviewed November 12–13, 2026 UTC; implementation checked November 16.
-The two district source contracts are registered, and a private development
-child passed independent source qualification. **Normal release attachment and
-publication remain separate gates.** Registration does not add facility values
-to an older selected release. This page documents the as-published source,
+The two district source contracts are registered, independently qualified and
+attached to the retained normal159 composition. Its 16 native source gates and
+actual district namespace, DSL and export workflow passed. **Publication and
+downstream adoption remain separate gates.** The [exact inventory](source-integration-status-0.0.159.json)
+pins this unpublished composition; an older selected release does not gain
+these observations automatically. This page documents the as-published source,
 implemented access contract and remaining limitations.
 
 ## Population and observation grain

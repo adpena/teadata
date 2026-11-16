@@ -1,9 +1,63 @@
 # Source integration status — November 16, 2026 (UTC)
 
 The selected release, rather than the installed software version, controls
-available observations. The version 0.0.158 inventory below describes its exact
-pinned normal data composition. Earlier sections remain dated baselines; their
+available observations. The version 0.0.159 inventory below describes a retained,
+unpublished normal composition. Earlier sections remain dated baselines; their
 counts and attachment lists must not be reused as the current inventory.
+
+## Version 0.0.159 retained normal composition — publication pending
+
+The retained normal manifest has SHA-256
+`b7cc37987ddae2b8f30f857a612a1836318a4477b0681b9db2e70ddb21076ec2`
+and build `9c27394493a7731235cc10b4ab7af77450228ced328491b7cb4755238f8f1eea`.
+Ordinary `load_data` produced it with software **0.0.159**, source
+`d6b0f4cae8f0e479d240d0653b5e76ab15f63fd5`. All 13 base input descriptors
+and all 15 normal158 native child descriptors are unchanged. The only addition
+is the qualified facility child
+`2b628a4ccf01c35be5a614d23d41e69f012b58d1ae04e7f048dcae27df3580b2`.
+
+The [machine inventory](source-integration-status-0.0.159.json) records **16 native
+attachments, 21 dataset IDs and 204 edition/scope keys**. Configuration now
+registers **126 IDs and 278 editions**; **95 source-only IDs remain unattached**.
+Facility usage was not among those previously registered 95 IDs, so this addition
+does not reduce that number. Inventory generation reads verified metadata, not
+observations or private evidence, and performs no acquisition or qualification
+replay. Only the local manifest path is redacted; the original generated report
+hash and actual software/time/source hashes remain in its generation context.
+
+| Added native dataset | Measurement collection | Publisher edition | Scope and grain |
+| --- | --- | --- | --- |
+| `facility_usage` | 2025–26 | `2026` | District-associated original worksheet rows: 17,763 facility records and 71 status-only rows |
+| `facility_usage_submission` | 2025–26 | `2026` | One consistent publisher submission status for each of 1,017 districts |
+
+The 31 public facility fields preserve original row locators, duplicate rows,
+exact Decimal values, raw tokens and missing-value support. Contact emails are
+excluded; the original source bytes remain private qualification evidence.
+`square_footage` uses `square_feet` and `acreage` uses `acres`. Construction-year
+attributes use `years` for their reported calendar-year values, not elapsed age.
+Identity fields have no invented measurement period. Existing families retain
+their individual periods and limitations, all enumerated in the machine inventory.
+
+The actual normal-parent workflow retains **1,229 district and 12,593 campus
+entities** and passed district namespace/DSL discovery and selection, text-status
+access, refusal to flatten multi-row facility facts, null versus outside-roster
+behavior, and exact Decimal Arrow, DataFrame, CSV, Excel and SQLite exports.
+Provenance binds both the source child and selected entity parent; no facility
+arrays or canonical enrollment values were inserted into entity metadata.
+
+The facility child independently passed all-cell/source-status checks and 12
+frozen publisher examples. Its scope is **as-published district records**:
+correction coverage remains unknown, facility enrollment mixes Fall Snapshot and
+average daily students, and no campus relationships, capacity aggregation or
+utilization series are admitted. Status-only or absent districts do not imply
+zero facilities. See the [source contract and access examples](facility-usage.md).
+
+The composed parent's canonical data validation passed all **16 attached native
+source gates**, as well as its retained publisher examples and private school
+population checks. These results and the actual-parent workflow are separate
+from the metadata inventory. Publication, explicit release selection,
+app cache adoption and deployment remain separate actions. The tracked default
+fixture and app data selection have not changed.
 
 ## Version 0.0.158 selected normal release
 

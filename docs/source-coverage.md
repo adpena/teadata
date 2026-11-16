@@ -1,5 +1,12 @@
 # Entity enrichment sources and years
 
+The retained **0.0.159 normal composition is not yet published**. Its
+[exact inventory](source-integration-status-0.0.159.json) records 16 native
+bundles, 21 dataset IDs and 204 edition/scope keys, preserving all 13 normal158
+base inputs and its 15 children. It adds the 2025–26 district facility records
+and publisher submission statuses described below. Their source-specific limits
+remain explicit; this does not update app profiles or the tracked default data.
+
 The [v0.0.158 normal release](https://github.com/adpena/teadata/releases/tag/v0.0.158)
 composes fifteen native bundles, 19 dataset IDs and 202 edition/scope/partition keys,
 alongside 13 unchanged base inputs. It includes PEIMS ethnicity for
@@ -110,16 +117,25 @@ roster and exact edition, and report any gaps by scope. Use a direct Texas
 report for [statewide comparisons](querying.md#compare-a-published-measure-with-texas) when the
 measure, population definition, and measurement period match.
 
-### Facility usage: acquired, integration pending
+### Facility usage: retained normal159 composition
 
-The [2025–26 facility usage review](facility-usage.md) documents TEA's statewide
-district collection: 17,763 facility records from 946 submitting districts and
-71 status-only district rows. TEA says charter schools are not currently required
-to report. The data are facility records, with some publisher-supplied campus links,
-not a campus enrollment or capacity series. Source bytes and definitions have
-been inspected; this source is not yet registered, qualified, or attached to
-v0.0.152. Unresolved correction lineage, mixed enrollment populations and shared
-facilities constrain the next normal-pipeline integration.
+The [2025–26 facility source contract](facility-usage.md) is independently
+qualified and attached to the retained normal159 parent. `facility_usage`
+preserves 17,763 facility records from 946 submitting districts and 71 status-only
+district rows. `facility_usage_submission` retains one proven-consistent
+publisher status for each of 1,017 districts. The publisher edition is `2026`;
+collection facts use school year 2025–26. The source's construction years and
+AskTED reference date remain separate. Area units are `square_feet` and `acres`.
+
+TEA says charter schools are not currently required to report. Missing facility
+facts on status-only rows remain null, and a district outside the collection has
+no published rows; neither is zero. Exact decimals, raw tokens, row locators and
+source category exceptions survive the ordinary namespace and export contracts.
+Contact email is excluded from public products. The records do not establish
+campus enrollment or additive capacity: correction coverage is unknown,
+enrollment mixes source populations, and shared facilities cannot be allocated
+to campuses. No corrected series, capacity/utilization aggregate or campus join
+is admitted. Publication and downstream adoption remain pending separate actions.
 
 ### Historical archive routes
 
