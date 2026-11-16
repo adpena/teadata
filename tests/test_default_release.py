@@ -3,6 +3,8 @@
 from hashlib import sha256
 from io import BytesIO
 import json
+from pathlib import Path
+import re
 from unittest.mock import Mock
 
 import pytest
@@ -45,10 +47,16 @@ def test_packaged_selector_accepts_exact_versioned_pin(selector):
     assert release_module._packaged_default_release() == (DEFAULT_URL, "a" * 64)
 
 
-def test_shipped_default_is_a_finalized_normal160_pin():
+def test_shipped_default_matches_the_qualified_normal_release_inventory():
     url, pin = release_module._packaged_default_release()
-    assert url == DEFAULT_URL
+    selected = re.fullmatch(r"https://github\.com/adpena/teadata/releases/download/v([0-9]+\.[0-9]+\.[0-9]+)/release\.json", url)
+    assert selected is not None
     assert len(pin) == 64 and all(character in "0123456789abcdef" for character in pin)
+    inventory = json.loads((Path(__file__).resolve().parents[1] / "docs" /
+                            f"source-integration-status-{selected[1]}.json").read_bytes())["selected_catalog"]
+    assert inventory["release"]["source"] == url
+    assert inventory["release"]["manifest_sha256"] == pin
+    assert inventory["base_inputs"]  # Normal entity release, rather than a standalone native bundle.
 
 
 @pytest.mark.parametrize("change", [

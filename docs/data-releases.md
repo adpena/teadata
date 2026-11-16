@@ -32,7 +32,10 @@ substituting older values. Texas Staff is a direct publisher aggregate, not a
 sum or average of local reports. The historical examples below remain pinned
 to their stated releases.
 
-## Historical normal release 0.0.158: explicit data selection
+## Normal release 0.0.158: select the data explicitly
+
+This historical example preserves the original section link. The current
+packaged default and qualified coverage are described above.
 
 
 The selected normal data release preserves all 14 prior native sources and adds

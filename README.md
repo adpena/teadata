@@ -24,13 +24,14 @@ PyYAML's supported pure Python implementation is tested on 3.15.
 
 ```bash
 uv venv
-uv pip install teadata==0.0.160
+uv pip install teadata==0.0.161
 ```
 
-Version 0.0.160 packages one immutable normal-release URL and SHA-256 for
-`current_release()` and `DataEngine.load_default()`. The selected normal160
-composition passed all 17 attached source gates and includes FY2026 district
-and charter budget accounts through the normal lazy namespace and export path.
+Version 0.0.161 packages one immutable normal-release URL and SHA-256 for
+`current_release()` and `DataEngine.load_default()`. The selected normal161
+composition passed all 18 attached source gates and adds regional TAPR Student
+and Staff plus direct Texas Staff to the existing FY2026 district and charter
+budget accounts. Qualified fields use the normal lazy access and export path.
 The wheel contains the selector and contracts; data files remain demand-loaded.
 See the [exact coverage and release identity](docs/source-integration-status.md).
 Explicit local/remote selections and `using_release` retain precedence.
@@ -39,7 +40,7 @@ manifest and requested files already in the cache. Online first use may fetch
 the pinned manifest and required files. Bare `DataEngine()` still creates an
 empty engine; use `DataEngine.load_default()` to load data.
 Software 0.0.159 requires an explicit release selection. Its historical checkout
-`.cache` remains available explicitly and is not the 0.0.160 default.
+`.cache` remains available explicitly and is not the packaged default.
 
 ### Development (recommended)
 
@@ -116,11 +117,12 @@ default SQLite checks because SQLite does not enforce declared `VARCHAR` widths.
 ## Quick Start
 
 Python packages contain code and metadata; data bundles are distributed
-separately. Select an immutable bundle before running the example:
+separately. The package selects a pinned default; optionally select the same
+current release explicitly:
 
 ```bash
-export TEADATA_RELEASE_URL="https://github.com/adpena/teadata/releases/download/v0.0.158/release.json"
-export TEADATA_RELEASE_SHA256="be9803cf7c27cff1020b5ec958bf1158d960a9ad574750d7242959ee051092f7"
+export TEADATA_RELEASE_URL="https://github.com/adpena/teadata/releases/download/v0.0.161/release.json"
+export TEADATA_RELEASE_SHA256="e36e65506c978985f77bb015af7826fbcb61fd098af62532cb3a27fa8c8889f8"
 export TEADATA_RELEASE_OFFLINE=0
 ```
 
@@ -128,8 +130,8 @@ Unset `TEADATA_RELEASE` when using a URL: a configured local manifest takes
 precedence. For a complete downloaded bundle, set it to the local `release.json`
 instead. The manifest binds one normal engine release and its attached sources
 to exact content hashes. The [coverage inventory](docs/source-integration-status.md)
-and [release selection guide](docs/data-releases.md#normal-release-00158-select-the-data-explicitly)
-show its 15 native attachments, including district/region/Texas College Credit
+and [release selection guide](docs/data-releases.md#current-normal-release-00161)
+show its 18 native attachments, including district/region/Texas College Credit
 and district hiring, reported EPP assignments and direct Texas hiring totals.
 The [TAPR and TPRS supplements](docs/data-releases.md#tapr-and-tprs-supplements)
 remain separately selectable sources.
