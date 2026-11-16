@@ -95,4 +95,13 @@ Require independent adversarial review of the exact landing diff. After each rep
 
 ## Local Verification
 
+Run heavy checks and profiling on Tertiary's shared checkout. Its project
+`.venv` can contain old dependencies; do not use it or synchronize over it to
+recover a check. Reuse the canonical cached environment: copy the interpreter
+and all extra flags from `scripts/check`, adding `--offline` for retained work.
+The library currently needs `--extra dev --extra database --extra scripts
+--extra speedups` with `uv run --isolated --locked`. An invocation without
+those extras is not the qualified library test environment. Mirror only owned
+files into the shared farm checkout and preserve other active lanes.
+
 `scripts/check` is the primary verification entry point; it runs locked isolated local Ruff, ty, deptry, and pytest checks and records receipts/logs in ignored `.local/checks/`. Use `scripts/check --verify-latest` to verify evidence for the current exact revision. After serialized-code or data changes, rebuild the bundle and run `scripts/check --release teadata/.cache/release.json`. Code-only receipts do not certify raw data or artifacts, and all receipts remain separate from adversarial review. `TEADATA_CHECK_PYTHON` selects another supported Python version for compatibility checks. Hosted workflows are manual only; do not restore automatic hosted triggers without a user request. Optional hook installation must preserve Git LFS and refuse custom hooks/configuration.

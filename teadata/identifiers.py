@@ -104,6 +104,8 @@ def canonical_source_identifier(value: Any, *, width: int) -> str | None:
     fractional, Boolean, overlong, negative, and all-zero codes are invalid.
     Excel text apostrophes, omitted leading zeros, and integral float cells are
     accepted without converting an integer/string through floating point.
+    Builtin numeric and string IDs do not import pandas; nullable third-party
+    scalars retain its missing-value interpretation.
     """
     if type(width) is not int or width < 1:
         raise ValueError("Identifier width must be a positive integer")
@@ -111,7 +113,10 @@ def canonical_source_identifier(value: Any, *, width: int) -> str | None:
         return None
     if isinstance(value, bool):
         raise ValueError("Boolean is not a source identifier")
-    if type(value) is not str:
+    scalar_type = type(value)
+    if scalar_type is not str and scalar_type is not int and scalar_type is not float:
+        # Numeric extension types can include nullable time-like scalars, such
+        # as NumPy timedelta64 NaT. Preserve their original missingness checks.
         import pandas as pd
 
         if not pd.api.types.is_scalar(value):
@@ -127,6 +132,8 @@ def canonical_source_identifier(value: Any, *, width: int) -> str | None:
     if isinstance(value, numbers.Integral):
         text = str(int(value))
     elif isinstance(value, numbers.Real):
+        if math.isnan(value):
+            return None
         if not math.isfinite(value) or value != int(value):
             raise ValueError("Source identifier must be a finite integer")
         text = str(int(value))
