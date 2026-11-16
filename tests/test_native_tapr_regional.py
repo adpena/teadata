@@ -1,4 +1,7 @@
 from types import SimpleNamespace
+from decimal import Decimal
+import os
+from uuid import uuid4
 
 import pytest
 
@@ -88,3 +91,69 @@ def test_numeric_control_keeps_zero_and_publisher_precision():
 def test_gate_requires_exact_offline_release(manifest, offline):
     with pytest.raises(ContractError, match="exact reviewed offline"):
         qualify_tapr_regional(SimpleNamespace(manifest_sha256=manifest, offline=offline), None)
+
+
+@pytest.fixture(scope="module")
+def normal_regional():
+    from teadata.release import DataRelease
+
+    path, pin = os.getenv("TEADATA_NORMAL_REGIONAL_RELEASE"), os.getenv("TEADATA_NORMAL_REGIONAL_PIN")
+    if not path or not pin:
+        pytest.skip("Actual normal TAPR parent and exact pin are explicit retained-data opt-ins")
+    return DataRelease(path, expected_sha256=pin, offline=True)
+
+
+def test_normal_regional_index_has_exact_attached_source(normal_regional):
+    ref, = (ref for ref in normal_regional.catalog.native_sources if ref.manifest_sha256 == REVIEWED_MANIFEST)
+    assert {key.dataset for key in ref.editions} == {
+        "region_tapr_student_profile", "region_tapr_staff_profile", "state_tapr_staff_profile",
+    }
+    assert len(normal_regional.catalog.native_sources) == 18
+    assert sum(len(ref.editions) for ref in normal_regional.catalog.native_sources) == 209
+
+
+def test_normal_regional_selection_never_substitutes_lagged_year(normal_regional):
+    field = "region_2025_student_membership_all_students_count"
+    source = normal_regional.observations("region_tapr_student_profile", field, scope="region", school_year=25)
+    table = source.to_arrow()
+    assert table.num_rows == 20
+    assert set(table["region_number"].to_pylist()) == {f"{n:02d}" for n in range(1, 21)}
+    assert {row["region_number"]: row[field] for row in table.to_pylist()}["06"] == "223549"
+    origin = source.provenance().to_dict()
+    assert origin["selector"]["entity_release"]["manifest_sha256"] == normal_regional.manifest_sha256
+    with pytest.raises(ContractError):
+        normal_regional.observations("region_tapr_student_profile", field, scope="region", school_year=24)
+
+
+def test_normal_staff_statewide_comparison_uses_same_period_and_population(normal_regional):
+    from teadata.entities import District
+    from teadata.query import Query
+
+    keys = {key.dataset: key for ref in normal_regional.catalog.native_sources for key in ref.editions
+            if key.dataset in {"district_tapr_staff_profile", "state_tapr_staff_profile"}}
+    query = Query([District(uuid4(), "Report witness", district_number="084908")], repo=None)
+    rows = query.compare_statewide(release=normal_regional, local=keys["district_tapr_staff_profile"],
+                                   statewide=keys["state_tapr_staff_profile"])
+    actual = {row.metric: row for row in rows}
+    assert len(actual) == 5
+    assert actual["staff_teacher_total_full_time_equiv_count"].statewide_value == Decimal("369689.2")
+    assert actual["staff_teacher_turnover_ratio"].statewide_value == Decimal("18.8")
+    assert actual["staff_teacher_total_base_salary_average"].statewide_value == 63751
+    assert all(row.period.end_year == 2025 for row in actual.values())
+    assert actual["staff_teacher_total_full_time_equiv_count"].difference_pp is None
+    assert all(row.entity_manifest_sha256 == normal_regional.manifest_sha256 for row in actual.values())
+    assert all(row.local_manifest_sha256 != row.statewide_manifest_sha256 for row in actual.values())
+
+
+def test_all_regional_staff_comparisons_share_one_direct_texas_baseline(normal_regional):
+    from teadata.query import Query
+
+    ref, = (r for r in normal_regional.catalog.native_sources if r.manifest_sha256 == REVIEWED_MANIFEST)
+    keys = {key.dataset: key for key in ref.editions}
+    rows = list(Query([f"{i:02d}" for i in range(1, 21)], repo=None).compare_statewide(
+        release=normal_regional, local=keys["region_tapr_staff_profile"], statewide=keys["state_tapr_staff_profile"],
+    ))
+    assert len(rows) == 100
+    assert {row.identifier for row in rows} == {f"{i:02d}" for i in range(1, 21)}
+    assert {row.statewide_value for row in rows if row.metric == "staff_teacher_turnover_ratio"} == {Decimal("18.8")}
+    assert all(row.local_manifest_sha256 == row.statewide_manifest_sha256 == REVIEWED_MANIFEST for row in rows)

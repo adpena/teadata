@@ -27,6 +27,15 @@ Normal-release composition and software publication remain separate gates.
 Until a newer pinned normal manifest is qualified, the current packaged default
 remains normal160 below; standalone qualification does not silently change it.
 
+The normal-parent workflow also exposed and repaired a shared comparison-routing
+gap: supported comparisons now resolve the exact local and Texas attachments
+independently. The five reviewed 2024–25 Staff metrics support district and all
+20 ESC comparisons with direct Texas Staff, including when the sources are in
+different children. Parent results retain the entity manifest, both child
+manifests and artifact identities. FRC keeps its additional acquisition and
+source-row lineage. Staff numbers use exact Decimal values from publisher raw
+tokens; unknown sentinels remain uninterpreted, never zero or inferred masks.
+
 ## Version 0.0.160 qualified normal release
 
 Ordinary `load_data` produced manifest

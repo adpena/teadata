@@ -9,6 +9,7 @@ from functools import lru_cache
 from hashlib import sha256
 import json
 from math import isfinite
+import re
 from typing import TYPE_CHECKING, Any
 
 from .column_schema import crosswalk_dataset, parse_column_schema, reader_options, table_input_sha256s
@@ -33,7 +34,7 @@ if TYPE_CHECKING:
     from .release import DataRelease
 
 _TAPR_RAW_FAMILIES = {"college_career_military_readiness", "college_readiness_components",
-                      "four_year_longitudinal_rate", "student_profile"}
+                      "four_year_longitudinal_rate", "student_profile", "staff_profile"}
 EDITION = 2025
 _TAPR_RATE_POLICY = ValuePolicy(
     "tapr_2025_reviewed_rates",
@@ -41,6 +42,7 @@ _TAPR_RATE_POLICY = ValuePolicy(
     reference_id="masking",
 )
 _TAPR_STUDENT_POLICY = ValuePolicy("tapr_2025_reviewed_student_profile", {}, reference_id="masking")
+_TAPR_STAFF_POLICY = ValuePolicy("tapr_2025_reviewed_staff_profile", {}, reference_id="masking")
 _NUMERIC_UNITS = frozenset(MeasurementUnit) - {MeasurementUnit.TEXT}
 _VALUE_STATUSES = frozenset(item.value for item in ValueStatus)
 _REGION_CODES = frozenset(f"{code:02d}" for code in range(1, 21))
@@ -131,6 +133,20 @@ class FrcStatewideComparison(StatewideComparison):
     statewide_acquisition_id: str
     local_source_row: int | None
     statewide_source_row: int
+
+
+@dataclass(frozen=True)
+class NativeStatewideComparison(StatewideComparison):
+    entity_manifest_sha256: str
+    local_manifest_sha256: str
+    statewide_manifest_sha256: str
+    local_artifact_id: str
+    statewide_artifact_id: str
+
+
+@dataclass(frozen=True)
+class NativeFrcStatewideComparison(FrcStatewideComparison):
+    entity_manifest_sha256: str
 
 
 @dataclass(frozen=True)
@@ -278,18 +294,27 @@ class _Projection:
     raw_policy: ValuePolicy | None
     integer_rates: bool = False
     student: _StudentContract | None = None
+    decimal_raw: bool = False
 
     def value(self, row: dict[str, Any], field: str, unit: str) -> tuple[str | None, str, Number | None]:
         if self.student is not None:
             return self.student.value(row, field, unit)
         if self.raw_policy is not None:
             raw = row[field]
-            if not isinstance(raw, str) or unit not in {"count", "percent"}:
-                raise ContractError("TAPR comparison requires a publisher token with a reviewed count or percent unit")
+            allowed = _NUMERIC_UNITS if self.decimal_raw else {"count", "percent"}
+            if not isinstance(raw, str) or unit not in allowed:
+                raise ContractError("TAPR comparison requires a publisher token with a reviewed numeric unit")
+            if self.decimal_raw and re.fullmatch(r"[0-9]+(?:\.[0-9]+)?", raw):
+                exact = Decimal(raw)
+                if (unit == "percent" and exact > 100) or (unit == "count" and exact != exact.to_integral_value()):
+                    return raw, "uninterpreted", None
+                return raw, "observed", exact
             if (self.integer_rates and raw not in {"", "-1"}
                     and not (raw.isascii() and raw.isdecimal() and len(raw) <= 3 and raw == str(int(raw)))):
                 return raw, "uninterpreted", None
             value = measure(raw, self.raw_policy, unit=unit, minimum=0, maximum=100 if unit == "percent" else None)
+            if self.decimal_raw and value.status == ValueStatus.OBSERVED:
+                return raw, "uninterpreted", None
             status = "uninterpreted" if value.status == ValueStatus.INVALID else value.status.value
             return raw, status, value.numeric
 
@@ -307,7 +332,8 @@ class _Projection:
 
 def _projection(release: DataRelease, key: EditionKey, fields: list[tuple[str, DataPeriod]], *,
                 keys: list[str], mapping: str, policy: str | None, raw_policy: ValuePolicy | None,
-                integer_rates: bool = False, student: _StudentContract | None = None) -> _Projection:
+                integer_rates: bool = False, student: _StudentContract | None = None,
+                decimal_raw: bool = False) -> _Projection:
     by_period: dict[DataPeriod, list[tuple[EditionKey, str]]] = {}
     for field, period in fields:
         by_period.setdefault(period, []).append((key, field))
@@ -334,7 +360,7 @@ def _projection(release: DataRelease, key: EditionKey, fields: list[tuple[str, D
             if not {"raw", "status"} <= selected.keys():
                 raise ContractError("PEIMS comparison requires normalized values with raw and status support")
             field_support[field] = selected["raw"], selected["status"]
-    return _Projection(artifact, columns, field_support, raw_policy, integer_rates, student)
+    return _Projection(artifact, columns, field_support, raw_policy, integer_rates, student, decimal_raw)
 
 
 @dataclass(frozen=True)
@@ -457,7 +483,8 @@ def _statistics(local: EditionKey, local_metadata: DatasetMetadata,
 
 def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionKey, metric: str,
                     dimensions: Mapping[str, str], school_year: int | None = None,
-                    exact_period: DataPeriod | None = None) -> tuple[list[_Statistic], _Projection, _Projection]:
+                    exact_period: DataPeriod | None = None, *,
+                    statewide_release: DataRelease | None = None) -> tuple[list[_Statistic], _Projection, _Projection]:
     key_column = f"{local.scope}_number"
     course_pair = local.dataset == statewide.dataset == COURSES
     if course_pair and local.scope != "district":
@@ -466,12 +493,16 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
 
     if not isinstance(release, DataRelease):
         raise TypeError("release must be a DataRelease opened from a release manifest.")
+    statewide_release = release if statewide_release is None else statewide_release
+    if not isinstance(statewide_release, DataRelease):
+        raise TypeError("statewide_release must be a DataRelease opened from a release manifest.")
     frc_pair = local.dataset == statewide.dataset == frc.DATASET
     if frc_pair:
         _require_frc_manifest(release.manifest_sha256)
+        _require_frc_manifest(statewide_release.manifest_sha256)
     catalog = release.catalog
     local_metadata = catalog.metadata(local.dataset, edition=local)
-    state_metadata = catalog.metadata(statewide.dataset, edition=statewide)
+    state_metadata = statewide_release.catalog.metadata(statewide.dataset, edition=statewide)
     if frc_pair:
         if local.scope not in {"campus", "district"} or dimensions:
             raise ContractError("FRC comparison requires a district or campus and has no dimensions")
@@ -480,7 +511,7 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
                                  metric, school_year, exact_period)
         return (statistics, _frc_projection(release, local, [(stat.local_field, stat.period) for stat in statistics],
                                            local_metadata, review),
-                _frc_projection(release, statewide, [(stat.statewide_field, stat.period) for stat in statistics],
+                _frc_projection(statewide_release, statewide, [(stat.statewide_field, stat.period) for stat in statistics],
                                 state_metadata, review))
     raw_policy = None
     left_student = right_student = None
@@ -490,7 +521,7 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
             raise ContractError("STAAR comparison requires the reviewed local grain and statewide singleton")
         local_keys, state_keys = [key_column], []
         left = staar_rate_contract(release, local)
-        right = staar_rate_contract(release, statewide)
+        right = staar_rate_contract(statewide_release, statewide)
         left_revision, left_mapping, local_metadata, raw_policy = (
             left.revision_sha256, left.mapping_sha256, left.metadata, left.value_policy)
         right_revision, right_mapping, state_metadata = right.revision_sha256, right.mapping_sha256, right.metadata
@@ -503,7 +534,7 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
             raise ContractError("Student comparison has no additional publisher dimensions")
         local_keys, state_keys = [key_column], []
         left_revision, left_mapping, left_review, left_policy, left_student = _reviewed_students(release, local)
-        right_revision, right_mapping, right_review, right_policy, right_student = _reviewed_students(release, statewide)
+        right_revision, right_mapping, right_review, right_policy, right_student = _reviewed_students(statewide_release, statewide)
         if local.scope == "campus" and left_student.roster_bound:
             # Campus coverage has its own roster. The reviewed Texas observation
             # supplies the same statewide baseline for each campus partition.
@@ -537,7 +568,8 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
         left_revision, left_mapping, left_review = _reviewed_tapr(local.scope, local.table)
         right_revision, right_mapping, right_review = _reviewed_tapr("state", local.table)
         left_policy = right_policy = None
-        raw_policy = _TAPR_STUDENT_POLICY if local.table == "student_profile" else _TAPR_RATE_POLICY
+        raw_policy = (_TAPR_STUDENT_POLICY if local.table == "student_profile" else
+                      _TAPR_STAFF_POLICY if local.table == "staff_profile" else _TAPR_RATE_POLICY)
         masking = next((ref for ref in left_review.references if ref.reference_id == raw_policy.reference_id), None)
         if masking is None or not masking.provenance_ids or masking not in local_metadata.references:
             raise ContractError("Statewide comparison requires the retained TAPR masking methodology")
@@ -551,10 +583,10 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
     statistics = _statistics(local, local_metadata, state_metadata, left_review, right_review, metric, school_year, exact_period)
     return (statistics, _projection(release, local, [(stat.local_field, stat.period) for stat in statistics],
                                     keys=local_keys, mapping=left_mapping, policy=left_policy, raw_policy=raw_policy,
-                                    integer_rates=staar, student=left_student),
-            _projection(release, statewide, [(stat.statewide_field, stat.period) for stat in statistics],
+                                    integer_rates=staar, student=left_student, decimal_raw=local.table == "staff_profile"),
+            _projection(statewide_release, statewide, [(stat.statewide_field, stat.period) for stat in statistics],
                         keys=state_keys, mapping=right_mapping, policy=right_policy, raw_policy=raw_policy,
-                        integer_rates=staar, student=right_student))
+                        integer_rates=staar, student=right_student, decimal_raw=local.table == "staff_profile"))
 
 
 def compare_statewide(items: Sequence[object], *, release: DataRelease, local: EditionKey,
@@ -582,7 +614,8 @@ def compare_statewide(items: Sequence[object], *, release: DataRelease, local: E
     entity_type = Campus if local.scope == "campus" else District
     if not regional and any(not isinstance(item, entity_type) for item in items):
         raise ContractError("Query entities must match the selected local edition scope")
-    if regional and (not supports_staar_rates(local.table, local.edition)
+    if regional and (not (supports_staar_rates(local.table, local.edition)
+                         or local.dataset == f"region_tapr_{local.table}" and local.table in {"student_profile", "staff_profile"})
                      or any(type(item) is not str or item not in _REGION_CODES for item in items)):
         raise ContractError("Region comparisons require literal education service center codes 01 through 20")
     dimensions = {} if dimensions is None else dimensions
@@ -592,18 +625,27 @@ def compare_statewide(items: Sequence[object], *, release: DataRelease, local: E
                             "such as {'course_code': '03100500'}, or None when the source has no dimensions.")
     from .release import DataRelease
 
+    if local.dataset == statewide.dataset == COURSES and local.scope != "district":
+        raise ContractError("Campus course comparisons are on hold pending publisher geography qualification")
+    if not isinstance(release, DataRelease):
+        raise TypeError("release must be a DataRelease opened from a release manifest.")
     frc_pair = local.dataset == statewide.dataset == frc.DATASET
     if frc_pair:
-        if not isinstance(release, DataRelease):
-            raise TypeError("release must be a DataRelease opened from a release manifest.")
-        if not release._v3:
+        if release._v3:
+            _require_frc_manifest(release.manifest_sha256)
+        else:
             sources = [source for source in release.catalog.native_sources
                        if local in source.editions or statewide in source.editions]
             if len(sources) != 1 or not {local, statewide} <= set(sources[0].editions):
                 raise ContractError("FRC comparison requires both exact editions in one native attachment")
             _require_frc_manifest(sources[0].manifest_sha256)
-            release = release._native_edition_release(local)
-    statistics, local_plan, state_plan = _compare_source(release, local, statewide, metric, dimensions, school_year, period)
+    entity_manifest = None if release._v3 else release.manifest_sha256
+    local_release = release._native_edition_release(local)
+    shared = release._v3 or any(local in ref.editions and statewide in ref.editions
+                               for ref in release.catalog.native_sources)
+    state_release = local_release if shared else release._native_edition_release(statewide)
+    statistics, local_plan, state_plan = _compare_source(local_release, local, statewide, metric, dimensions,
+                                                        school_year, period, statewide_release=state_release)
     if not items:
         return []
     frc_review = _reviewed_frc() if frc_pair else None
@@ -617,7 +659,7 @@ def compare_statewide(items: Sequence[object], *, release: DataRelease, local: E
     for field, literal in dimensions.items():
         selected = ds.field(field) == literal
         predicate = selected if predicate is None else predicate & selected
-    state_rows = release.analytical_dataset(state_plan.artifact.identity).head(
+    state_rows = state_release.analytical_dataset(state_plan.artifact.identity).head(
         2, columns=list(state_plan.columns), filter=predicate)
     if state_rows.num_rows != 1:
         raise ContractError("Select exactly one published statewide observation")
@@ -644,7 +686,7 @@ def compare_statewide(items: Sequence[object], *, release: DataRelease, local: E
             local_filter = ds.field(key_column).isin([key[1:] for key in sorted(wanted)])
         if frc_review is not None:
             local_filter = ds.field(key_column).isin(sorted(wanted))
-        source_rows = release.analytical_dataset(local_plan.artifact.identity).to_table(
+        source_rows = local_release.analytical_dataset(local_plan.artifact.identity).to_table(
             columns=list(local_plan.columns), filter=local_filter)
         if frc_review is not None:
             keys = source_rows[key_column]
@@ -682,10 +724,14 @@ def compare_statewide(items: Sequence[object], *, release: DataRelease, local: E
             arguments = (identifier or None, local.scope, stat.name, stat.period, local, statewide,
                          stat.unit, dimension_values, raw, status, value, state_raw, state_status, state_value, difference)
             if frc_review is not None and state_row_number is not None:
-                rows.append(FrcStatewideComparison(
-                    *arguments, release.manifest_sha256, local_plan.artifact.identity, state_plan.artifact.identity,
+                values = (*arguments, local_release.manifest_sha256, local_plan.artifact.identity, state_plan.artifact.identity,
                     frc_review.acquisitions[local.scope], frc_review.acquisitions["state"],
-                    frc_rows.get(identifier) if applies and identifier else None, state_row_number))
+                    frc_rows.get(identifier) if applies and identifier else None, state_row_number)
+                rows.append(NativeFrcStatewideComparison(*values, entity_manifest) if entity_manifest is not None
+                            else FrcStatewideComparison(*values))
+            elif entity_manifest is not None:
+                rows.append(NativeStatewideComparison(*arguments, entity_manifest, local_release.manifest_sha256,
+                    state_release.manifest_sha256, local_plan.artifact.identity, state_plan.artifact.identity))
             else:
                 rows.append(StatewideComparison(*arguments))
     return rows

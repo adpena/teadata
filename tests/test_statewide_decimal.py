@@ -6,6 +6,18 @@ import pytest
 
 from teadata.dataset_metadata import ArtifactRef
 from teadata.statewide import _Projection, _difference
+from teadata.values import ValuePolicy
+
+
+@pytest.mark.parametrize("unit", ["fte", "years", "currency", "ratio", "percent"])
+def test_raw_staff_comparison_preserves_decimal_without_float_roundtrip(unit):
+    projection = _Projection(cast(ArtifactRef, None), (), {}, ValuePolicy("staff", {}), decimal_raw=True)
+    raw = "18.400000000000000001"
+    assert projection.value({"value": raw}, "value", unit) == (raw, "observed", Decimal(raw))
+    assert projection.value({"value": "0"}, "value", unit) == ("0", "observed", Decimal(0))
+    for token in ("-1", "-3", "*", "<5", "NaN", "1,234"):
+        assert projection.value({"value": token}, "value", unit) == (token, "uninterpreted", None)
+    assert projection.value({"value": ""}, "value", unit) == ("", "missing", None)
 
 
 def test_native_projection_keeps_decimal_precision_and_missingness():

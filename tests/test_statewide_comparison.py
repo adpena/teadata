@@ -163,6 +163,33 @@ def comparison_release(tmp_path, monkeypatch, request):
     _reviewed_staar_source.cache_clear()
 
 
+def test_parent_routes_shared_native_comparison_and_retains_source_identities(comparison_release, monkeypatch):
+    child, editions = comparison_release
+    local, state = editions["district"], editions["state"]
+    parent = object.__new__(DataRelease)
+    parent._v3 = False
+    parent._manifest_sha256 = "f" * 64
+    parent.catalog = SimpleNamespace(native_sources=(SimpleNamespace(editions=(local, state)),))
+    resolved = []
+
+    def resolve(key):
+        resolved.append(key)
+        if key not in (local, state):
+            raise ContractError("Exact edition is not attached")
+        return child
+
+    monkeypatch.setattr(parent, "_native_edition_release", resolve)
+    query = Query([District(uuid4(), "Example", district_number="227901")], repo=None)
+    row, = query.compare_statewide(release=parent, local=local, statewide=state, metric=METRIC)
+    assert row.local_value == 35.6 and row.statewide_value == 25.1
+    assert row.entity_manifest_sha256 == "f" * 64
+    assert row.local_manifest_sha256 == row.statewide_manifest_sha256 == child.manifest_sha256
+    assert row.local_artifact_id != row.statewide_artifact_id
+    assert resolved == [local]  # One shared child opens once.
+    with pytest.raises(ContractError, match="not attached"):
+        query.compare_statewide(release=parent, local=replace(local, revision_sha256="0" * 64), statewide=state)
+
+
 def test_statewide_golden(comparison_release):
     from teadata.engine import DataEngine
     from uuid import UUID
