@@ -155,5 +155,8 @@ def test_all_regional_staff_comparisons_share_one_direct_texas_baseline(normal_r
     ))
     assert len(rows) == 100
     assert {row.identifier for row in rows} == {f"{i:02d}" for i in range(1, 21)}
+    assert all(row.local_status == row.statewide_status == "observed" for row in rows)
+    assert {row.local_value for row in rows if row.identifier == "06"
+            and row.metric == "staff_teacher_total_full_time_equiv_count"} == {Decimal("14817.8")}
     assert {row.statewide_value for row in rows if row.metric == "staff_teacher_turnover_ratio"} == {Decimal("18.8")}
     assert all(row.local_manifest_sha256 == row.statewide_manifest_sha256 == REVIEWED_MANIFEST for row in rows)

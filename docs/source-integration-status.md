@@ -1,9 +1,30 @@
 # Source integration status — November 16, 2026 (UTC)
 
 The selected release, rather than the installed software version, controls
-available observations. Software 0.0.160 packages the qualified normal160 pin
+available observations. Software 0.0.161 packages the qualified normal161 pin
 below as its default. Earlier sections remain dated baselines; their
 counts and attachment lists must not be reused as the current inventory.
+
+## Version 0.0.161 qualified normal release
+
+Normal161 adds the retained regional Student and Staff / direct Texas Staff
+attachment described below. Its manifest is
+`e36e65506c978985f77bb015af7826fbcb61fd098af62532cb3a27fa8c8889f8`
+and build `67f5136711ff1182770bd1b5c0b49815957279c7af202ee8c2608a3942109d3d`.
+The actual producer is `b4b3d331eb462a7e3ead7d4340c2a823841f04c2`.
+All 13 base selections and 17 earlier native attachments are unchanged.
+
+The [machine inventory](source-integration-status-0.0.161.json) records **18
+native attachments, 25 dataset IDs and 209 edition/scope keys**. Registration is
+still 126 IDs / 278 editions; **91 source-only IDs remain unattached**. These are
+registration gaps, not a count of missing files or a claim of publisher absence.
+All **18 canonical attached-source qualification gates** passed, along with
+**22 focused qualification/workflow checks**, including four actual normal-parent
+checks. The workflow includes actual district
+Staff comparisons across two attachments and all 20 regional Staff comparisons
+with direct Texas, with exact raw tokens, Decimal values and parent/child
+provenance. Source qualification, software publication and application adoption
+remain separate gates; this section does not establish a production deployment.
 
 ## Regional TAPR qualification, November 16
 
@@ -23,9 +44,9 @@ report edition. Teacher turnover describes the fall 2023 to fall 2024 teacher
 role comparison and can include teachers who stayed in a different role.
 It is not a measure of departures from the district or profession.
 
-Normal-release composition and software publication remain separate gates.
-Until a newer pinned normal manifest is qualified, the current packaged default
-remains normal160 below; standalone qualification does not silently change it.
+The qualified normal161 parent now carries this attachment. The packaged
+default selects its exact pin above; explicit older releases remain immutable.
+Software publication and application adoption remain separate gates.
 
 The normal-parent workflow also exposed and repaired a shared comparison-routing
 gap: supported comparisons now resolve the exact local and Texas attachments

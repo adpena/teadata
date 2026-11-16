@@ -4,7 +4,36 @@ TEA Data keeps one source contract in `teadata/teadata_sources.yaml`. Each versi
 
 A build records the files it actually reads. The runtime catalog is embedded in the snapshot and SQLite sidecars. `release.json` selects the source and analytical artifacts by content hash and one build identity. Runtime consumers use the embedded catalog to interpret the snapshot. The default engine takes one manifest for the entity snapshot and its sidecars. Stand-alone data releases can be selected by their own pinned manifests.
 
-## Normal release 0.0.158: select the data explicitly
+## Current normal release 0.0.161
+
+`DataEngine.load_default()` selects the packaged, immutable normal161 manifest
+unless an explicit release or scoped context overrides it. Installation keeps
+source payloads external; discovery reads catalog metadata and observations
+remain lazy. Strict offline mode never fetches or substitutes another release.
+See the [current coverage and qualification inventory](source-integration-status.md).
+
+This release adds 2024–25 TAPR regional Student / Staff and direct Texas Staff.
+Only the reviewed 38 Student and five Staff bindings have measurement periods
+and units. Mobility and attrition still describe 2023–24. The remaining raw
+columns are preserved without invented interpretation.
+
+Supported statewide comparisons resolve exact source editions through the
+normal parent, even when local and Texas values are in different attachments.
+Five Staff metrics support district and ESC comparisons: teacher FTE, average
+professional experience, regular-duty average salary, students per teacher FTE
+and teacher turnover. The ratio is not class size; turnover can include teachers
+who stayed in a non-teaching role. Staff values retain exact Decimal precision.
+Unknown tokens remain visible as uninterpreted. Parent results include both
+source manifest and artifact identities alongside the entity manifest.
+
+Use exact EditionKeys from `release.catalog_inventory()` or the native-source
+index. An explicit unavailable year or unsupported metric fails instead of
+substituting older values. Texas Staff is a direct publisher aggregate, not a
+sum or average of local reports. The historical examples below remain pinned
+to their stated releases.
+
+## Historical normal release 0.0.158: explicit data selection
+
 
 The selected normal data release preserves all 14 prior native sources and adds
 **45 educator hiring tables**. It has **15 native attachments, 19 dataset IDs and
