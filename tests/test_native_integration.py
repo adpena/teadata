@@ -172,3 +172,141 @@ def test_budget_evidence_captures_independent_pwr_roots(tmp_path, monkeypatch):
     plan = verification._native_review(child, publisher_store)
     assert plan.evidence() == {"processing": sorted([raw, processing]), "publisher": [publisher]}
     qualifier.assert_not_called()
+
+
+def test_facility_submission_parent_routes_one_leaf_and_keeps_multidimensional_records(tmp_path, monkeypatch):
+    """Actual source child through a synthetic parent; not a normal-production build."""
+    import os
+    import shutil
+    import csv
+    from decimal import Decimal
+    import pyarrow as pa
+    from openpyxl import load_workbook
+    from sqlalchemy import Column, Integer, JSON, MetaData, String, Table, Text, create_engine, select
+    from uuid import uuid4
+    from test_catalog_projections import attach_observation_child, selected_catalog
+    from teadata import DataEngine, District
+    from teadata.dataset_metadata import EditionKey
+    from teadata.manifest import ContractError
+    from teadata.query import Query
+    from teadata.release import _schema_publication_destinations
+
+    location = os.environ.get("TEADATA_FACILITY_TEST_ROOT")
+    if not location:
+        pytest.skip("Actual facility artifact regression requires explicit retained custody")
+    source = Path(location)
+    original = DataRelease(source / "release.json", offline=True)
+    index = original.catalog.to_dict()
+    _, names = _schema_publication_destinations(original.catalog)
+    for name in names:
+        shutil.copyfile(source / name, tmp_path / name)
+    shutil.copyfile(original.path, tmp_path / "facility-native.json")
+    child = DataRelease(tmp_path / "facility-native.json", offline=True)
+    parent = attach_observation_child(selected_catalog.__wrapped__(), child)
+    engine = DataEngine()
+    engine.catalog = parent.catalog
+    district = District(uuid4(), "Synthetic bound district", district_number="001902")
+    engine.add_district(district)
+    engine.bind_release(parent)
+    before_meta = dict(district.meta)
+    calls = []
+    actual = DataRelease.artifact
+    facility = next(child.catalog.artifact_ref(aid) for aid in index["artifacts"]
+                    if child.catalog.artifact_ref(aid).edition.dataset == "facility_usage")
+    def one_leaf(selected, role, **kwargs):
+        if selected._v3 and role == facility.identity:
+            pytest.fail("Submission query opened the facility source leaf")
+        calls.append(role)
+        return actual(selected, role, **kwargs)
+    with monkeypatch.context() as guard:
+        guard.setattr(DataRelease, "artifact", one_leaf)
+        namespace = district.dataset("facility_usage_submission")
+        assert district.facility_usage_submission.submission_status == "SUBMITTED"
+        assert "submission_status" in namespace.variables()
+        assert namespace.submission_status == "SUBMITTED"
+        selected = namespace.select("submission_status", school_year=2026)
+        selected.to_csv(tmp_path / "status.csv")
+        selected.to_excel(tmp_path / "status.xlsx")
+        key = next(EditionKey.from_dict(row["key"]) for row in index["editions"].values()
+                   if row["key"]["dataset"] == "facility_usage_submission")
+        full = parent.for_entity(district, edition="2026").dataset(key).select(
+            "district_name", "district_number", "map_esc_region", "submission_status")
+        assert full.num_rows == 1
+        assert full["submission_status"].to_pylist() == ["SUBMITTED"]
+        exact = parent.table(key).select("district_name", "district_number", "map_esc_region", "submission_status")
+        exact = exact.query("district_number == @identifier", params={"identifier": "'001902"})
+        assert exact.to_df()["submission_status"].tolist() == ["SUBMITTED"]
+        exact.to_csv(tmp_path / "full-status.csv")
+        exact.to_excel(tmp_path / "full-status.xlsx")
+        metadata = child.catalog.field_metadata("submission_status", scope="district", edition=key)
+        assert metadata["support"]["raw"] == "raw_submission_status"
+        assert "status" not in metadata["support"]
+        queried = Query([district], engine).observations("facility_usage_submission", "submission_status",
+                                                        school_year=2026, release=parent)
+        assert queried.to_arrow().num_rows == 1
+    assert calls and district.meta == before_meta
+    assert {"facility_usage", "facility_usage_submission"} <= set(district.available_datasets())
+    assert district.facility_usage.years("acreage") == (2026,)
+    with pytest.raises(ContractError, match="Multiple published rows"):
+        _ = district.dataset("facility_usage").maximum_instructional_capacity
+    assert district.dataset("facility_usage").select("acreage", school_year=2026).to_arrow().num_rows > 1
+    with pytest.raises(ContractError, match="unavailable"):
+        district.dataset("facility_usage").select("acreage", school_year=2025)
+
+    # Exact retained XML witness R11813. CSV/XLSX and SQLite must not round it.
+    witness = parent.table(facility.edition).select("acreage").query("publisher_worksheet_row == 11813")
+    observed = witness.to_arrow().to_pylist()
+    assert len(observed) == 1
+    expected = Decimal("0.008500000000000001")
+    assert observed[0]["acreage"] == expected
+    assert witness.to_df()["acreage"].tolist() == [expected]
+    witness.to_csv(tmp_path / "acreage.csv")
+    witness.to_excel(tmp_path / "acreage.xlsx")
+    with (tmp_path / "acreage.csv").open() as stream:
+        csv_row = next(csv.DictReader(stream))
+    assert csv_row["acreage"] == csv_row["raw_acreage"] == str(expected)
+    workbook = load_workbook(tmp_path / "acreage.xlsx", read_only=True)
+    try:
+        rows = workbook["Data"].iter_rows()
+        headers = [cell.value for cell in next(rows)]
+        excel_row = dict(zip(headers, next(rows), strict=True))
+        assert excel_row["acreage"].value == str(expected)
+        assert excel_row["acreage"].data_type == "s"
+        assert excel_row["raw_acreage"].value == str(expected)
+    finally:
+        workbook.close()
+    series = parent.series("facility_usage", "acreage", scope="district", years=[2026],
+                           ids=[observed[0]["district_number"].lstrip("'")])
+    sql_metadata = MetaData()
+    facts = Table("facility", sql_metadata, Column("import_id", String(64), nullable=False))
+    for field in series.schema:
+        facts.append_column(Column(field.name, Integer if pa.types.is_integer(field.type) else Text))
+    receipts = Table("imports", sql_metadata, Column("id", String(64), primary_key=True), Column("receipt", JSON))
+    sql = create_engine("sqlite://")
+    sql_metadata.create_all(sql)
+    with sql.begin() as connection:
+        result = series.to_sql(connection, facts, receipts=receipts)
+    assert not result.missing_entity_years
+    with sql.connect() as connection:
+        row = connection.execute(select(facts.c.acreage, facts.c.raw_acreage)
+                                 .where(facts.c.publisher_worksheet_row == 11813)).one()
+        assert row == (str(expected), str(expected))
+        receipt = connection.execute(select(receipts.c.receipt)).scalar_one()
+        assert receipt["release"]["manifest_sha256"] == parent.manifest_sha256
+    sql.dispose()
+
+    # A source status-only district has missing facility values, never zero.
+    statuses = parent.table(key).select("submission_status").to_arrow().to_pylist()
+    missing_id = next(row["district_number"] for row in statuses if row["submission_status"] == "NOT SUBMITTED")
+    missing = District(uuid4(), "Status-only district", district_number=missing_id)
+    engine.add_district(missing)
+    assert missing.facility_usage_submission.submission_status == "NOT SUBMITTED"
+    nulls = missing.facility_usage.select("classroom_count", "property_id", school_year=2026).to_arrow().to_pylist()
+    assert len(nulls) == 1 and nulls[0]["record_kind"] == "status_only"
+    assert nulls[0]["classroom_count"] is None and nulls[0]["status_classroom_count"] == "missing"
+    assert nulls[0]["property_id"] is None and "status_property_id" not in nulls[0]
+    absent = District(uuid4(), "Outside collection", district_number="999999")
+    engine.add_district(absent)
+    with pytest.raises(ContractError, match="No published rows"):
+        _ = absent.facility_usage_submission.submission_status
+    assert absent.facility_usage.select("acreage", school_year=2026).to_arrow().num_rows == 0

@@ -1,0 +1,396 @@
+{
+  "schema_version": 2,
+  "mapping_version": 1,
+  "datasets": [
+    {
+      "dataset": "facility_usage",
+      "edition": "2026",
+      "source_only": true,
+      "tables": [
+        {
+          "table": "district",
+          "header_identity": "position",
+          "input_sha256": "a71e0919f2451e2343be2600c8bccf2cea72fffa21641d4a241ce18c6528b944",
+          "source_schema_sha256": "a42855a346193b60a0b10de704ba870d24bca4439c2ba04083157de38970df85",
+          "metric_period": {
+            "kind": "school_year",
+            "start_year": 2025,
+            "end_year": 2026
+          },
+          "fields": [
+            {
+              "position": 1,
+              "code": "Name of the district",
+              "label": "Name of the district",
+              "field": "district_name",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 2,
+              "code": "County District Number",
+              "label": "County District Number",
+              "field": "district_number",
+              "disposition": "identity",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 3,
+              "code": "Type of Submission",
+              "label": "Type of Submission",
+              "field": "submission_type",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 4,
+              "code": "Active used facility",
+              "label": "Active used facility",
+              "field": "active_used_facility",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 5,
+              "code": "Property ID",
+              "label": "Property ID",
+              "field": "property_id",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 6,
+              "code": "Street Address",
+              "label": "Street Address",
+              "field": "street_address",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 7,
+              "code": "City, State",
+              "label": "City, State",
+              "field": "city_state",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 8,
+              "code": "Zip Code",
+              "label": "Zip Code",
+              "field": "zip_code",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 9,
+              "code": "TSDS/PEIMS Org Code",
+              "label": "TSDS/PEIMS Org Code",
+              "field": "reported_org_code",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 10,
+              "code": "Type of Building (Recoded)",
+              "label": "Type of Building (Recoded)",
+              "field": "building_type_recoded",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 11,
+              "code": "Number of Classrooms",
+              "label": "Number of Classrooms",
+              "field": "classroom_count",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 12,
+              "code": "Original Year Completed",
+              "label": "Original Year Completed",
+              "field": "original_year_completed",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 13,
+              "code": "Year of Most Recent Renovation Completed",
+              "label": "Year of Most Recent Renovation Completed",
+              "field": "most_recent_renovation_year",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 14,
+              "code": "Does the facility house portables",
+              "label": "Does the facility house portables",
+              "field": "houses_portables",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 15,
+              "code": "How many Portables",
+              "label": "How many Portables",
+              "field": "portable_count",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 16,
+              "code": "Square Footage",
+              "label": "Square Footage",
+              "field": "square_footage",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 17,
+              "code": "Acreage",
+              "label": "Acreage",
+              "field": "acreage",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 18,
+              "code": "Ownership Status",
+              "label": "Ownership Status",
+              "field": "ownership_status",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 19,
+              "code": "Shared Usage",
+              "label": "Shared Usage",
+              "field": "shared_usage",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 20,
+              "code": "Shared Building Type 1 (Recoded)",
+              "label": "Shared Building Type 1 (Recoded)",
+              "field": "shared_building_type_1",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 21,
+              "code": "Shared Building Type 2 (Recoded)",
+              "label": "Shared Building Type 2 (Recoded)",
+              "field": "shared_building_type_2",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 22,
+              "code": "Shared Building Type 3 (Recoded)",
+              "label": "Shared Building Type 3 (Recoded)",
+              "field": "shared_building_type_3",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 23,
+              "code": "Shared Building Type 4 (Recoded)",
+              "label": "Shared Building Type 4 (Recoded)",
+              "field": "shared_building_type_4",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 24,
+              "code": "Facility Usage",
+              "label": "Facility Usage",
+              "field": "facility_usage",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 25,
+              "code": "Grades for this Facility",
+              "label": "Grades for this Facility",
+              "field": "grades_for_facility",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 26,
+              "code": "Maximum Instructional Capacity",
+              "label": "Maximum Instructional Capacity",
+              "field": "maximum_instructional_capacity",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 27,
+              "code": "Adjusted Instructional Capacity",
+              "label": "Adjusted Instructional Capacity",
+              "field": "adjusted_instructional_capacity",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 28,
+              "code": "Total Current Enrollment",
+              "label": "Total Current Enrollment",
+              "field": "reported_current_enrollment",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 29,
+              "code": "Campus Name (Campus ID)",
+              "label": "Campus Name (Campus ID)",
+              "field": "reported_campus_label",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 30,
+              "code": "ESC Region (Map)",
+              "label": "ESC Region (Map)",
+              "field": "map_esc_region",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 31,
+              "code": "Submission Status",
+              "label": "Submission Status",
+              "field": "submission_status",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "dataset": "facility_usage_submission",
+      "edition": "2026",
+      "source_only": true,
+      "tables": [
+        {
+          "table": "district",
+          "header_identity": "position",
+          "input_sha256": "a71e0919f2451e2343be2600c8bccf2cea72fffa21641d4a241ce18c6528b944",
+          "source_schema_sha256": "e49acf5785e6b59f2a7bc9f1a1528557a40b85a9688f041dac651b233a1406d8",
+          "metric_period": {
+            "kind": "school_year",
+            "start_year": 2025,
+            "end_year": 2026
+          },
+          "fields": [
+            {
+              "position": 1,
+              "code": "Name of the district",
+              "label": "Name of the district",
+              "field": "district_name",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 2,
+              "code": "County District Number",
+              "label": "County District Number",
+              "field": "district_number",
+              "disposition": "identity",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 3,
+              "code": "ESC Region (Map)",
+              "label": "ESC Region (Map)",
+              "field": "map_esc_region",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            },
+            {
+              "position": 4,
+              "code": "Submission Status",
+              "label": "Submission Status",
+              "field": "submission_status",
+              "disposition": "fact",
+              "dictionary_status": "not_documented",
+              "publisher_type": null,
+              "publisher_description": null
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

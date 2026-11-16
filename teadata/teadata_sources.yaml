@@ -18229,6 +18229,182 @@ data_sources:
           source:
             column_schema: schemas/rda--2025--sped-indicator1-crosswalk.json
 
+  facility_usage:
+    2026:
+      path: data/facility_usage/2026/FUD_2025-2026_All_Districts.xlsx
+      metadata:
+        title: As-published district facility records, 2025-26
+        publisher: Texas Education Agency
+        version: '2026'
+        period:
+          kind: school_year
+          start_year: 2025
+          end_year: 2026
+        source_url: https://tea4avcastro.tea.state.tx.us/fud/facility-usage-report.html
+        notes: As-published workbook revision; correction coverage, finality and publication
+          date unknown. Enrollment mixes Fall Snapshot and average daily students served.
+          No campus allocation, corrected series, utilization or additive district capacity.
+          Collection-year attributes are not a single census date; construction years
+          are calendar-year attributes. Source-only until exact native qualification
+          and normal attachment.
+        metrics:
+          district_name:
+            field: district_name
+            unit: text
+          submission_type:
+            field: submission_type
+            unit: text
+          active_used_facility:
+            field: active_used_facility
+            unit: text
+          property_id:
+            field: property_id
+            unit: text
+          street_address:
+            field: street_address
+            unit: text
+          city_state:
+            field: city_state
+            unit: text
+          zip_code:
+            field: zip_code
+            unit: text
+          reported_org_code:
+            field: reported_org_code
+            unit: text
+          building_type_recoded:
+            field: building_type_recoded
+            unit: text
+          classroom_count:
+            field: classroom_count
+            unit: count
+          original_year_completed:
+            field: original_year_completed
+            unit: years
+          most_recent_renovation_year:
+            field: most_recent_renovation_year
+            unit: years
+          houses_portables:
+            field: houses_portables
+            unit: text
+          portable_count:
+            field: portable_count
+            unit: count
+          square_footage:
+            field: square_footage
+            unit: square_feet
+          acreage:
+            field: acreage
+            unit: acres
+          ownership_status:
+            field: ownership_status
+            unit: text
+          shared_usage:
+            field: shared_usage
+            unit: text
+          shared_building_type_1:
+            field: shared_building_type_1
+            unit: text
+          shared_building_type_2:
+            field: shared_building_type_2
+            unit: text
+          shared_building_type_3:
+            field: shared_building_type_3
+            unit: text
+          shared_building_type_4:
+            field: shared_building_type_4
+            unit: text
+          facility_usage:
+            field: facility_usage
+            unit: text
+          grades_for_facility:
+            field: grades_for_facility
+            unit: text
+          maximum_instructional_capacity:
+            field: maximum_instructional_capacity
+            unit: count
+          adjusted_instructional_capacity:
+            field: adjusted_instructional_capacity
+            unit: count
+          reported_current_enrollment:
+            field: reported_current_enrollment
+            unit: count
+          reported_campus_label:
+            field: reported_campus_label
+            unit: text
+          map_esc_region:
+            field: map_esc_region
+          submission_status:
+            field: submission_status
+            unit: text
+        references: &facility_usage_references
+        - reference_id: collection_faq_2025_26
+          role: source_notes
+          status: available
+          title: 2025-26 facility use FAQ; mixed enrollment population and capacity
+            definitions
+          url: https://tea.texas.gov/data-reports/financial-compliance/faq-facility-use-4-23-2026.pdf
+          reviewed_sha256: 12abf52300f03c30aba96bdc3576561289ba8d2add01b3be71068f97ab5a4edc
+          provenance_ids:
+          - c077f0203f1deec279cc11aacc191bf90494d7bf659104e20c56b6e4137a57cd
+        - reference_id: legislative_correction_limits
+          role: source_notes
+          status: available
+          title: Legislative report Appendix A and C; updated aggregates are a different
+            series
+          url: https://tea.texas.gov/data-reports/financial-compliance/fud-legislative-report.pdf
+          reviewed_sha256: 7119730bfb3684b84cf309a752296a54ad498556e9b16ef4112e9d7f8b7b54e6
+          provenance_ids:
+          - 9e802b447cfb7c3ad53a031a25c0b8ac1b4f67ef06e3883366d3105fcc1bf361
+        - reference_id: public_projection_crosswalk
+          role: schema
+          status: available
+          title: Reviewed 31-column projection and derived district submission mapping
+          path: schemas/facility-usage--2026--crosswalk.json
+          reviewed_sha256: 89bde77dc74dfe55785f72ae2649a7bb7f6a005544af69d3fd88d29ff15a1caf
+          provenance_ids:
+          - 32f696eb8026d1bca32b6d1dc93659dcab9d42aaa655178e3b88cb6745386f93
+      reader:
+        profiles:
+          source:
+            acquisition_id: 40c0a709aa04f5ef871292982535b08fe9fc7a7dcf51da3e1cd1da6033241e48
+            worksheet: Facilities Data
+            column_schema: schemas/facility-usage--2026--crosswalk.json
+  facility_usage_submission:
+    2026:
+      path: data/facility_usage/2026/FUD_2025-2026_All_Districts.xlsx
+      metadata:
+        title: As-published district facility submission status, 2025-26
+        publisher: Texas Education Agency
+        version: '2026'
+        period:
+          kind: school_year
+          start_year: 2025
+          end_year: 2026
+        source_url: https://tea4avcastro.tea.state.tx.us/fud/facility-usage-report.html
+        notes: As-published workbook revision; correction coverage, finality and publication
+          date unknown. Enrollment mixes Fall Snapshot and average daily students served.
+          No campus allocation, corrected series, utilization or additive district capacity.
+          Collection-year attributes are not a single census date; construction years
+          are calendar-year attributes. Source-only until exact native qualification
+          and normal attachment.
+        metrics:
+          district_name:
+            field: district_name
+            unit: text
+          map_esc_region:
+            field: map_esc_region
+          submission_status:
+            field: submission_status
+            unit: text
+        references: *facility_usage_references
+      reader:
+        profiles:
+          source:
+            acquisition_id: 40c0a709aa04f5ef871292982535b08fe9fc7a7dcf51da3e1cd1da6033241e48
+            worksheet: Facilities Data
+            column_schema: schemas/facility-usage--2026--crosswalk.json
+
   educator_district_new_hires:
     2026:
       path: data/educators/2026/district-new-hires.xlsx

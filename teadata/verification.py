@@ -885,6 +885,17 @@ def _native_record_evidence(release: DataRelease, processing_store: ProvenanceSt
 
 def _native_review(release: DataRelease, store: ProvenanceStore) -> _NativeReview:
     """Select one reviewed plan for standalone, parent and receipt-reuse gates."""
+    from teadata.native_facility_usage import (
+        qualify_facility_usage, reviewed_facility_usage, validate_facility_identity,
+    )
+
+    facility = reviewed_facility_usage(release.manifest_sha256)
+    if facility is not None:
+        validate_facility_identity(release, facility)
+        processing_store = _retained_store(release.path.parent / "provenance")
+        return _NativeReview("facility usage", partial(qualify_facility_usage, release, processing_store, store, facility),
+                             partial(_native_record_evidence, release, processing_store, store, facility["publisher_roots"]))
+
     from teadata.native_educator_hiring import (
         qualify_educator_hiring, reviewed_educator_hiring, validate_educator_hiring_identity,
     )

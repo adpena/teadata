@@ -1,0 +1,328 @@
+{
+  "schema_version": 1,
+  "manifest_sha256": null,
+  "build_id": null,
+  "editions": {},
+  "physical_contract": [
+    {
+      "coordinate": "A",
+      "position": 1,
+      "header": "Name of the district",
+      "name": "district_name",
+      "type": "string",
+      "unit": "text",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "B",
+      "position": 2,
+      "header": "County District Number",
+      "name": "district_number",
+      "type": "string",
+      "unit": "text",
+      "disposition": "identity"
+    },
+    {
+      "coordinate": "D",
+      "position": 3,
+      "header": "Type of Submission",
+      "name": "submission_type",
+      "type": "string",
+      "unit": "text",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "E",
+      "position": 4,
+      "header": "Active used facility",
+      "name": "active_used_facility",
+      "type": "string",
+      "unit": "text",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "F",
+      "position": 5,
+      "header": "Property ID",
+      "name": "property_id",
+      "type": "string",
+      "unit": "text",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "G",
+      "position": 6,
+      "header": "Street Address",
+      "name": "street_address",
+      "type": "string",
+      "unit": "text",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "H",
+      "position": 7,
+      "header": "City, State",
+      "name": "city_state",
+      "type": "string",
+      "unit": "text",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "I",
+      "position": 8,
+      "header": "Zip Code",
+      "name": "zip_code",
+      "type": "string",
+      "unit": "text",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "J",
+      "position": 9,
+      "header": "TSDS/PEIMS Org Code",
+      "name": "reported_org_code",
+      "type": "string",
+      "unit": "text",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "K",
+      "position": 10,
+      "header": "Type of Building (Recoded)",
+      "name": "building_type_recoded",
+      "type": "string",
+      "unit": "text",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "L",
+      "position": 11,
+      "header": "Number of Classrooms",
+      "name": "classroom_count",
+      "type": "int32",
+      "unit": "count",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "M",
+      "position": 12,
+      "header": "Original Year Completed",
+      "name": "original_year_completed",
+      "type": "int16",
+      "unit": "years",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "N",
+      "position": 13,
+      "header": "Year of Most Recent Renovation Completed",
+      "name": "most_recent_renovation_year",
+      "type": "int16",
+      "unit": "years",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "O",
+      "position": 14,
+      "header": "Does the facility house portables",
+      "name": "houses_portables",
+      "type": "string",
+      "unit": "text",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "P",
+      "position": 15,
+      "header": "How many Portables",
+      "name": "portable_count",
+      "type": "int32",
+      "unit": "count",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "Q",
+      "position": 16,
+      "header": "Square Footage",
+      "name": "square_footage",
+      "type": "decimal128(19,12)",
+      "unit": "square_feet",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "R",
+      "position": 17,
+      "header": "Acreage",
+      "name": "acreage",
+      "type": "decimal128(24,18)",
+      "unit": "acres",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "S",
+      "position": 18,
+      "header": "Ownership Status",
+      "name": "ownership_status",
+      "type": "string",
+      "unit": "text",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "T",
+      "position": 19,
+      "header": "Shared Usage",
+      "name": "shared_usage",
+      "type": "string",
+      "unit": "text",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "U",
+      "position": 20,
+      "header": "Shared Building Type 1 (Recoded)",
+      "name": "shared_building_type_1",
+      "type": "string",
+      "unit": "text",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "V",
+      "position": 21,
+      "header": "Shared Building Type 2 (Recoded)",
+      "name": "shared_building_type_2",
+      "type": "string",
+      "unit": "text",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "W",
+      "position": 22,
+      "header": "Shared Building Type 3 (Recoded)",
+      "name": "shared_building_type_3",
+      "type": "string",
+      "unit": "text",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "X",
+      "position": 23,
+      "header": "Shared Building Type 4 (Recoded)",
+      "name": "shared_building_type_4",
+      "type": "string",
+      "unit": "text",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "Y",
+      "position": 24,
+      "header": "Facility Usage",
+      "name": "facility_usage",
+      "type": "string",
+      "unit": "text",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "Z",
+      "position": 25,
+      "header": "Grades for this Facility",
+      "name": "grades_for_facility",
+      "type": "string",
+      "unit": "text",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "AA",
+      "position": 26,
+      "header": "Maximum Instructional Capacity",
+      "name": "maximum_instructional_capacity",
+      "type": "decimal128(18,13)",
+      "unit": "count",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "AB",
+      "position": 27,
+      "header": "Adjusted Instructional Capacity",
+      "name": "adjusted_instructional_capacity",
+      "type": "decimal128(18,13)",
+      "unit": "count",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "AC",
+      "position": 28,
+      "header": "Total Current Enrollment",
+      "name": "reported_current_enrollment",
+      "type": "decimal128(9,1)",
+      "unit": "count",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "AD",
+      "position": 29,
+      "header": "Campus Name (Campus ID)",
+      "name": "reported_campus_label",
+      "type": "string",
+      "unit": "text",
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "AE",
+      "position": 30,
+      "header": "ESC Region (Map)",
+      "name": "map_esc_region",
+      "type": "int8",
+      "unit": null,
+      "disposition": "fact"
+    },
+    {
+      "coordinate": "AF",
+      "position": 31,
+      "header": "Submission Status",
+      "name": "submission_status",
+      "type": "string",
+      "unit": "text",
+      "disposition": "fact"
+    }
+  ],
+  "goldens": {
+    "L6": "0",
+    "AB4469": "-346",
+    "U453": "CHARLES HEAD",
+    "Q5465": "9324.700000000001",
+    "R11813": "0.008500000000000001",
+    "AA4033": "740.3000000000001",
+    "AB226": "780.3000000000001",
+    "AC6822": "3.5",
+    "AC16356": "13721607",
+    "AA11029": "18700",
+    "AB11029": null,
+    "G12683": "10058"
+  },
+  "publisher_roots": [
+    "40c0a709aa04f5ef871292982535b08fe9fc7a7dcf51da3e1cd1da6033241e48",
+    "c077f0203f1deec279cc11aacc191bf90494d7bf659104e20c56b6e4137a57cd",
+    "9e802b447cfb7c3ad53a031a25c0b8ac1b4f67ef06e3883366d3105fcc1bf361"
+  ],
+  "source_sha256": "a71e0919f2451e2343be2600c8bccf2cea72fffa21641d4a241ce18c6528b944",
+  "expected": {
+    "facility_rows": 17834,
+    "submission_rows": 1017,
+    "statuses": {
+      "SUBMITTED": 946,
+      "INCOMPLETE": 36,
+      "NOT SUBMITTED": 35
+    },
+    "category_cells": {
+      "U": 116,
+      "V": 27,
+      "W": 18,
+      "X": 8
+    },
+    "category_rows": 152
+  },
+  "limits": [
+    "As-published bulk revision; correction coverage unknown, not the updated legislative series.",
+    "Facility enrollment mixes Fall Snapshot and average daily students served.",
+    "No campus linkage, capacity aggregates, utilization or real-world accuracy qualification."
+  ]
+}

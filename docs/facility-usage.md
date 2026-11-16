@@ -1,8 +1,11 @@
 # Facility usage: 2025–26 source review
 
-Reviewed November 12–13, 2026 UTC. **Acquired and inspected; not yet registered,
-qualified, attached to a normal release, or queryable in v0.0.151.**
-This page documents the published source and the remaining integration gates.
+Source reviewed November 12–13, 2026 UTC; implementation checked November 16.
+The two district source contracts are registered, and a private development
+child passed independent source qualification. **Normal release attachment and
+publication remain separate gates.** Registration does not add facility values
+to an older selected release. This page documents the as-published source,
+implemented access contract and remaining limitations.
 
 ## Population and observation grain
 
@@ -73,13 +76,14 @@ All 32 source columns must remain attributable to their original header and
 worksheet row. Columns A–AC are the 29 published submission fields, including
 TEA's recoded categories. AD–AF are added by TEA. The Validation worksheet
 provides allowed labels; it is not proof that every submitted value conforms.
-The following handling is the intended source contract, not a newly available API.
+The following handling is the implemented source contract. Public availability
+depends on the selected normal release containing its qualified native child.
 
 | Column | Publisher header | Meaning and handling |
 | --- | --- | --- |
 | A | Name of the district | District name from TEA's AskTED directory; retain alongside the ID, not as a join key. |
 | B | County District Number | Six-digit district ID; normalize with the project's shared identifier rules and retain its raw token. |
-| C | Contact Email Address | Published submission contact; retain in source evidence, not as an entity identity or an unused browser field. |
+| C | Contact Email Address | Excluded from all public tables, metadata and exports. Original publisher bytes remain private qualification evidence. |
 | D | Type of Submission | Literal submission-method label, not publication or review approval. |
 | E | Active used facility | Literal YES/NO/blank response; blank is not NO. |
 | F | Property ID | Identifier text, possibly blank or repeated; never a campus ID or unique facility key. |
@@ -190,18 +194,73 @@ worksheet row and header, status coverage, lookup consistency, numeric lexical
 types and selected source cells. This is **not** whole-dataset semantic
 qualification or independent confirmation of real-world facilities or students.
 
-The next implementation should use the existing Config, catalog, native leaf,
-lazy entity/DSL and provenance/export path. The smallest coherent contract is
-unreduced district facility records plus one proven-consistent district submission
-status, sharing the same raw workbook identity. Normal release attachment needs
-the same reviewed qualification gate as a standalone candidate. It must cover
-all 17,834 worksheet data rows, preserve duplicates and precise source locators,
-and check raw/status/decimal exports against the workbook independently of the
-producer. Registration alone cannot make the source available.
+The implementation uses the existing source-only Config, schema4 native catalog,
+lazy district namespaces, DSL, series and provenance/export paths. It creates
+`facility_usage` with all 17,834 worksheet rows and `facility_usage_submission`
+with 1,017 district rows. Both use publisher edition `2026`, district scope and
+the 2025–26 collection school year. Submission rows retain the unique publisher
+name, district number, map region and AF status only after proving agreement
+across every source row in that district. Group row counts, bounds and a hash
+of the original row numbers provide lineage; the immutable processing chain
+binds the submission table to the facility artifact. Submission field selection
+opens only the submission leaf.
+
+Strings retain their exact raw tokens and normalize only empty/missing cells to
+null, apart from the shared district identifier normalization. They use the
+existing raw-only support contract. Numeric fields retain raw tokens and
+`observed`/`missing` status columns. Source cell-type context distinguishes
+absent XML cells, empty cells and observed values. Numeric zeros remain observed.
+Area and capacity values use fixed Arrow decimal types selected from the complete
+XML lexeme scan: Q `(19,12)`, R `(24,18)`, AA/AB `(18,13)` and AC `(9,1)`.
+The original worksheet coordinate and row number remain attributable through
+the recipe and row context. Validation conformance flags retain 169 out-of-list
+cells in 152 rows, without changing their values or treating them as missing.
+
+For a release-bound district whose selected release contains this child:
+
+```python
+district.available_datasets()
+district.facility_usage_submission.submission_status
+district.dataset("facility_usage").variables()
+records = district.facility_usage.select("acreage", "maximum_instructional_capacity", school_year=2026)
+records.to_df()
+records.to_csv("facility-records.csv")
+records.to_excel("facility-records.xlsx")
+```
+
+The ordinary `.dataset(...)` spelling also avoids entity metadata name
+collisions. Entity `.meta` remains unchanged; facility arrays are not copied
+into it. A scalar access fails helpfully when a district has multiple facility
+rows. Use `.select(...).query(...)` with original row locators to select records.
+The exact-edition `release.table(key)` path can also select identity fields.
+The existing `Query.observations` and `release.series` paths preserve source
+grain and raw support. Excel stores exact decimals as text. For SQLite series
+exports, use Text/String destination columns for decimals; SQLite Numeric is
+not an exact decimal transport. A status-only district has null facility facts;
+a district outside the collection has no published rows. Neither means zero.
+
+The offline producer is `uv run python -m teadata.scripts.refresh_facility_usage
+--store <retained-store> --output <new-child-directory>` (one shell command).
+It requires the retained four inputs and their original acquisition/extraction
+records, plus the pinned public schema reference. It does not download data.
+Independent qualification reads the original XML without using the producer's
+parser or normalizer, compares every public cell and numeric status, checks
+grouping lineage, and checks 12 frozen publisher examples. Its scope is exact
+as-published district records, not corrected statistics or confirmation of
+real-world facilities.
+
+Qualification and qualification-receipt reuse require both the publisher
+evidence and child-adjacent processing store; missing or altered evidence fails
+closed. Public reading and export require only the descriptor-reachable
+manifest, edition metadata, column schemas and Parquet files. Raw XLSX/HTML/PDF
+objects and the whole private `provenance` directory are excluded from the
+public asset allowlist. Normal release composition must use this same reviewed
+qualification gate and the actual final producer identities; a development
+child is never relabeled as a later release.
 
 Campus relationship admission, derived utilization, statewide aggregates,
 corrected-series claims and scalar enrollment/capacity aliases remain on hold.
 The as-published observations can be preserved without endorsing their
 accuracy; any intentional numeric correction needs identified evidence and
-separate authorization. No application profile or published release was changed
-by this source review.
+separate authorization. No application profile activation follows from library
+registration or source qualification.
