@@ -1837,7 +1837,13 @@ def test_exact_native_exports_route_through_entity_release(tmp_path, selected_ca
             getattr(sources, key.dataset)
         assert sources.dataset(key).release.manifest_sha256 == child.manifest_sha256
         view = parent.table(key).select("amount")
-        assert view.provenance().to_dict() == child.table(key).select("amount").provenance().to_dict()
+        origin = view.provenance().to_dict()
+        standalone = child.table(key).select("amount").provenance().to_dict()
+        parent_identity = {"build_id": parent.build_id, "manifest_sha256": parent.manifest_sha256}
+        assert origin["selector"] == {**standalone["selector"], "entity_release": parent_identity}
+        assert standalone["selector"]["entity_release"] is None
+        assert {name: value for name, value in origin.items() if name not in {"selector", "description_sha256"}} == {
+            name: value for name, value in standalone.items() if name not in {"selector", "description_sha256"}}
         direct = parent.provenance(key).to_dict()
         assert direct == child.provenance(key).to_dict()
         assert direct["release"]["manifest_sha256"] == child.manifest_sha256
@@ -1980,7 +1986,8 @@ def test_school_year_query_keeps_the_saved_parent_and_native_grain(tmp_path, sel
     assert df[["campus_number", "source_record", "amount", "VALUE", "amount_status"]].iloc[0].tolist() == ["004", 5, 5, "5", "observed"]
     assert df.attrs["teadata"]["entity_manifest_sha256"] == old.manifest_sha256
     assert df.attrs["teadata"]["measurement_period"] == DataPeriod("school_year", 2023, 2024).to_dict()
-    assert calls == [old_leaf, old_leaf]
+    # Both materializations preflight the schema, then own the consumption read.
+    assert calls == [old_leaf] * 4
     with pytest.raises(ContractError, match="period"):
         planned.select("campus_name").to_arrow()
     assert empty.observations("campus_student", "amount", school_year=2024, scope="campus", release=old).to_arrow().num_rows == 0
