@@ -18361,9 +18361,9 @@ data_sources:
           status: available
           title: Reviewed 31-column projection and derived district submission mapping
           path: schemas/facility-usage--2026--crosswalk.json
-          reviewed_sha256: 89bde77dc74dfe55785f72ae2649a7bb7f6a005544af69d3fd88d29ff15a1caf
+          reviewed_sha256: 5367455b8ff96a6d4899edb79053fd87ca3d4409203761cee566fbd85f7c06af
           provenance_ids:
-          - 32f696eb8026d1bca32b6d1dc93659dcab9d42aaa655178e3b88cb6745386f93
+          - d564e32d2ce8184321bebd29c7fef9492a9b743ad39faad6d2c5ab6538cb39bf
       reader:
         profiles:
           source:
