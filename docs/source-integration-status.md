@@ -8,13 +8,13 @@ counts and attachment lists must not be reused as the current inventory.
 ## Version 0.0.159 retained normal composition — publication pending
 
 The retained normal manifest has SHA-256
-`b7cc37987ddae2b8f30f857a612a1836318a4477b0681b9db2e70ddb21076ec2`
-and build `9c27394493a7731235cc10b4ab7af77450228ced328491b7cb4755238f8f1eea`.
+`803a0ae418b724167b320f8488284fb9f25a001bb04e6066e6f4299d496dc0d5`
+and build `a0d2fb494299d4ef0ccae84acadb5b6cbe1e018c0f6b26c61bfbd717ed3cb4ed`.
 Ordinary `load_data` produced it with software **0.0.159**, source
-`d6b0f4cae8f0e479d240d0653b5e76ab15f63fd5`. All 13 base input descriptors
+`1c23e27b4429605c57dfdae8d394a24ed3e7ddfd`. All 13 base input descriptors
 and all 15 normal158 native child descriptors are unchanged. The only addition
 is the qualified facility child
-`2b628a4ccf01c35be5a614d23d41e69f012b58d1ae04e7f048dcae27df3580b2`.
+`ba34346da8d71b7f87bee82d0b3798c20b5e566516d191e2145f4754a1b9d359`.
 
 The [machine inventory](source-integration-status-0.0.159.json) records **16 native
 attachments, 21 dataset IDs and 204 edition/scope keys**. Configuration now
@@ -52,10 +52,13 @@ average daily students, and no campus relationships, capacity aggregation or
 utilization series are admitted. Status-only or absent districts do not imply
 zero facilities. See the [source contract and access examples](facility-usage.md).
 
-The composed parent's canonical data validation passed all **16 attached native
-source gates**, as well as its retained publisher examples and private school
-population checks. These results and the actual-parent workflow are separate
-from the metadata inventory. Publication, explicit release selection,
+The independently qualified facility child joins fifteen unchanged, previously
+qualified native children. Canonical validation of the exact composed parent,
+including all **16 attached native source gates**, retained publisher examples
+and private school population checks, remains a separate publication gate.
+The release's [qualification details](https://github.com/adpena/teadata/releases/download/v0.0.159/qualification.json)
+record that outcome when published. Qualification and the actual-parent workflow
+are separate from the metadata inventory. Publication, explicit release selection,
 app cache adoption and deployment remain separate actions. The tracked default
 fixture and app data selection have not changed.
 

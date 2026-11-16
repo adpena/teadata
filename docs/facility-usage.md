@@ -2,9 +2,11 @@
 
 Source reviewed November 12–13, 2026 UTC; implementation checked November 16.
 The two district source contracts are registered, independently qualified and
-attached to the retained normal159 composition. Its 16 native source gates and
-actual district namespace, DSL and export workflow passed. **Publication and
-downstream adoption remain separate gates.** The [exact inventory](source-integration-status-0.0.159.json)
+attached to the retained normal159 composition, alongside fifteen unchanged,
+previously qualified native children. The exact composed-parent qualification
+is a separate gate recorded in the release's
+[qualification details](https://github.com/adpena/teadata/releases/download/v0.0.159/qualification.json)
+when published. **Publication and downstream adoption remain separate gates.** The [exact inventory](source-integration-status-0.0.159.json)
 pins this unpublished composition; an older selected release does not gain
 these observations automatically. This page documents the as-published source,
 implemented access contract and remaining limitations.

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "observed_at": "2026-11-16T04:40:43.220416+00:00",
+  "observed_at": "2026-11-16T05:19:36.271800+00:00",
   "generator": {
     "software_version": "0.0.159",
     "working_source_sha256": {
@@ -10,7 +10,7 @@
       "teadata/teadata_config.py": "df0ddde32572e3f43d245f07fbb7640eabedf9a8bfccfc068fdc3c8e3c498b24"
     }
   },
-  "config_sha256": "0cd1fc018f73f2f4c8f20cc83335257e127c11e9b57312a4cf58442620afc6c7",
+  "config_sha256": "75acd36675a434f8c370069694cfecc1082a739c6ae7da2ea54cdbc0717ed300",
   "scope": "Configuration registration and selected catalog metadata only. No observation, source acquisition or qualification replay.",
   "summary": {
     "registered_ids": 126,
@@ -2183,8 +2183,8 @@
     "schema_version": 1,
     "release": {
       "source": "[retained local manifest]",
-      "manifest_sha256": "b7cc37987ddae2b8f30f857a612a1836318a4477b0681b9db2e70ddb21076ec2",
-      "build_id": "9c27394493a7731235cc10b4ab7af77450228ced328491b7cb4755238f8f1eea"
+      "manifest_sha256": "803a0ae418b724167b320f8488284fb9f25a001bb04e6066e6f4299d496dc0d5",
+      "build_id": "a0d2fb494299d4ef0ccae84acadb5b6cbe1e018c0f6b26c61bfbd717ed3cb4ed"
     },
     "include_variables": true,
     "metadata_inspected": true,
@@ -4960,29 +4960,6 @@
         ]
       },
       {
-        "location": "native-2b628a4ccf01c35be5a614d23d41e69f012b58d1ae04e7f048dcae27df3580b2.json",
-        "manifest_sha256": "2b628a4ccf01c35be5a614d23d41e69f012b58d1ae04e7f048dcae27df3580b2",
-        "build_id": "9e053f4108927f9cb42a839f5311edc90adbb38de7e604f37dfb24c30f863f1d",
-        "editions": [
-          {
-            "dataset": "facility_usage_submission",
-            "edition": "2026",
-            "revision_sha256": "e775e27ab9746c70dd66160ae702d76c4c7af456751dbee16e3311ad674e5d48",
-            "scope": "district",
-            "table": "district",
-            "grain": "one publisher submission status per district"
-          },
-          {
-            "dataset": "facility_usage",
-            "edition": "2026",
-            "revision_sha256": "e775e27ab9746c70dd66160ae702d76c4c7af456751dbee16e3311ad674e5d48",
-            "scope": "district",
-            "table": "district",
-            "grain": "one original worksheet row per district"
-          }
-        ]
-      },
-      {
         "location": "native-6c1e3512c3a5186578f5db03a53d565a64bdcd3ef7c28e959162a943b9c81b83.json",
         "manifest_sha256": "6c1e3512c3a5186578f5db03a53d565a64bdcd3ef7c28e959162a943b9c81b83",
         "build_id": "f3981aae307d46f4241d7ac0c4dd703a625123ca492a03e5202cf23be3d0d878",
@@ -5566,6 +5543,29 @@
             "scope": "region",
             "table": "region_attendance_2025",
             "grain": "one publisher row per region_number"
+          }
+        ]
+      },
+      {
+        "location": "native-ba34346da8d71b7f87bee82d0b3798c20b5e566516d191e2145f4754a1b9d359.json",
+        "manifest_sha256": "ba34346da8d71b7f87bee82d0b3798c20b5e566516d191e2145f4754a1b9d359",
+        "build_id": "53eea22e7c2828fa8affe5fe4294dc96e60d814774d4e8fbb677e835d6a44c69",
+        "editions": [
+          {
+            "dataset": "facility_usage_submission",
+            "edition": "2026",
+            "revision_sha256": "e775e27ab9746c70dd66160ae702d76c4c7af456751dbee16e3311ad674e5d48",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher submission status per district"
+          },
+          {
+            "dataset": "facility_usage",
+            "edition": "2026",
+            "revision_sha256": "e775e27ab9746c70dd66160ae702d76c4c7af456751dbee16e3311ad674e5d48",
+            "scope": "district",
+            "table": "district",
+            "grain": "one original worksheet row per district"
           }
         ]
       },
@@ -21237,7 +21237,7 @@
     "Value queries and downstream deployment"
   ],
   "generation_context": {
-    "retained_generator_output_sha256": "2311e095caf136adb907ce74d662022f4a6cd0197258a760fabba3e09c0edfbb",
+    "retained_generator_output_sha256": "31a21c46a6560b847ce3439d94c5f80e06caa523b552339c3f58f18fabd620c0",
     "release_source_projection": "Only selected_catalog.release.source is redacted as [retained local manifest]; generator version/time/hashes, manifest hash, build and all semantic catalog data are unchanged. This is not an HTTP acquisition."
   }
 }
