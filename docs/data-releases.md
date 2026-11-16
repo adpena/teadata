@@ -4,6 +4,76 @@ TEA Data keeps one source contract in `teadata/teadata_sources.yaml`. Each versi
 
 A build records the files it actually reads. The runtime catalog is embedded in the snapshot and SQLite sidecars. `release.json` selects the source and analytical artifacts by content hash and one build identity. Runtime consumers use the embedded catalog to interpret the snapshot. The default engine takes one manifest for the entity snapshot and its sidecars. Stand-alone data releases can be selected by their own pinned manifests.
 
+## Normal release 0.0.158: select the data explicitly
+
+The selected normal data release preserves all 14 prior native sources and adds
+**45 educator hiring tables**. It has **15 native attachments, 19 dataset IDs and
+202 edition/scope keys**, alongside the same 13 base inputs, 1,229 district
+entities and 12,593 campus entities. The new district hiring and reported EPP
+assignment products cover **2009–10 through 2025–26**; the direct Texas product
+covers **2015–16 through 2025–26**. There is no campus hiring product. This is the
+retrospective version 5 district series, not a reconstruction of every original
+historical report. See the [coverage inventory](source-integration-status.md)
+and [workforce definitions and limits](educator-workforce-sources.md).
+
+Installing software does not select data. Wheels contain no data, and the
+unconfigured source checkout retains its unchanged fixture without native
+attachments. Select one immutable root for the engine, entity namespaces, DSL
+and exports:
+
+```sh
+export TEADATA_RELEASE_URL=https://github.com/adpena/teadata/releases/download/v0.0.158/release.json
+export TEADATA_RELEASE_SHA256=be9803cf7c27cff1020b5ec958bf1158d960a9ad574750d7242959ee051092f7
+export TEADATA_RELEASE_OFFLINE=0
+```
+
+Unset `TEADATA_RELEASE` when using this URL; a local manifest takes precedence.
+Populate only the verified artifacts your workflow needs. Reuse the same URL,
+pin and cache with `TEADATA_RELEASE_OFFLINE=1` for offline work; absent or corrupt
+bytes fail without downloading or substituting another year. An explicit
+`DataRelease(..., expected_sha256=..., offline=...)` and `using_release()` can
+select the same bundle within a scoped analysis.
+
+```python
+from teadata import DataEngine
+
+engine = DataEngine.load_default(indexes_enabled=False)
+district = (engine >> ("district", 1902)).first()
+assert district is not None, "District 001902 is absent from the selected snapshot."
+hiring = district.educator_district_new_hires
+hiring.variables()  # Metadata discovery; no observation leaf is opened.
+hiring.years("new_hires_count")
+selected = hiring.at("2025-26").select("new_hires_count").query(
+    "certification_at_hire_category == @category",
+    params={"category": "Standard Certified, Direct Entry"},
+    record=True,
+)
+frame = selected.to_df()
+trend = hiring.series("new_hires_count", years=[13, 26])
+```
+
+Category and reported EPP rows remain distinct. Scalar access refuses multiple
+published rows; select their dimensions explicitly. Counts and ratios retain
+full precision, raw/status support and source receipts. A reported EPP label is
+not an institution ID or a preparation-route assignment. Historical source IDs
+absent from today's entity roster remain accessible through
+`release.series(..., scope="district", ids=[...], years=[...])`; current names,
+geometry and entity attributes do not become historical facts. Cross-year
+comparability remains explicitly unassessed until supported by source evidence.
+
+This data's unchanged manifest is
+`be9803cf7c27cff1020b5ec958bf1158d960a9ad574750d7242959ee051092f7`,
+with build `6d80cc6c538fa65983490218865aee881d8b4297e0924b44744a0ba76f571649`.
+Its actual producer is software **0.0.157**, source
+`f0b25ec83d90963a14ea6a0589193e8e7579d78e`; software **0.0.158** is a
+subsequent consumer. Distribution under the 158 URL preserves that producer
+identity. Retained producer qualification and consumer code/wheel checks have
+separate scopes; they do not establish fresh independent verification against
+all live TEA reports. Source years, report editions, populations and download
+dates remain specific to each field. Retention and certification holds remain
+outside this composition. Publication does not change the app's selected data
+or rebuild its profiles automatically.
+
 ## Normal release 0.0.157: select the data explicitly
 
 Software 0.0.157 includes lazy entity dataset namespaces and their `series()`

@@ -1,13 +1,13 @@
 # Entity enrichment sources and years
 
-The [v0.0.157 normal release](https://github.com/adpena/teadata/releases/tag/v0.0.157)
-composes fourteen native bundles, 16 dataset IDs and 157 edition/scope/partition keys,
+The [v0.0.158 normal release](https://github.com/adpena/teadata/releases/tag/v0.0.158)
+composes fifteen native bundles, 19 dataset IDs and 202 edition/scope/partition keys,
 alongside 13 unchanged base inputs. It includes PEIMS ethnicity for
 2018–19 through 2025–26 and programs for 2022–23 through 2025–26,
 statewide by district and campus plus direct Texas, and
 district transfer reports for 2023–24 through 2025–26. The primary-disability
 2012–13–2025–26 and staff FTE/salary 2022–23–2025–26 families remain available.
-The [integration inventory](source-integration-status-0.0.157.json) pins this exact
+The [integration inventory](source-integration-status-0.0.158.json) pins this exact
 selection. Library publication does not change deployed profiles or an
 unconfigured wheel's default data; select the release explicitly.
 
@@ -17,7 +17,16 @@ PEIMS course-credit counts retain service/course and student-group dimensions.
 A student can contribute to several course counts, so reported Total rows are
 not unique-student participation or annual-graduate readiness. Use the
 [College Credit definitions and comparison limits](peims-sources.md#peims-college-credit)
-and [explicit pinned release selection](data-releases.md#normal-release-00157-select-the-data-explicitly).
+and [explicit pinned release selection](data-releases.md#normal-release-00158-select-the-data-explicitly).
+
+The three educator hiring products add district and reported EPP assignment
+rows for **2009–10 through 2025–26**, plus direct Texas counts and ratios for
+**2015–16 through 2025–26**. This is the retrospective version 5 district series;
+it does not establish each original historical name or definition. Category and
+EPP rows stay explicit, with no campus product or inferred institution linkage.
+Use the [workforce definitions](educator-workforce-sources.md) and the same lazy
+entity dataset namespaces and multi-year observation API. The separate retention
+and certification holds remain outside the normal release.
 
 PEIMS ethnicity preserves one row per reported group. Use the matching programs
 report's direct total rather than reconstructing it from masked categories.
@@ -30,7 +39,7 @@ Inspect each source's roster and limitations before pooling.
 
 ## Attendance and evaluation additions in the selected release
 
-The following attendance additions entered v0.0.154 and remain in v0.0.157.
+The following attendance additions entered v0.0.154 and remain in v0.0.158.
 The SPP evaluation family entered v0.0.155 and also remains attached.
 Standalone qualification, normal-parent composition, publication and application
 activation are distinct.
@@ -64,8 +73,8 @@ for CSV, DataFrame and Excel provenance and original-header behavior.
 
 For the current registration-to-release gap, see the dated
 [source integration inventory](source-integration-status.md) and its
-[machine-readable edition/scope comparison](source-integration-status-0.0.157.json).
-Configuration still registers 124 IDs and 276 editions; 98 source-only IDs
+[machine-readable edition/scope comparison](source-integration-status-0.0.158.json).
+Configuration still registers 124 IDs and 276 editions; 95 source-only IDs
 remain unattached. This is not proof of their publisher availability, acquisition
 or semantic qualification. The selected catalog's explicit per-field periods
 control actual observation years. Metadata-only catalog inspection/diff tools
@@ -73,7 +82,7 @@ introduced in software v0.0.156 remain available; inspection does not acquire,
 qualify or attach a source.
 The v0.0.128 table below remains a historical release description.
 
-This table describes the [v0.0.128 entity release](https://github.com/adpena/teadata/releases/tag/v0.0.128) used in the Quick Start, build ID `17061ef34da36b4c968e0d162cfeb2ba0dfddd64fe4fd8067a785b3dd2bca685`. It includes all 13 recorded inputs, including roster, boundary, and reference inputs used alongside enrichment. The catalog for each selected release records the requested and resolved edition, source period, and provenance.
+This historical table describes the [v0.0.128 entity release](https://github.com/adpena/teadata/releases/tag/v0.0.128), build ID `17061ef34da36b4c968e0d162cfeb2ba0dfddd64fe4fd8067a785b3dd2bca685`. It includes all 13 recorded inputs, including roster, boundary, and reference inputs used alongside enrichment. The catalog for each selected release records the requested and resolved edition, source period, and provenance.
 
 | Source ID | Use in the entity build | Period in v0.0.128 | Editions in the tracked source configuration |
 | --- | --- | --- | --- |
@@ -415,8 +424,8 @@ not establish that an older document describes every current field.
 
 A native source release holds a verified table with its original row keys,
 source revision and field definitions. You can query and export it directly
-through `DataRelease`. The selected v0.0.157 normal release attaches the families
-listed in its [integration inventory](source-integration-status.md#current-157-native-coverage)
+through `DataRelease`. The selected v0.0.158 normal release attaches the families
+listed in its [integration inventory](source-integration-status.md#version-00158-selected-normal-release)
 to the shared lazy entity namespaces; other standalone source tables remain
 separate. Standalone publication or installing the wheel does not select a
 normal release. See [published TAPR and TPRS supplements](data-releases.md#tapr-and-tprs-supplements)
@@ -552,5 +561,5 @@ through `--native-release` with its manifest SHA-256 and adjacent
 to an entity release. Verification replays the archived configuration,
 crosswalk, workbooks, roster pages, and newsroom controls against the
 physical and public Arrow tables. The child published in v0.0.146 is attached
-to the selected v0.0.157 normal release; the held non-university charter
+to the selected v0.0.158 normal release; the held non-university charter
 population remains excluded.

@@ -1,9 +1,70 @@
-# Source integration status — November 15, 2026
+# Source integration status — November 16, 2026 (UTC)
 
 The selected release, rather than the installed software version, controls
-available observations. The version 0.0.157 inventory below describes its exact
+available observations. The version 0.0.158 inventory below describes its exact
 pinned normal data composition. Earlier sections remain dated baselines; their
 counts and attachment lists must not be reused as the current inventory.
+
+## Version 0.0.158 selected normal release
+
+The [normal manifest](https://github.com/adpena/teadata/releases/download/v0.0.158/release.json)
+has SHA-256 `be9803cf7c27cff1020b5ec958bf1158d960a9ad574750d7242959ee051092f7`
+and build `6d80cc6c538fa65983490218865aee881d8b4297e0924b44744a0ba76f571649`.
+All 13 base input descriptors and all 14 prior native child descriptors are
+preserved exactly. The qualified 45-table hiring child adds three dataset IDs.
+The resulting inventory has **15 native attachments, 19 native dataset IDs and
+202 edition/scope keys**, with the same **1,229 district and 12,593 campus
+entities**. Historical source rows are retained even when their IDs are absent
+from the current entity roster.
+
+The [machine inventory](source-integration-status-0.0.158.json) comes from
+`scripts/source_inventory.py` against this exact retained manifest and verified
+metadata; generation opens no observation leaves and performs no TEA acquisition
+or qualification replay. Configuration registers **124 IDs and 276 editions**;
+**95 source-only IDs remain unattached**, down from 98 in the 157 inventory.
+Registration does not establish publisher availability, acquisition, parsing,
+semantic qualification or query access. The inventory preserves actual field
+periods and edition/revision/scope keys. Only the local manifest path is redacted
+as `[retained local manifest]`; its generation context retains the original
+report hash. The generation time and software 0.0.157 identity remain factual.
+This redaction is not an HTTP acquisition or a new 0.0.158 data-production claim.
+
+### Hiring added to the normal pipeline
+
+| Native dataset | Measurement school years | Publisher edition | Scope |
+| --- | --- | --- | --- |
+| `educator_district_new_hires` | 2009–10 through 2025–26 | Version 5 | District |
+| `educator_district_new_hires_by_epp` | 2009–10 through 2025–26 | Version 5 | District, with reported EPP dimensions |
+| `educator_state_new_hires` | 2015–16 through 2025–26 | April 2026 workbook | Direct Texas |
+
+The ordinary ingestion/enrichment build creates a fresh identity-bound entity
+snapshot, SQLite and analytical sidecars. These sources use the same lazy entity
+namespaces, DSL observation selection, discovery, periods and provenance as
+other attached families. No separate entity copy, data store or query API is
+introduced. Numeric scalar access refuses multi-category rows rather than
+silently summing or choosing one. A reported EPP assignment does not establish
+an institution identity or preparation route. Historical names and definitions
+are not inferred from retrospective labels; cross-year comparability remains
+unassessed. There is no campus hiring product or pre-2015–16 Texas estimate.
+
+The retained-source qualification checked all **83,478 district rows, 168,585
+EPP rows and 11 direct Texas rows**, nine frozen publisher examples, exact
+cross-product key/count sets including zeros, and direct Texas counts/ratios.
+The composed parent's canonical data validation passed all 15 attached source
+gates. A selected actual-parent workflow checked the new entity namespace, DSL,
+historical rows, unavailable selections and Arrow, DataFrame, CSV, Excel and
+SQLite exports. These checks reuse retained publisher bytes, not a new download
+or an independent live re-acquisition of every source record. The
+[workforce source notes](educator-workforce-sources.md) preserve dictionary
+limitations and the separate retention/certification holds.
+
+The unchanged data producer is software **0.0.157**, source
+`f0b25ec83d90963a14ea6a0589193e8e7579d78e`; **0.0.158** is the software
+consumer. Use the [explicit pinned selection](data-releases.md#normal-release-00158-select-the-data-explicitly).
+Earlier sources retain their own periods and limits in the 157 coverage below;
+this is not a claim that all fields measure 2025–26. Publication, local release
+selection, app cache adoption and deployment remain separate actions. The
+tracked source fixture and app's 157 data selection are unchanged.
 
 ## Version 0.0.157 selected normal release
 
@@ -191,13 +252,12 @@ configuration digest and parent hash pin this comparison; it is not a live feed.
 
 ## Consequential integration gaps
 
-The November 15 unreleased source adds an exact normal-gate qualification plan
-for educator hiring. Its standalone candidate contains 45 tables: district and
-EPP detail for measurement years ending 2010–2026, plus direct Texas 2016–2026.
-Full retained-workbook/native-row parity, cross-product counts/ratios and nine
-publisher-row examples passed locally. The candidate remains unpublished and
-**outside the normal v0.0.157 parent**; it does not change the current attachment
-counts above. See [scope, pinned identity and reproduction](educator-workforce-sources.md#hiring-qualification-in-unreleased-source).
+Normal release 0.0.158 attaches the qualified 45-table educator hiring family:
+district and reported EPP detail for measurement years ending 2010–2026, plus
+direct Texas 2016–2026. Full retained-workbook/native-row parity, cross-product
+counts/ratios and nine publisher-row examples passed, followed by qualification
+and researcher workflows through the actual normal parent. The historical
+0.0.157 parent remains unchanged. See [scope, pinned identity and reproduction](educator-workforce-sources.md#hiring-in-normal-release-00158).
 Do not include held retention or certification products under that result.
 
 | Source family and remaining scope gaps | Registered edition keys | Delivery and next work |
@@ -327,7 +387,7 @@ numbers. Recompute them after changing configuration or the selected release.
 
 This complete preparation-only table is the frozen **v0.0.154** baseline.
 Its attachment statuses, including College Credit “Not attached,” are historical;
-use the current157 native coverage and machine inventory above for this release.
+use the current 158 composition and machine inventory above for the selected release.
 
 Edition keys below describe registered contracts, not a promise of qualified
 data for every cell. “Not attached” does not mean no standalone candidate exists.

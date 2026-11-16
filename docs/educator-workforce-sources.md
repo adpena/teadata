@@ -1,45 +1,41 @@
-# Educator workforce: reported EPP assignments
+# Educator workforce
 
-The source tables described here are not native attachments in the
-[v0.0.157 normal release](source-integration-status.md#current-157-native-coverage).
-Examples require an explicitly selected matching native source release or
-candidate. TAPR staff fields in the entity snapshot are a different source.
+The three hiring products below are attached to the
+[v0.0.158 normal release](source-integration-status.md#hiring-added-to-the-normal-pipeline).
+Select that release explicitly for the normal entity namespaces, DSL and exports.
+TAPR staff fields are a separate source; retention and certification products
+below retain their own candidate status and unresolved holds.
 
-## Hiring qualification in unreleased source
+## Hiring in normal release 0.0.158
 
-The November 15 source update adds the normal release gate for one exact
-standalone hiring candidate: **45 tables**, comprising district and reported
-EPP detail for school years ending **2010–2026**, and direct Texas for
-**2016–2026**. Retained-source replay checked all **83,478 district rows,
-168,585 EPP rows and 11 Texas rows**, their publisher fields, raw/status
-companions and worksheet coordinates. It also checked nine frozen publisher-row
-examples, exact district/EPP key sets including zeros, and direct Texas category
-counts and ratios. This is not fresh source reacquisition or independent
-confirmation of every historical definition.
+The normal release adds **45 tables**: district hiring and reported EPP detail
+for **2009–10 through 2025–26**, and direct Texas for **2015–16 through 2025–26**.
+Retained-source replay checked all **83,478 district rows, 168,585 EPP rows and
+11 Texas rows**, publisher fields, raw/status companions and worksheet
+coordinates. It also checked nine frozen publisher-row examples, exact
+district/EPP key sets including zeros, and direct Texas category counts and
+ratios. The composed parent passed the existing canonical data validator for
+all 15 native attachments. A selected actual-parent workflow checked entity
+namespaces, DSL, historical rows and Arrow, DataFrame, CSV, Excel and SQLite
+exports. This is retained-source reproduction, not fresh re-acquisition or
+independent confirmation of every original historical definition.
 
-The candidate manifest is
+The hiring child remains pinned to
 `8989e9860aadd5d43bcb30bcc40aab2af59f230429638fb0723a1496ca821626`.
-It is **unpublished and not attached to the normal v0.0.157 release**. The new
-gate is source-only until a subsequent software release. Neither qualification
-nor a successful producer run activates a normal parent or publishes data.
-An admitted executor must compose the normal successor with all prior sources;
-source review, canonical checks and release approval remain separate.
+Its exact bytes are now an attachment of normal parent
+`be9803cf7c27cff1020b5ec958bf1158d960a9ad574750d7242959ee051092f7`.
+The parent producer was software **0.0.157**, source
+`f0b25ec83d90963a14ea6a0589193e8e7579d78e`; software **0.0.158** is its
+subsequent consumer. Neither package installation nor publication selects data
+or changes the app's profiles. See [release selection](data-releases.md#normal-release-00158-select-the-data-explicitly).
 
-With the retained candidate and source evidence available, run the existing
-offline gate from the updated source:
-
-```sh
-uv run --locked python -m teadata.verification --kind library \
-  --native-release "$EDUCATOR_HIRING_MANIFEST" \
-  --native-pin 8989e9860aadd5d43bcb30bcc40aab2af59f230429638fb0723a1496ca821626 \
-  --source-store "$TEADATA_PROVENANCE_DIR"
-```
-
-There is no campus hiring product in this candidate. Historical district rows
-remain accessible by ID even when absent from the latest reporting roster;
-publisher names in a retrospective workbook do not establish historical names
-or entity continuity. The dated dictionary limitations below remain in force.
-Retention and certification are separate families with their existing holds.
+There is no campus hiring product. Historical source IDs remain queryable even
+when absent from the latest entity roster. Retrospective publisher names do not
+establish historical entity names or continuity. Preserve category, reported
+EPP region and assignment dimensions; a single district/year can have multiple
+published rows, so scalar access refuses to choose one. The dated dictionary
+limitations below remain in force. Retention and certification are separate
+families with their existing holds.
 
 ## Reported EPP assignments
 

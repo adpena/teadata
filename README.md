@@ -24,7 +24,7 @@ PyYAML's supported pure Python implementation is tested on 3.15.
 
 ```bash
 uv venv
-uv pip install teadata==0.0.157
+uv pip install teadata==0.0.158
 ```
 
 ### Development (recommended)
@@ -105,8 +105,8 @@ Python packages contain code and metadata; data bundles are distributed
 separately. Select an immutable bundle before running the example:
 
 ```bash
-export TEADATA_RELEASE_URL="https://github.com/adpena/teadata/releases/download/v0.0.157/release.json"
-export TEADATA_RELEASE_SHA256="17c65e26ef44c64ddb2ef63ce060fe389320776447e1716f88c1b355ca6e91bb"
+export TEADATA_RELEASE_URL="https://github.com/adpena/teadata/releases/download/v0.0.158/release.json"
+export TEADATA_RELEASE_SHA256="be9803cf7c27cff1020b5ec958bf1158d960a9ad574750d7242959ee051092f7"
 export TEADATA_RELEASE_OFFLINE=0
 ```
 
@@ -114,8 +114,9 @@ Unset `TEADATA_RELEASE` when using a URL: a configured local manifest takes
 precedence. For a complete downloaded bundle, set it to the local `release.json`
 instead. The manifest binds one normal engine release and its attached sources
 to exact content hashes. The [coverage inventory](docs/source-integration-status.md)
-and [release selection guide](docs/data-releases.md#normal-release-00157-select-the-data-explicitly)
-show its 14 native attachments, including district/region/Texas College Credit.
+and [release selection guide](docs/data-releases.md#normal-release-00158-select-the-data-explicitly)
+show its 15 native attachments, including district/region/Texas College Credit
+and district hiring, reported EPP assignments and direct Texas hiring totals.
 The [TAPR and TPRS supplements](docs/data-releases.md#tapr-and-tprs-supplements)
 remain separately selectable sources.
 
