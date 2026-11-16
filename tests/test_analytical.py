@@ -206,7 +206,7 @@ def test_arrow_types_are_explicit():
         list(presentation_values(pa.RecordBatch.from_pylist([{"wrong": 0}])))
 
 
-def test_complete_release_binds_arrow_children_to_exact_source(analytical, catalog, tmp_path):
+def test_complete_release_binds_arrow_children_to_exact_source(analytical, catalog, tmp_path, monkeypatch):
     source, paths, _ = analytical
     paths = {**paths, "entities": source}
     for role in ("maps", "boundaries"):
@@ -231,8 +231,20 @@ def test_complete_release_binds_arrow_children_to_exact_source(analytical, catal
     release = DataRelease(manifest)
     assert json.loads(manifest.read_text())["schema_version"] == 2
     assert set(release.verify()) == set(paths)
+    artifact = release.artifact
+    admissions = []
+
+    def record_admission(role, **kwargs):
+        admissions.append((role, kwargs))
+        return artifact(role, **kwargs)
+
+    monkeypatch.setattr(release, "artifact", record_admission)
     assert isinstance(release.analytical_dataset("campus"), ds.Dataset)
     assert release.analytical_dataset("sources").count_rows() > 0
+    assert admissions == [
+        ("campus_analytics", {"discard_cached_reads": True}),
+        ("analytical_sources", {"discard_cached_reads": True}),
+    ]
     with pytest.raises(ContractError, match="Unknown analytical"):
         release.analytical_dataset("unknown")
     document = json.loads(manifest.read_text())

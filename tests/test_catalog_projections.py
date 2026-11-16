@@ -149,7 +149,7 @@ def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staf
                          normalized=False, support_damage=None, source_qualifiers=None, row_runs=None,
                          qualifier_reference_damage=None, amount_period=None, observed_amount=5, entity_grain=False,
                          name_period=None, extra_context=None, unique_entity_key=False, entity_binding=None,
-                         dataset_name=None, identifiers=None):
+                         dataset_name=None, identifiers=None, row_group_rows=None):
     """The same tiny fixture, optionally widened without adding source rows."""
     import pyarrow as pa
     import pyarrow.csv as pacsv
@@ -342,7 +342,7 @@ def make_edition_fixture(tmp_path, *, extra_fields=0, families=("student", "staf
             column_support=support, entity_binding=entity_binding)
         leaf_id = sha256(canonical_json(contract).encode()).hexdigest()
         leaf = tmp_path / (family + ".parquet")
-        write_leaf_artifact(leaf, actual.to_batches(), contract=contract)
+        write_leaf_artifact(leaf, actual.to_batches(max_chunksize=row_group_rows), contract=contract)
         processing = store.record_processing(dataset=dataset, inputs=acquisitions, outputs={"leaf": leaf},
             processor="native-fixture", code_version=recorder.processor_sha256,
             parameters={"leaf_contract_sha256": leaf_id, "recipe": recipe, "toolchain": toolchain})

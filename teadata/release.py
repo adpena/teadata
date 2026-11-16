@@ -752,7 +752,7 @@ class DataRelease:
             role = ANALYTICAL_DATASETS[name]
         except KeyError as error:
             raise ContractError(f"Unknown analytical dataset: {name}") from error
-        return analytical_dataset(self.artifact(role), self.catalog, role,
+        return analytical_dataset(self.artifact(role, discard_cached_reads=True), self.catalog, role,
                                   entities_sha256=self._artifacts["entities"]["sha256"])
 
     def for_entity(self, entity: District | Campus, *, edition: str) -> EntitySources:

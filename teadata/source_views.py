@@ -894,19 +894,33 @@ class _ParquetScan:
                 if self.entity_ids == ():
                     return
                 columns, aliases, key = self.columns, None, None
+                row_groups = None
                 if self.entity_ids is not None:
+                    from .arrow_io import primitive_array
+
                     key = _entity_key(self.artifact)
-                    aliases = _entity_aliases(
-                        parquet.iter_batches(batch_size=65_536, columns=[key], use_threads=False),
-                        parquet.schema_arrow.field(key).type, self.entity_ids,
-                        width=6 if self.artifact.edition.scope == "district" else 9,
-                    )
-                    _require_unchanged_stream(source, signature)
+                    key_type = parquet.schema_arrow.field(key).type
+                    row_groups, spellings = [], set()
+                    # Validate every key before emitting data, including keys
+                    # in groups that do not contain a selected entity.
+                    for group in range(parquet.metadata.num_row_groups):
+                        matched = _entity_aliases(
+                            parquet.iter_batches(batch_size=65_536, columns=[key],
+                                                 row_groups=[group], use_threads=False),
+                            key_type, self.entity_ids,
+                            width=6 if self.artifact.edition.scope == "district" else 9,
+                        )
+                        _require_unchanged_stream(source, signature)
+                        if len(matched):
+                            row_groups.append(group)
+                            spellings.update(matched.to_pylist())
+                    aliases = primitive_array(sorted(spellings), key_type)
                     if not len(aliases):
                         return
                     if key not in columns:
                         columns = (*columns, key)
-                batches = parquet.iter_batches(batch_size=256, columns=list(columns), use_threads=False)
+                batches = parquet.iter_batches(batch_size=256, columns=list(columns),
+                                               row_groups=row_groups, use_threads=False)
                 try:
                     for batch in batches:
                         if aliases is not None:

@@ -6,6 +6,10 @@ A build records the files it actually reads. The runtime catalog is embedded in 
 
 ## Current normal release 0.0.161
 
+Software 0.0.162 retains this same qualified data release. Its changes are to
+bounded reader execution and hashing page advice; it does not revise source
+values, acquisition dates, definitions or published artifact identities.
+
 `DataEngine.load_default()` selects the packaged, immutable normal161 manifest
 unless an explicit release or scoped context overrides it. Installation keeps
 source payloads external; discovery reads catalog metadata and observations
@@ -25,6 +29,15 @@ and teacher turnover. The ratio is not class size; turnover can include teachers
 who stayed in a non-teaching role. Staff values retain exact Decimal precision.
 Unknown tokens remain visible as uninterpreted. Parent results include both
 source manifest and artifact identities alongside the entity manifest.
+
+Entity-scoped native Parquet reads validate the complete identifier column
+before returning observations, then decode data columns only in row groups
+containing the selected entities. Batches stay bounded and retain source order,
+raw values, suppression states and provenance. A file with one row group may
+not benefit. This is local row-group pruning: initial acquisition and integrity
+verification can still require the whole immutable artifact. Analytical-file
+admission uses best-effort operating-system advice to discard pages read only
+for hashing; unsupported systems retain the same full integrity checks.
 
 Use exact EditionKeys from `release.catalog_inventory()` or the native-source
 index. An explicit unavailable year or unsupported metric fails instead of
