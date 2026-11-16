@@ -1082,11 +1082,47 @@ The AskTED adapter discovers archive controls from publisher year/season labels,
 
 The builder sets `PYTHONHASHSEED=0`, records code and lockfile content identity and software versions, uses deterministic entity IDs, and writes deterministic gzip framing. It stages the entire bundle, verifies artifact bindings and a processing receipt, and atomically replaces the release pointer only after success. A failure leaves the previous pointer active. Exact-byte reproducibility is gated by publication refusing conflicting artifact bytes for an existing build identity; source and environment identities must match when comparing runs.
 
-`TEADATA_CONFIG`, `TEADATA_PROVENANCE_DIR`, and `TEADATA_OUTPUT_DIR` select alternate build locations. Defaults are portable. The default output is `teadata/.cache/`, the sole runtime release authority. Older tracked assets are archival rollback inputs and are not discovered automatically.
+`TEADATA_CONFIG`, `TEADATA_PROVENANCE_DIR`, and `TEADATA_OUTPUT_DIR` select alternate build locations. Defaults are portable. The default build output is `teadata/.cache/`. Select an unpublished local build explicitly with `TEADATA_RELEASE`; generating it does not activate the packaged software default. Older tracked assets remain explicit fixture/rollback inputs.
 
 ## Runtime and rollout
 
-Set `TEADATA_RELEASE` to a local manifest or `TEADATA_RELEASE_URL` to a version-pinned remote manifest URL. A source checkout defaults to `teadata/.cache/release.json` and must hydrate its Git LFS artifacts. Wheels contain code, source contracts, and methodology documents; configure their data release explicitly. For HTTP delivery, publish the unchanged `release.json` and all of its hash-bound artifacts as adjacent files under one base URL, such as a GitHub Release asset directory. Raw GitHub URLs for Git LFS files serve pointer text rather than artifact bytes, so they fail checksum validation; the reader does not combine a raw manifest URL with a separate media base. Remote files are cached by content hash and verified before use. A process pins a configured remote release until restart; requests and cache rebuilds pin one release for their duration.
+Set `TEADATA_RELEASE` to a local manifest or `TEADATA_RELEASE_URL` to a
+version-pinned remote manifest URL. Software 0.0.159 requires that explicit
+selection: its wheel contains code/contracts but no default manifest or data.
+Its source-checkout fallback is the historical `teadata/.cache/release.json`,
+whose Git LFS artifacts must be hydrated; that graph lacks the sixteen native
+attachments of the published normal 159 release.
+
+Software 0.0.160 replaces that implicit historical fallback with a
+small packaged `default_release.json`. It selects one qualified normal release
+by a fixed versioned URL and manifest hash, identically in a checkout and wheel.
+It neither looks up “latest” nor embeds the full data corpus. Its only wire keys
+are `schema_version` (integer `1`, not Boolean), `url` (the official versioned
+HTTPS manifest URL) and `sha256` (64 lowercase hex characters). The finalized
+normal160 selector uses
+`https://github.com/adpena/teadata/releases/download/v0.0.160/release.json`
+with SHA-256
+`1d0ff6904ef4b259562f4ec750a082b90226bf05f48a5e871c937b481f89df0a`.
+That ordinary normal build preserves 13 base inputs and 16 prior children and
+adds the qualified FY2026 district/charter budget child. It passed all 17 source
+gates and bounded actual-parent Arrow/DataFrame/CSV/XLSX/SQLAlchemy checks.
+During two-phase development only, `sha256: null` denotes an unfinalized selector
+and raises `ContractError` before cache/network access; it is not a valid release.
+
+Priority is an active `using_release` context, then explicit `TEADATA_RELEASE`,
+then explicit `TEADATA_RELEASE_URL`, then the packaged pin. A stray environment
+hash cannot replace the default's trusted hash; a mismatch fails configuration.
+Historical explicit selections retain their own pins. Missing/malformed defaults
+fail instead of selecting the historical cache. Tests and local build consumers
+select fixture manifests explicitly. `DataEngine.load_default()` loads the
+selection; bare `DataEngine()` remains an empty constructor. Importing the
+package and constructing an empty engine do not fetch data.
+
+For HTTP delivery, publish the unchanged manifest and hash-bound files adjacent
+under one base URL, such as a GitHub Release asset directory. Raw GitHub URLs
+for Git LFS files serve pointer text and fail checksum validation. Remote files
+are cached by content hash and verified before use. A process pins a remote
+release until restart; requests and rebuilds pin one release for their duration.
 
 For a deployment that can download at build time, set `TEADATA_RELEASE_URL` to
 the manifest URL and `TEADATA_RELEASE_SHA256` to its trusted lowercase SHA-256. Run

@@ -24,8 +24,22 @@ PyYAML's supported pure Python implementation is tested on 3.15.
 
 ```bash
 uv venv
-uv pip install teadata==0.0.158
+uv pip install teadata==0.0.160
 ```
+
+Version 0.0.160 packages one immutable normal-release URL and SHA-256 for
+`current_release()` and `DataEngine.load_default()`. The selected normal160
+composition passed all 17 attached source gates and includes FY2026 district
+and charter budget accounts through the normal lazy namespace and export path.
+The wheel contains the selector and contracts; data files remain demand-loaded.
+See the [exact coverage and release identity](docs/source-integration-status.md).
+Explicit local/remote selections and `using_release` retain precedence.
+`TEADATA_RELEASE_OFFLINE=1` forbids network access and requires the matching
+manifest and requested files already in the cache. Online first use may fetch
+the pinned manifest and required files. Bare `DataEngine()` still creates an
+empty engine; use `DataEngine.load_default()` to load data.
+Software 0.0.159 requires an explicit release selection. Its historical checkout
+`.cache` remains available explicitly and is not the 0.0.160 default.
 
 ### Development (recommended)
 

@@ -1,11 +1,24 @@
 # Entity enrichment sources and years
 
-The retained **0.0.159 normal composition is not yet published**. Its
+The **0.0.160 qualified normal composition** preserves all 13 normal159 base
+inputs and its 16 native children, adding the complete FY2026 district/charter
+budget family. Its [exact inventory](source-integration-status-0.0.160.json)
+records **17 attachments, 22 dataset IDs and 206 edition/scope keys**; 94
+registered source-only IDs remain unattached. The normal parent passed all
+17 canonical source gates and the bounded actual-parent namespace/DSL/export
+workflow. Software 0.0.160 packages this exact normal manifest pin as its default;
+explicit historical selections and offline mode retain their contracts. See
+[current identities and qualification scope](source-integration-status.md).
+
+The **0.0.159 normal composition was published on November 16, 2026**
+([release](https://github.com/adpena/teadata/releases/tag/v0.0.159)). Its
 [exact inventory](source-integration-status-0.0.159.json) records 16 native
 bundles, 21 dataset IDs and 204 edition/scope keys, preserving all 13 normal158
 base inputs and its 15 children. It adds the 2025–26 district facility records
 and publisher submission statuses described below. Their source-specific limits
-remain explicit; this does not update app profiles or the tracked default data.
+remain explicit. Library publication does not establish application adoption;
+the historical tracked `.cache` files remain unchanged. Version 160 uses the
+packaged default pin described above.
 
 The [v0.0.158 normal release](https://github.com/adpena/teadata/releases/tag/v0.0.158)
 composes fifteen native bundles, 19 dataset IDs and 202 edition/scope/partition keys,
@@ -15,8 +28,8 @@ statewide by district and campus plus direct Texas, and
 district transfer reports for 2023–24 through 2025–26. The primary-disability
 2012–13–2025–26 and staff FTE/salary 2022–23–2025–26 families remain available.
 The [integration inventory](source-integration-status-0.0.158.json) pins this exact
-selection. Library publication does not change deployed profiles or an
-unconfigured wheel's default data; select the release explicitly.
+selection. At version 158, library publication did not change deployed profiles
+or select data for an unconfigured wheel; explicit selection was required.
 
 College Credit adds school years **2021–22 through 2025–26** for district,
 20 ESC region and direct Texas scopes; there is no campus product. These summer
@@ -80,8 +93,8 @@ for CSV, DataFrame and Excel provenance and original-header behavior.
 
 For the current registration-to-release gap, see the dated
 [source integration inventory](source-integration-status.md) and its
-[machine-readable edition/scope comparison](source-integration-status-0.0.158.json).
-Configuration still registers 124 IDs and 276 editions; 95 source-only IDs
+[machine-readable edition/scope comparison](source-integration-status-0.0.160.json).
+Configuration registers 126 IDs and 278 editions; 94 source-only IDs
 remain unattached. This is not proof of their publisher availability, acquisition
 or semantic qualification. The selected catalog's explicit per-field periods
 control actual observation years. Metadata-only catalog inspection/diff tools

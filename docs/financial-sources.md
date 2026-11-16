@@ -1,5 +1,39 @@
 # Financial workbook source candidates
 
+## Reviewed FY2026 budget accounts and normal integration
+
+The retained budget child
+`bcff73e52199f4d8e527db2d66a89f8ee3a825d3734e7902e16ab4f7824e7f38`
+passed the canonical reviewed native gate on Python 3.14.10 and 3.15.2. It
+contains both FY2026 populations: 1,337,887 district rows and 88,400 charter
+rows, preserving all 12,836,583 original account cells. Independent Budget PWR
+instruction controls compare 2,402 AF/GF values over 1,019 district and 182
+charter IDs. This qualifies budget account fidelity and those instruction
+controls, not audited actuals, every financial interpretation or funding adequacy.
+Signed integer amounts, zero, account codes, raw/status support and source row
+locators remain explicit. FY2026 here is fiscal 2025–26, not a school-year label.
+
+Normal 159 does not attach this child. The qualified normal160 composition adds
+its exact pin while preserving all thirteen base inputs and sixteen existing
+children. The resulting parent passed all seventeen canonical source gates.
+Six actual-parent checks passed both population selections, fiscal and scalar
+guards, normal provenance and bounded Arrow, DataFrame, CSV, Excel and
+transactional SQLAlchemy SQLite roundtrips. Software 0.0.160 packages the
+[same normal-parent manifest and pin](source-integration-status.md) as its
+default. Public delivery and application adoption remain separate scopes.
+
+Once that normal release is selected, use its entity namespace and an exact
+`EditionKey` from `release.for_entity(district, edition="2026").datasets()`.
+The two populations share dataset, scope and edition, so select `table="district"`
+or `table="charter"` explicitly. Use the source's `select` with account predicates
+or `release.table(exact_key).select("budget_amount").query(...)` for the existing
+lazy DSL. New selections retain both the normal parent and source child in
+provenance. A plain scalar refuses multiple account rows. The school-year
+`.at(...)` resolver intentionally refuses this fiscal period; do not relabel it
+or silently choose a population. Exports use canonical headers and preserve
+the Excel worksheet row limit. A bounded SQLite roundtrip uses caller-owned
+SQLAlchemy tables and a transaction, not a `SourceTable.to_sql` method.
+
 The narrowly qualified [SOF attendance projection](attendance-sources.md#sof-attendance-equivalents)
 is separate from the broad financial candidates described below. Its run 47422
 Near Final source has four original LPE/DPE input/output tables and six selected

@@ -1,13 +1,49 @@
 # Source integration status — November 16, 2026 (UTC)
 
 The selected release, rather than the installed software version, controls
-available observations. The version 0.0.159 inventory below describes a retained,
-unpublished normal composition. Earlier sections remain dated baselines; their
+available observations. Software 0.0.160 packages the qualified normal160 pin
+below as its default. Earlier sections remain dated baselines; their
 counts and attachment lists must not be reused as the current inventory.
 
-## Version 0.0.159 retained normal composition — publication pending
+## Version 0.0.160 qualified normal release
 
-The retained normal manifest has SHA-256
+Ordinary `load_data` produced manifest
+`1d0ff6904ef4b259562f4ec750a082b90226bf05f48a5e871c937b481f89df0a`
+and build `104ee03b5c3343e9ff65d6278855df0d4dc3db5028f3b4ea49f74cdeebcb92cb`
+with software 0.0.160 at committed processing source
+`45a25dfd1f30e4b0a2eef80e22902275e100cb4e`. All 13 base input descriptors
+and all 16 normal159 native child descriptors are unchanged. The only added
+child is the reviewed FY2026 budget pin
+`bcff73e52199f4d8e527db2d66a89f8ee3a825d3734e7902e16ab4f7824e7f38`.
+
+The [machine inventory](source-integration-status-0.0.160.json) records **17
+native attachments, 22 dataset IDs and 206 edition/scope keys**. Registration
+remains **126 IDs and 278 editions**; **94 source-only IDs remain unattached**,
+one fewer because the complete district/charter budget family is now attached.
+Registration alone does not establish acquisition or qualification of the other
+families. Inventory generation reads metadata, not observation leaves, and
+retains its actual generator identity with only the local manifest path redacted.
+
+The composed parent passed all **17 canonical attached native source gates**,
+retained publisher examples and private school population checks. Six actual-parent
+checks passed exact population selection, fiscal-period refusal, lazy entity
+namespace and DSL access, parent/child provenance, and bounded Arrow, DataFrame,
+CSV, Excel and transactional SQLAlchemy SQLite roundtrips. It retains **1,229
+district and 12,593 campus entities**; budget arrays and aggregate financial
+values are not inserted into entity metadata. The fiscal source limitations are
+preserved in the [budget documentation](financial-sources.md).
+
+The packaged selector points to the exact versioned
+[normal160 manifest](https://github.com/adpena/teadata/releases/download/v0.0.160/release.json)
+and the SHA above. Explicit releases and scoped contexts retain precedence.
+Offline mode requires the matching retained manifest and requested files and
+never falls back to another release. Data qualification, public delivery and
+application adoption are distinct scopes; this record does not claim a new
+application deployment.
+
+## Version 0.0.159 published normal release
+
+The [published normal manifest](https://github.com/adpena/teadata/releases/download/v0.0.159/release.json) has SHA-256
 `803a0ae418b724167b320f8488284fb9f25a001bb04e6066e6f4299d496dc0d5`
 and build `a0d2fb494299d4ef0ccae84acadb5b6cbe1e018c0f6b26c61bfbd717ed3cb4ed`.
 Ordinary `load_data` produced it with software **0.0.159**, source
@@ -53,14 +89,20 @@ utilization series are admitted. Status-only or absent districts do not imply
 zero facilities. See the [source contract and access examples](facility-usage.md).
 
 The independently qualified facility child joins fifteen unchanged, previously
-qualified native children. Canonical validation of the exact composed parent,
-including all **16 attached native source gates**, retained publisher examples
-and private school population checks, remains a separate publication gate.
-The release's [qualification details](https://github.com/adpena/teadata/releases/download/v0.0.159/qualification.json)
-record that outcome when published. Qualification and the actual-parent workflow
-are separate from the metadata inventory. Publication, explicit release selection,
-app cache adoption and deployment remain separate actions. The tracked default
-fixture and app data selection have not changed.
+qualified native children. Canonical validation of the exact composed parent
+passed all **16 attached native source gates**, retained publisher examples and
+private school population checks. The published
+[qualification details](https://github.com/adpena/teadata/releases/download/v0.0.159/qualification.json)
+record that outcome. The actual-parent namespace/DSL/export workflow, installed
+wheel checks and public pinned-reader/offline-reuse check passed as separately
+scoped evidence; the release notes preserve the SQLite versus installed-wheel
+export qualification clarification. These are retained-source checks, not a new
+acquisition or independent qualification of the 95 unattached registrations.
+
+Software 0.0.159 and this normal data release are published. Explicit release
+selection and application cache adoption/deployment remain separate gates. The
+tracked default fixture is unchanged; this dated library publication record
+does not establish the current application's selected source or runtime.
 
 ## Version 0.0.158 selected normal release
 
