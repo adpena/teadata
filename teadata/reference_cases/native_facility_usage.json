@@ -1,8 +1,369 @@
 {
   "schema_version": 1,
-  "manifest_sha256": null,
-  "build_id": null,
-  "editions": {},
+  "manifest_sha256": "2b628a4ccf01c35be5a614d23d41e69f012b58d1ae04e7f048dcae27df3580b2",
+  "build_id": "9e053f4108927f9cb42a839f5311edc90adbb38de7e604f37dfb24c30f863f1d",
+  "editions": {
+    "8cce3476597a98b14d94e68978880e3ec87674295e204234f92010ace93e3f45": {
+      "entry": {
+        "key": {
+          "dataset": "facility_usage_submission",
+          "edition": "2026",
+          "grain": "one publisher submission status per district",
+          "revision_sha256": "e775e27ab9746c70dd66160ae702d76c4c7af456751dbee16e3311ad674e5d48",
+          "scope": "district",
+          "table": "district"
+        },
+        "metadata": {
+          "location": "ebac1f8d3d19d48d88c9cc46810f37e99cd8f0fe0819359614687b9c80b38064.json",
+          "sha256": "ebac1f8d3d19d48d88c9cc46810f37e99cd8f0fe0819359614687b9c80b38064",
+          "size_bytes": 19434
+        }
+      },
+      "artifact": {
+        "edition": {
+          "dataset": "facility_usage_submission",
+          "edition": "2026",
+          "revision_sha256": "e775e27ab9746c70dd66160ae702d76c4c7af456751dbee16e3311ad674e5d48",
+          "scope": "district",
+          "table": "district",
+          "grain": "one publisher submission status per district"
+        },
+        "sha256": "441eba0a706057d4432e4d4a419592f93f5bfe694a35824633bdc6c687653667",
+        "size_bytes": 77291,
+        "location": "ac7a2519d4ac491c575036b259b1740b4d2c97bbe1dda1635cc821a6e05fb99c.parquet",
+        "contract": {
+          "column_support": {
+            "context": [
+              "publisher_worksheet",
+              "source_group_row_count",
+              "source_group_min_row",
+              "source_group_max_row",
+              "source_group_rows_sha256"
+            ],
+            "fields": {
+              "district_name": {
+                "raw": "raw_district_name"
+              },
+              "district_number": {
+                "raw": "raw_district_number"
+              },
+              "map_esc_region": {
+                "raw": "raw_map_esc_region",
+                "status": "status_map_esc_region"
+              },
+              "submission_status": {
+                "raw": "raw_submission_status"
+              }
+            }
+          },
+          "columns": [
+            "district_name",
+            "raw_district_name",
+            "district_number",
+            "raw_district_number",
+            "map_esc_region",
+            "raw_map_esc_region",
+            "status_map_esc_region",
+            "submission_status",
+            "raw_submission_status",
+            "publisher_worksheet",
+            "source_group_row_count",
+            "source_group_min_row",
+            "source_group_max_row",
+            "source_group_rows_sha256"
+          ],
+          "edition": {
+            "dataset": "facility_usage_submission",
+            "edition": "2026",
+            "grain": "one publisher submission status per district",
+            "revision_sha256": "e775e27ab9746c70dd66160ae702d76c4c7af456751dbee16e3311ad674e5d48",
+            "scope": "district",
+            "table": "district"
+          },
+          "inputs": [
+            "a71e0919f2451e2343be2600c8bccf2cea72fffa21641d4a241ce18c6528b944"
+          ],
+          "key_columns": [
+            "district_number"
+          ],
+          "mapping_sha256": "308b1cd662b246b8a6f4cfd37050ab1b4ea6982b76154754093751829e6d8816",
+          "policy_sha256": null,
+          "producer": {
+            "code_sha256": "e08b22543fa757a08bc9f3c489ebdde9405cf7ebcbe23d81e8dc2495bf7b06a9",
+            "toolchain": {
+              "pyarrow": "26.0.1",
+              "python": "3.14.10 (main, Oct 25 2026, 17:12:00) [Clang 21.0.0 (clang-2100.3.34.2)]"
+            }
+          },
+          "recipe_sha256": "aae13dec54992cf54c5a1749430a61abfd594eb5fb1298a4abd3717709419499",
+          "rows": 1017,
+          "schema": "/////5ADAAAQAAAAAAAKAAwABgAFAAgACgAAAAABBAAMAAAACAAIAAAABAAIAAAABAAAAA4AAAAoAwAA4AIAAKwCAAB0AgAAMAIAAPgBAAC8AQAAhAEAAEgBAAAQAQAAzAAAAIgAAABEAAAABAAAACD9//8AAAEFEAAAACwAAAAEAAAAAAAAABgAAABzb3VyY2VfZ3JvdXBfcm93c19zaGEyNTYAAAAAHP3//1z9//8AAAECEAAAACgAAAAEAAAAAAAAABQAAABzb3VyY2VfZ3JvdXBfbWF4X3JvdwAAAAA8/v//AAAAASAAAACc/f//AAABAhAAAAAoAAAABAAAAAAAAAAUAAAAc291cmNlX2dyb3VwX21pbl9yb3cAAAAAfP7//wAAAAEgAAAA3P3//wAAAQIQAAAAKAAAAAQAAAAAAAAAFgAAAHNvdXJjZV9ncm91cF9yb3dfY291bnQAALz+//8AAAABIAAAABz+//8AAAEFEAAAACQAAAAEAAAAAAAAABMAAABwdWJsaXNoZXJfd29ya3NoZWV0ABD+//9Q/v//AAABBRAAAAAoAAAABAAAAAAAAAAVAAAAcmF3X3N1Ym1pc3Npb25fc3RhdHVzAAAASP7//4j+//8AAAEFEAAAACQAAAAEAAAAAAAAABEAAABzdWJtaXNzaW9uX3N0YXR1cwAAAHz+//+8/v//AAABBRAAAAAoAAAABAAAAAAAAAAVAAAAc3RhdHVzX21hcF9lc2NfcmVnaW9uAAAAtP7///T+//8AAAEFEAAAACQAAAAEAAAAAAAAABIAAAByYXdfbWFwX2VzY19yZWdpb24AAOj+//8o////AAABAhAAAAAoAAAABAAAAAAAAAAOAAAAbWFwX2VzY19yZWdpb24AAAgADAAIAAcACAAAAAAAAAEIAAAAaP///wAAAQUQAAAAJAAAAAQAAAAAAAAAEwAAAHJhd19kaXN0cmljdF9udW1iZXIAXP///5z///8AAAEFEAAAACAAAAAEAAAAAAAAAA8AAABkaXN0cmljdF9udW1iZXIAjP///8z///8AAAEFEAAAACQAAAAEAAAAAAAAABEAAAByYXdfZGlzdHJpY3RfbmFtZQAAAMD///8QABQACAAGAAcADAAAABAAEAAAAAAAAQUQAAAAJAAAAAQAAAAAAAAADQAAAGRpc3RyaWN0X25hbWUAAAAEAAQABAAAAAAAAAA=",
+          "schema_sha256": "138631f8405007017f4f9ecd06ba27b4754a41b488bd73b43a1e1d6278cfb4ee",
+          "semantics_sha256": "cfad871861dba8fc47b9dddf704905170f76064a838a39cb0ccf21fa8bbc6622"
+        },
+        "format": "parquet",
+        "processing_id": "fd09c24887c59e4533ccba6dbb73448e705d48727df61132ee6764f4130a8534",
+        "output": "leaf"
+      }
+    },
+    "fb0d1a053b3b567ed627758c14ee03c423abeea9f28eb1e8e857c23c81e77c6f": {
+      "entry": {
+        "key": {
+          "dataset": "facility_usage",
+          "edition": "2026",
+          "grain": "one original worksheet row per district",
+          "revision_sha256": "e775e27ab9746c70dd66160ae702d76c4c7af456751dbee16e3311ad674e5d48",
+          "scope": "district",
+          "table": "district"
+        },
+        "metadata": {
+          "location": "d69d0e59079d9e54838ebb43c15973f7057a5dc6aaf6a2759a749f3db35c8933.json",
+          "sha256": "d69d0e59079d9e54838ebb43c15973f7057a5dc6aaf6a2759a749f3db35c8933",
+          "size_bytes": 33967
+        }
+      },
+      "artifact": {
+        "edition": {
+          "dataset": "facility_usage",
+          "edition": "2026",
+          "revision_sha256": "e775e27ab9746c70dd66160ae702d76c4c7af456751dbee16e3311ad674e5d48",
+          "scope": "district",
+          "table": "district",
+          "grain": "one original worksheet row per district"
+        },
+        "sha256": "fb9cb642974c394988ad69773e02c843dadfd8e1e26359ac9d7c451ccec0e525",
+        "size_bytes": 2362017,
+        "location": "e303aebffcdbcd8444d1a357c415e4660ac0ca41d2c9c7546e4e406a35ca419c.parquet",
+        "contract": {
+          "column_support": {
+            "context": [
+              "publisher_worksheet",
+              "publisher_worksheet_row",
+              "record_kind",
+              "source_cell_types_json",
+              "quality_conformance_json"
+            ],
+            "fields": {
+              "acreage": {
+                "raw": "raw_acreage",
+                "status": "status_acreage"
+              },
+              "active_used_facility": {
+                "raw": "raw_active_used_facility"
+              },
+              "adjusted_instructional_capacity": {
+                "raw": "raw_adjusted_instructional_capacity",
+                "status": "status_adjusted_instructional_capacity"
+              },
+              "building_type_recoded": {
+                "raw": "raw_building_type_recoded"
+              },
+              "city_state": {
+                "raw": "raw_city_state"
+              },
+              "classroom_count": {
+                "raw": "raw_classroom_count",
+                "status": "status_classroom_count"
+              },
+              "district_name": {
+                "raw": "raw_district_name"
+              },
+              "district_number": {
+                "raw": "raw_district_number"
+              },
+              "facility_usage": {
+                "raw": "raw_facility_usage"
+              },
+              "grades_for_facility": {
+                "raw": "raw_grades_for_facility"
+              },
+              "houses_portables": {
+                "raw": "raw_houses_portables"
+              },
+              "map_esc_region": {
+                "raw": "raw_map_esc_region",
+                "status": "status_map_esc_region"
+              },
+              "maximum_instructional_capacity": {
+                "raw": "raw_maximum_instructional_capacity",
+                "status": "status_maximum_instructional_capacity"
+              },
+              "most_recent_renovation_year": {
+                "raw": "raw_most_recent_renovation_year",
+                "status": "status_most_recent_renovation_year"
+              },
+              "original_year_completed": {
+                "raw": "raw_original_year_completed",
+                "status": "status_original_year_completed"
+              },
+              "ownership_status": {
+                "raw": "raw_ownership_status"
+              },
+              "portable_count": {
+                "raw": "raw_portable_count",
+                "status": "status_portable_count"
+              },
+              "property_id": {
+                "raw": "raw_property_id"
+              },
+              "reported_campus_label": {
+                "raw": "raw_reported_campus_label"
+              },
+              "reported_current_enrollment": {
+                "raw": "raw_reported_current_enrollment",
+                "status": "status_reported_current_enrollment"
+              },
+              "reported_org_code": {
+                "raw": "raw_reported_org_code"
+              },
+              "shared_building_type_1": {
+                "raw": "raw_shared_building_type_1"
+              },
+              "shared_building_type_2": {
+                "raw": "raw_shared_building_type_2"
+              },
+              "shared_building_type_3": {
+                "raw": "raw_shared_building_type_3"
+              },
+              "shared_building_type_4": {
+                "raw": "raw_shared_building_type_4"
+              },
+              "shared_usage": {
+                "raw": "raw_shared_usage"
+              },
+              "square_footage": {
+                "raw": "raw_square_footage",
+                "status": "status_square_footage"
+              },
+              "street_address": {
+                "raw": "raw_street_address"
+              },
+              "submission_status": {
+                "raw": "raw_submission_status"
+              },
+              "submission_type": {
+                "raw": "raw_submission_type"
+              },
+              "zip_code": {
+                "raw": "raw_zip_code"
+              }
+            }
+          },
+          "columns": [
+            "district_name",
+            "raw_district_name",
+            "district_number",
+            "raw_district_number",
+            "submission_type",
+            "raw_submission_type",
+            "active_used_facility",
+            "raw_active_used_facility",
+            "property_id",
+            "raw_property_id",
+            "street_address",
+            "raw_street_address",
+            "city_state",
+            "raw_city_state",
+            "zip_code",
+            "raw_zip_code",
+            "reported_org_code",
+            "raw_reported_org_code",
+            "building_type_recoded",
+            "raw_building_type_recoded",
+            "classroom_count",
+            "raw_classroom_count",
+            "status_classroom_count",
+            "original_year_completed",
+            "raw_original_year_completed",
+            "status_original_year_completed",
+            "most_recent_renovation_year",
+            "raw_most_recent_renovation_year",
+            "status_most_recent_renovation_year",
+            "houses_portables",
+            "raw_houses_portables",
+            "portable_count",
+            "raw_portable_count",
+            "status_portable_count",
+            "square_footage",
+            "raw_square_footage",
+            "status_square_footage",
+            "acreage",
+            "raw_acreage",
+            "status_acreage",
+            "ownership_status",
+            "raw_ownership_status",
+            "shared_usage",
+            "raw_shared_usage",
+            "shared_building_type_1",
+            "raw_shared_building_type_1",
+            "shared_building_type_2",
+            "raw_shared_building_type_2",
+            "shared_building_type_3",
+            "raw_shared_building_type_3",
+            "shared_building_type_4",
+            "raw_shared_building_type_4",
+            "facility_usage",
+            "raw_facility_usage",
+            "grades_for_facility",
+            "raw_grades_for_facility",
+            "maximum_instructional_capacity",
+            "raw_maximum_instructional_capacity",
+            "status_maximum_instructional_capacity",
+            "adjusted_instructional_capacity",
+            "raw_adjusted_instructional_capacity",
+            "status_adjusted_instructional_capacity",
+            "reported_current_enrollment",
+            "raw_reported_current_enrollment",
+            "status_reported_current_enrollment",
+            "reported_campus_label",
+            "raw_reported_campus_label",
+            "map_esc_region",
+            "raw_map_esc_region",
+            "status_map_esc_region",
+            "submission_status",
+            "raw_submission_status",
+            "publisher_worksheet",
+            "publisher_worksheet_row",
+            "record_kind",
+            "source_cell_types_json",
+            "quality_conformance_json"
+          ],
+          "edition": {
+            "dataset": "facility_usage",
+            "edition": "2026",
+            "grain": "one original worksheet row per district",
+            "revision_sha256": "e775e27ab9746c70dd66160ae702d76c4c7af456751dbee16e3311ad674e5d48",
+            "scope": "district",
+            "table": "district"
+          },
+          "inputs": [
+            "a71e0919f2451e2343be2600c8bccf2cea72fffa21641d4a241ce18c6528b944"
+          ],
+          "key_columns": [
+            "district_number",
+            "publisher_worksheet_row"
+          ],
+          "mapping_sha256": "ccfc92b6793bd634807dab7fa8ff5181f31a5de8e056d7f89aa42dbd35c1413c",
+          "policy_sha256": null,
+          "producer": {
+            "code_sha256": "e08b22543fa757a08bc9f3c489ebdde9405cf7ebcbe23d81e8dc2495bf7b06a9",
+            "toolchain": {
+              "pyarrow": "26.0.1",
+              "python": "3.14.10 (main, Oct 25 2026, 17:12:00) [Clang 21.0.0 (clang-2100.3.34.2)]"
+            }
+          },
+          "recipe_sha256": "5711895743dbafe26bb09b3b526dbe5b5854e2750c9bc8f9599e21ea80fc4695",
+          "rows": 17834,
+          "schema": "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",
+          "schema_sha256": "ccc03cf7a9f0d9633cd5d57f761f5fcade5cbb428aeb72f2faa9b11a45ba44d1",
+          "semantics_sha256": "ea04da93461733bdcb1db587f8837c0e131d11714fbf46a20a6b02a758dee2d2"
+        },
+        "format": "parquet",
+        "processing_id": "b8f78661a28a39ef64b4abb983bce81d73a93e8537f870de5501352de072a567",
+        "output": "leaf"
+      }
+    }
+  },
   "physical_contract": [
     {
       "coordinate": "A",
