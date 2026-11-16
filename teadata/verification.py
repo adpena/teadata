@@ -885,6 +885,14 @@ def _native_record_evidence(release: DataRelease, processing_store: ProvenanceSt
 
 def _native_review(release: DataRelease, store: ProvenanceStore) -> _NativeReview:
     """Select one reviewed plan for standalone, parent and receipt-reuse gates."""
+    from teadata.native_tapr_regional import (
+        REVIEWED_MANIFEST as REGIONAL_TAPR_MANIFEST, qualify_tapr_regional, retained_regional_evidence,
+    )
+
+    if release.manifest_sha256 == REGIONAL_TAPR_MANIFEST:
+        return _NativeReview("regional TAPR", partial(qualify_tapr_regional, release, store),
+                             partial(retained_regional_evidence, release, store))
+
     from teadata.native_facility_usage import (
         qualify_facility_usage, reviewed_facility_usage, validate_facility_identity,
     )

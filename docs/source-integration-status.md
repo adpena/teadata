@@ -5,6 +5,28 @@ available observations. Software 0.0.160 packages the qualified normal160 pin
 below as its default. Earlier sections remain dated baselines; their
 counts and attachment lists must not be reused as the current inventory.
 
+## Regional TAPR qualification, November 16
+
+The retained 2024–25 regional Student and Staff family and direct Texas Staff
+now have a canonical offline semantic replay gate. The immutable standalone
+manifest is `9c4e189a85b1a12130207e4a3546d437a0704f4833c45225c401b8f88ea1a50c`.
+It contains 20 regional Student rows, 20 regional Staff rows and one Texas Staff
+row. Full original-header CSV export parity covers all **7,276 raw cells**.
+Independent retained TEA reports provide **91 printed controls**, and the
+2023–24 annual attrition workbook provides **40 controls across all 20 regions**.
+These are retained-source checks, not fresh publisher reacquisition.
+
+Only 38 Student and five Staff metric bindings have qualified units and
+measurement periods; other columns remain raw. Membership and Enrollment are
+separate populations. Mobility and attrition refer to 2023–24 in the 2024–25
+report edition. Teacher turnover describes the fall 2023 to fall 2024 teacher
+role comparison and can include teachers who stayed in a different role.
+It is not a measure of departures from the district or profession.
+
+Normal-release composition and software publication remain separate gates.
+Until a newer pinned normal manifest is qualified, the current packaged default
+remains normal160 below; standalone qualification does not silently change it.
+
 ## Version 0.0.160 qualified normal release
 
 Ordinary `load_data` produced manifest
