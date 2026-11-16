@@ -68,6 +68,9 @@ Python 3.14 and 3.15 are required compatibility targets alongside supported earl
 
 ## Completing Source Integration
 
+- When adding a registered source or crosswalk, include `test_every_packaged_version_and_declared_profile_has_an_offline_schema` and `test_latest_source_opt_ins_preserve_unaffected_preexisting_config` in the initial focused family checks.
+  Run these existing schema-format and configuration-isolation checks before the whole canonical suite; do not add a separate runner or test policy.
+
 - Inspect exact release coverage with `DataRelease.catalog_inventory()` and
   `catalog_diff(other)` where supported by the selected software. Default index
   mode opens no additional files; explicit variable mode reads verified metadata,

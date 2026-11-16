@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "manifest_sha256": "2b628a4ccf01c35be5a614d23d41e69f012b58d1ae04e7f048dcae27df3580b2",
-  "build_id": "9e053f4108927f9cb42a839f5311edc90adbb38de7e604f37dfb24c30f863f1d",
+  "manifest_sha256": "ba34346da8d71b7f87bee82d0b3798c20b5e566516d191e2145f4754a1b9d359",
+  "build_id": "53eea22e7c2828fa8affe5fe4294dc96e60d814774d4e8fbb677e835d6a44c69",
   "editions": {
     "8cce3476597a98b14d94e68978880e3ec87674295e204234f92010ace93e3f45": {
       "entry": {
@@ -14,9 +14,9 @@
           "table": "district"
         },
         "metadata": {
-          "location": "ebac1f8d3d19d48d88c9cc46810f37e99cd8f0fe0819359614687b9c80b38064.json",
-          "sha256": "ebac1f8d3d19d48d88c9cc46810f37e99cd8f0fe0819359614687b9c80b38064",
-          "size_bytes": 19434
+          "location": "c672a824035f669ee3f13d645cac258de999c02356ee49f38078769dc9c6bfec.json",
+          "sha256": "c672a824035f669ee3f13d645cac258de999c02356ee49f38078769dc9c6bfec",
+          "size_bytes": 19432
         }
       },
       "artifact": {
@@ -28,9 +28,9 @@
           "table": "district",
           "grain": "one publisher submission status per district"
         },
-        "sha256": "441eba0a706057d4432e4d4a419592f93f5bfe694a35824633bdc6c687653667",
+        "sha256": "bb623977c8538368697cf6adbc13411698eed4dacc6f7be1f212b36786d23302",
         "size_bytes": 77291,
-        "location": "ac7a2519d4ac491c575036b259b1740b4d2c97bbe1dda1635cc821a6e05fb99c.parquet",
+        "location": "3e1153992d575277708840e1543049e9c09ca1dc6676e814dd19c3e9c088a3fa.parquet",
         "contract": {
           "column_support": {
             "context": [
@@ -95,14 +95,14 @@
               "python": "3.14.10 (main, Oct 25 2026, 17:12:00) [Clang 21.0.0 (clang-2100.3.34.2)]"
             }
           },
-          "recipe_sha256": "aae13dec54992cf54c5a1749430a61abfd594eb5fb1298a4abd3717709419499",
+          "recipe_sha256": "33a441ad76b0eafe8e171e99d89e6d781550dec0ac7ffd637194867d77204b4e",
           "rows": 1017,
           "schema": "/////5ADAAAQAAAAAAAKAAwABgAFAAgACgAAAAABBAAMAAAACAAIAAAABAAIAAAABAAAAA4AAAAoAwAA4AIAAKwCAAB0AgAAMAIAAPgBAAC8AQAAhAEAAEgBAAAQAQAAzAAAAIgAAABEAAAABAAAACD9//8AAAEFEAAAACwAAAAEAAAAAAAAABgAAABzb3VyY2VfZ3JvdXBfcm93c19zaGEyNTYAAAAAHP3//1z9//8AAAECEAAAACgAAAAEAAAAAAAAABQAAABzb3VyY2VfZ3JvdXBfbWF4X3JvdwAAAAA8/v//AAAAASAAAACc/f//AAABAhAAAAAoAAAABAAAAAAAAAAUAAAAc291cmNlX2dyb3VwX21pbl9yb3cAAAAAfP7//wAAAAEgAAAA3P3//wAAAQIQAAAAKAAAAAQAAAAAAAAAFgAAAHNvdXJjZV9ncm91cF9yb3dfY291bnQAALz+//8AAAABIAAAABz+//8AAAEFEAAAACQAAAAEAAAAAAAAABMAAABwdWJsaXNoZXJfd29ya3NoZWV0ABD+//9Q/v//AAABBRAAAAAoAAAABAAAAAAAAAAVAAAAcmF3X3N1Ym1pc3Npb25fc3RhdHVzAAAASP7//4j+//8AAAEFEAAAACQAAAAEAAAAAAAAABEAAABzdWJtaXNzaW9uX3N0YXR1cwAAAHz+//+8/v//AAABBRAAAAAoAAAABAAAAAAAAAAVAAAAc3RhdHVzX21hcF9lc2NfcmVnaW9uAAAAtP7///T+//8AAAEFEAAAACQAAAAEAAAAAAAAABIAAAByYXdfbWFwX2VzY19yZWdpb24AAOj+//8o////AAABAhAAAAAoAAAABAAAAAAAAAAOAAAAbWFwX2VzY19yZWdpb24AAAgADAAIAAcACAAAAAAAAAEIAAAAaP///wAAAQUQAAAAJAAAAAQAAAAAAAAAEwAAAHJhd19kaXN0cmljdF9udW1iZXIAXP///5z///8AAAEFEAAAACAAAAAEAAAAAAAAAA8AAABkaXN0cmljdF9udW1iZXIAjP///8z///8AAAEFEAAAACQAAAAEAAAAAAAAABEAAAByYXdfZGlzdHJpY3RfbmFtZQAAAMD///8QABQACAAGAAcADAAAABAAEAAAAAAAAQUQAAAAJAAAAAQAAAAAAAAADQAAAGRpc3RyaWN0X25hbWUAAAAEAAQABAAAAAAAAAA=",
           "schema_sha256": "138631f8405007017f4f9ecd06ba27b4754a41b488bd73b43a1e1d6278cfb4ee",
           "semantics_sha256": "cfad871861dba8fc47b9dddf704905170f76064a838a39cb0ccf21fa8bbc6622"
         },
         "format": "parquet",
-        "processing_id": "fd09c24887c59e4533ccba6dbb73448e705d48727df61132ee6764f4130a8534",
+        "processing_id": "feba2e2444d711fd250198287c1c653c3d91c24cc6622b9f0325e39f8a9d3d45",
         "output": "leaf"
       }
     },
@@ -117,9 +117,9 @@
           "table": "district"
         },
         "metadata": {
-          "location": "d69d0e59079d9e54838ebb43c15973f7057a5dc6aaf6a2759a749f3db35c8933.json",
-          "sha256": "d69d0e59079d9e54838ebb43c15973f7057a5dc6aaf6a2759a749f3db35c8933",
-          "size_bytes": 33967
+          "location": "67df4cbc947b8226e5ffd48faedf935fc048fb7f7a999a66b95ccf1d59a995c7.json",
+          "sha256": "67df4cbc947b8226e5ffd48faedf935fc048fb7f7a999a66b95ccf1d59a995c7",
+          "size_bytes": 33965
         }
       },
       "artifact": {
@@ -359,7 +359,7 @@
           "semantics_sha256": "ea04da93461733bdcb1db587f8837c0e131d11714fbf46a20a6b02a758dee2d2"
         },
         "format": "parquet",
-        "processing_id": "b8f78661a28a39ef64b4abb983bce81d73a93e8537f870de5501352de072a567",
+        "processing_id": "e8690676bf563a586d4f906073f21c7ddd8d91cde78208fea2af5e9f4ef37a93",
         "output": "leaf"
       }
     }
