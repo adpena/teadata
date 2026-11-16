@@ -24,20 +24,20 @@ def test_single_view_stream_is_lazy_filtered_exact_and_carries_receipt(tmp_path,
     key, _, _ = fixture["leaves"]["student"]
     view = release.table(key).select("amount")
     expected = view.to_arrow()
-    source = DataRelease.analytical_dataset
+    source = DataRelease._open_artifact
     opened = []
 
     def open_leaf(self, identity):
         opened.append(identity)
         return source(self, identity)
 
-    monkeypatch.setattr(DataRelease, "analytical_dataset", open_leaf)
+    monkeypatch.setattr(DataRelease, "_open_artifact", open_leaf)
     monkeypatch.setattr(type(view), "to_arrow", lambda *_: pytest.fail("Stream collected a table"))
     stream = view.iter_batches()
     assert opened == []
     with closing(stream):
         batches = list(stream)
-    assert len(opened) == 1
+    assert len(opened) == 2  # schema preparation and the owned consumption stream
     assert pa.Table.from_batches(batches).equals(expected)
     assert [value for batch in batches for value in batch["amount"].to_pylist()] == [0, None, None, large]
     assert all(json.loads(batch.schema.metadata[b"teadata_provenance"]) == receipt(view) for batch in batches)
@@ -58,28 +58,28 @@ def test_multi_source_batches_retain_rows_receipts_and_close_before_later_leaves
     batches = list(view.iter_batches())
     assert pa.Table.from_batches(batches).equals(expected)
     assert all(json.loads(batch.schema.metadata[b"teadata_provenance"]) == receipt(view) for batch in batches)
-    source = DataRelease.analytical_dataset
+    source = DataRelease._open_artifact
     opened = []
 
     def open_leaf(self, identity):
         opened.append(identity)
-        if len(opened) > 1:
+        if identity not in opened[:1] and opened:
             raise RuntimeError("later leaf unavailable")
         return source(self, identity)
 
-    monkeypatch.setattr(DataRelease, "analytical_dataset", open_leaf)
+    monkeypatch.setattr(DataRelease, "_open_artifact", open_leaf)
     stream = view.iter_batches()
     assert opened == []
     with closing(stream):
         assert next(stream).num_rows == 2
-    assert len(opened) == 1
+    assert len(opened) == 2
     assert list(stream) == []
     opened.clear()
     with closing(view.iter_batches()) as failing:
         next(failing)
         with pytest.raises(RuntimeError, match="later leaf unavailable"):
             next(failing)
-    assert len(opened) == 2
+    assert len(opened) == 3
 
 
 @pytest.mark.parametrize("finish", ["exhaust", "early", "source_error", "encode_error"])

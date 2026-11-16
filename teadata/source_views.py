@@ -55,22 +55,43 @@ def _entity_key(artifact: ArtifactRef) -> str:
 
 def _entity_predicate(native: Dataset, entity_key: str, identifiers: tuple[str, ...], *, width: int) -> Expression:
     import pyarrow as pa
-    import pyarrow.compute as arrow_compute
     from pyarrow.dataset import field, scalar
 
-    pc: Any = arrow_compute
     if not identifiers:
         return scalar(False)
     key_type = native.schema.field(entity_key).type
     if not (pa.types.is_string(key_type) or pa.types.is_large_string(key_type)):
         raise ValueError("Source identifier batches require Arrow strings")
-    selected = pa.array(["'" + identifier for identifier in identifiers], type=key_type)
+    batches = native.to_batches(columns=[entity_key], batch_size=65_536,
+                               use_threads=False, **_dataset_scan_options())
+    aliases = _entity_aliases(batches, key_type, identifiers, width=width)
+    return field(entity_key).isin(aliases)
+
+
+def _entity_aliases(batches, key_type, identifiers: tuple[str, ...], *, width: int):
+    import pyarrow.compute as arrow_compute
+    from .arrow_io import primitive_array
+
+    pc: Any = arrow_compute  # Arrow registers these kernels dynamically.
+    selected = primitive_array(["'" + identifier for identifier in identifiers], key_type)
     aliases = set()
-    for batch in native.to_batches(columns=[entity_key], batch_size=65_536, use_threads=False):
-        keys = batch.column(0)
-        normalized = canonical_source_identifiers(keys, width=width)
-        aliases.update(pc.unique(pc.filter(keys, pc.is_in(normalized, value_set=selected))).to_pylist())
-    return field(entity_key).isin(pa.array(sorted(aliases), type=key_type))
+    try:
+        for batch in batches:
+            keys = batch.column(0)
+            normalized = canonical_source_identifiers(keys, width=width)
+            aliases.update(pc.unique(pc.filter(keys, pc.is_in(normalized, value_set=selected))).to_pylist())
+    finally:
+        if close := getattr(batches, "close", None):
+            close()
+    return primitive_array(sorted(aliases), key_type)
+
+
+def _dataset_scan_options() -> dict[str, Any]:
+    from pyarrow.dataset import ParquetFragmentScanOptions
+
+    return {"batch_readahead": 0, "fragment_readahead": 0, "cache_metadata": False,
+            "fragment_scan_options": ParquetFragmentScanOptions(
+                pre_buffer=False, use_buffered_stream=True, buffer_size=65_536)}
 
 
 def _provenance_batches(batches: Generator[pa.RecordBatch, None, None],
@@ -136,9 +157,8 @@ class SourceTable:
     def __getitem__(self, key: list[str] | tuple[str, ...] | Expression) -> SourceTable: ...
 
     def __getitem__(self, key: str | list[str] | tuple[str, ...] | Expression) -> Expression | SourceTable:
-        from pyarrow.dataset import field
-
         if isinstance(key, str):
+            from pyarrow.dataset import field
             return field(key)
         if isinstance(key, (list, tuple)):
             return self.select(*key)
@@ -238,9 +258,8 @@ class PartitionedSourceTable:
     def __getitem__(self, key: list[str] | tuple[str, ...] | Expression) -> PartitionedSourceTable: ...
 
     def __getitem__(self, key: str | list[str] | tuple[str, ...] | Expression) -> Expression | PartitionedSourceTable:
-        from pyarrow.dataset import field
-
         if isinstance(key, str):
+            from pyarrow.dataset import field
             return field(key)
         if isinstance(key, (list, tuple)):
             return self.select(*key)
@@ -248,7 +267,6 @@ class PartitionedSourceTable:
 
     def _prepare(self, *, restore_original_headers: bool = False) -> _TableExport:
         import pyarrow as pa
-        from pyarrow.dataset import dataset
 
         from .analytical import _leaf_schema
 
@@ -269,6 +287,7 @@ class PartitionedSourceTable:
                     or not schema.equals(pa.schema([native.field(name) for name in plan.columns]), check_metadata=True)):
                 raise ContractError("Campus partitions have incompatible fields or source types. Read their exact editions separately.")
             if part._predicate is not None or part._queries:
+                from pyarrow.dataset import dataset
                 try:
                     empty = dataset(pa.Table.from_batches([], schema=native))
                     empty.scanner(filter=_bind_queries(part._predicate, part._queries, native))
@@ -359,6 +378,7 @@ class SourceFields:
     release: DataRelease
     edition: EditionKey
     identifier: str
+    _entity_build: tuple[str, str] | None = None
 
     def variables(self, pattern: str | re.Pattern[str] | None = None) -> tuple[dict[str, Any], ...]:
         """Discover fields in this exact source, optionally by regex on their names."""
@@ -368,7 +388,8 @@ class SourceFields:
 
     def select(self, *fields: str, where: Expression | None = None) -> pa.Table:
         """Project selected fields, native keys and their available source support."""
-        table = SourceTable(self.release, self.edition, _entity_ids=(self.identifier,)).select(*fields)
+        table = SourceTable(self.release, self.edition, _entity_ids=(self.identifier,),
+                            _entity_build=self._entity_build).select(*fields)
         if where is not None:
             table = table.where(where)
         return table.to_arrow()
@@ -450,7 +471,8 @@ class EntitySources:
         if len(choices) != 1:
             raise ContractError("Source name is ambiguous; select an exact EditionKey")
         (key,) = choices
-        return SourceFields(self.release.table(key).release, key, self.identifier)
+        table = self.release.table(key)
+        return SourceFields(table.release, key, self.identifier, _entity_build=table._entity_build)
 
     def __getitem__(self, name: str) -> SourceFields:
         return self.dataset(name)
@@ -720,7 +742,7 @@ class DatasetFields(_EntityFields):
 
 @dataclass(frozen=True, slots=True)
 class _TableExport:
-    scanner: Scanner | _PartitionScan
+    scanner: Scanner | _PartitionScan | _ParquetScan
     headers: tuple[tuple[str, ...], ...]
     restore_original_headers: bool
     rows_hint: int | None
@@ -732,18 +754,23 @@ class _TableExport:
         return self.scanner.projected_schema
 
     def batches(self) -> Generator[pa.RecordBatch, None, None]:
-        for batch in self.scanner.to_batches():
-            if self.restore_original_headers and any(column.null_count for column in batch.columns):
-                raise ContractError("A publisher-header export cannot substitute blanks for null values")
-            yield batch
+        batches = self.scanner.to_batches()
+        try:
+            for batch in batches:
+                if self.restore_original_headers and any(column.null_count for column in batch.columns):
+                    raise ContractError("A publisher-header export cannot substitute blanks for null values")
+                yield batch
+        finally:
+            if close := getattr(batches, "close", None):
+                close()
 
     def to_arrow(self) -> pa.Table:
         import pyarrow as pa
 
-        schema = self.schema
-        if isinstance(self.scanner, _PartitionScan):
-            schema = schema.with_metadata({b"teadata_provenance": canonical_json(self.provenance().to_dict()).encode()})
-        return pa.Table.from_batches(self.batches(), schema=schema)
+        schema = self.schema.with_metadata({**(self.schema.metadata or {}),
+            b"teadata_provenance": canonical_json(self.provenance().to_dict()).encode()})
+        with _owned_batches(self.batches()) as batches:
+            return pa.Table.from_batches(batches, schema=schema)
 
     def to_df(self) -> pd.DataFrame:
         import pandas as pd
@@ -803,8 +830,96 @@ class _PartitionScan:
             export = _open_export(part.release, plan, restore_original_headers=plan.restore_original_headers,
                                   predicate=part._predicate, queries=part._queries, period=part.measurement_period,
                                   entity_build=part._entity_build, entity_ids=part._entity_ids)
-            for batch in export.batches():
-                yield batch.replace_schema_metadata(None)
+            batches = export.batches()
+            try:
+                for batch in batches:
+                    yield batch.replace_schema_metadata(None)
+            finally:
+                batches.close()
+
+
+def _projected_schema(schema: pa.Schema, columns: tuple[str, ...]) -> pa.Schema:
+    import pyarrow as pa
+
+    return pa.schema([schema.field(name) for name in columns], metadata=schema.metadata)
+
+
+def _require_unchanged_stream(stream: BinaryIO, signature: tuple[int, ...]) -> None:
+    state = os.fstat(stream.fileno())
+    if (state.st_ino, state.st_size, state.st_mtime_ns, state.st_ctime_ns) != signature:
+        raise ContractError("Native artifact changed during its owned read")
+
+
+@dataclass(frozen=True, slots=True)
+class _ParquetScan:
+    """One descriptor-owned plain projection; no handles survive preparation."""
+
+    release: DataRelease
+    artifact: ArtifactRef
+    columns: tuple[str, ...]
+    entity_ids: tuple[str, ...] | None
+    projected_schema: pa.Schema
+
+    @classmethod
+    def prepare(cls, release: DataRelease, artifact: ArtifactRef, columns: tuple[str, ...],
+                entity_ids: tuple[str, ...] | None) -> _ParquetScan:
+        import pyarrow as pa
+        import pyarrow.parquet as pq
+
+        if release.catalog.artifact_ref(artifact.identity) != artifact:
+            raise ContractError("Native projection descriptor changed before preparation")
+        with release._open_artifact(artifact.identity) as (source, signature):
+            with pq.ParquetFile(source, pre_buffer=False, buffer_size=65_536) as parquet:
+                schema = _projected_schema(parquet.schema_arrow, columns)
+                if entity_ids:
+                    key_type = parquet.schema_arrow.field(_entity_key(artifact)).type
+                    if not (pa.types.is_string(key_type) or pa.types.is_large_string(key_type)):
+                        raise ValueError("Source identifier batches require Arrow strings")
+                _require_unchanged_stream(source, signature)
+        return cls(release, artifact, columns, entity_ids, schema)
+
+    def to_batches(self) -> Generator[pa.RecordBatch, None, None]:
+        import pyarrow.compute as arrow_compute
+        import pyarrow.parquet as pq
+
+        pc: Any = arrow_compute  # Arrow registers these kernels dynamically.
+        if self.release.catalog.artifact_ref(self.artifact.identity) != self.artifact:
+            raise ContractError("Native projection descriptor changed before consumption")
+        with self.release._open_artifact(self.artifact.identity) as (source, signature):
+            with pq.ParquetFile(source, pre_buffer=False, buffer_size=65_536) as parquet:
+                if not _projected_schema(parquet.schema_arrow, self.columns).equals(
+                    self.projected_schema, check_metadata=True,
+                ):
+                    raise ContractError("Native projection schema changed before consumption")
+                if self.entity_ids == ():
+                    return
+                columns, aliases, key = self.columns, None, None
+                if self.entity_ids is not None:
+                    key = _entity_key(self.artifact)
+                    aliases = _entity_aliases(
+                        parquet.iter_batches(batch_size=65_536, columns=[key], use_threads=False),
+                        parquet.schema_arrow.field(key).type, self.entity_ids,
+                        width=6 if self.artifact.edition.scope == "district" else 9,
+                    )
+                    _require_unchanged_stream(source, signature)
+                    if not len(aliases):
+                        return
+                    if key not in columns:
+                        columns = (*columns, key)
+                batches = parquet.iter_batches(batch_size=256, columns=list(columns), use_threads=False)
+                try:
+                    for batch in batches:
+                        if aliases is not None:
+                            assert key is not None
+                            batch = batch.filter(pc.is_in(batch.column(key), value_set=aliases)).select(self.columns)
+                        _require_unchanged_stream(source, signature)
+                        if not batch.schema.equals(self.projected_schema, check_metadata=True):
+                            raise ContractError("Native projection returned a different schema")
+                        if batch.num_rows:
+                            yield batch
+                finally:
+                    if close := getattr(batches, "close", None):
+                        close()
 
 
 def _plan_export(release: DataRelease, edition: EditionKey, *, restore_original_headers: bool,
@@ -915,15 +1030,25 @@ def _open_export(
     edition = artifact.edition
     opaque_filter = predicate is not None
     entity_key = _entity_key(artifact) if entity_ids is not None else None
-    native = release.analytical_dataset(artifact.identity)
-    if entity_key is not None and entity_ids is not None:
-        expression = _entity_predicate(native, entity_key, entity_ids,
-                                       width=6 if edition.scope == "district" else 9)
-        predicate = expression if predicate is None else predicate & expression
-    if queries:
-        predicate = _bind_queries(predicate, queries, native.schema)
-    rows_hint = artifact.contract["rows"] if predicate is None else None
-    scanner = native.scanner(columns=list(selection.columns), filter=predicate, batch_size=256, use_threads=False)
+    # Parquet's dotted-path selectors can differ from an Arrow expression's
+    # literal field-name semantics. Keep those unusual names on the existing
+    # Dataset executor, alongside explicit predicates and queries.
+    plain = (predicate is None and not queries and not any("." in name for name in selection.columns)
+             and (entity_key is None or "." not in entity_key))
+    if plain:
+        scanner = _ParquetScan.prepare(release, artifact, selection.columns, entity_ids)
+        rows_hint = artifact.contract["rows"] if entity_ids is None else None
+    else:
+        native = release.analytical_dataset(artifact.identity)
+        if entity_key is not None and entity_ids is not None:
+            expression = _entity_predicate(native, entity_key, entity_ids,
+                                           width=6 if edition.scope == "district" else 9)
+            predicate = expression if predicate is None else predicate & expression
+        if queries:
+            predicate = _bind_queries(predicate, queries, native.schema)
+        rows_hint = artifact.contract["rows"] if predicate is None else None
+        scanner = native.scanner(columns=list(selection.columns), filter=predicate, batch_size=256,
+                                 use_threads=False, **_dataset_scan_options())
     lineage: dict[str, Any] = {"build_id": release.build_id, "edition": edition.to_dict(), "artifact_sha256": artifact.sha256,
                                "manifest_sha256": release.manifest_sha256}
     if period is not None:
@@ -968,6 +1093,16 @@ class _StreamingExport(Protocol):
     def provenance(self) -> _WriterProvenance: ...
 
 
+@contextmanager
+def _owned_batches(batches: Iterator[pa.RecordBatch]) -> Generator[Iterator[pa.RecordBatch], None, None]:
+    """Close even a retained iterator when encoding or a consumer fails."""
+    try:
+        yield batches
+    finally:
+        if close := getattr(batches, "close", None):
+            close()
+
+
 def write_csv(table: _StreamingExport, path_or_buf: str | Path | BinaryIO) -> None:
     from pyarrow.csv import CSVWriter, WriteOptions
 
@@ -977,8 +1112,9 @@ def write_csv(table: _StreamingExport, path_or_buf: str | Path | BinaryIO) -> No
             csv.writer(labels, lineterminator="\r\n").writerows(table.headers)
             stream.write(labels.getvalue().encode("utf-8"))
         with CSVWriter(stream, table.schema, write_options=WriteOptions(include_header=not table.restore_original_headers)) as writer:
-            for batch in table.batches():
-                writer.write_batch(batch)
+            with _owned_batches(table.batches()) as batches:
+                for batch in batches:
+                    writer.write_batch(batch)
 
 
 @contextmanager
@@ -1072,10 +1208,11 @@ def write_excel(table: _StreamingExport, path_or_buf: str | Path | BinaryIO) -> 
         for row in table.headers:
             sheet.append(list(cells(row)))
         rows = 0
-        for batch in table.batches():
-            rows += batch.num_rows
-            if rows > max_rows:
-                raise ValueError(row_limit_error)
-            for row in zip(*(column.to_pylist() for column in batch.columns), strict=True):
-                sheet.append(list(cells(row)))
+        with _owned_batches(table.batches()) as batches:
+            for batch in batches:
+                rows += batch.num_rows
+                if rows > max_rows:
+                    raise ValueError(row_limit_error)
+                for row in zip(*(column.to_pylist() for column in batch.columns), strict=True):
+                    sheet.append(list(cells(row)))
         provenance._append_sheet(workbook, rows=rows)

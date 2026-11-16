@@ -68,6 +68,19 @@ Python 3.14 and 3.15 are required compatibility targets alongside supported earl
 
 ## Completing Source Integration
 
+- `teadata/default_release.json` is the single packaged default manifest pin.
+  Source checkouts and installed packages use the same selector; historical
+  `.cache` manifests require explicit selection. Keep a candidate's default pin
+  unfinalized until its normal parent is sealed and qualified, then finalize
+  the actual manifest SHA before packaging. Never publish a null selector or
+  infer a release from the package version. Use explicit retained manifests
+  for producer and qualification work; strict offline mode must never fetch.
+- Freeze processing Python, the lock and selected inputs before a normal data
+  build. Finalizing only the packaged JSON pin and documentation may reuse that
+  build only when `processor_identity()` and input closure still match. Retain
+  actual producer and final package identities. Publish immutable data assets
+  before exposing a software default that refers to them.
+
 - When adding a registered source or crosswalk, include `test_every_packaged_version_and_declared_profile_has_an_offline_schema` and `test_latest_source_opt_ins_preserve_unaffected_preexisting_config` in the initial focused family checks.
   Run these existing schema-format and configuration-isolation checks before the whole canonical suite; do not add a separate runner or test policy.
 

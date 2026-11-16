@@ -146,7 +146,7 @@ def test_series_plans_once_and_streams_selected_years_with_provenance(tmp_path, 
     assert not reads
     batches = series.iter_batches()
     assert next(batches)["measurement_school_year"].to_pylist() == [2025, 2025]
-    assert reads == [children[2025].manifest_sha256]
+    assert reads == [children[2025].manifest_sha256] * 2  # preflight then owned read
     batches.close()
     table = series.to_arrow()
     assert table["measurement_school_year"].to_pylist() == [2025, 2025, 2023, 2023, 2024, 2024]
@@ -352,7 +352,7 @@ def test_pair_years_aligns_only_two_pinned_leaves_and_keeps_absences(tmp_path, m
     assert not opened
     assert receipt["cross_year_comparability"] == receipt["historical_entity_continuity"] == "unassessed"
     table = pair.to_arrow()
-    assert opened == [children[year].manifest_sha256 for year in (2023, 2025)]
+    assert opened == [children[year].manifest_sha256 for year in (2023, 2023, 2025, 2025)]
     assert table["campus_number"].to_pylist() == ["000000004", "000000999", "000000002"]
     assert table["from_campus_number"].to_pylist() == ["004", None, "002"]
     assert table["from_present"].to_pylist() == [True, False, True]

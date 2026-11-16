@@ -277,17 +277,22 @@ class ObservationSeries:
 
     def _iter_batches(self) -> Generator[pa.RecordBatch, None, None]:
         import pyarrow as pa
+        from .arrow_io import primitive_scalar
 
         fields = tuple(self.schema)[1:]
         for year, view, selected, _ in self._sources:
-            scalar = pa.scalar(year, type=pa.int32())
+            scalar = primitive_scalar(year, pa.int32())
             offsets = {name: position for position, name in enumerate(selected.columns)}
             export = _open_export(view.release, selected, period=view.measurement_period,
                                   entity_build=view._entity_build, entity_ids=view._entity_ids)
-            for batch in export.batches():
-                columns = [batch.column(offsets[field.name]) if field.name in offsets
-                           else pa.nulls(batch.num_rows, type=field.type) for field in fields]
-                yield pa.RecordBatch.from_arrays([pa.repeat(scalar, batch.num_rows), *columns], schema=self.schema)
+            batches = export.batches()
+            try:
+                for batch in batches:
+                    columns = [batch.column(offsets[field.name]) if field.name in offsets
+                               else pa.nulls(batch.num_rows, type=field.type) for field in fields]
+                    yield pa.RecordBatch.from_arrays([pa.repeat(scalar, batch.num_rows), *columns], schema=self.schema)
+            finally:
+                batches.close()
 
     def to_arrow(self) -> pa.Table:
         """Collect the series as an Arrow table with its source provenance."""

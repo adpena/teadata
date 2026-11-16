@@ -508,6 +508,34 @@ class DataRelease:
         with self._artifact_lock(digest):
             return self._artifact(role, discard_cached_reads=discard_cached_reads)
 
+    @contextmanager
+    def _open_artifact(self, role: str):
+        """Own a v3 reader bound to the existing successful byte admission.
+
+        No file survives this context and no new verification cache is created.
+        The lock covers admission/open only, rather than a slow consumer.
+        """
+        if not self._v3:
+            raise ContractError("An owned native reader requires a schema3/schema4 source release")
+        descriptor = self.catalog.artifact_ref(role)
+        with self._artifact_lock(descriptor.sha256):
+            path = self.artifact(role, discard_cached_reads=True)
+            admitted_path, signature = self._verified_bytes[descriptor.sha256]
+            if path != admitted_path:
+                raise ContractError("Native reader differs from its admitted artifact")
+            stream = path.open("rb")
+            try:
+                state = os.fstat(stream.fileno())
+                if (state.st_ino, state.st_size, state.st_mtime_ns, state.st_ctime_ns) != signature:
+                    raise ContractError("Native artifact changed between verification and opening")
+            except BaseException:
+                stream.close()
+                raise
+        try:
+            yield stream, signature
+        finally:
+            stream.close()
+
     def _artifact(self, role: str, *, discard_cached_reads: bool = False) -> Path:
         identify = partial(file_identity, discard_cached_reads=True) if discard_cached_reads else file_identity
         reusable = _artifact_cache_reusable()
@@ -719,7 +747,7 @@ class DataRelease:
         """
         if self._v3:
             import pyarrow.dataset as ds
-            return ds.dataset(self.artifact(name), format="parquet")
+            return ds.dataset(self.artifact(name, discard_cached_reads=True), format="parquet")
         try:
             role = ANALYTICAL_DATASETS[name]
         except KeyError as error:
@@ -760,7 +788,8 @@ class DataRelease:
         """Start a lazy scan bound to an exact standalone or attached native edition."""
         from .source_views import SourceTable
 
-        return SourceTable(self._native_edition_release(edition), edition)
+        return SourceTable(self._native_edition_release(edition), edition,
+                           _entity_build=None if self._v3 else (self.build_id, self.manifest_sha256))
 
     def tprs_student_campus_index(self, *, edition: str) -> TPRSStudentCampusIndex:
         """Prepare reusable point routes for one literal TPRS Student report edition."""
@@ -1292,14 +1321,58 @@ def release_offline() -> bool:
     return value == "1"
 
 
+def _packaged_default_release() -> tuple[str, str]:
+    """Read the small immutable default pin; never guess or select old data."""
+    import re
+    from urllib.parse import urlsplit
+
+    resource = Path(__file__).with_name("default_release.json")
+    try:
+        with resource.open("rb") as stream:
+            raw = stream.read(65_537)
+        if len(raw) > 65_536:
+            raise ValueError("Selector exceeds 64 KiB")
+        def unique_object(pairs):
+            value = {}
+            for key, item in pairs:
+                if key in value:
+                    raise ValueError("Duplicate selector key")
+                value[key] = item
+            return value
+        value = json.loads(raw, object_pairs_hook=unique_object)
+        if (not isinstance(value, dict) or set(value) != {"schema_version", "url", "sha256"}
+                or type(value["schema_version"]) is not int or value["schema_version"] != 1):
+            raise ValueError("Expected schema_version 1, url and sha256")
+        url, digest = value["url"], value["sha256"]
+        validate_http_url(url)
+        if not isinstance(url, str) or any(ord(character) <= 32 or ord(character) == 127 for character in url):
+            raise ValueError("Default manifest URLs cannot contain spaces or controls")
+        parsed = urlsplit(url)
+        if (parsed.scheme != "https" or parsed.netloc != "github.com" or parsed.query or parsed.fragment
+                or not re.fullmatch(r"/adpena/teadata/releases/download/v[0-9]+\.[0-9]+\.[0-9]+/release\.json", parsed.path)):
+            raise ValueError("Expected a versioned TEA Data release manifest URL")
+        if not isinstance(digest, str) or re.fullmatch("[0-9a-f]{64}", digest) is None:
+            raise ValueError("Expected a finalized lowercase SHA-256 pin")
+    except (OSError, ValueError, TypeError, KeyError) as error:
+        raise ContractError(
+            "The packaged default release selector is missing, malformed or unfinalized. "
+            "Select an explicit retained manifest with TEADATA_RELEASE or using_release()."
+        ) from error
+    return url, digest
+
+
 def current_release() -> DataRelease:
     active = _ACTIVE_RELEASE.get()
     if active is not None:
         return active
     source = os.environ.get("TEADATA_RELEASE") or os.environ.get("TEADATA_RELEASE_URL")
-    if not source:
-        source = str(Path(__file__).with_name(".cache") / "release.json")
     expected_sha256 = os.environ.get("TEADATA_RELEASE_SHA256")
+    if not source:
+        source, packaged_sha256 = _packaged_default_release()
+        if expected_sha256 is not None and expected_sha256 != packaged_sha256:
+            raise ContractError("TEADATA_RELEASE_SHA256 conflicts with the packaged default release pin. "
+                                "Select TEADATA_RELEASE explicitly for another release.")
+        expected_sha256 = packaged_sha256
     offline = release_offline()
     local_manifest = None
     if "://" not in source:

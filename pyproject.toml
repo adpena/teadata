@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "teadata"
-version = "0.0.159"
+version = "0.0.160"
 description = "Pythonic data engine for Texas education datasets"
 authors = [{name="Alejandro Peña", email="adpena@gmail.com"}]
 readme = "README.md"
@@ -55,6 +55,7 @@ classifiers = [
 # Faster I/O / performance add-ons
 speedups = [
     "polars>=1.0",
+    "nanoarrow>=0.9.0; implementation_name == 'cpython' and python_version < '3.15' and ((sys_platform == 'darwin' and (platform_machine == 'arm64' or platform_machine == 'x86_64')) or (sys_platform == 'linux' and (platform_machine == 'aarch64' or platform_machine == 'x86_64')) or (sys_platform == 'win32' and platform_machine == 'AMD64'))",
 ]
 
 # Development tooling
@@ -143,7 +144,7 @@ include = ["teadata*"]
 exclude = ["tests*", "docs*", "examples*"]
 
 [tool.setuptools.package-data]
-teadata = ["teadata_sources.yaml", "methodologies/*.md", "methodologies/*.json", "schemas/*.json", "reference_cases/*.json"]
+teadata = ["teadata_sources.yaml", "default_release.json", "methodologies/*.md", "methodologies/*.json", "schemas/*.json", "reference_cases/*.json"]
 
 [tool.setuptools]
 include-package-data = false
@@ -164,6 +165,7 @@ known_first_party = ["teadata"]
 # Per-rule ignores by code
 [tool.deptry.per_rule_ignores]
 DEP002 = [
+    "nanoarrow",  # optional C Data encoder loaded with import_module in arrow_io
     # Indirect dependencies deliberately declared to publish secure extra graphs.
     "certifi",
     "requests",

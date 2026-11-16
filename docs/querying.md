@@ -827,3 +827,36 @@ Place labels come from the selected directory. A historical ID absent
 from that directory has no inferred city or county. Resolve names or
 cohorts first, then pass the IDs explicitly to `series()` for the desired
 performance-report periods.
+
+## Streaming projections and memory
+
+Source selection and provenance discovery remain lazy. Plain selected-column
+reads use an owned Parquet reader; explicit Arrow filters and query expressions
+use Arrow Dataset. Both executors admit the same pinned artifact and preserve
+its values, statuses, field metadata and source identity. A selected entity
+cohort first validates the complete identifier column, so this is bounded
+local scanning, not a claim of row-selective remote downloading. A Parquet
+artifact still requires its full verified download when absent from cache.
+
+Use `iter_batches()` for bounded processing and close its generator when
+stopping early. CSV and Excel exports stream; `to_arrow()` and `to_df()` collect
+the requested result. Arrow tables and batches retain the canonical receipt in
+`schema.metadata[b"teadata_provenance"]`; DataFrames expose that same receipt in
+`attrs["teadata_provenance"]`. Exact attached-source selections also identify
+the normal parent release. A standalone source has no inferred parent.
+
+The optional `speedups` extra uses the public Arrow C Data interface for flat
+primitive conversion on supported CPython wheel targets. The ordinary encoder
+remains functional elsewhere. This avoids initializing Pandas for plain native
+reads when the accelerator is installed; DataFrame output intentionally uses
+Pandas. Installing TEA Data, creating an empty engine and discovering its API
+do not acquire the observation corpus.
+
+A matched November 16, 2026 Tertiary ARM64 / Python 3.14.10 measurement used the
+same retained 159 release, interpreter and dependency lock for both readers.
+Texas, one district, all 1,202 reporting districts, one campus and a three-campus
+cohort produced identical row digests over two reads each. Peak process RSS
+fell from 352.7 to 285.2 MiB and total fresh-process time from 4.46 to 3.48 seconds.
+Small warm-query timings were mixed. These measurements describe that workload;
+they do not establish Linux container capacity, concurrent web throughput or
+an improvement for every query.
