@@ -1,35 +1,16 @@
 # Entity enrichment sources and years
 
-The **0.0.160 qualified normal composition** preserves all 13 normal159 base
-inputs and its 16 native children, adding the complete FY2026 district/charter
-budget family. Its [exact inventory](source-integration-status-0.0.160.json)
-records **17 attachments, 22 dataset IDs and 206 edition/scope keys**; 94
-registered source-only IDs remain unattached. The normal parent passed all
-17 canonical source gates and the bounded actual-parent namespace/DSL/export
-workflow. Software 0.0.160 packages this exact normal manifest pin as its default;
-explicit historical selections and offline mode retain their contracts. See
-[current identities and qualification scope](source-integration-status.md).
+Start with the [current source integration inventory](source-integration-status.md)
+for the packaged release pin, qualified datasets, measurement years, report
+editions, scopes and remaining gaps. That page and its immutable machine-readable
+inventory are the authority for current coverage; this page explains source
+definitions, methodological limits and historical releases.
 
-The **0.0.159 normal composition was published on November 16, 2026**
-([release](https://github.com/adpena/teadata/releases/tag/v0.0.159)). Its
-[exact inventory](source-integration-status-0.0.159.json) records 16 native
-bundles, 21 dataset IDs and 204 edition/scope keys, preserving all 13 normal158
-base inputs and its 15 children. It adds the 2025–26 district facility records
-and publisher submission statuses described below. Their source-specific limits
-remain explicit. Library publication does not establish application adoption;
-the historical tracked `.cache` files remain unchanged. Version 160 uses the
-packaged default pin described above.
-
-The [v0.0.158 normal release](https://github.com/adpena/teadata/releases/tag/v0.0.158)
-composes fifteen native bundles, 19 dataset IDs and 202 edition/scope/partition keys,
-alongside 13 unchanged base inputs. It includes PEIMS ethnicity for
-2018–19 through 2025–26 and programs for 2022–23 through 2025–26,
-statewide by district and campus plus direct Texas, and
-district transfer reports for 2023–24 through 2025–26. The primary-disability
-2012–13–2025–26 and staff FTE/salary 2022–23–2025–26 families remain available.
-The [integration inventory](source-integration-status-0.0.158.json) pins this exact
-selection. At version 158, library publication did not change deployed profiles
-or select data for an unconfigured wheel; explicit selection was required.
+Registration, acquisition, parsing, semantic qualification, release publication,
+query access and application adoption are separate stages. Neither a configured
+year nor a successful download establishes qualified coverage. Installing a newer
+reader does not change an explicitly pinned historical release. The historical
+tracked `.cache` files remain unchanged.
 
 College Credit adds school years **2021–22 through 2025–26** for district,
 20 ESC region and direct Texas scopes; there is no campus product. These summer
@@ -45,8 +26,11 @@ rows for **2009–10 through 2025–26**, plus direct Texas counts and ratios fo
 it does not establish each original historical name or definition. Category and
 EPP rows stay explicit, with no campus product or inferred institution linkage.
 Use the [workforce definitions](educator-workforce-sources.md) and the same lazy
-entity dataset namespaces and multi-year observation API. The separate retention
-and certification holds remain outside the normal release.
+entity dataset namespaces and multi-year observation API. Direct Texas retention
+and certification totals are also attached where qualified; the
+[current inventory's limits](source-integration-status.md#limits-and-remaining-integration-work)
+identify the held retention cohort and certification detail. These workforce
+products describe different populations and periods.
 
 PEIMS ethnicity preserves one row per reported group. Use the matching programs
 report's direct total rather than reconstructing it from masked categories.
@@ -59,8 +43,9 @@ Inspect each source's roster and limitations before pooling.
 
 ## Attendance and evaluation additions in the selected release
 
-The following attendance additions entered v0.0.154 and remain in v0.0.158.
-The SPP evaluation family entered v0.0.155 and also remains attached.
+The following attendance additions entered v0.0.154; the SPP evaluation family
+entered v0.0.155. Their current attachment and scope are recorded in the
+[selected inventory](source-integration-status.md#qualified-native-coverage).
 Standalone qualification, normal-parent composition, publication and application
 activation are distinct.
 The current work does not imply complete TAPR/TPRS domain coverage.
@@ -91,15 +76,13 @@ values. Select those dimensions explicitly; overlapping categories cannot be
 summed as unique staff. See [series exports](enrichment.md#observations-across-school-years)
 for CSV, DataFrame and Excel provenance and original-header behavior.
 
-For the current registration-to-release gap, see the dated
-[source integration inventory](source-integration-status.md) and its
-[machine-readable edition/scope comparison](source-integration-status-0.0.160.json).
-Configuration registers 126 IDs and 278 editions; 94 source-only IDs
-remain unattached. This is not proof of their publisher availability, acquisition
-or semantic qualification. The selected catalog's explicit per-field periods
-control actual observation years. Metadata-only catalog inspection/diff tools
-introduced in software v0.0.156 remain available; inspection does not acquire,
-qualify or attach a source.
+For the current registration-to-release gap, use the dated
+[source integration inventory](source-integration-status.md) and its linked
+machine-readable edition/scope comparison. An unattached registered ID is not
+proof of publisher availability, acquisition or semantic qualification. The
+selected catalog's explicit per-field periods control actual observation years.
+Metadata-only catalog inspection and comparison do not acquire, qualify or
+attach a source.
 The v0.0.128 table below remains a historical release description.
 
 This historical table describes the [v0.0.128 entity release](https://github.com/adpena/teadata/releases/tag/v0.0.128), build ID `17061ef34da36b4c968e0d162cfeb2ba0dfddd64fe4fd8067a785b3dd2bca685`. It includes all 13 recorded inputs, including roster, boundary, and reference inputs used alongside enrichment. The catalog for each selected release records the requested and resolved edition, source period, and provenance.
@@ -148,7 +131,9 @@ Contact email is excluded from public products. The records do not establish
 campus enrollment or additive capacity: correction coverage is unknown,
 enrollment mixes source populations, and shared facilities cannot be allocated
 to campuses. No corrected series, capacity/utilization aggregate or campus join
-is admitted. Publication and downstream adoption remain pending separate actions.
+is admitted. This family was first published in v0.0.159; its current attachment
+is recorded in the [selected inventory](source-integration-status.md#qualified-native-coverage).
+Library publication and downstream application adoption remain separate gates.
 
 ### Historical archive routes
 
@@ -282,7 +267,7 @@ enrichment use their separately configured inputs.
 
 ## Published 2026 entity snapshot
 
-The explicit [v0.0.136 entity snapshot](data-releases.md#2026-entity-snapshot-and-tprs-student-data)
+The historical [v0.0.136 entity snapshot](data-releases.md#2026-entity-snapshot-and-tprs-student-data)
 updates `accountability` to calendar 2026 preliminary ratings and
 `campus_transfer_reports` to school year 2025–26. The other 11 resolved inputs,
 including both 2024–25 TAPR student and staff profiles, retain their source
@@ -591,6 +576,6 @@ through `--native-release` with its manifest SHA-256 and adjacent
 `provenance` store. It uses the same checks when that candidate is attached
 to an entity release. Verification replays the archived configuration,
 crosswalk, workbooks, roster pages, and newsroom controls against the
-physical and public Arrow tables. The child published in v0.0.146 is attached
-to the selected v0.0.158 normal release; the held non-university charter
-population remains excluded.
+physical and public Arrow tables. The child was published in v0.0.146 and is
+attached to the [selected normal release](source-integration-status.md#qualified-native-coverage);
+the held non-university charter population remains excluded.
