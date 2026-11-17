@@ -2222,7 +2222,7 @@
   "selected_catalog": {
     "schema_version": 1,
     "release": {
-      "source": "[retained local manifest]",
+      "source": "https://github.com/adpena/teadata/releases/download/v0.0.163/release.json",
       "manifest_sha256": "c9c0f7b89da5e3ae4126c1ff255a772c4d5ec6addc5f9a27099366b3a5866629",
       "build_id": "18960162f1c61139cf32cdd3e1702de213f3723702eae55f9af9b1a5d1370963"
     },
@@ -26208,6 +26208,6 @@
   ],
   "generation_context": {
     "retained_generator_output_sha256": "8de8f0e3c6b119a7933c40cb45ad1c24a5da6d387ccc1b801849a5d04db8c341",
-    "release_source_projection": "Only selected_catalog.release.source is redacted as [retained local manifest]; generator version/time/hashes, manifest hash, build and all semantic catalog data are unchanged. This is not an HTTP acquisition."
+    "release_source_projection": "Only selected_catalog.release.source is projected to the pinned publication URL for the packaged default. This labels the public release identity; it is not an HTTP acquisition or proof that publication has completed. Metadata was generated from the retained local manifest; its original generator output SHA-256, time, version, hashes, build and all semantic catalog data are preserved. Public availability is verified separately before package publication."
   }
 }
