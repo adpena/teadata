@@ -883,8 +883,138 @@ def _native_record_evidence(release: DataRelease, processing_store: ProvenanceSt
             "publisher": sorted(publisher_store.verify_record_closure(publisher_roots))}
 
 
+_EDUCATOR_AGGREGATE_PINS = {
+    "afdd42feb4380f1716af0ca89daf0e0a7382fcad49bba7e6a1578eaef28b7c68": "retention",
+    "a05d1150131ddb067272f43fdffb9c769ab2f46bd34443f14db4bfcb1b45d250": "certification",
+}
+_EDUCATOR_WITNESS = "60b36d3b53fd124bc7c8428867c57ea3e3159fa1f3f36f9d75f4c070ae5fa4a5"
+_EDUCATOR_WITNESS_SHA = "0a1be12bfaa32e09b3affbd65207db17c01dc1cb061812e50f67ccbd17d0e867"
+
+
+def _educator_aggregate_witness(store: ProvenanceStore, roots: Sequence[str]) -> dict[str, Any]:
+    """Read independent source observations, never producer output or a PASS receipt."""
+    store.verify_record_closure(roots)
+    record = store.read_record(_EDUCATOR_WITNESS)
+    if (record.get("kind") != "acquisition" or record.get("method") != "local_observation"
+            or record.get("artifact", {}).get("sha256") != _EDUCATOR_WITNESS_SHA
+            or set(record.get("parameters", {}).get("source_receipts", [])) != set(roots) - {_EDUCATOR_WITNESS}):
+        raise ReceiptError("Educator independent source witness or publisher receipt roots differ")
+    proof = json.loads(store.verify_artifact(_EDUCATOR_WITNESS_SHA).read_bytes())
+    if (proof.get("status") != "FROZEN_SOURCE_WITNESSES_NOT_MATERIALIZATION"
+            or proof.get("schema_version") != 1 or proof.get("source_release_activation") is not False):
+        raise ReceiptError("Educator independent source witness scope differs")
+    return proof
+
+
+def _educator_aggregate_rows(proof: Mapping[str, Any], kind: str,
+                             fields: Sequence[str]) -> dict[tuple[str, str], list[dict[str, Any]]]:
+    """Apply only the reviewed decoded-scalar raw-text representation."""
+    grouped: dict[tuple[str, str], list[dict[str, Any]]] = {}
+    seen = set()
+    for item in proof[kind]["rows"]:
+        values = item["values"]
+        label = values[0]
+        if (len(values) != len(fields) or not isinstance(label, str) or len(label) != 7
+                or not label[:4].isdigit() or label[4] != "-" or not label[5:].isdigit()):
+            raise ReceiptError("Educator witness row width or year label differs")
+        year = int(label[:4]) + 1
+        if label != f"{year - 1}-{year % 100:02d}":
+            raise ReceiptError("Educator witness year label is inconsistent")
+        dataset = (item["dataset"] if kind == "retention"
+                   else "educator_state_initial_certification_" + values[2].lower())
+        if (kind == "retention" and dataset.endswith("_preparation_route") and year == 2018
+                or kind == "certification" and (values[1], values[3], values[4]) != ("All", "All", "All")):
+            raise ReceiptError("Held retention rows or certification detail cannot be qualified")
+        ordinal = item["row"]
+        identity = dataset, year, ordinal
+        if type(ordinal) is not int or ordinal < 2 or identity in seen:
+            raise ReceiptError("Educator witness source coordinates are invalid or repeated")
+        seen.add(identity)
+        row = dict(zip(fields, values, strict=True))
+        row["publisher_worksheet_row"] = ordinal
+        for field, original in zip(fields, values, strict=True):
+            if field.endswith(("_count", "_ratio")):
+                numeric_types = (int, float) if field.endswith("_ratio") else (int,)
+                if original is not None and (type(original) not in numeric_types or not isfinite(original)
+                                             or original < 0 or field.endswith("_ratio") and original > 1):
+                    raise ReceiptError("Educator witness numeric value is invalid")
+                row[field] = float(original) if original is not None and field.endswith("_ratio") else original
+                row["raw_" + field] = "" if original is None else str(original)
+                row["status_" + field] = "missing" if original is None else "observed"
+            elif not isinstance(original, str):
+                raise ReceiptError("Educator witness identity must be a string")
+        grouped.setdefault((dataset, f"state_{year}"), []).append(row)
+    return grouped
+
+
+def _qualify_educator_aggregate(release: DataRelease, processing_store: ProvenanceStore,
+                               publisher_store: ProvenanceStore, kind: str,
+                               plan: Mapping[str, Any]) -> dict[str, Any]:
+    from teadata.dataset_metadata import DataPeriod, EditionKey
+
+    if (release.manifest_sha256 != plan["manifest_sha256"] or release.catalog.to_dict() != plan["catalog"]
+            or release.build_id != plan["catalog"]["build_id"]):
+        raise ReceiptError("Educator aggregate manifest or complete catalog differs from its reviewed identity")
+    release.verify()
+    evidence = _native_record_evidence(release, processing_store, publisher_store, plan["publisher_roots"])
+    proof = _educator_aggregate_witness(publisher_store, plan["publisher_roots"])
+    expected = _educator_aggregate_rows(proof, kind, plan["fields"])
+    cases = [EditionKey.from_dict(item["key"]) for item in plan["catalog"]["editions"].values()]
+    if (len(cases) != len(expected) or {(key.dataset, key.table) for key in cases} != expected.keys()
+            or any(key.scope != "state" for key in cases)
+            or sum(len(rows) for rows in expected.values()) != plan["rows"]):
+        raise ReceiptError("Educator aggregate witness and edition coverage differ")
+    rows_checked = 0
+    for key in cases:
+        raw = expected[key.dataset, key.table]
+        actual = release.table(key).to_arrow().to_pylist()
+        def sort(row: Mapping[str, Any]) -> int:
+            return row["publisher_worksheet_row"]
+        # Canonical JSON distinguishes bool/int, int/float and signed zero; raw
+        # text is str(decoded source scalar), not the XML lexical spelling.
+        if (any(row.keys() != raw[0].keys() or type(row.get("publisher_worksheet_row")) is not int for row in actual)
+                or _canonical(sorted(actual, key=sort)) != _canonical(sorted(raw, key=sort))):
+            raise ReceiptError(f"Educator aggregate raw/value/status/source-row parity differs: {key.dataset}/{key.table}")
+        year = int(key.table.removeprefix("state_"))
+        period = DataPeriod("school_year", year - 1, year).to_dict()
+        for field in plan["fields"]:
+            if field.endswith(("_count", "_ratio")):
+                metadata = release.catalog.field_metadata(field, scope=key.scope, edition=key)
+                if metadata is None or metadata.get("period") != period:
+                    raise ReceiptError(f"Educator aggregate metric period differs: {key.dataset}/{field}")
+        rows_checked += len(raw)
+    return {"status": "PASS_REVIEWED_NATIVE", "manifest_sha256": release.manifest_sha256,
+            "build_id": release.build_id, "editions": len(cases), "rows": rows_checked,
+            "processing_records": len(evidence["processing"]), "publisher_records": len(evidence["publisher"]),
+            "source_witness_receipt": _EDUCATOR_WITNESS, "held_route_rows_excluded": 5,
+            "certification_detail_qualified": False,
+            "qualification_scope": "pinned_native_family_against_retained_independent_XML_witnesses"}
+
+
+def _reviewed_educator_aggregate(release: DataRelease, store: ProvenanceStore) -> _NativeReview | None:
+    """Select only two reviewed children without opening resources for other pins."""
+    kind = _EDUCATOR_AGGREGATE_PINS.get(release.manifest_sha256)
+    if kind is None:
+        return None
+    from importlib.resources import files
+
+    document = json.loads(files("teadata").joinpath("reference_cases/native_educator_aggregates.json").read_text())
+    plan = document["children"][kind]
+    if (document.get("schema_version") != 1 or plan["manifest_sha256"] != release.manifest_sha256
+            or release.catalog.to_dict() != plan["catalog"]
+            or release.build_id != plan["catalog"]["build_id"]):
+        raise ReceiptError("Educator aggregate differs from the exact reviewed manifest, build or catalog")
+    processing_store = _retained_store(release.path.parent / "provenance")
+    return _NativeReview("educator " + kind,
+        partial(_qualify_educator_aggregate, release, processing_store, store, kind, plan),
+        partial(_native_record_evidence, release, processing_store, store, plan["publisher_roots"]))
+
+
 def _native_review(release: DataRelease, store: ProvenanceStore) -> _NativeReview:
     """Select one reviewed plan for standalone, parent and receipt-reuse gates."""
+    educator = _reviewed_educator_aggregate(release, store)
+    if educator is not None:
+        return educator
     from teadata.native_tapr_regional import (
         REVIEWED_MANIFEST as REGIONAL_TAPR_MANIFEST, qualify_tapr_regional, retained_regional_evidence,
     )

@@ -1,11 +1,12 @@
 # Educator workforce
 
 The three hiring products below first joined normal release 0.0.158 and remain
-attached to the selected normal 0.0.161 data release. The packaged default pin
+attached to the selected normal 0.0.163 data release. The packaged default pin
 selects that current data release; explicitly select historical 0.0.158 when
-reproducing its original parent. TAPR staff fields are separate. The retention
-and certification materializers below are intermediate source candidates until
-their qualified children are attached to a newly qualified normal parent.
+reproducing its original parent. TAPR staff fields are separate. Normal 0.0.163
+also attaches the qualified retention and direct certification families below:
+68 editions and 184 published rows, with the stated holds retained. See the
+[current inventory](source-integration-status.md) for exact parent and child coverage.
 
 ## Hiring in normal release 0.0.158
 
@@ -105,10 +106,10 @@ not enabled for these typed hiring tables.
 
 ## Statewide continuous teacher retention
 
-The local candidate admits three views of first-teaching cohorts from the
+The normal release admits three views of first-teaching cohorts from the
 April 2026 workbook, covering 2013–14 through 2024–25.
 
-| Dataset | Reported grouping | Cohorts admitted locally |
+| Dataset | Reported grouping | Cohorts admitted in normal 0.0.163 |
 |---|---|---|
 | `educator_state_retention_by_preparation_route` | Initial standard certification preparation route | 2013–14 through 2024–25, excluding 2017–18 |
 | `educator_state_retention_by_demographic_group` | Publisher race and ethnicity group | 2013–14 through 2024–25 |
@@ -171,7 +172,7 @@ years. A 2018 selection builds the demographic and gender editions.
 The September 2026 TEA workbook directly publishes 33 statewide role/year
 totals. The materializer selects those cells, rather than summing its detail.
 
-| Dataset | Academic years available in this candidate |
+| Dataset | Academic years in normal 0.0.163 |
 |---|---|
 | `educator_state_initial_certification_teacher` | 2015–16 through 2025–26 |
 | `educator_state_initial_certification_principal` | 2015–16 through 2025–26 |

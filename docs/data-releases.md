@@ -4,22 +4,33 @@ TEA Data keeps one source contract in `teadata/teadata_sources.yaml`. Each versi
 
 A build records the files it actually reads. The runtime catalog is embedded in the snapshot and SQLite sidecars. `release.json` selects the source and analytical artifacts by content hash and one build identity. Runtime consumers use the embedded catalog to interpret the snapshot. The default engine takes one manifest for the entity snapshot and its sidecars. Stand-alone data releases can be selected by their own pinned manifests.
 
-## Current normal release 0.0.161
+## Current normal release 0.0.163
 
-Software 0.0.162 retains this same qualified data release. Its changes are to
-bounded reader execution and hashing page advice; it does not revise source
-values, acquisition dates, definitions or published artifact identities.
+Software 0.0.163 selects the normal163 data release: 20 native attachments,
+31 dataset IDs and 277 edition/scope keys. It adds statewide continuous retention
+cohorts and direct initial certification totals, preserving their definitions,
+holds and original source identities. Entity name/variable discovery reads keys
+without loading full metadata values; temporary catalog and receipt validation
+traversals avoid self-retaining recursive closures. These correctness changes
+do not establish a production memory reduction.
 
-`DataEngine.load_default()` selects the packaged, immutable normal161 manifest
+`DataEngine.load_default()` selects the packaged, immutable normal163 manifest
 unless an explicit release or scoped context overrides it. Installation keeps
 source payloads external; discovery reads catalog metadata and observations
 remain lazy. Strict offline mode never fetches or substitutes another release.
 See the [current coverage and qualification inventory](source-integration-status.md).
 
-This release adds 2024–25 TAPR regional Student / Staff and direct Texas Staff.
-Only the reviewed 38 Student and five Staff bindings have measurement periods
-and units. Mobility and attrition still describe 2023–24. The remaining raw
-columns are preserved without invented interpretation.
+The two new educator attachments contain 151 retention rows across 35
+first teaching cohort/group editions and 33 direct certification role/year rows.
+The 2017–18 preparation-route retention cohort and all certification detail stay
+held. Certification academic-year finality is unknown. Use state observations
+through the normal release, not district/campus entity scalars. See the
+[workforce contracts](educator-workforce-sources.md).
+
+Retained 2024–25 TAPR regional Student / Staff and direct Texas Staff keep their
+reviewed 38 Student and five Staff bindings. Mobility and attrition still
+describe 2023–24. Remaining raw columns are preserved without invented units or
+measurement periods.
 
 Supported statewide comparisons resolve exact source editions through the
 normal parent, even when local and Texas values are in different attachments.

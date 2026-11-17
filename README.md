@@ -24,14 +24,15 @@ PyYAML's supported pure Python implementation is tested on 3.15.
 
 ```bash
 uv venv
-uv pip install teadata==0.0.161
+uv pip install teadata==0.0.163
 ```
 
-Version 0.0.161 packages one immutable normal-release URL and SHA-256 for
-`current_release()` and `DataEngine.load_default()`. The selected normal161
-composition passed all 18 attached source gates and adds regional TAPR Student
-and Staff plus direct Texas Staff to the existing FY2026 district and charter
-budget accounts. Qualified fields use the normal lazy access and export path.
+Version 0.0.163 packages one immutable normal-release URL and SHA-256 for
+`current_release()` and `DataEngine.load_default()`. The selected normal163
+composition retains the existing 18 attachments and adds statewide teacher
+retention cohorts and directly published initial certification totals: 20
+attachments and 31 native dataset IDs. Qualified fields use the normal lazy
+access and export path, with source-specific years, populations and holds.
 The wheel contains the selector and contracts; data files remain demand-loaded.
 See the [exact coverage and release identity](docs/source-integration-status.md).
 Explicit local/remote selections and `using_release` retain precedence.
@@ -121,8 +122,8 @@ separately. The package selects a pinned default; optionally select the same
 current release explicitly:
 
 ```bash
-export TEADATA_RELEASE_URL="https://github.com/adpena/teadata/releases/download/v0.0.161/release.json"
-export TEADATA_RELEASE_SHA256="e36e65506c978985f77bb015af7826fbcb61fd098af62532cb3a27fa8c8889f8"
+export TEADATA_RELEASE_URL="https://github.com/adpena/teadata/releases/download/v0.0.163/release.json"
+export TEADATA_RELEASE_SHA256="c9c0f7b89da5e3ae4126c1ff255a772c4d5ec6addc5f9a27099366b3a5866629"
 export TEADATA_RELEASE_OFFLINE=0
 ```
 
@@ -130,8 +131,8 @@ Unset `TEADATA_RELEASE` when using a URL: a configured local manifest takes
 precedence. For a complete downloaded bundle, set it to the local `release.json`
 instead. The manifest binds one normal engine release and its attached sources
 to exact content hashes. The [coverage inventory](docs/source-integration-status.md)
-and [release selection guide](docs/data-releases.md#current-normal-release-00161)
-show its 18 native attachments, including district/region/Texas College Credit
+and [release selection guide](docs/data-releases.md#current-normal-release-00163)
+show its 20 native attachments, including district/region/Texas College Credit
 and district hiring, reported EPP assignments and direct Texas hiring totals.
 The [TAPR and TPRS supplements](docs/data-releases.md#tapr-and-tprs-supplements)
 remain separately selectable sources.

@@ -453,11 +453,13 @@ not establish that an older document describes every current field.
 
 A native source release holds a verified table with its original row keys,
 source revision and field definitions. You can query and export it directly
-through `DataRelease`. The selected v0.0.158 normal release attaches the families
-listed in its [integration inventory](source-integration-status.md#version-00158-selected-normal-release)
-to the shared lazy entity namespaces; other standalone source tables remain
-separate. Standalone publication or installing the wheel does not select a
-normal release. See [published TAPR and TPRS supplements](data-releases.md#tapr-and-tprs-supplements)
+through `DataRelease`. Historical normal release v0.0.158 attached the families
+listed in its [frozen inventory](source-integration-status-0.0.158.json).
+See the [current selected inventory](source-integration-status.md#qualified-native-coverage)
+for today's attached families and shared lazy entity namespaces; other standalone
+source tables remain separate. Publishing a standalone table does not attach it
+to the selected normal release. Installing the wheel supplies its pinned default
+selector; it does not download the corpus or update an existing app deployment. See [published TAPR and TPRS supplements](data-releases.md#tapr-and-tprs-supplements)
 and [annual dropout](research-annual-dropout.md) for source-specific access.
 
 Annual dropout is available for school year 2024–25 across campus, district, county, region, and Texas. A campus or district can have several rows for the same school year, distinguished by grade span and calculation variant. Its published values are raw tokens.

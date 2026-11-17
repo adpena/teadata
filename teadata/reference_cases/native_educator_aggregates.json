@@ -1,0 +1,1162 @@
+{
+  "children": {
+    "certification": {
+      "catalog": {
+        "artifacts": {
+          "0af8bb4e5037ec6123c2068809bc1ba72a3d32e0c29348d9a490c65e7a1dbb29": "af5c1d8b1ada08ad10e7d37e70767dd01f843bfe00f2eb88809fa40a11b616b6",
+          "11d4848dfa3f4cc0b67cb27e93d95cbf89b1272bceca4be18e3e1ba22933ece5": "b74f2e332ae143e79c3eb903176d3c840580a7d08a092abc681df0653f193060",
+          "1e11ffb6e083a30df70980b9eeeed2f52057584bdb0296f2ca3108f089bc0e6c": "1a2c15962b84f4c58d0d9a9ce2255cbd0e1dd4cb74339ecf4e988c5880a138c6",
+          "3822d1f2f843477f05aa1f183d2a98d08545d85e7de8fadeca217fee4eed72e5": "522ed7ff8552a1af5670f759ecac0adb193e43f42b42e92e993f4b9e5be535a7",
+          "4214ee43f41732b1401faf462ac7cc236769cd9b2c82094ef1fd18250ba29001": "6ae057db34f6d7cd91402b6a34c1168c22b6e45ddf1b6eb3bc7a38995b7f5329",
+          "4309f9a083675a6c48753e9206dd717e86e652d78549c244b21f7029ed30a865": "43b24d08626b0d4cda0870dae717e87c6f7876600f53191b26c66a40c7135b2b",
+          "448841787278a396a0aeadad494164b2a6c792e2be63c841e2735384ec9ef5a8": "4fb81b2aca0e831a9f818fc85890d63c62c44fe2a3693b96db157e2964d7188d",
+          "4ad054c3d884e7485ba5ee86238615fa86d255c73e06ef7195be858279902e85": "59bc72aa24880d4613525b70e7b1db5bccb1f496215363c4e4f464cded213447",
+          "5ef6d972384c878ced09d48fa513ad3ae6010a6800f761cf97b9559b04a7ff42": "35549c4356a203e621d74a5f95f743381cf10ab70f2d25c1857c14fd32fc6539",
+          "65775be58b4dd7dfabe722ea85a033d5f29e4fcf07913a823c63c27442b92acb": "576a221712643cb3fae201d8b678c6a22c336005affc0fbd4dc7e08938a0ccff",
+          "688a72fbac1ea26c2cbea4767cffbd579ac34ed62ac05d5b584a61fdb3ea59d5": "c16a4c59d7c0323b52c20a69de267b98ef0c87bb1863529960ac12d54df9cebe",
+          "68a67b335cd7c21e5b4be8a42007ceded2f5d1f5c9d24c7f4a62180ec509ef82": "37032aa2a66aa3d363db0d568d015b82e8912954557922a6fb1e2a6d0dba85be",
+          "78c8fd4ce90a559b84b4c39dfad51dff267f8799f0fa0b6d4650c19b12252bf3": "daaac2459ca28016cad60da80eb083296acb46ca73a8fd83eaf5652881a4eb3f",
+          "7bc7a563b6a5f7a35ea6e12dbf77e25a39eb653c5176994ddcab73937496f11c": "42e1870f3015b4577f8867fe81697ed9b316e2ef3c472015592fa0813b86c5bb",
+          "7fd8601da993731d418881c31775052f9ce8d5e7e78fcee196cee8f8acc6d3f9": "424329a4a01e085d57e7cbc62d8d27b33f18967e57066a80f92bc097a7a0925b",
+          "80d3a940378658e8d415bf588dba04fe32263cb99b192889a0bc5744e025cc7e": "292f11ce32039330e8409bb2fb5575540e1fe4f48e4e58d287bbee9354152ed6",
+          "837fc16b46c5c11f9e15485c42f1e94bc30e02b7854ba7eea36c68096ebbac12": "665562b52ff2b0674308933d2ea524cac88b69f828c19bf19738b7695ba7033a",
+          "84222957c8947795b9a984b62ce31480feb0be1d5db4c3aa385cac9854a8f1d2": "1e7e947cf0676a61cb558e010f8ede48413222b1994db94771a2252b5ae838e4",
+          "a75e92e935babef58884f76070d0eb86bb7222e7dc642a7e542bf90979de0bed": "6046f0686153a7a70c745c260c86f4207b12fdeaabde1cff6daa3d7996ffc161",
+          "a77df803996428bc625f95469b3c294ee73a278a8d5116186a7de4a54706e184": "002658c4fd0b90b506ee495f7cac42d563286c005c574511a9b30c33a1ccb0d7",
+          "aea351f0aa202bd28353e2a5abc010dfe941b61ab331e50ce98b7a8336b2da90": "fb185267f05dadd6e3d33e2b9f5929ed7869e6f6c5d12744e6be52692071ec48",
+          "b3e1a63a5b482f5f2b565f3a31b5a00cbb2e4b59b1e11a66aaa3664e65e3ad73": "c67f47f57a1919f314cf7ccfec0ba351ab79ccaf16d7dbc8ee707c8acef2ee00",
+          "ba490892478e465fccd79e8fa2cdd6692e7fbd325598f9b02739915368038685": "63d252e0428036d822d793903e568a12ceb23e7635e40fe3900486d9cfe3584a",
+          "bf9d734ac192f967a6133e523ee94c079f90ad3bdb430997a93df71571bc2ab6": "8838de3f8e54393551f07a38b3bd8346d3a98a6a3943ca255a665267dcfaa698",
+          "bffc67e00044d80f3bc778fc9253cdeef6f0231469a8d69d824e4889e48d5b9c": "82f01a5193175b760b2d4a8630d281e380149c2da8593a9da3d4b295c6dd5e81",
+          "c5992628c2dbabde51cb25e510a59d28919bced17fcf122e22e698fe0041d7c8": "d5f7731ce95edcdcf2e1e3e6f50bc00f5baef27102be7b1821dc8148f506cdf0",
+          "ce30bdf158045514957aee32375361e2dc4d3b39678166a9f0ddea97134e49c3": "9f2bd2ac93a03d1a479c16b697e0a29a4f796c7c23f4df272dad0bf99bfa65ca",
+          "cfc728822371872f11db6bf9a42a6ea03f10a8cc7bf8cec34c68392b640d1e68": "255a2e3b1e500115e7005ecfc9d84e304a7cd946bd831ba73fc30e559a9b9aaf",
+          "d5c6708818672f7b163388774a853560d2fb7508e81601ad82548313158c78b5": "bab6fc26bba420537cca95641a8988578c676822bd3532a2258fa806caf7bec6",
+          "dc96f91b46b0d484ed40fa259c2ba8aa215494f2bf367c0507b4477ae5211f90": "3be9b9f24352d40c1e020d85f6936050672ffec421853d1edc54710fec311a96",
+          "dea7cc179ad31e93321157c1cbcc369c1f5e351f2408f1feb71eebaea46a463e": "68bed5979080dbca33ca793882330d9375b071c448097a779ef87c8ba53197ed",
+          "e16203bbb7beeee76d6da8874fb0dfa3db5d976d5ae0d52e28515bed8fe7570a": "4f85df24902ec087ca9eb8d721dcbb47359dc0ae75bfec18bee8047cfe581ca6",
+          "e5808edefae989f989894e147a4f52aa9b4ced5bdd2b85a81a87ea22b441329a": "f2ef37e59e89250c0c42b9c4549ca56898f038ff6c0d03c444619f4b7fa86028"
+        },
+        "build_id": "c380feaba35252bde41ab11612d375236f3d8ff003d34c93bbd9a198a289d4b0",
+        "description": "",
+        "editions": {
+          "002658c4fd0b90b506ee495f7cac42d563286c005c574511a9b30c33a1ccb0d7": {
+            "key": {
+              "dataset": "educator_state_initial_certification_superintendent",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2023"
+            },
+            "metadata": {
+              "location": "eb7d287bdd71f9c744505238e243925e5a0bc8bc54f1f8c43e48ac7c7c1718ab.json",
+              "sha256": "eb7d287bdd71f9c744505238e243925e5a0bc8bc54f1f8c43e48ac7c7c1718ab",
+              "size_bytes": 15742
+            }
+          },
+          "1a2c15962b84f4c58d0d9a9ce2255cbd0e1dd4cb74339ecf4e988c5880a138c6": {
+            "key": {
+              "dataset": "educator_state_initial_certification_superintendent",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2017"
+            },
+            "metadata": {
+              "location": "7d860b22268d23d285219ddc13678a8bc7bcf76335235ea49aea73bf9bd6829e.json",
+              "sha256": "7d860b22268d23d285219ddc13678a8bc7bcf76335235ea49aea73bf9bd6829e",
+              "size_bytes": 15762
+            }
+          },
+          "1e7e947cf0676a61cb558e010f8ede48413222b1994db94771a2252b5ae838e4": {
+            "key": {
+              "dataset": "educator_state_initial_certification_teacher",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2019"
+            },
+            "metadata": {
+              "location": "a91c9f9ac554014b3508cd8b66dc9876480c7e379cad23800d730b1a2a501b00.json",
+              "sha256": "a91c9f9ac554014b3508cd8b66dc9876480c7e379cad23800d730b1a2a501b00",
+              "size_bytes": 15688
+            }
+          },
+          "255a2e3b1e500115e7005ecfc9d84e304a7cd946bd831ba73fc30e559a9b9aaf": {
+            "key": {
+              "dataset": "educator_state_initial_certification_superintendent",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2018"
+            },
+            "metadata": {
+              "location": "36d14b9840dc20bf52ea5d4b5687f8d57ba949cfb64ea8123cc3485cc186e890.json",
+              "sha256": "36d14b9840dc20bf52ea5d4b5687f8d57ba949cfb64ea8123cc3485cc186e890",
+              "size_bytes": 15763
+            }
+          },
+          "292f11ce32039330e8409bb2fb5575540e1fe4f48e4e58d287bbee9354152ed6": {
+            "key": {
+              "dataset": "educator_state_initial_certification_principal",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2020"
+            },
+            "metadata": {
+              "location": "a892621c537f4b89f15d5ea93a598dd245e7e9c3f078ad279f5da4ec198ccd40.json",
+              "sha256": "a892621c537f4b89f15d5ea93a598dd245e7e9c3f078ad279f5da4ec198ccd40",
+              "size_bytes": 15693
+            }
+          },
+          "35549c4356a203e621d74a5f95f743381cf10ab70f2d25c1857c14fd32fc6539": {
+            "key": {
+              "dataset": "educator_state_initial_certification_teacher",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2022"
+            },
+            "metadata": {
+              "location": "f8d0b2942dbb3f578e76bcb6ef3acad5e2d617ad747e49959812d4059c112e94.json",
+              "sha256": "f8d0b2942dbb3f578e76bcb6ef3acad5e2d617ad747e49959812d4059c112e94",
+              "size_bytes": 15711
+            }
+          },
+          "37032aa2a66aa3d363db0d568d015b82e8912954557922a6fb1e2a6d0dba85be": {
+            "key": {
+              "dataset": "educator_state_initial_certification_superintendent",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2022"
+            },
+            "metadata": {
+              "location": "4e7b5adccd879c451b8d3b932022e7cdcaa2474194fd50cb50fc8b6135777134.json",
+              "sha256": "4e7b5adccd879c451b8d3b932022e7cdcaa2474194fd50cb50fc8b6135777134",
+              "size_bytes": 15742
+            }
+          },
+          "3be9b9f24352d40c1e020d85f6936050672ffec421853d1edc54710fec311a96": {
+            "key": {
+              "dataset": "educator_state_initial_certification_principal",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2019"
+            },
+            "metadata": {
+              "location": "84ce0b18ff4bef1b5e3c216a67b00797c7d3e66e84701dc4809251edf7d6d3cc.json",
+              "sha256": "84ce0b18ff4bef1b5e3c216a67b00797c7d3e66e84701dc4809251edf7d6d3cc",
+              "size_bytes": 15693
+            }
+          },
+          "424329a4a01e085d57e7cbc62d8d27b33f18967e57066a80f92bc097a7a0925b": {
+            "key": {
+              "dataset": "educator_state_initial_certification_teacher",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2024"
+            },
+            "metadata": {
+              "location": "906df860fdd906615c57c0d6c9eb730ba6d0296b95658692ea9764f2f51b2e52.json",
+              "sha256": "906df860fdd906615c57c0d6c9eb730ba6d0296b95658692ea9764f2f51b2e52",
+              "size_bytes": 15840
+            }
+          },
+          "42e1870f3015b4577f8867fe81697ed9b316e2ef3c472015592fa0813b86c5bb": {
+            "key": {
+              "dataset": "educator_state_initial_certification_superintendent",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2019"
+            },
+            "metadata": {
+              "location": "83856abd8b559c6580d82509065dc982f5756aef8f6d40961a2205dc4549a08f.json",
+              "sha256": "83856abd8b559c6580d82509065dc982f5756aef8f6d40961a2205dc4549a08f",
+              "size_bytes": 15759
+            }
+          },
+          "43b24d08626b0d4cda0870dae717e87c6f7876600f53191b26c66a40c7135b2b": {
+            "key": {
+              "dataset": "educator_state_initial_certification_superintendent",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2021"
+            },
+            "metadata": {
+              "location": "62ae4e5fc4da0961ae8b73f3f061af42b406b633f1efa2bd8d913db4bfca6583.json",
+              "sha256": "62ae4e5fc4da0961ae8b73f3f061af42b406b633f1efa2bd8d913db4bfca6583",
+              "size_bytes": 15746
+            }
+          },
+          "4f85df24902ec087ca9eb8d721dcbb47359dc0ae75bfec18bee8047cfe581ca6": {
+            "key": {
+              "dataset": "educator_state_initial_certification_teacher",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2018"
+            },
+            "metadata": {
+              "location": "6ef7b6281723b62ea17512303b1b388ea6d7cfbd01fb5310e09ce3a2471172cd.json",
+              "sha256": "6ef7b6281723b62ea17512303b1b388ea6d7cfbd01fb5310e09ce3a2471172cd",
+              "size_bytes": 15691
+            }
+          },
+          "4fb81b2aca0e831a9f818fc85890d63c62c44fe2a3693b96db157e2964d7188d": {
+            "key": {
+              "dataset": "educator_state_initial_certification_principal",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2025"
+            },
+            "metadata": {
+              "location": "005b01c7a5648744180ec0b8f8626cf61809a20b8241602676124b3018c5c3ec.json",
+              "sha256": "005b01c7a5648744180ec0b8f8626cf61809a20b8241602676124b3018c5c3ec",
+              "size_bytes": 15681
+            }
+          },
+          "522ed7ff8552a1af5670f759ecac0adb193e43f42b42e92e993f4b9e5be535a7": {
+            "key": {
+              "dataset": "educator_state_initial_certification_superintendent",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2026"
+            },
+            "metadata": {
+              "location": "2eb06d54f863508326afb0c71a4083d2f394d94d6b10845b98b780d67ab70609.json",
+              "sha256": "2eb06d54f863508326afb0c71a4083d2f394d94d6b10845b98b780d67ab70609",
+              "size_bytes": 15750
+            }
+          },
+          "576a221712643cb3fae201d8b678c6a22c336005affc0fbd4dc7e08938a0ccff": {
+            "key": {
+              "dataset": "educator_state_initial_certification_teacher",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2016"
+            },
+            "metadata": {
+              "location": "28df73682e4517777e40b9e3bf29179b074c4a130c6c01d856e5b179a53f4e63.json",
+              "sha256": "28df73682e4517777e40b9e3bf29179b074c4a130c6c01d856e5b179a53f4e63",
+              "size_bytes": 15691
+            }
+          },
+          "59bc72aa24880d4613525b70e7b1db5bccb1f496215363c4e4f464cded213447": {
+            "key": {
+              "dataset": "educator_state_initial_certification_superintendent",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2025"
+            },
+            "metadata": {
+              "location": "5c889f7a1638a7e87023ffd0774d7fc92aadf911e70c13140ca250c5210bdb5d.json",
+              "sha256": "5c889f7a1638a7e87023ffd0774d7fc92aadf911e70c13140ca250c5210bdb5d",
+              "size_bytes": 15746
+            }
+          },
+          "6046f0686153a7a70c745c260c86f4207b12fdeaabde1cff6daa3d7996ffc161": {
+            "key": {
+              "dataset": "educator_state_initial_certification_principal",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2026"
+            },
+            "metadata": {
+              "location": "bb3decbbcfcaec7b0d911fe499537bd5616a68c127fd02c339261198ea38ca4c.json",
+              "sha256": "bb3decbbcfcaec7b0d911fe499537bd5616a68c127fd02c339261198ea38ca4c",
+              "size_bytes": 15685
+            }
+          },
+          "63d252e0428036d822d793903e568a12ceb23e7635e40fe3900486d9cfe3584a": {
+            "key": {
+              "dataset": "educator_state_initial_certification_principal",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2022"
+            },
+            "metadata": {
+              "location": "c2d15cbd509086ccc6227b7bfbda4c25ad573c341797789a12f0611379fb3b29.json",
+              "sha256": "c2d15cbd509086ccc6227b7bfbda4c25ad573c341797789a12f0611379fb3b29",
+              "size_bytes": 15677
+            }
+          },
+          "665562b52ff2b0674308933d2ea524cac88b69f828c19bf19738b7695ba7033a": {
+            "key": {
+              "dataset": "educator_state_initial_certification_teacher",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2025"
+            },
+            "metadata": {
+              "location": "b55578cb334c65e048cd594d60566b4d9bd094bfc6239c293753d354f258fdf9.json",
+              "sha256": "b55578cb334c65e048cd594d60566b4d9bd094bfc6239c293753d354f258fdf9",
+              "size_bytes": 15715
+            }
+          },
+          "68bed5979080dbca33ca793882330d9375b071c448097a779ef87c8ba53197ed": {
+            "key": {
+              "dataset": "educator_state_initial_certification_superintendent",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2016"
+            },
+            "metadata": {
+              "location": "1031fb20ee6b96222839cc5a470a96ee5984ea71d9f3a5767f77a6d06c6e82eb.json",
+              "sha256": "1031fb20ee6b96222839cc5a470a96ee5984ea71d9f3a5767f77a6d06c6e82eb",
+              "size_bytes": 15762
+            }
+          },
+          "6ae057db34f6d7cd91402b6a34c1168c22b6e45ddf1b6eb3bc7a38995b7f5329": {
+            "key": {
+              "dataset": "educator_state_initial_certification_superintendent",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2024"
+            },
+            "metadata": {
+              "location": "d80befd786dd2772fe12e5cbca2c21aa8a497aaf246749f3e196996340de7c28.json",
+              "sha256": "d80befd786dd2772fe12e5cbca2c21aa8a497aaf246749f3e196996340de7c28",
+              "size_bytes": 15742
+            }
+          },
+          "82f01a5193175b760b2d4a8630d281e380149c2da8593a9da3d4b295c6dd5e81": {
+            "key": {
+              "dataset": "educator_state_initial_certification_superintendent",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2020"
+            },
+            "metadata": {
+              "location": "51430e43197dec931064c58a45e42686603986fe9aa0457afa7e26ca0c7e3625.json",
+              "sha256": "51430e43197dec931064c58a45e42686603986fe9aa0457afa7e26ca0c7e3625",
+              "size_bytes": 15759
+            }
+          },
+          "8838de3f8e54393551f07a38b3bd8346d3a98a6a3943ca255a665267dcfaa698": {
+            "key": {
+              "dataset": "educator_state_initial_certification_principal",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2024"
+            },
+            "metadata": {
+              "location": "b23ccb0579269c39b894af4b26161c6c7fd97190f9d659841e9921a40b981d16.json",
+              "sha256": "b23ccb0579269c39b894af4b26161c6c7fd97190f9d659841e9921a40b981d16",
+              "size_bytes": 15677
+            }
+          },
+          "9f2bd2ac93a03d1a479c16b697e0a29a4f796c7c23f4df272dad0bf99bfa65ca": {
+            "key": {
+              "dataset": "educator_state_initial_certification_teacher",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2026"
+            },
+            "metadata": {
+              "location": "44b304db8870fb513661a7b3b056a4829e6b38a968aecb31f7c169481e70057a.json",
+              "sha256": "44b304db8870fb513661a7b3b056a4829e6b38a968aecb31f7c169481e70057a",
+              "size_bytes": 15715
+            }
+          },
+          "af5c1d8b1ada08ad10e7d37e70767dd01f843bfe00f2eb88809fa40a11b616b6": {
+            "key": {
+              "dataset": "educator_state_initial_certification_principal",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2017"
+            },
+            "metadata": {
+              "location": "da9ce462b79fe875b684c030bb32395593d01009ac3fa36754e98b517ca5a7d4.json",
+              "sha256": "da9ce462b79fe875b684c030bb32395593d01009ac3fa36754e98b517ca5a7d4",
+              "size_bytes": 15696
+            }
+          },
+          "b74f2e332ae143e79c3eb903176d3c840580a7d08a092abc681df0653f193060": {
+            "key": {
+              "dataset": "educator_state_initial_certification_teacher",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2020"
+            },
+            "metadata": {
+              "location": "e20b648b82d7c67ddf3523745d5a215200d9035627e57d159d31e81667eb3056.json",
+              "sha256": "e20b648b82d7c67ddf3523745d5a215200d9035627e57d159d31e81667eb3056",
+              "size_bytes": 15688
+            }
+          },
+          "bab6fc26bba420537cca95641a8988578c676822bd3532a2258fa806caf7bec6": {
+            "key": {
+              "dataset": "educator_state_initial_certification_principal",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2021"
+            },
+            "metadata": {
+              "location": "280cbcc8a6d547110a0761badb4cffa26a37468d4774ea29b00eec9e68691978.json",
+              "sha256": "280cbcc8a6d547110a0761badb4cffa26a37468d4774ea29b00eec9e68691978",
+              "size_bytes": 15681
+            }
+          },
+          "c16a4c59d7c0323b52c20a69de267b98ef0c87bb1863529960ac12d54df9cebe": {
+            "key": {
+              "dataset": "educator_state_initial_certification_principal",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2018"
+            },
+            "metadata": {
+              "location": "a7201e973b58daa6565d098eb39b2311a3484b146cfddbf9428370d70b92bb14.json",
+              "sha256": "a7201e973b58daa6565d098eb39b2311a3484b146cfddbf9428370d70b92bb14",
+              "size_bytes": 15696
+            }
+          },
+          "c67f47f57a1919f314cf7ccfec0ba351ab79ccaf16d7dbc8ee707c8acef2ee00": {
+            "key": {
+              "dataset": "educator_state_initial_certification_teacher",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2017"
+            },
+            "metadata": {
+              "location": "efe18608d3e523ebd647d0c498118944af0f278470907d5403252ea110e9539b.json",
+              "sha256": "efe18608d3e523ebd647d0c498118944af0f278470907d5403252ea110e9539b",
+              "size_bytes": 15691
+            }
+          },
+          "d5f7731ce95edcdcf2e1e3e6f50bc00f5baef27102be7b1821dc8148f506cdf0": {
+            "key": {
+              "dataset": "educator_state_initial_certification_teacher",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2023"
+            },
+            "metadata": {
+              "location": "1c5f622d7d95b35d758e60cd619f64470b4bddeb300bfb939fe0f3def76031a7.json",
+              "sha256": "1c5f622d7d95b35d758e60cd619f64470b4bddeb300bfb939fe0f3def76031a7",
+              "size_bytes": 15711
+            }
+          },
+          "daaac2459ca28016cad60da80eb083296acb46ca73a8fd83eaf5652881a4eb3f": {
+            "key": {
+              "dataset": "educator_state_initial_certification_principal",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2016"
+            },
+            "metadata": {
+              "location": "8f662fec620177a017a2d8b32553e9db1465d454e63373ede0795ca6af528652.json",
+              "sha256": "8f662fec620177a017a2d8b32553e9db1465d454e63373ede0795ca6af528652",
+              "size_bytes": 15696
+            }
+          },
+          "f2ef37e59e89250c0c42b9c4549ca56898f038ff6c0d03c444619f4b7fa86028": {
+            "key": {
+              "dataset": "educator_state_initial_certification_teacher",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2021"
+            },
+            "metadata": {
+              "location": "36ea4f8d6cc50febf08307619573d494f08be242cb5fae9365b76982132df908.json",
+              "sha256": "36ea4f8d6cc50febf08307619573d494f08be242cb5fae9365b76982132df908",
+              "size_bytes": 15839
+            }
+          },
+          "fb185267f05dadd6e3d33e2b9f5929ed7869e6f6c5d12744e6be52692071ec48": {
+            "key": {
+              "dataset": "educator_state_initial_certification_principal",
+              "edition": "2026-09",
+              "grain": "one statewide observation",
+              "revision_sha256": "23c622134c780caa1acb626ddad4f2177dd35d90270ac5db9e43e5a651daa4b8",
+              "scope": "state",
+              "table": "state_2023"
+            },
+            "metadata": {
+              "location": "1c22de6d5a795546e6189222678a73e89e221c137e0f66ca02d64ec68d0fa8ab.json",
+              "sha256": "1c22de6d5a795546e6189222678a73e89e221c137e0f66ca02d64ec68d0fa8ab",
+              "size_bytes": 15677
+            }
+          }
+        },
+        "schema_version": 4
+      },
+      "fields": [
+        "academic_year",
+        "preparation_route",
+        "certification_role",
+        "gender",
+        "ethnicity",
+        "certification_count"
+      ],
+      "manifest_sha256": "a05d1150131ddb067272f43fdffb9c769ab2f46bd34443f14db4bfcb1b45d250",
+      "publisher_roots": [
+        "60b36d3b53fd124bc7c8428867c57ea3e3159fa1f3f36f9d75f4c070ae5fa4a5",
+        "856062919b82a961a510bbc029a09de32d5f5a01bdcdf92cc13c7b1479cce001",
+        "25da37791dc801b1e5dee15ffc5f645996ceb884e61c47e0a31f25d831b480ce",
+        "ced842282ec2bac773d8d0a472ed4df9813b5369decc5c8fe9daa726e5a5e280",
+        "4970586447fe1ade12160e9833ce9d836e3dd062f4657f7d85e5841a5cae576c",
+        "3080f0cda5f374bbf19f66360ef8fb0eace3ef8b818dc9403f573ef0b855ec09",
+        "4cf373a894032281dc9d0824b38f0e9c963b1cbac3f7bc63ab90c0ff7ca7c98c",
+        "1509fd73ed09026c447f348ca7a9b3dae2f4a513ad0b874cf92196bd130e02e1"
+      ],
+      "rows": 33
+    },
+    "retention": {
+      "catalog": {
+        "artifacts": {
+          "0e16e3c7c524fad838c88c3fc215c0865788173d66bddcf291e551c3293dc030": "e2bde355d0076c915a5fe1c9f76dc80b148075a48b6c10e5965eb10ad7cd9fd1",
+          "112775b9d43dc0cc90f4d19ad6b71b8661d00f71b54453440adac2fe949e1139": "2bd5267579a1c635c40c5b9b24fb74299b063d1c85a70f483e941cf11ca1bee7",
+          "121b422d7fbf577074f647a078b38843eca02695ff7607c0bd66fc4faaab9244": "77fc5d733b4610d279d88c371084ffecb1a624099bbce324827ed69ba756ba5c",
+          "14d3591a4231bd613eda1026fdb4b6c4ad3d83d1df01e9edd6722bf550a9667d": "3a5463348f00baf7009e2e5cb048c359e13422c0866ce43710b30900352bff87",
+          "1e607c86170cb8889c72f656f5979544692af48b79de31b3322bea4042f2a3f5": "89b2602389bb308f296c9eb7876d8c5268bb958b0e94fd625c120199ccc8b13f",
+          "1f3b2c6025eeccf32289eb9f1cabbb22c7f9526703ce7ffbd14664cadffd87cd": "cfceee84529769fd011c24761cfd3a74a91160de984a59e65f9dcf19bcb99cf0",
+          "28c61db3467010e382224ed305b24b921ff0ba6d78e7e02c8fcf4e1457e1f704": "c19d8df130adc7cc00c2bfec010d221db3d817e00e8fdd0a1ca8030cf9dddd24",
+          "29aada8a0a081a12f1cbf306b4a2c1160a1c2f7841b21ca8713235f2c9ead8e7": "c545eec15b918454d5bfa2267f9f85d858564672a2bea62a1feb510088184753",
+          "2dd411765881311fc8211755c053116b57a7b123b12d978b541f5054ddf4bac5": "e78d3658ad301687a693cedaabaebee7f5e8d045bacf03bfc4afd96757efb023",
+          "3fe1ce30ab9dbf28ee609e3d79ccb38f78f29b521c1c1f742441a3832539f4d5": "53ad6a581825bfd64d3019dde11e1e1e0e772c526224f15b458b79b61196b41b",
+          "509d648c915f2f25c95b0b06eb6284aa1b90bce9a6e62a9812fbe4f472dfa864": "80839bbb0995fc799f691639bfb3b6a3030c3c55c17d95d90a658a57f9ff8080",
+          "534ae5d0d95f0ba5751c4f59b5d91c7e96c03ecdeb13dcf2f4ace3084b6b4ecf": "c2c62ed0c9ddbaf4574bf74bc54eecd95e11dfcbd7fe8266c69bce7a74c9d9fb",
+          "5c64fcbece13f9175177e84ade548bd0dcd155b183b63243ab2eb193cdf2db8d": "a001296c68c3925f47f2a70dedee5bc0c35734d646d7928f99252da41b3f9871",
+          "5eaaae2b462ca91d06c51c678ea77d9f55ce942a1ad490f3167e56ee4338a5c4": "0fbf8eb0627e781df4f4f329b1616f185435258d83cc70ae7b74a140320406f5",
+          "652da1875f48d93c207feadf1f241a3ea840edf9208c0e0d40a78f587b547b47": "6712224e4d4267e5c69884fcb71f85b6b54b7eb2a6fb02dc96812cc4391373b0",
+          "7800a67be8ff1569d363fd7f4e188274395c8c75ded9b3094047b54b90d767ba": "3a582bbd159b55e6c72e810e44724a9e4486114eab6d2df93231206a78afa7d7",
+          "79c1f437a142f3390597794ca34baeba7046c16782fc123f6036181082c339c7": "2b4db155ef996e59da7e35f879ceb28db3b778026e024247519c08eae3bf9960",
+          "7ee1e00d9213671ff5b6679aef62d66a0513d382c0390ab7432e4a13bf98f227": "e2337a0ed3795a6d4ac870c0141304c194ef9b2c98efac08fd8f22185591243f",
+          "85b7d0383bb46ddebcb0a2681c34f46628245861e6a37b750b3986f2efac7e17": "7cbc5069f9d8209a3463573bd2692a0f98a42a8e10364760152537f4a2d5cbe1",
+          "912dfbe7f521ebddab7057647a8d82cd363f91fc9fdf9b20a42a508df7a8e5b7": "c26cd5d21942ab034d23c1403634fd0ad3d3fba90692120d191f1d8c9b4a2971",
+          "93490bde377d81d5bf79fa107fd5e7601e4918629ea18b0a3eb778287b68fed5": "e77a1939ae9a7a2b40f209a518ee8989574a234bdf7c705ba467d6ca2117c80d",
+          "a129cbe9be52ad7c28d49f6b7d57627a8bd53c7e2d8eeade36899b90343ddbbe": "7da77a8f3a137596a10dd997e329c6bef24bc1ce18405ced2c284ed6d5b74d43",
+          "a426a797a7757f3154ec294beb1bb786fc74b9d60cb742c4039e493507f52134": "48b70ed58e8db9ff850e5ff3169d51369d8c723277798359e0fa1b076e3397dd",
+          "b36ea55adc5ae34dd191ef6febbcf52ca5cc7050e7d52c943ae14a158ace8f7d": "d101cdaa9481b7f62498c2c198031214448ec925643792824d945765b4573471",
+          "c1ba22a563613423899dc362b098fc27403982b2ed872d5e225393b8cbaab2e2": "2d95d55aa9319c14ce691794e1e30f96ceb16a54092066e54ad2b164d8eaaa6b",
+          "c3e28ea463cb728b3d4fb52aadf61939e88ab9aef0ebefb3c80aad2b00aaec18": "616c6b037ebfc154ea87928e7662acb38c56696b178544ba2dee235c1898cdfb",
+          "c9f15a9d0fcec233b8b28437de5e6b81d0c4bf9d7a6768247bfa6ff60630aa41": "7dd1af4c6dc07a5da3fbca282c398dacb60c5c10e9c411ed890d58588b7789d0",
+          "ce506b4bf29103bf9d7756dec0c7f7891b8d055e36454fa8a59c85c3c39aa414": "333972d46d25a5612b8af611ef35acf29a3797574ca1b954f5621b1b1db2f632",
+          "d44497ad9fb9fb6159dacd9306b267cd2ad6a0671e85e43249081eb48b4ad656": "7467c2bf82379f8b3a35464744336f157c74ff3e1f68c405ccf744a832465bfb",
+          "db3829b1cacaae7c30fed3d849c44d4261fa37c5a88913af64c4c18a53032d6e": "c3a9d61d7b560e1da129756bf8ffbedb4430b1dad1a18c881a9562966e560190",
+          "e8af684c04413673705a52f3a8d13d9a4a554b5146a5ca2583328f4078817d3d": "0b6d8cdcdffd29d190ad6800e35ce590e7176156f1a0339ef5effd238bb430b9",
+          "f08c8cacf519bb27dfa0f9527ab3ac2efbb3d8224d6922402a4bd29d13c71f6f": "047f9a76d3ad11100a2d9fc6f1fe6251d0edee0eb66429449359b5da1d39503c",
+          "f2dbb351356fcdf47c96e1321081d47f620caa7e1011cee46aeacee0e1e671de": "aadc4cf2d1c3dda5091abec5926a2ef3ad8c62a345ee21e5bf47149cf17480a1",
+          "f7ce3098fa185d0df2a7d02c1f4a5e77581c28b07e795971c1f34b7d9dc78c1e": "590db8de08f27a14e41e24fee819abc3fc0e99b373d8b8ef2368bcada7c07fde",
+          "f7e6eb909bd2d5d2e81e42d03a27c85bcf7d3fd5ee8d2709dd2cde7367e52e88": "b1dd56fd6ce07801bb8e95a33cd18cfba15bf1610685c27db81d5e1bae3339f8"
+        },
+        "build_id": "6ff173c47d68c897c7d750e9bed4c5dc83f840df302f9fcd3b1adc1e5659fc1e",
+        "description": "",
+        "editions": {
+          "047f9a76d3ad11100a2d9fc6f1fe6251d0edee0eb66429449359b5da1d39503c": {
+            "key": {
+              "dataset": "educator_state_retention_by_gender",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2015"
+            },
+            "metadata": {
+              "location": "82c4837776e04e768e3f4bc118ea57e25f407ad8aad2268c763126a5d5c144e3.json",
+              "sha256": "82c4837776e04e768e3f4bc118ea57e25f407ad8aad2268c763126a5d5c144e3",
+              "size_bytes": 22417
+            }
+          },
+          "0b6d8cdcdffd29d190ad6800e35ce590e7176156f1a0339ef5effd238bb430b9": {
+            "key": {
+              "dataset": "educator_state_retention_by_demographic_group",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2017"
+            },
+            "metadata": {
+              "location": "e0f9837616fa609fe0dfb7a6a7c9079a70f7bd57f79be9a7e87263ce64ec3e49.json",
+              "sha256": "e0f9837616fa609fe0dfb7a6a7c9079a70f7bd57f79be9a7e87263ce64ec3e49",
+              "size_bytes": 22483
+            }
+          },
+          "0fbf8eb0627e781df4f4f329b1616f185435258d83cc70ae7b74a140320406f5": {
+            "key": {
+              "dataset": "educator_state_retention_by_preparation_route",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2024"
+            },
+            "metadata": {
+              "location": "0820b2328a23e23fc310825e0661fe461339d7a2e0ddf7ab2580ae2650227374.json",
+              "sha256": "0820b2328a23e23fc310825e0661fe461339d7a2e0ddf7ab2580ae2650227374",
+              "size_bytes": 22483
+            }
+          },
+          "2b4db155ef996e59da7e35f879ceb28db3b778026e024247519c08eae3bf9960": {
+            "key": {
+              "dataset": "educator_state_retention_by_preparation_route",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2020"
+            },
+            "metadata": {
+              "location": "94d33251b7bd3f2ca3ac5a18fa8927b43cb7acbddee08e74705c843abe836e5a.json",
+              "sha256": "94d33251b7bd3f2ca3ac5a18fa8927b43cb7acbddee08e74705c843abe836e5a",
+              "size_bytes": 22483
+            }
+          },
+          "2bd5267579a1c635c40c5b9b24fb74299b063d1c85a70f483e941cf11ca1bee7": {
+            "key": {
+              "dataset": "educator_state_retention_by_preparation_route",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2022"
+            },
+            "metadata": {
+              "location": "847a9de4cdcdb4cdea39d39aa3a999371fbcc62a52e062251a9be0a2ce8f9bec.json",
+              "sha256": "847a9de4cdcdb4cdea39d39aa3a999371fbcc62a52e062251a9be0a2ce8f9bec",
+              "size_bytes": 22483
+            }
+          },
+          "2d95d55aa9319c14ce691794e1e30f96ceb16a54092066e54ad2b164d8eaaa6b": {
+            "key": {
+              "dataset": "educator_state_retention_by_gender",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2018"
+            },
+            "metadata": {
+              "location": "8931f6c00eeb04fa3a4305c56f8da3ba29065d2793d1c2816e99964bb4a6777e.json",
+              "sha256": "8931f6c00eeb04fa3a4305c56f8da3ba29065d2793d1c2816e99964bb4a6777e",
+              "size_bytes": 22417
+            }
+          },
+          "333972d46d25a5612b8af611ef35acf29a3797574ca1b954f5621b1b1db2f632": {
+            "key": {
+              "dataset": "educator_state_retention_by_gender",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2014"
+            },
+            "metadata": {
+              "location": "d0af3fa61459503a04d5a95e007e9696701396bae80a0faa60c5cedde43a1cde.json",
+              "sha256": "d0af3fa61459503a04d5a95e007e9696701396bae80a0faa60c5cedde43a1cde",
+              "size_bytes": 22417
+            }
+          },
+          "3a5463348f00baf7009e2e5cb048c359e13422c0866ce43710b30900352bff87": {
+            "key": {
+              "dataset": "educator_state_retention_by_preparation_route",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2023"
+            },
+            "metadata": {
+              "location": "b6981385c1a20da452cafc7ec2dca940c6c5bfbf220080ef5769b7139c6f451b.json",
+              "sha256": "b6981385c1a20da452cafc7ec2dca940c6c5bfbf220080ef5769b7139c6f451b",
+              "size_bytes": 22483
+            }
+          },
+          "3a582bbd159b55e6c72e810e44724a9e4486114eab6d2df93231206a78afa7d7": {
+            "key": {
+              "dataset": "educator_state_retention_by_preparation_route",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2019"
+            },
+            "metadata": {
+              "location": "4e9f16b106e6e7892e91e5d57266abcc076d586ff0064a36bd0529df96b48224.json",
+              "sha256": "4e9f16b106e6e7892e91e5d57266abcc076d586ff0064a36bd0529df96b48224",
+              "size_bytes": 22483
+            }
+          },
+          "48b70ed58e8db9ff850e5ff3169d51369d8c723277798359e0fa1b076e3397dd": {
+            "key": {
+              "dataset": "educator_state_retention_by_gender",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2019"
+            },
+            "metadata": {
+              "location": "d8b908486597350a975d047b7e65596fa176b330f4b480f0c1233fba7c21c1dd.json",
+              "sha256": "d8b908486597350a975d047b7e65596fa176b330f4b480f0c1233fba7c21c1dd",
+              "size_bytes": 22417
+            }
+          },
+          "53ad6a581825bfd64d3019dde11e1e1e0e772c526224f15b458b79b61196b41b": {
+            "key": {
+              "dataset": "educator_state_retention_by_preparation_route",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2025"
+            },
+            "metadata": {
+              "location": "1cc404bb50de4b7f862acb13337d09faca02f02acb311c88ee42393ebe9b43ce.json",
+              "sha256": "1cc404bb50de4b7f862acb13337d09faca02f02acb311c88ee42393ebe9b43ce",
+              "size_bytes": 22483
+            }
+          },
+          "590db8de08f27a14e41e24fee819abc3fc0e99b373d8b8ef2368bcada7c07fde": {
+            "key": {
+              "dataset": "educator_state_retention_by_gender",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2024"
+            },
+            "metadata": {
+              "location": "9e8e184293e9906f87e496c08dc4b4619f287619728f66b731045674e19520e7.json",
+              "sha256": "9e8e184293e9906f87e496c08dc4b4619f287619728f66b731045674e19520e7",
+              "size_bytes": 22417
+            }
+          },
+          "616c6b037ebfc154ea87928e7662acb38c56696b178544ba2dee235c1898cdfb": {
+            "key": {
+              "dataset": "educator_state_retention_by_demographic_group",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2021"
+            },
+            "metadata": {
+              "location": "28143080de3f33a20c9098d07728c6058b2d34437f55ac891c0b1c531bdc3781.json",
+              "sha256": "28143080de3f33a20c9098d07728c6058b2d34437f55ac891c0b1c531bdc3781",
+              "size_bytes": 22483
+            }
+          },
+          "6712224e4d4267e5c69884fcb71f85b6b54b7eb2a6fb02dc96812cc4391373b0": {
+            "key": {
+              "dataset": "educator_state_retention_by_demographic_group",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2025"
+            },
+            "metadata": {
+              "location": "af2168634fa2748ddea6982e6ddfd8f725595064252a287efeadc75d44e40c0e.json",
+              "sha256": "af2168634fa2748ddea6982e6ddfd8f725595064252a287efeadc75d44e40c0e",
+              "size_bytes": 22483
+            }
+          },
+          "7467c2bf82379f8b3a35464744336f157c74ff3e1f68c405ccf744a832465bfb": {
+            "key": {
+              "dataset": "educator_state_retention_by_gender",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2020"
+            },
+            "metadata": {
+              "location": "3d97002deb6724e9eb916db5dcae77860ab2387c4f72f8000805ac5e92909d75.json",
+              "sha256": "3d97002deb6724e9eb916db5dcae77860ab2387c4f72f8000805ac5e92909d75",
+              "size_bytes": 22417
+            }
+          },
+          "77fc5d733b4610d279d88c371084ffecb1a624099bbce324827ed69ba756ba5c": {
+            "key": {
+              "dataset": "educator_state_retention_by_demographic_group",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2015"
+            },
+            "metadata": {
+              "location": "e0514bc63005dbab71a0f72bf66591f7c82a23fdf64a332b3748f315f711b484.json",
+              "sha256": "e0514bc63005dbab71a0f72bf66591f7c82a23fdf64a332b3748f315f711b484",
+              "size_bytes": 22483
+            }
+          },
+          "7cbc5069f9d8209a3463573bd2692a0f98a42a8e10364760152537f4a2d5cbe1": {
+            "key": {
+              "dataset": "educator_state_retention_by_demographic_group",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2024"
+            },
+            "metadata": {
+              "location": "721327d54121ac6df48380907042be8b737e0bb12ab088e68d4c3bbb0bfede67.json",
+              "sha256": "721327d54121ac6df48380907042be8b737e0bb12ab088e68d4c3bbb0bfede67",
+              "size_bytes": 22483
+            }
+          },
+          "7da77a8f3a137596a10dd997e329c6bef24bc1ce18405ced2c284ed6d5b74d43": {
+            "key": {
+              "dataset": "educator_state_retention_by_demographic_group",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2019"
+            },
+            "metadata": {
+              "location": "2391c178bd76b8243a7b1783b12a368cd74cd2e12fcf23dcedea20ceec82a8d1.json",
+              "sha256": "2391c178bd76b8243a7b1783b12a368cd74cd2e12fcf23dcedea20ceec82a8d1",
+              "size_bytes": 22483
+            }
+          },
+          "7dd1af4c6dc07a5da3fbca282c398dacb60c5c10e9c411ed890d58588b7789d0": {
+            "key": {
+              "dataset": "educator_state_retention_by_demographic_group",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2018"
+            },
+            "metadata": {
+              "location": "14557e5156907f6b40b6c452eeb0c1e0aba318ab486e111e8d7f70ba53fdfee0.json",
+              "sha256": "14557e5156907f6b40b6c452eeb0c1e0aba318ab486e111e8d7f70ba53fdfee0",
+              "size_bytes": 22483
+            }
+          },
+          "80839bbb0995fc799f691639bfb3b6a3030c3c55c17d95d90a658a57f9ff8080": {
+            "key": {
+              "dataset": "educator_state_retention_by_gender",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2016"
+            },
+            "metadata": {
+              "location": "1769cecb60e6a8c5b05e8fbecfe7ecbb4037cc29d688a30949e9d3f51abe0c0c.json",
+              "sha256": "1769cecb60e6a8c5b05e8fbecfe7ecbb4037cc29d688a30949e9d3f51abe0c0c",
+              "size_bytes": 22417
+            }
+          },
+          "89b2602389bb308f296c9eb7876d8c5268bb958b0e94fd625c120199ccc8b13f": {
+            "key": {
+              "dataset": "educator_state_retention_by_demographic_group",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2014"
+            },
+            "metadata": {
+              "location": "6251f8c45c8b868021aa733dc9670a9bfe8c0e01b1c6e51c969f6e344de418e5.json",
+              "sha256": "6251f8c45c8b868021aa733dc9670a9bfe8c0e01b1c6e51c969f6e344de418e5",
+              "size_bytes": 22483
+            }
+          },
+          "a001296c68c3925f47f2a70dedee5bc0c35734d646d7928f99252da41b3f9871": {
+            "key": {
+              "dataset": "educator_state_retention_by_preparation_route",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2016"
+            },
+            "metadata": {
+              "location": "1056294c44d823457f3dfac9c9dabcd9a7a2319c1c842563edb29028a64e979e.json",
+              "sha256": "1056294c44d823457f3dfac9c9dabcd9a7a2319c1c842563edb29028a64e979e",
+              "size_bytes": 22483
+            }
+          },
+          "aadc4cf2d1c3dda5091abec5926a2ef3ad8c62a345ee21e5bf47149cf17480a1": {
+            "key": {
+              "dataset": "educator_state_retention_by_preparation_route",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2015"
+            },
+            "metadata": {
+              "location": "1f5aa4146437db5e14acf2890cf3acd125e580fc0c8c7a1c97d28fcc4e0f1185.json",
+              "sha256": "1f5aa4146437db5e14acf2890cf3acd125e580fc0c8c7a1c97d28fcc4e0f1185",
+              "size_bytes": 22483
+            }
+          },
+          "b1dd56fd6ce07801bb8e95a33cd18cfba15bf1610685c27db81d5e1bae3339f8": {
+            "key": {
+              "dataset": "educator_state_retention_by_gender",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2023"
+            },
+            "metadata": {
+              "location": "fef43699a2a167f2d8cec920a79d3f443d6330d70a8442e1c0afe9c5795b0c2c.json",
+              "sha256": "fef43699a2a167f2d8cec920a79d3f443d6330d70a8442e1c0afe9c5795b0c2c",
+              "size_bytes": 22417
+            }
+          },
+          "c19d8df130adc7cc00c2bfec010d221db3d817e00e8fdd0a1ca8030cf9dddd24": {
+            "key": {
+              "dataset": "educator_state_retention_by_gender",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2025"
+            },
+            "metadata": {
+              "location": "ed28befb8b465a14c290094d4ddd6c7bead3ec3bad306c6c9a398449acfd994f.json",
+              "sha256": "ed28befb8b465a14c290094d4ddd6c7bead3ec3bad306c6c9a398449acfd994f",
+              "size_bytes": 22417
+            }
+          },
+          "c26cd5d21942ab034d23c1403634fd0ad3d3fba90692120d191f1d8c9b4a2971": {
+            "key": {
+              "dataset": "educator_state_retention_by_preparation_route",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2017"
+            },
+            "metadata": {
+              "location": "3f3822c91cd45eed5f0dfb93b6dbc276bf1da85f6e19f08fb635f80f7b2373d7.json",
+              "sha256": "3f3822c91cd45eed5f0dfb93b6dbc276bf1da85f6e19f08fb635f80f7b2373d7",
+              "size_bytes": 22483
+            }
+          },
+          "c2c62ed0c9ddbaf4574bf74bc54eecd95e11dfcbd7fe8266c69bce7a74c9d9fb": {
+            "key": {
+              "dataset": "educator_state_retention_by_gender",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2022"
+            },
+            "metadata": {
+              "location": "09eb632a6cae4516381587119cb28f04f6681aaad07349ff742af39b337bf054.json",
+              "sha256": "09eb632a6cae4516381587119cb28f04f6681aaad07349ff742af39b337bf054",
+              "size_bytes": 22417
+            }
+          },
+          "c3a9d61d7b560e1da129756bf8ffbedb4430b1dad1a18c881a9562966e560190": {
+            "key": {
+              "dataset": "educator_state_retention_by_demographic_group",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2022"
+            },
+            "metadata": {
+              "location": "5a544d35afaa53113894b1c78001aa9c655e21c70d8541630322b9886bce579d.json",
+              "sha256": "5a544d35afaa53113894b1c78001aa9c655e21c70d8541630322b9886bce579d",
+              "size_bytes": 22483
+            }
+          },
+          "c545eec15b918454d5bfa2267f9f85d858564672a2bea62a1feb510088184753": {
+            "key": {
+              "dataset": "educator_state_retention_by_preparation_route",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2021"
+            },
+            "metadata": {
+              "location": "5535aeec4ba95ae68f00c9c39df91f98f465f6fde64d50603e07ced6f4392c85.json",
+              "sha256": "5535aeec4ba95ae68f00c9c39df91f98f465f6fde64d50603e07ced6f4392c85",
+              "size_bytes": 22483
+            }
+          },
+          "cfceee84529769fd011c24761cfd3a74a91160de984a59e65f9dcf19bcb99cf0": {
+            "key": {
+              "dataset": "educator_state_retention_by_demographic_group",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2016"
+            },
+            "metadata": {
+              "location": "537b0f0f3ea3b851f6f7b50fd349d446869841effdd6dcadceeb053dae778f39.json",
+              "sha256": "537b0f0f3ea3b851f6f7b50fd349d446869841effdd6dcadceeb053dae778f39",
+              "size_bytes": 22483
+            }
+          },
+          "d101cdaa9481b7f62498c2c198031214448ec925643792824d945765b4573471": {
+            "key": {
+              "dataset": "educator_state_retention_by_demographic_group",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2020"
+            },
+            "metadata": {
+              "location": "fdb571782485c6043fb67b38bf18453a0a789d783ed013bb82ba86b332bc4ffc.json",
+              "sha256": "fdb571782485c6043fb67b38bf18453a0a789d783ed013bb82ba86b332bc4ffc",
+              "size_bytes": 22483
+            }
+          },
+          "e2337a0ed3795a6d4ac870c0141304c194ef9b2c98efac08fd8f22185591243f": {
+            "key": {
+              "dataset": "educator_state_retention_by_preparation_route",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2014"
+            },
+            "metadata": {
+              "location": "3f22c09361c025eefca9e91772b3cca4b52ca2af4049c7b5daa305c78a3d767a.json",
+              "sha256": "3f22c09361c025eefca9e91772b3cca4b52ca2af4049c7b5daa305c78a3d767a",
+              "size_bytes": 22483
+            }
+          },
+          "e2bde355d0076c915a5fe1c9f76dc80b148075a48b6c10e5965eb10ad7cd9fd1": {
+            "key": {
+              "dataset": "educator_state_retention_by_gender",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2021"
+            },
+            "metadata": {
+              "location": "6edd8fe9245a211f2231de95fcd7f176db6833172dae8c67e0e59c4f77980831.json",
+              "sha256": "6edd8fe9245a211f2231de95fcd7f176db6833172dae8c67e0e59c4f77980831",
+              "size_bytes": 22417
+            }
+          },
+          "e77a1939ae9a7a2b40f209a518ee8989574a234bdf7c705ba467d6ca2117c80d": {
+            "key": {
+              "dataset": "educator_state_retention_by_demographic_group",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2023"
+            },
+            "metadata": {
+              "location": "2cc9e8d64edcabb493cdc6f3d0de411c0bee192ae24fbc02cafba763e86c389b.json",
+              "sha256": "2cc9e8d64edcabb493cdc6f3d0de411c0bee192ae24fbc02cafba763e86c389b",
+              "size_bytes": 22483
+            }
+          },
+          "e78d3658ad301687a693cedaabaebee7f5e8d045bacf03bfc4afd96757efb023": {
+            "key": {
+              "dataset": "educator_state_retention_by_gender",
+              "edition": "2026-04",
+              "grain": "one publisher row per first teaching school year and reported group",
+              "revision_sha256": "04787455c74560ee7c500b30f8d5b5918a25c5f74a295e1f5a675da04b079cbd",
+              "scope": "state",
+              "table": "state_2017"
+            },
+            "metadata": {
+              "location": "5caf7547ac7b7f2d5c5961a103ca5e43668aede675d659e6c776b4e45d6be42c.json",
+              "sha256": "5caf7547ac7b7f2d5c5961a103ca5e43668aede675d659e6c776b4e45d6be42c",
+              "size_bytes": 22417
+            }
+          }
+        },
+        "schema_version": 4
+      },
+      "fields": [
+        "first_teaching_school_year",
+        "publisher_group",
+        "first_year_teacher_count",
+        "retained_year_1_count",
+        "retained_year_1_ratio",
+        "retained_year_2_count",
+        "retained_year_2_ratio",
+        "retained_year_3_count",
+        "retained_year_3_ratio",
+        "retained_year_4_count",
+        "retained_year_4_ratio",
+        "retained_year_5_count",
+        "retained_year_5_ratio"
+      ],
+      "manifest_sha256": "afdd42feb4380f1716af0ca89daf0e0a7382fcad49bba7e6a1578eaef28b7c68",
+      "publisher_roots": [
+        "60b36d3b53fd124bc7c8428867c57ea3e3159fa1f3f36f9d75f4c070ae5fa4a5",
+        "856062919b82a961a510bbc029a09de32d5f5a01bdcdf92cc13c7b1479cce001",
+        "25da37791dc801b1e5dee15ffc5f645996ceb884e61c47e0a31f25d831b480ce",
+        "ced842282ec2bac773d8d0a472ed4df9813b5369decc5c8fe9daa726e5a5e280",
+        "4970586447fe1ade12160e9833ce9d836e3dd062f4657f7d85e5841a5cae576c",
+        "3080f0cda5f374bbf19f66360ef8fb0eace3ef8b818dc9403f573ef0b855ec09",
+        "4cf373a894032281dc9d0824b38f0e9c963b1cbac3f7bc63ab90c0ff7ca7c98c",
+        "1509fd73ed09026c447f348ca7a9b3dae2f4a513ad0b874cf92196bd130e02e1"
+      ],
+      "rows": 151
+    }
+  },
+  "schema_version": 1
+}
