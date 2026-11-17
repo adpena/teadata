@@ -850,6 +850,7 @@ class DatasetCatalog:
             headers = {(identifier, row["field"]): {
                 **{name: row[name] for name in ("code", "label", "period")},
                 "unit": units.get(row["field"]), "publisher_description": row.get("publisher_description"),
+                **({"denominator": row["denominator"]} if "denominator" in row else {}),
             } for row in rows}
             self._field_headers.update(headers)
             self._validated_editions.add(identifier)
@@ -938,7 +939,8 @@ class DatasetCatalog:
         binding, row = self._field_bindings[qualified], self._field_headers[qualified]
         result: dict[str, Any] = {**binding.to_dict(), "edition": self._edition_keys[qualified[0]].to_dict(),
                 "code": row["code"], "label": row["label"], "period": deepcopy(row["period"]),
-                "unit": row["unit"], "policy_id": self._edition_metadata[qualified[0]].value_policy}
+                "unit": row["unit"], "policy_id": self._edition_metadata[qualified[0]].value_policy,
+                **({"denominator": row["denominator"]} if "denominator" in row else {})}
         support = self._artifact_refs[binding.artifact_id].column_support
         if support is not None:
             result["support"] = support.projection(binding.field)

@@ -819,6 +819,19 @@ The raw bulk edition's `masking` reference is still `unreviewed`. TEA's
 dates the linked TAPR masking rules to 2024–25. The reviewed rate legend
 does not govern the entire 2025–26 bulk table or other products.
 
+Some published percentages use a narrower population than all students. When
+the source contract declares a denominator, metadata discovery and native export
+field descriptions include `denominator`. The five 2025–26 disability-composition
+Membership percentages use `membership_total_students_with_disabilities_count`.
+This is a source attribution, not permission to reconstruct suppressed counts.
+Selecting a percentage does not also load its denominator's observations.
+DataFrame provenance and CSV companions retain the declaration; Excel adds a
+Denominator column to the existing Provenance field table only when needed.
+An absent declaration stays absent. Conflicting declarations for two aliases of
+one physical field raise an error. See [the source qualification and remaining
+holds](attendance-sources.md#disability-counts-and-composition-distinct-denominators-and-source-holds)
+and the current inventory before selecting a source revision.
+
 The source must contain both selected editions. Each comparison requires the
 same grade, school year, subject, student group and criterion. Suppression,
 missing values and unavailable entities retain their individual statuses.

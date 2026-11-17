@@ -90,6 +90,13 @@ def original_grid():
 
 
 @pytest.fixture(scope="module")
+def reviewed174_grid():
+    raw = (Path(__file__).parent / "fixtures/tprs-students-reviewed174.json").read_bytes()
+    assert sha256(raw).hexdigest() == "f7628dd08a539c52f5323664b1292e62869875e548230e657b56423461d7526f"
+    return json.loads(raw)
+
+
+@pytest.fixture(scope="module")
 def policy():
     cfg = load_config()
     return cfg.value_policies["tprs_student_selected_2026"]
@@ -443,7 +450,7 @@ def test_packaged_student_contract_is_explicit_and_source_only(grid):
     assert cfg.column_schema(students.DATASET, 2026) is None
     source = cfg.resolve_dataset(students.DATASET, 2026, reader_profile="source", exact=True)
     fields = students.semantic_fields(grid)
-    assert len(fields) == len(source.metadata.metrics) == 174
+    assert len(fields) == len(source.metadata.metrics) == 179
     assert set(source.metadata.metrics) == {field["field"] for field in fields}
     assert all(metric.period == students.PERIOD for metric in source.metadata.metrics.values())
     assert not any(any(token in field for token in ("technical", "disciplinary", "mobility"))
@@ -457,7 +464,7 @@ def test_packaged_student_contract_is_explicit_and_source_only(grid):
     tables = crosswalk_dataset(parse_column_schema(resource["text"].encode()), students.DATASET, "2026")["tables"]
     assert {table["table"] for table in tables} == set(students.SCOPES)
     for table in tables:
-        assert len(table["fields"]) == 174
+        assert len(table["fields"]) == 179
         assert table["header_identity"] == "position"
         assert all(field["code"] == field["label"] and field["dictionary_status"] == "not_documented"
                    for field in table["fields"])
@@ -511,12 +518,12 @@ def test_all_raw_current_cells_and_lagged_period_remain_visible(grid, policy, sc
     assert all(cell.period == students.PERIOD for cell in report.cells if cell not in lagged)
     assert all(cell.row > 0 and cell.column > 1 for cell in report.cells)
     local = [cell for cell in report.cells if cell.geography_role == "local"]
-    assert sum(cell.field is not None for cell in local) == 174
+    assert sum(cell.field is not None for cell in local) == 179
     assert all(cell.field is None for cell in report.cells if cell.geography_role != "local")
     table, support, audit = students.projection([report], policy)
     assert len(table) == 1 and audit["projection_qualified"] is True
     assert audit["whole_report_semantics_qualified"] is False and audit["raw_field_holds"]
-    assert len(support["fields"]) == 174
+    assert len(support["fields"]) == 179
     assert table["membership_total_students_count"].type == pa.int64()
     assert table["membership_total_students_percent"].type == pa.float64()
     if scope != "state":
@@ -1054,7 +1061,7 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(
     else:
         assert built["campus_regions"] == ["01", "02"]
     assert built["release_activation"] is False
-    assert entry["rows"] == len(intake["reports"]) and entry["raw_field_hold_count"] == 30 * entry["rows"]
+    assert entry["rows"] == len(intake["reports"]) and entry["raw_field_hold_count"] == 25 * entry["rows"]
     key = EditionKey.from_dict(entry["edition"])
     excluded = earlier[0]["identifier"] if partitioned else "003901001"
     with monkeypatch.context() as routing:
@@ -1450,7 +1457,7 @@ def test_statewide_audit_rejects_missing_held_cell_despite_valid_gzip(grid, poli
     selection = (tprs_statewide_intake.ReportSelection("state", "S", report.receipt, report.sha256),)
     grid_bytes = canonical_json(grid).encode()
     encoded = [(canonical_json(row) + "\n").encode() for row in rows]
-    assert tprs_statewide_intake.verify_audit_coverage(gzip.compress(b"".join(encoded)), selection, grid_bytes) == 30
+    assert tprs_statewide_intake.verify_audit_coverage(gzip.compress(b"".join(encoded)), selection, grid_bytes) == 25
     with pytest.raises(ContractError, match="required report slot"):
         tprs_statewide_intake.verify_audit_coverage(gzip.compress(b"".join(encoded[:-1])), selection, grid_bytes)
 
@@ -1620,15 +1627,16 @@ def test_invalid_selective_field_contract_is_rejected(grid, key, value):
 
 
 @pytest.mark.parametrize('scope,identifier', [('state', 'S'), ('district', '001902'), ('campus', '001902001')])
-def test_disability_counts_do_not_invent_enrollment_or_percent_fields(grid, policy, scope, identifier):
+def test_historical174_disability_counts_do_not_invent_enrollment_or_percent_fields(reviewed174_grid, policy, scope, identifier):
+    grid = reviewed174_grid
     rows = report_rows(grid, scope, identifier)
     specs = [r for r in grid['rows'] if r['section'] == 'Students with Disabilities by Type of Primary Disability']
     for spec, token in zip(specs, ['13,949', '*', '**', '0', '2', '93'], strict=True):
         row = next(row for row in rows if row[0] == spec['label'])
         row[1:] = [''] * (len(row) - 1)
         row[1] = token
-    report = students.parse_student_report(html(rows), scope=scope, identifier=identifier)
-    table, support, audit = students.projection([report], policy, audit_raw=True)
+    report = students.parse_student_report(html(rows), scope=scope, identifier=identifier, contract=grid)
+    table, support, audit = students.projection([report], policy, audit_raw=True, contract=grid)
     selected = [f for f in students.semantic_fields(grid) if f['section'] == specs[0]['section']]
     assert len(selected) == 6
     assert all(f['population'] == 'membership' and f['quantity'] == 'count' and f['denominator'] is None for f in selected)
@@ -1661,10 +1669,10 @@ def test_disability_extension_preserves_original_projection(grid, original_grid,
     previous, _, original_audit = students.projection([original_report], policy, contract=original_grid)
     assert current.select(previous.column_names).equals(previous)
     assert current_report.grid_sha256 != original_report.grid_sha256
-    assert current_audit['qualified_fields'] == 174 and original_audit['qualified_fields'] == 168
+    assert current_audit['qualified_fields'] == 179 and original_audit['qualified_fields'] == 168
     old_holds = [cell for cell in original_report.cells if cell.field is None and cell.geography_role == 'local']
     new_holds = [cell for cell in current_report.cells if cell.field is None and cell.geography_role == 'local']
-    assert len(old_holds) - len(new_holds) == 6
+    assert len(old_holds) - len(new_holds) == 11
 
 
 @pytest.mark.parametrize('contract', [{}, [], 0, False, '', {'rows': []}, {'schema_version': 99}])
@@ -1696,12 +1704,12 @@ def test_parse_projection_requires_same_captured_identity(grid, original_grid, p
         students.projection(reports,policy,contract=contract)
 
 
-def test_omitted_contract_retains_current174(grid, policy):
+def test_omitted_contract_retains_current179(grid, policy):
     report=students.parse_student_report(html(report_rows(grid)),scope='district',identifier='001902')
-    assert report.grid_sha256=='f7628dd08a539c52f5323664b1292e62869875e548230e657b56423461d7526f'
+    assert report.grid_sha256=='38cdb41b151f762feeb7dc3a7f4d44d6b8a9e3a83e29d86db79ec72bc91c782c'
     table,_,audit=students.projection([report],policy)
     explicit,_,_=students.projection([report],policy,contract=grid)
-    assert table.equals(explicit) and audit['qualified_fields']==174
+    assert table.equals(explicit) and audit['qualified_fields']==179
     assert students._crosswalk({'district':['a'*64]})==students._crosswalk({'district':['a'*64]},contract=grid)
 
 
@@ -1750,10 +1758,13 @@ def test_unreviewed_native_pin_rejects_before_catalog_access():
 @pytest.mark.parametrize('pin',[
     '373041dfb0eb994ccde4a88f1e7e630e7b395bf9f7a51199655d843788a2b5f6',
     'c96effc9bcbfd01c7cd969082cf701a2dc4e1900b6d6973b23c0ed2d21559f9e',
-    '3b07ad9d41ada9d28487d14259be2b6700729e5ed2cca632e77f845f7b0eebaa'])
-def test_exact_native_scope_classes_retain_full_census_guard(grid, original_grid, monkeypatch, pin):
+    '3b07ad9d41ada9d28487d14259be2b6700729e5ed2cca632e77f845f7b0eebaa',
+    '8d5362e43c3374b11647592e618a82707794e49a1bc76739d69eea299ad6f131'])
+def test_exact_native_scope_classes_retain_full_census_guard(grid, original_grid, reviewed174_grid, monkeypatch, pin):
     complete=pin!='373041dfb0eb994ccde4a88f1e7e630e7b395bf9f7a51199655d843788a2b5f6'
-    contract=grid if pin==tprs_statewide_intake.REVIEWED_CAMPUS_STUDENT_174_MANIFEST else original_grid
+    contract=reviewed174_grid if pin==tprs_statewide_intake.REVIEWED_CAMPUS_STUDENT_174_MANIFEST else original_grid
+    if pin == tprs_statewide_intake.REVIEWED_CAMPUS_STUDENT_179_MANIFEST:
+        contract = grid
     identity=students._resolve_contract(contract)[1]
     scopes=('district','state','campus') if complete else ('district','state')
     leaves=tuple(tprs_statewide_intake._ReplayLeaf(SimpleNamespace(edition=SimpleNamespace(

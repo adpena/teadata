@@ -133,8 +133,11 @@ _STUDENT_PROFILES = {
     "f7628dd08a539c52f5323664b1292e62869875e548230e657b56423461d7526f": _StudentProfile(
         "0a6e3e30a2a3005a92d2b90173b27ac5f18344b1e98158db43e12c419d7fc7e8",
         "d13b4c90563086887f77c4a211813d63977d62aa70ca866579307edfc1ca183e"),
+    "38cdb41b151f762feeb7dc3a7f4d44d6b8a9e3a83e29d86db79ec72bc91c782c": _StudentProfile(
+        "77061bf49042409045d82835a3d252887dd201e886a715a9473bbf0ef3af464c",
+        "d13b4c90563086887f77c4a211813d63977d62aa70ca866579307edfc1ca183e"),
 }
-_CURRENT_STUDENT_GRID = "f7628dd08a539c52f5323664b1292e62869875e548230e657b56423461d7526f"
+_CURRENT_STUDENT_GRID = "38cdb41b151f762feeb7dc3a7f4d44d6b8a9e3a83e29d86db79ec72bc91c782c"
 
 
 def _student_metadata_sha256(metadata: DatasetMetadata) -> str:
@@ -204,9 +207,17 @@ def semantic_fields(contract: Mapping[str, Any] | None = None) -> list[dict[str,
             for quantity in selectors["quantities"]:
                 result.append({"field": f"{population}_{row['name']}_{quantity}", "label": row["label"],
                     "section": row["section"], "population": population, "quantity": quantity,
-                    "denominator": None if quantity == "count" else f"Total Students / {population}",
+                    "denominator": (None if quantity == "count" else
+                                    row.get("percent_denominator", f"Total Students / {population}")),
                     "unit": "count" if quantity == "count" else "percent"})
     _need(len({field["field"] for field in result}) == len(result), "Duplicate reviewed student field binding")
+    if "field_order" in grid:
+        order = grid["field_order"]
+        _need(isinstance(order, list) and all(isinstance(name, str) for name in order)
+              and len(order) == len(set(order)) == len(result)
+              and set(order) == {field["field"] for field in result}, "Invalid student field order")
+        by_name = {field["field"]: field for field in result}
+        result = [by_name[name] for name in order]
     return result
 
 
@@ -452,7 +463,7 @@ def _student_workbook_cells(store: ProvenanceStore, scope: str, witness: Mapping
                             contract: Mapping[str, Any] | None = None) -> dict[tuple[int, str], str]:
     """Read independently acquired Student Information workbook cells."""
     grid, _ = _resolve_contract(contract)
-    from .financial_leaves import NS, _package, _xml
+    from .financial_leaves import _package, _xml
     from zipfile import ZipFile
 
     record = store.verify_record_closure([witness["xlsx_receipt"]])[witness["xlsx_receipt"]]
@@ -483,6 +494,15 @@ def _student_workbook_cells(store: ProvenanceStore, scope: str, witness: Mapping
         sheets, strings = _package(archive)
         _need(set(sheets) == {"Student Information"}, "Student workbook sheets differ")
         sheet = _xml(archive, sheets["Student Information"])
+    cells = _student_sheet_cells(sheet, strings)
+    _workbook_headers(cells, grid, scope, witness["identifier"])
+    return cells
+
+
+def _student_sheet_cells(sheet: Any, strings: Sequence[str]) -> dict[tuple[int, str], str]:
+    """Retain physical empty XML cells separately from omitted addresses."""
+    from .financial_leaves import NS
+
     cells: dict[tuple[int, str], str] = {}
     addresses = set()
     for row in sheet.findall(NS + "sheetData/" + NS + "row"):
@@ -497,7 +517,8 @@ def _student_workbook_cells(store: ProvenanceStore, scope: str, witness: Mapping
             if raw is not None:
                 text = strings[int(raw)] if cell.get("t", "n") == "s" else raw
                 cells[key] = " ".join(text.split())
-    _workbook_headers(cells, grid, scope, witness["identifier"])
+            else:
+                cells[key] = ""
     return cells
 
 
@@ -627,8 +648,13 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
     _need(policy == load_config().value_policies[policy_id], "Student value policy changed")
     resource = cfg.column_contract(DATASET, EDITION, reader_profile="source")
     _need(resource == load_config().column_contract(DATASET, EDITION, reader_profile="source"), "Student field binding changed")
-    expected_metrics = {field["field"]: (field["unit"], PERIOD) for field in semantic_fields()}
-    _need({metric.field: (metric.unit, metric.period) for metric in source.metadata.metrics.values()} == expected_metrics,
+    grid = definition()
+    denominators = frozenset(grid.get("denominator_fields", []))
+    expected_metrics = {field["field"]: (field["unit"], PERIOD,
+                        field["denominator"] if field["field"] in denominators else None)
+                        for field in semantic_fields(grid)}
+    _need({metric.field: (metric.unit, metric.period, metric.denominator)
+           for metric in source.metadata.metrics.values()} == expected_metrics,
           "Student semantic bindings differ from the reviewed report grid")
     validate_reference_records(source, store.read_record, verify_all_claimed=True)
     with intake.open("rb") as stream:

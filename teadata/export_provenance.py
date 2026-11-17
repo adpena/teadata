@@ -349,7 +349,9 @@ class ExportProvenance:
         elif recipe := document["selector"].get("query_replay"):
             for query in recipe["queries"]:
                 append(("Recorded filter", query["expression"]))
-        append(("Column", "Export header", "Publisher code", "Measurement period", "Unit", "Binding", "Publisher definition"), heading=True)
+        show_denominators = any("denominator" in field for column in document["columns"] for field in column["fields"])
+        append(("Column", "Export header", "Publisher code", "Measurement period", "Unit", "Binding", "Publisher definition",
+                *(("Denominator",) if show_denominators else ())), heading=True)
         for column in document["columns"]:
             header = " / ".join(column["headers"])
             for field in column["fields"] or [None]:
@@ -363,7 +365,8 @@ class ExportProvenance:
                     binding = f'{field["field"]} ({binding})'
                 append((column["position"], header, field["code"] if field else None,
                         DataPeriod.from_dict(field["period"]).label if field else None, field["unit"] if field else None,
-                        binding, field["publisher_description"] if field else None))
+                        binding, field["publisher_description"] if field else None,
+                        *((field.get("denominator") if field else None,) if show_denominators else ())))
         append(("Edition acquisitions", "Receipt", "Method", "Downloaded at", "Recorded at",
                 "Requested URL", "Resolved URL", "Artifact SHA-256"), heading=True)
         for row in document["edition_acquisitions"]:

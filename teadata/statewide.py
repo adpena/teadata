@@ -545,7 +545,7 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
         right_revision, right_mapping, right_review, right_policy, right_student = _reviewed_students(statewide_release, statewide)
         if left_student.grid_sha256 != right_student.grid_sha256:
             raise ContractError("Student comparison requires the same reviewed grid profile for local and Texas; "
-                                "mixed original168 and reviewed174 projections are not comparable here.")
+                                "mixed reviewed Student projections are not comparable here.")
         if local.scope == "campus" and left_student.roster_bound:
             # Campus coverage has its own roster. The reviewed Texas observation
             # supplies the same statewide baseline for each campus partition.

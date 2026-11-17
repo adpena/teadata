@@ -22742,6 +22742,46 @@ data_sources:
               kind: school_year
               start_year: 2025
               end_year: 2026
+          membership_students_with_intellectual_disabilities_percent:
+            field: membership_students_with_intellectual_disabilities_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+            denominator: membership_total_students_with_disabilities_count
+          membership_students_with_physical_disabilities_percent:
+            field: membership_students_with_physical_disabilities_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+            denominator: membership_total_students_with_disabilities_count
+          membership_students_with_autism_percent:
+            field: membership_students_with_autism_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+            denominator: membership_total_students_with_disabilities_count
+          membership_students_with_behavioral_disabilities_percent:
+            field: membership_students_with_behavioral_disabilities_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+            denominator: membership_total_students_with_disabilities_count
+          membership_students_with_non_categorical_early_childhood_percent:
+            field: membership_students_with_non_categorical_early_childhood_percent
+            unit: percent
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+            denominator: membership_total_students_with_disabilities_count
         references:
         - reference_id: definitions
           title: 2026 TPRS glossary profile definitions (PDF 37–40)
@@ -22756,17 +22796,17 @@ data_sources:
           role: methodology
           status: available
           path: methodologies/tprs-students-2026.json
-          reviewed_sha256: f7628dd08a539c52f5323664b1292e62869875e548230e657b56423461d7526f
+          reviewed_sha256: 38cdb41b151f762feeb7dc3a7f4d44d6b8a9e3a83e29d86db79ec72bc91c782c
           provenance_ids:
-          - e1a84687f57a6ab4cb5f4507c2c1286eca1042657393f4257640c488cf6c1f3b
+          - 48800d598f1f16836f03e4f038a53acd2500d189c1a10f5405d8e0629f36a49c
         - reference_id: columns
           title: Derived row-label projection (not CSV codes)
           role: schema
           status: available
           path: schemas/tprs--2026--student-selected-reports-crosswalk.json
-          reviewed_sha256: 1612f79165760c8f51304024c2bb5ddf71128ef29940c66e1c0198c3d7624d70
+          reviewed_sha256: 37eddfb9f52d9df4540a8936c924b932bd1a215c357fa4c6bdb8b9468794fa3c
           provenance_ids:
-          - ea8ddf6097786bd69e89053f394ae54d71bd27ce17a127867501843bf1713767
+          - 22c282867410974109f4311dbb44acf59e121db96a7e15506d74ccd9a69e3145
         - reference_id: legend
           title: Exact 2026 selected report disclosure legend
           role: masking_methodology
@@ -22787,7 +22827,8 @@ data_sources:
           positional crosswalk codes are literal HTML row labels, not invented CSV variable names. Entire
           raw current table stays in the reader/retained HTML; only reviewed current Membership/Enrollment
           fields are native. Missing grade rows are absent observations, never zero. Six grouped-disability Membership counts are selected; Intellectual Disabilities includes ID, LD, DD and TBI.
-          Disability percentages and Enrollment cells, CTE, lagged and embedded benchmarks remain raw/HOLD.
+          Five disability composition Membership percentages use Total Students with Disabilities in Membership, not Total Students.
+          Blank total-disability percent and disability Enrollment cells, CTE, lagged and embedded benchmarks remain raw/HOLD.
       reader:
         profiles:
           source:

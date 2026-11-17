@@ -662,12 +662,13 @@ class MetricDefinition:
     field: str
     period: DataPeriod | None = None
     unit: str | None = None
+    denominator: str | None = None
 
     @classmethod
     def from_dict(cls, raw: Mapping[str, Any]) -> MetricDefinition:
         if not isinstance(raw, Mapping):
             raise ValueError("Metric definitions must be mappings")
-        _known_fields(raw, {"field", "period", "unit"}, "metric definition")
+        _known_fields(raw, {"field", "period", "unit", "denominator"}, "metric definition")
         if not isinstance(raw.get("field"), str) or not raw["field"].strip():
             raise ValueError("Metric definitions require a field")
         unit = raw.get("unit")
@@ -676,13 +677,18 @@ class MetricDefinition:
                 unit = MeasurementUnit(unit).value
             except (TypeError, ValueError) as error:
                 raise ValueError("Unknown metric unit") from error
+        denominator = raw.get("denominator")
+        if denominator is not None and (not isinstance(denominator, str) or not denominator.strip()):
+            raise ValueError("Metric denominator must be a nonempty source field or population description, or unknown")
         return cls(
-            raw["field"], DataPeriod.from_dict(raw["period"]) if raw.get("period") is not None else None, unit
+            raw["field"], DataPeriod.from_dict(raw["period"]) if raw.get("period") is not None else None,
+            unit, denominator,
         )
 
     def to_dict(self) -> dict[str, Any]:
         return {"field": self.field, "unit": self.unit,
-                **({"period": self.period.to_dict()} if self.period is not None else {})}
+                **({"period": self.period.to_dict()} if self.period is not None else {}),
+                **({"denominator": self.denominator} if self.denominator is not None else {})}
 
 
 _SourceQualifierFamily = Literal["sof", "peims_financial", "accountability", "ccmr_outcomes_bonus"]

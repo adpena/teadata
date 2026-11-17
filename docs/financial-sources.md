@@ -132,6 +132,48 @@ uv run --locked --extra scripts python -m teadata.scripts.refresh_financials \
 
 Actual PWR2024/2025 inspection found narrowed 2025 AF program-code labels while GF retained broader labels, matching changes in only four Notes cells. These observations do not establish semantic equivalence or a publisher error. The original source contracts, reviewed references and later independent field-level examples must resolve what can be compared. Future 2026 workbooks use this same producer only after their own exact sheet/header/unit/period/source contracts are reviewed; a year label alone establishes none of those facts.
 
+### SOF 2025–26 DPE: source accounting and an unresolved formula question
+
+The retained statewide publication run **47422, Near Final** contains four DPE
+worksheets: inputs, outputs, M&O ASAHE and I&S ASAHE. They contain 593 fact
+occurrences. Three DPE attendance facts are already qualified through
+`summary_of_finances_attendance`; the remaining 590 have not been numerically
+qualified or added to the normal release. The existing native raw contract
+preserves their original strings. A dictionary match supplies a source
+definition, not proof of a field's unit, measurement period or correctness.
+
+The first three sheets each report 1,243 districts. The I&S sheet reports 1,030;
+its 213 absent districts must not become zero observations. Preserve each row's
+actual SOF run separately from publication run 47422 and retain Payment Cycle 2
+without inventing a named interpretation. The separate 2026–27 Preliminary
+run 47562 is a different funding edition.
+
+On November 17, 2026, a direct read of the pinned original workbook and dictionary
+confirmed this documentation/formula reconciliation question in `is_asahe_dpe`:
+
+| District | Source row | Line 16: published / dictionary line 5 + line 15 | Line 28: published / dictionary line 5 + line 27 |
+| --- | ---: | ---: | ---: |
+| Cayuga ISD (001902) | 2 | 1,516,508 / 1,832,213 | 1,471,268 / 1,786,973 |
+| Austin ISD (227901) | 916 | 242,137,652 / 229,297,732 | 236,172,085 / 223,332,165 |
+
+Both physical headers say “Total State and Local Revenue for Debt Service.”
+Keep column U / line 16 and column AG / line 28 distinct. The descriptions are in
+`Variable Listing!D600` and `D598`, respectively. Cayuga's row run is 47223;
+Austin's is 47422. These are exact original integer tokens and arithmetic, not
+a claim that the published values are wrong or a qualified dollar series.
+Another formula context or a documentation error may explain the difference.
+Independent detail-report evidence is still required; no value was corrected.
+
+The [TEA SOF download service](https://tealprod.tea.state.tx.us/fsp/Reports/ReportSelection.aspx)
+is the publisher authority. Frozen workbook SHA-256:
+`5026e6cb7533dfc157b2371108fd0ecfc54f3792bb63f5b3341acec90ccee715`;
+dictionary SHA-256:
+`9d018f14dd81e2bed5f896b621c5e86f64caa61b8dbc48a7373fe4dbaa575db0`.
+The original dictionary download time is unrecorded; its later custody
+observation is not substituted for that time. This question blocks semantic
+admission of the affected descriptions/formulas, not retention of their source
+bytes or the separately qualified attendance fields.
+
 Both annual GF/AF sheets also repeat their literal Capital Outlay label at AD1 and CA1. Their Notes crosswalk gives different later column pointers (CC1 and CB1); those pointers must not override the actual headers or establish equal values. Keep both physical observations and their raw/status support. PWR tax-rate denominators/scales and metric periods remain source-review questions; do not force a fractional, per-ADA or per-valuation measure into `count` or `ratio` to satisfy the current canonical unit vocabulary.
 
 ## Qualify selected FY2025 dollar fields

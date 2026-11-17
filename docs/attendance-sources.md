@@ -15,7 +15,7 @@ acceptance, publication and application activation remain separate stages.
 
 ## Current population
 
-The published baseline for this extension, v0.0.163, retains 2025–26 TPRS Membership and
+The published baseline for this extension, v0.0.164, retains 2025–26 TPRS Membership and
 Enrollment at district, campus and direct Texas scopes, PEIMS programs for
 2022–23 through 2025–26 and ethnicity enrollment for 2018–19 through 2025–26.
 The TPRS acquisition contains 9,105 admitted campus reports in 23 partitions;
@@ -29,15 +29,28 @@ and DataFrame/CSV/Excel/SQL exports. Texas 2025–26 Membership was 5,454,059 an
 Enrollment 5,467,642. These are retained-source checks; they do not establish
 that every released record was freshly reacquired from TEA.
 
-### Six disability counts: frozen source qualification, not yet a live release
+### Disability counts and composition: distinct denominators and source holds
 
-The current source contract adds six Membership counts: the published disability
+The v0.0.164 normal release includes six Membership counts: the published disability
 total and five primary-disability groups. Intellectual Disabilities groups ID,
 learning disability, developmental delay and traumatic brain injury; it is not
-an ID-only count. These counts need no percentage denominator. Disability
-percentages and Enrollment blanks remain held, as do CTE tokens and lagged rows.
-The parser still excludes the report tail beginning at Mobility. This is not
-complete Student Information coverage.
+an ID-only count. These counts need no percentage denominator. The separate
+179-field source contract adds the five published disability-group Membership
+percentages. Their denominator is **Total Students with Disabilities in
+Membership**, not all students. Its shared source gate replayed all 10,308
+retained reports on November 17, 2026. Normal release publication and application
+adoption are separate gates; consult the [selected release inventory](source-integration-status.md).
+The 168- and 174-field captured contracts remain unchanged.
+
+Total-disability percent and disability Enrollment cells are blank in the
+three publisher witnesses; no corresponding observations are manufactured.
+CTE dots lack a documented interpretation and stay held. Lagged disciplinary,
+mobility, attrition, retention and data-quality cells need their own definitions,
+periods and denominators. The retained glossary has inconsistent years in its
+discipline and mobility explanations. No silent period correction is applied.
+The core projection stops at Mobility; the separate full-report inventory
+accounts for all data cells before Class Size without admitting tail measures.
+Class Size continues through its existing qualified reader.
 
 On November 17, 2026, the existing producer materialized all 24 retained intakes:
 9,105 campuses, 1,202 districts and direct Texas. All 174 fields passed producer
@@ -46,6 +59,31 @@ across 10,308 rows. The six added fields provide 61,848 observations, including
 suppressed and unavailable states. No report was downloaded again for that run.
 These are checks against frozen publisher extracts, not fresh live verification.
 The three independent HTML/XLSX witnesses remain a distinct check.
+
+The full inventory matched all 1,298 data cells in the three retained exports:
+476 campus, 548 district and 274 Texas cells. Physical empty XML cells remain
+distinct from absent cells and numeric zero. These witnesses contain 79, 78 and
+39 explicit empty XML cells, respectively, and no absent data-cell addresses.
+That finding describes these named witnesses, not every campus workbook.
+The raw HTML/XLSX and download receipts remain authoritative.
+
+```python
+from teadata.tprs_student_inventory import inventory_student_report
+
+audit = inventory_student_report(
+    retained_html_bytes, scope="district", identifier="227901",
+    contract=captured_student_grid,
+)
+for cell in audit.cells:
+    if cell.disposition == "held":
+        print(cell.section, cell.label, cell.row, cell.column, cell.raw, cell.reason)
+```
+
+Inventory coordinates are one-based parsed HTML table coordinates. Whitespace
+normalization follows the existing HTML reader; original bytes retain styling,
+merged-cell and whitespace evidence. Inventory is an audit, not another entity
+dataset or a shortcut around source qualification. A changed or unrecognized
+layout raises an error. No network lookup or fallback year is performed.
 
 The published normal release and live app remain unchanged until normal-release
 integration and app ingestion pass. A source-only candidate is not a selected

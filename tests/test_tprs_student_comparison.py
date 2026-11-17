@@ -182,7 +182,7 @@ def test_all_qualified_fields_use_the_direct_texas_leaf_and_exact_population(com
     release, keys = comparison
     for scope, entity in (("district", district()), ("campus", campus())):
         rows = list(Query([entity], repo=None).compare_statewide(release=release, local=keys[scope], statewide=keys["state"]))
-        assert len(rows) == 174 and {row.metric for row in rows} == {f["field"] for f in students.semantic_fields()}
+        assert len(rows) == 179 and {row.metric for row in rows} == {f["field"] for f in students.semantic_fields()}
         count = next(row for row in rows if row.metric == "membership_total_students_count")
         assert (count.identifier, count.local_raw, count.local_value, count.statewide_raw,
                 count.statewide_value, count.difference, count.difference_pp) == (
@@ -432,8 +432,10 @@ def original168_grid():
     return json.loads(raw)
 
 
-def test_two_literal_reviewed_grids_keep_exact_ordered_crosswalks():
-    current = students.definition()
+def test_historical_literal_reviewed_grids_keep_exact_ordered_crosswalks():
+    import json
+    from pathlib import Path
+    current = json.loads((Path(__file__).parent / "fixtures/tprs-students-reviewed174.json").read_bytes())
     assert sha256((canonical_json(current) + "\n").encode()).hexdigest() == (
         "f7628dd08a539c52f5323664b1292e62869875e548230e657b56423461d7526f")
     original = original168_grid()
@@ -454,7 +456,7 @@ def test_two_literal_reviewed_grids_keep_exact_ordered_crosswalks():
 def test_real_packaged_metadata_uses_literal_fingerprints_without_fixture_bridge(damage):
     cfg = load_config()
     metadata = cfg.resolve_dataset(students.DATASET, 2026, exact=True, reader_profile="source").metadata
-    assert _student_metadata_sha256(metadata) == "0a6e3e30a2a3005a92d2b90173b27ac5f18344b1e98158db43e12c419d7fc7e8"
+    assert _student_metadata_sha256(metadata) == "77061bf49042409045d82835a3d252887dd201e886a715a9473bbf0ef3af464c"
     assert sha256(canonical_json(cfg.value_policies[metadata.value_policy].to_dict()).encode()).hexdigest() == (
         "d13b4c90563086887f77c4a211813d63977d62aa70ca866579307edfc1ca183e")
     if damage == "unknown_grid":
@@ -505,5 +507,41 @@ def test_mixed_supported_profiles_refuse_before_observations(comparison, monkeyp
         return revision, mapping, metadata, policy, contract
     monkeypatch.setattr("teadata.statewide._reviewed_students", reviewed)
     monkeypatch.setattr(release, "analytical_dataset", lambda *_: pytest.fail("Mixed profiles opened observations"))
-    with pytest.raises(ContractError, match="same reviewed grid profile.*mixed original168 and reviewed174"):
+    with pytest.raises(ContractError, match="same reviewed grid profile.*mixed reviewed Student"):
         Query([district()], repo=None).compare_statewide(release=release, local=keys["district"], statewide=keys["state"])
+
+
+def test_denominator_discovery_and_export_metadata_do_not_select_its_observation(comparison, monkeypatch):
+    from openpyxl import load_workbook
+
+    release, keys = comparison
+    key = keys["district"]
+    field = "membership_students_with_autism_percent"
+    denominator = "membership_total_students_with_disabilities_count"
+    plans = release.catalog.resolve_artifacts([(key, field)])
+    assert denominator not in plans[0]["columns"]
+    with monkeypatch.context() as isolated:
+        isolated.setattr(release, "analytical_dataset", lambda *_: pytest.fail("Metadata opened observations"))
+        headers = release.catalog.header_records(students.DATASET, table="district", edition_key=key)
+        assert next(row for row in headers if row["field"] == field)["denominator"] == denominator
+        variables = list(release.catalog.variables(dataset=students.DATASET, edition=key))
+        assert next(row for row in variables if row["field"] == field)["denominator"] == denominator
+        assert "denominator" not in next(row for row in variables if row["field"] == "membership_total_students_count")
+        for selected, expected in ((field, denominator), ("membership_total_students_count", None)):
+            provenance = release.table(key).select(selected).provenance()
+            descriptions = [definition for column in provenance.to_dict()["columns"] for definition in column["fields"]]
+            assert next(definition for definition in descriptions if definition["field"] == selected).get("denominator") == expected
+            stream = BytesIO()
+            provenance.to_excel(stream)
+            stream.seek(0)
+            book = load_workbook(stream, read_only=True)
+            try:
+                rows = list(book["Provenance"].values)
+                heading = next(row for row in rows if row[0] == "Column")
+                if expected:
+                    assert heading[7] == "Denominator"
+                    assert any(len(row) > 7 and row[7] == expected for row in rows)
+                else:
+                    assert not any(heading[7:])
+            finally:
+                book.close()

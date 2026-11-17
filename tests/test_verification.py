@@ -45,7 +45,8 @@ def passing():
 @pytest.mark.parametrize('pin',[
     '373041dfb0eb994ccde4a88f1e7e630e7b395bf9f7a51199655d843788a2b5f6',
     'c96effc9bcbfd01c7cd969082cf701a2dc4e1900b6d6973b23c0ed2d21559f9e',
-    '3b07ad9d41ada9d28487d14259be2b6700729e5ed2cca632e77f845f7b0eebaa'])
+    '3b07ad9d41ada9d28487d14259be2b6700729e5ed2cca632e77f845f7b0eebaa',
+    '8d5362e43c3374b11647592e618a82707794e49a1bc76739d69eea299ad6f131'])
 def test_tprs_native_dispatch_uses_same_source_and_evidence_gate(monkeypatch,pin):
     from types import SimpleNamespace
     from teadata import tprs_statewide_intake as intake, verification

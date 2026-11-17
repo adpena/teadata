@@ -48,7 +48,9 @@ MAX_STATEWIDE_HTML_BYTES = 160 * 1024**2
 REVIEWED_DISTRICT_STATE_MANIFEST = "373041dfb0eb994ccde4a88f1e7e630e7b395bf9f7a51199655d843788a2b5f6"
 REVIEWED_CAMPUS_STUDENT_MANIFEST = "c96effc9bcbfd01c7cd969082cf701a2dc4e1900b6d6973b23c0ed2d21559f9e"
 REVIEWED_CAMPUS_STUDENT_174_MANIFEST = "3b07ad9d41ada9d28487d14259be2b6700729e5ed2cca632e77f845f7b0eebaa"
-REVIEWED_COMPLETE_CAMPUS_MANIFESTS = frozenset({REVIEWED_CAMPUS_STUDENT_MANIFEST, REVIEWED_CAMPUS_STUDENT_174_MANIFEST})
+REVIEWED_CAMPUS_STUDENT_179_MANIFEST = "8d5362e43c3374b11647592e618a82707794e49a1bc76739d69eea299ad6f131"
+REVIEWED_COMPLETE_CAMPUS_MANIFESTS = frozenset({REVIEWED_CAMPUS_STUDENT_MANIFEST,
+    REVIEWED_CAMPUS_STUDENT_174_MANIFEST, REVIEWED_CAMPUS_STUDENT_179_MANIFEST})
 REVIEWED_STATEWIDE_TPRS_MANIFESTS = REVIEWED_COMPLETE_CAMPUS_MANIFESTS | {REVIEWED_DISTRICT_STATE_MANIFEST}
 
 
@@ -220,7 +222,7 @@ def _reviewed_leaves(release: DataRelease) -> tuple[_ReplayLeaf, ...]:
         leaves.append(_ReplayLeaf(artifact, refs["raw_audit"], reports, campus_rosters, contract, identity))
     _need(len(cohorts) == 1 and sorted(statewide_scopes) == ["district", "state"],
           "Reviewed TPRS leaves must share the district and Texas cohort")
-    _need(len(grids) == 1, "Reviewed TPRS replay requires one supported grid across all leaves; mixed168/174 sources are unsupported")
+    _need(len(grids) == 1, "Reviewed TPRS replay requires one supported grid across all leaves; mixed projections are unsupported")
     return tuple(leaves)
 
 
@@ -257,7 +259,7 @@ def _replay_contract(leaves: tuple[_ReplayLeaf, ...]) -> Mapping[str, Any]:
         _need(identity == leaf.grid_sha256, "Reviewed TPRS leaf contract identity changed")
         identities.add(identity)
         selected = contract
-    _need(len(identities) == 1, "Reviewed TPRS replay requires one supported grid across all leaves; mixed168/174 sources are unsupported")
+    _need(len(identities) == 1, "Reviewed TPRS replay requires one supported grid across all leaves; mixed projections are unsupported")
     assert selected is not None
     return selected
 

@@ -410,8 +410,12 @@ def header_records(document: Mapping[str, Any], *, dataset: str, edition: str,
     if not tables:
         raise ValueError(f"Header crosswalk table unavailable: {table!r}")
     periods: dict[str, DataPeriod] = {}
+    denominators: dict[str, str] = {}
     if metadata is not None:
         for definition in metadata.metrics.values():
+            if definition.denominator is not None:
+                if denominators.setdefault(definition.field, definition.denominator) != definition.denominator:
+                    raise ValueError(f"Conflicting reviewed denominators for {definition.field!r}")
             if definition.period is None and metadata.period.kind == "unknown":
                 continue
             period = definition.period if definition.period is not None else metadata.period
@@ -438,6 +442,8 @@ def header_records(document: Mapping[str, Any], *, dataset: str, edition: str,
                       "mapping_version": document["mapping_version"],
                       **({"input_sha256": inputs[0]} if "input_sha256" in item else {"input_sha256s": list(inputs)}),
                       "source_schema_sha256": item["source_schema_sha256"], "period": period.to_dict()}
+            if field["field"] in denominators:
+                record["denominator"] = denominators[field["field"]]
             if "header_identity" in item:
                 record["header_identity"] = table_header_identity(item)
             if "dictionary_records" in item:
