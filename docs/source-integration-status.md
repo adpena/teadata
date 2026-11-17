@@ -1,8 +1,8 @@
 # Source integration status — November 16, 2026 (UTC)
 
 The selected release, rather than the installed software version, controls
-available observations. Software 0.0.161 packages the qualified normal161 pin
-below as its default. Earlier sections remain dated baselines; their
+available observations. The packaged default selects the qualified normal161 pin
+below; software and data release versions advance independently. Earlier sections remain dated baselines; their
 counts and attachment lists must not be reused as the current inventory.
 
 ## Version 0.0.161 qualified normal release

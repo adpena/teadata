@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import Counter
 from collections.abc import Iterable
 from contextlib import closing
 from hashlib import sha256
 from importlib.metadata import version
-import json
 from pathlib import Path
 import platform
 import sys
@@ -29,6 +28,7 @@ from .dataset_metadata import (
     MetricDefinition,
     ResolvedDataset,
 )
+from .educator_retention import SOURCE_WITNESS_RECEIPT, _source_witness
 from .manifest import BuildRecorder, ContractError, canonical_json, file_identity
 from .provenance import ProvenanceStore, validate_reference_records
 from .release import _install_candidate, publish_release
@@ -37,11 +37,10 @@ from .values import ValueStatus
 
 REPORT_YEAR = 2026
 EDITION = "2026-09"
-WORKBOOK_RECEIPT = "fd872b771d3b8e2e3795172299b1286ef38991a901d0b0e1ca7f6246eb435d66"
+WORKBOOK_RECEIPT = "4970586447fe1ade12160e9833ce9d836e3dd062f4657f7d85e5841a5cae576c"
 WORKBOOK_SHA = "148a8e20669aba384d0e398d093829f6db9b95a5d2391bd5f38d3051fb0c56bb"
 WORKBOOK_URL = "https://tea4avcastro.tea.state.tx.us/oess/edrs/newly-certified-by-role-dashboards/downloads/newly-certified-by-role-workbook.xlsx"
-ARCHIVE_PROOF_SHA = "17334b2305831e6aedf727e030530a7c4b7b8af88b54322a033a92cf7161f793"
-ADMITTED = {"Teacher": (2019, 2020, 2021, 2024), "Principal": (2022, 2023, 2024), "Superintendent": (2022, 2023, 2024)}
+ADMITTED = {role: tuple(range(2016, 2027)) for role in ("Teacher", "Principal", "Superintendent")}
 # These are revisions between two direct statewide totals. Their detailed
 # publisher rows still have ambiguous repeated keys.
 PUBLISHER_REVISIONS = {("Teacher", "2020-21"): (26085, 26086), ("Teacher", "2023-24"): (17797, 17801)}
@@ -73,54 +72,58 @@ def _year_label(year: int) -> str:
     return f"{year - 1}-{year % 100:02d}"
 
 
-def _selected_rows(rollups: Iterable[tuple], details: Iterable[tuple],
-                   witnesses: dict[tuple[str, str], tuple[int, int]]) -> dict[tuple[str, str], tuple[int, tuple]]:
-    rollup_iter, detail_iter = iter(rollups), iter(details)
-    if next(rollup_iter, None) != ROLLUP_HEADERS or next(detail_iter, None) != DETAIL_HEADERS:
+def _selected_rows(rollups: Iterable[tuple],
+                   witnesses: dict[tuple[str, str], tuple[int, tuple]]) -> dict[tuple[str, str], tuple[int, tuple]]:
+    rollup_iter = iter(rollups)
+    if next(rollup_iter, None) != ROLLUP_HEADERS:
         raise ContractError("Certification worksheet headers differ from the reviewed workbook")
     direct = {}
     for physical_row, row in enumerate(rollup_iter, 2):
+        if len(row) != len(ROLLUP_HEADERS):
+            raise ContractError("Certification rollup width differs from the reviewed workbook")
         year, route, role, gender, ethnicity, count = row
         key = role, year
-        if key not in witnesses:
-            continue
-        if (key in direct or (route, gender, ethnicity) != ("All", "All", "All")
-                or type(count) is not int or count < 0 or witnesses[key] != (physical_row, count)):
-            raise ContractError(f"Certification rollup differs from the exact archive witness for {key}")
+        if (key not in witnesses or key in direct or (route, gender, ethnicity) != ("All", "All", "All")
+                or type(count) is not int or count < 0 or witnesses[key] != (physical_row, row)):
+            raise ContractError(f"Certification rollup differs from the independent XML witness for {key}")
         direct[key] = physical_row, row
-    detail_required = witnesses.keys() - PUBLISHER_REVISIONS.keys()
-    totals: dict[tuple[str, str], int] = defaultdict(int)
-    keys = set()
-    for year, route, role, gender, ethnicity, count in detail_iter:
-        key = role, year
-        if key not in detail_required:
-            continue
-        detail_key = role, year, route, gender, ethnicity
-        if (detail_key in keys or any(not isinstance(value, str) or not value or value == "All"
-                                     for value in (route, gender, ethnicity))
-                or type(count) is not int or count < 0):
-            raise ContractError(f"Certification detail keys or values differ for {key}")
-        keys.add(detail_key)
-        totals[key] += count
-    if direct.keys() != witnesses.keys() or totals.keys() != detail_required or any(
-        direct[key][1][-1] != totals[key] for key in detail_required
-    ):
-        raise ContractError("Certification scoped detail and rollup totals do not reconcile")
+    if direct.keys() != witnesses.keys():
+        raise ContractError("Certification direct row roster differs from the independent XML witness")
     return direct
 
 
+def _detail_diagnostics(details: Iterable[tuple], direct: dict[tuple[str, str], tuple[int, tuple]]) -> list[dict[str, Any]]:
+    """Describe actual unqualified detail; never use it to produce a total."""
+    iterator = iter(details)
+    if next(iterator, None) != DETAIL_HEADERS:
+        raise ContractError("Certification detail headers differ from the reviewed workbook")
+    grouped: dict[tuple[str, str], list[tuple]] = {key: [] for key in direct}
+    for row in iterator:
+        if (len(row) != 6 or any(not isinstance(v, str) or not v for v in row[:5])
+                or type(row[-1]) is not int or row[-1] < 0 or (row[2], row[0]) not in grouped):
+            raise ContractError("Certification detail diagnostic input changed")
+        grouped[row[2], row[0]].append(row)
+    result = []
+    for (role, year), (_, row) in direct.items():
+        values = grouped[role, year]
+        keys = Counter(value[:5] for value in values)
+        duplicates, total = sum(n - 1 for n in keys.values()), sum(value[-1] for value in values)
+        outcomes = ([] if values else ["missing_detail"]) + (["duplicate_keys"] if duplicates else [])
+        if total != row[-1]:
+            outcomes.append("sum_differs")
+        result.append({"role": role, "year": year, "rows": len(values), "unique_keys": len(keys),
+                       "duplicate_rows": duplicates, "sum": total, "direct_total": row[-1],
+                       "outcomes": outcomes or ["matches"], "detail_qualified": False})
+    return result
+
+
 def _proof(store: ProvenanceStore, receipt: str) -> dict[str, Any]:
-    record = store.read_record(receipt)
-    if (record["kind"] != "acquisition" or record["artifact"]["sha256"] != ARCHIVE_PROOF_SHA
-            or record["method"] != "local_observation"):
-        raise ContractError("Certification archive readback differs from the reviewed evidence")
-    proof = json.loads(store.verify_artifact(ARCHIVE_PROOF_SHA).read_bytes())
-    if (proof["status"] != "ARCHIVE_RECONCILIATION_COMPLETE_CERTIFICATION_HOLD_REMAINS"
-            or proof["source_release_activation"] is not False
+    proof = _source_witness(store, receipt)["certification"]
+    if (receipt != SOURCE_WITNESS_RECEIPT
             or proof["workbook_receipt"] != WORKBOOK_RECEIPT
-            or proof["workbook_artifact"]["sha256"] != WORKBOOK_SHA
+            or proof["workbook_sha256"] != WORKBOOK_SHA
             or set(proof["reports"]) != set(ADMITTED)):
-        raise ContractError("Certification archive readback scope changed")
+        raise ContractError("Certification source witness scope changed")
     return proof
 
 
@@ -138,7 +141,11 @@ def materialize_educator_certification(store: ProvenanceStore, output: Path, *,
 
     config_bytes = CONFIG.read_bytes()
     config = load_config_bytes(config_bytes, path=CONFIG)
-    sources, witnesses = {}, {}
+    sources = {}
+    witnesses = {(item["values"][2], item["values"][0]): (item["row"], tuple(item["values"]))
+                 for item in proof["rows"]}
+    if len(witnesses) != 33 or len(proof["rows"]) != 33:
+        raise ContractError("Certification requires all 33 independent direct-row witnesses")
     table_dictionaries = []
     roots = {WORKBOOK_RECEIPT, archive_receipt}
     for role, years in ADMITTED.items():
@@ -182,10 +189,16 @@ def materialize_educator_certification(store: ProvenanceStore, output: Path, *,
                 raise ContractError(f"Certification archive witness is missing or repeated for {role} {year}")
             witness = matches[0]
             archive_count, workbook_count = witness["archive_total"], witness["workbook_total"]
-            expected = PUBLISHER_REVISIONS.get((role, label), (archive_count, archive_count))
-            if (archive_count, workbook_count) != expected:
+            expected = PUBLISHER_REVISIONS.get((role, label), (workbook_count, workbook_count))
+            outcome = witness["outcome"]
+            if (witnesses.get((role, label)) != (witness["workbook_row"], (label, "All", role, "All", "All", workbook_count))
+                    or (2019 <= year <= 2024 and ((archive_count, workbook_count) != expected
+                        or outcome != ("publisher_edition_difference" if (role, label) in PUBLISHER_REVISIONS else "matches")
+                        or len(witness["archive_tables"]) != 2
+                        or any(item["total"] != archive_count for item in witness["archive_tables"])))
+                    or (not 2019 <= year <= 2024 and (archive_count is not None or outcome != "unavailable"
+                                                     or witness["archive_tables"]))):
                 raise ContractError(f"Certification archive count does not reconcile for {role} {year}")
-            witnesses[role, label] = witness["workbook_row"], workbook_count
         sources[role] = source
     store.verify_record_closure(sorted(roots))
     with store.verify_artifact(WORKBOOK_SHA).open("rb") as file, closing(
@@ -203,7 +216,10 @@ def materialize_educator_certification(store: ProvenanceStore, output: Path, *,
                 or {item["code"] for item in definitions} != set(ROLLUP_HEADERS)
                 or any(dictionary != definitions for dictionary in table_dictionaries)):
             raise ContractError("Certification field definitions differ from the exact workbook dictionary")
-        records = _selected_rows(book[ROLLUP_SHEET].values, book["Data"].values, witnesses)
+        records = _selected_rows(book[ROLLUP_SHEET].values, witnesses)
+        diagnostics = _detail_diagnostics(book["Data"].values, records)
+        if diagnostics != proof["detail_diagnostics"]:
+            raise ContractError("Certification detail diagnostics differ from the independent XML observation")
 
     output.parent.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory(prefix=".educator-certification-", dir=output.parent) as directory:
@@ -228,9 +244,14 @@ def materialize_educator_certification(store: ProvenanceStore, output: Path, *,
                 label = _year_label(year)
                 number, row = records[role, label]
                 revision = PUBLISHER_REVISIONS.get((role, label))
+                comparison_row = next(item for item in proof["reports"][role]["comparisons"] if item["year"] == label)
+                detail = next(item for item in diagnostics if (item["role"], item["year"]) == (role, label))
                 comparison: dict[str, Any] = {
-                    "archive_total_matches": revision is None,
-                    "unique_workbook_detail_matches": True if revision is None else None,
+                    "archive_comparison": comparison_row["outcome"],
+                    "archive_total_matches": None if comparison_row["outcome"] == "unavailable" else revision is None,
+                    "detail_diagnostic": detail,
+                    "detail_qualified": False,
+                    "independent_xml_witness_matches": True,
                 }
                 if revision is not None:
                     comparison["publisher_edition_difference"] = {

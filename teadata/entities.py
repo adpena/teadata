@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from collections.abc import Mapping, MutableMapping
+from collections.abc import Iterable, Mapping, MutableMapping
 from dataclasses import dataclass, field
 from datetime import date
 from functools import cached_property, singledispatchmethod
-from typing import TYPE_CHECKING, Any, Optional, Tuple
+from typing import TYPE_CHECKING, Any, Optional, Tuple, cast
 import sys
 import uuid
 
@@ -30,6 +30,7 @@ from .identifiers import EntityIdentityError, campus_lookup_key, canonical_sourc
 
 if TYPE_CHECKING:
     from .manifest import _SQLMetadataOrigin
+    from .persistence.sqlalchemy_store import LazyMetaDict
     from .source_views import DatasetFields, TPRSFields
 
 __all__ = [
@@ -126,18 +127,74 @@ class _SQLMetadataOwner:
         """Select a lazy source namespace explicitly, bypassing metadata name collisions."""
         return self._source_owner()._entity_dataset(self, name)
 
+    def _metadata_names(self, *, require_complete: bool = False) -> tuple[str, ...]:
+        meta = object.__getattribute__(self, "meta")
+        if not isinstance(meta, Mapping):
+            return ()
+        keys: Iterable[object]
+        lazy = cast("LazyMetaDict", meta)
+        if getattr(type(meta), "_supports_lazy_keys", False) is True and not lazy._loaded:
+            reader = lazy._strict_read_keys or lazy._read_keys
+            if reader is None and not require_complete:
+                # Completion can show sparse known names without fetching values.
+                # These names cannot establish absence for namespace collisions.
+                known = set(lazy._payload)
+                known.difference_update(lazy._removed or ())
+                known.update(lazy._overrides or ())
+                keys = known
+            else:
+                keys = lazy.iter_keys(require_lazy=True)
+        else:
+            keys = meta.keys()
+        return tuple(key for key in keys if isinstance(key, str))
+
+    def _attribute_value(self, name: str):
+        # Python completion/copy protocols probe dunders such as __dict__.
+        # Missing protocol hooks are never measurement or metadata requests.
+        if name.startswith("__") and name.endswith("__"):
+            raise AttributeError(name)
+        if namespace := self._dataset_attribute(name):
+            return namespace
+        meta = object.__getattribute__(self, "meta")
+        if isinstance(meta, Mapping):
+            # Keep default mappings' __missing__ out of attribute resolution.
+            if name in meta:
+                return meta[name]
+            names = self._metadata_names()
+            matches = [key for key in names if key.casefold() == name.casefold()]
+            if len(matches) == 1:
+                return meta[matches[0]]
+            if matches:
+                raise AttributeError(f"Ambiguous metadata attribute {name!r}. "
+                                     f"Use entity.meta[key] with exact spelling: {sorted(matches)!r}.")
+        else:
+            names = ()
+        from .source_views import _unknown_source_name
+
+        error = _unknown_source_name(name, (*names, *self._directory_names(include_meta=False)),
+                                     f"{type(self).__name__} attribute", "dir(entity) and entity.meta")
+        raise AttributeError(*error.args)
+
+    def _directory_names(self, *, include_meta: bool = True) -> list[str]:
+        names = set(object.__dir__(self))
+        if include_meta:
+            names.update(self._metadata_names())
+        try:
+            repo = object.__getattribute__(self, "_repo")
+        except AttributeError:
+            repo = None
+        catalog = getattr(repo, "catalog", None) if repo is not None else None
+        scope = "district" if isinstance(self, District) else "campus"
+        if catalog is not None and not (isinstance(self, Campus) and self.is_private):
+            names.update(key.dataset for source in catalog.native_sources for key in source.editions
+                         if key.scope == scope)
+        return sorted(names)
+
     def _check_namespace_collision(self, name: str) -> None:
         from .manifest import ContractError
 
-        meta = object.__getattribute__(self, "meta")
-        if not isinstance(meta, Mapping):
-            return
-        # LazyMetaDict's ordinary membership may fetch a value or the full row.
-        iter_keys = getattr(meta, "iter_keys", None)
-        keys = (iter_keys(require_lazy=True)
-                if getattr(type(meta), "_supports_lazy_keys", False) is True
-                and getattr(meta, "_loaded", False) is False and callable(iter_keys) else meta.keys())
-        collision = next((key for key in keys if isinstance(key, str) and key.casefold() == name.casefold()), None)
+        collision = next((key for key in self._metadata_names(require_complete=True)
+                          if key.casefold() == name.casefold()), None)
         if collision is not None:
             raise ContractError(f"Metadata key {collision!r} conflicts with the source namespace. "
                                 f"Use entity.meta[{collision!r}] for the metadata value "
@@ -292,19 +349,10 @@ class District(_SQLMetadataOwner):
     def __getattr__(self, name: str):
         if name == "_sql_metadata_origin":
             raise AttributeError(name)
-        if namespace := self._dataset_attribute(name):
-            return namespace
-        meta = object.__getattribute__(self, "meta")
-        if isinstance(meta, Mapping) and name in meta:
-            return meta[name]
-        raise AttributeError(f"{self.__class__.__name__} has no attribute {name!r}")
+        return self._attribute_value(name)
 
     def __dir__(self):
-        base = list(object.__dir__(self))
-        m = object.__getattribute__(self, "meta")
-        if isinstance(m, Mapping):
-            base.extend(k for k in m.keys() if isinstance(k, str))
-        return sorted(set(base))
+        return self._directory_names()
 
     def to_dict(
         self, *, include_meta: bool = True, include_geometry: bool = False
@@ -443,19 +491,10 @@ class Campus(_SQLMetadataOwner):
             raise AttributeError(name)
         if name in {"lookup_key", "source_namespace", "source_id", "campus_number", "district_id", "district_number", "district_name"}:
             raise AttributeError(f"Missing explicit campus identity field: {name}")
-        if namespace := self._dataset_attribute(name):
-            return namespace
-        meta = object.__getattribute__(self, "meta")
-        if isinstance(meta, Mapping) and name in meta:
-            return meta[name]
-        raise AttributeError(f"{self.__class__.__name__} has no attribute {name!r}")
+        return self._attribute_value(name)
 
     def __dir__(self):
-        base = list(object.__dir__(self))
-        m = object.__getattribute__(self, "meta")
-        if isinstance(m, Mapping):
-            base.extend(k for k in m.keys() if isinstance(k, str))
-        return sorted(set(base))
+        return self._directory_names()
 
     def to_dict(
         self, *, include_meta: bool = True, include_geometry: bool = False

@@ -132,10 +132,24 @@ Publisher edition must never stand in for measurement year.
 `entity.available_datasets()` reads parent descriptors only. `view.variables()`
 reads verified metadata for that dataset, with bounded runtime caches excluded
 from snapshots. Scalar access reads the selected source artifact; this is not a
-promise of remote row-level transfers or an indexed point lookup. Regular
-`dir(entity)` and whole-mapping operations retain their existing mapping behavior.
+promise of remote row-level transfers or an indexed point lookup. `dir(entity)`
+lists attached dataset names and metadata names without loading metadata values
+when a safe keys-only reader is available. Dataset names come from parent
+descriptors; listing them does not certify that a standalone or SQL-imported
+entity is bound for source access. For an unloaded custom metadata loader with
+no key index, completion includes only already known metadata names. Genuine
+source/key-reader errors remain visible. Whole-mapping operations such as
+`dict(entity.meta)` and copying still load the full payload intentionally.
 `describe_operators()["entity_access"]` documents this interface without opening
 a release; available dataset names and fields come from the selected release.
+
+Direct metadata attributes accept a unique case-insensitive match after an exact
+miss; ambiguous matches list exact choices and unknown names offer suggestions
+without fetching suggested values. Stored Python attributes keep ordinary
+Python spelling. Dunder protocol names are reserved; use `entity.meta[key]`
+for metadata keys with those names. ASCII identifier metadata keys support SQL
+point reads; Unicode or punctuation value access may still require the complete
+metadata payload. These are value reads, separate from keys-only discovery.
 
 Existing direct metadata attributes and local edits remain supported. Native
 fields do not automatically become unqualified scalar aliases. A metadata key

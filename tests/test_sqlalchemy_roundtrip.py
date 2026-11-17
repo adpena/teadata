@@ -278,7 +278,10 @@ def _assert_lazy_metadata_projection(engine, factory, catalog):
         assert district.meta["huge"] == 10**500
         assert len(statements) == 2 and " -> " in statements[-1]
         assert campus.nullable is None and "nullable" in campus.meta
+        before_missing = len(statements)
         assert not hasattr(campus, "absent_meta_key")
+        assert len(statements) == before_missing + 2  # Exact miss, then names-only diagnostics.
+        assert "json_group_array(" in statements[-1] or "json_agg(" in statements[-1]
         value = restored.catalog.measurement(campus, "overall_rating")
         assert value.value == "Not Rated: Minimum Size rules"
         assert value.source["build_id"] == catalog.build_id
@@ -293,7 +296,9 @@ def _assert_lazy_metadata_projection(engine, factory, catalog):
         with pytest.raises(ContractError, match="another data release"):
             changed_catalog(catalog).field_measurement(campus, exact_field)
         assert not district.meta._loaded and not campus.meta._loaded
-        assert all(" -> " in sql for sql in statements)
+        names_only = [sql for sql in statements if " -> " not in sql]
+        assert len(names_only) == 1
+        assert "json_group_array(" in names_only[0] or "json_agg(" in names_only[0]
         statements.clear()
         assert tuple(district.meta.iter_keys()) == ("huge", "structured", "zero")
         assert len(statements) == 1 and ("json_each(" in statements[0] or "json_object_keys(" in statements[0])

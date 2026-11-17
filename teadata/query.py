@@ -186,7 +186,7 @@ def describe_operators() -> _Discovery:
         "release_methods": deepcopy(_RELEASE_METHODS),
         "entity_access": {
             "receivers": ["District", "Campus (public)"],
-            "discovery": "entity.available_datasets()",
+            "discovery": "entity.available_datasets(); dir(entity) lists names without loading metadata values",
             "selection": "entity.dataset(name)",
             "dot_path": "entity.<attached_dataset>.<field>; entity.tprs.<field>",
             "methods": ["at", "variables", "years", "select", "series", "provenance"],

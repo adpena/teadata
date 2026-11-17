@@ -18643,35 +18643,38 @@ data_sources:
           retained_year_5_count: {field: retained_year_5_count, unit: count}
           retained_year_5_ratio: {field: retained_year_5_ratio, unit: ratio}
         notes: >-
-          School year selects the first-teaching cohort. Year n is continuous employment through the nth
-          school year after that cohort. The published denominator covers teachers of record who received
-          their initial standard certificate in the preceding academic year and taught in Texas public
-          schools at 0.5 or greater cumulative FTE. An interruption ends continuous retention even when
-          a teacher returns. A blank is an unreported follow-up horizon. The three views share statewide
-          totals and have overlapping populations. They are separate from pathway at entry and TAPR turnover.
-          The 2017–18 preparation-route cohort is held after a publisher example failed to reconcile.
+          School year is a first-teaching cohort selector, not the measurement year of every follow-up. Year n is
+          continuous employment through the nth school year after that cohort. Cohort 2024–25 Year 1 describes
+          employment through 2025–26; its blank Year 5 is unreported, not a future measurement or a reason to
+          select an older cohort. The denominator covers teachers of record initially standard-certified in the
+          preceding academic year, teaching in Texas public schools at cumulative FTE of at least 0.5. An
+          interruption ends continuous retention even when a teacher returns. The three views share overlapping
+          statewide totals. They are separate from pathway at entry and TAPR turnover. The workbook was created
+          February 24, 2026; rules were updated March 31, 2026. All five 2017–18 preparation-route rows remain
+          held: the rules give 56.44% for Out of State Year 4 but workbook row 33 gives 1,786 of 3,168 (56.38%
+          rounded). The cause is unknown.
         references: &educator_retention_references
         - reference_id: retention_workbook
           role: data_dictionary
           title: TEA Teacher Retention Workbook introduction and data dictionary (created February 24, 2026)
           url: https://tea4avcastro.tea.state.tx.us/oess/edrs/teacher-retention-dashboard/downloads/Teacher_Retention_Workbook.xlsx
           reviewed_sha256: 893883bcf8960da35a06d8dcf01016b4bf7816fab093da60b6f29e1c83bd17ac
-          provenance_ids: [4b225a3078c31dab9a072742d390be2af2dbb13af3347f81248b96bf5748c928]
+          provenance_ids: [25da37791dc801b1e5dee15ffc5f645996ceb884e61c47e0a31f25d831b480ce]
         - reference_id: retention_business_rules
           role: methodology
           title: TEA Teacher Retention Dashboard business rules (March 31, 2026)
           url: https://tea4avcastro.tea.state.tx.us/oess/edrs/teacher-retention-dashboard/downloads/Business_Rules_Document_Retention.pdf
           reviewed_sha256: 26a4bebd511f01d15739dc2f616e13cc805a068554400a7d64f7b3fe6506e315
-          provenance_ids: [7c538cb7ecc13e94a2fa3c91443979d2e8a1ff62b0960c70d3ad0cce3d287ce4]
+          provenance_ids: [ced842282ec2bac773d8d0a472ed4df9813b5369decc5c8fe9daa726e5a5e280]
         - reference_id: retention_crosswalk
           role: schema
           path: schemas/edrs--2026--teacher-retention-crosswalk.json
           reviewed_sha256: 00af57f96e2177343c092e1d098ed5fd2c2ecc5b6eb6197a51ca0e9e36515b78
-          provenance_ids: [38886d9ff62b7b8eb47a354385a55718d04fe338e7ddfdca60de946ada8ffc1d]
+          provenance_ids: [51254064649818eabd750df9d5c7398c7b9ec7754afb69d10ee15e074589a839]
       reader:
         profiles:
           source:
-            acquisition_id: 4b225a3078c31dab9a072742d390be2af2dbb13af3347f81248b96bf5748c928
+            acquisition_id: 25da37791dc801b1e5dee15ffc5f645996ceb884e61c47e0a31f25d831b480ce
             worksheet: Retention by Preparation Route
             column_schema: schemas/edrs--2026--teacher-retention-crosswalk.json
 
@@ -18687,17 +18690,21 @@ data_sources:
         value_policy: edrs_retention_2026
         metrics: *educator_retention_metrics
         notes: >-
-          School year selects the first-teaching cohort. Year n is continuous employment through the nth
-          school year after that cohort. The published denominator covers teachers of record who received
-          their initial standard certificate in the preceding academic year and taught in Texas public
-          schools at 0.5 or greater cumulative FTE. An interruption ends continuous retention even when
-          a teacher returns. A blank is an unreported follow-up horizon. The three views share statewide
-          totals and have overlapping populations. They are separate from pathway at entry and TAPR turnover.
+          School year is a first-teaching cohort selector, not the measurement year of every follow-up. Year n is
+          continuous employment through the nth school year after that cohort. Cohort 2024–25 Year 1 describes
+          employment through 2025–26; its blank Year 5 is unreported, not a future measurement or a reason to
+          select an older cohort. The denominator covers teachers of record initially standard-certified in the
+          preceding academic year, teaching in Texas public schools at cumulative FTE of at least 0.5. An
+          interruption ends continuous retention even when a teacher returns. The three views share overlapping
+          statewide totals. They are separate from pathway at entry and TAPR turnover. The workbook was created
+          February 24, 2026; rules were updated March 31, 2026. All five 2017–18 preparation-route rows remain
+          held: the rules give 56.44% for Out of State Year 4 but workbook row 33 gives 1,786 of 3,168 (56.38%
+          rounded). The cause is unknown.
         references: *educator_retention_references
       reader:
         profiles:
           source:
-            acquisition_id: 4b225a3078c31dab9a072742d390be2af2dbb13af3347f81248b96bf5748c928
+            acquisition_id: 25da37791dc801b1e5dee15ffc5f645996ceb884e61c47e0a31f25d831b480ce
             worksheet: Retention by Demographic Group
             column_schema: schemas/edrs--2026--teacher-retention-crosswalk.json
 
@@ -18713,17 +18720,21 @@ data_sources:
         value_policy: edrs_retention_2026
         metrics: *educator_retention_metrics
         notes: >-
-          School year selects the first-teaching cohort. Year n is continuous employment through the nth
-          school year after that cohort. The published denominator covers teachers of record who received
-          their initial standard certificate in the preceding academic year and taught in Texas public
-          schools at 0.5 or greater cumulative FTE. An interruption ends continuous retention even when
-          a teacher returns. A blank is an unreported follow-up horizon. The three views share statewide
-          totals and have overlapping populations. They are separate from pathway at entry and TAPR turnover.
+          School year is a first-teaching cohort selector, not the measurement year of every follow-up. Year n is
+          continuous employment through the nth school year after that cohort. Cohort 2024–25 Year 1 describes
+          employment through 2025–26; its blank Year 5 is unreported, not a future measurement or a reason to
+          select an older cohort. The denominator covers teachers of record initially standard-certified in the
+          preceding academic year, teaching in Texas public schools at cumulative FTE of at least 0.5. An
+          interruption ends continuous retention even when a teacher returns. The three views share overlapping
+          statewide totals. They are separate from pathway at entry and TAPR turnover. The workbook was created
+          February 24, 2026; rules were updated March 31, 2026. All five 2017–18 preparation-route rows remain
+          held: the rules give 56.44% for Out of State Year 4 but workbook row 33 gives 1,786 of 3,168 (56.38%
+          rounded). The cause is unknown.
         references: *educator_retention_references
       reader:
         profiles:
           source:
-            acquisition_id: 4b225a3078c31dab9a072742d390be2af2dbb13af3347f81248b96bf5748c928
+            acquisition_id: 25da37791dc801b1e5dee15ffc5f645996ceb884e61c47e0a31f25d831b480ce
             worksheet: Retention by Gender
             column_schema: schemas/edrs--2026--teacher-retention-crosswalk.json
 
@@ -18742,13 +18753,18 @@ data_sources:
             field: certification_count
             unit: count
         notes: >-
-          Initial standard certification counts for the statewide teacher role. Academic year selects certification year.
-          Publisher edition differences (errata): the September 2026 TEA workbook's direct statewide totals are
-          26,086 for 2020–21 and 17,801 for 2023–24. The November 2024 TEA report on pages 2 and 4 gives
-          26,085 and 17,797, respectively. This release uses the later published workbook totals.
-          The reason for these revisions is unknown. Workbook preparation-route and demographic detail for these
-          years remains unqualified because rows repeat at the published grain. Certification counts do not
-          measure employment, hiring or retention. Other role-years require separate qualification.
+          Only directly published statewide All/All/All totals for each role and academic year are admitted,
+          2015–16 through 2025–26. School year is the certification academic-period selector: September 1–August
+          31. The report was created August 25, 2026; this is not a data cutoff or an as-of date. Completed
+          coverage and finality through August 31 are unknown, including 2025–26. Role populations are separate and
+          not additive; certification does not measure employment, hiring or retention. All preparation-route,
+          gender and ethnicity detail remains unqualified, including years whose detail sum matches. The November
+          2024 archive comparison covers 2018–19 through 2023–24 only; the other five academic years per role have
+          no archived comparison. Publisher edition differences (errata): current direct totals are 26,086 for
+          2020–21 and 17,801 for 2023–24 (workbook rows 17 and 26), versus 26,085 and 17,797 in the November 2024
+          report, pages 2 and 4. The later published workbook totals are used without repairing either edition; the
+          cause of the +1 and +4 differences is unknown. Current teacher detail repeats keys from 2020–21 onward
+          and is not a total source.
         references:
         - reference_id: certification_workbook
           role: data_dictionary
@@ -18756,7 +18772,7 @@ data_sources:
           url: https://tea4avcastro.tea.state.tx.us/oess/edrs/newly-certified-by-role-dashboards/downloads/newly-certified-by-role-workbook.xlsx
           reviewed_sha256: 148a8e20669aba384d0e398d093829f6db9b95a5d2391bd5f38d3051fb0c56bb
           provenance_ids:
-          - fd872b771d3b8e2e3795172299b1286ef38991a901d0b0e1ca7f6246eb435d66
+          - 4970586447fe1ade12160e9833ce9d836e3dd062f4657f7d85e5841a5cae576c
         - reference_id: certification_role_archive
           role: methodology
           title: TEA Newly Certified Teacher Demographics by Preparation Route 2018–19 through 2023–24 (November 2024,
@@ -18764,17 +18780,17 @@ data_sources:
           url: https://tea.texas.gov/data-reports/educator-data/newly-certified-teacher-demographics-by-preparation-route-1819-2324.pdf
           reviewed_sha256: 2896473c95b544b559457e08d59e7ad9f2e00cc43739f4d16b2ea591e91719cf
           provenance_ids:
-          - c5176d2bbbda687af09b22e92310d26d41d619448ec87bc755d25bb66ec703cd
+          - 3080f0cda5f374bbf19f66360ef8fb0eace3ef8b818dc9403f573ef0b855ec09
         - reference_id: certification_crosswalk
           role: schema
           path: schemas/edrs--2026--initial-certification-rollup-crosswalk.json
-          reviewed_sha256: fc06a4dbffbe26862248f3ebb5b07366eef9872ff463239fda5c9395c733dbc8
+          reviewed_sha256: 2c940826eaadb977d94241bf267bea7be5a52b2381488ef8f7dcf1e2969e703c
           provenance_ids:
-          - 0964d8ea9f815e7879c422745beb07234d5081a9fafdb0c3235481cbf4fd826d
+          - 741068116b276abc05eef414c19dc1e5b35e8bcc808c3aea4172f18afd5c7c92
       reader:
         profiles:
           source:
-            acquisition_id: fd872b771d3b8e2e3795172299b1286ef38991a901d0b0e1ca7f6246eb435d66
+            acquisition_id: 4970586447fe1ade12160e9833ce9d836e3dd062f4657f7d85e5841a5cae576c
             worksheet: Rolled up Data
             column_schema: schemas/edrs--2026--initial-certification-rollup-crosswalk.json
   educator_state_initial_certification_principal:
@@ -18791,11 +18807,18 @@ data_sources:
           certification_count:
             field: certification_count
             unit: count
-        notes: Initial standard certification counts for the statewide principal role. Academic year selects certification
-          year. The September 2026 workbook rollup and unique workbook detail totals reconcile to the November 2024
-          report on physical PDF pages 1 and 2 in the admitted years. The archive supplies a separate publisher-edition
-          comparison. Certification counts do not measure employment, hiring or retention. Other role-years require
-          separate qualification.
+        notes: >-
+          Only directly published statewide All/All/All totals for each role and academic year are admitted,
+          2015–16 through 2025–26. School year is the certification academic-period selector: September 1–August
+          31. The report was created August 25, 2026; this is not a data cutoff or an as-of date. Completed
+          coverage and finality through August 31 are unknown, including 2025–26. Role populations are separate and
+          not additive; certification does not measure employment, hiring or retention. All preparation-route,
+          gender and ethnicity detail remains unqualified, including years whose detail sum matches. The November
+          2024 archive comparison covers 2018–19 through 2023–24 only; the other five academic years per role have
+          no archived comparison. All six overlapping direct totals match both archived All Routes tables, pages 1
+          and 2. Current detail is absent for 2015–16 through 2019–20; 2020–21 detail sums 1,599 versus direct
+          1,837 (the archive separately reports Alternative 238). Latest 2025–26 detail sums 1,881 versus direct
+          1,932. These unresolved detail discrepancies do not change the published direct totals.
         references:
         - reference_id: certification_workbook
           role: data_dictionary
@@ -18803,7 +18826,7 @@ data_sources:
           url: https://tea4avcastro.tea.state.tx.us/oess/edrs/newly-certified-by-role-dashboards/downloads/newly-certified-by-role-workbook.xlsx
           reviewed_sha256: 148a8e20669aba384d0e398d093829f6db9b95a5d2391bd5f38d3051fb0c56bb
           provenance_ids:
-          - fd872b771d3b8e2e3795172299b1286ef38991a901d0b0e1ca7f6246eb435d66
+          - 4970586447fe1ade12160e9833ce9d836e3dd062f4657f7d85e5841a5cae576c
         - reference_id: certification_role_archive
           role: methodology
           title: TEA Newly Certified Principal Demographics by Preparation Route 2018–19 through 2023–24 (November
@@ -18811,17 +18834,17 @@ data_sources:
           url: https://tea.texas.gov/data-reports/educator-data/newly-certified-principal-demographics-by-preparation-route-1819-2324.pdf
           reviewed_sha256: 02c1d85cf150ca34d4a271ad48818e02a151490382dbfce0dd26efd90490eac2
           provenance_ids:
-          - 29f3f42fb2bad8737e6a8b2b76587367c81e6b2924248c6f685d9822ce8d358c
+          - 4cf373a894032281dc9d0824b38f0e9c963b1cbac3f7bc63ab90c0ff7ca7c98c
         - reference_id: certification_crosswalk
           role: schema
           path: schemas/edrs--2026--initial-certification-rollup-crosswalk.json
-          reviewed_sha256: fc06a4dbffbe26862248f3ebb5b07366eef9872ff463239fda5c9395c733dbc8
+          reviewed_sha256: 2c940826eaadb977d94241bf267bea7be5a52b2381488ef8f7dcf1e2969e703c
           provenance_ids:
-          - 0964d8ea9f815e7879c422745beb07234d5081a9fafdb0c3235481cbf4fd826d
+          - 741068116b276abc05eef414c19dc1e5b35e8bcc808c3aea4172f18afd5c7c92
       reader:
         profiles:
           source:
-            acquisition_id: fd872b771d3b8e2e3795172299b1286ef38991a901d0b0e1ca7f6246eb435d66
+            acquisition_id: 4970586447fe1ade12160e9833ce9d836e3dd062f4657f7d85e5841a5cae576c
             worksheet: Rolled up Data
             column_schema: schemas/edrs--2026--initial-certification-rollup-crosswalk.json
   educator_state_initial_certification_superintendent:
@@ -18838,11 +18861,18 @@ data_sources:
           certification_count:
             field: certification_count
             unit: count
-        notes: Initial standard certification counts for the statewide superintendent role. Academic year selects
-          certification year. The September 2026 workbook rollup and unique workbook detail totals reconcile to the
-          November 2024 report on physical PDF pages 1 and 2 in the admitted years. The archive supplies a separate
-          publisher-edition comparison. Certification counts do not measure employment, hiring or retention. Other
-          role-years require separate qualification.
+        notes: >-
+          Only directly published statewide All/All/All totals for each role and academic year are admitted,
+          2015–16 through 2025–26. School year is the certification academic-period selector: September 1–August
+          31. The report was created August 25, 2026; this is not a data cutoff or an as-of date. Completed
+          coverage and finality through August 31 are unknown, including 2025–26. Role populations are separate and
+          not additive; certification does not measure employment, hiring or retention. All preparation-route,
+          gender and ethnicity detail remains unqualified, including years whose detail sum matches. The November
+          2024 archive comparison covers 2018–19 through 2023–24 only; the other five academic years per role have
+          no archived comparison. All six overlapping direct totals match both archived All Routes tables, pages 1
+          and 2. Current detail is absent for 2015–16 through 2019–20; 2020–21 detail sums 395 versus direct 553
+          (the archive separately reports Alternative 158). Latest 2025–26 detail sums 367 versus direct 387. These
+          unresolved detail discrepancies do not change the published direct totals.
         references:
         - reference_id: certification_workbook
           role: data_dictionary
@@ -18850,7 +18880,7 @@ data_sources:
           url: https://tea4avcastro.tea.state.tx.us/oess/edrs/newly-certified-by-role-dashboards/downloads/newly-certified-by-role-workbook.xlsx
           reviewed_sha256: 148a8e20669aba384d0e398d093829f6db9b95a5d2391bd5f38d3051fb0c56bb
           provenance_ids:
-          - fd872b771d3b8e2e3795172299b1286ef38991a901d0b0e1ca7f6246eb435d66
+          - 4970586447fe1ade12160e9833ce9d836e3dd062f4657f7d85e5841a5cae576c
         - reference_id: certification_role_archive
           role: methodology
           title: TEA Newly Certified Superintendent Demographics by Preparation Route 2018–19 through 2023–24 (November
@@ -18858,17 +18888,17 @@ data_sources:
           url: https://tea.texas.gov/data-reports/educator-data/newly-certified-superintendent-demographics-by-preparation-route-1819-2324.pdf
           reviewed_sha256: 84146d1886518a32ff42f79861c734edf0d691906940fb40e3fff60ead351820
           provenance_ids:
-          - 1715aede602e8ccb59acd58c795db5a59eb0f38e957d82a5bfeeee074b45fe7c
+          - 1509fd73ed09026c447f348ca7a9b3dae2f4a513ad0b874cf92196bd130e02e1
         - reference_id: certification_crosswalk
           role: schema
           path: schemas/edrs--2026--initial-certification-rollup-crosswalk.json
-          reviewed_sha256: fc06a4dbffbe26862248f3ebb5b07366eef9872ff463239fda5c9395c733dbc8
+          reviewed_sha256: 2c940826eaadb977d94241bf267bea7be5a52b2381488ef8f7dcf1e2969e703c
           provenance_ids:
-          - 0964d8ea9f815e7879c422745beb07234d5081a9fafdb0c3235481cbf4fd826d
+          - 741068116b276abc05eef414c19dc1e5b35e8bcc808c3aea4172f18afd5c7c92
       reader:
         profiles:
           source:
-            acquisition_id: fd872b771d3b8e2e3795172299b1286ef38991a901d0b0e1ca7f6246eb435d66
+            acquisition_id: 4970586447fe1ade12160e9833ce9d836e3dd062f4657f7d85e5841a5cae576c
             worksheet: Rolled up Data
             column_schema: schemas/edrs--2026--initial-certification-rollup-crosswalk.json
 

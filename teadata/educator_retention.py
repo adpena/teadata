@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Sequence
 from hashlib import sha256
 from importlib.metadata import version
+import json
 from math import isclose
 from pathlib import Path
 import platform
@@ -28,10 +29,10 @@ from .values import ValueStatus
 REPORT_YEAR = 2026
 COHORT_YEARS = tuple(range(2014, 2026))
 EDITION = "2026-04"
-WORKBOOK_RECEIPT = "4b225a3078c31dab9a072742d390be2af2dbb13af3347f81248b96bf5748c928"
+WORKBOOK_RECEIPT = "25da37791dc801b1e5dee15ffc5f645996ceb884e61c47e0a31f25d831b480ce"
 WORKBOOK_SHA = "893883bcf8960da35a06d8dcf01016b4bf7816fab093da60b6f29e1c83bd17ac"
 WORKBOOK_URL = "https://tea4avcastro.tea.state.tx.us/oess/edrs/teacher-retention-dashboard/downloads/Teacher_Retention_Workbook.xlsx"
-RULES_RECEIPT = "7c538cb7ecc13e94a2fa3c91443979d2e8a1ff62b0960c70d3ad0cce3d287ce4"
+RULES_RECEIPT = "ced842282ec2bac773d8d0a472ed4df9813b5369decc5c8fe9daa726e5a5e280"
 RULES_SHA = "26a4bebd511f01d15739dc2f616e13cc805a068554400a7d64f7b3fe6506e315"
 RULES_URL = "https://tea4avcastro.tea.state.tx.us/oess/edrs/teacher-retention-dashboard/downloads/Business_Rules_Document_Retention.pdf"
 VALUE_POLICY = "edrs_retention_2026"
@@ -45,6 +46,8 @@ FIELDS = (*KEYS, "first_year_teacher_count", *(f"retained_year_{n}_{kind}"
           for n in range(1, 6) for kind in ("count", "ratio")))
 METRICS = {name: MetricDefinition(name, unit=name.rsplit("_", 1)[-1]) for name in FIELDS[2:]}
 _CONFIG = Path(__file__).with_name("teadata_sources.yaml")
+SOURCE_WITNESS_RECEIPT = "60b36d3b53fd124bc7c8428867c57ea3e3159fa1f3f36f9d75f4c070ae5fa4a5"
+SOURCE_WITNESS_SHA = "0a1be12bfaa32e09b3affbd65207db17c01dc1cb061812e50f67ccbd17d0e867"
 
 
 class _View(NamedTuple):
@@ -125,6 +128,31 @@ def _read(path: Path) -> _Populations:
     return populations
 
 
+def _source_witness(store: ProvenanceStore, receipt: str = SOURCE_WITNESS_RECEIPT) -> dict[str, Any]:
+    """Admit the independently frozen XML/PDF observation, never generate it."""
+    record = store.read_record(receipt)
+    if (receipt != SOURCE_WITNESS_RECEIPT or record.get("kind") != "acquisition"
+            or record.get("method") != "local_observation"
+            or record.get("artifact", {}).get("sha256") != SOURCE_WITNESS_SHA):
+        raise ContractError("Educator source witness differs from the reviewed observation")
+    proof = json.loads(store.verify_artifact(SOURCE_WITNESS_SHA).read_bytes())
+    if (proof.get("status") != "FROZEN_SOURCE_WITNESSES_NOT_MATERIALIZATION"
+            or proof.get("source_release_activation") is not False
+            or proof["retention"]["workbook_receipt"] != WORKBOOK_RECEIPT
+            or proof["retention"]["workbook_sha256"] != WORKBOOK_SHA):
+        raise ContractError("Educator source witness scope changed")
+    return proof
+
+
+def _verify_source_rows(populations: _Populations, witnesses: list[dict[str, Any]]) -> None:
+    actual = {(dataset, number): row for dataset, cohorts in populations.items()
+              for year, groups in cohorts.items() if year in _admitted_years(dataset)
+              for number, row in groups.values()}
+    expected = {(item["dataset"], item["row"]): tuple(item["values"]) for item in witnesses}
+    if len(expected) != len(witnesses) or actual != expected:
+        raise ContractError("Retention rows differ from the independent fixed-coordinate XML witnesses")
+
+
 def _project(groups: dict[str, tuple[int, tuple]]) -> tuple[pa.Table, dict[str, Any]]:
     locators, rows = zip(*groups.values(), strict=True)
     columns = {name: pa.array([row[index] for row in rows], type=pa.string()) for index, name in enumerate(KEYS)}
@@ -203,7 +231,10 @@ def materialize_educator_retention(store: ProvenanceStore, output: Path, *,
     raw_config = _CONFIG.read_bytes()
     config = load_config_bytes(raw_config, path=_CONFIG)
     sources, roots = _admit(store, config)
+    proof = _source_witness(store)
+    roots.add(SOURCE_WITNESS_RECEIPT)
     populations = _read(store.verify_artifact(WORKBOOK_SHA))
+    _verify_source_rows(populations, proof["retention"]["rows"])
     output.parent.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory(prefix=".educator-retention-", dir=output.parent) as directory:
         stage = Path(directory) / "bundle"
@@ -241,6 +272,7 @@ def materialize_educator_retention(store: ProvenanceStore, output: Path, *,
                     outputs={"leaf": leaf}, processor="teadata.educator_retention", code_version=recorder.processor_sha256,
                     parameters={"leaf_contract_sha256": leaf.stem, "recipe": recipe, "toolchain": toolchain},
                     validation={"subgroups_reconcile": True, "direct_totals_match_across_tabs": True,
+                                "independent_xml_witness_matches": True,
                                 "exact_native_projection": True, "rows": table.num_rows, "release_activation": False})
                 artifact = ArtifactRef(key, physical["sha256"], physical["size_bytes"], leaf.name,
                                        contract_json, processing, "leaf")

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Hashable, Iterator
 from contextvars import ContextVar
 from contextlib import closing
 from copy import deepcopy
@@ -16,7 +17,7 @@ import os
 import sqlite3
 import sys
 import unicodedata
-from typing import Any, Callable, Iterable, Mapping
+from typing import Any, Callable, Iterable, Mapping, TypeVar
 from uuid import UUID
 
 from ._sqlite import readonly_connection
@@ -43,6 +44,24 @@ CATALOG_TABLE_DDL = (
 
 class ContractError(RuntimeError):
     """An artifact or source does not satisfy the dataset contract."""
+
+
+_Node = TypeVar("_Node", bound=Hashable)
+
+
+def _visit_depth_first(roots: Iterable[_Node], visit: Callable[[_Node], Iterable[_Node]],
+                       visited: set[_Node]) -> None:
+    """Visit lazily in preorder without a self-referential callback closure."""
+    pending: list[Iterator[_Node]] = [iter(roots)]
+    while pending:
+        try:
+            node = next(pending[-1])
+        except StopIteration:
+            pending.pop()
+            continue
+        if node not in visited:
+            visited.add(node)
+            pending.append(iter(visit(node)))
 
 
 class FieldMeasurementError(ContractError):
@@ -525,18 +544,25 @@ class DatasetCatalog:
                 raise ValueError("Edition index does not account for every registered field")
             visiting: set[tuple[str, str]] = set()
             visited: set[tuple[str, str]] = set()
-
-            def visit(qualified: tuple[str, str]) -> None:
-                if qualified in visiting:
-                    raise ValueError("Field dependencies contain a cycle")
-                if qualified not in visited:
-                    visiting.add(qualified)
-                    for dependency in self._field_bindings[qualified].dependencies:
-                        visit(dependency)
-                    visiting.remove(qualified)
-                    visited.add(qualified)
             for qualified in self._field_bindings:
-                visit(qualified)
+                if qualified in visited:
+                    continue
+                visiting.add(qualified)
+                pending = [(qualified, iter(self._field_bindings[qualified].dependencies))]
+                while pending:
+                    node, dependencies = pending[-1]
+                    try:
+                        dependency = next(dependencies)
+                    except StopIteration:
+                        pending.pop()
+                        visiting.remove(node)
+                        visited.add(node)
+                        continue
+                    if dependency in visiting:
+                        raise ValueError("Field dependencies contain a cycle")
+                    if dependency not in visited:
+                        visiting.add(dependency)
+                        pending.append((dependency, iter(self._field_bindings[dependency].dependencies)))
             self._field_headers: dict[tuple[str, str], dict[str, Any]] = {}
             self._build_id, self._serialized = identity, canonical_json(document)
             self._v3 = True
@@ -637,12 +663,10 @@ class DatasetCatalog:
     def _edition_view(self, identifier: str) -> DatasetCatalog:
         """Close selected foreign dependencies, then run the same catalog validator."""
         children: dict[str, dict[str, Any]] = {}
-        def visit(selected):
-            if selected not in children:
-                child = children[selected] = self._edition_child(selected)
-                for value in child["field_bindings"]:
-                    for edition, _field in FieldBinding.from_dict(value).dependencies:
-                        visit(edition)
+        def visit(selected: str) -> Iterable[str]:
+            child = children[selected] = self._edition_child(selected)
+            return (edition for value in child["field_bindings"]
+                    for edition, _field in FieldBinding.from_dict(value).dependencies)
         try:
             if cached := self._edition_views.get(identifier):
                 view, dependencies = cached
@@ -651,7 +675,7 @@ class DatasetCatalog:
                 for dependency in dependencies:
                     self.edition_metadata_bytes(dependency)
                 return view
-            visit(identifier)
+            _visit_depth_first((identifier,), visit, set())
             combined: dict[str, Any] = {"schema_version": 3, "editions": {}, "artifacts": {}, "field_bindings": [],
                                         "column_schemas": {}, "provenance": {}, "value_policies": {}, "description": ""}
             policies = {}
@@ -838,17 +862,13 @@ class DatasetCatalog:
                                    editions: set[str] | None = None) -> None:
         visited = set() if visited is None else visited
         editions = set() if editions is None else editions
-        def visit(qualified: tuple[str, str]) -> None:
-            if qualified not in visited:
-                visited.add(qualified)
-                catalog = self if catalog_for is None else catalog_for(qualified[0])
-                if qualified[0] not in editions:
-                    catalog._ensure_edition(qualified[0])
-                    editions.add(qualified[0])
-                for dependency in catalog._field_bindings[qualified].dependencies:
-                    visit(dependency)
-        for qualified in fields:
-            visit(qualified)
+        def visit(qualified: tuple[str, str]) -> Iterable[tuple[str, str]]:
+            catalog = self if catalog_for is None else catalog_for(qualified[0])
+            if qualified[0] not in editions:
+                catalog._ensure_edition(qualified[0])
+                editions.add(qualified[0])
+            return catalog._field_bindings[qualified].dependencies
+        _visit_depth_first(fields, visit, visited)
 
     def verify_metadata(self) -> None:
         """Explicitly validate every registered edition's external metadata."""
@@ -992,10 +1012,7 @@ class DatasetCatalog:
                     catalogs.setdefault(selected, view)
             return catalogs[identifier]
 
-        def visit(qualified: tuple[str, str]) -> None:
-            if qualified in visited:
-                return
-            visited.add(qualified)
+        def visit(qualified: tuple[str, str]) -> Iterable[tuple[str, str]]:
             try:
                 catalog = catalog_for(qualified[0])
                 binding = catalog._field_bindings[qualified]
@@ -1023,8 +1040,7 @@ class DatasetCatalog:
                 if column not in column_sets[identifier]:
                     columns[identifier].append(column)
                     column_sets[identifier].add(column)
-            for dependency in binding.dependencies:
-                visit(dependency)
+            return binding.dependencies
         for key, field, period in fields:
             qualified = key.identity, field
             if self._edition_keys.get(key.identity) != key:
@@ -1038,7 +1054,7 @@ class DatasetCatalog:
             if period is not None and (period.kind == "unknown" or actual_period != period):
                 raise ContractError("Requested reference period is unsupported")
             bindings[key, field] = catalog._field_bindings[qualified]
-            visit(qualified)
+            _visit_depth_first((qualified,), visit, visited)
         # Keep revalidation per operation: even a lazy input iterable may change
         # a resource between requested fields. Recheck bytes/stat, not the graph.
         for identifier in catalogs:

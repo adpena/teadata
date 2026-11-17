@@ -6,13 +6,14 @@ observing an existing local file never invents its original download date.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from hashlib import sha256
 import json
 import os
 from pathlib import Path
 import tempfile
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any, Callable, Iterator, Mapping, Sequence
 
 from .dataset_metadata import DatasetMetadata, ResolvedDataset, _SHA256_TEXT, validate_http_url
 
@@ -92,16 +93,44 @@ def _validate_acquisition_producer(
         raise ValueError("Prepared acquisition must match an output of its processing receipt")
 
 
+@dataclass(slots=True)
+class _RecordFrame:
+    identifier: str
+    record: dict[str, Any]
+    artifacts: list[Mapping[str, Any]]
+    metadata: DatasetMetadata | None
+
+
 def validate_record_graph(read_record: Callable[[str], Mapping[str, Any]],
                           record_ids: Sequence[str]) -> dict[str, dict[str, Any]]:
     """Canonical pure receipt/typed-reference closure, shared by store and catalog."""
     records: dict[str, dict[str, Any]] = {}
     pending: set[str] = set()
-
-    def visit(identifier: str) -> None:
+    stack: list[tuple[_RecordFrame | None, Iterator[str]]] = [(None, iter(record_ids))]
+    while stack:
+        frame, identifiers = stack[-1]
+        try:
+            identifier = next(identifiers)
+        except StopIteration:
+            stack.pop()
+            if frame is not None:
+                identifier, record, metadata = frame.identifier, frame.record, frame.metadata
+                for artifact in frame.artifacts:
+                    _identifier(artifact["sha256"])
+                    if type(artifact.get("size_bytes")) is not int or artifact["size_bytes"] < 0:
+                        raise ValueError("Invalid provenance artifact size")
+                if metadata is not None:
+                    if "derived_from" in record:
+                        _validate_acquisition_producer(record, records[record["derived_from"]])
+                    validate_reference_records(ResolvedDataset(record["dataset"], record["section"],
+                        record["requested_year"], record["resolved_year"], "", metadata), read_record,
+                        verify_all_claimed=True)
+                pending.remove(identifier)
+                records[identifier] = record
+            continue
         _identifier(identifier)
         if identifier in records:
-            return
+            continue
         if identifier in pending:
             raise ValueError("Provenance records contain a cycle")
         pending.add(identifier)
@@ -123,23 +152,7 @@ def validate_record_graph(read_record: Callable[[str], Mapping[str, Any]],
             dependencies = record["inputs"]
             if not artifacts or not dependencies or not record.get("processor") or not record.get("code_version"):
                 raise ValueError("Incomplete processing receipt")
-        for dependency in dependencies:
-            visit(dependency)
-        for artifact in artifacts:
-            _identifier(artifact["sha256"])
-            if type(artifact.get("size_bytes")) is not int or artifact["size_bytes"] < 0:
-                raise ValueError("Invalid provenance artifact size")
-        if metadata is not None:
-            if "derived_from" in record:
-                _validate_acquisition_producer(record, records[record["derived_from"]])
-            validate_reference_records(ResolvedDataset(record["dataset"], record["section"],
-                record["requested_year"], record["resolved_year"], "", metadata), read_record,
-                verify_all_claimed=True)
-        pending.remove(identifier)
-        records[identifier] = record
-
-    for identifier in record_ids:
-        visit(identifier)
+        stack.append((_RecordFrame(identifier, record, artifacts, metadata), iter(dependencies)))
     return records
 
 

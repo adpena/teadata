@@ -1,10 +1,11 @@
 # Educator workforce
 
-The three hiring products below are attached to the
-[v0.0.158 normal release](source-integration-status.md#hiring-added-to-the-normal-pipeline).
-Select that release explicitly for the normal entity namespaces, DSL and exports.
-TAPR staff fields are a separate source; retention and certification products
-below retain their own candidate status and unresolved holds.
+The three hiring products below first joined normal release 0.0.158 and remain
+attached to the selected normal 0.0.161 data release. The packaged default pin
+selects that current data release; explicitly select historical 0.0.158 when
+reproducing its original parent. TAPR staff fields are separate. The retention
+and certification materializers below are intermediate source candidates until
+their qualified children are attached to a newly qualified normal parent.
 
 ## Hiring in normal release 0.0.158
 
@@ -26,8 +27,9 @@ Its exact bytes are now an attachment of normal parent
 `be9803cf7c27cff1020b5ec958bf1158d960a9ad574750d7242959ee051092f7`.
 The parent producer was software **0.0.157**, source
 `f0b25ec83d90963a14ea6a0589193e8e7579d78e`; software **0.0.158** is its
-subsequent consumer. Neither package installation nor publication selects data
-or changes the app's profiles. See [release selection](data-releases.md#normal-release-00158-select-the-data-explicitly).
+subsequent consumer. That historical identity does not change when later normal
+parents retain the child. Current default selection follows the packaged pin;
+application adoption is a separate deployment. See [release selection](data-releases.md).
 
 There is no campus hiring product. Historical source IDs remain queryable even
 when absent from the latest entity roster. Retrospective publisher names do not
@@ -140,6 +142,12 @@ its text and the worksheet row. The retained workbook preserves literal
 Excel storage. CSV users can save the same provenance descriptor as a
 separate file. Excel includes it in the metadata sheet.
 
+The compatible `school_year` period is a **first-teaching cohort selector**,
+not the observation year for every follow-up field. Cohort 2024–25 Year 1
+describes employment through 2025–26; its missing Year 5 is unreported.
+Source and edition notes carry this distinction in machine provenance, the
+CSV companion descriptor and XLSX Source notes.
+
 The business rules' 2017–18 out-of-state Year 4 example gives 56.44%.
 The workbook gives 1,786 of 3,168, which is 56.38% rounded to two places.
 The 2017–18 preparation-route edition remains held. TEA's 2023–24
@@ -160,25 +168,42 @@ years. A 2018 selection builds the demographic and gender editions.
 
 ## Initial standard certification by role
 
-The September 2026 TEA workbook and the November 2024 archived reports
-support a scoped statewide candidate of ten role-year totals.
+The September 2026 TEA workbook directly publishes 33 statewide role/year
+totals. The materializer selects those cells, rather than summing its detail.
 
 | Dataset | Academic years available in this candidate |
 |---|---|
-| `educator_state_initial_certification_teacher` | 2018–19, 2019–20, 2020–21, and 2023–24 |
-| `educator_state_initial_certification_principal` | 2021–22 through 2023–24 |
-| `educator_state_initial_certification_superintendent` | 2021–22 through 2023–24 |
+| `educator_state_initial_certification_teacher` | 2015–16 through 2025–26 |
+| `educator_state_initial_certification_principal` | 2015–16 through 2025–26 |
+| `educator_state_initial_certification_superintendent` | 2015–16 through 2025–26 |
 
-Eight totals agree with the current workbook's direct rollup, its detail at
-unique keys, and both tables in the applicable archived report. The two
-teacher totals in the errata use the latest workbook rollup. Each leaf
-preserves the workbook row, academic year, reported role, total dimensions,
-observed status and raw count. Academic year selects the certification
-year, September 1 through August 31. Counts refer to individuals receiving
-an initial standard certificate for the reported role. Employment, hiring, and retention use separate
-sources. The archived reports and current workbook are separate publisher
-editions. Unresolved role-years, including 2025–26 teacher detail, remain
-held. The three roles should be used as separately reported populations.
+Each leaf preserves the physical workbook row, academic year, reported role,
+three literal `All` dimensions, observed status and raw count. Independent
+fixed-coordinate worksheet XML witnesses bind every complete six-cell tuple
+before materialization. The two archived All Routes tables per role cover
+2018–19 through 2023–24: sixteen role/year totals match, and the two teacher
+totals below are edition differences. The other fifteen role-years have no
+archived comparison. Missing archive coverage is not reported as agreement.
+
+The compatible `school_year` selector means the publisher's certification
+academic period, **September 1–August 31**. The workbook says the report was
+created **August 25, 2026**. That date does not establish a data cutoff or an
+"as of" date for the counts; completed coverage and finality through August 31
+are unknown, including 2025–26. These statements are carried in machine export
+descriptions, CSV companion descriptors and XLSX Source notes. Counts concern
+people receiving an initial standard certificate for the reported role.
+Employment, hiring and retention use separate sources, and the three role
+populations are separate and not additive.
+
+No certification detail is qualified by this total-cell selection. Teacher
+detail repeats keys from 2020–21 onward. Principal and superintendent detail
+is absent for 2015–16 through 2019–20. Their 2020–21 detail sums are 1,599 and
+395, against directly published totals 1,837 and 553; the archived reports
+separately show Alternative counts 238 and 158. Their latest 2025–26 detail
+sums are 1,881 and 367, against direct totals 1,932 and 387. These discrepancies
+remain unexplained. Detail diagnostics record actual missing, repeated-key and
+sum outcomes; neither a matching sum nor absence of a known revision marks
+detail as qualified. No row deduplication or aggregate repair is performed.
 
 ```python
 view = release.observations(
@@ -188,8 +213,10 @@ view = release.observations(
 print(view.to_df())
 ```
 
-Build the scoped candidate offline from the retained store and its exact
-archive readback observation.
+Build the scoped candidate offline from the retained store and the exact
+reviewed XML/PDF source-witness observation. The existing CLI argument name
+`--archive-receipt` is retained; it now binds that complete source observation,
+not an invented replacement of the unavailable historical receipt.
 
 ```sh
 uv run --locked python -m teadata.scripts.refresh_educator_certification \
@@ -215,8 +242,9 @@ provenance. The November 2024 methodology explains that TEA sometimes
 updates counts when it corrects records or changes how it identifies the
 eligible population. The reason for these two revisions remains unknown.
 The workbook repeats detail keys in these years, so preparation-route and
-demographic breakdowns remain unqualified. XLSX provenance worksheets
-and machine-readable export descriptions carry the edition differences.
+demographic breakdowns remain unqualified along with all other detail in this
+family. XLSX provenance worksheets, CSV companions and machine-readable export
+descriptions carry the edition differences.
 
 Sources: [TEA's September 2026 workbook](https://tea4avcastro.tea.state.tx.us/oess/edrs/newly-certified-by-role-dashboards/downloads/newly-certified-by-role-workbook.xlsx)
 and [November 2024 teacher report](https://tea.texas.gov/data-reports/educator-data/newly-certified-teacher-demographics-by-preparation-route-1819-2324.pdf).
