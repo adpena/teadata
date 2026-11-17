@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "observed_at": "2026-11-17T16:56:48.877174+00:00",
+  "observed_at": "2026-11-17T23:26:26.220247+00:00",
   "generator": {
-    "software_version": "0.0.164",
+    "software_version": "0.0.165",
     "working_source_sha256": {
       "scripts/source_inventory.py": "68a90e79a7066867c3604e2a304ab650c59591389e2eb00c0234e035c7a7893a",
       "teadata/release_inventory.py": "5f6e4cbac970e08d71b2d5713ce1eb0cf3e4944b0adedd41e01fed6d20196cce",
@@ -10,7 +10,7 @@
       "teadata/teadata_config.py": "df0ddde32572e3f43d245f07fbb7640eabedf9a8bfccfc068fdc3c8e3c498b24"
     }
   },
-  "config_sha256": "3c4789611123c87f06b678ed2fbeace7aaa782890a25e698ace35bbcc4d73172",
+  "config_sha256": "600c53fdbcbdb8326790da854b7310a524f05edcc92718e782ebb343e19252bc",
   "scope": "Configuration registration and selected catalog metadata only. No observation, source acquisition or qualification replay.",
   "summary": {
     "registered_ids": 126,
@@ -2222,9 +2222,9 @@
   "selected_catalog": {
     "schema_version": 1,
     "release": {
-      "source": "https://github.com/adpena/teadata/releases/download/v0.0.164/release.json",
-      "manifest_sha256": "b2a46d2e690f4aa36b97f27788b4d5eeb7ed10aa322cbb884a54c1f8598ee64d",
-      "build_id": "69faad22d961a1ba428916d8f240814ae1ab59d0c04b5012e1adb2dae9cbd021"
+      "source": "https://github.com/adpena/teadata/releases/download/v0.0.165/release.json",
+      "manifest_sha256": "e32c15b1f782f7a10f97b2158c4560a0c161d2c47fec5448987a9d55fe4c5685",
+      "build_id": "92d82a7b54f4b3f6b8ea9850e31897a746f456d7542cf8e74396d0dc6fab636c"
     },
     "include_variables": true,
     "metadata_inspected": true,
@@ -5000,213 +5000,6 @@
         ]
       },
       {
-        "location": "native-3b07ad9d41ada9d28487d14259be2b6700729e5ed2cca632e77f845f7b0eebaa.json",
-        "manifest_sha256": "3b07ad9d41ada9d28487d14259be2b6700729e5ed2cca632e77f845f7b0eebaa",
-        "build_id": "708731530625dfb4d5829b86fe054de23e47c6d4cca7b7735afdb2d37e001804",
-        "editions": [
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "273b0ee7a9b0a301db2cc0856f119681cd301fb634548ba08da643b7b969cb39",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "b16c1ecb1e083e10ce96de044c1c2d60b34965e5f2a5341e9383cc817a933521",
-            "scope": "state",
-            "table": "state",
-            "grain": "one statewide observation"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "bce66df28462b82850ff6f81e44a953eae1297243703f116a0fa3fb259118d99",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "78f7956aa15c6842b540ba73f3e57f24c3d22f86cd39e797644ef463a15e6504",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "d8605b8a209a8710cbc6fb7af735f9ab35738314fba33f796d3783432bc74eb3",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "d23d023eaf3c96b7b12ccc2bc2ff52b9dbb9fefaa39df7806423a61a183bbf31",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "a83d629f34f1427a2abccb6953a28f0f2070b5e393589d4a6f8204f65c6d0664",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "7e897d2e27652bd6b6428594d90e38fc3990302deebb9325e3aaad7b1735c206",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "77043f9df20ebc79516de2355b46369317282b4267f6d3f7132a94f3bacdb102",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "239e03fa5ead73cb539a2ca7ffe739dcf97578908877eceb5a5b22ccca4f7cee",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "9230bdf47af9996500e3631e2b3b48cfd8a135bb401669a347af1f4aae1822fc",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "7cc01e7030e264f521f954b923a1cb6cc7ce34e184d7876389957a141fb87427",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "77d3e7c012321696105fd4d7f504ee0bc0efba972d1c398531614004c7c1ef09",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "509de5e86fc974cdc5ce25c14db9545ccf2b092a19ca76e570428f719d62c256",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "b8e377fc5263a71759f6b3ac1f4c1a9cfd586a28b82aa8d7a234e5d50c09f6be",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "519bdb143a8647a829c27fa9f92ff20aa1c07b59bfb602959abad5f770077392",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "8f705348358c2cd601589059a7ccc41692480de4e5fd81ba2f1d01ab6224fa8d",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "a21fc42e93302e92a22889e0d3312eacee51ceb83101a6c6101debe046b33a43",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "28b493f9d1a6cab495a36dd0dd3bd61b65754fa3b3ec290e13b4d1112125583c",
-            "scope": "district",
-            "table": "district",
-            "grain": "one row per district_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "c578f4c176aa702e4d634194b755cd21bf7bc85e9bc48a52e80d8c8a858ca79a",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "9748c6f26df5e4e404b6b102ba7bcb21808dbaf9b4203660e3faba24110fbda7",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "848fa011ec76015ad2aab867701f45c458ee8fb1feb50f09ac157b2ad71658d7",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "e8533516c2629d05f1aa76c1302e7063e6978c4ae3632c528e523138e65b1dbf",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "22896e479f3a829f9f4fa34621397ee112e6033abf92244dd0f4fbaa0f8da8d2",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          },
-          {
-            "dataset": "tprs_student_membership_enrollment_reports",
-            "edition": "2026",
-            "revision_sha256": "a100f05d332d80d7f084534ba44d092ba7756b15cd7b97ad00fa8c3113baaa71",
-            "scope": "campus",
-            "table": "campus",
-            "grain": "one row per campus_number"
-          }
-        ]
-      },
-      {
         "location": "native-6c1e3512c3a5186578f5db03a53d565a64bdcd3ef7c28e959162a943b9c81b83.json",
         "manifest_sha256": "6c1e3512c3a5186578f5db03a53d565a64bdcd3ef7c28e959162a943b9c81b83",
         "build_id": "f3981aae307d46f4241d7ac0c4dd703a625123ca492a03e5202cf23be3d0d878",
@@ -5751,6 +5544,213 @@
             "scope": "state",
             "table": "state",
             "grain": "one publisher row per staff_category and staff_role"
+          }
+        ]
+      },
+      {
+        "location": "native-8d5362e43c3374b11647592e618a82707794e49a1bc76739d69eea299ad6f131.json",
+        "manifest_sha256": "8d5362e43c3374b11647592e618a82707794e49a1bc76739d69eea299ad6f131",
+        "build_id": "4d2c5e1623474641ef80a4642a5bcdf6675f62fce40f9e863d6070e5a2c9fefd",
+        "editions": [
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "273b0ee7a9b0a301db2cc0856f119681cd301fb634548ba08da643b7b969cb39",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "b16c1ecb1e083e10ce96de044c1c2d60b34965e5f2a5341e9383cc817a933521",
+            "scope": "state",
+            "table": "state",
+            "grain": "one statewide observation"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "bce66df28462b82850ff6f81e44a953eae1297243703f116a0fa3fb259118d99",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "78f7956aa15c6842b540ba73f3e57f24c3d22f86cd39e797644ef463a15e6504",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "d8605b8a209a8710cbc6fb7af735f9ab35738314fba33f796d3783432bc74eb3",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "d23d023eaf3c96b7b12ccc2bc2ff52b9dbb9fefaa39df7806423a61a183bbf31",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "a83d629f34f1427a2abccb6953a28f0f2070b5e393589d4a6f8204f65c6d0664",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "7e897d2e27652bd6b6428594d90e38fc3990302deebb9325e3aaad7b1735c206",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "77043f9df20ebc79516de2355b46369317282b4267f6d3f7132a94f3bacdb102",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "239e03fa5ead73cb539a2ca7ffe739dcf97578908877eceb5a5b22ccca4f7cee",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "9230bdf47af9996500e3631e2b3b48cfd8a135bb401669a347af1f4aae1822fc",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "7cc01e7030e264f521f954b923a1cb6cc7ce34e184d7876389957a141fb87427",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "77d3e7c012321696105fd4d7f504ee0bc0efba972d1c398531614004c7c1ef09",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "509de5e86fc974cdc5ce25c14db9545ccf2b092a19ca76e570428f719d62c256",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "b8e377fc5263a71759f6b3ac1f4c1a9cfd586a28b82aa8d7a234e5d50c09f6be",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "519bdb143a8647a829c27fa9f92ff20aa1c07b59bfb602959abad5f770077392",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "8f705348358c2cd601589059a7ccc41692480de4e5fd81ba2f1d01ab6224fa8d",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "a21fc42e93302e92a22889e0d3312eacee51ceb83101a6c6101debe046b33a43",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "28b493f9d1a6cab495a36dd0dd3bd61b65754fa3b3ec290e13b4d1112125583c",
+            "scope": "district",
+            "table": "district",
+            "grain": "one row per district_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "c578f4c176aa702e4d634194b755cd21bf7bc85e9bc48a52e80d8c8a858ca79a",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "9748c6f26df5e4e404b6b102ba7bcb21808dbaf9b4203660e3faba24110fbda7",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "848fa011ec76015ad2aab867701f45c458ee8fb1feb50f09ac157b2ad71658d7",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "e8533516c2629d05f1aa76c1302e7063e6978c4ae3632c528e523138e65b1dbf",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "22896e479f3a829f9f4fa34621397ee112e6033abf92244dd0f4fbaa0f8da8d2",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_membership_enrollment_reports",
+            "edition": "2026",
+            "revision_sha256": "a100f05d332d80d7f084534ba44d092ba7756b15cd7b97ad00fa8c3113baaa71",
+            "scope": "campus",
+            "table": "campus",
+            "grain": "one row per campus_number"
           }
         ]
       },
@@ -7479,7 +7479,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -7669,6 +7669,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -8057,7 +8062,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -8247,6 +8252,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -8553,7 +8563,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -8743,6 +8753,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -8768,7 +8783,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -8958,6 +8973,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -9589,7 +9609,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -9779,6 +9799,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -10153,7 +10178,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -10343,6 +10368,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -11439,7 +11469,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -11629,6 +11659,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -11926,7 +11961,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -12116,6 +12151,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -15592,7 +15632,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -15782,6 +15822,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -15977,7 +16022,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -16167,6 +16212,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -16516,7 +16566,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -16706,6 +16756,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -17056,7 +17111,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -17246,6 +17301,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -17360,7 +17420,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -17550,6 +17610,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -17934,7 +17999,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -18124,6 +18189,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -18356,7 +18426,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -18546,6 +18616,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -18620,7 +18695,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -18810,6 +18885,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -20169,7 +20249,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -20359,6 +20439,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -22104,7 +22189,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -22294,6 +22379,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -22661,7 +22751,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -22851,6 +22941,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -23839,7 +23934,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -24029,6 +24124,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -24396,7 +24496,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -24586,6 +24686,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -24653,7 +24758,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -24843,6 +24948,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -25064,7 +25174,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -25254,6 +25364,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -25878,7 +25993,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -26068,6 +26183,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
@@ -26093,7 +26213,7 @@
           "end_year": 2026
         },
         "source_qualifiers": null,
-        "variable_count": 174,
+        "variable_count": 179,
         "field_periods": [
           {
             "period": {
@@ -26283,6 +26403,11 @@
               "membership_section_504_students_percent",
               "membership_special_education_percent",
               "membership_students_w_dyslexia_percent",
+              "membership_students_with_autism_percent",
+              "membership_students_with_behavioral_disabilities_percent",
+              "membership_students_with_intellectual_disabilities_percent",
+              "membership_students_with_non_categorical_early_childhood_percent",
+              "membership_students_with_physical_disabilities_percent",
               "membership_title_i_percent",
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",

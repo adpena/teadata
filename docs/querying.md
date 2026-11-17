@@ -658,8 +658,9 @@ result = districts >> ("compare_statewide", release, local, texas, "*", None, 20
 
 Prepared [2026 TPRS student bundles](config.md#selected-2026-tprs-student-membership-and-enrollment-reports)
 use this same interface. The original projection has 168 reviewed
-Membership/Enrollment count and percent fields; the newer reviewed projection
-adds six Membership disability counts, for 174 fields. Select the local and direct Texas editions from one explicit
+Membership/Enrollment count and percent fields; the 174-field projection
+adds six Membership disability counts, and the 179-field projection adds five
+disability-composition Membership percentages. Select the local and direct Texas editions from one explicit
 bundle; engine entities supply identifiers only, not observations from their
 own build. For example, with Austin ISD included in the selected intake:
 
@@ -685,17 +686,18 @@ print(result.local_raw, result.statewide_raw, result.difference)
 ```
 
 Both editions cover 2025–26 and use the same population and measure: Membership is not
-Enrollment. Published percentages use Total Students within that same
-population. Count differences remain counts; percent differences are percentage
+Enrollment. Most published percentages use Total Students within that same
+population; the five disability-composition percentages use Total Students with
+Disabilities in Membership. Count differences remain counts; percent differences are percentage
 points. The Texas observation comes from its state report, never a sum of the
 selected local reports or an embedded benchmark. Omit `metric` for every field
 qualified in that pinned projection. An older 168-field release retains its
 original interpretation; requesting one of the six newer counts raises an
 error rather than substituting a current value.
 
-Student comparisons admit two explicitly reviewed captured-grid profiles.
-Both sides must use the same profile: mixing the original 168-field projection
-with the 174-field projection is rejected. Exact source metadata, policy,
+Student comparisons admit three explicitly reviewed captured-grid profiles.
+Both sides must use the same profile: mixing the 168-, 174- or 179-field
+projections is rejected. Exact source metadata, policy,
 processing recipe and captured-grid identity remain checked. A historical
 projection requires its captured grid; a source without roster attachments
 supports only the current reviewed contract. Unknown or changed contracts are
@@ -708,7 +710,8 @@ no-students tokens retain their separate statuses; a difference requires two
 observed values. The six newer disability counts use the publisher's broad
 groupings; its Intellectual Disabilities group includes learning disability,
 developmental delay and traumatic brain injury, not only intellectual disability.
-Disability percentages and Enrollment variants, CTE, lagged discipline and
+The five composition percentages are included only in the 179-field contract.
+Blank disability Enrollment/total-percent cells, CTE, lagged discipline and
 embedded benchmarks remain outside this comparison contract. No regional or longitudinal
 comparison, default engine activation, or statewide local-entity coverage is implied.
 

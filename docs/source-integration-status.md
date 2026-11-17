@@ -1,66 +1,63 @@
-# Source integration status — November 17, 2026 (UTC)
+# Source integration status
 
-The packaged selector is pinned to **normal data release 0.0.164**. Software and data
-versions are separate identities: installing a newer reader does not silently
-replace an explicitly pinned historical release. This is a dated release
-inventory, not a live TEA feed. Qualification, public data publication, software
-publication and application adoption are separate gates.
+The packaged selector identifies **normal data release 0.0.165**. Software, data
+publication and application adoption are separate; an explicitly pinned older
+release does not change when the reader is upgraded. The [machine inventory](source-integration-status-0.0.165.json)
+was regenerated from the actual selected release on November 17, 2026. It lists
+126 registered IDs, 278 configured editions, 13 base inputs and 20 native
+attachments covering 31 dataset IDs and 277 edition/scope keys. The 85 registered
+source-only IDs not attached by name are not 85 missing measures or proof that
+publisher data are unavailable.
 
-The [machine inventory](source-integration-status-0.0.164.json) was generated
-from the exact retained manifest and verified metadata. It records **13 base
-inputs, 20 native attachments, 31 native dataset IDs and 277 edition/scope
-keys**. The configuration registers 126 IDs and 278 report editions; **85
-registered source-only IDs remain unattached by name**. Those are integration
-gaps, not 85 missing measures or evidence that the publisher has no data.
-
-- Manifest SHA-256: `b2a46d2e690f4aa36b97f27788b4d5eeb7ed10aa322cbb884a54c1f8598ee64d`.
-- Build: `69faad22d961a1ba428916d8f240814ae1ab59d0c04b5012e1adb2dae9cbd021`.
-- Actual producer: `c2d4cfe3bf732e000d447caca706b5ca92c8f4ba`.
-- Processing identity: `12afcbc0662288cb0c2660ef4a3bfa81cdbe9f411d8367c41c3bdbf1c4775054`.
+- Manifest SHA-256: `e32c15b1f782f7a10f97b2158c4560a0c161d2c47fec5448987a9d55fe4c5685`.
+- Build: `92d82a7b54f4b3f6b8ea9850e31897a746f456d7542cf8e74396d0dc6fab636c`.
+- Actual normal producer: `e24277068834b5a6279764e643c1e46ab6f8194a`.
+- Processing identity: `7c2b10997f6797801a5c93c412a9d79ec4472195029095ae7e33202737d3f3f7`.
 
 ## What this release adds
 
-The TPRS Student attachment now exposes **174 qualified fields**, adding six
-Membership disability counts to the original 168-field projection. The 25
-editions cover 23 campus partitions, 1,202 reporting districts and the direct
-Texas observation: **9,105 campus rows and 10,308 rows overall**. Six new fields
-therefore add 61,848 observations, with raw tokens and value statuses retained.
-This is the reviewed current Student Information projection, not every TPRS
-domain or every raw report cell. The 13 base inputs and other 19 native
-attachments are unchanged; their earlier source qualifications are reused.
+The TPRS Student projection now has **179 qualified fields**. It preserves all
+174 existing fields and appends five disability-composition Membership
+percentages. Coverage remains 9,105 reporting campuses, 1,202 reporting districts
+and the direct Texas report in 2025–26: 10,308 rows across 25 editions. The new
+five fields add 51,540 observations, including publisher value statuses. No
+measurement year or additional TPRS domain is added by this release.
 
-These counts use TEA's broad disability groupings. Intellectual Disabilities
-includes learning disability, developmental delay and traumatic brain injury,
-not only the specific intellectual-disability category. Disability percentages
-and Enrollment variants remain held. Texas reports 901,935 in total disability
-Membership and 901,932 in Special Education program Membership; both source
-observations remain distinct. No suppressed count is reconstructed or forced
-to reconcile. See [student definitions and source holds](attendance-sources.md)
-and [same-profile statewide comparisons](querying.md#compare-a-published-measure-with-texas).
+Their denominator is **Total Students with Disabilities in Membership**, not all
+students. It is declared in source metadata, variable/header discovery and the
+shared DataFrame/CSV/Excel provenance. Selecting a percentage does not read its
+denominator's observations. Excel adds a Denominator column to the Provenance
+field table only when needed. Broad disability group names follow the glossary:
+Intellectual Disabilities includes learning disability, developmental delay and
+traumatic brain injury, not only the specific intellectual-disability category.
+Texas disability Membership 901,935 and Special Education program Membership
+901,932 remain distinct source observations.
 
-The retained producer census reproduced all original 168 values, raw tokens
-and statuses for all 10,308 rows. The shared scientific source gate also
-replayed all 10,308 original reports against the complete 174-field source,
-checking raw/status/locator equality and the raw-HOLD audit. Historical
-168-field Texas replay and the named workbook witnesses passed under both
-captured contracts. These checks do not cover every earlier standalone
-source bundle. Three named publisher HTML/XLSX witness pairs
-support the reviewed field interpretation. These are retained-source checks,
-not a fresh live re-acquisition of every record. Source download times remain
-available in provenance; no finality is inferred from the report edition.
+The normal producer reused all retained acquisitions. Every original 174 field,
+raw token and status matched across all 10,308 rows. One shared scientific gate
+replayed the complete new 179-field projection, its locators and raw-HOLD audit.
+Three genuine HTML/XLSX pairs also matched all 1,298 inventoried data cells
+before Class Size. Physical blank XML cells are distinguished from absent cells
+and zero. These are frozen-source checks, not fresh live reacquisition of every
+TEA record. Original download dates remain in provenance.
 
-Bounded checks against the actual new normal parent verified all nine parent
-artifact hashes/build bindings, metadata-only discovery and year availability,
-actual entity identities, district/campus `.tprs` access, all 174 district/Texas
-comparisons and an older pinned 168-field comparison. Six new counts round-trip
-through DataFrame, CSV and Excel with the same canonical provenance. Real
-campus masked, observed-zero and absent-grade states remain explicit in the
-new parent readback; the corresponding three-format export receipts are
-reused for those unchanged native rows. The existing class-size route and
-its source bytes are unchanged.
-The unchanged native families and source census were not replayed merely to
-repeat their existing receipts. This inventory itself establishes metadata
-coverage only, not semantic or live-source verification.
+Bounded actual-parent checks verified all nine parent artifacts, replacement-only
+wiring, metadata-only discovery/year resolution, actual district/campus dot
+access, and all 179 district/Texas comparisons. The five new percentages and
+real campus masked, zero and missing cases passed DataFrame, CSV and Excel
+readback with the same shared provenance. Older 174-field descriptors, source
+meaning, description hash, CSV bytes and XLSX data remain unchanged. A new
+reconstruction truthfully cites software 0.0.165; frozen saved files still cite
+0.0.164. The retained saved selection had no supported public query-replay
+recipe, so reconstruction is not described as successful `replay_table` use.
+
+The other 19 native attachments and 13 base inputs are unchanged and retain
+their earlier qualifications. They were not scientifically replayed merely to
+repeat matching evidence. Class-size source bytes are unchanged. The full-report
+inventory exposes unsupported cells without turning them into another dataset:
+blank disability Enrollment/total-percent cells, undocumented CTE dots and
+unreviewed lagged/tail measures remain held. See [Student source notes](attendance-sources.md)
+and [the SOF documentation/formula question](financial-sources.md#sof-202526-dpe-source-accounting-and-an-unresolved-formula-question).
 
 ## Qualified native coverage
 
@@ -134,9 +131,9 @@ name or geometry historically accurate.
 
 ## Limits and remaining integration work
 
-- The new Student counts have measurement year 2025–26. Lagged or differently
+- The current Student counts and five composition percentages have measurement year 2025–26. Lagged or differently
   defined fields are not silently advanced to that year. Supported frozen
-  168-field and 174-field comparison profiles remain separate; mixed or unknown
+  168-, 174- and 179-field comparison profiles remain separate; mixed or unknown
   profiles fail clearly. No cross-year scientific comparability is inferred.
 - The 2017–18 preparation-route retention cohort stays held: the rules example
   and workbook disagree. Five route rows are excluded. Other admitted views

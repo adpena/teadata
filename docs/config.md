@@ -1603,25 +1603,32 @@ Overlapping selections, different roster receipts and invalid manifest pins
 fail the command. The checks cover roster and leaf integrity. Field
 semantics, query routing and release activation are separate.
 
-The sole reviewed field contract is
-`teadata/methodologies/tprs-students-2026.json`. It defines 42 current row labels
-across Membership and Enrollment, with count and percent measures: 168 native
-fields. Membership excludes students served less than two hours daily;
+The current reviewed field contract is
+`teadata/methodologies/tprs-students-2026.json`. It preserves the original 168
+Membership/Enrollment fields and six disability Membership counts, then appends
+five disability-composition Membership percentages: 179 native fields. Historical
+168- and 174-field releases retain their own captured grids; parsing or replay
+never substitutes the newest contract for an older one.
+Membership excludes students served less than two hours daily;
 Enrollment follows TEA's Fall PEIMS Snapshot definition. Percentages use Total
-Students within the same reported population. Pre-K total and age detail rows
+Students within the same reported population, except the five disability
+composition percentages, which use Total Students with Disabilities in
+Membership. Their metric metadata declares that denominator. Pre-K total and age detail rows
 overlap, as do program and student cohorts; these are not disjoint components.
 The retained 2026 glossary supplies the definitions, and the report's own legend
 supplies the value policy. Observed zero, masked `*`/`**`, no-students `-`, and
 invalid `?` remain distinct. Complementary `**` masking is interpreted only
-within the documented disability grouping, which is held outside this native
-projection. A missing campus grade row is a missing observation.
+within the documented disability grouping. A missing campus grade row is a missing observation.
 
-CTE cells, grouped disability cells, embedded local-report benchmarks and the
+CTE cells, blank disability Enrollment/total-percent cells, embedded local-report benchmarks and the
 explicitly lagged 2024–25 disciplinary row remain raw, outside the qualified
 native metrics. In particular, the retained legend does not define literal
 `.` tokens, and the CTE 9–12 denominator is not qualified. No dot is converted
-to zero or missing. Mobility, attrition, class sizes and staffing are outside
-this family. A previously unseen token in a qualified field blocks preparation.
+to zero or missing. Mobility, attrition, retention and data-quality measures
+remain held in the full-report inventory; it preserves their physical cells
+without assigning unreviewed semantics. Class size uses its existing separate
+qualified family, and staffing is a separate source. A previously unseen token
+in a qualified field blocks preparation. See the [source notes](attendance-sources.md).
 
 Build an offline candidate with an explicit JSON intake:
 

@@ -24,14 +24,14 @@ PyYAML's supported pure Python implementation is tested on 3.15.
 
 ```bash
 uv venv
-uv pip install teadata==0.0.164
+uv pip install teadata==0.0.165
 ```
 
-Version 0.0.164 packages one immutable normal-release URL and SHA-256 for
+Version 0.0.165 packages one immutable normal-release URL and SHA-256 for
 `current_release()` and `DataEngine.load_default()`. The selected release
 retains 20 attachments and 31 native dataset IDs, including statewide educator
-series. Its 2025–26 TPRS Student projection adds six disability Membership
-counts, for 174 qualified fields across 9,105 reporting campuses, 1,202
+series. Its 2025–26 TPRS Student projection includes disability Membership
+counts and five composition percentages, for 179 qualified fields across 9,105 reporting campuses, 1,202
 reporting districts and Texas. Other TPRS domains retain their documented
 coverage and gaps. Qualified fields use the normal lazy
 access and export path, with source-specific years, populations and holds.
@@ -124,8 +124,8 @@ separately. The package selects a pinned default; optionally select the same
 current release explicitly:
 
 ```bash
-export TEADATA_RELEASE_URL="https://github.com/adpena/teadata/releases/download/v0.0.164/release.json"
-export TEADATA_RELEASE_SHA256="b2a46d2e690f4aa36b97f27788b4d5eeb7ed10aa322cbb884a54c1f8598ee64d"
+export TEADATA_RELEASE_URL="https://github.com/adpena/teadata/releases/download/v0.0.165/release.json"
+export TEADATA_RELEASE_SHA256="e32c15b1f782f7a10f97b2158c4560a0c161d2c47fec5448987a9d55fe4c5685"
 export TEADATA_RELEASE_OFFLINE=0
 ```
 

@@ -132,6 +132,8 @@ uv run --locked --extra scripts python -m teadata.scripts.refresh_financials \
 
 Actual PWR2024/2025 inspection found narrowed 2025 AF program-code labels while GF retained broader labels, matching changes in only four Notes cells. These observations do not establish semantic equivalence or a publisher error. The original source contracts, reviewed references and later independent field-level examples must resolve what can be compared. Future 2026 workbooks use this same producer only after their own exact sheet/header/unit/period/source contracts are reviewed; a year label alone establishes none of those facts.
 
+<a id="sof-202526-dpe-source-accounting-and-an-unresolved-formula-question"></a>
+
 ### SOF 2025–26 DPE: source accounting and an unresolved formula question
 
 The retained statewide publication run **47422, Near Final** contains four DPE
