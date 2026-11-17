@@ -1,48 +1,66 @@
 # Source integration status — November 17, 2026 (UTC)
 
-The packaged default selects **normal data release 0.0.163**. Software and data
+The packaged selector is pinned to **normal data release 0.0.164**. Software and data
 versions are separate identities: installing a newer reader does not silently
 replace an explicitly pinned historical release. This is a dated release
-inventory, not a live TEA feed.
+inventory, not a live TEA feed. Qualification, public data publication, software
+publication and application adoption are separate gates.
 
-The [machine inventory](source-integration-status-0.0.163.json) was generated
+The [machine inventory](source-integration-status-0.0.164.json) was generated
 from the exact retained manifest and verified metadata. It records **13 base
 inputs, 20 native attachments, 31 native dataset IDs and 277 edition/scope
 keys**. The configuration registers 126 IDs and 278 report editions; **85
 registered source-only IDs remain unattached by name**. Those are integration
 gaps, not 85 missing measures or evidence that the publisher has no data.
 
-- Manifest SHA-256: `c9c0f7b89da5e3ae4126c1ff255a772c4d5ec6addc5f9a27099366b3a5866629`.
-- Build: `18960162f1c61139cf32cdd3e1702de213f3723702eae55f9af9b1a5d1370963`.
-- Actual producer: `6f6aec088f8f97af8a1271e41ab6d67387c57292`.
-- Processing identity: `ac91b53d391cb9cfc48793bd2c025daafc9c245bf863d09fb89dce813177d33b`.
+- Manifest SHA-256: `b2a46d2e690f4aa36b97f27788b4d5eeb7ed10aa322cbb884a54c1f8598ee64d`.
+- Build: `69faad22d961a1ba428916d8f240814ae1ab59d0c04b5012e1adb2dae9cbd021`.
+- Actual producer: `c2d4cfe3bf732e000d447caca706b5ca92c8f4ba`.
+- Processing identity: `12afcbc0662288cb0c2660ef4a3bfa81cdbe9f411d8367c41c3bdbf1c4775054`.
 
 ## What this release adds
 
-Two attachments add **68 editions and 184 published rows**: 151 statewide
-teacher retention rows across 35 cohort/group editions, and 33 directly
-published statewide initial certification totals across three roles and eleven
-academic years. All 13 base input descriptors and 18 earlier native references
-are unchanged. Retention is a first teaching cohort measure; certification uses
-September 1–August 31 academic periods, with finality unknown. Neither is a
-campus or district statistic. See [educator definitions, sources and holds](educator-workforce-sources.md).
+The TPRS Student attachment now exposes **174 qualified fields**, adding six
+Membership disability counts to the original 168-field projection. The 25
+editions cover 23 campus partitions, 1,202 reporting districts and the direct
+Texas observation: **9,105 campus rows and 10,308 rows overall**. Six new fields
+therefore add 61,848 observations, with raw tokens and value statuses retained.
+This is the reviewed current Student Information projection, not every TPRS
+domain or every raw report cell. The 13 base inputs and other 19 native
+attachments are unchanged; their earlier source qualifications are reused.
 
-The actual normal-parent workflow checked the six series, all 184 rows, row query
-filters, raw/status values, parent/child provenance and Arrow, DataFrame, CSV,
-Excel and SQLAlchemy SQLite exports. It retained 1,229 district and 12,593 campus
-entities. Source qualification is recorded separately from this metadata
-inventory. All **20 canonical attached-source plans passed**: three completed
-plans were reused and the remaining seventeen continued after an exact retained
-private validation file was restored. No completed plan or compiler was rerun;
-the initial staging failure remains recorded. Software publication and
-application adoption are separate gates.
+These counts use TEA's broad disability groupings. Intellectual Disabilities
+includes learning disability, developmental delay and traumatic brain injury,
+not only the specific intellectual-disability category. Disability percentages
+and Enrollment variants remain held. Texas reports 901,935 in total disability
+Membership and 901,932 in Special Education program Membership; both source
+observations remain distinct. No suppressed count is reconstructed or forced
+to reconcile. See [student definitions and source holds](attendance-sources.md)
+and [same-profile statewide comparisons](querying.md#compare-a-published-measure-with-texas).
 
-Seven official educator resources were freshly retrieved; the six workbook,
-rules and report resources matched retained pins, and the publisher index was
-newly observed. Independent fixed-coordinate XML witnesses and retained PDF
-controls qualify these educator selections; the existing source families use
-their own retained-source evidence. This does not independently verify every
-historical observation against a newly acquired live TEA report.
+The retained producer census reproduced all original 168 values, raw tokens
+and statuses for all 10,308 rows. The shared scientific source gate also
+replayed all 10,308 original reports against the complete 174-field source,
+checking raw/status/locator equality and the raw-HOLD audit. Historical
+168-field Texas replay and the named workbook witnesses passed under both
+captured contracts. These checks do not cover every earlier standalone
+source bundle. Three named publisher HTML/XLSX witness pairs
+support the reviewed field interpretation. These are retained-source checks,
+not a fresh live re-acquisition of every record. Source download times remain
+available in provenance; no finality is inferred from the report edition.
+
+Bounded checks against the actual new normal parent verified all nine parent
+artifact hashes/build bindings, metadata-only discovery and year availability,
+actual entity identities, district/campus `.tprs` access, all 174 district/Texas
+comparisons and an older pinned 168-field comparison. Six new counts round-trip
+through DataFrame, CSV and Excel with the same canonical provenance. Real
+campus masked, observed-zero and absent-grade states remain explicit in the
+new parent readback; the corresponding three-format export receipts are
+reused for those unchanged native rows. The existing class-size route and
+its source bytes are unchanged.
+The unchanged native families and source census were not replayed merely to
+repeat their existing receipts. This inventory itself establishes metadata
+coverage only, not semantic or live-source verification.
 
 ## Qualified native coverage
 
@@ -116,6 +134,10 @@ name or geometry historically accurate.
 
 ## Limits and remaining integration work
 
+- The new Student counts have measurement year 2025–26. Lagged or differently
+  defined fields are not silently advanced to that year. Supported frozen
+  168-field and 174-field comparison profiles remain separate; mixed or unknown
+  profiles fail clearly. No cross-year scientific comparability is inferred.
 - The 2017–18 preparation-route retention cohort stays held: the rules example
   and workbook disagree. Five route rows are excluded. Other admitted views
   do not repair or reconstruct them. Unreported follow-up horizons remain
@@ -174,7 +196,8 @@ Frozen prior inventories remain available for
 [0.0.157](source-integration-status-0.0.157.json),
 [0.0.158](source-integration-status-0.0.158.json),
 [0.0.159](source-integration-status-0.0.159.json),
-[0.0.160](source-integration-status-0.0.160.json) and
-[0.0.161](source-integration-status-0.0.161.json).
+[0.0.160](source-integration-status-0.0.160.json),
+[0.0.161](source-integration-status-0.0.161.json) and
+[0.0.163](source-integration-status-0.0.163.json).
 The previous narrative is preserved in Git history; those historical counts
 must not be reused as the current selected release.
