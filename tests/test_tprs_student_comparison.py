@@ -16,7 +16,8 @@ from teadata.manifest import BuildRecorder, ContractError, canonical_json
 from teadata.provenance import ProvenanceStore
 from teadata.query import Query
 from teadata.release import DataRelease, publish_release
-from teadata.statewide import _CURRENT_STUDENT_GRID, _STUDENT_PROFILES, _reviewed_students, _student_metadata_sha256, _student_profile
+from teadata.statewide import _reviewed_students
+from teadata.tprs_students import _CURRENT_STUDENT_GRID, _STUDENT_PROFILES, _student_metadata_sha256, _student_profile
 from teadata.teadata_config import Config, load_config
 
 from test_tprs_students import html, receipt, report_rows
@@ -109,7 +110,7 @@ def comparison(prepared_students, monkeypatch):
     expected = _student_metadata_sha256(config.resolve_dataset(
         students.DATASET, 2026, exact=True, reader_profile="source").metadata)
     reviewed = _STUDENT_PROFILES[_CURRENT_STUDENT_GRID].metadata_sha256
-    monkeypatch.setattr("teadata.statewide._student_metadata_sha256",
+    monkeypatch.setattr("teadata.tprs_students._student_metadata_sha256",
                         lambda metadata: reviewed if _student_metadata_sha256(metadata) == expected
                         else _student_metadata_sha256(metadata))
     return DataRelease(root / "release.json", offline=True), editions
@@ -422,19 +423,13 @@ def test_row_context_cannot_substitute_another_reports_receipt(comparison):
 
 
 def original168_grid():
-    """Reconstruct exact predecessor bytes, guarded by its literal reviewed hash."""
-    grid = students.definition()
-    grid["definition"]["disability_grouping_hold"] = (
-        "The broad Intellectual Disabilities group includes ID, LD, DD and TBI. "
-        "It is not the specific ID category. Raw grouped-disability observations remain outside this projection.")
-    for row in grid["rows"]:
-        if row["section"] == "Students with Disabilities by Type of Primary Disability":
-            row.update(qualified=False, hold="grouped_disability_column_applicability_or_denominator_unreviewed")
-            row.pop("populations")
-            row.pop("quantities")
-    assert sha256((canonical_json(grid) + "\n").encode()).hexdigest() == (
+    """Exact retained predecessor; no mutation of today's interpretation."""
+    from pathlib import Path
+    import json
+    raw = (Path(__file__).parent / "fixtures/tprs-students-original168.json").read_bytes()
+    assert sha256(raw).hexdigest() == (
         "e7759843a9296a25d03f79782b14c061f696cf9700c76f77d6f1b17c234d9dd5")
-    return grid
+    return json.loads(raw)
 
 
 def test_two_literal_reviewed_grids_keep_exact_ordered_crosswalks():

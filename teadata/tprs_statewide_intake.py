@@ -47,7 +47,9 @@ MAX_STATEWIDE_HTML_BYTES = 160 * 1024**2
 # Each new revision needs its own source review.
 REVIEWED_DISTRICT_STATE_MANIFEST = "373041dfb0eb994ccde4a88f1e7e630e7b395bf9f7a51199655d843788a2b5f6"
 REVIEWED_CAMPUS_STUDENT_MANIFEST = "c96effc9bcbfd01c7cd969082cf701a2dc4e1900b6d6973b23c0ed2d21559f9e"
-REVIEWED_STATEWIDE_TPRS_MANIFESTS = frozenset({REVIEWED_DISTRICT_STATE_MANIFEST, REVIEWED_CAMPUS_STUDENT_MANIFEST})
+REVIEWED_CAMPUS_STUDENT_174_MANIFEST = "3b07ad9d41ada9d28487d14259be2b6700729e5ed2cca632e77f845f7b0eebaa"
+REVIEWED_COMPLETE_CAMPUS_MANIFESTS = frozenset({REVIEWED_CAMPUS_STUDENT_MANIFEST, REVIEWED_CAMPUS_STUDENT_174_MANIFEST})
+REVIEWED_STATEWIDE_TPRS_MANIFESTS = REVIEWED_COMPLETE_CAMPUS_MANIFESTS | {REVIEWED_DISTRICT_STATE_MANIFEST}
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,27 +171,42 @@ class _ReplayLeaf:
     audit: ColumnSchemaRef
     reports: tuple[ReportSelection, ...]
     campus_rosters: tuple[tuple[str, str], ...] = ()
+    contract: Mapping[str, Any] | None = None
+    grid_sha256: str = ""
 
 
 def _reviewed_leaves(release: DataRelease) -> tuple[_ReplayLeaf, ...]:
     from .release import _student_attachments
+    from .tprs_students import _resolve_contract, _student_profile
 
     _need(release.offline and release.manifest_sha256 in REVIEWED_STATEWIDE_TPRS_MANIFESTS,
           "Statewide TPRS replay requires the exact reviewed offline manifest")
-    complete_campuses = release.manifest_sha256 == REVIEWED_CAMPUS_STUDENT_MANIFEST
+    complete_campuses = release.manifest_sha256 in REVIEWED_COMPLETE_CAMPUS_MANIFESTS
     catalog = release.catalog.to_dict()
     _need(catalog["schema_version"] == 4 and len(catalog["artifacts"]) == len(catalog["editions"])
           and (len(catalog["artifacts"]) > 2 if complete_campuses else len(catalog["artifacts"]) == 2),
           "Reviewed statewide TPRS requires exact native leaves for its scopes")
     leaves = []
     cohorts = set()
+    grids = set()
     statewide_scopes = []
     for identifier in catalog["artifacts"]:
         artifact = release.catalog.artifact_ref(identifier)
         key = artifact.edition
         _need(key.dataset == DATASET and key.edition == str(EDITION), "Unexpected reviewed TPRS edition")
+        metadata = release.catalog.metadata(key.dataset, edition=key)
+        identity, profile = _student_profile(metadata)
+        policy = release.catalog.policy(key.dataset, edition=key)
+        if policy is None or sha256(canonical_json(policy.to_dict()).encode()).hexdigest() != profile.policy_sha256:
+            raise ContractError("Reviewed TPRS replay requires the frozen reviewed disclosure policy")
         refs = _student_attachments(release.catalog, artifact)
         _need(bool(refs), "Reviewed statewide TPRS lacks its report ledger")
+        raw_grid = release._column_schema_bytes(refs["grid"])
+        _need(refs["grid"].sha256 == identity == sha256(raw_grid).hexdigest(),
+              "Reviewed TPRS captured grid differs from its metadata, recipe or descriptor")
+        contract, captured_identity = _resolve_contract(json.loads(raw_grid, object_pairs_hook=_unique_object))
+        _need(captured_identity == identity, "Reviewed TPRS replay contract identity differs")
+        grids.add(identity)
         reports, cohort = release._student_report_ledger(artifact, refs)
         campus_rosters = ()
         if key.scope == "campus":
@@ -200,9 +217,10 @@ def _reviewed_leaves(release: DataRelease) -> tuple[_ReplayLeaf, ...]:
             _need(cohort is not None, "Reviewed statewide TPRS requires a district and Texas cohort")
             cohorts.add(cohort)
             statewide_scopes.append(key.scope)
-        leaves.append(_ReplayLeaf(artifact, refs["raw_audit"], reports, campus_rosters))
+        leaves.append(_ReplayLeaf(artifact, refs["raw_audit"], reports, campus_rosters, contract, identity))
     _need(len(cohorts) == 1 and sorted(statewide_scopes) == ["district", "state"],
           "Reviewed TPRS leaves must share the district and Texas cohort")
+    _need(len(grids) == 1, "Reviewed TPRS replay requires one supported grid across all leaves; mixed168/174 sources are unsupported")
     return tuple(leaves)
 
 
@@ -227,12 +245,29 @@ def _verify_campus_census(leaves: tuple[_ReplayLeaf, ...], store: ProvenanceStor
     _need(observed == expected, "Campus leaves do not cover the exact publisher roster")
 
 
+def _replay_contract(leaves: tuple[_ReplayLeaf, ...]) -> Mapping[str, Any]:
+    from .tprs_students import _resolve_contract
+
+    _need(bool(leaves), "Reviewed TPRS replay requires bound leaves")
+    identities = set()
+    selected = None
+    for leaf in leaves:
+        _need(leaf.contract is not None and bool(leaf.grid_sha256), "Reviewed TPRS leaf lacks its captured contract identity")
+        contract, identity = _resolve_contract(leaf.contract)
+        _need(identity == leaf.grid_sha256, "Reviewed TPRS leaf contract identity changed")
+        identities.add(identity)
+        selected = contract
+    _need(len(identities) == 1, "Reviewed TPRS replay requires one supported grid across all leaves; mixed168/174 sources are unsupported")
+    assert selected is not None
+    return selected
+
+
 def _retained_replay_records(leaves: tuple[_ReplayLeaf, ...], store: ProvenanceStore) -> list[str]:
-    from .tprs_students import definition
+    contract = _replay_contract(leaves)
 
     roots = {item.receipt for leaf in leaves for item in leaf.reports}
     roots.update(pin for leaf in leaves for _, pin in leaf.campus_rosters)
-    roots.update(witness[role] for witness in definition()["witnesses"].values() for role in ("html_receipt", "xlsx_receipt"))
+    roots.update(witness[role] for witness in contract["witnesses"].values() for role in ("html_receipt", "xlsx_receipt"))
     # Each identifier commits the complete record and its artifact digest. The
     # store checks the actual artifact bytes again when verifying a check receipt.
     return sorted(store.verify_record_closure(sorted(roots)))
@@ -281,7 +316,7 @@ def qualify_statewide_tprs(release: DataRelease, store: ProvenanceStore) -> dict
 
     leaves = _reviewed_leaves(release)
     paths = release.verify()
-    complete_campuses = release.manifest_sha256 == REVIEWED_CAMPUS_STUDENT_MANIFEST
+    complete_campuses = release.manifest_sha256 in REVIEWED_COMPLETE_CAMPUS_MANIFESTS
     if complete_campuses:
         _verify_campus_census(leaves, store)
     evidence = _retained_replay_records(leaves, store)
@@ -290,12 +325,12 @@ def qualify_statewide_tprs(release: DataRelease, store: ProvenanceStore) -> dict
         key = leaf.artifact.edition
         audit = release._resource_path(leaf.audit.location, leaf.audit.sha256, leaf.audit.size_bytes)
         _verify_statewide_projection(store, leaf.reports, release.catalog.policy(key.dataset, edition=key),
-                                     paths[leaf.artifact.identity], audit)
+                                     paths[leaf.artifact.identity], audit, contract=leaf.contract)
         counts[key.scope] = counts.get(key.scope, 0) + len(leaf.reports)
     return {"status": "PASS_REVIEWED_NATIVE", "manifest_sha256": release.manifest_sha256,
             "build_id": release.build_id, "structural_integrity": True,
             "report_replay_counts": counts, "retained_records": len(evidence),
-            "publisher_witnesses": verify_workbook_witnesses(store),
+            "publisher_witnesses": verify_workbook_witnesses(store, contract=_replay_contract(leaves)),
             "scope": ("Reviewed 2025–26 campus, district and Texas student projection, with explicit raw field holds"
                       if complete_campuses else
                       "Reviewed 2025–26 district and Texas student projection, with explicit raw field holds")}

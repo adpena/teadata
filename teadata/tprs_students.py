@@ -63,7 +63,7 @@ def _reviewed_grid_sha256(config_bytes: bytes, config_path: Path) -> str | None:
 
 
 def definition() -> dict[str, Any]:
-    """Return a detached copy of the sole reviewed field/layout authority."""
+    """Return a detached copy of the current packaged field/layout contract."""
     raw = files("teadata").joinpath(RESOURCE).read_bytes()
     config_path = _PACKAGED_CONFIG_PATH
     reviewed = _reviewed_grid_sha256(config_path.read_bytes(), config_path)
@@ -120,6 +120,61 @@ class StudentCell:
 
 
 @dataclass(frozen=True)
+class _StudentProfile:
+    metadata_sha256: str
+    policy_sha256: str
+
+
+# Independently frozen source contracts; never inferred from candidate leaves.
+_STUDENT_PROFILES = {
+    "e7759843a9296a25d03f79782b14c061f696cf9700c76f77d6f1b17c234d9dd5": _StudentProfile(
+        "da3896eac4faf500a0b507250059b567e375ee463630804cbd3612a1155461be",
+        "d13b4c90563086887f77c4a211813d63977d62aa70ca866579307edfc1ca183e"),
+    "f7628dd08a539c52f5323664b1292e62869875e548230e657b56423461d7526f": _StudentProfile(
+        "0a6e3e30a2a3005a92d2b90173b27ac5f18344b1e98158db43e12c419d7fc7e8",
+        "d13b4c90563086887f77c4a211813d63977d62aa70ca866579307edfc1ca183e"),
+}
+_CURRENT_STUDENT_GRID = "f7628dd08a539c52f5323664b1292e62869875e548230e657b56423461d7526f"
+
+
+def _student_metadata_sha256(metadata: DatasetMetadata) -> str:
+    document = metadata.to_dict()
+    columns = [ref for ref in document["references"] if ref["reference_id"] == "columns"]
+    _need(len(columns) == 1, "Student comparison requires one selected columns reference")
+    for name in ("path", "reviewed_sha256", "provenance_ids"):
+        columns[0].pop(name, None)
+    return sha256(canonical_json(document).encode()).hexdigest()
+
+
+def _student_profile(metadata: DatasetMetadata) -> tuple[str, _StudentProfile]:
+    grids = [ref for ref in metadata.references if ref.reference_id == "report_grid"]
+    _need(len(grids) == 1, "Student comparison requires one reviewed report_grid reference")
+    identity = grids[0].reviewed_sha256
+    _need(identity in _STUDENT_PROFILES,
+          f"Unsupported Student report grid {identity!r}. Supported reviewed grids: "
+          f"{tuple(_STUDENT_PROFILES)}; select an admitted source release.")
+    assert identity is not None
+    profile = _STUDENT_PROFILES[identity]
+    _need(_student_metadata_sha256(metadata) == profile.metadata_sha256,
+          "Student comparison metadata differs from its frozen reviewed field contract")
+    return identity, profile
+
+
+def _resolve_contract(contract: Mapping[str, Any] | None = None) -> tuple[Mapping[str, Any], str]:
+    """Select one reviewed interpretation without replacing explicit bad input."""
+    grid = definition() if contract is None else contract
+    _need(isinstance(grid, Mapping), "Student report contract must be a reviewed JSON mapping")
+    try:
+        digest = sha256((canonical_json(dict(grid)) + "\n").encode()).hexdigest()
+    except (TypeError, ValueError) as error:
+        raise ContractError("Student report contract must be a reviewed JSON mapping") from error
+    _need(digest in _STUDENT_PROFILES,
+          f"Unsupported Student report grid {digest!r}. Supported reviewed grids: "
+          f"{tuple(_STUDENT_PROFILES)}; use the captured contract from an admitted source release.")
+    return grid, digest
+
+
+@dataclass(frozen=True)
 class StudentReport:
     scope: str
     identifier: str
@@ -127,12 +182,14 @@ class StudentReport:
     sha256: str
     cells: tuple[StudentCell, ...]
     acquisition_notes: tuple[str, ...] = ()
+    grid_sha256: str = ""
 
 
 def semantic_fields(contract: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:
     """Compile the projection from the report-grid authority, never CSV codes."""
     result = []
-    for row in (contract or definition())["rows"]:
+    grid, _ = _resolve_contract(contract)
+    for row in grid["rows"]:
         if not row["qualified"]:
             continue
         selectors = {}
@@ -169,15 +226,16 @@ def _check_student_heading(rows: Sequence[list[str]], scope: str, identifier: st
           "Student report geography differs")
 
 
-def parse_student_report(raw: bytes, *, scope: str, identifier: str, receipt: str = "") -> StudentReport:
-    """Parse the complete current table and preserve unqualified/lagged cells.
+def parse_student_report(raw: bytes, *, scope: str, identifier: str, receipt: str = "",
+                         contract: Mapping[str, Any] | None = None) -> StudentReport:
+    """Parse the selected contract and preserve unqualified/lagged cells.
 
     Row/column locators are one-based parsed HTML table coordinates, not lines.
     Whitespace is normalized by the shared HTML reader; original bytes remain
     in the acquisition store.  Missing grade rows are never manufactured.
     """
     _identifier(scope, identifier)
-    grid = definition()
+    grid, grid_sha256 = _resolve_contract(contract)
     rows = _Rows(_student_html(raw)).rows
     _check_student_heading(rows, scope, identifier)
     _need(rows[4] == ["", "Membership", "Enrollment"], "Student report population headers differ")
@@ -223,7 +281,8 @@ def parse_student_report(raw: bytes, *, scope: str, identifier: str, receipt: st
           "Student report omits a required current row")
     if scope != "campus":
         _need(seen == set(expected), "State/district student report grade coverage differs")
-    return StudentReport(scope, identifier, receipt, sha256(raw).hexdigest(), tuple(cells))
+    return StudentReport(scope, identifier, receipt, sha256(raw).hexdigest(), tuple(cells),
+                         grid_sha256=grid_sha256)
 
 
 def _validate_report_acquisition(record: Mapping[str, Any], *, scope: str, identifier: str,
@@ -281,21 +340,26 @@ def _read_student_input(store: ProvenanceStore, receipt: str, *, scope: str, ide
 
 
 def read_student_report(store: ProvenanceStore, receipt: str, *, scope: str, identifier: str,
-                        expected_sha256: str) -> StudentReport:
-    """Read the current population table from the verified Student Information bytes."""
+                        expected_sha256: str, contract: Mapping[str, Any] | None = None) -> StudentReport:
+    """Read the selected population contract from verified Student Information bytes."""
+    grid, _ = _resolve_contract(contract)
     raw, notes = _read_student_input(store, receipt, scope=scope, identifier=identifier,
                                      expected_sha256=expected_sha256)
-    report = parse_student_report(raw, scope=scope, identifier=identifier, receipt=receipt)
+    report = parse_student_report(raw, scope=scope, identifier=identifier, receipt=receipt, contract=grid)
     return replace(report, acquisition_notes=notes)
 
 
-def projection(reports: Sequence[StudentReport], policy: ValuePolicy, *, audit_raw: bool = False) -> tuple[pa.Table, dict[str, Any], dict[str, Any]]:
+def projection(reports: Sequence[StudentReport], policy: ValuePolicy, *, audit_raw: bool = False,
+               contract: Mapping[str, Any] | None = None) -> tuple[pa.Table, dict[str, Any], dict[str, Any]]:
     """Project only reviewed fields; retain exact raw/status and cell locators."""
     _need(bool(reports) and len({r.scope for r in reports}) == 1, "Select one nonempty source scope")
+    grid, identity = _resolve_contract(contract)
+    _need(all(report.grid_sha256 == identity for report in reports),
+          "Student parse/projection contracts differ or are unbound; parse every report with the selected captured contract")
     scope = reports[0].scope
     _need(len({r.identifier for r in reports}) == len(reports), "Duplicate student-report entity identifier")
     _need(scope != "state" or len(reports) == 1, "Texas requires one direct publisher report")
-    fields = semantic_fields()
+    fields = semantic_fields(grid)
     values: dict[str, list[Any]] = {}
     support: dict[str, Any] = {"fields": {}, "context": ["tprs_report_receipt", "tprs_report_sha256"]}
     if scope != "state":
@@ -346,7 +410,7 @@ def projection(reports: Sequence[StudentReport], policy: ValuePolicy, *, audit_r
 
 
 def _crosswalk(inputs: Mapping[str, Sequence[str]], contract: Mapping[str, Any] | None = None) -> dict[str, Any]:
-    grid = contract or definition()
+    grid, _ = _resolve_contract(contract)
     fields: list[dict[str, Any]] = [{"position": i, "code": f["label"], "label": f["label"], "field": f["field"],
                "dictionary_status": "not_documented", "publisher_type": None, "publisher_description": None,
                "disposition": "fact"} for i, f in enumerate(semantic_fields(grid), 1)]
@@ -384,8 +448,10 @@ def _workbook_headers(cells: Mapping[tuple[int, str], str], grid: Mapping[str, A
         _need(row(6) == geography, "Student workbook geography role headers differ")
 
 
-def _student_workbook_cells(store: ProvenanceStore, scope: str, witness: Mapping[str, str]) -> dict[tuple[int, str], str]:
+def _student_workbook_cells(store: ProvenanceStore, scope: str, witness: Mapping[str, str], *,
+                            contract: Mapping[str, Any] | None = None) -> dict[tuple[int, str], str]:
     """Read independently acquired Student Information workbook cells."""
+    grid, _ = _resolve_contract(contract)
     from .financial_leaves import NS, _package, _xml
     from zipfile import ZipFile
 
@@ -431,22 +497,22 @@ def _student_workbook_cells(store: ProvenanceStore, scope: str, witness: Mapping
             if raw is not None:
                 text = strings[int(raw)] if cell.get("t", "n") == "s" else raw
                 cells[key] = " ".join(text.split())
-    _workbook_headers(cells, definition(), scope, witness["identifier"])
+    _workbook_headers(cells, grid, scope, witness["identifier"])
     return cells
 
 
-def verify_workbook_witnesses(store: ProvenanceStore) -> dict[str, Any]:
+def verify_workbook_witnesses(store: ProvenanceStore, *, contract: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Independently decode the publisher's OOXML for the complete current grid.
 
     This is presentation agreement for three named exports, not a census of
     every selected report. Malformed numeric-typed dot cells remain text.
     """
-    grid = definition()
+    grid, _ = _resolve_contract(contract)
     comparisons = []
     for scope, witness in grid["witnesses"].items():
         report = read_student_report(store, witness["html_receipt"], scope=scope,
-            identifier=witness["identifier"], expected_sha256=witness["html_sha256"])
-        cells = _student_workbook_cells(store, scope, witness)
+            identifier=witness["identifier"], expected_sha256=witness["html_sha256"], contract=grid)
+        cells = _student_workbook_cells(store, scope, witness, contract=grid)
         labels: dict[tuple[str, str], int] = {}
         expected_rows = {(cell.section, cell.label) for cell in report.cells}
         section = ""
@@ -499,17 +565,21 @@ def _statewide_row_groups(batches: Iterator[pa.RecordBatch]) -> Iterator[pa.Reco
         yield from combine(pending)
 
 
-def _statewide_batches(store: ProvenanceStore, entries: Sequence[ReportSelection], policy: ValuePolicy
+def _statewide_batches(store: ProvenanceStore, entries: Sequence[ReportSelection], policy: ValuePolicy, *,
+                       contract: Mapping[str, Any] | None = None
                        ) -> Iterator[tuple[pa.Table, dict[str, Any], dict[str, Any]]]:
+    grid, _ = _resolve_contract(contract)
     for offset in range(0, len(entries), _STATEWIDE_BATCH_ROWS):
         reports = [read_student_report(store, item.receipt, scope=item.scope, identifier=item.identifier,
-                                       expected_sha256=item.sha256)
+                                       expected_sha256=item.sha256, contract=grid)
                    for item in entries[offset:offset + _STATEWIDE_BATCH_ROWS]]
-        yield projection(reports, policy, audit_raw=True)
+        yield projection(reports, policy, audit_raw=True, contract=grid)
 
 
 def _verify_statewide_projection(store: ProvenanceStore, entries: tuple[ReportSelection, ...],
-                                 policy: ValuePolicy, path: Path, audit_path: Path) -> None:
+                                 policy: ValuePolicy, path: Path, audit_path: Path, *,
+                                 contract: Mapping[str, Any] | None = None) -> None:
+    grid, _ = _resolve_contract(contract)
     from .dataset_metadata import COLUMN_SCHEMA_MAX_BYTES
     from .tprs_statewide_intake import audit_rows
 
@@ -518,7 +588,7 @@ def _verify_statewide_projection(store: ProvenanceStore, entries: tuple[ReportSe
     _need(len(raw) <= COLUMN_SCHEMA_MAX_BYTES, "Compressed student audit exceeds its bounds")
     audit = audit_rows(raw, entries)
     batches = pq.ParquetFile(path).iter_batches(batch_size=_STATEWIDE_BATCH_ROWS)
-    for projection_result, observed in zip_longest(_statewide_batches(store, entries, policy), batches):
+    for projection_result, observed in zip_longest(_statewide_batches(store, entries, policy, contract=grid), batches):
         _need(projection_result is not None and observed is not None, "Statewide student readback row count differs")
         assert projection_result is not None and observed is not None
         table, _, audit_data = projection_result

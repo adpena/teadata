@@ -42,6 +42,33 @@ def passing():
     return [Check("example", ("@python", "-c", "print('checked')"))]
 
 
+@pytest.mark.parametrize('pin',[
+    '373041dfb0eb994ccde4a88f1e7e630e7b395bf9f7a51199655d843788a2b5f6',
+    'c96effc9bcbfd01c7cd969082cf701a2dc4e1900b6d6973b23c0ed2d21559f9e',
+    '3b07ad9d41ada9d28487d14259be2b6700729e5ed2cca632e77f845f7b0eebaa'])
+def test_tprs_native_dispatch_uses_same_source_and_evidence_gate(monkeypatch,pin):
+    from types import SimpleNamespace
+    from teadata import tprs_statewide_intake as intake, verification
+
+    release,store=SimpleNamespace(manifest_sha256=pin),object()
+    seen=[]
+    def qualify(selected,retained):
+        assert selected is release and retained is store
+        seen.append('qualify')
+        return {'status':'PASS_REVIEWED_NATIVE'}
+    def evidence(selected,retained):
+        assert selected is release and retained is store
+        seen.append('evidence')
+        return ['captured-grid-evidence']
+    monkeypatch.setattr(intake,'qualify_statewide_tprs',qualify)
+    monkeypatch.setattr(intake,'retained_tprs_evidence',evidence)
+    review=verification._native_review(release,store)
+    assert review.label=='TPRS'
+    assert review.qualify()['status']=='PASS_REVIEWED_NATIVE'
+    assert review.evidence()==['captured-grid-evidence']
+    assert seen==['qualify','evidence']
+
+
 @pytest.mark.parametrize("kind,override,expected", [
     ("library", None, 3600), ("app", None, 900), ("library", "42", 42),
 ])

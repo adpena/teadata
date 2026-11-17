@@ -83,6 +83,13 @@ def grid():
 
 
 @pytest.fixture(scope="module")
+def original_grid():
+    raw = (Path(__file__).parent / "fixtures/tprs-students-original168.json").read_bytes()
+    assert sha256(raw).hexdigest() == "e7759843a9296a25d03f79782b14c061f696cf9700c76f77d6f1b17c234d9dd5"
+    return json.loads(raw)
+
+
+@pytest.fixture(scope="module")
 def policy():
     cfg = load_config()
     return cfg.value_policies["tprs_student_selected_2026"]
@@ -114,7 +121,7 @@ def html(rows):
 def parse(grid, **kwargs):
     scope, identifier = kwargs.pop("scope", "district"), kwargs.pop("identifier", "001902")
     return students.parse_student_report(html(report_rows(grid, scope, identifier, **kwargs)),
-                                         scope=scope, identifier=identifier)
+                                         scope=scope, identifier=identifier, contract=grid)
 
 
 def receipt(store, tmp_path, raw, *, identifier="001902", scope="district", overrides=None, legacy=False, parents=()):
@@ -621,7 +628,7 @@ def test_duplicate_entities_and_semantic_aliases_cannot_collapse(grid, policy):
         students.projection([report, report], policy)
     altered = deepcopy(grid)
     altered["rows"][1]["name"] = altered["rows"][0]["name"]
-    with pytest.raises(ContractError, match="Duplicate"):
+    with pytest.raises(ContractError, match="Unsupported Student report grid"):
         students.semantic_fields(altered)
 
 
@@ -778,11 +785,11 @@ def test_workbook_exact_parse_buffer_refuses_after_verify_comment_change(tmp_pat
         DatasetMetadata(title='Synthetic workbook', version='2026', provenance_ids=(html_id,))),
         downloaded_at=datetime(2026, 11, 4, tzinfo=timezone.utc), requested_url=url, resolved_url=url,
         response_headers={'content-type': 'application/ms-excel'}, parameters={'http_method': 'GET', 'http_status': 200})
-    contract = deepcopy(grid)
-    contract['witnesses'] = {'state': {'identifier': 'S', 'html_receipt': html_id, 'html_sha256': sha256(raw).hexdigest(),
-        'xlsx_receipt': xlsx_id, 'xlsx_sha256': digest}}
-    monkeypatch.setattr(students, 'definition', lambda: contract)
-    assert students.verify_workbook_witnesses(store)['comparisons'][0]['current_cells'] == 204
+    witness = {'identifier': 'S', 'html_receipt': html_id, 'html_sha256': sha256(raw).hexdigest(),
+               'xlsx_receipt': xlsx_id, 'xlsx_sha256': digest}
+    # Exercise the bounded workbook reader, not qualification of a synthetic
+    # grid with invented evidence roots. The actual grid stays reviewed174.
+    assert students._student_workbook_cells(store, 'state', witness, contract=grid) == cells
     verify = store.verify_artifact
     calls = 0
 
@@ -800,7 +807,7 @@ def test_workbook_exact_parse_buffer_refuses_after_verify_comment_change(tmp_pat
 
     monkeypatch.setattr(store, 'verify_artifact', mutate_comment_after_verification)
     with pytest.raises(ContractError, match='bytes changed'):
-        students.verify_workbook_witnesses(store)
+        students._student_workbook_cells(store, 'state', witness, contract=grid)
 
 
 def test_selected_aggregate_size_refuses_before_parsing_or_staging(tmp_path, grid, monkeypatch):
@@ -1020,7 +1027,20 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(
     config = yaml.safe_dump(document).encode()
     config_path.write_bytes(config)
     monkeypatch.setattr(students, "load_config", lambda: load_config_bytes(config, path=config_path))
-    monkeypatch.setattr(students, "definition", lambda: {**grid, "witnesses": {}})
+    monkeypatch.setattr(students, "verify_workbook_witnesses", lambda *args, **kwargs: {
+        "status": "SYNTHETIC_PRODUCER_FIXTURE_ONLY", "comparisons": []})
+    # This synthetic producer fixture has no genuine publisher workbook inputs.
+    # Skip only copying those six auxiliary witness roots; retain real closure
+    # admission for every selected synthetic report, roster and interpretation
+    # record. Actual retained qualification exercises the unstubbed witness path.
+    external_witnesses = {witness[role] for witness in grid['witnesses'].values()
+                          for role in ('html_receipt', 'xlsx_receipt')}
+    copy_record = ProvenanceStore.copy_record_from
+    def copy_fixture_record(target, source, identifier):
+        if identifier not in external_witnesses:
+            return copy_record(target, source, identifier)
+        return None
+    monkeypatch.setattr(ProvenanceStore, 'copy_record_from', copy_fixture_record)
     raw = (canonical_json(intake) + "\n").encode()
     intake_path = tmp_path / "intake.json"
     intake_path.write_bytes(raw)
@@ -1595,7 +1615,7 @@ def test_thin_command_requires_explicit_pins_and_has_no_loader_default():
 def test_invalid_selective_field_contract_is_rejected(grid, key, value):
     contract = deepcopy(grid)
     contract['rows'][0][key] = value
-    with pytest.raises(ContractError, match='Invalid student field selector'):
+    with pytest.raises(ContractError, match='Unsupported Student report grid'):
         students.semantic_fields(contract)
 
 
@@ -1630,16 +1650,130 @@ def test_disability_count_unknown_tokens_block_projection(grid, policy, token):
 
 
 @pytest.mark.parametrize('scope,identifier', [('state', 'S'), ('district', '001902'), ('campus', '001902001')])
-def test_disability_extension_preserves_original_projection(grid, policy, monkeypatch, scope, identifier):
-    original = deepcopy(grid)
-    for row in original['rows']:
-        if row['section'] == 'Students with Disabilities by Type of Primary Disability':
-            row['qualified'] = False
-    old_fields = students.semantic_fields(original)
+def test_disability_extension_preserves_original_projection(grid, original_grid, policy, scope, identifier):
+    old_fields = students.semantic_fields(original_grid)
     new_fields = students.semantic_fields(grid)
     assert len(old_fields) == 168 and new_fields[:168] == old_fields
     raw = html(report_rows(grid, scope, identifier))
-    current, _, _ = students.projection([students.parse_student_report(raw, scope=scope, identifier=identifier)], policy)
-    monkeypatch.setattr(students, 'definition', lambda: original)
-    previous, _, _ = students.projection([students.parse_student_report(raw, scope=scope, identifier=identifier)], policy)
+    current_report = students.parse_student_report(raw, scope=scope, identifier=identifier, contract=grid)
+    original_report = students.parse_student_report(raw, scope=scope, identifier=identifier, contract=original_grid)
+    current, _, current_audit = students.projection([current_report], policy, contract=grid)
+    previous, _, original_audit = students.projection([original_report], policy, contract=original_grid)
     assert current.select(previous.column_names).equals(previous)
+    assert current_report.grid_sha256 != original_report.grid_sha256
+    assert current_audit['qualified_fields'] == 174 and original_audit['qualified_fields'] == 168
+    old_holds = [cell for cell in original_report.cells if cell.field is None and cell.geography_role == 'local']
+    new_holds = [cell for cell in current_report.cells if cell.field is None and cell.geography_role == 'local']
+    assert len(old_holds) - len(new_holds) == 6
+
+
+@pytest.mark.parametrize('contract', [{}, [], 0, False, '', {'rows': []}, {'schema_version': 99}])
+@pytest.mark.parametrize('operation', ['parse', 'projection', 'fields', 'crosswalk', 'workbook'])
+def test_explicit_invalid_contract_never_selects_current(contract, operation, grid, policy):
+    with pytest.raises(ContractError, match='reviewed JSON mapping|Unsupported Student report grid'):
+        if operation == 'parse':
+            students.parse_student_report(html(report_rows(grid)),scope='district',identifier='001902',contract=contract)
+        elif operation == 'projection':
+            students.projection([parse(grid)],policy,contract=contract)
+        elif operation == 'fields':
+            students.semantic_fields(contract)
+        elif operation == 'crosswalk':
+            students._crosswalk({'state': ['a' * 64]},contract=contract)
+        else:
+            students.verify_workbook_witnesses(None,contract=contract)
+
+
+@pytest.mark.parametrize('direction', ['old_as_new','new_as_old','mixed','unbound'])
+def test_parse_projection_requires_same_captured_identity(grid, original_grid, policy, direction):
+    current=parse(grid)
+    previous=parse(original_grid)
+    reports,contract=([previous],grid) if direction=='old_as_new' else ([current],original_grid)
+    if direction=='mixed':
+        reports,contract=[current,previous],grid
+    if direction=='unbound':
+        reports,contract=[replace(current,grid_sha256='')],grid
+    with pytest.raises(ContractError, match='contract|grid|identity'):
+        students.projection(reports,policy,contract=contract)
+
+
+def test_omitted_contract_retains_current174(grid, policy):
+    report=students.parse_student_report(html(report_rows(grid)),scope='district',identifier='001902')
+    assert report.grid_sha256=='f7628dd08a539c52f5323664b1292e62869875e548230e657b56423461d7526f'
+    table,_,audit=students.projection([report],policy)
+    explicit,_,_=students.projection([report],policy,contract=grid)
+    assert table.equals(explicit) and audit['qualified_fields']==174
+    assert students._crosswalk({'district':['a'*64]})==students._crosswalk({'district':['a'*64]},contract=grid)
+
+
+@pytest.mark.parametrize('operation',['read','workbook','native_readback'])
+def test_invalid_contract_rejects_before_store_or_path_io(tmp_path,policy,operation):
+    def unexpected(*args,**kwargs):
+        pytest.fail('Invalid contract reached retained source I/O')
+    store=SimpleNamespace(read_record=unexpected,verify_record_closure=unexpected,verify_artifact=unexpected)
+    with pytest.raises(ContractError,match='Unsupported Student report grid'):
+        if operation=='read':
+            students.read_student_report(store,'a'*64,scope='state',identifier='S',expected_sha256='b'*64,contract={})
+        elif operation=='workbook':
+            students._student_workbook_cells(store,'state',{},contract={})
+        else:
+            students._verify_statewide_projection(store,(),policy,tmp_path/'absent.parquet',tmp_path/'absent.audit',contract={})
+
+
+@pytest.mark.parametrize('profile',['original','current'])
+def test_replay_evidence_roots_follow_bound_grid_not_current_definition(grid, original_grid, monkeypatch, profile):
+    contract=original_grid if profile=='original' else grid
+    _,identity=students._resolve_contract(contract)
+    report=tprs_statewide_intake.ReportSelection('state','S','a'*64,'b'*64)
+    leaf=tprs_statewide_intake._ReplayLeaf(None,None,(report,),(),contract,identity)
+    seen=[]
+    store=SimpleNamespace(verify_record_closure=lambda roots:seen.extend(roots) or {root:{} for root in roots})
+    monkeypatch.setattr(students,'definition',lambda:pytest.fail('Historical evidence consulted current definition'))
+    result=tprs_statewide_intake._retained_replay_records((leaf,),store)
+    expected={'a'*64,*(witness[role] for witness in contract['witnesses'].values() for role in ('html_receipt','xlsx_receipt'))}
+    assert set(result)==set(seen)==expected
+
+
+def test_replay_binding_rejects_mixed_or_missing_identity(grid, original_grid):
+    old=tprs_statewide_intake._ReplayLeaf(None,None,(),(),original_grid,students._resolve_contract(original_grid)[1])
+    current=tprs_statewide_intake._ReplayLeaf(None,None,(),(),grid,students._resolve_contract(grid)[1])
+    for leaves in ((old,current),(replace(current,grid_sha256=''),),(replace(current,contract=None),)):
+        with pytest.raises(ContractError,match='captured contract|one supported grid'):
+            tprs_statewide_intake._replay_contract(leaves)
+
+
+def test_unreviewed_native_pin_rejects_before_catalog_access():
+    release=SimpleNamespace(offline=True,manifest_sha256='f'*64)
+    with pytest.raises(ContractError,match='exact reviewed offline manifest'):
+        tprs_statewide_intake._reviewed_leaves(release)
+
+
+@pytest.mark.parametrize('pin',[
+    '373041dfb0eb994ccde4a88f1e7e630e7b395bf9f7a51199655d843788a2b5f6',
+    'c96effc9bcbfd01c7cd969082cf701a2dc4e1900b6d6973b23c0ed2d21559f9e',
+    '3b07ad9d41ada9d28487d14259be2b6700729e5ed2cca632e77f845f7b0eebaa'])
+def test_exact_native_scope_classes_retain_full_census_guard(grid, original_grid, monkeypatch, pin):
+    complete=pin!='373041dfb0eb994ccde4a88f1e7e630e7b395bf9f7a51199655d843788a2b5f6'
+    contract=grid if pin==tprs_statewide_intake.REVIEWED_CAMPUS_STUDENT_174_MANIFEST else original_grid
+    identity=students._resolve_contract(contract)[1]
+    scopes=('district','state','campus') if complete else ('district','state')
+    leaves=tuple(tprs_statewide_intake._ReplayLeaf(SimpleNamespace(edition=SimpleNamespace(
+        scope=scope,dataset=students.DATASET),identity=scope),None,(SimpleNamespace(identifier=scope),),(),contract,identity)
+        for scope in scopes)
+    seen=[]
+    release=SimpleNamespace(manifest_sha256=pin,build_id='reviewed',verify=lambda:{scope:Path(scope) for scope in scopes},
+        _resource_path=lambda *args:Path('audit'),catalog=SimpleNamespace(policy=lambda *args,**kwargs:object()))
+    leaves=tuple(replace(leaf,audit=SimpleNamespace(location='audit',sha256='a'*64,size_bytes=1)) for leaf in leaves)
+    monkeypatch.setattr(tprs_statewide_intake,'_reviewed_leaves',lambda selected:leaves)
+    monkeypatch.setattr(tprs_statewide_intake,'_retained_replay_records',lambda *args:[])
+    monkeypatch.setattr(tprs_statewide_intake,'_verify_campus_census',lambda selected,store:seen.append('census'))
+    def verify(*args,contract):
+        assert students._resolve_contract(contract)[1]==identity
+        seen.append('projection')
+    def workbook(*args,contract):
+        assert students._resolve_contract(contract)[1]==identity
+        return {'selected_grid':identity}
+    monkeypatch.setattr(students,'_verify_statewide_projection',verify)
+    monkeypatch.setattr(students,'verify_workbook_witnesses',workbook)
+    result=tprs_statewide_intake.qualify_statewide_tprs(release,None)
+    assert seen.count('census')==int(complete) and seen.count('projection')==len(scopes)
+    assert result['publisher_witnesses']['selected_grid']==identity

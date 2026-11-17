@@ -159,49 +159,6 @@ class _Statistic:
 
 
 @dataclass(frozen=True)
-class _StudentProfile:
-    metadata_sha256: str
-    policy_sha256: str
-
-
-# Frozen from the independently reviewed predecessor and current source configs,
-# not inferred from candidate leaves. Only selected columns path/hash/receipts vary.
-_STUDENT_PROFILES = {
-    "e7759843a9296a25d03f79782b14c061f696cf9700c76f77d6f1b17c234d9dd5": _StudentProfile(
-        "da3896eac4faf500a0b507250059b567e375ee463630804cbd3612a1155461be",
-        "d13b4c90563086887f77c4a211813d63977d62aa70ca866579307edfc1ca183e"),
-    "f7628dd08a539c52f5323664b1292e62869875e548230e657b56423461d7526f": _StudentProfile(
-        "0a6e3e30a2a3005a92d2b90173b27ac5f18344b1e98158db43e12c419d7fc7e8",
-        "d13b4c90563086887f77c4a211813d63977d62aa70ca866579307edfc1ca183e"),
-}
-_CURRENT_STUDENT_GRID = "f7628dd08a539c52f5323664b1292e62869875e548230e657b56423461d7526f"
-
-
-def _student_metadata_sha256(metadata: DatasetMetadata) -> str:
-    document = metadata.to_dict()
-    columns = [ref for ref in document["references"] if ref["reference_id"] == "columns"]
-    if len(columns) != 1:
-        raise ContractError("Student comparison requires one selected columns reference")
-    for name in ("path", "reviewed_sha256", "provenance_ids"):
-        columns[0].pop(name, None)
-    return sha256(canonical_json(document).encode()).hexdigest()
-
-
-def _student_profile(metadata: DatasetMetadata) -> tuple[str, _StudentProfile]:
-    grids = [ref for ref in metadata.references if ref.reference_id == "report_grid"]
-    if len(grids) != 1:
-        raise ContractError("Student comparison requires one reviewed report_grid reference")
-    identity = grids[0].reviewed_sha256
-    if identity is None or identity not in _STUDENT_PROFILES:
-        raise ContractError(f"Unsupported Student report grid {identity!r}. Supported reviewed grids: "
-                            f"{tuple(_STUDENT_PROFILES)}; select an admitted source release.")
-    profile = _STUDENT_PROFILES[identity]
-    if _student_metadata_sha256(metadata) != profile.metadata_sha256:
-        raise ContractError("Student comparison metadata differs from its frozen reviewed field contract")
-    return identity, profile
-
-
-@dataclass(frozen=True)
 class _StudentContract:
     scope: str
     fields: Mapping[str, Mapping[str, Any]]
@@ -250,7 +207,7 @@ def _reviewed_students(release: DataRelease, key: EditionKey) -> tuple[str, str,
             or key.scope not in students.SCOPES or key.table != key.scope or key.grain != grain):
         raise ContractError("Student comparison requires the reviewed edition, scope and grain")
     metadata = release.catalog.metadata(key.dataset, edition=key)
-    identity, profile = _student_profile(metadata)
+    identity, profile = students._student_profile(metadata)
     policy = release.catalog.policy(key.dataset, edition=key)
     if metadata.value_policy is None or policy is None:
         raise ContractError("Student comparison requires its reviewed disclosure policy")
@@ -274,7 +231,7 @@ def _reviewed_students(release: DataRelease, key: EditionKey) -> tuple[str, str,
         reports, cohort = release._student_report_ledger(artifact, attachments)
         sources = {item.identifier: (item.receipt, item.sha256) for item in reports}
     else:
-        if identity != _CURRENT_STUDENT_GRID:
+        if identity != students._CURRENT_STUDENT_GRID:
             raise ContractError("Historical Student comparisons require their captured reviewed grid; "
                                 "select a roster-bound source release.")
         grid = students.definition()
