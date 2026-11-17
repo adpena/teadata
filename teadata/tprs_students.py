@@ -33,7 +33,7 @@ from .column_schema import _unique_object, parse_column_schema, source_schema_fi
 from .dataset_metadata import STATEWIDE_SINGLETON_GRAIN, ArtifactRef, DataPeriod, DatasetMetadata, EditionKey, ResolvedDataset
 from .manifest import BuildRecorder, ContractError, canonical_json
 from .native_witnesses import _Rows
-from .provenance import ProvenanceStore
+from .provenance import ProvenanceStore, validate_reference_records
 from .teadata_config import _PACKAGED_CONFIG_PATH, _load_packaged_config, load_config, load_config_bytes
 from .values import Measurement, ValuePolicy, ValueStatus, measure
 
@@ -135,8 +135,16 @@ def semantic_fields(contract: Mapping[str, Any] | None = None) -> list[dict[str,
     for row in (contract or definition())["rows"]:
         if not row["qualified"]:
             continue
-        for population in ("membership", "enrollment"):
-            for quantity in ("count", "percent"):
+        selectors = {}
+        for key, allowed in (("populations", ("membership", "enrollment")),
+                             ("quantities", ("count", "percent"))):
+            selected = row.get(key, list(allowed))
+            _need(isinstance(selected, list) and bool(selected)
+                  and all(isinstance(value, str) and value in allowed for value in selected)
+                  and len(selected) == len(set(selected)), "Invalid student field selector: " + key)
+            selectors[key] = selected
+        for population in selectors["populations"]:
+            for quantity in selectors["quantities"]:
                 result.append({"field": f"{population}_{row['name']}_{quantity}", "label": row["label"],
                     "section": row["section"], "population": population, "quantity": quantity,
                     "denominator": None if quantity == "count" else f"Total Students / {population}",
@@ -551,6 +559,7 @@ def materialize_students(store: ProvenanceStore, *, config: Path, config_sha256:
     expected_metrics = {field["field"]: (field["unit"], PERIOD) for field in semantic_fields()}
     _need({metric.field: (metric.unit, metric.period) for metric in source.metadata.metrics.values()} == expected_metrics,
           "Student semantic bindings differ from the reviewed report grid")
+    validate_reference_records(source, store.read_record, verify_all_claimed=True)
     with intake.open("rb") as stream:
         body = stream.read(4 * 1024**2 + 1)
     _need(0 < len(body) <= 4 * 1024**2 and sha256(body).hexdigest() == intake_sha256, "Student intake pin differs")

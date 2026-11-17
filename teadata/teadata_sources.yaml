@@ -22700,6 +22700,48 @@ data_sources:
               kind: school_year
               start_year: 2025
               end_year: 2026
+          membership_total_students_with_disabilities_count:
+            field: membership_total_students_with_disabilities_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_students_with_intellectual_disabilities_count:
+            field: membership_students_with_intellectual_disabilities_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_students_with_physical_disabilities_count:
+            field: membership_students_with_physical_disabilities_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_students_with_autism_count:
+            field: membership_students_with_autism_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_students_with_behavioral_disabilities_count:
+            field: membership_students_with_behavioral_disabilities_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
+          membership_students_with_non_categorical_early_childhood_count:
+            field: membership_students_with_non_categorical_early_childhood_count
+            unit: count
+            period:
+              kind: school_year
+              start_year: 2025
+              end_year: 2026
         references:
         - reference_id: definitions
           title: 2026 TPRS glossary profile definitions (PDF 37–40)
@@ -22714,17 +22756,17 @@ data_sources:
           role: methodology
           status: available
           path: methodologies/tprs-students-2026.json
-          reviewed_sha256: e7759843a9296a25d03f79782b14c061f696cf9700c76f77d6f1b17c234d9dd5
+          reviewed_sha256: f7628dd08a539c52f5323664b1292e62869875e548230e657b56423461d7526f
           provenance_ids:
-          - c3770cc98d201aa4cddfaef3b6d7fa2b2a26e61d77fe2c40c8ae8bc4f5f85f3f
+          - e1a84687f57a6ab4cb5f4507c2c1286eca1042657393f4257640c488cf6c1f3b
         - reference_id: columns
           title: Derived row-label projection (not CSV codes)
           role: schema
           status: available
           path: schemas/tprs--2026--student-selected-reports-crosswalk.json
-          reviewed_sha256: d9522732b04ff29ca7bf10237383e41cf9eb36fc62b8ca0c10cc1ce47692d2a1
+          reviewed_sha256: 1612f79165760c8f51304024c2bb5ddf71128ef29940c66e1c0198c3d7624d70
           provenance_ids:
-          - 128e2aebbd507ab5434b4a96412f4d92092337e6e1272bba99ed3b7845c5614e
+          - ea8ddf6097786bd69e89053f394ae54d71bd27ce17a127867501843bf1713767
         - reference_id: legend
           title: Exact 2026 selected report disclosure legend
           role: masking_methodology
@@ -22744,8 +22786,8 @@ data_sources:
         notes: Explicit selected-report collection; not statewide bulk coverage or default enrichment. Row-label
           positional crosswalk codes are literal HTML row labels, not invented CSV variable names. Entire
           raw current table stays in the reader/retained HTML; only reviewed current Membership/Enrollment
-          fields are native. Missing grade rows are absent observations, never zero. CTE, grouped-disability,
-          lagged and embedded-benchmark cells remain raw/HOLD.
+          fields are native. Missing grade rows are absent observations, never zero. Six grouped-disability Membership counts are selected; Intellectual Disabilities includes ID, LD, DD and TBI.
+          Disability percentages and Enrollment cells, CTE, lagged and embedded benchmarks remain raw/HOLD.
       reader:
         profiles:
           source:

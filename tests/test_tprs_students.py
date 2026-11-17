@@ -436,10 +436,10 @@ def test_packaged_student_contract_is_explicit_and_source_only(grid):
     assert cfg.column_schema(students.DATASET, 2026) is None
     source = cfg.resolve_dataset(students.DATASET, 2026, reader_profile="source", exact=True)
     fields = students.semantic_fields(grid)
-    assert len(fields) == len(source.metadata.metrics) == 168
+    assert len(fields) == len(source.metadata.metrics) == 174
     assert set(source.metadata.metrics) == {field["field"] for field in fields}
     assert all(metric.period == students.PERIOD for metric in source.metadata.metrics.values())
-    assert not any(any(token in field for token in ("technical", "disabilit", "disciplinary", "mobility"))
+    assert not any(any(token in field for token in ("technical", "disciplinary", "mobility"))
                    for field in source.metadata.metrics)
     assert source.metadata.metrics["membership_special_education_count"].unit == "count"
     assert source.metadata.metrics["enrollment_special_education_percent"].unit == "percent"
@@ -450,7 +450,7 @@ def test_packaged_student_contract_is_explicit_and_source_only(grid):
     tables = crosswalk_dataset(parse_column_schema(resource["text"].encode()), students.DATASET, "2026")["tables"]
     assert {table["table"] for table in tables} == set(students.SCOPES)
     for table in tables:
-        assert len(table["fields"]) == 168
+        assert len(table["fields"]) == 174
         assert table["header_identity"] == "position"
         assert all(field["code"] == field["label"] and field["dictionary_status"] == "not_documented"
                    for field in table["fields"])
@@ -504,12 +504,12 @@ def test_all_raw_current_cells_and_lagged_period_remain_visible(grid, policy, sc
     assert all(cell.period == students.PERIOD for cell in report.cells if cell not in lagged)
     assert all(cell.row > 0 and cell.column > 1 for cell in report.cells)
     local = [cell for cell in report.cells if cell.geography_role == "local"]
-    assert sum(cell.field is not None for cell in local) == 168
+    assert sum(cell.field is not None for cell in local) == 174
     assert all(cell.field is None for cell in report.cells if cell.geography_role != "local")
     table, support, audit = students.projection([report], policy)
     assert len(table) == 1 and audit["projection_qualified"] is True
     assert audit["whole_report_semantics_qualified"] is False and audit["raw_field_holds"]
-    assert len(support["fields"]) == 168
+    assert len(support["fields"]) == 174
     assert table["membership_total_students_count"].type == pa.int64()
     assert table["membership_total_students_percent"].type == pa.float64()
     if scope != "state":
@@ -538,7 +538,8 @@ def test_masks_zero_and_undefined_dot_are_distinct(grid, policy):
     assert dot.field is None and dot.hold and dot.measurement(policy).status == ValueStatus.INVALID
     assert any(item["row"] == dot.row and item["token_status"] == "invalid" for item in audit["raw_field_holds"])
     complementary, = [cell for cell in report.cells if cell.raw == "**"]
-    assert complementary.field is None and complementary.measurement(policy).status == ValueStatus.SUPPRESSED
+    assert complementary.field == "membership_students_with_autism_count"
+    assert complementary.measurement(policy).status == ValueStatus.SUPPRESSED
 
 
 @pytest.mark.parametrize("token", [".", "", "-1", "1.0", "01", "NaN", "1e2", "**"])
@@ -806,7 +807,10 @@ def test_selected_aggregate_size_refuses_before_parsing_or_staging(tmp_path, gri
     store = ProvenanceStore(tmp_path / "store")
     raw = html(report_rows(grid))
     rid = receipt(store, tmp_path, raw)
-    config = ROOT / "teadata/teadata_sources.yaml"
+    config = tmp_path / "source.yaml"
+    body = yaml.safe_dump(_synthetic_reference_config(tmp_path, store)).encode()
+    config.write_bytes(body)
+    monkeypatch.setattr(students, "load_config", lambda: load_config_bytes(body, path=config))
     intake = tmp_path / "intake.json"
     intake.write_text(canonical_json({"schema_version": 1, "dataset": students.DATASET, "edition": "2026",
         "reports": [{"receipt": rid, "sha256": sha256(raw).hexdigest(), "scope": "district", "identifier": "001902"}]}))
@@ -1030,7 +1034,7 @@ def test_campus_cohort_materializes_and_verifies_a_standalone_native_leaf(
     else:
         assert built["campus_regions"] == ["01", "02"]
     assert built["release_activation"] is False
-    assert entry["rows"] == len(intake["reports"]) and entry["raw_field_hold_count"] == 36 * entry["rows"]
+    assert entry["rows"] == len(intake["reports"]) and entry["raw_field_hold_count"] == 30 * entry["rows"]
     key = EditionKey.from_dict(entry["edition"])
     excluded = earlier[0]["identifier"] if partitioned else "003901001"
     with monkeypatch.context() as routing:
@@ -1426,7 +1430,7 @@ def test_statewide_audit_rejects_missing_held_cell_despite_valid_gzip(grid, poli
     selection = (tprs_statewide_intake.ReportSelection("state", "S", report.receipt, report.sha256),)
     grid_bytes = canonical_json(grid).encode()
     encoded = [(canonical_json(row) + "\n").encode() for row in rows]
-    assert tprs_statewide_intake.verify_audit_coverage(gzip.compress(b"".join(encoded)), selection, grid_bytes) == 36
+    assert tprs_statewide_intake.verify_audit_coverage(gzip.compress(b"".join(encoded)), selection, grid_bytes) == 30
     with pytest.raises(ContractError, match="required report slot"):
         tprs_statewide_intake.verify_audit_coverage(gzip.compress(b"".join(encoded[:-1])), selection, grid_bytes)
 
@@ -1481,10 +1485,79 @@ def test_dynamic_crosswalk_changes_only_ordered_actual_input_identity():
         students._crosswalk({"district": [a, a]})
 
 
+def _synthetic_reference_config(tmp_path, store):
+    packaged = ROOT / "teadata"
+    document = yaml.safe_load((packaged / "teadata_sources.yaml").read_bytes())
+    references = document["data_sources"][students.DATASET][2026]["metadata"]["references"]
+    for reference in references:
+        local = reference.get("path")
+        if local:
+            path = tmp_path / local
+            raw = (packaged / local).read_bytes()
+        else:
+            path = tmp_path / f"{reference['reference_id']}.txt"
+            raw = f"Synthetic {reference['reference_id']} reference".encode()
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(raw)
+        pin = store.record_acquisition(path, ResolvedDataset(
+            "reference:synthetic", "reference", 2026, 2026, "", DatasetMetadata(version="2026"),
+        ))
+        reference.update(path=path.relative_to(tmp_path).as_posix(), url=None,
+                         reviewed_sha256=sha256(raw).hexdigest(), provenance_ids=[pin])
+    return document
+
+
+@pytest.mark.parametrize("damage", ["missing", "processing"])
+def test_candidate_admits_direct_reference_receipts_before_intake_or_reports(tmp_path, monkeypatch, damage):
+    from teadata import release as release_module
+
+    store = ProvenanceStore(tmp_path / "store")
+    document = _synthetic_reference_config(tmp_path, store)
+    reference = next(ref for ref in document["data_sources"][students.DATASET][2026]["metadata"]["references"]
+                     if ref["reference_id"] == "columns")
+    if damage == "processing":
+        receipt = store.record_processing(
+            dataset="reference:synthetic", inputs=reference["provenance_ids"],
+            outputs={"columns": tmp_path / reference["path"]},
+            processor="synthetic reference receipt corruption", code_version="test",
+        )
+        reference["provenance_ids"] = [receipt]
+        expected, message = ContractError, "Reference receipt is not an acquisition"
+    else:
+        reference["provenance_ids"] = ["0" * 64]
+        expected, message = FileNotFoundError, r"0{64}\.json"
+    body = yaml.safe_dump(document).encode()
+    config = tmp_path / "config.yaml"
+    config.write_bytes(body)
+    monkeypatch.setattr(students, "load_config", lambda: load_config_bytes(body, path=config))
+    intake, output = tmp_path / "intake.json", tmp_path / "candidate"
+    original_open = Path.open
+
+    def open_before_admission(path, *args, **kwargs):
+        if path == intake:
+            pytest.fail("Intake opened before reference admission")
+        return original_open(path, *args, **kwargs)
+
+    def unexpected(*args, **kwargs):
+        pytest.fail("Publisher report or candidate installation reached before reference admission")
+
+    monkeypatch.setattr(Path, "open", open_before_admission)
+    monkeypatch.setattr(students, "read_student_report", unexpected)
+    monkeypatch.setattr(students, "TemporaryDirectory", unexpected)
+    monkeypatch.setattr(release_module, "_install_candidate", unexpected)
+    with pytest.raises(expected, match=message):
+        students.materialize_students(store, config=config, config_sha256=sha256(body).hexdigest(),
+            intake=intake, intake_sha256="a" * 64, output=output)
+    assert not output.exists()
+
+
 @pytest.mark.parametrize("damage", ["config", "semantics", "policy", "intake", "json-duplicate"])
-def test_candidate_refuses_tampering_before_creating_output(tmp_path, damage):
+def test_candidate_refuses_tampering_before_creating_output(tmp_path, monkeypatch, damage):
+    store = ProvenanceStore(tmp_path / "store")
     config = tmp_path / "source.yaml"
-    body = (ROOT / "teadata/teadata_sources.yaml").read_bytes()
+    reviewed_body = yaml.safe_dump(_synthetic_reference_config(tmp_path, store)).encode()
+    monkeypatch.setattr(students, "load_config", lambda: load_config_bytes(reviewed_body, path=config))
+    body = reviewed_body
     if damage in {"semantics", "policy"}:
         document = yaml.safe_load(body)
         if damage == "semantics":
@@ -1497,8 +1570,11 @@ def test_candidate_refuses_tampering_before_creating_output(tmp_path, damage):
     intake.write_bytes(b'{"schema_version":1,"schema_version":1}' if damage == "json-duplicate" else
                       canonical_json({"schema_version": 1, "dataset": students.DATASET, "edition": "2026", "reports": []}).encode())
     output = tmp_path / "candidate"
-    with pytest.raises((ContractError, ValueError)):
-        students.materialize_students(ProvenanceStore(tmp_path / "store"), config=config,
+    reason = {"config": "Student Config pin differs", "semantics": "Student source differs from packaged definition",
+              "policy": "Student value policy changed", "intake": "Student intake pin differs",
+              "json-duplicate": "duplicate JSON keys"}[damage]
+    with pytest.raises((ContractError, ValueError), match=reason):
+        students.materialize_students(store, config=config,
             config_sha256="0" * 64 if damage == "config" else sha256(body).hexdigest(), intake=intake,
             intake_sha256="0" * 64 if damage == "intake" else sha256(intake.read_bytes()).hexdigest(), output=output)
     assert not output.exists()
@@ -1511,3 +1587,59 @@ def test_thin_command_requires_explicit_pins_and_has_no_loader_default():
     assert result.value.code == 2
     assert students.EDITION == 2026
     assert json.loads(students.files("teadata").joinpath(students.RESOURCE).read_bytes())["edition"] == "2026"
+
+
+@pytest.mark.parametrize('key,value', [('populations', []), ('populations', ['membership', 'membership']),
+    ('populations', ['unknown']), ('populations', 'membership'), ('quantities', []),
+    ('quantities', ['count', 'count']), ('quantities', ['unknown']), ('quantities', [None])])
+def test_invalid_selective_field_contract_is_rejected(grid, key, value):
+    contract = deepcopy(grid)
+    contract['rows'][0][key] = value
+    with pytest.raises(ContractError, match='Invalid student field selector'):
+        students.semantic_fields(contract)
+
+
+@pytest.mark.parametrize('scope,identifier', [('state', 'S'), ('district', '001902'), ('campus', '001902001')])
+def test_disability_counts_do_not_invent_enrollment_or_percent_fields(grid, policy, scope, identifier):
+    rows = report_rows(grid, scope, identifier)
+    specs = [r for r in grid['rows'] if r['section'] == 'Students with Disabilities by Type of Primary Disability']
+    for spec, token in zip(specs, ['13,949', '*', '**', '0', '2', '93'], strict=True):
+        row = next(row for row in rows if row[0] == spec['label'])
+        row[1:] = [''] * (len(row) - 1)
+        row[1] = token
+    report = students.parse_student_report(html(rows), scope=scope, identifier=identifier)
+    table, support, audit = students.projection([report], policy, audit_raw=True)
+    selected = [f for f in students.semantic_fields(grid) if f['section'] == specs[0]['section']]
+    assert len(selected) == 6
+    assert all(f['population'] == 'membership' and f['quantity'] == 'count' and f['denominator'] is None for f in selected)
+    assert list(support['fields'])[-6:] == [f['field'] for f in selected]
+    for spec, expected in zip(specs, [13949, None, None, 0, 2, 93], strict=True):
+        assert table['membership_' + spec['name'] + '_count'].to_pylist() == [expected]
+    remaining = [c for c in report.cells if c.section == specs[0]['section'] and c.field is None]
+    assert remaining and all(c.hold for c in remaining)
+    assert not audit['whole_report_semantics_qualified']
+
+
+@pytest.mark.parametrize('token', ['', '.', '-1', '1.0'])
+def test_disability_count_unknown_tokens_block_projection(grid, policy, token):
+    rows = report_rows(grid)
+    next(r for r in rows if r[0] == 'Students with Autism')[1] = token
+    report = students.parse_student_report(html(rows), scope='district', identifier='001902')
+    with pytest.raises(ContractError, match='Unreviewed token'):
+        students.projection([report], policy)
+
+
+@pytest.mark.parametrize('scope,identifier', [('state', 'S'), ('district', '001902'), ('campus', '001902001')])
+def test_disability_extension_preserves_original_projection(grid, policy, monkeypatch, scope, identifier):
+    original = deepcopy(grid)
+    for row in original['rows']:
+        if row['section'] == 'Students with Disabilities by Type of Primary Disability':
+            row['qualified'] = False
+    old_fields = students.semantic_fields(original)
+    new_fields = students.semantic_fields(grid)
+    assert len(old_fields) == 168 and new_fields[:168] == old_fields
+    raw = html(report_rows(grid, scope, identifier))
+    current, _, _ = students.projection([students.parse_student_report(raw, scope=scope, identifier=identifier)], policy)
+    monkeypatch.setattr(students, 'definition', lambda: original)
+    previous, _, _ = students.projection([students.parse_student_report(raw, scope=scope, identifier=identifier)], policy)
+    assert current.select(previous.column_names).equals(previous)

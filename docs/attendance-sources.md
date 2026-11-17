@@ -15,7 +15,7 @@ acceptance, publication and application activation remain separate stages.
 
 ## Current population
 
-The selected v0.0.157 normal release retains 2025–26 TPRS Membership and
+The published baseline for this extension, v0.0.163, retains 2025–26 TPRS Membership and
 Enrollment at district, campus and direct Texas scopes, PEIMS programs for
 2022–23 through 2025–26 and ethnicity enrollment for 2018–19 through 2025–26.
 The TPRS acquisition contains 9,105 admitted campus reports in 23 partitions;
@@ -28,6 +28,30 @@ district, public and charter campuses, direct Texas, suppressed ethnicity cells
 and DataFrame/CSV/Excel/SQL exports. Texas 2025–26 Membership was 5,454,059 and
 Enrollment 5,467,642. These are retained-source checks; they do not establish
 that every released record was freshly reacquired from TEA.
+
+### Six disability counts: frozen source qualification, not yet a live release
+
+The current source contract adds six Membership counts: the published disability
+total and five primary-disability groups. Intellectual Disabilities groups ID,
+learning disability, developmental delay and traumatic brain injury; it is not
+an ID-only count. These counts need no percentage denominator. Disability
+percentages and Enrollment blanks remain held, as do CTE tokens and lagged rows.
+The parser still excludes the report tail beginning at Mobility. This is not
+complete Student Information coverage.
+
+On November 17, 2026, the existing producer materialized all 24 retained intakes:
+9,105 campuses, 1,202 districts and direct Texas. All 174 fields passed producer
+readback; every original field, raw token and status matched the prior Parquet
+across 10,308 rows. The six added fields provide 61,848 observations, including
+suppressed and unavailable states. No report was downloaded again for that run.
+These are checks against frozen publisher extracts, not fresh live verification.
+The three independent HTML/XLSX witnesses remain a distinct check.
+
+The published normal release and live app remain unchanged until normal-release
+integration and app ingestion pass. A source-only candidate is not a selected
+normal release. Derived grid and crosswalk references retain their actual
+processing receipt through typed local-acquisition edges; they are not publisher
+downloads. Invalid reference types now fail before report parsing or staging.
 
 ## Named attendance and chronic absence
 

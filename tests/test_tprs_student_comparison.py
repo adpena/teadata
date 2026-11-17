@@ -165,11 +165,11 @@ def test_entity_source_namespace_does_not_hide_binding_or_row_errors(comparison,
         hasattr(fields, metric)
 
 
-def test_all_168_fields_use_the_direct_texas_leaf_and_exact_population(comparison):
+def test_all_qualified_fields_use_the_direct_texas_leaf_and_exact_population(comparison):
     release, keys = comparison
     for scope, entity in (("district", district()), ("campus", campus())):
         rows = list(Query([entity], repo=None).compare_statewide(release=release, local=keys[scope], statewide=keys["state"]))
-        assert len(rows) == 168 and {row.metric for row in rows} == {f["field"] for f in students.semantic_fields()}
+        assert len(rows) == 174 and {row.metric for row in rows} == {f["field"] for f in students.semantic_fields()}
         count = next(row for row in rows if row.metric == "membership_total_students_count")
         assert (count.identifier, count.local_raw, count.local_value, count.statewide_raw,
                 count.statewide_value, count.difference, count.difference_pp) == (
