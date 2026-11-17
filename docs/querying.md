@@ -657,8 +657,9 @@ result = districts >> ("compare_statewide", release, local, texas, "*", None, 20
 ```
 
 Prepared [2026 TPRS student bundles](config.md#selected-2026-tprs-student-membership-and-enrollment-reports)
-use this same interface for all 168 reviewed Membership/Enrollment count and
-percent fields. Select the local and direct Texas editions from one explicit
+use this same interface. The original projection has 168 reviewed
+Membership/Enrollment count and percent fields; the newer reviewed projection
+adds six Membership disability counts, for 174 fields. Select the local and direct Texas editions from one explicit
 bundle; engine entities supply identifiers only, not observations from their
 own build. For example, with Austin ISD included in the selected intake:
 
@@ -687,14 +688,28 @@ Both editions cover 2025–26 and use the same population and measure: Membershi
 Enrollment. Published percentages use Total Students within that same
 population. Count differences remain counts; percent differences are percentage
 points. The Texas observation comes from its state report, never a sum of the
-selected local reports or an embedded benchmark. Omit `metric` for all 168 fields.
+selected local reports or an embedded benchmark. Omit `metric` for every field
+qualified in that pinned projection. An older 168-field release retains its
+original interpretation; requesting one of the six newer counts raises an
+error rather than substituting a current value.
+
+Student comparisons admit two explicitly reviewed captured-grid profiles.
+Both sides must use the same profile: mixing the original 168-field projection
+with the 174-field projection is rejected. Exact source metadata, policy,
+processing recipe and captured-grid identity remain checked. A historical
+projection requires its captured grid; a source without roster attachments
+supports only the current reviewed contract. Unknown or changed contracts are
+rejected with their unsupported identity rather than interpreted automatically.
 
 Selected coverage remains explicit. An entity absent from the bundle is
 `unavailable`; an omitted campus grade row remains `missing`, with a null raw
 token, rather than zero. Private campuses are `not_applicable`. Masked and
 no-students tokens retain their separate statuses; a difference requires two
-observed values. CTE, grouped disability, lagged discipline and embedded
-benchmarks remain outside this comparison contract. No regional or longitudinal
+observed values. The six newer disability counts use the publisher's broad
+groupings; its Intellectual Disabilities group includes learning disability,
+developmental delay and traumatic brain injury, not only intellectual disability.
+Disability percentages and Enrollment variants, CTE, lagged discipline and
+embedded benchmarks remain outside this comparison contract. No regional or longitudinal
 comparison, default engine activation, or statewide local-entity coverage is implied.
 
 For tested-grade STAAR, prepare a grade bundle containing the local and state

@@ -345,12 +345,13 @@ def projection(reports: Sequence[StudentReport], policy: ValuePolicy, *, audit_r
         "whole_report_semantics_qualified": False, "projection_qualified": True}
 
 
-def _crosswalk(inputs: Mapping[str, Sequence[str]]) -> dict[str, Any]:
+def _crosswalk(inputs: Mapping[str, Sequence[str]], contract: Mapping[str, Any] | None = None) -> dict[str, Any]:
+    grid = contract or definition()
     fields: list[dict[str, Any]] = [{"position": i, "code": f["label"], "label": f["label"], "field": f["field"],
                "dictionary_status": "not_documented", "publisher_type": None, "publisher_description": None,
-               "disposition": "fact"} for i, f in enumerate(semantic_fields(), 1)]
+               "disposition": "fact"} for i, f in enumerate(semantic_fields(grid), 1)]
     tables = [{"table": scope, "header_identity": "position", "input_sha256s": list(hashes),
-               "metric_period": PERIOD.to_dict(), "source_schema_sha256": source_schema_fingerprint(
+               "metric_period": grid["period"], "source_schema_sha256": source_schema_fingerprint(
                    [f["label"] for f in fields], [f["code"] for f in fields]), "fields": fields}
               for scope, hashes in inputs.items()]
     result = {"schema_version": 2, "mapping_version": 1, "datasets": [

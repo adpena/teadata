@@ -16,7 +16,7 @@ from teadata.manifest import BuildRecorder, ContractError, canonical_json
 from teadata.provenance import ProvenanceStore
 from teadata.query import Query
 from teadata.release import DataRelease, publish_release
-from teadata.statewide import _reviewed_students
+from teadata.statewide import _CURRENT_STUDENT_GRID, _STUDENT_PROFILES, _reviewed_students, _student_metadata_sha256, _student_profile
 from teadata.teadata_config import Config, load_config
 
 from test_tprs_students import html, receipt, report_rows
@@ -34,7 +34,11 @@ def prepared_students(tmp_path_factory):
     # publisher parity is checked separately against the sealed native bundle.
     for index, ref in enumerate(metadata["references"]):
         path = root / f"reference-{index}.txt"
-        path.write_text("Synthetic interpretation reference " + ref["reference_id"])
+        if ref["reference_id"] == "report_grid":
+            # Keep an explicitly supported grid, even in this synthetic fixture.
+            path.write_bytes(students.files("teadata").joinpath(students.RESOURCE).read_bytes())
+        else:
+            path.write_text("Synthetic interpretation reference " + ref["reference_id"])
         rid = store.record_acquisition(path, ResolvedDataset("reference:synthetic", "reference", 2026, 2026, "", DatasetMetadata()))
         ref.update(path=path.name, url=None, reviewed_sha256=sha256(path.read_bytes()).hexdigest(), provenance_ids=[rid])
     reports, observations = {}, {}
@@ -99,7 +103,15 @@ def prepared_students(tmp_path_factory):
 @pytest.fixture
 def comparison(prepared_students, monkeypatch):
     root, config, editions = prepared_students
-    monkeypatch.setattr("teadata.statewide.load_config", lambda: config)
+    # Synthetic acquisitions intentionally have different reference receipt IDs.
+    # Bridge only this exact frozen fixture metadata, never a profile/grid or
+    # an arbitrary candidate. Any metadata mutation still takes the real hash.
+    expected = _student_metadata_sha256(config.resolve_dataset(
+        students.DATASET, 2026, exact=True, reader_profile="source").metadata)
+    reviewed = _STUDENT_PROFILES[_CURRENT_STUDENT_GRID].metadata_sha256
+    monkeypatch.setattr("teadata.statewide._student_metadata_sha256",
+                        lambda metadata: reviewed if _student_metadata_sha256(metadata) == expected
+                        else _student_metadata_sha256(metadata))
     return DataRelease(root / "release.json", offline=True), editions
 
 
@@ -191,15 +203,13 @@ def test_roster_campus_uses_only_the_reviewed_direct_texas_observation(compariso
     release, keys = comparison
     _, _, _, _, state = _reviewed_students(release, keys["state"])
     original_receipt, original_sha = state.sources["S"]
-    grid = students.definition()
     witness_receipt = "a" * 64 if case == "state_row" else original_receipt
-    grid["witnesses"]["state"].update(html_receipt=witness_receipt, html_sha256=original_sha)
-    monkeypatch.setattr(students, "definition", lambda: grid)
     cohort = (keys["district"].identity, keys["state"].identity, "b" * 64, "c" * 64)
     absent_id = "001902002"
 
     def reviewed(bundle, key):
         revision, mapping, metadata, policy, contract = _reviewed_students(bundle, key)
+        contract = replace(contract, state_witness=("S", witness_receipt, original_sha))
         if key.scope == "state" and case != "unbound_state":
             receipt = "d" * 64 if case == "receipt" else witness_receipt
             digest = "e" * 64 if case == "bytes" else original_sha
@@ -409,3 +419,96 @@ def test_row_context_cannot_substitute_another_reports_receipt(comparison):
     row["tprs_report_receipt"] = "0" * 64
     with pytest.raises(ContractError, match="source binding"):
         typed.value(row, field, "count")
+
+
+def original168_grid():
+    """Reconstruct exact predecessor bytes, guarded by its literal reviewed hash."""
+    grid = students.definition()
+    grid["definition"]["disability_grouping_hold"] = (
+        "The broad Intellectual Disabilities group includes ID, LD, DD and TBI. "
+        "It is not the specific ID category. Raw grouped-disability observations remain outside this projection.")
+    for row in grid["rows"]:
+        if row["section"] == "Students with Disabilities by Type of Primary Disability":
+            row.update(qualified=False, hold="grouped_disability_column_applicability_or_denominator_unreviewed")
+            row.pop("populations")
+            row.pop("quantities")
+    assert sha256((canonical_json(grid) + "\n").encode()).hexdigest() == (
+        "e7759843a9296a25d03f79782b14c061f696cf9700c76f77d6f1b17c234d9dd5")
+    return grid
+
+
+def test_two_literal_reviewed_grids_keep_exact_ordered_crosswalks():
+    current = students.definition()
+    assert sha256((canonical_json(current) + "\n").encode()).hexdigest() == (
+        "f7628dd08a539c52f5323664b1292e62869875e548230e657b56423461d7526f")
+    original = original168_grid()
+    old_fields = [row["field"] for row in students.semantic_fields(original)]
+    new_fields = [row["field"] for row in students.semantic_fields(current)]
+    assert len(old_fields) == 168 and len(new_fields) == 174 and new_fields[:168] == old_fields
+    assert new_fields[168:] == [
+        "membership_total_students_with_disabilities_count", "membership_students_with_intellectual_disabilities_count",
+        "membership_students_with_physical_disabilities_count", "membership_students_with_autism_count",
+        "membership_students_with_behavioral_disabilities_count", "membership_students_with_non_categorical_early_childhood_count"]
+    for grid, expected in ((original, "8cdc88eb65ebb08925856b8fb6091f7998a24bf8ab08e5cb5bd4b43166512e05"),
+                           (current, "0330d4179a93c26dde7f0b052ac3d52b70224a90072409f37b23ee0dca32b3e7")):
+        table, = students._crosswalk({"state": ["a" * 64]}, contract=grid)["datasets"][0]["tables"]
+        assert sha256(canonical_json(table).encode()).hexdigest() == expected
+
+
+@pytest.mark.parametrize("damage", [None, "unknown_grid", "metric", "period", "reference", "column_title"])
+def test_real_packaged_metadata_uses_literal_fingerprints_without_fixture_bridge(damage):
+    cfg = load_config()
+    metadata = cfg.resolve_dataset(students.DATASET, 2026, exact=True, reader_profile="source").metadata
+    assert _student_metadata_sha256(metadata) == "0a6e3e30a2a3005a92d2b90173b27ac5f18344b1e98158db43e12c419d7fc7e8"
+    assert sha256(canonical_json(cfg.value_policies[metadata.value_policy].to_dict()).encode()).hexdigest() == (
+        "d13b4c90563086887f77c4a211813d63977d62aa70ca866579307edfc1ca183e")
+    if damage == "unknown_grid":
+        metadata = replace(metadata, references=tuple(replace(ref, reviewed_sha256="0" * 64)
+                           if ref.reference_id == "report_grid" else ref for ref in metadata.references))
+    elif damage == "metric":
+        metrics = dict(metadata.metrics)
+        metrics["membership_total_students_count"] = replace(metrics["membership_total_students_count"], unit="percent")
+        metadata = replace(metadata, metrics=metrics)
+    elif damage == "period":
+        metadata = replace(metadata, period=replace(metadata.period, start_year=2024, end_year=2025))
+    elif damage == "reference":
+        metadata = replace(metadata, references=metadata.references[:-1])
+    elif damage == "column_title":
+        metadata = replace(metadata, references=tuple(replace(ref, title="Not the reviewed columns")
+                           if ref.reference_id == "columns" else ref for ref in metadata.references))
+    else:
+        # Only these three selected-column attributes may vary with coverage.
+        metadata = replace(metadata, references=tuple(replace(ref, path="different.json", reviewed_sha256="1" * 64,
+                           provenance_ids=("2" * 64,)) if ref.reference_id == "columns" else ref
+                           for ref in metadata.references))
+        assert _student_profile(metadata)[0] == _CURRENT_STUDENT_GRID
+        return
+    with pytest.raises(ContractError, match="Unsupported Student report grid|frozen reviewed field contract"):
+        _student_profile(metadata)
+
+
+@pytest.mark.parametrize("damage", ["descriptor", "bytes"])
+def test_captured_grid_must_match_supported_metadata_before_observations(comparison, monkeypatch, damage):
+    from teadata.dataset_metadata import ColumnSchemaRef
+
+    release, keys = comparison
+    raw = (canonical_json(original168_grid()) + "\n").encode()
+    digest = sha256(raw).hexdigest() if damage == "descriptor" else _CURRENT_STUDENT_GRID
+    monkeypatch.setattr("teadata.statewide._student_attachments", lambda *_: {"grid": ColumnSchemaRef(digest, len(raw), "grid.json")})
+    monkeypatch.setattr(release, "_column_schema_bytes", lambda _: raw)
+    monkeypatch.setattr(release, "analytical_dataset", lambda *_: pytest.fail("Grid mismatch opened observations"))
+    with pytest.raises(ContractError, match="captured grid differs"):
+        _reviewed_students(release, keys["district"])
+
+
+def test_mixed_supported_profiles_refuse_before_observations(comparison, monkeypatch):
+    release, keys = comparison
+    def reviewed(bundle, key):
+        revision, mapping, metadata, policy, contract = _reviewed_students(bundle, key)
+        if key.scope == "district":
+            contract = replace(contract, grid_sha256="e7759843a9296a25d03f79782b14c061f696cf9700c76f77d6f1b17c234d9dd5")
+        return revision, mapping, metadata, policy, contract
+    monkeypatch.setattr("teadata.statewide._reviewed_students", reviewed)
+    monkeypatch.setattr(release, "analytical_dataset", lambda *_: pytest.fail("Mixed profiles opened observations"))
+    with pytest.raises(ContractError, match="same reviewed grid profile.*mixed original168 and reviewed174"):
+        Query([district()], repo=None).compare_statewide(release=release, local=keys["district"], statewide=keys["state"])

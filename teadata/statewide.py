@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from decimal import Decimal, localcontext
 from functools import lru_cache
 from hashlib import sha256
@@ -12,7 +12,7 @@ from math import isfinite
 import re
 from typing import TYPE_CHECKING, Any
 
-from .column_schema import crosswalk_dataset, parse_column_schema, reader_options, table_input_sha256s
+from .column_schema import _unique_object, crosswalk_dataset, parse_column_schema, reader_options, table_input_sha256s
 from .dataset_metadata import (
     STATEWIDE_SINGLETON_GRAIN, ArtifactRef, DataPeriod, DatasetMetadata, EditionKey,
     _EDITION_KEY_GUIDANCE, _parse_school_year,
@@ -159,6 +159,49 @@ class _Statistic:
 
 
 @dataclass(frozen=True)
+class _StudentProfile:
+    metadata_sha256: str
+    policy_sha256: str
+
+
+# Frozen from the independently reviewed predecessor and current source configs,
+# not inferred from candidate leaves. Only selected columns path/hash/receipts vary.
+_STUDENT_PROFILES = {
+    "e7759843a9296a25d03f79782b14c061f696cf9700c76f77d6f1b17c234d9dd5": _StudentProfile(
+        "da3896eac4faf500a0b507250059b567e375ee463630804cbd3612a1155461be",
+        "d13b4c90563086887f77c4a211813d63977d62aa70ca866579307edfc1ca183e"),
+    "f7628dd08a539c52f5323664b1292e62869875e548230e657b56423461d7526f": _StudentProfile(
+        "0a6e3e30a2a3005a92d2b90173b27ac5f18344b1e98158db43e12c419d7fc7e8",
+        "d13b4c90563086887f77c4a211813d63977d62aa70ca866579307edfc1ca183e"),
+}
+_CURRENT_STUDENT_GRID = "f7628dd08a539c52f5323664b1292e62869875e548230e657b56423461d7526f"
+
+
+def _student_metadata_sha256(metadata: DatasetMetadata) -> str:
+    document = metadata.to_dict()
+    columns = [ref for ref in document["references"] if ref["reference_id"] == "columns"]
+    if len(columns) != 1:
+        raise ContractError("Student comparison requires one selected columns reference")
+    for name in ("path", "reviewed_sha256", "provenance_ids"):
+        columns[0].pop(name, None)
+    return sha256(canonical_json(document).encode()).hexdigest()
+
+
+def _student_profile(metadata: DatasetMetadata) -> tuple[str, _StudentProfile]:
+    grids = [ref for ref in metadata.references if ref.reference_id == "report_grid"]
+    if len(grids) != 1:
+        raise ContractError("Student comparison requires one reviewed report_grid reference")
+    identity = grids[0].reviewed_sha256
+    if identity is None or identity not in _STUDENT_PROFILES:
+        raise ContractError(f"Unsupported Student report grid {identity!r}. Supported reviewed grids: "
+                            f"{tuple(_STUDENT_PROFILES)}; select an admitted source release.")
+    profile = _STUDENT_PROFILES[identity]
+    if _student_metadata_sha256(metadata) != profile.metadata_sha256:
+        raise ContractError("Student comparison metadata differs from its frozen reviewed field contract")
+    return identity, profile
+
+
+@dataclass(frozen=True)
 class _StudentContract:
     scope: str
     fields: Mapping[str, Mapping[str, Any]]
@@ -167,6 +210,9 @@ class _StudentContract:
     sources: Mapping[str, tuple[str, str]]
     local_columns: Mapping[tuple[str, str], int]
     roster_bound: bool
+    grid_sha256: str
+    period: DataPeriod
+    state_witness: tuple[str, str, str]
     cohort: tuple[str, str, str, str] | None = None
 
     def value(self, row: dict[str, Any], field: str, unit: str) -> tuple[str | None, str, Number | None]:
@@ -188,7 +234,7 @@ class _StudentContract:
                 or type(column) is not int or column != self.local_columns[spec["population"], spec["quantity"]]):
             raise ContractError("Student comparison requires exact raw tokens and local cell locators")
         cell = students.StudentCell(spec["section"], spec["label"], spec["population"], spec["quantity"],
-                                    "local", raw, locator, column, field, None, students.PERIOD)
+                                    "local", raw, locator, column, field, None, self.period)
         measured = cell.measurement(self.policy)
         valid_type = type(value) is (int if unit == "count" else float) if status == "observed" else value is None
         if (measured.status == ValueStatus.INVALID or measured.status.value != status
@@ -203,38 +249,42 @@ def _reviewed_students(release: DataRelease, key: EditionKey) -> tuple[str, str,
     if (key.dataset != students.DATASET or key.edition != str(students.EDITION)
             or key.scope not in students.SCOPES or key.table != key.scope or key.grain != grain):
         raise ContractError("Student comparison requires the reviewed edition, scope and grain")
-    config = load_config()
-    review = config.resolve_dataset(students.DATASET, students.EDITION, exact=True, reader_profile="source").metadata
     metadata = release.catalog.metadata(key.dataset, edition=key)
-    # Selected coverage changes the genuine derived schema observation, not the
-    # field definitions, policy, or other publisher interpretation references.
-    expected = {ref.reference_id: ref for ref in review.references}
-    actual = {ref.reference_id: ref for ref in metadata.references}
-    if set(actual) != set(expected) or len(actual) != len(metadata.references):
-        raise ContractError("Student comparison requires the reviewed source references")
-    columns = actual["columns"]
-    if (replace(columns, path=expected["columns"].path, reviewed_sha256=expected["columns"].reviewed_sha256,
-                provenance_ids=expected["columns"].provenance_ids) != expected["columns"]
-            or any(actual[name] != ref for name, ref in expected.items() if name != "columns")
-            or replace(metadata, references=review.references) != review):
-        raise ContractError("Student comparison metadata differs from the packaged field contract")
-    if review.value_policy is None:
+    identity, profile = _student_profile(metadata)
+    policy = release.catalog.policy(key.dataset, edition=key)
+    if metadata.value_policy is None or policy is None:
         raise ContractError("Student comparison requires its reviewed disclosure policy")
-    policy = config.value_policies[review.value_policy]
-    if release.catalog.policy(key.dataset, edition=key) != policy:
+    policy_hash = sha256(canonical_json(policy.to_dict()).encode()).hexdigest()
+    if policy_hash != profile.policy_sha256:
         raise ContractError("Student comparison requires the reviewed disclosure policy")
-    fields = {field["field"]: field for field in students.semantic_fields()}
-    plans = release.catalog.resolve_artifacts([(key, field) for field in fields], period=students.PERIOD)
+    # The admitted metadata fingerprint fixes the complete field set before we
+    # locate the leaf and read its independently captured interpretation grid.
+    plans = release.catalog.resolve_artifacts([(key, metric.field) for metric in metadata.metrics.values()],
+                                             period=metadata.period)
     if len(plans) != 1:
         raise ContractError("Student comparison requires one complete reviewed native leaf")
     artifact = plans[0]["artifact"]
     cohort = None
     attachments = _student_attachments(release.catalog, artifact)
     if attachments:
+        raw_grid = release._column_schema_bytes(attachments["grid"])
+        if attachments["grid"].sha256 != identity or sha256(raw_grid).hexdigest() != identity:
+            raise ContractError("Student comparison captured grid differs from its reviewed profile and recipe")
+        grid = json.loads(raw_grid, object_pairs_hook=_unique_object)
         reports, cohort = release._student_report_ledger(artifact, attachments)
         sources = {item.identifier: (item.receipt, item.sha256) for item in reports}
     else:
+        if identity != _CURRENT_STUDENT_GRID:
+            raise ContractError("Historical Student comparisons require their captured reviewed grid; "
+                                "select a roster-bound source release.")
+        grid = students.definition()
+        if sha256((canonical_json(grid) + "\n").encode()).hexdigest() != identity:
+            raise ContractError("Student comparison requires the current reviewed grid for a non-roster leaf")
         sources = _selected_student_sources(release, key)
+    fields = {field["field"]: field for field in students.semantic_fields(grid)}
+    period = DataPeriod.from_dict(grid["period"])
+    if period != metadata.period or set(fields) != {metric.field for metric in metadata.metrics.values()}:
+        raise ContractError("Student comparison captured grid differs from the admitted fields or period")
     hashes = [digest for _, digest in sources.values()]
     if key.revision_sha256 != EditionKey.source_revision(tuple(hashes)):
         raise ContractError("Student comparison source revision differs from its ordered inputs")
@@ -251,14 +301,15 @@ def _reviewed_students(release: DataRelease, key: EditionKey) -> tuple[str, str,
         if support is None or support.projection(field) != expected_support:
             raise ContractError("Student comparison requires the retained raw/status/locator support")
         pointers[field] = names
-    table, = students._crosswalk({key.scope: hashes})["datasets"][0]["tables"]
+    table, = students._crosswalk({key.scope: hashes}, contract=grid)["datasets"][0]["tables"]
     mapping = sha256(canonical_json(table).encode()).hexdigest()
-    policy_hash = sha256(canonical_json(policy.to_dict()).encode()).hexdigest()
     local_columns = {(population, quantity): index + 2
-                     for index, (population, quantity, role) in enumerate(students.definition()["column_roles"][key.scope])
+                     for index, (population, quantity, role) in enumerate(grid["column_roles"][key.scope])
                      if role == "local"}
-    typed = _StudentContract(key.scope, fields, policy, pointers, sources, local_columns, bool(attachments), cohort)
-    return key.revision_sha256, mapping, replace(review, references=metadata.references), policy_hash, typed
+    witness = grid["witnesses"]["state"]
+    typed = _StudentContract(key.scope, fields, policy, pointers, sources, local_columns, bool(attachments),
+                             identity, period, (witness["identifier"], witness["html_receipt"], witness["html_sha256"]), cohort)
+    return key.revision_sha256, mapping, metadata, policy_hash, typed
 
 
 def _selected_student_sources(release: DataRelease, key: EditionKey) -> dict[str, tuple[str, str]]:
@@ -535,12 +586,14 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
         local_keys, state_keys = [key_column], []
         left_revision, left_mapping, left_review, left_policy, left_student = _reviewed_students(release, local)
         right_revision, right_mapping, right_review, right_policy, right_student = _reviewed_students(statewide_release, statewide)
+        if left_student.grid_sha256 != right_student.grid_sha256:
+            raise ContractError("Student comparison requires the same reviewed grid profile for local and Texas; "
+                                "mixed original168 and reviewed174 projections are not comparable here.")
         if local.scope == "campus" and left_student.roster_bound:
             # Campus coverage has its own roster. The reviewed Texas observation
             # supplies the same statewide baseline for each campus partition.
-            witness = students.definition()["witnesses"]["state"]
-            if (right_student.cohort is None or right_student.sources.get(witness["identifier"])
-                    != (witness["html_receipt"], witness["html_sha256"])):
+            identifier, receipt, digest = left_student.state_witness
+            if right_student.cohort is None or right_student.sources.get(identifier) != (receipt, digest):
                 raise ContractError("Campus student comparison requires the pinned direct Texas report")
         elif left_student.cohort != right_student.cohort:
             raise ContractError("Student comparison requires the same pinned statewide cohort")

@@ -48,6 +48,17 @@ def test_receipt_only_producers_accept_relocated_contracts(tmp_path, monkeypatch
     if producer is tprs_students.materialize_students:
         arguments = {"intake": tmp_path / "intake.json", "intake_sha256": "0" * 64}
         expected = "intake.json"
+        # This test exercises relocation/config identity, not retained custody.
+        # Keep the direct-reference admission valid so absence of the selected
+        # intake remains the intended next guard.
+        references = {}
+        for reference in source.metadata.references:
+            for identifier in reference.provenance_ids:
+                record = {"kind": "acquisition", "artifact": {"sha256": reference.reviewed_sha256},
+                          "requested_url": reference.url, "resolved_url": reference.url,
+                          "source_metadata": {"source_url": reference.url}}
+                assert references.setdefault(identifier, record) == record
+        monkeypatch.setattr(store, "read_record", references.__getitem__)
 
     with pytest.raises(FileNotFoundError, match=expected):
         producer(store, config=config, config_sha256=sha256(source_config).hexdigest(),
