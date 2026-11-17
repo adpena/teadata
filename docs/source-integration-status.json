@@ -2222,7 +2222,7 @@
   "selected_catalog": {
     "schema_version": 1,
     "release": {
-      "source": "/Users/adpena/PycharmProjects/teadata/.local/dpe-enrollment-20261117/normal164/normal-r2/output/release.json",
+      "source": "https://github.com/adpena/teadata/releases/download/v0.0.164/release.json",
       "manifest_sha256": "b2a46d2e690f4aa36b97f27788b4d5eeb7ed10aa322cbb884a54c1f8598ee64d",
       "build_id": "69faad22d961a1ba428916d8f240814ae1ab59d0c04b5012e1adb2dae9cbd021"
     },

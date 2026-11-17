@@ -4,23 +4,30 @@ TEA Data keeps one source contract in `teadata/teadata_sources.yaml`. Each versi
 
 A build records the files it actually reads. The runtime catalog is embedded in the snapshot and SQLite sidecars. `release.json` selects the source and analytical artifacts by content hash and one build identity. Runtime consumers use the embedded catalog to interpret the snapshot. The default engine takes one manifest for the entity snapshot and its sidecars. Stand-alone data releases can be selected by their own pinned manifests.
 
-## Current normal release 0.0.163
+<a id="current-normal-release-00163"></a>
 
-Software 0.0.163 selects the normal163 data release: 20 native attachments,
-31 dataset IDs and 277 edition/scope keys. It adds statewide continuous retention
-cohorts and direct initial certification totals, preserving their definitions,
-holds and original source identities. Entity name/variable discovery reads keys
+## Current normal release 0.0.164
+
+Software 0.0.164 selects 20 native attachments, 31 dataset IDs and 277
+edition/scope keys. Its TPRS Student projection adds six disability Membership
+counts, for 174 qualified fields in 2025–26 across 9,105 reporting campuses,
+1,202 reporting districts and Texas. The other 19 attachments remain unchanged,
+including statewide continuous retention cohorts and direct initial
+certification totals. Historical Student contracts retain their original
+168-field interpretation; mixed or unknown contracts fail explicitly.
+Definitions, holds and original source identities remain available.
+Entity name/variable discovery reads keys
 without loading full metadata values; temporary catalog and receipt validation
 traversals avoid self-retaining recursive closures. These correctness changes
 do not establish a production memory reduction.
 
-`DataEngine.load_default()` selects the packaged, immutable normal163 manifest
+`DataEngine.load_default()` selects the packaged, immutable normal164 manifest
 unless an explicit release or scoped context overrides it. Installation keeps
 source payloads external; discovery reads catalog metadata and observations
 remain lazy. Strict offline mode never fetches or substitutes another release.
 See the [current coverage and qualification inventory](source-integration-status.md).
 
-The two new educator attachments contain 151 retention rows across 35
+The two retained educator attachments contain 151 retention rows across 35
 first teaching cohort/group editions and 33 direct certification role/year rows.
 The 2017–18 preparation-route retention cohort and all certification detail stay
 held. Certification academic-year finality is unknown. Use state observations
