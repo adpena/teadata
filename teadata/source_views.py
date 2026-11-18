@@ -1120,6 +1120,13 @@ class _StreamingExport(Protocol):
     def provenance(self) -> _WriterProvenance: ...
 
 
+class _CSVStream(Protocol):
+    @property
+    def closed(self) -> bool: ...
+
+    def write(self, data: Any, /) -> int: ...
+
+
 @contextmanager
 def _owned_batches(batches: Iterator[pa.RecordBatch]) -> Generator[Iterator[pa.RecordBatch], None, None]:
     """Close even a retained iterator when encoding or a consumer fails."""
@@ -1131,23 +1138,27 @@ def _owned_batches(batches: Iterator[pa.RecordBatch]) -> Generator[Iterator[pa.R
 
 
 def write_csv(table: _StreamingExport, path_or_buf: str | Path | BinaryIO) -> None:
+    with _export_stream(path_or_buf) as stream:
+        _write_csv_stream(table, stream)
+
+
+def _write_csv_stream(table: _StreamingExport, stream: _CSVStream) -> None:
     from pyarrow.csv import CSVWriter, WriteOptions
 
-    with _export_stream(path_or_buf) as stream:
-        if table.restore_original_headers:
-            labels = StringIO(newline="")
-            csv.writer(labels, lineterminator="\r\n").writerows(table.headers)
-            stream.write(labels.getvalue().encode("utf-8"))
-        with CSVWriter(stream, table.schema, write_options=WriteOptions(include_header=not table.restore_original_headers)) as writer:
-            with _owned_batches(table.batches()) as batches:
-                for batch in batches:
-                    writer.write_batch(batch)
+    if table.restore_original_headers:
+        labels = StringIO(newline="")
+        csv.writer(labels, lineterminator="\r\n").writerows(table.headers)
+        stream.write(labels.getvalue().encode("utf-8"))
+    with CSVWriter(stream, table.schema, write_options=WriteOptions(include_header=not table.restore_original_headers)) as writer:
+        with _owned_batches(table.batches()) as batches:
+            for batch in batches:
+                writer.write_batch(batch)
 
 
 class _DigestWriter(RawIOBase):
     """Hash the exact bytes accepted by one ZIP member, without owning it."""
 
-    def __init__(self, stream: BinaryIO):
+    def __init__(self, stream: _CSVStream):
         super().__init__()
         self.stream = stream
         self.digest = sha256()
@@ -1181,7 +1192,7 @@ def write_csv_bundle(table: _StreamingExport, path_or_buf: str | Path | BinaryIO
     with _export_stream(path_or_buf) as stream, ZipFile(stream, "w", compression=ZIP_DEFLATED,
                                                      compresslevel=6, allowZip64=True) as archive:
         with archive.open("data.csv", "w", force_zip64=True) as member, _DigestWriter(member) as writer:
-            write_csv(table, writer)
+            _write_csv_stream(table, writer)
             data_identity = {"sha256": writer.digest.hexdigest(), "size_bytes": writer.size}
         archive.writestr("provenance.json", provenance)
         manifest = {"schema_version": 1, "format": "teadata-csv-bundle",
