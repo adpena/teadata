@@ -65,7 +65,7 @@ def test_series_discovery_matches_the_release_method_signature():
     assert method["result"] == "ObservationSeries"
     assert {"to_arrow", "to_df", "provenance", "iter_batches"} <= set(method["result_methods"])
     operations = {operation["name"]: operation for operation in method["result_operations"]}
-    assert operations.keys() == {"pair_years", "to_sql", "iter_sql_batches", "to_csv", "to_excel", "iter_batches"}
+    assert operations.keys() == {"pair_years", "to_sql", "iter_sql_batches", "to_csv", "to_csv_bundle", "to_excel", "iter_batches"}
     for name, operation in operations.items():
         assert name in method["result_methods"]
         assert [arg["name"] for arg in operation["arguments"]] == list(

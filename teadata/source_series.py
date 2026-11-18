@@ -12,7 +12,7 @@ from .identifiers import canonical_source_identifier, canonical_source_identifie
 from .manifest import ContractError, canonical_json
 from .selectors import _EntityNames
 from .source_views import (PartitionedSourceTable, SourceTable, _entity_key, _open_export, _plan_export,
-                           _provenance_batches, write_csv, write_excel)
+                           _provenance_batches, write_csv, write_csv_bundle, write_excel)
 from .tprs_partitions import TPRS_PARTITION_DATASETS
 
 if TYPE_CHECKING:
@@ -315,6 +315,10 @@ class ObservationSeries:
         """Stream selected years to CSV; save provenance() as a JSON sidecar."""
         write_csv(_SeriesExport(self), path_or_buf)
 
+    def to_csv_bundle(self, path_or_buf: str | Path | BinaryIO) -> None:
+        """Stream selected years, canonical provenance and checksums to one ZIP."""
+        write_csv_bundle(_SeriesExport(self), path_or_buf)
+
     def to_excel(self, path_or_buf: str | Path | BinaryIO) -> None:
         """Stream selected years to Data and canonical Provenance worksheets."""
         write_excel(_SeriesExport(self), path_or_buf)
@@ -381,6 +385,9 @@ class _SeriesExport:
 
     def provenance(self) -> _SeriesExport:
         return self
+
+    def to_dict(self) -> dict[str, Any]:
+        return self.series.provenance()
 
     def _append_sheet(self, workbook: Workbook, *, rows: int | None = None) -> None:
         from base64 import b64encode

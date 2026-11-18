@@ -83,7 +83,7 @@ class _MethodArgument(_Argument):
 
 
 class _SeriesMethod(TypedDict):
-    name: Literal["pair_years", "to_sql", "iter_sql_batches", "to_csv", "to_excel", "iter_batches"]
+    name: Literal["pair_years", "to_sql", "iter_sql_batches", "to_csv", "to_csv_bundle", "to_excel", "iter_batches"]
     receiver: Literal["ObservationSeries"]
     description: str
     arguments: list[_MethodArgument]
@@ -1016,7 +1016,7 @@ _RELEASE_METHODS: list[_ReleaseMethod] = [{
                                              description="Entity directory for names. Required for native-only releases.")},
     ],
     "result": "ObservationSeries",
-    "result_methods": ["for_year", "iter_batches", "to_arrow", "to_df", "to_csv", "to_excel", "provenance", "pair_years", "to_sql",
+    "result_methods": ["for_year", "iter_batches", "to_arrow", "to_df", "to_csv", "to_csv_bundle", "to_excel", "provenance", "pair_years", "to_sql",
                        "iter_sql_batches"],
     "result_operations": [{
         "name": "iter_batches",
@@ -1034,6 +1034,14 @@ _RELEASE_METHODS: list[_ReleaseMethod] = [{
         "result": "None",
         "result_methods": [],
         "requires": "Save provenance() beside CSV. Use for_year(year) for publisher-header restoration.",
+    }, {
+        "name": "to_csv_bundle",
+        "receiver": "ObservationSeries",
+        "description": "Stream CSV, the canonical source/selection provenance and member checksums into one compressed ZIP.",
+        "arguments": [{"kind": "positional", **_argument("path_or_buf", python_types=("str", "pathlib.Path", "BinaryIO"))}],
+        "result": "None",
+        "result_methods": [],
+        "requires": "Contains data.csv, provenance.json and manifest.json. Use for_year(year) for publisher-header restoration; comparability remains unassessed.",
     }, {
         "name": "to_excel",
         "receiver": "ObservationSeries",

@@ -140,6 +140,7 @@ transfers = district.dataset("district_transfer_reports").at(26).select(
 outgoing = transfers.query("transfer_direction == @direction", params={"direction": "out"}, record=True)
 frame = outgoing.to_df()
 provenance = outgoing.provenance().to_dict()
+outgoing.to_csv_bundle("outgoing.zip")  # CSV plus canonical provenance and member checksums.
 ```
 
 This requires a release containing the explicit reporting-district binding.

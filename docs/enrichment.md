@@ -74,6 +74,29 @@ Writers preserve decimal precision (as text in Excel when necessary), reject
 existing destination paths and publish files atomically. Caller-owned binary
 streams remain open; a stream can contain partial output if writing fails.
 
+For a portable CSV handoff, keep values and provenance in one compressed file:
+
+```python
+series.to_csv_bundle("observations.zip")
+# A source supporting publisher-header restoration can retain those headings:
+series.for_year(25).to_csv_bundle("publisher.zip", restore_original_headers=True)
+```
+
+`SourceTable`, `PartitionedSourceTable` and `ObservationSeries` use the same
+streaming CSV bundle writer. The ZIP contains `data.csv`, the existing canonical
+`provenance.json`, and `manifest.json` with SHA-256 and byte size for both members.
+The CSV preserves the same raw tokens, values and statuses as `to_csv`; the
+provenance retains the source editions, measurement periods, release pins and
+recorded or opaque query status. Hashes establish byte identity, not comparability
+or publisher approval. A bundle adds no observation scan beyond the existing CSV
+export and its admission checks, and does not collect a DataFrame or a full CSV
+buffer. Path output uses the same atomic, no-overwrite publication as the other
+writers. Caller-owned binary streams remain open, including on failure; failed
+streams may contain partial ZIP bytes. ZIP creation times are packaging metadata,
+separate from source download and measurement dates.
+Original headers retain the existing source-specific eligibility checks; an
+unsupported normalized table still raises the same actionable error as `to_csv`.
+
 ### Lazy dataset access on entities
 
 An entity in a release-bound engine discovers attached, qualified dataset names

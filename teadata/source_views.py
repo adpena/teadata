@@ -7,7 +7,8 @@ from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
 from decimal import Decimal
-from io import StringIO
+from hashlib import sha256
+from io import RawIOBase, StringIO
 import json
 from math import isfinite
 import os
@@ -205,6 +206,10 @@ class SourceTable:
         """Stream the selected rows to CSV."""
         write_csv(self._prepare(restore_original_headers=restore_original_headers), path_or_buf)
 
+    def to_csv_bundle(self, path_or_buf: str | Path | BinaryIO, *, restore_original_headers: bool = False) -> None:
+        """Stream CSV, canonical provenance and member checksums to one ZIP file."""
+        write_csv_bundle(self._prepare(restore_original_headers=restore_original_headers), path_or_buf)
+
     def to_excel(self, path_or_buf: str | Path | BinaryIO, *, restore_original_headers: bool = False) -> None:
         """Stream the selected rows to XLSX."""
         write_excel(self._prepare(restore_original_headers=restore_original_headers), path_or_buf)
@@ -328,6 +333,10 @@ class PartitionedSourceTable:
 
     def to_csv(self, path_or_buf: str | Path | BinaryIO, *, restore_original_headers: bool = False) -> None:
         write_csv(self._prepare(restore_original_headers=restore_original_headers), path_or_buf)
+
+    def to_csv_bundle(self, path_or_buf: str | Path | BinaryIO, *, restore_original_headers: bool = False) -> None:
+        """Stream selected partitions and their exact provenance to one ZIP file."""
+        write_csv_bundle(self._prepare(restore_original_headers=restore_original_headers), path_or_buf)
 
     def to_excel(self, path_or_buf: str | Path | BinaryIO, *, restore_original_headers: bool = False) -> None:
         write_excel(self._prepare(restore_original_headers=restore_original_headers), path_or_buf)
@@ -1090,6 +1099,8 @@ def _bind_queries(predicate: Expression | None, queries: tuple[PreparedPredicate
 class _WriterProvenance(Protocol):
     def _append_sheet(self, workbook: Workbook, *, rows: int | None = None) -> None: ...
 
+    def to_dict(self) -> dict[str, Any]: ...
+
 
 class _StreamingExport(Protocol):
     @property
@@ -1131,6 +1142,53 @@ def write_csv(table: _StreamingExport, path_or_buf: str | Path | BinaryIO) -> No
             with _owned_batches(table.batches()) as batches:
                 for batch in batches:
                     writer.write_batch(batch)
+
+
+class _DigestWriter(RawIOBase):
+    """Hash the exact bytes accepted by one ZIP member, without owning it."""
+
+    def __init__(self, stream: BinaryIO):
+        super().__init__()
+        self.stream = stream
+        self.digest = sha256()
+        self.size = 0
+
+    def writable(self) -> bool:
+        return True
+
+    def tell(self) -> int:
+        return self.size
+
+    def write(self, data: Any) -> int:
+        written = self.stream.write(data)
+        if written != len(data):
+            raise OSError("Incomplete CSV bundle member write")
+        self.digest.update(data)
+        self.size += written
+        return written
+
+
+def write_csv_bundle(table: _StreamingExport, path_or_buf: str | Path | BinaryIO) -> None:
+    """One streaming traversal and one atomic publication for data plus lineage.
+
+    Member hashes describe these exported bytes, not scientific comparability or
+    publisher approval. Source and selection identities remain the existing
+    canonical provenance record. The caller owns non-path output streams.
+    """
+    from zipfile import ZIP_DEFLATED, ZipFile
+
+    provenance = canonical_json(table.provenance().to_dict()).encode("utf-8")
+    with _export_stream(path_or_buf) as stream, ZipFile(stream, "w", compression=ZIP_DEFLATED,
+                                                     compresslevel=6, allowZip64=True) as archive:
+        with archive.open("data.csv", "w", force_zip64=True) as member, _DigestWriter(member) as writer:
+            write_csv(table, writer)
+            data_identity = {"sha256": writer.digest.hexdigest(), "size_bytes": writer.size}
+        archive.writestr("provenance.json", provenance)
+        manifest = {"schema_version": 1, "format": "teadata-csv-bundle",
+                    "members": {"data.csv": data_identity,
+                                "provenance.json": {"sha256": sha256(provenance).hexdigest(),
+                                                    "size_bytes": len(provenance)}}}
+        archive.writestr("manifest.json", canonical_json(manifest).encode("utf-8"))
 
 
 @contextmanager
