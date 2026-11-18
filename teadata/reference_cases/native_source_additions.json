@@ -161,6 +161,10 @@
           "sha256": "a8b660583dc01d2b700bcee3c5d4b2745f712ec35e205b08d92d3d398790b14d"
         }
       }
+    },
+    "b2123b82b5762f0f71c49c76d2bb96a50891789a9c1b9a61f2e5b1c692fede0a": {
+      "family": "sof_dpe",
+      "references": {}
     }
   }
 }

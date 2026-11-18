@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "observed_at": "2026-11-18T11:43:20.507488+00:00",
+  "observed_at": "2026-11-18T14:06:59.555331+00:00",
   "generator": {
-    "software_version": "0.0.167",
+    "software_version": "0.0.168",
     "working_source_sha256": {
       "scripts/source_inventory.py": "68a90e79a7066867c3604e2a304ab650c59591389e2eb00c0234e035c7a7893a",
       "teadata/release_inventory.py": "5f6e4cbac970e08d71b2d5713ce1eb0cf3e4944b0adedd41e01fed6d20196cce",
@@ -2242,9 +2242,9 @@
   "selected_catalog": {
     "schema_version": 1,
     "release": {
-      "source": "https://github.com/adpena/teadata/releases/download/v0.0.167/release.json",
-      "manifest_sha256": "ecc89a8dea775defa5c3e81911d059fe9eb6af09d0ccb65112a5f1be5e43573a",
-      "build_id": "df8c457b82a6029591b4d835fff70a3ddc2b64e2b70389d72754aeb421c8c421"
+      "source": "https://github.com/adpena/teadata/releases/download/v0.0.168/release.json",
+      "manifest_sha256": "6107ada84cdce6dabcddb1b60ff133cfe558622cf4362144570de05bd7f85479",
+      "build_id": "ec4d619f474137a292b14a4d577ac925ca9b048b0e2ae3a0b70f18117150a66f"
     },
     "include_variables": true,
     "metadata_inspected": true,
@@ -4409,7 +4409,7 @@
     ],
     "attachments": [
       {
-        "location": "native-1512f0ef1a8b1df41f969c683c3ec1dab0d607499dddb589127c6f5a41b9af4e.json",
+        "location": "https://github.com/adpena/teadata/releases/download/v0.0.167/native-1512f0ef1a8b1df41f969c683c3ec1dab0d607499dddb589127c6f5a41b9af4e.json",
         "manifest_sha256": "1512f0ef1a8b1df41f969c683c3ec1dab0d607499dddb589127c6f5a41b9af4e",
         "build_id": "3666ae1bc73cc10d2dfe02623cf520c041767d4aa80bef09c5454e4eb1c3c994",
         "editions": [
@@ -4616,7 +4616,7 @@
         ]
       },
       {
-        "location": "native-17e8582abdda6ad9cd1ab60a597da73d2d9ef0049868de25f1a7c1441d9a1afa.json",
+        "location": "https://github.com/adpena/teadata/releases/download/v0.0.167/native-17e8582abdda6ad9cd1ab60a597da73d2d9ef0049868de25f1a7c1441d9a1afa.json",
         "manifest_sha256": "17e8582abdda6ad9cd1ab60a597da73d2d9ef0049868de25f1a7c1441d9a1afa",
         "build_id": "4d7af0c7157d8fd9fea6c6a9f32cc21767c198fa3814641de1ccdbe99173aabf",
         "editions": [
@@ -4695,7 +4695,7 @@
         ]
       },
       {
-        "location": "native-19fffe1f8d481d3c08bb01fe7cb4f73ae9ca8393d523a0d973411500cc33e3b8.json",
+        "location": "https://github.com/adpena/teadata/releases/download/v0.0.167/native-19fffe1f8d481d3c08bb01fe7cb4f73ae9ca8393d523a0d973411500cc33e3b8.json",
         "manifest_sha256": "19fffe1f8d481d3c08bb01fe7cb4f73ae9ca8393d523a0d973411500cc33e3b8",
         "build_id": "3aaafccb36a0350d7b5e474bd3f80eb7d0300e88a362a8f53c5b1860f5fb96e3",
         "editions": [
@@ -4822,7 +4822,7 @@
         ]
       },
       {
-        "location": "native-1c5cc0185fafefca1304eb8c2d71e6c5f95819c672f1fd022c08b0d05a096065.json",
+        "location": "https://github.com/adpena/teadata/releases/download/v0.0.167/native-1c5cc0185fafefca1304eb8c2d71e6c5f95819c672f1fd022c08b0d05a096065.json",
         "manifest_sha256": "1c5cc0185fafefca1304eb8c2d71e6c5f95819c672f1fd022c08b0d05a096065",
         "build_id": "c5387f2bdfd66e405b1b6cd47ab42c1180d9f332a17b36d266df68053e88d76b",
         "editions": [
@@ -4869,7 +4869,7 @@
         ]
       },
       {
-        "location": "native-28123464cec8f1b64883be5573e34bc665dad739f29865c74d37532b4d60c3ff.json",
+        "location": "https://github.com/adpena/teadata/releases/download/v0.0.167/native-28123464cec8f1b64883be5573e34bc665dad739f29865c74d37532b4d60c3ff.json",
         "manifest_sha256": "28123464cec8f1b64883be5573e34bc665dad739f29865c74d37532b4d60c3ff",
         "build_id": "7223ded159cdbee4c7b150ea00d73ddd14bfde1b19fde2180269fc406e073151",
         "editions": [
@@ -5020,7 +5020,7 @@
         ]
       },
       {
-        "location": "native-6c1e3512c3a5186578f5db03a53d565a64bdcd3ef7c28e959162a943b9c81b83.json",
+        "location": "https://github.com/adpena/teadata/releases/download/v0.0.167/native-6c1e3512c3a5186578f5db03a53d565a64bdcd3ef7c28e959162a943b9c81b83.json",
         "manifest_sha256": "6c1e3512c3a5186578f5db03a53d565a64bdcd3ef7c28e959162a943b9c81b83",
         "build_id": "f3981aae307d46f4241d7ac0c4dd703a625123ca492a03e5202cf23be3d0d878",
         "editions": [
@@ -5059,7 +5059,7 @@
         ]
       },
       {
-        "location": "native-6f2cc32a7b9cc1b43d8b0ed84f2870d3dd75ddcfef58e9e8508e37f34c41cd37.json",
+        "location": "https://github.com/adpena/teadata/releases/download/v0.0.167/native-6f2cc32a7b9cc1b43d8b0ed84f2870d3dd75ddcfef58e9e8508e37f34c41cd37.json",
         "manifest_sha256": "6f2cc32a7b9cc1b43d8b0ed84f2870d3dd75ddcfef58e9e8508e37f34c41cd37",
         "build_id": "624b7302bc8506637feee36609b1c5d5d602b1e6e8d81fa9bb947c3d8c88f2fa",
         "editions": [
@@ -5130,7 +5130,7 @@
         ]
       },
       {
-        "location": "native-8989e9860aadd5d43bcb30bcc40aab2af59f230429638fb0723a1496ca821626.json",
+        "location": "https://github.com/adpena/teadata/releases/download/v0.0.167/native-8989e9860aadd5d43bcb30bcc40aab2af59f230429638fb0723a1496ca821626.json",
         "manifest_sha256": "8989e9860aadd5d43bcb30bcc40aab2af59f230429638fb0723a1496ca821626",
         "build_id": "a6bc2dd366d57884facf80c3d2ace9a96c194e53c665b14b9f8bcbee51c1c328",
         "editions": [
@@ -5497,7 +5497,7 @@
         ]
       },
       {
-        "location": "native-8cd071e5cfaac027a43895aa2335206d87eb5bf19a9001b2cc42797c5b0c9325.json",
+        "location": "https://github.com/adpena/teadata/releases/download/v0.0.167/native-8cd071e5cfaac027a43895aa2335206d87eb5bf19a9001b2cc42797c5b0c9325.json",
         "manifest_sha256": "8cd071e5cfaac027a43895aa2335206d87eb5bf19a9001b2cc42797c5b0c9325",
         "build_id": "179ce321efa364d706cc14f57a405e3670910bf42ef25e3c88a03c3ec73c12de",
         "editions": [
@@ -5568,7 +5568,7 @@
         ]
       },
       {
-        "location": "native-8d5362e43c3374b11647592e618a82707794e49a1bc76739d69eea299ad6f131.json",
+        "location": "https://github.com/adpena/teadata/releases/download/v0.0.167/native-8d5362e43c3374b11647592e618a82707794e49a1bc76739d69eea299ad6f131.json",
         "manifest_sha256": "8d5362e43c3374b11647592e618a82707794e49a1bc76739d69eea299ad6f131",
         "build_id": "4d2c5e1623474641ef80a4642a5bcdf6675f62fce40f9e863d6070e5a2c9fefd",
         "editions": [
@@ -5775,7 +5775,7 @@
         ]
       },
       {
-        "location": "native-9c4e189a85b1a12130207e4a3546d437a0704f4833c45225c401b8f88ea1a50c.json",
+        "location": "https://github.com/adpena/teadata/releases/download/v0.0.167/native-9c4e189a85b1a12130207e4a3546d437a0704f4833c45225c401b8f88ea1a50c.json",
         "manifest_sha256": "9c4e189a85b1a12130207e4a3546d437a0704f4833c45225c401b8f88ea1a50c",
         "build_id": "13da621dbfff8a8161923ae1944228461465192a3c59b944c2834d071d12c7d7",
         "editions": [
@@ -5806,7 +5806,7 @@
         ]
       },
       {
-        "location": "native-a05d1150131ddb067272f43fdffb9c769ab2f46bd34443f14db4bfcb1b45d250.json",
+        "location": "https://github.com/adpena/teadata/releases/download/v0.0.167/native-a05d1150131ddb067272f43fdffb9c769ab2f46bd34443f14db4bfcb1b45d250.json",
         "manifest_sha256": "a05d1150131ddb067272f43fdffb9c769ab2f46bd34443f14db4bfcb1b45d250",
         "build_id": "c380feaba35252bde41ab11612d375236f3d8ff003d34c93bbd9a198a289d4b0",
         "editions": [
@@ -6077,7 +6077,7 @@
         ]
       },
       {
-        "location": "native-a37382dc60f04ed64f6d4e32f045d531d83310ab30ba62a1fc25e4fb723985f9.json",
+        "location": "https://github.com/adpena/teadata/releases/download/v0.0.167/native-a37382dc60f04ed64f6d4e32f045d531d83310ab30ba62a1fc25e4fb723985f9.json",
         "manifest_sha256": "a37382dc60f04ed64f6d4e32f045d531d83310ab30ba62a1fc25e4fb723985f9",
         "build_id": "e0f6ed3ce203af8bdc24980cb956de598ecb5e832bb11c49eb79d4acd273f27d",
         "editions": [
@@ -6116,7 +6116,7 @@
         ]
       },
       {
-        "location": "native-afdd42feb4380f1716af0ca89daf0e0a7382fcad49bba7e6a1578eaef28b7c68.json",
+        "location": "https://github.com/adpena/teadata/releases/download/v0.0.167/native-afdd42feb4380f1716af0ca89daf0e0a7382fcad49bba7e6a1578eaef28b7c68.json",
         "manifest_sha256": "afdd42feb4380f1716af0ca89daf0e0a7382fcad49bba7e6a1578eaef28b7c68",
         "build_id": "6ff173c47d68c897c7d750e9bed4c5dc83f840df302f9fcd3b1adc1e5659fc1e",
         "editions": [
@@ -6403,7 +6403,7 @@
         ]
       },
       {
-        "location": "native-b4985df48b57c894b11abd2d2596f74defb29fabe20fe2c589366b56602e2e4e.json",
+        "location": "https://github.com/adpena/teadata/releases/download/v0.0.167/native-b4985df48b57c894b11abd2d2596f74defb29fabe20fe2c589366b56602e2e4e.json",
         "manifest_sha256": "b4985df48b57c894b11abd2d2596f74defb29fabe20fe2c589366b56602e2e4e",
         "build_id": "04af827e01883ea6d20ec9f0146613e0032df609e79eb49c027276b271f38fd9",
         "editions": [
@@ -6610,7 +6610,7 @@
         ]
       },
       {
-        "location": "native-ba34346da8d71b7f87bee82d0b3798c20b5e566516d191e2145f4754a1b9d359.json",
+        "location": "https://github.com/adpena/teadata/releases/download/v0.0.167/native-ba34346da8d71b7f87bee82d0b3798c20b5e566516d191e2145f4754a1b9d359.json",
         "manifest_sha256": "ba34346da8d71b7f87bee82d0b3798c20b5e566516d191e2145f4754a1b9d359",
         "build_id": "53eea22e7c2828fa8affe5fe4294dc96e60d814774d4e8fbb677e835d6a44c69",
         "editions": [
@@ -6633,7 +6633,7 @@
         ]
       },
       {
-        "location": "native-bcff73e52199f4d8e527db2d66a89f8ee3a825d3734e7902e16ab4f7824e7f38.json",
+        "location": "https://github.com/adpena/teadata/releases/download/v0.0.167/native-bcff73e52199f4d8e527db2d66a89f8ee3a825d3734e7902e16ab4f7824e7f38.json",
         "manifest_sha256": "bcff73e52199f4d8e527db2d66a89f8ee3a825d3734e7902e16ab4f7824e7f38",
         "build_id": "676bee26b1c3d58868832f9dae204afeaa9b52ec4af0036176b629b7176c9989",
         "editions": [
@@ -6656,7 +6656,7 @@
         ]
       },
       {
-        "location": "native-c157679fc6a8d33fb135ac6b67f102500d9f17a7346270d52dcbdbb934e372ce.json",
+        "location": "https://github.com/adpena/teadata/releases/download/v0.0.167/native-c157679fc6a8d33fb135ac6b67f102500d9f17a7346270d52dcbdbb934e372ce.json",
         "manifest_sha256": "c157679fc6a8d33fb135ac6b67f102500d9f17a7346270d52dcbdbb934e372ce",
         "build_id": "eea0c38d23844516f5e58795d42d406937c9da184acdb31a398cfdfe8fb67f2b",
         "editions": [
@@ -6823,7 +6823,7 @@
         ]
       },
       {
-        "location": "native-c631a058e264c70ea9e1a27a32a949aabf36d37b2f518d9f58d3e8378f460b27.json",
+        "location": "https://github.com/adpena/teadata/releases/download/v0.0.167/native-c631a058e264c70ea9e1a27a32a949aabf36d37b2f518d9f58d3e8378f460b27.json",
         "manifest_sha256": "c631a058e264c70ea9e1a27a32a949aabf36d37b2f518d9f58d3e8378f460b27",
         "build_id": "bee2bb438ebb6cbadb4ed3a436c71cc3abbd1b74ddd778eaa7c449a905171996",
         "editions": [
@@ -6846,7 +6846,7 @@
         ]
       },
       {
-        "location": "native-c7a02280b6228040552cb895da02a6fb9f9773887fc96e7121a257dc40adf95b.json",
+        "location": "https://github.com/adpena/teadata/releases/download/v0.0.167/native-c7a02280b6228040552cb895da02a6fb9f9773887fc96e7121a257dc40adf95b.json",
         "manifest_sha256": "c7a02280b6228040552cb895da02a6fb9f9773887fc96e7121a257dc40adf95b",
         "build_id": "5eeab22f059b4229544b81f23abe44112da6db5888deffe350d95a115e5059a6",
         "editions": [
@@ -6869,46 +6869,7 @@
         ]
       },
       {
-        "location": "native-fd1ca0e36103153ae4175e188b7eb86debac289ccfaeb56e8a412df7e9d7857a.json",
-        "manifest_sha256": "fd1ca0e36103153ae4175e188b7eb86debac289ccfaeb56e8a412df7e9d7857a",
-        "build_id": "6101bab118a0922db1bda360875709bc33308eeb7c989bf5da39551d91f125c0",
-        "editions": [
-          {
-            "dataset": "summary_of_finances_dpe",
-            "edition": "47422",
-            "revision_sha256": "722f599d8023ad6cb9c8f83a41318133291f1c768d46c2ba4ff4dee92e625c14",
-            "scope": "district",
-            "table": "inputs_dpe",
-            "grain": "one publisher LEA row in worksheet inputs_dpe"
-          },
-          {
-            "dataset": "summary_of_finances_dpe",
-            "edition": "47422",
-            "revision_sha256": "722f599d8023ad6cb9c8f83a41318133291f1c768d46c2ba4ff4dee92e625c14",
-            "scope": "district",
-            "table": "is_asahe_dpe",
-            "grain": "one publisher LEA row in worksheet is_asahe_dpe"
-          },
-          {
-            "dataset": "summary_of_finances_dpe",
-            "edition": "47422",
-            "revision_sha256": "722f599d8023ad6cb9c8f83a41318133291f1c768d46c2ba4ff4dee92e625c14",
-            "scope": "district",
-            "table": "outputs_dpe",
-            "grain": "one publisher LEA row in worksheet outputs_dpe"
-          },
-          {
-            "dataset": "summary_of_finances_dpe",
-            "edition": "47422",
-            "revision_sha256": "722f599d8023ad6cb9c8f83a41318133291f1c768d46c2ba4ff4dee92e625c14",
-            "scope": "district",
-            "table": "mo_asahe_dpe",
-            "grain": "one publisher LEA row in worksheet mo_asahe_dpe"
-          }
-        ]
-      },
-      {
-        "location": "native-fdd86b5bf8e5c4b1e2a97523e3f651cf41281cf0f94cae5cfc7e0a97f0300791.json",
+        "location": "https://github.com/adpena/teadata/releases/download/v0.0.167/native-fdd86b5bf8e5c4b1e2a97523e3f651cf41281cf0f94cae5cfc7e0a97f0300791.json",
         "manifest_sha256": "fdd86b5bf8e5c4b1e2a97523e3f651cf41281cf0f94cae5cfc7e0a97f0300791",
         "build_id": "07efa838021462de6aad1805a58acf31117ec1a72cc08e2fd3fc384846ad56e5",
         "editions": [
@@ -7007,6 +6968,45 @@
             "scope": "campus",
             "table": "campus",
             "grain": "one publisher row per school_year and campus_number and ethnicity"
+          }
+        ]
+      },
+      {
+        "location": "native-b2123b82b5762f0f71c49c76d2bb96a50891789a9c1b9a61f2e5b1c692fede0a.json",
+        "manifest_sha256": "b2123b82b5762f0f71c49c76d2bb96a50891789a9c1b9a61f2e5b1c692fede0a",
+        "build_id": "3cef71d89335e843dc72b5733c3a32875163f2b2d5bf49119db9de8d88c2fd81",
+        "editions": [
+          {
+            "dataset": "summary_of_finances_dpe",
+            "edition": "47422",
+            "revision_sha256": "722f599d8023ad6cb9c8f83a41318133291f1c768d46c2ba4ff4dee92e625c14",
+            "scope": "district",
+            "table": "inputs_dpe",
+            "grain": "one publisher LEA row in worksheet inputs_dpe"
+          },
+          {
+            "dataset": "summary_of_finances_dpe",
+            "edition": "47422",
+            "revision_sha256": "722f599d8023ad6cb9c8f83a41318133291f1c768d46c2ba4ff4dee92e625c14",
+            "scope": "district",
+            "table": "is_asahe_dpe",
+            "grain": "one publisher LEA row in worksheet is_asahe_dpe"
+          },
+          {
+            "dataset": "summary_of_finances_dpe",
+            "edition": "47422",
+            "revision_sha256": "722f599d8023ad6cb9c8f83a41318133291f1c768d46c2ba4ff4dee92e625c14",
+            "scope": "district",
+            "table": "outputs_dpe",
+            "grain": "one publisher LEA row in worksheet outputs_dpe"
+          },
+          {
+            "dataset": "summary_of_finances_dpe",
+            "edition": "47422",
+            "revision_sha256": "722f599d8023ad6cb9c8f83a41318133291f1c768d46c2ba4ff4dee92e625c14",
+            "scope": "district",
+            "table": "mo_asahe_dpe",
+            "grain": "one publisher LEA row in worksheet mo_asahe_dpe"
           }
         ]
       }
@@ -9914,7 +9914,7 @@
         "grain": "one publisher LEA row in worksheet inputs_dpe",
         "title": "2025–26 SOF District Payment Estimate: reviewed quantities as published",
         "publisher": "Texas Education Agency",
-        "source_url": null,
+        "source_url": "https://tea.texas.gov/about-tea/state-funding/state-funding",
         "declared_period": {
           "kind": "unknown"
         },
@@ -13744,7 +13744,7 @@
         "grain": "one publisher LEA row in worksheet is_asahe_dpe",
         "title": "2025–26 SOF District Payment Estimate: reviewed quantities as published",
         "publisher": "Texas Education Agency",
-        "source_url": null,
+        "source_url": "https://tea.texas.gov/about-tea/state-funding/state-funding",
         "declared_period": {
           "kind": "unknown"
         },
@@ -19827,7 +19827,7 @@
         "grain": "one publisher LEA row in worksheet outputs_dpe",
         "title": "2025–26 SOF District Payment Estimate: reviewed quantities as published",
         "publisher": "Texas Education Agency",
-        "source_url": null,
+        "source_url": "https://tea.texas.gov/about-tea/state-funding/state-funding",
         "declared_period": {
           "kind": "unknown"
         },
@@ -25904,7 +25904,7 @@
         "grain": "one publisher LEA row in worksheet mo_asahe_dpe",
         "title": "2025–26 SOF District Payment Estimate: reviewed quantities as published",
         "publisher": "Texas Education Agency",
-        "source_url": null,
+        "source_url": "https://tea.texas.gov/about-tea/state-funding/state-funding",
         "declared_period": {
           "kind": "unknown"
         },

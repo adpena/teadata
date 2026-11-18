@@ -9,6 +9,7 @@ from __future__ import annotations
 import ast
 from collections import Counter
 from collections.abc import Iterator
+from datetime import datetime
 from decimal import Decimal, InvalidOperation
 from hashlib import sha256
 from html.parser import HTMLParser
@@ -228,6 +229,16 @@ def _verify_report_goldens(store: ProvenanceStore, grid: dict[str, Any],
 
 def _configuration(store: ProvenanceStore, stage: Path) -> tuple[bytes, str]:
     grid = definition()
+    original_id = grid["source_receipts"]["sof_bulk_2026"]
+    original = store.read_record(original_id)
+    try:
+        downloaded_at = datetime.fromisoformat(original["downloaded_at"])
+        if (original["method"] != "download" or downloaded_at.tzinfo is None
+                or original["artifact"]["sha256"] != grid["workbook_sha256"]
+                or not original["requested_url"] or not original["resolved_url"]):
+            raise ValueError("Not the retained publisher download")
+    except (KeyError, TypeError, ValueError) as error:
+        raise ContractError("SOF DPE requires its original dated publisher download") from error
     dictionary = store.verify_artifact(grid["dictionary_sha256"])
     with dictionary.open("rb") as handle:
         book = load_workbook(handle, read_only=True, data_only=False, keep_links=False)
@@ -292,6 +303,8 @@ def _configuration(store: ProvenanceStore, stage: Path) -> tuple[bytes, str]:
         "reviewed_sha256": sha256(schema.read_bytes()).hexdigest(), "provenance_ids": [receipt]})
     metadata = {"title": "2025–26 SOF District Payment Estimate: reviewed quantities as published", "version": grid["edition"],
         "publisher": "Texas Education Agency", "period": {"kind": "unknown"}, "identifiers": ["district_number"],
+        "source_url": store.read_record(grid["source_receipts"]["state_funding_index"])["requested_url"],
+        "download_url": original["requested_url"],
         "metrics": metrics, "references": references,
         "notes": "Frozen Near Final funding observations, not expenditures, receipts, Enrollment or Membership. "
                  "Field periods can differ from funding year and are not overwritten by it. Codes remain text. "
@@ -301,7 +314,9 @@ def _configuration(store: ProvenanceStore, stage: Path) -> tuple[bytes, str]:
                               "reference_id": "state_funding_index", "row_run_column": "sof_run_id"}}
     raw = store.verify_artifact(grid["workbook_sha256"])
     acquisition = store.record_acquisition(raw, ResolvedDataset(DATASET, "data_sources", 2026, 2026, "",
-        DatasetMetadata.from_dict(metadata)), parameters={"original_publisher_receipt": grid["source_receipts"]["sof_bulk_2026"]})
+        DatasetMetadata.from_dict(metadata)), requested_url=original["requested_url"], resolved_url=original["resolved_url"],
+        downloaded_at=downloaded_at, response_headers=original["response_headers"],
+        parameters={"original_publisher_receipt": original_id})
     metadata["provenance_ids"] = [acquisition]
     return (canonical_json({"data_sources": {DATASET: {2026: {"path": "provenance/objects/" + grid["workbook_sha256"], "metadata": metadata,
         "reader": {"profiles": {"source": {"column_schema": schema.name}}}}}}}) + "\n").encode(), acquisition
@@ -375,6 +390,7 @@ def qualify_sof_dpe(release: DataRelease, store: ProvenanceStore) -> dict[str, A
         raise ContractError("SOF DPE requires exactly four original offline district tables")
     cells = 0
     source_values = {}
+    download_citations = 0
     for name, expected in iter_sof_dpe_tables(store.verify_artifact(grid["workbook_sha256"])):
         ref = refs[name]
         key = ref.edition
@@ -402,6 +418,19 @@ def qualify_sof_dpe(release: DataRelease, store: ProvenanceStore) -> dict[str, A
                 or ref.contract["column_support"] != _support(grid["tables"][name])
                 or records != json.loads(release.catalog.edition_metadata_bytes(key.identity))["provenance"]):
             raise ContractError("SOF DPE units, periods, original source, runs or processing lineage differ")
+        # Published167 had neither URL. Its original value qualification stays
+        # reproducible; newly declared download citations must be fully bound.
+        if metadata.source_url is not None or metadata.download_url is not None:
+            original_id = grid["source_receipts"]["sof_bulk_2026"]
+            original = records[original_id]
+            acquisitions = release.catalog.acquisitions(DATASET, edition=key)
+            if (metadata.source_url != records[grid["source_receipts"]["state_funding_index"]]["requested_url"]
+                    or metadata.download_url != original["requested_url"] or len(acquisitions) != 1
+                    or acquisitions[0]["parameters"].get("original_publisher_receipt") != original_id
+                    or any(acquisitions[0][field] != original[field] for field in (
+                        "method", "downloaded_at", "requested_url", "resolved_url", "response_headers"))):
+                raise ContractError("SOF DPE citation differs from its original publisher acquisition")
+            download_citations += 1
         physical = release.analytical_dataset(ref.identity).to_table().replace_schema_metadata(None)
         public = release.table(key).to_arrow().replace_schema_metadata(None)
         if not physical.equals(expected) or not public.select(expected.column_names).equals(expected):
@@ -417,4 +446,5 @@ def qualify_sof_dpe(release: DataRelease, store: ProvenanceStore) -> dict[str, A
     return {"status": "PASS_REVIEWED_NATIVE", "manifest_sha256": release.manifest_sha256,
             "tables": 4, "selected_fields": grid["admission_counts"]["selected"], "original_cells": cells,
             "independent_report_literal_goldens": report_cells,
+            "original_download_citations": download_citations,
             "publisher_formula_qualification": False, "scope": "Original selected raw/value/status/coordinate fidelity and frozen field semantics."}

@@ -113,7 +113,8 @@ def fixture(tmp_path, monkeypatch):
                 dictionary_sha256=sha256(dictionary_path.read_bytes()).hexdigest(),
                 admission_counts=dict(selected=12, held=4, already_live=0))
     grid["source_receipts"] = {key: store.record_acquisition(path, descriptor,
-        requested_url="https://example.org/" + path.name, downloaded_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
+        requested_url="https://example.org/" + path.name, resolved_url="https://example.org/" + path.name,
+        downloaded_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
         for key, path in (("sof_bulk_2026", source_path), ("sof_dictionary_2026", dictionary_path),
                           ("state_funding_index", index), ("sof_timeline_2026", index))}
     audit = tmp_path / "audit.json"
@@ -153,14 +154,47 @@ def test_source_projection_and_native_roundtrip_keep_runs_codes_missing_and_prov
     receipt = sof_dpe.qualify_sof_dpe(release, ProvenanceStore(output / "provenance"))
     assert receipt["original_cells"] == 24 and receipt["publisher_formula_qualification"] is False
     assert receipt["independent_report_literal_goldens"] == 1
+    assert receipt["original_download_citations"] == 4
     for artifact in release.catalog.to_dict()["artifacts"]:
         key = release.catalog.artifact_ref(artifact).edition
         metadata = release.catalog.metadata(sof_dpe.DATASET, edition=key)
         assert metadata.source_qualifiers is not None
         assert metadata.source_qualifiers.publication_run_id == "47422"
         assert metadata.source_qualifiers.row_run_column == "sof_run_id"
+        original_id = grid["source_receipts"]["sof_bulk_2026"]
+        original = store.read_record(original_id)
+        assert metadata.source_url == "https://example.org/index.html"
+        assert metadata.download_url == original["requested_url"]
+        acquired, = release.catalog.acquisitions(sof_dpe.DATASET, edition=key)
+        for field in ("method", "downloaded_at", "requested_url", "resolved_url", "response_headers"):
+            assert acquired[field] == original[field]
+        assert acquired["parameters"]["original_publisher_receipt"] == original_id
+        assert acquired["recorded_at"] != original["recorded_at"]
+        assert ProvenanceStore(output / "provenance").read_record(original_id) == original
+        citation = release.table(key).select(key.table + "_amount").provenance()
+        assert citation.to_dict()["source"]["url"] == metadata.source_url
+        assert "Downloaded 2026-01-01 UTC." in citation.publisher_data_citation
+        assert "unrecorded" not in citation.publisher_data_citation
     with pytest.raises(FileExistsError):
         sof_dpe.materialize_sof_dpe(store, output=output)
+
+
+@pytest.mark.parametrize("changes", [
+    {"method": "local_observation"}, {"downloaded_at": None},
+    {"downloaded_at": "2026-01-01T00:00:00"}, {"resolved_url": None},
+    {"artifact": {"sha256": "0" * 64}},
+])
+def test_missing_or_incorrect_download_cannot_be_relabelled(fixture, tmp_path, monkeypatch, changes):
+    grid, _, store = fixture
+    read = store.read_record
+    def altered(identifier):
+        record = read(identifier)
+        if identifier == grid["source_receipts"]["sof_bulk_2026"]:
+            record.update(changes)
+        return record
+    monkeypatch.setattr(store, "read_record", altered)
+    with pytest.raises(ContractError, match="original dated publisher download"):
+        sof_dpe._configuration(store, tmp_path)
 
 
 def test_incorrect_source_and_interpretation_fail_without_fallback(fixture, monkeypatch):

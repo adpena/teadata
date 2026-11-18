@@ -93,8 +93,23 @@ The command refuses an existing output. It emits an **unpublished candidate**,
 not a qualified or activated release. Original-cell replay, exact scientific
 dispatch admission, independent review, normal-parent composition, immutable
 publication and application adoption are separate steps. The command does not
-change a selected release by itself. The normal 0.0.167 selector is finalized
+change a selected release by itself. The normal 0.0.168 selector is finalized
 only after its separate integration qualification.
+
+Release 0.0.168 corrects the publisher citation metadata without changing the
+selected values, periods, units or original evidence. It binds the official
+funding page and workbook URL to the retained November 17, 2026 HTTP receipt.
+The dataset-specific metadata alias preserves that actual download time;
+its later recording time is a separate observation. Version 0.0.167 remains
+immutable and has incomplete top-level URL/download-date citation metadata;
+its original publisher receipts remain in its reference evidence.
+
+The 21 unchanged native attachments use their exact published 0.0.167 URLs,
+manifest hashes, build IDs and editions. Offline use requires their verified
+cache entries. This rollout reuses their unchanged source qualifications and
+checks the changed child and normal-parent integration separately. The older
+full `scripts/check --release` scientific runner requires adjacent local
+attachments; it does not qualify a parent with remote attachment references.
 
 After normal integration, `summary_of_finances_dpe` uses the same lazy entity
 source namespaces, native tables, discovery, DSL and exports as other attached

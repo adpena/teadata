@@ -7,9 +7,15 @@ A build records the files it actually reads. The runtime catalog is embedded in 
 <a id="current-normal-release-00163"></a>
 <a id="current-normal-release-00164"></a>
 
-## Current normal release 0.0.167
+## Current normal release 0.0.168
 
-Software 0.0.167 selects 22 native attachments, 33 dataset IDs and 306
+This revision corrects SOF DPE publisher URLs and binds its citation to the
+original November 17, 2026 download. Source values and measurement definitions
+are unchanged from 0.0.167. The 21 unchanged native sources reference their
+existing immutable published files; strict offline access needs verified cache
+entries. See the [citation qualification and historical limits](sof-dpe-sources.md).
+
+Software 0.0.168 selects 22 native attachments, 33 dataset IDs and 306
 edition/scope keys. Its TPRS Student projection includes six disability Membership
 counts and five composition percentages, for 179 qualified fields in 2025–26 across 9,105 reporting campuses,
 1,202 reporting districts and Texas. All 21 preexisting native attachments remain
@@ -24,7 +30,7 @@ without loading full metadata values; temporary catalog and receipt validation
 traversals avoid self-retaining recursive closures. These correctness changes
 do not establish a production memory reduction.
 
-`DataEngine.load_default()` selects the packaged, immutable normal167 manifest
+`DataEngine.load_default()` selects the packaged, immutable normal168 manifest
 unless an explicit release or scoped context overrides it. Installation keeps
 source payloads external; discovery reads catalog metadata and observations
 remain lazy. Strict offline mode never fetches or substitutes another release.

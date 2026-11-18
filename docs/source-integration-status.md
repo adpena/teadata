@@ -1,20 +1,32 @@
 # Source integration status
 
-The packaged selector identifies **normal data release 0.0.167**. This is a
+The packaged selector identifies **normal data release 0.0.168**. This is a
 frozen analysis release, not a live TEA feed. Software publication and
 application deployment are separate gates; historical requests keep their pins.
-The [machine inventory](source-integration-status-0.0.167.json), generated from
+The [machine inventory](source-integration-status-0.0.168.json), generated from
 the qualified normal parent on November 18, 2026, records
 127 registered IDs, 279 configured editions,
 13 base inputs and 22 native attachments covering 33 dataset IDs and
 306 edition/scope keys. Registration is not
 acquisition, semantic qualification or query access.
 
-- Manifest: `ecc89a8dea775defa5c3e81911d059fe9eb6af09d0ccb65112a5f1be5e43573a`.
-- Build: `df8c457b82a6029591b4d835fff70a3ddc2b64e2b70389d72754aeb421c8c421`.
-- Processing identity: `3804ddc10606b294b837636e92138b90ad788bd04e1643b5e886860d33375cd0`.
+- Manifest: `6107ada84cdce6dabcddb1b60ff133cfe558622cf4362144570de05bd7f85479`.
+- Build: `ec4d619f474137a292b14a4d577ac925ca9b048b0e2ae3a0b70f18117150a66f`.
+- Processing identity: `e193e862ae8871449aeabb774ad2eca39899451e106c0ee5ec33c2a140788842`.
 
-## What this release adds
+## What this revision changes
+
+SOF DPE citations now bind the official funding page, workbook URL and actual
+November 17, 2026 download time to the retained HTTP receipt. Values, units,
+periods and source evidence are unchanged from 0.0.167. The 21 unchanged
+attachments reference their existing immutable published files, avoiding
+republication. Strict offline use needs those verified cached files.
+
+Their unchanged source qualifications are reused; this revision checks the
+changed child and bounded normal-parent integration. The legacy full
+`--release` scientific runner still requires adjacent local attachments.
+
+## Retained SOF DPE coverage
 
 `summary_of_finances_dpe` adds **486 fields: 462 numeric quantities and 24
 literal code/text fields**, from the 2025–26 Near Final publication run 47422.
