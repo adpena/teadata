@@ -27,7 +27,7 @@ from .askted_directory import _verified_archive
 from .askted_lifecycle import LifecycleEventKind, LifecycleReportKind, _PORTAL, read_lifecycle_report
 from .acquisition import _form_request
 from .column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
-from .dataset_metadata import ArtifactRef, DataPeriod, DatasetMetadata, EditionKey, ReferenceDocument, ResolvedDataset
+from .dataset_metadata import ArtifactRef, DataPeriod, DatasetMetadata, EditionKey, EntityRowBinding, ReferenceDocument, ResolvedDataset
 from .entity_store import EntityStore
 from .identifiers import canonical_source_identifier
 from .manifest import BuildRecorder, canonical_json, file_identity
@@ -36,7 +36,10 @@ from .release import DataRelease, publish_release
 from .scripts.download_askted import ARCHIVE_URL
 from .teadata_config import Config, load_config_bytes
 from .transfer_leaves import _leaf_projection
-from .transfer_sources import _ACTION, _captured_input, _selected_encoding, _write_index, read_transfer_table, validate_campus_directions
+from .transfer_sources import (
+    _ACTION, _captured_input, _selected_encoding, _write_index, read_transfer_table, transfer_columns,
+    validate_campus_directions,
+)
 
 DATASET = "campus_transfer_reports"
 DIRECTORY_REFERENCE = "historical_endpoint_directory"
@@ -361,7 +364,8 @@ def materialize_campus_transfers(store: ProvenanceStore, *, config: Path, config
     table_input_sha256s(crosswalk, acquisition_sha256s=[original_sha])
     names, support, operations = _leaf_projection(table.column_names, crosswalk["fields"], grain="campus", year=year,
                                                    extra_context=context)
-    count_field, = [field["field"] for field in crosswalk["fields"] if field["code"] == "TRANSFERS_IN_OR_OUT"]
+    count_code = transfer_columns("campus", year=year)[-1]
+    count_field, = [field["field"] for field in crosswalk["fields"] if field["code"] == count_code]
     if ({metric.field for metric in source.metadata.metrics.values() if metric.unit == "count"} != {count_field}
             or DataPeriod.from_dict(crosswalk.get("metric_period")) != source.metadata.period
             or next(field for field in crosswalk["fields"] if field["field"] == count_field).get("disposition") != "fact"):
@@ -400,7 +404,8 @@ def materialize_campus_transfers(store: ProvenanceStore, *, config: Path, config
             physical_inputs.append(obsolescence.sha256)
         contract = recorder.leaf_contract(key, source, native_schema=projected.schema.serialize().to_pybytes(),
             columns=names, key_columns=_LOCATORS, rows=projected.num_rows, inputs=physical_inputs,
-            recipe=recipe, toolchain=toolchain, column_support=support)
+            recipe=recipe, toolchain=toolchain, column_support=support,
+            entity_binding=EntityRowBinding("reporting_campus_number", "reporting campus"))
         leaf_id = sha256(canonical_json(contract).encode()).hexdigest()
         leaf = stage / (leaf_id + ".parquet")
         physical = write_leaf_artifact(leaf, projected.to_batches(max_chunksize=4096), contract=contract, batch_bytes=8 * 1024 * 1024)
@@ -421,8 +426,8 @@ def materialize_campus_transfers(store: ProvenanceStore, *, config: Path, config
             parameters={"leaf_contract_sha256": leaf_id, "recipe": recipe, "toolchain": toolchain}, validation=validation)
         ref = ArtifactRef(key, physical["sha256"], physical["size_bytes"], leaf.name, canonical_json(contract), processing, "leaf")
         recorder.record_edition(key, source, artifacts=[ref], acquisition_ids=source.metadata.provenance_ids)
-        catalog = recorder.catalog(schema_version=3)
-        manifest = publish_release(stage, catalog, schema_version=3)
+        catalog = recorder.catalog(schema_version=4)
+        manifest = publish_release(stage, catalog, schema_version=4)
         result = {"status": "unpublished_native_transfer_candidate", "grain": "campus", "edition": key.to_dict(),
                   "build_id": catalog.build_id, "manifest": file_identity(manifest), "processing_record_id": processing,
                   "historical_endpoints": historical, **validation}

@@ -196,6 +196,15 @@ tokens. The processing receipt is
 Both preparations passed native readback and remain at the source preparation
 stage. Field-level qualification and release activation are pending.
 
+The campus materializer uses the retained year's exact count header and writes
+an edition manifest with a reporting-campus row binding. A campus selection
+therefore retrieves the reports filed for that campus, including the retained
+directions and row locators. The attendance or residence partner is a separate
+field. An exact source selection in the candidate can query a historical campus
+found only in AskTED by identifier. The current campus registry is independent.
+Release review must cover both 2024–25 and 2025–26 before attaching this series
+to the normal snapshot.
+
 ## Offline structural preparation
 
 `prepare` consumes either explicitly pinned source acquisition/SHA pairs or one
