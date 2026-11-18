@@ -81,6 +81,20 @@ workbook:
 
 All original worksheets must be accounted for exactly once. Table names must match the reviewed crosswalk. Each table binds the exact original acquisition SHA, with real header positions, one canonical field per real publisher header, and honest dictionary-review status. Physical worksheet names and an embedded `TAB NAME` value are distinct observations. No year-pattern substitution, SOF header alias, fuzzy mapping, or automatic cross-year formula equivalence is used.
 
+To produce a selected subset, keep every data table in the Config and crosswalk
+and explicitly list the unused logical table IDs in `workbook.unselected_tables`.
+For example, a DPE-only SOF candidate can list `inputs_lpe`, `outputs_lpe`,
+`mo_asahe_lpe`, and `is_asahe_lpe` there while retaining all eight table
+declarations. The producer checks the physical framing and exact headers of
+every declared worksheet. It decodes and emits facts and editions only for the
+selected tables. An unselected data worksheet is not a notes sheet, and its
+fact values are not qualified by these header checks. Unknown/duplicate table
+IDs and a selection leaving no output table are rejected. The original workbook
+remains a provenance input; the explicit selection is frozen in processing
+recipes, and `MATERIALIZATION.json` accounts for unselected physical tables.
+Omitting the option retains the existing all-table behavior. This selection
+does not weaken the normal release's complete native-child attachment check.
+
 Publisher-label-only worksheets can opt into `header_identity: position` **in the existing crosswalk table**. This permits repeated literal header occurrences while ordered physical positions and canonical field IDs remain unique. Codes and labels both retain the exact publisher text; only canonical Python field IDs may distinguish occurrences, for example `_at_ad` and `_at_ca`. The native read explicitly skips the verified physical header, assigns reviewed canonical column names and selects verified physical indexes. It never treats Calamine's automatic duplicate-name mangling as publisher metadata. `catalog.header_records` retains each occurrence and position; code/label-to-name lookup still rejects ambiguity. Coded tables retain their default strict behavior, and TAPR's coded readers, comparisons, dictionaries and merges reject position mode.
 
 `DatasetMetadata.metrics` supplies explicit per-field units and reference periods; a table with mixed enrollment, tax and fiscal periods can keep its table period unknown and declare the field periods separately. Numeric facts require reviewed units. Existing `SourceQualifiers` distinguishes SOF publication run/status and its actual physical row-run column from PEIMS actual/budget basis. Mixed SOF row runs need not equal the publication run, and a run column is not added to business keys to force its selection.
@@ -144,6 +158,16 @@ qualified or added to the normal release. The existing native raw contract
 preserves their original strings. A dictionary match supplies a source
 definition, not proof of a field's unit, measurement period or correctness.
 
+The DPE-only successor now binds all 611 physical headers (593 facts and 18
+identity/context columns) to the exact dictionary while leaving LPE mappings
+unchanged. It accounts for all eight original sheets and emits only the four
+DPE editions. An independent original-OOXML comparison matched all 729,857
+DPE fact cells, including literal nulls, integer/decimal strings and row runs.
+This establishes raw fidelity and dictionary identity. The additional values
+remain uninterpreted strings with unknown units/reference periods; it does
+not establish numerical qualification, normal-release availability or app
+ingestion. Check the current integration inventory for those later stages.
+
 The first three sheets each report 1,243 districts. The I&S sheet reports 1,030;
 its 213 absent districts must not become zero observations. Preserve each row's
 actual SOF run separately from publication run 47422 and retain Payment Cycle 2
@@ -161,10 +185,26 @@ confirmed this documentation/formula reconciliation question in `is_asahe_dpe`:
 Both physical headers say “Total State and Local Revenue for Debt Service.”
 Keep column U / line 16 and column AG / line 28 distinct. The descriptions are in
 `Variable Listing!D600` and `D598`, respectively. Cayuga's row run is 47223;
-Austin's is 47422. These are exact original integer tokens and arithmetic, not
-a claim that the published values are wrong or a qualified dollar series.
-Another formula context or a documentation error may explain the difference.
-Independent detail-report evidence is still required; no value was corrected.
+Austin's is 47422. These are exact original integer tokens and arithmetic.
+Fresh official facilities-detail reports for these same district/run pairs
+agree with the six checked LPE/DPE dollar cells and repeat both printed
+formulas. This rules out a workbook-only parsing mismatch for those checked
+cells; it does not establish which tax-collection base TEA intends to use.
+
+An exact-decimal comparison of all 1,030 I&S rows found that each of lines 16
+and 28 equals **LPE line 5 plus the DPE aid term** in 1,028 districts. Using
+the displayed DPE line 5 instead matches 145 districts; 144 match both bases.
+Louise ISD (241906) matches the DPE formula alone (published 0 versus LPE-base
+50). Devers ISD (146903) matches neither (published 0 versus DPE-base 800 or
+LPE-base 1,017). These are observed arithmetic patterns, not authorized formula
+definitions or corrections. Both exceptions retain their original values.
+The named official reports are available through the SOF report's own
+“ASAHE for Facilities” link (`rpt=2`); their acquisition timestamps, hashes,
+report headings and displayed-cell comparisons are retained separately.
+No value was corrected and no additional numeric series was qualified.
+The uncertainty also applies to the dictionary's dependent lines 17–18,
+29–30 and 34. Retain the source descriptions and values; do not silently
+substitute a different base in either formula.
 
 The [TEA SOF download service](https://tealprod.tea.state.tx.us/fsp/Reports/ReportSelection.aspx)
 is the publisher authority. Frozen workbook SHA-256:
@@ -172,7 +212,9 @@ is the publisher authority. Frozen workbook SHA-256:
 dictionary SHA-256:
 `9d018f14dd81e2bed5f896b621c5e86f64caa61b8dbc48a7373fe4dbaa575db0`.
 The original dictionary download time is unrecorded; its later custody
-observation is not substituted for that time. This question blocks semantic
+observation is not substituted for that time. A separate November 17, 2026
+reacquisition returned the identical workbook and dictionary bytes and retains
+its own download time. This question blocks semantic
 admission of the affected descriptions/formulas, not retention of their source
 bytes or the separately qualified attendance fields.
 

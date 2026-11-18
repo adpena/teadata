@@ -13,6 +13,7 @@ from .manifest import ContractError, canonical_json
 from .selectors import _EntityNames
 from .source_views import (PartitionedSourceTable, SourceTable, _entity_key, _open_export, _plan_export,
                            _provenance_batches, write_csv, write_excel)
+from .tprs_partitions import TPRS_PARTITION_DATASETS
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -151,9 +152,7 @@ class ObservationSeries:
         for year in requested:
             pin = pins.get(year)
             candidates = list(release._observation_year_options(dataset, fields, scope, pin)) if pin is not None else options
-            if cohort is not None and pin is None and scope == "campus" and dataset in {
-                "tprs_student_membership_enrollment_reports", "tprs_class_size",
-            }:
+            if cohort is not None and pin is None and scope == "campus" and dataset in TPRS_PARTITION_DATASETS:
                 _, matches = release._observation_matches(fields, scope, year, candidates)
                 if len(matches) > 1:
                     routed = release._entity_observations(dataset, fields, school_year=year, scope=scope,

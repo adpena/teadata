@@ -44,7 +44,8 @@ class StudentReportInventory:
     sha256: str
     grid_sha256: str
     cells: tuple[StudentInventoryCell, ...]
-    class_size_boundary_row: int
+    class_size_boundary_row: int | None
+    unpublished_sections: tuple[str, ...] = ()
 
 
 _MOBILITY = (
@@ -56,15 +57,18 @@ _MOBILITY = (
 _GRADES = ("Kindergarten", *(f"Grade {grade}" for grade in range(1, 10)))
 _GEOGRAPHIES = {"state": ["State"], "district": ["District", "State"],
                 "campus": ["Campus", "District", "State"]}
+_FOOTER = ["", "TEA | Analytics, Assessment, and Reporting | Performance Reporting", ""]
 
 
 def inventory_student_report(raw: bytes, *, scope: str, identifier: str,
                              contract: Mapping[str, Any] | None = None) -> StudentReportInventory:
-    """Give every data cell before Class Size one qualified/held disposition.
+    """Give every published Student Information data cell one disposition.
 
     The tail has a separate, closed 2026 presentation layout. Its semantic
     fields remain null: headings and glossary alone do not qualify its periods
-    or denominators. Original HTML retains whitespace and merged-cell evidence.
+    or denominators. Some campus reports end after attrition or retention;
+    absent sections are reported explicitly, never manufactured as zero cells.
+    Original HTML retains whitespace and merged-cell evidence.
     """
     grid, _ = _resolve_contract(contract)
     report = parse_student_report(raw, scope=scope, identifier=identifier, contract=grid)
@@ -86,6 +90,7 @@ def inventory_student_report(raw: bytes, *, scope: str, identifier: str,
             fields[cell.field]["denominator"] if qualified else None,
         ))
     position = next(i for i, row in enumerate(rows) if row == ["Mobility (2024-25)"])
+    boundary = ["Class Size Information", *_GEOGRAPHIES[scope]]
 
     def take(expected: list[str]) -> None:
         nonlocal position
@@ -104,11 +109,32 @@ def inventory_student_report(raw: bytes, *, scope: str, identifier: str,
                 "unreviewed_tail_period_population_denominator"))
         position += 1
 
+    def complete(boundary_row: int | None, unpublished: tuple[str, ...] = ()) -> StudentReportInventory:
+        keys = {(cell.row, cell.column) for cell in cells}
+        _need(len(keys) == len(cells), "Student inventory assigned a data coordinate more than once")
+        return StudentReportInventory(scope, identifier, report.sha256, report.grid_sha256,
+                                      tuple(cells), boundary_row, unpublished)
+
+    def campus_end(unpublished: tuple[str, ...]) -> StudentReportInventory | None:
+        if scope != "campus" or position >= len(rows) or rows[position] != grid["legend"][0]:
+            return None
+        remainder = rows[position:]
+        _need(remainder in (grid["legend"], [*grid["legend"], _FOOTER]),
+              "Student inventory campus has unrecognized data after the report tail")
+        return complete(None, unpublished)
+
     take(["Mobility (2024-25)"])
     for label in _MOBILITY:
         data("Mobility (2024-25)", label, len(grid["headers"][scope]) - 1)
     take(["Student Attrition (2024-25)"])
     data("Student Attrition (2024-25)", "Total Student Attrition", len(grid["headers"][scope]) - 1)
+    ended = campus_end(("Retention Rates by Grade", "Class Size Information"))
+    if ended is not None:
+        return ended
+    if scope == "campus" and position < len(rows) and rows[position] == boundary:
+        _need(rows.count(boundary) == 1, "Student inventory requires one exact Class Size boundary")
+        take(boundary)
+        return complete(position, ("Retention Rates by Grade",))
     if scope == "state":
         take(["Student Information", "Non-SpecialEducationRates", "SpecialEducationRates"])
     else:
@@ -129,13 +155,12 @@ def inventory_student_report(raw: bytes, *, scope: str, identifier: str,
         take(["", *[item for _ in _GEOGRAPHIES[scope] for item in ("Count", "Percent")]])
         take(["Data Quality"])
         data("Data Quality", "Underreported Students", len(_GEOGRAPHIES[scope]) * 2)
-    boundary = ["Class Size Information", *_GEOGRAPHIES[scope]]
+    ended = campus_end(("Class Size Information",))
+    if ended is not None:
+        return ended
     _need(rows.count(boundary) == 1, "Student inventory requires one exact Class Size boundary")
     take(boundary)
-    keys = {(cell.row, cell.column) for cell in cells}
-    _need(len(keys) == len(cells), "Student inventory assigned a data coordinate more than once")
-    return StudentReportInventory(scope, identifier, report.sha256, report.grid_sha256,
-                                  tuple(cells), position)
+    return complete(position)
 
 
 def verify_inventory_workbook_witnesses(store: ProvenanceStore, *,

@@ -95,7 +95,7 @@ def reviewed_source_additions(manifest_sha256: str) -> tuple[str, dict[str, Any]
     if entry is None:
         return None
     if (not isinstance(entry, dict) or set(entry) != {"family", "references"}
-            or entry["family"] not in {"sof_attendance", "chronic_absence", "bound_transfers"}
+            or entry["family"] not in {"sof_attendance", "chronic_absence", "bound_transfers", "tprs_continuity"}
             or not isinstance(entry["references"], dict)
             or (entry["family"] != "bound_transfers" and entry["references"])
             or (entry["family"] == "bound_transfers" and not entry["references"])):

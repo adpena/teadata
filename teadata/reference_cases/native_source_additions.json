@@ -1,6 +1,10 @@
 {
   "schema_version": 1,
   "releases": {
+    "b4985df48b57c894b11abd2d2596f74defb29fabe20fe2c589366b56602e2e4e": {
+      "family": "tprs_continuity",
+      "references": {}
+    },
     "6c1e3512c3a5186578f5db03a53d565a64bdcd3ef7c28e959162a943b9c81b83": {
       "family": "sof_attendance",
       "references": {}

@@ -6,6 +6,7 @@ owns every publisher field. Literal mode preserves original numeric tokens.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from hashlib import sha256
 from importlib.metadata import distribution, version
@@ -85,6 +86,7 @@ class _WorkbookSelection:
     tables: tuple[_TableSelection, ...]
     notes_sheets: tuple[str, ...]
     literal_cells: bool
+    unselected_tables: tuple[str, ...]
 
 
 def _xml(archive: zipfile.ZipFile, member: str, *, literal: bool = False):
@@ -287,36 +289,46 @@ def _literal_token(cell: ET.Element, strings: list[str]) -> str | None:
     raise ValueError("Unsupported literal financial cell type or value")
 
 
-def _literal_batch(rows: list[ET.Element], strings: list[str], names: list[str], header_row: int,
-                   row_count: int) -> pa.RecordBatch:
-    import pyarrow as pa
-
-    dense_cells = row_count * len(names)
-    if dense_cells > MAX_LITERAL_CELLS or len(rows) != row_count + 1:
-        raise ValueError("Literal financial worksheet exceeds cell admission or has a physical row gap")
-    projected: list[list[str | None]] = [[None] * row_count for _ in names]
-    allocated = 5 * (dense_cells + len(names))
+def _worksheet_cells(rows: list[ET.Element], header_row: int, row_count: int,
+                     column_count: int, *, literal: bool = False) -> Iterator[tuple[int, int, ET.Element]]:
+    """Validate either reader's physical coordinates without interpreting values."""
+    dense_cells = row_count * column_count
+    if (literal and dense_cells > MAX_LITERAL_CELLS) or len(rows) != row_count + 1:
+        raise ValueError("Financial worksheet exceeds cell admission or has a physical row gap")
     for row_index, row in enumerate(rows[1:]):
         ordinal = row_index + header_row + 1
         if int(row.attrib["r"]) != ordinal:
-            raise ValueError("Literal financial worksheet has a physical row gap")
+            raise ValueError("Financial worksheet has a physical row gap")
         seen: set[str] = set()
         for cell in row.findall(NS + "c"):
             reference = cell.attrib["r"]
             match = _CELL_ADDRESS.fullmatch(reference)
             if match is None or int(match[2]) != ordinal or reference in seen:
-                raise ValueError("Duplicate or mismatched literal financial cell coordinate")
+                raise ValueError("Duplicate or mismatched financial cell coordinate")
             seen.add(reference)
             column = 0
             for character in match[1]:
                 column = 26 * column + ord(character) - 64
-            value = _literal_token(cell, strings)
-            if value is not None:
-                allocated += len(value.encode("utf-8"))
-                if allocated > MAX_BATCH_BYTES:
-                    raise ValueError("Literal financial worksheet exceeds expanded string byte admission")
-            if column <= len(names):
-                projected[column - 1][row_index] = value
+            yield row_index, column, cell
+
+
+def _literal_batch(rows: list[ET.Element], strings: list[str], names: list[str], header_row: int,
+                   row_count: int) -> pa.RecordBatch:
+    import pyarrow as pa
+
+    dense_cells = row_count * len(names)
+    if dense_cells > MAX_LITERAL_CELLS:
+        raise ValueError("Literal financial worksheet exceeds cell admission")
+    projected: list[list[str | None]] = [[None] * row_count for _ in names]
+    allocated = 5 * (dense_cells + len(names))
+    for row_index, column, cell in _worksheet_cells(rows, header_row, row_count, len(names), literal=True):
+        value = _literal_token(cell, strings)
+        if value is not None:
+            allocated += len(value.encode("utf-8"))
+            if allocated > MAX_BATCH_BYTES:
+                raise ValueError("Literal financial worksheet exceeds expanded string byte admission")
+        if column <= len(names):
+            projected[column - 1][row_index] = value
     return pa.RecordBatch.from_arrays([pa.array(column, type=pa.string()) for column in projected], names=names)
 
 
@@ -330,7 +342,7 @@ def _selection(cfg: Config, dataset: str, year: int, recorder: BuildRecorder) ->
     options = reader_options(source.reader, "source")
     workbook = options.get("workbook")
     if (not isinstance(workbook, dict) or not {"tables", "notes_sheets"} <= set(workbook)
-            or set(workbook) - {"tables", "notes_sheets", "cell_text"}
+            or set(workbook) - {"tables", "notes_sheets", "cell_text", "unselected_tables"}
             or workbook.get("cell_text", "calamine") not in ("calamine", "ooxml_literal")
             or not isinstance(workbook["tables"], dict) or not workbook["tables"]
             or not isinstance(workbook["notes_sheets"], list)
@@ -344,6 +356,12 @@ def _selection(cfg: Config, dataset: str, year: int, recorder: BuildRecorder) ->
     tables = selected["tables"]
     if set(workbook["tables"]) != {table["table"] for table in tables}:
         raise ValueError("Financial worksheet choices must account for every reviewed table")
+    unselected = workbook.get("unselected_tables", [])
+    if (not isinstance(unselected, list)
+            or any(not isinstance(name, str) or name not in workbook["tables"] for name in unselected)
+            or len(set(unselected)) != len(unselected)
+            or len(unselected) >= len(tables)):
+        raise ValueError("Financial unselected_tables must name distinct reviewed data tables and leave a selected table")
     choices = []
     for table in tables:
         if table_input_sha256s(table) != (identity["sha256"],):
@@ -385,7 +403,7 @@ def _selection(cfg: Config, dataset: str, year: int, recorder: BuildRecorder) ->
             uninterpreted_fields=tuple(uninterpreted)))
     return _WorkbookSelection(source=source, edition=source.metadata.version, source_sha256=identity["sha256"],
         source_size_bytes=identity["size_bytes"], tables=tuple(choices), notes_sheets=tuple(workbook["notes_sheets"]),
-        literal_cells=workbook.get("cell_text") == "ooxml_literal")
+        literal_cells=workbook.get("cell_text") == "ooxml_literal", unselected_tables=tuple(unselected))
 
 
 def _project(batch: pa.RecordBatch, selection: _TableSelection, source: ResolvedDataset,
@@ -538,6 +556,21 @@ def materialize_financial_workbooks(store: ProvenanceStore, *, config: Path, con
                     names = [field["field"] for field in selection.fields] if selection.header_identity == "position" else codes
                     expected_rows, rows = _sheet_frame(archive, sheets[selection.sheet], strings,
                         header_row=selection.header_row, codes=codes, literal=item.literal_cells)
+                    if selection.table in item.unselected_tables:
+                        # These remain real data sheets. Verify their physical
+                        # framing/header, but neither decode facts nor emit an edition.
+                        for _ in _worksheet_cells(rows, selection.header_row, expected_rows, len(names),
+                                                  literal=item.literal_cells):
+                            pass
+                        result.setdefault("unselected_data_tables", []).append({
+                            "dataset": source.dataset, "edition": item.edition,
+                            "table": selection.table, "sheet": selection.sheet,
+                            "header_row": selection.header_row, "physical_rows": expected_rows,
+                            "source_sha256": item.source_sha256,
+                            "field_correctness_qualified": False,
+                        })
+                        del rows
+                        continue
                     if reader is None:
                         batch = _literal_batch(rows, strings, names, selection.header_row, expected_rows)
                         del rows
@@ -562,6 +595,7 @@ def materialize_financial_workbooks(store: ProvenanceStore, *, config: Path, con
                             "header_identity": selection.header_identity,
                             **({"uninterpreted_fields": list(selection.uninterpreted_fields)} if selection.uninterpreted_fields else {})},
                         "notes_sheets": list(item.notes_sheets), "value_policy": policy.to_dict(),
+                        **({"unselected_tables": list(item.unselected_tables)} if item.unselected_tables else {}),
                         "representation": ("literal OOXML numeric tokens and decoded worksheet text"
                                            if item.literal_cells else "Calamine native strings, not original OOXML lexemes"),
                         "batch_rows": 1024,

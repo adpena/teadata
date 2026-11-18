@@ -7,7 +7,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from teadata import attendance_chronic, native_witnesses, sof_attendance, verification
+from teadata import attendance_chronic, native_witnesses, sof_attendance, tprs_student_continuity, verification
 from teadata.manifest import ContractError
 from teadata.release import DataRelease
 
@@ -17,6 +17,7 @@ from teadata.release import DataRelease
     {"family": "sof_attendance", "references": {"unexpected": {}}},
     {"family": "chronic_absence", "references": []},
     {"family": "bound_transfers", "references": {}},
+    {"family": "tprs_continuity", "references": {"unexpected": {}}},
     {"family": "sof_attendance", "references": {}, "approved": True},
 ])
 def test_admission_registry_requires_exact_closed_review(tmp_path, monkeypatch, entry):
@@ -53,6 +54,30 @@ def test_source_review_and_reuse_bind_adjacent_retained_store(monkeypatch, famil
     retained.assert_called_once_with(Path("frozen/child/provenance"))
     qualify.assert_called_once_with(selected, store)
     records.assert_called_once_with(selected, store)
+
+
+@pytest.mark.parametrize("status", ["PASS_CONTINUITY_SOURCE_REPLAY", "HOLD", "PASS_REVIEWED_NATIVE"])
+def test_continuity_admission_requires_exact_review_then_its_own_replay(monkeypatch, status):
+    pin = "b4985df48b57c894b11abd2d2596f74defb29fabe20fe2c589366b56602e2e4e"
+    assert native_witnesses.reviewed_source_additions(pin) == ("tprs_continuity", {})
+    assert native_witnesses.reviewed_source_additions("e" * 64) is None
+    selected = SimpleNamespace(manifest_sha256=pin, path=Path("frozen/child/release.json"))
+    store = Mock()
+    monkeypatch.setattr(verification, "_retained_store", lambda path: store)
+    qualify = Mock(return_value={"status": status})
+    evidence = Mock(return_value=["source_receipt"])
+    monkeypatch.setattr(tprs_student_continuity, "qualify_continuity", qualify)
+    monkeypatch.setattr(tprs_student_continuity, "retained_continuity_evidence", evidence)
+    review = verification._native_review(cast(DataRelease, selected), Mock())
+    assert review.label == "TPRS continuity"
+    assert review.evidence() == ["source_receipt"]
+    if status == "PASS_CONTINUITY_SOURCE_REPLAY":
+        assert review.qualify() == {"status": "PASS_REVIEWED_NATIVE", "source_replay_status": status}
+    else:
+        with pytest.raises(verification.ReceiptError, match="Continuity source replay"):
+            review.qualify()
+    qualify.assert_called_once_with(selected, store, expected_manifest_sha256=pin)
+    evidence.assert_called_once_with(selected, store, expected_manifest_sha256=pin)
 
 
 def test_new_transfer_review_preserves_original_independent_reports():

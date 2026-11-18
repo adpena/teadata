@@ -331,6 +331,7 @@ def test_native_class_size_build_keeps_campus_partitions_opt_in(grid, tmp_path, 
                 metadata.setattr(DataRelease, "artifact", lambda *a, **k: pytest.fail("Class-size planning opened a leaf"))
                 view = entity.tprs.select(field)
                 assert view.edition == class_size_campus_edition(leaf.artifact.edition)
+                assert parent.for_entity(entity, edition="2026").dataset("tprs_class_size").edition == view.edition
                 assert entity.tprs.provenance(field).to_dict() == view.provenance().to_dict()
             assert entity.tprs.class_size_kindergarten_avg_size == value
             row, = view.to_arrow().to_pylist()

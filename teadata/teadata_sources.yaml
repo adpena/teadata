@@ -22839,6 +22839,283 @@ data_sources:
               district: 600b4d3a6204146154ba727ee84278290e3f26a123648d1b4de20b78090b098f
               campus: 3a32e0912f838de49aa272d2161a2b6bc6351f4b59f883c451b206599eb976ff
     latest: 2026
+  tprs_student_continuity:
+    2026:
+      path: source-only/tprs/student-continuity-2026.html
+      metadata:
+        title: 2024-25 TPRS student continuity cohorts, reported 2026
+        version: '2026'
+        publisher: Texas Education Agency
+        source_url: https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html
+        period:
+          kind: school_year
+          start_year: 2024
+          end_year: 2025
+        value_policy: tprs_student_selected_2026
+        metrics:
+          attrition_2024_25_count:
+            field: attrition_2024_25_count
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: count
+          attrition_2024_25_percent:
+            field: attrition_2024_25_percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: percent
+            denominator: Adjusted number of students enrolled in fall 2024; exclude
+              students whose prior campus did not offer the next expected grade in 2025-26
+              or was no longer active. Retained students, including grade 12, remain
+              eligible.
+          retention_2024_25_non_special_education_kindergarten_percent:
+            field: retention_2024_25_non_special_education_kindergarten_percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: percent
+            denominator: Number of non special education students in the prior-year
+              grade who return the next year or graduate.
+          retention_2024_25_non_special_education_grade_1_percent:
+            field: retention_2024_25_non_special_education_grade_1_percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: percent
+            denominator: Number of non special education students in the prior-year
+              grade who return the next year or graduate.
+          retention_2024_25_non_special_education_grade_2_percent:
+            field: retention_2024_25_non_special_education_grade_2_percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: percent
+            denominator: Number of non special education students in the prior-year
+              grade who return the next year or graduate.
+          retention_2024_25_non_special_education_grade_3_percent:
+            field: retention_2024_25_non_special_education_grade_3_percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: percent
+            denominator: Number of non special education students in the prior-year
+              grade who return the next year or graduate.
+          retention_2024_25_non_special_education_grade_4_percent:
+            field: retention_2024_25_non_special_education_grade_4_percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: percent
+            denominator: Number of non special education students in the prior-year
+              grade who return the next year or graduate.
+          retention_2024_25_non_special_education_grade_5_percent:
+            field: retention_2024_25_non_special_education_grade_5_percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: percent
+            denominator: Number of non special education students in the prior-year
+              grade who return the next year or graduate.
+          retention_2024_25_non_special_education_grade_6_percent:
+            field: retention_2024_25_non_special_education_grade_6_percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: percent
+            denominator: Number of non special education students in the prior-year
+              grade who return the next year or graduate.
+          retention_2024_25_non_special_education_grade_7_percent:
+            field: retention_2024_25_non_special_education_grade_7_percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: percent
+            denominator: Number of non special education students in the prior-year
+              grade who return the next year or graduate.
+          retention_2024_25_non_special_education_grade_8_percent:
+            field: retention_2024_25_non_special_education_grade_8_percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: percent
+            denominator: Number of non special education students in the prior-year
+              grade who return the next year or graduate.
+          retention_2024_25_non_special_education_grade_9_percent:
+            field: retention_2024_25_non_special_education_grade_9_percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: percent
+            denominator: Number of non special education students in the prior-year
+              grade who return the next year or graduate.
+          retention_2024_25_special_education_kindergarten_percent:
+            field: retention_2024_25_special_education_kindergarten_percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: percent
+            denominator: Number of special education students in the prior-year grade
+              who return the next year or graduate.
+          retention_2024_25_special_education_grade_1_percent:
+            field: retention_2024_25_special_education_grade_1_percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: percent
+            denominator: Number of special education students in the prior-year grade
+              who return the next year or graduate.
+          retention_2024_25_special_education_grade_2_percent:
+            field: retention_2024_25_special_education_grade_2_percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: percent
+            denominator: Number of special education students in the prior-year grade
+              who return the next year or graduate.
+          retention_2024_25_special_education_grade_3_percent:
+            field: retention_2024_25_special_education_grade_3_percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: percent
+            denominator: Number of special education students in the prior-year grade
+              who return the next year or graduate.
+          retention_2024_25_special_education_grade_4_percent:
+            field: retention_2024_25_special_education_grade_4_percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: percent
+            denominator: Number of special education students in the prior-year grade
+              who return the next year or graduate.
+          retention_2024_25_special_education_grade_5_percent:
+            field: retention_2024_25_special_education_grade_5_percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: percent
+            denominator: Number of special education students in the prior-year grade
+              who return the next year or graduate.
+          retention_2024_25_special_education_grade_6_percent:
+            field: retention_2024_25_special_education_grade_6_percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: percent
+            denominator: Number of special education students in the prior-year grade
+              who return the next year or graduate.
+          retention_2024_25_special_education_grade_7_percent:
+            field: retention_2024_25_special_education_grade_7_percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: percent
+            denominator: Number of special education students in the prior-year grade
+              who return the next year or graduate.
+          retention_2024_25_special_education_grade_8_percent:
+            field: retention_2024_25_special_education_grade_8_percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: percent
+            denominator: Number of special education students in the prior-year grade
+              who return the next year or graduate.
+          retention_2024_25_special_education_grade_9_percent:
+            field: retention_2024_25_special_education_grade_9_percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: percent
+            denominator: Number of special education students in the prior-year grade
+              who return the next year or graduate.
+          underreported_students_2024_25_count:
+            field: underreported_students_2024_25_count
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: count
+          underreported_students_2024_25_percent:
+            field: underreported_students_2024_25_percent
+            period:
+              kind: school_year
+              start_year: 2024
+              end_year: 2025
+            unit: percent
+            denominator: Number of students in grades 7-12 served in the district in
+              the 2024-25 school year; use the direct publisher state observation at
+              state scope.
+        references:
+        - reference_id: definitions
+          title: 2026 TPRS continuity definitions (PDF 41)
+          role: glossary
+          status: available
+          url: https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/comprehensive-tprs-glossary.pdf
+          reviewed_sha256: 8fb51b87853918759ab321d5522ab9f56b8ac318c7d856f5f6f43e947b8a80bb
+          provenance_ids:
+          - 075b06040a75b5cff9d50364d21de15d6ea0886812dd87bd886b512c109328a3
+        - reference_id: legend
+          title: Exact 2026 selected report disclosure legend
+          role: masking_methodology
+          status: available
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2026&id=S&lev=S&prgopt=reports%2Ftapr%2Fstudent.sas
+          reviewed_sha256: ffb93666f4748b7abbc33a031e318b3eb2a2e25d610dd1eba76380ec0ffce3b6
+          provenance_ids:
+          - 6aee427354eccb8b3d238c81f34429178816be63566c899998553044efd21946
+        - reference_id: schedule
+          title: 2026 TPRS release guide
+          role: source_notes
+          status: available
+          url: https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/tprs-user-guide-2026.pdf
+          reviewed_sha256: 911ca6bdfeef3f1780ddcc6fadce1a57bebd95872945bc793c9a177fcd038cf8
+          provenance_ids:
+          - f6a2d6f9390bfcf8d01d624db953d9ddadc00ef75e8858abf50d9a46a71ae012
+        - reference_id: continuity_grid
+          title: 2026 continuity source definitions, scope and independent publisher
+            goldens
+          role: methodology
+          path: methodologies/tprs-student-continuity-2026.json
+          reviewed_sha256: 5875db1689db35522b150ee82485b44cc3f8ad85f56e0ceef7f0c98dd72d71a9
+        - reference_id: columns
+          title: Continuity source-label field bindings
+          role: schema
+          path: schemas/tprs--2026--student-continuity-crosswalk.json
+          reviewed_sha256: 3335edfe7b11d3849bcb95741012825649026ca27c0097b98d87dd13c7b90264
+        notes: Baseline cohort/grade year 2024-25; return and processing window fall
+          2025, report edition 2026. Source-only registration does not qualify or activate
+          a release. Exact attrition exclusions, separate retention populations and
+          September 26, 2025 leaver window are retained in the pinned methodology. Campus
+          excludes underreporting. Percent values are percentage points; no current
+          Membership denominator, masked reconstruction or inferred missing eligibility.
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tprs--2026--student-continuity-crosswalk.json
+            continuity_grid: methodologies/tprs-student-continuity-2026.json
+    latest: 2026
 spatial:
   districts:
     2025:

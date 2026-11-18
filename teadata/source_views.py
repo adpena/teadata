@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING, Any, BinaryIO, Generator, Iterator, Protocol, 
 from .dataset_metadata import ArtifactRef, DataPeriod, EditionKey
 from .identifiers import canonical_source_identifiers
 from .manifest import ContractError, canonical_json
+from .tprs_partitions import TPRS_PARTITION_DATASETS as _TPRS_DATASETS
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -456,15 +457,18 @@ class EntitySources:
         else:
             raise TypeError("Source dataset selection requires a name or exact EditionKey")
         if len(choices) > 1 and isinstance(name, str) and self.scope == "campus":
-            from .tprs_statewide_intake import DATASET
+            from .tprs_partitions import STUDENT_DATASET, TPRS_PARTITION_DATASETS, derived_campus_edition
 
-            if all(key.dataset == DATASET for key in choices):
+            dataset = choices[0].dataset
+            if dataset in TPRS_PARTITION_DATASETS and all(key.dataset == dataset for key in choices):
                 routed = self.release.tprs_student_campus_index(edition=self.edition).edition_for(self.identifier)
                 if routed is None:
                     raise ContractError(
-                        f"No admitted {DATASET} report for campus {self.identifier} in publisher edition "
+                        f"No admitted {dataset} report for campus {self.identifier} in publisher edition "
                         f"{self.edition}. Check that edition's publisher roster; see datasets() for source choices."
                     )
+                if dataset != STUDENT_DATASET:
+                    routed = derived_campus_edition(routed, dataset)
                 if routed not in choices:
                     raise ContractError("Campus report route is outside the selected dataset editions")
                 choices = [routed]
@@ -485,8 +489,6 @@ class EntitySources:
         except _UnknownSourceName as error:
             raise AttributeError(*error.args) from error
 
-
-_TPRS_DATASETS = frozenset({"tprs_student_membership_enrollment_reports", "tprs_class_size"})
 
 
 @dataclass(frozen=True, slots=True)

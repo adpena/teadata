@@ -2,6 +2,7 @@
 
 from hashlib import sha256
 import json
+import re
 from zipfile import ZipFile
 
 from openpyxl import Workbook
@@ -240,6 +241,116 @@ def test_uninterpreted_fact_requires_an_explicit_unknown_unit_definition(tmp_pat
         materialize_financial_workbooks(store, config=config, config_sha256=digest,
             selections=[("fixture_finance", 2024)], output=tmp_path / "native")
     assert not (tmp_path / "native").exists()
+
+
+def _leave_second_data_table_unselected(config, value):
+    document = json.loads(config.read_text())
+    workbook = document["data_sources"]["fixture_finance"]["2024"]["reader"]["profiles"]["source"]["workbook"]
+    workbook["unselected_tables"] = value
+    config.write_text(canonical_json(document))
+    return sha256(config.read_bytes()).hexdigest()
+
+
+def test_unselected_data_table_is_header_accounted_without_an_output_edition(tmp_path):
+    store, config, _ = financial_fixture(tmp_path, tables=2, uninterpreted_values=["<2,790", None])
+    digest = _leave_second_data_table_unselected(config, ["actual1"])
+    result = materialize_financial_workbooks(store, config=config, config_sha256=digest,
+        selections=[("fixture_finance", 2024)], output=tmp_path / "native")
+    assert [entry["key"]["table"] for entry in result["editions"]] == ["actual0"]
+    omitted, = result["unselected_data_tables"]
+    assert omitted["table"] == "actual1"
+    assert omitted["sheet"] == "2024 AF Act secondary"
+    assert omitted["physical_rows"] == 2
+    assert omitted["field_correctness_qualified"] is False
+    release = DataRelease(tmp_path / "native/release.json", offline=True)
+    entry, = result["editions"]
+    ref = release.catalog.artifact_ref(entry["artifact_id"])
+    recipe = release.catalog.to_dict()["provenance"][ref.processing_id]["parameters"]["recipe"]
+    assert recipe["unselected_tables"] == ["actual1"]
+    assert recipe["notes_sheets"] == ["Literal Notes"]
+    assert sha256(canonical_json(recipe).encode()).hexdigest() == ref.contract["recipe_sha256"]
+    values = release.analytical_dataset(entry["artifact_id"]).to_table()
+    assert values["unreviewed_tax_detail"].to_pylist() == ["<2,790", None]
+    assert {key.table for key in release.native_source_ref(location="native.release.json").editions} == {"actual0"}
+    assert all(row["table"] == "actual0" for row in release.catalog.editions(include_metadata=False))
+
+
+@pytest.mark.parametrize("value", [None, "actual1", ["actual1", "actual1"], ["missing"],
+    ["Literal Notes"], ["actual0", "actual1"], [True]])
+def test_unselected_data_table_option_rejects_unknown_duplicate_nonlist_or_empty_output(tmp_path, value):
+    store, config, _ = financial_fixture(tmp_path, tables=2)
+    digest = _leave_second_data_table_unselected(config, value)
+    with pytest.raises(ValueError, match="Financial unselected_tables"):
+        materialize_financial_workbooks(store, config=config, config_sha256=digest,
+            selections=[("fixture_finance", 2024)], output=tmp_path / "native")
+    assert not (tmp_path / "native").exists()
+
+
+def test_unselected_data_table_still_requires_its_exact_publisher_header(tmp_path):
+    store, config, _ = financial_fixture(tmp_path, tables=2,
+        literal_part="xl/worksheets/sheet2.xml",
+        literal_xml=lambda value: value.replace(b"DISTRICT ID", b"UNREVIEWED HEADER"))
+    digest = _leave_second_data_table_unselected(config, ["actual1"])
+    with pytest.raises(ValueError, match="publisher headers differ"):
+        materialize_financial_workbooks(store, config=config, config_sha256=digest,
+            selections=[("fixture_finance", 2024)], output=tmp_path / "native")
+    assert not (tmp_path / "native").exists()
+
+
+@pytest.mark.parametrize("damage", ["wrong_row", "duplicate_cell", "row_gap"])
+@pytest.mark.parametrize("literal", [False, True])
+def test_unselected_table_preserves_coordinate_and_row_gap_admission(tmp_path, damage, literal):
+    def change_xml(raw):
+        if damage == "wrong_row":
+            return raw.replace(b'r="E2"', b'r="E3"')
+        if damage == "duplicate_cell":
+            return raw.replace(b'<c r="E2"', b'<c r="E2"><v>1</v></c><c r="E2"')
+        return re.sub(rb'<row r="2"[^>]*>.*?</row>', b'', raw)
+    store, config, _ = financial_fixture(tmp_path, tables=2,
+        literal_part="xl/worksheets/sheet2.xml", literal_xml=change_xml)
+    digest = _leave_second_data_table_unselected(config, ["actual1"])
+    if not literal:
+        document = json.loads(config.read_text())
+        document["data_sources"]["fixture_finance"]["2024"]["reader"]["profiles"]["source"]["workbook"].pop("cell_text")
+        config.write_text(canonical_json(document))
+        digest = sha256(config.read_bytes()).hexdigest()
+    with pytest.raises(ValueError, match="coordinate|row gap"):
+        materialize_financial_workbooks(store, config=config, config_sha256=digest,
+            selections=[("fixture_finance", 2024)], output=tmp_path / "native")
+    assert not (tmp_path / "native").exists()
+
+
+@pytest.mark.parametrize("selected", [False, True])
+def test_unselected_facts_are_not_interpreted_as_known_unit_numbers(tmp_path, selected):
+    def nonnumeric_amount(raw):
+        return re.sub(rb'<c r="E2"[^>]*>.*?</c>',
+            b'<c r="E2" t="inlineStr"><is><t>unreviewed amount</t></is></c>', raw)
+    store, config, _ = financial_fixture(tmp_path, tables=2,
+        literal_part="xl/worksheets/sheet2.xml", literal_xml=nonnumeric_amount)
+    digest = _leave_second_data_table_unselected(config, [] if selected else ["actual1"])
+    if selected:
+        with pytest.raises(ValueError, match="invalid value"):
+            materialize_financial_workbooks(store, config=config, config_sha256=digest,
+                selections=[("fixture_finance", 2024)], output=tmp_path / "native")
+        assert not (tmp_path / "native").exists()
+    else:
+        result = materialize_financial_workbooks(store, config=config, config_sha256=digest,
+            selections=[("fixture_finance", 2024)], output=tmp_path / "native")
+        assert len(result["editions"]) == 1 and len(result["unselected_data_tables"]) == 1
+
+
+def test_empty_unselected_list_preserves_old_recipe_shape(tmp_path):
+    store, config, _ = financial_fixture(tmp_path, tables=2)
+    digest = _leave_second_data_table_unselected(config, [])
+    result = materialize_financial_workbooks(store, config=config, config_sha256=digest,
+        selections=[("fixture_finance", 2024)], output=tmp_path / "native")
+    assert len(result["editions"]) == 2
+    assert "unselected_data_tables" not in result
+    release = DataRelease(tmp_path / "native/release.json", offline=True)
+    for entry in result["editions"]:
+        ref = release.catalog.artifact_ref(entry["artifact_id"])
+        recipe = release.catalog.to_dict()["provenance"][ref.processing_id]["parameters"]["recipe"]
+        assert "unselected_tables" not in recipe
 
 
 def test_unknown_unit_fact_does_not_implicitly_enable_uninterpreted_projection(tmp_path):

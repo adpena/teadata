@@ -23,7 +23,6 @@ from .release import DataRelease, _install_candidate, publish_release
 from .teadata_config import load_config_bytes
 from .tprs_class_size import CLASS_SIZE_POLICY, CLASS_SIZE_UNIT, _COLUMNS, _FIELDS, _TITLE, read_class_size_report
 from .tprs_statewide_intake import (
-    DATASET as STUDENT_DATASET,
     REVIEWED_CAMPUS_STUDENT_MANIFEST,
     ReportSelection,
     _project_class_size_reports,
@@ -59,11 +58,9 @@ def _crosswalk(inputs: Mapping[str, list[str]]) -> dict[str, Any]:
 
 def class_size_campus_edition(student: EditionKey) -> EditionKey:
     """Translate an exact 2025–26 Student campus partition to its class-size edition."""
-    if (student.dataset, student.edition, student.scope, student.table, student.grain) != (
-        STUDENT_DATASET, str(EDITION), "campus", "campus", "one row per campus_number",
-    ):
-        raise ValueError("Expected a 2025–26 TPRS Student campus edition key")
-    return replace(student, dataset=DATASET, table=f"campus-{student.identity}")
+    from .tprs_partitions import derived_campus_edition
+
+    return derived_campus_edition(student, DATASET)
 
 
 def _class_size_edition(student: EditionKey) -> EditionKey:

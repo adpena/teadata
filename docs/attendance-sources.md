@@ -67,6 +67,16 @@ distinct from absent cells and numeric zero. These witnesses contain 79, 78 and
 That finding describes these named witnesses, not every campus workbook.
 The raw HTML/XLSX and download receipts remain authoritative.
 
+A separate November 17, 2026 retained-source census accounted for all
+10,308 selected reports (9,105 campus, 1,202 district and one direct Texas
+report), covering 4,709,972 physical data cells before Class Size or the actual
+campus report endpoint. No new download or numerical admission followed from
+that census. Of the campus reports, 301 omit both retention and Class Size,
+311 omit only Class Size, and 168 publish Class Size without retention. These
+are observed publisher layouts, not failed joins or zero-valued measurements.
+Embedded benchmark cells, blanks and measures awaiting separate definitions
+remain explicitly held. The existing 179-field projection is unchanged.
+
 ```python
 from teadata.tprs_student_inventory import inventory_student_report
 
@@ -84,6 +94,13 @@ normalization follows the existing HTML reader; original bytes retain styling,
 merged-cell and whitespace evidence. Inventory is an audit, not another entity
 dataset or a shortcut around source qualification. A changed or unrecognized
 layout raises an error. No network lookup or fallback year is performed.
+Some campus reports end after attrition or retention and do not publish the
+later sections; others publish Class Size without retention rows.
+For these exact layouts, `unpublished_sections` names the
+absent sections and `class_size_boundary_row` is `None`. The reader accepts
+only the source's complete disclosure legend and optional publisher footer at
+that endpoint. It does not invent retention/class-size cells or interpret the
+absence as zero. District/state reports still require their complete layout.
 
 The published normal release and live app remain unchanged until normal-release
 integration and app ingestion pass. A source-only candidate is not a selected

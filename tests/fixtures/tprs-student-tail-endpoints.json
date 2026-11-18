@@ -1,0 +1,251 @@
+{
+  "scope": "Original publisher tail rows for layout regression only; prefix in tests is synthetic, not a whole-report numeric golden.",
+  "cases": [
+    {
+      "identifier": "015915668",
+      "source_sha256": "91c3f0513c37c458a1c0eac5af798c297a83ab32ab2f2e65ae0adda190282d59",
+      "receipt": "a5514b85a0baded1bfbde068a66a554576bcb27c93d5fa0563bd750154edac0a",
+      "source_url": "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2026&id=015915668&lev=C&prgopt=reports%2Ftapr%2Fstudent.sas",
+      "downloaded_at": "2026-11-07T13:30:56.215068+00:00",
+      "tail_first_parsed_row": 61,
+      "tail_rows": [
+        [
+          "Student Attrition (2024-25)"
+        ],
+        [
+          "Total Student Attrition",
+          "0",
+          "0.0%",
+          "17.7%",
+          "18.2%",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "-",
+          "Indicates there are no students in the group."
+        ],
+        [
+          "*",
+          "Indicates results are masked due to small numbers to protect student confidentiality."
+        ],
+        [
+          "**",
+          "When only one student disability group is masked, then the second smallest student disability group is masked regardless of size."
+        ],
+        [
+          "?",
+          "Indicates that the data for this item were statistically improbable or were reported outside a reasonable range."
+        ],
+        [
+          "",
+          "TEA | Analytics, Assessment, and Reporting | Performance Reporting",
+          ""
+        ]
+      ],
+      "unpublished_sections": [
+        "Retention Rates by Grade",
+        "Class Size Information"
+      ]
+    },
+    {
+      "identifier": "015916005",
+      "source_sha256": "8dc6bea0b0c674c5c44948f9f50fac9f0597146fca67ab84d4b09b919c83f4d7",
+      "receipt": "14e15641d392f82cb93fff7fd990bacd469b4c349487be8ea9cc17611acdf542",
+      "source_url": "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2026&id=015916005&lev=C&prgopt=reports%2Ftapr%2Fstudent.sas",
+      "downloaded_at": "2026-11-07T13:31:56.376607+00:00",
+      "tail_first_parsed_row": 67,
+      "tail_rows": [
+        [
+          "Student Attrition (2024-25)"
+        ],
+        [
+          "Total Student Attrition",
+          "0",
+          "0.0%",
+          "27.1%",
+          "18.2%",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "",
+          "Non-Special Education Rates",
+          "Special Education Rates"
+        ],
+        [
+          "Student Information",
+          "Campus",
+          "District",
+          "State",
+          "Campus",
+          "District",
+          "State"
+        ],
+        [
+          "Retention Rates by Grade"
+        ],
+        [
+          "Grade 6",
+          "0.0%",
+          "1.1%",
+          "0.3%",
+          "0.0%",
+          "2.3%",
+          "0.3%"
+        ],
+        [
+          "Grade 7",
+          "0.0%",
+          "1.9%",
+          "0.4%",
+          "0.0%",
+          "1.4%",
+          "0.4%"
+        ],
+        [
+          "Grade 8",
+          "40.0%",
+          "1.2%",
+          "0.4%",
+          "0.0%",
+          "2.3%",
+          "0.5%"
+        ],
+        [
+          "Grade 9",
+          "15.8%",
+          "8.4%",
+          "6.6%",
+          "100.0%",
+          "11.3%",
+          "10.2%"
+        ],
+        [
+          "-",
+          "Indicates there are no students in the group."
+        ],
+        [
+          "*",
+          "Indicates results are masked due to small numbers to protect student confidentiality."
+        ],
+        [
+          "**",
+          "When only one student disability group is masked, then the second smallest student disability group is masked regardless of size."
+        ],
+        [
+          "?",
+          "Indicates that the data for this item were statistically improbable or were reported outside a reasonable range."
+        ],
+        [
+          "",
+          "TEA | Analytics, Assessment, and Reporting | Performance Reporting",
+          ""
+        ]
+      ],
+      "unpublished_sections": [
+        "Class Size Information"
+      ]
+    },
+    {
+      "identifier": "015916046",
+      "source_sha256": "584bb16aa6ac3869f345498a8d5a1f7706c5589a940a3f9633d001d49ab6f985",
+      "receipt": "3c6073c4b6658c49cbc4bee020b9cc31b784f8ea1f8df9fb94210a8377f77342",
+      "source_url": "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_debug=0&_program=perfrept.perfmast.sas&_service=marykay&ccyy=2026&id=015916046&lev=C&prgopt=reports%2Ftapr%2Fstudent.sas",
+      "downloaded_at": "2026-11-07T13:35:16.434078+00:00",
+      "tail_first_parsed_row": 63,
+      "tail_rows": [
+        [
+          "Student Attrition (2024-25)"
+        ],
+        [
+          "Total Student Attrition",
+          "0",
+          "0.0%",
+          "27.1%",
+          "18.2%",
+          "",
+          "",
+          "",
+          ""
+        ],
+        [
+          "Class Size Information",
+          "Campus",
+          "District",
+          "State"
+        ],
+        [
+          "Elementary"
+        ],
+        [
+          "Grade 6",
+          "12.5",
+          "14.1",
+          "19.5"
+        ],
+        [
+          "Secondary"
+        ],
+        [
+          "English/Language Arts",
+          "11.6",
+          "15.0",
+          "16.0"
+        ],
+        [
+          "Foreign Languages",
+          "26.4",
+          "20.4",
+          "18.4"
+        ],
+        [
+          "Mathematics",
+          "12.0",
+          "15.7",
+          "17.2"
+        ],
+        [
+          "Science",
+          "15.2",
+          "15.6",
+          "18.4"
+        ],
+        [
+          "Social Studies",
+          "14.4",
+          "16.3",
+          "18.3"
+        ],
+        [
+          "-",
+          "Indicates there are no students in the group."
+        ],
+        [
+          "*",
+          "Indicates results are masked due to small numbers to protect student confidentiality."
+        ],
+        [
+          "**",
+          "When only one student disability group is masked, then the second smallest student disability group is masked regardless of size."
+        ],
+        [
+          "?",
+          "Indicates that the data for this item were statistically improbable or were reported outside a reasonable range."
+        ],
+        [
+          "",
+          "TEA | Analytics, Assessment, and Reporting | Performance Reporting",
+          ""
+        ]
+      ],
+      "unpublished_sections": [
+        "Retention Rates by Grade"
+      ]
+    }
+  ]
+}

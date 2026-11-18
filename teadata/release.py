@@ -467,13 +467,15 @@ class DataRelease:
         return raw
 
     def __getstate__(self) -> dict:
+        from .tprs_partitions import STUDENT_DERIVED_ROUTES
+
         if self._v3:
             return {"_v3": True, "source": self.source, "pin": self.manifest_sha256, "offline": self.offline,
                     "cache_dir": self._cache_dir}
         return {key: value for key, value in self.__dict__.items()
                 if key not in {"_campus_observation_routes", "_campus_observation_plan",
-                               "_campus_class_size_plan", "_tprs_name_indexes", "_source_name_indexes",
-                               "_artifact_locks", "_artifact_lock_pid"}}
+                               "_tprs_name_indexes", "_source_name_indexes", "_artifact_locks", "_artifact_lock_pid",
+                               *(route.memo_attribute for route in STUDENT_DERIVED_ROUTES.values())}}
 
     def __setstate__(self, state: dict) -> None:
         if state.get("_v3") is True:
@@ -1038,16 +1040,18 @@ class DataRelease:
         _options: Sequence[tuple[DataRelease, EditionKey, dict[str, int]]] | None = None,
     ) -> SourceTable | PartitionedSourceTable:
         from .tprs_statewide_intake import DATASET
+        from .tprs_partitions import STUDENT_DERIVED_ROUTES
 
         route_campuses = dataset == DATASET and scope == "campus" and edition is None and bool(identifiers)
-        route_class_size = dataset == "tprs_class_size" and scope == "campus" and edition is None and bool(identifiers)
-        memoize = (_options is None and (route_campuses or route_class_size) and not self._v3
+        derived_route = STUDENT_DERIVED_ROUTES.get(dataset)
+        route_derived = derived_route is not None and scope == "campus" and edition is None and bool(identifiers)
+        memoize = (_options is None and (route_campuses or route_derived) and not self._v3
                    and bool(getattr(os, "O_NOFOLLOW", 0))
                    and 0 < len(fields) <= 32 and all(isinstance(name, str) and len(name) <= 256 for name in fields))
         request = (fields, school_year)
         parent = self.source if self.remote else self.path
         cache_dir = getattr(self, "_cache_dir", None)
-        memo_name = "_campus_class_size_plan" if route_class_size else "_campus_observation_plan"
+        memo_name = derived_route.memo_attribute if route_derived and derived_route else "_campus_observation_plan"
         if memoize:
             memo: _CampusObservationPlan | None = getattr(self, memo_name, None)
             if memo is not None and memo.request == request:
@@ -1055,11 +1059,11 @@ class DataRelease:
                 route_child = (_open_native_source(memo.route_source, parent, offline=self.offline, cache_dir=cache_dir)
                                if memo.route_source is not None else None)
                 if memo.matches_files(child, route_child):
-                    if route_class_size:
+                    if route_derived:
                         returned = False
                         try:
                             result = self._routed_student_campuses(fields, memo.year, child, memo.keys, memo.route.index,
-                                                                   identifiers, class_size=True)
+                                                                   identifiers, dataset=dataset)
                             returned = True
                             return result
                         finally:
@@ -1074,7 +1078,7 @@ class DataRelease:
                 self.__dict__.pop(memo_name, None)
         selected_options = (_options if _options is not None else
                             self._observation_year_options(dataset, fields, scope, edition, memoize, cleanup_on_error=True)
-                            if route_class_size else
+                            if route_derived else
                             self._observation_year_options(dataset, fields, scope, edition, True) if memoize else
                             self._observation_year_options(dataset, fields, scope, edition))
         options = []
@@ -1082,13 +1086,14 @@ class DataRelease:
             for option in selected_options:
                 options.append(option)
         except BaseException:
-            if route_class_size:
+            if route_derived:
                 for source in {source for source, _, _ in options if source is not self}:
                     source.catalog._clear_edition_caches()
                     source._column_schema_data.clear()
             raise
-        if route_class_size:
-            return self._class_size_campus_observations(fields, school_year, options, identifiers, memoize=memoize)
+        if route_derived:
+            return self._derived_student_campus_observations(dataset, fields, school_year, options, identifiers,
+                                                             memoize=memoize)
         if route_campuses:
             year, matches = self._observation_matches(fields, scope, school_year, options)
             child, first = matches[0]
@@ -1120,13 +1125,15 @@ class DataRelease:
                 return self._routed_student_campuses(fields, year, child, matching_keys, route.index, identifiers)
         return self._select_observation_view(fields, scope, school_year, options)._for_entity_ids(identifiers)
 
-    def _class_size_campus_observations(
-        self, fields: tuple[str, ...], school_year: int | None,
+    def _derived_student_campus_observations(
+        self, dataset: str, fields: tuple[str, ...], school_year: int | None,
         options: Sequence[tuple[DataRelease, EditionKey, dict[str, int]]], identifiers: tuple[str, ...], *,
         memoize: bool,
     ) -> SourceTable | PartitionedSourceTable:
         from .tprs_statewide_intake import DATASET
+        from .tprs_partitions import STUDENT_DERIVED_ROUTES
 
+        route_definition = STUDENT_DERIVED_ROUTES[dataset]
         parent = self.source if self.remote else self.path
         cache_dir = getattr(self, "_cache_dir", None)
         request = (fields, school_year)
@@ -1157,24 +1164,25 @@ class DataRelease:
                     route = None
             index = route.index if route is not None else self.tprs_student_campus_index(edition=first.edition)
             matching_keys = frozenset(key for _, key in matches)
-            class_refs = [ref for ref in self.catalog.native_sources if ref.manifest_sha256 == child.manifest_sha256]
-            selected = (_open_native_source(class_refs[0], parent, offline=self.offline, cache_dir=cache_dir)
-                        if len(class_refs) == 1 else child)
+            derived_refs = [ref for ref in self.catalog.native_sources if ref.manifest_sha256 == child.manifest_sha256]
+            selected = (_open_native_source(derived_refs[0], parent, offline=self.offline, cache_dir=cache_dir)
+                        if len(derived_refs) == 1 else child)
             trace = getattr(child, "_metadata_trace", None)
             candidate = None
             if (memoize and route is not None and route.files and route_source is not None
-                    and len(class_refs) == 1 and trace and len(trace) <= 256 and len(options) <= 64
+                    and len(derived_refs) == 1 and trace and len(trace) <= 256 and len(options) <= 64
                     and all(len(str(path)) <= 4096 for path, _ in trace)
                     and all(source is child for source, _, _ in options)):
-                candidate = _CampusObservationPlan(request, year, class_refs[0], matching_keys, route, tuple(trace),
+                candidate = _CampusObservationPlan(request, year, derived_refs[0], matching_keys, route, tuple(trace),
                                                    route_source=route_source, location=(child.path, child.cache))
                 if not candidate.matches_files(selected, student_child):
-                    self.__dict__.pop("_campus_class_size_plan", None)
-                    raise ContractError("Class-size metadata changed during planning; retry with verified source artifacts")
+                    self.__dict__.pop(route_definition.memo_attribute, None)
+                    raise ContractError(f"{route_definition.topic} metadata changed during planning; "
+                                        "retry with verified source artifacts")
             result = self._routed_student_campuses(fields, year, selected, matching_keys, index,
-                                                   identifiers, class_size=True)
+                                                   identifiers, dataset=dataset)
             if candidate is not None:
-                self._campus_class_size_plan = candidate
+                setattr(self, route_definition.memo_attribute, candidate)
             returned = True
             return result
         finally:
@@ -1189,9 +1197,10 @@ class DataRelease:
 
     def _routed_student_campuses(
         self, fields: tuple[str, ...], year: int, child: DataRelease, matching_keys: frozenset[EditionKey],
-        index: TPRSStudentCampusIndex, identifiers: tuple[str, ...], *, class_size: bool = False,
+        index: TPRSStudentCampusIndex, identifiers: tuple[str, ...], *, dataset: str | None = None,
     ) -> SourceTable | PartitionedSourceTable:
         from .source_views import PartitionedSourceTable
+        from .tprs_partitions import STUDENT_DERIVED_ROUTES, derived_campus_edition
 
         groups: dict[EditionKey, list[str]] = {}
         missing, unavailable = [], []
@@ -1200,16 +1209,14 @@ class DataRelease:
             if key is None:
                 missing.append(identifier)
             else:
-                if class_size:
-                    from .tprs_class_size_native import class_size_campus_edition
-
-                    key = class_size_campus_edition(key)
+                if dataset is not None:
+                    key = derived_campus_edition(key, dataset)
                 if key not in matching_keys:
                     unavailable.append(identifier)
                 else:
                     groups.setdefault(key, []).append(identifier)
         if missing or unavailable:
-            topic = "Class Size" if class_size else "Student Information"
+            topic = STUDENT_DERIVED_ROUTES[dataset].topic if dataset is not None else "Student Information"
             raise ContractError(
                 f"Campus {topic} is incomplete for school year {year} "
                 f"in report edition {index.edition}. "

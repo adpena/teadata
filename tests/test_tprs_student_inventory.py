@@ -1,5 +1,7 @@
 """Full retained-report accounting is distinct from semantic admission."""
 from copy import deepcopy
+import json
+from pathlib import Path
 
 import pytest
 
@@ -14,6 +16,7 @@ from test_tprs_students import html, report_rows
 grid = student_fixtures.grid
 policy = student_fixtures.policy
 reviewed174_grid = student_fixtures.reviewed174_grid
+_ENDPOINTS = json.loads((Path(__file__).parent / "fixtures/tprs-student-tail-endpoints.json").read_bytes())["cases"]
 
 
 def full_report(grid, scope):
@@ -52,6 +55,7 @@ def test_inventory_accounts_every_current_and_tail_data_coordinate(grid, scope):
     assert all(cell.disposition == "held" and cell.field is None and cell.period is None
                and cell.population is None and cell.denominator is None for cell in tail)
     assert any(cell.raw == "0" for cell in tail) and any(cell.raw == "*" for cell in tail)
+    assert result.class_size_boundary_row is not None
     assert rows[result.class_size_boundary_row - 1][0] == "Class Size Information"
 
 
@@ -82,6 +86,63 @@ def test_inventory_preserves_explicit_blank_and_dot_as_held(grid):
     report = inventory_student_report(html(rows), scope="district", identifier=identifier)
     assert any(cell.raw == "." and cell.reason == "undocumented_dot_token" for cell in report.cells)
     assert any(cell.raw == "" and cell.reason == "publisher_blank_no_measure_published" for cell in report.cells)
+
+
+@pytest.mark.parametrize("retention,footer", [(False, False), (False, True), (True, False), (True, True)])
+def test_campus_report_can_end_at_attrition_or_retention_without_class_size(grid, retention, footer):
+    # Source layout witnesses: 015915668 /91c3f051... ends after attrition;
+    # 015916005 /8dc6bea0... ends after its retention rows. No zero rows are added.
+    rows, identifier = full_report(grid, "campus")
+    boundary = rows.index(["Class Size Information", "Campus", "District", "State"])
+    start = boundary if retention else rows.index(["", "Non-Special Education Rates", "Special Education Rates"])
+    rows = [*rows[:start], *grid["legend"]]
+    if footer:
+        rows.append(["", "TEA | Analytics, Assessment, and Reporting | Performance Reporting", ""])
+    report = inventory_student_report(html(rows), scope="campus", identifier=identifier)
+    assert report.class_size_boundary_row is None
+    assert report.unpublished_sections == (("Class Size Information",) if retention else
+                                          ("Retention Rates by Grade", "Class Size Information"))
+    assert any(cell.section == "Retention Rates by Grade" for cell in report.cells) is retention
+    assert not any(cell.section == "Class Size Information" for cell in report.cells)
+
+
+def test_absent_campus_sections_do_not_allow_unknown_or_duplicate_tail_data(grid):
+    rows, identifier = full_report(grid, "campus")
+    boundary = rows.index(["", "Non-Special Education Rates", "Special Education Rates"])
+    for extra in (["Unknown data", "1"], ["Student Attrition (2024-25)"]):
+        changed = [*rows[:boundary], *grid["legend"], extra]
+        with pytest.raises(ContractError, match="unrecognized data"):
+            inventory_student_report(html(changed), scope="campus", identifier=identifier)
+
+
+def test_campus_can_publish_class_size_without_retention_rows(grid):
+    # Source 015916046 /584bb16a... proceeds directly from attrition to Class Size.
+    rows, identifier = full_report(grid, "campus")
+    retention = rows.index(["", "Non-Special Education Rates", "Special Education Rates"])
+    boundary = rows.index(["Class Size Information", "Campus", "District", "State"])
+    changed = [*rows[:retention], *rows[boundary:]]
+    report = inventory_student_report(html(changed), scope="campus", identifier=identifier)
+    assert report.unpublished_sections == ("Retention Rates by Grade",)
+    assert report.class_size_boundary_row is not None
+    assert changed[report.class_size_boundary_row - 1][0] == "Class Size Information"
+    assert not any(cell.section == "Retention Rates by Grade" for cell in report.cells)
+    changed.insert(-len(grid["legend"]), ["Class Size Information", "Campus", "District", "State"])
+    with pytest.raises(ContractError, match="one exact Class Size boundary"):
+        inventory_student_report(html(changed), scope="campus", identifier=identifier)
+
+
+@pytest.mark.parametrize("case", _ENDPOINTS, ids=lambda case: case["identifier"])
+def test_actual_publisher_tail_layouts_preserve_original_cells_and_missing_sections(grid, case):
+    rows, _ = full_report(grid, "campus")
+    start = rows.index(["Student Attrition (2024-25)"])
+    rows[2] = [f"Synthetic prefix ({case['identifier']})"]
+    combined = [*rows[:start], *case["tail_rows"]]
+    report = inventory_student_report(html(combined), scope="campus", identifier=case["identifier"])
+    assert report.unpublished_sections == tuple(case["unpublished_sections"])
+    attrition = [cell for cell in report.cells if cell.section == "Student Attrition (2024-25)"]
+    assert [cell.raw for cell in attrition] == case["tail_rows"][1][1:]
+    assert all(cell.disposition == "held" and cell.field is None for cell in attrition)
+    assert (report.class_size_boundary_row is None) == ("Class Size Information" in report.unpublished_sections)
 
 
 def test_new_composition_contract_preserves174_and_has_exact_denominators(grid, reviewed174_grid):

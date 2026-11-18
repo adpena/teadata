@@ -1073,6 +1073,20 @@ def _native_review(release: DataRelease, store: ProvenanceStore) -> _NativeRevie
         if release.manifest_sha256 in pins:
             return _NativeReview(label, partial(qualify, release, store), partial(evidence, release, store))
     addition = reviewed_source_additions(release.manifest_sha256)
+    if addition is not None and addition[0] == "tprs_continuity":
+        from teadata.tprs_student_continuity import qualify_continuity, retained_continuity_evidence
+
+        processing_store = _retained_store(release.path.parent / "provenance")
+        pin = release.manifest_sha256
+
+        def continuity_qualification() -> dict[str, Any]:
+            result = qualify_continuity(release, processing_store, expected_manifest_sha256=pin)
+            if result.get("status") != "PASS_CONTINUITY_SOURCE_REPLAY":
+                raise ReceiptError("Continuity source replay did not pass qualification")
+            return {**result, "status": "PASS_REVIEWED_NATIVE", "source_replay_status": result["status"]}
+
+        return _NativeReview("TPRS continuity", continuity_qualification,
+            partial(retained_continuity_evidence, release, processing_store, expected_manifest_sha256=pin))
     if addition is not None and addition[0] in {"sof_attendance", "chronic_absence"}:
         if addition[0] == "sof_attendance":
             from teadata.sof_attendance import qualify_sof_attendance as qualify, retained_sof_evidence as evidence

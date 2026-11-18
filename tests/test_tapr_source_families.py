@@ -553,6 +553,13 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     selected_entry = current['data_sources'].pop(selected_students)
     assert list(selected_entry) == [2026, 'latest'] and selected_entry['latest'] == 2026
     assert current['schema']['data_sources'].pop(selected_students) == ['html']
+    continuity = current['data_sources'].pop('tprs_student_continuity')
+    assert list(continuity) == [2026, 'latest'] and continuity['latest'] == 2026
+    assert list(continuity[2026]['reader']['profiles']) == ['source']
+    assert continuity[2026]['metadata']['version'] == '2026'
+    assert continuity[2026]['metadata']['period'] == {'kind': 'school_year', 'start_year': 2024, 'end_year': 2025}
+    assert 'tprs_student_continuity' not in current['schema']['data_sources']
+    assert load_config().is_source_only('tprs_student_continuity', 2026)
     assert current['value_policies'].pop('tprs_student_selected_2026')['reference_id'] == 'legend'
     campus_transfer = current['data_sources']['campus_transfer_reports'][2025]
     transfer_profiles = campus_transfer['reader'].pop('profiles')
