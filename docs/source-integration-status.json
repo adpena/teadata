@@ -1,26 +1,26 @@
 {
   "schema_version": 1,
-  "observed_at": "2026-11-17T23:26:26.220247+00:00",
+  "observed_at": "2026-11-18T06:44:26.287753+00:00",
   "generator": {
-    "software_version": "0.0.165",
+    "software_version": "0.0.166",
     "working_source_sha256": {
       "scripts/source_inventory.py": "68a90e79a7066867c3604e2a304ab650c59591389e2eb00c0234e035c7a7893a",
       "teadata/release_inventory.py": "5f6e4cbac970e08d71b2d5713ce1eb0cf3e4944b0adedd41e01fed6d20196cce",
-      "teadata/release.py": "7a387fd50de889e0de51aee226911bc0162426f8e79d9f3ab1e8cdde48c06399",
+      "teadata/release.py": "cdce1593d10a5113732e90ae8698cf92ac14b6ea1fe0f32826a5097c94b422c7",
       "teadata/teadata_config.py": "df0ddde32572e3f43d245f07fbb7640eabedf9a8bfccfc068fdc3c8e3c498b24"
     }
   },
-  "config_sha256": "600c53fdbcbdb8326790da854b7310a524f05edcc92718e782ebb343e19252bc",
+  "config_sha256": "215dd97196cc740835435dcf83887b1862a8214a3f11c71df02bc3a4eb85327f",
   "scope": "Configuration registration and selected catalog metadata only. No observation, source acquisition or qualification replay.",
   "summary": {
-    "registered_ids": 126,
-    "registered_editions": 278,
-    "source_only_ids": 113,
+    "registered_ids": 127,
+    "registered_editions": 279,
+    "source_only_ids": 114,
     "source_only_ids_not_attached": 85,
     "base_inputs": 13,
-    "native_attachments": 20,
-    "native_dataset_ids": 31,
-    "native_edition_scope_keys": 277
+    "native_attachments": 21,
+    "native_dataset_ids": 32,
+    "native_edition_scope_keys": 302
   },
   "registration": [
     {
@@ -2174,6 +2174,26 @@
       "attached_scopes": []
     },
     {
+      "dataset": "tprs_student_continuity",
+      "section": "data_sources",
+      "registered_editions": [
+        2026
+      ],
+      "source_only_editions": [
+        2026
+      ],
+      "base_input_present": false,
+      "native_attachment_present": true,
+      "attached_report_editions": [
+        "2026"
+      ],
+      "attached_scopes": [
+        "campus",
+        "district",
+        "state"
+      ]
+    },
+    {
       "dataset": "tprs_student_membership_enrollment_reports",
       "section": "data_sources",
       "registered_editions": [
@@ -2222,9 +2242,9 @@
   "selected_catalog": {
     "schema_version": 1,
     "release": {
-      "source": "https://github.com/adpena/teadata/releases/download/v0.0.165/release.json",
-      "manifest_sha256": "e32c15b1f782f7a10f97b2158c4560a0c161d2c47fec5448987a9d55fe4c5685",
-      "build_id": "92d82a7b54f4b3f6b8ea9850e31897a746f456d7542cf8e74396d0dc6fab636c"
+      "source": "https://github.com/adpena/teadata/releases/download/v0.0.166/release.json",
+      "manifest_sha256": "e34cce994f2db88b5a2dd0eb3d6950412d0bd7439603675018503844f4da471a",
+      "build_id": "63290448a80ffa9fd959f4217dcb2015f882d51e426bde264b95e292486c6514"
     },
     "include_variables": true,
     "metadata_inspected": true,
@@ -6383,6 +6403,213 @@
         ]
       },
       {
+        "location": "native-b4985df48b57c894b11abd2d2596f74defb29fabe20fe2c589366b56602e2e4e.json",
+        "manifest_sha256": "b4985df48b57c894b11abd2d2596f74defb29fabe20fe2c589366b56602e2e4e",
+        "build_id": "04af827e01883ea6d20ec9f0146613e0032df609e79eb49c027276b271f38fd9",
+        "editions": [
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "a21fc42e93302e92a22889e0d3312eacee51ceb83101a6c6101debe046b33a43",
+            "scope": "campus",
+            "table": "campus-ccd555aca0428dc8325e2d554fbb8f0ed913637eb9977c466644edfbd82dd7f6",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "78f7956aa15c6842b540ba73f3e57f24c3d22f86cd39e797644ef463a15e6504",
+            "scope": "campus",
+            "table": "campus-1faf11c9f7c1d852f2f9fba3e62cffda010a60e4470f3ecbddea158f586ae4ac",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "848fa011ec76015ad2aab867701f45c458ee8fb1feb50f09ac157b2ad71658d7",
+            "scope": "campus",
+            "table": "campus-efde17423d7bbcf7bc8f500999edf11fd4f5ef707d4cf84b275c4790c9ab587d",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "b16c1ecb1e083e10ce96de044c1c2d60b34965e5f2a5341e9383cc817a933521",
+            "scope": "state",
+            "table": "state",
+            "grain": "one statewide observation"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "77043f9df20ebc79516de2355b46369317282b4267f6d3f7132a94f3bacdb102",
+            "scope": "campus",
+            "table": "campus-7b135d070acdff2193cad4b3992490ec1f49eb017ebbcc65778ccee07b46f2df",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "b8e377fc5263a71759f6b3ac1f4c1a9cfd586a28b82aa8d7a234e5d50c09f6be",
+            "scope": "campus",
+            "table": "campus-93672a72957c7a111847e7c00afc8f04ae991c1bfa235e1c02ba2d26c4eba748",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "28b493f9d1a6cab495a36dd0dd3bd61b65754fa3b3ec290e13b4d1112125583c",
+            "scope": "district",
+            "table": "district",
+            "grain": "one row per district_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "7cc01e7030e264f521f954b923a1cb6cc7ce34e184d7876389957a141fb87427",
+            "scope": "campus",
+            "table": "campus-8795087b4036a501a0219991a4c2056e852285b8133d30e420da5c11dbc15f6c",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "a100f05d332d80d7f084534ba44d092ba7756b15cd7b97ad00fa8c3113baaa71",
+            "scope": "campus",
+            "table": "campus-fcb44a16f94d7c1dd665051ee2518eac6eb8de8124f25f313dabafb41c430b0e",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "7e897d2e27652bd6b6428594d90e38fc3990302deebb9325e3aaad7b1735c206",
+            "scope": "campus",
+            "table": "campus-45f12ac990129e287ccbdb065dff6f166556b315e7738f8f8c5022df3f32acac",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "d23d023eaf3c96b7b12ccc2bc2ff52b9dbb9fefaa39df7806423a61a183bbf31",
+            "scope": "campus",
+            "table": "campus-2c7690e6f8ca8722c068c20eeb5f372242ee5a9a1dc6ed3fc4991f6c1a05e504",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "273b0ee7a9b0a301db2cc0856f119681cd301fb634548ba08da643b7b969cb39",
+            "scope": "campus",
+            "table": "campus-10ce4160182787d4cda7f4020fdff4456285f8c9df9a9467b808cf12844f214b",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "9230bdf47af9996500e3631e2b3b48cfd8a135bb401669a347af1f4aae1822fc",
+            "scope": "campus",
+            "table": "campus-8255bad948b5fd2a587336820f393e3f91f33d62f1988422bf83af62b40fa81d",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "239e03fa5ead73cb539a2ca7ffe739dcf97578908877eceb5a5b22ccca4f7cee",
+            "scope": "campus",
+            "table": "campus-7d334f02277f7bfc7ef46e40e951456aa8549d072def34a551de15d9a876ebec",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "8f705348358c2cd601589059a7ccc41692480de4e5fd81ba2f1d01ab6224fa8d",
+            "scope": "campus",
+            "table": "campus-b5b766a2f9c15e889df8c4b379f286032bc499f7cc08ebfab9b2ff6985326791",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "519bdb143a8647a829c27fa9f92ff20aa1c07b59bfb602959abad5f770077392",
+            "scope": "campus",
+            "table": "campus-93f790bf1742137d441d87a1d757084928115ebcb55251ae7c30058c359232a5",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "c578f4c176aa702e4d634194b755cd21bf7bc85e9bc48a52e80d8c8a858ca79a",
+            "scope": "campus",
+            "table": "campus-e47421fee896f6891f74096c95c0c931271e4cbbdaf231e3a596a638af2220c6",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "e8533516c2629d05f1aa76c1302e7063e6978c4ae3632c528e523138e65b1dbf",
+            "scope": "campus",
+            "table": "campus-f48b824774d88690e25cd591c3334e18bee2e1cf38fe2c7491d71ab9adddfaec",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "9748c6f26df5e4e404b6b102ba7bcb21808dbaf9b4203660e3faba24110fbda7",
+            "scope": "campus",
+            "table": "campus-ea529bc6b28574eee4a8d7273563a98397286eb860ac1c56e6fa916689c9cd51",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "77d3e7c012321696105fd4d7f504ee0bc0efba972d1c398531614004c7c1ef09",
+            "scope": "campus",
+            "table": "campus-884efda675555c51ca4f6e6e34af1d721abc4bc0664347217a53654babacb05f",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "bce66df28462b82850ff6f81e44a953eae1297243703f116a0fa3fb259118d99",
+            "scope": "campus",
+            "table": "campus-1ed739262ad170b289854a3162c89bc3b5294126fba334db6af277f5391d3c2c",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "a83d629f34f1427a2abccb6953a28f0f2070b5e393589d4a6f8204f65c6d0664",
+            "scope": "campus",
+            "table": "campus-41943807a32722a291d3dd5d4a9de064eefb08c3c3cc9e211c6cbf929c39a7dd",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "d8605b8a209a8710cbc6fb7af735f9ab35738314fba33f796d3783432bc74eb3",
+            "scope": "campus",
+            "table": "campus-2aa6b75ef94cdb9699cd1d435009555642a0bb321fda290b6f89459536054feb",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "509de5e86fc974cdc5ce25c14db9545ccf2b092a19ca76e570428f719d62c256",
+            "scope": "campus",
+            "table": "campus-8d0d94c703d39eefb3b339c773cb47ff157791f3fd6016d50be9ba16a193e418",
+            "grain": "one row per campus_number"
+          },
+          {
+            "dataset": "tprs_student_continuity",
+            "edition": "2026",
+            "revision_sha256": "22896e479f3a829f9f4fa34621397ee112e6033abf92244dd0f4fbaa0f8da8d2",
+            "scope": "campus",
+            "table": "campus-fcafa83812ab3f499783ae8d30fb0ffdabe5c82d489d57d14d5fcb412fdded0d",
+            "grain": "one row per campus_number"
+          }
+        ]
+      },
+      {
         "location": "native-ba34346da8d71b7f87bee82d0b3798c20b5e566516d191e2145f4754a1b9d359.json",
         "manifest_sha256": "ba34346da8d71b7f87bee82d0b3798c20b5e566516d191e2145f4754a1b9d359",
         "build_id": "53eea22e7c2828fa8affe5fe4294dc96e60d814774d4e8fbb677e835d6a44c69",
@@ -6785,6 +7012,69 @@
               "ethnicity",
               "gender",
               "preparation_route"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "01c067b1db992d27a912227259f294262fbf7fd3f2f060f5b50a6accf4528e07",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "a21fc42e93302e92a22889e0d3312eacee51ceb83101a6c6101debe046b33a43",
+        "scope": "campus",
+        "table": "campus-ccd555aca0428dc8325e2d554fbb8f0ed913637eb9977c466644edfbd82dd7f6",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
             ]
           }
         ]
@@ -8266,6 +8556,69 @@
         ]
       },
       {
+        "edition_id": "1b0c0ca5110beb1d530f8f0d4ae7a65fbed2d1fccd3170518ae9e8714ff2c4ec",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "78f7956aa15c6842b540ba73f3e57f24c3d22f86cd39e797644ef463a15e6504",
+        "scope": "campus",
+        "table": "campus-1faf11c9f7c1d852f2f9fba3e62cffda010a60e4470f3ecbddea158f586ae4ac",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "1c16e22d5f8be1fc11f357a2fde500ff8d23b5fb0bcb37d592d29304e4f69711",
         "dataset": "peims_student_programs_and_special_populations",
         "edition": "2023",
@@ -9240,6 +9593,69 @@
         ]
       },
       {
+        "edition_id": "2356dc54c0e8fa4014c2e6c104976a409dc70775adc595d31bf26d049bf806cd",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "848fa011ec76015ad2aab867701f45c458ee8fb1feb50f09ac157b2ad71658d7",
+        "scope": "campus",
+        "table": "campus-efde17423d7bbcf7bc8f500999edf11fd4f5ef707d4cf84b275c4790c9ab587d",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "250a19ed945282407fdfcfdf37c873e6641215d75b0540738e56a3dab68174ae",
         "dataset": "peims_student_enrollment_by_ethnicity",
         "edition": "2026",
@@ -9320,6 +9736,71 @@
               "ethnicity",
               "gender",
               "preparation_route"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "25aec664a09e397bd8fb43e8178bf4f2c0e44dcd4e9904397d13d113ddb975a4",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "b16c1ecb1e083e10ce96de044c1c2d60b34965e5f2a5341e9383cc817a933521",
+        "scope": "state",
+        "table": "state",
+        "grain": "one statewide observation",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 24,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count",
+              "underreported_students_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent",
+              "underreported_students_2024_25_percent"
             ]
           }
         ]
@@ -10508,6 +10989,69 @@
         ]
       },
       {
+        "edition_id": "2e274cb4e22314162bbff12e9f3f4f7b2e1ee4c15f85e679344ec0663783ff4e",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "77043f9df20ebc79516de2355b46369317282b4267f6d3f7132a94f3bacdb102",
+        "scope": "campus",
+        "table": "campus-7b135d070acdff2193cad4b3992490ec1f49eb017ebbcc65778ccee07b46f2df",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "2e7437e5f0f9e86899f31fc544ef1416deabfb7146b7d40f8b7981b5f2f8543d",
         "dataset": "tprs_class_size",
         "edition": "2026",
@@ -10652,6 +11196,69 @@
             "fields": [
               "first_teaching_school_year",
               "publisher_group"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "33d4db0b260b76d2e00dc1b175a6e0f74fb30fd476bf87d89ea2d4067b5ce0cc",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "b8e377fc5263a71759f6b3ac1f4c1a9cfd586a28b82aa8d7a234e5d50c09f6be",
+        "scope": "campus",
+        "table": "campus-93672a72957c7a111847e7c00afc8f04ae991c1bfa235e1c02ba2d26c4eba748",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
             ]
           }
         ]
@@ -10980,6 +11587,71 @@
               "region_number",
               "staff_category",
               "staff_role"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "385307d15dc6c61593693c1d3e9647cc2b08a012e7411f97fe2fb06b0b192c7d",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "28b493f9d1a6cab495a36dd0dd3bd61b65754fa3b3ec290e13b4d1112125583c",
+        "scope": "district",
+        "table": "district",
+        "grain": "one row per district_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 24,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count",
+              "underreported_students_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent",
+              "underreported_students_2024_25_percent"
             ]
           }
         ]
@@ -12758,6 +13430,69 @@
         ]
       },
       {
+        "edition_id": "5020d76e9d793c2e12b08fd236ccfd3e74d6eaa494b84caaa77d69982dcccb2d",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "7cc01e7030e264f521f954b923a1cb6cc7ce34e184d7876389957a141fb87427",
+        "scope": "campus",
+        "table": "campus-8795087b4036a501a0219991a4c2056e852285b8133d30e420da5c11dbc15f6c",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "5176f41b9d9e2146f70fe5e226204efa6a2bc178a712465dbb5023de87d364b7",
         "dataset": "peims_student_enrollment_by_ethnicity",
         "edition": "2022",
@@ -12970,6 +13705,69 @@
               "region_number",
               "school_year",
               "source_scope"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "53881ef0ee409734738999a4108bdbda28ae830871f793c3477138c715a5fada",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "a100f05d332d80d7f084534ba44d092ba7756b15cd7b97ad00fa8c3113baaa71",
+        "scope": "campus",
+        "table": "campus-fcb44a16f94d7c1dd665051ee2518eac6eb8de8124f25f313dabafb41c430b0e",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
             ]
           }
         ]
@@ -13472,6 +14270,69 @@
             "fields": [
               "first_teaching_school_year",
               "publisher_group"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "5960877b25b19b1ab556f6fe59c3e859f67d9b826903c7fb5aedaa5ace6f34bd",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "7e897d2e27652bd6b6428594d90e38fc3990302deebb9325e3aaad7b1735c206",
+        "scope": "campus",
+        "table": "campus-45f12ac990129e287ccbdb065dff6f166556b315e7738f8f8c5022df3f32acac",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
             ]
           }
         ]
@@ -14137,6 +14998,69 @@
         ]
       },
       {
+        "edition_id": "62663b68e6308109642384690b8ff446c746e2a8f9f3436cbf0cec9573d20621",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "d23d023eaf3c96b7b12ccc2bc2ff52b9dbb9fefaa39df7806423a61a183bbf31",
+        "scope": "campus",
+        "table": "campus-2c7690e6f8ca8722c068c20eeb5f372242ee5a9a1dc6ed3fc4991f6c1a05e504",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "63d252e0428036d822d793903e568a12ceb23e7635e40fe3900486d9cfe3584a",
         "dataset": "educator_state_initial_certification_principal",
         "edition": "2026-09",
@@ -14388,6 +15312,69 @@
               "ethnicity",
               "gender",
               "preparation_route"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "68ffddf0284662f251db8c375432eb6a2ce8b316793a9f1b27924c981de47bad",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "273b0ee7a9b0a301db2cc0856f119681cd301fb634548ba08da643b7b969cb39",
+        "scope": "campus",
+        "table": "campus-10ce4160182787d4cda7f4020fdff4456285f8c9df9a9467b808cf12844f214b",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
             ]
           }
         ]
@@ -15424,6 +16411,69 @@
               "region_number",
               "school_year",
               "source_scope"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "76e671730d7a6c1ce37144941a1a08d3b2f5e110d2cd9cdb215a1cc0983e684b",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "9230bdf47af9996500e3631e2b3b48cfd8a135bb401669a347af1f4aae1822fc",
+        "scope": "campus",
+        "table": "campus-8255bad948b5fd2a587336820f393e3f91f33d62f1988422bf83af62b40fa81d",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
             ]
           }
         ]
@@ -18948,6 +19998,132 @@
         ]
       },
       {
+        "edition_id": "948e7ca5272e576b17230886b834928e509efe5d80cef0d1f9d88470786a2966",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "239e03fa5ead73cb539a2ca7ffe739dcf97578908877eceb5a5b22ccca4f7cee",
+        "scope": "campus",
+        "table": "campus-7d334f02277f7bfc7ef46e40e951456aa8549d072def34a551de15d9a876ebec",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "9dccdf168eb7400ed6eb5ff6337a3e1dcc04c7f099633c800e23a359634f84dc",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "8f705348358c2cd601589059a7ccc41692480de4e5fd81ba2f1d01ab6224fa8d",
+        "scope": "campus",
+        "table": "campus-b5b766a2f9c15e889df8c4b379f286032bc499f7cc08ebfab9b2ff6985326791",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "9f2bd2ac93a03d1a479c16b697e0a29a4f796c7c23f4df272dad0bf99bfa65ca",
         "dataset": "educator_state_initial_certification_teacher",
         "edition": "2026-09",
@@ -19110,6 +20286,69 @@
         ]
       },
       {
+        "edition_id": "a1d1bf5397f1ac24afd022988dd0797c041fd7b2e689651f93d8a30be69fa544",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "519bdb143a8647a829c27fa9f92ff20aa1c07b59bfb602959abad5f770077392",
+        "scope": "campus",
+        "table": "campus-93f790bf1742137d441d87a1d757084928115ebcb55251ae7c30058c359232a5",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "a2001809aef9a59966f98f53145063e6a89843886d783ac1c5eacd4a013866d9",
         "dataset": "educator_district_new_hires",
         "edition": "5",
@@ -19151,6 +20390,69 @@
               "education_service_center_label",
               "school_year_end",
               "school_year_label"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "a5ff4ef096e1ad9cd0916ea4006a021ce6894dddd9de65dea99f3c2157ce122b",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "c578f4c176aa702e4d634194b755cd21bf7bc85e9bc48a52e80d8c8a858ca79a",
+        "scope": "campus",
+        "table": "campus-e47421fee896f6891f74096c95c0c931271e4cbbdaf231e3a596a638af2220c6",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
             ]
           }
         ]
@@ -20111,6 +21413,69 @@
         ]
       },
       {
+        "edition_id": "b4138cfc2b36b5adc88084e009e7ba6f80dbf265500eda50fee7ce892c7ced85",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "e8533516c2629d05f1aa76c1302e7063e6978c4ae3632c528e523138e65b1dbf",
+        "scope": "campus",
+        "table": "campus-f48b824774d88690e25cd591c3334e18bee2e1cf38fe2c7491d71ab9adddfaec",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "b4b4c3d43d1f1e6d977c2e83871d93c28f4296b6ed249c393e5338cc10890faa",
         "dataset": "peims_college_credit",
         "edition": "2026",
@@ -20564,6 +21929,69 @@
               "ethnicity",
               "gender",
               "preparation_route"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "b796a70f20655ea2f8971c5f476808490ea2121ca92ac26455ee5542480d853e",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "9748c6f26df5e4e404b6b102ba7bcb21808dbaf9b4203660e3faba24110fbda7",
+        "scope": "campus",
+        "table": "campus-ea529bc6b28574eee4a8d7273563a98397286eb860ac1c56e6fa916689c9cd51",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
             ]
           }
         ]
@@ -22459,6 +23887,69 @@
         ]
       },
       {
+        "edition_id": "cf5b8a85efa3b742f062a2c55ca9941ed2124f4f52188b744e56831591e2c68b",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "77d3e7c012321696105fd4d7f504ee0bc0efba972d1c398531614004c7c1ef09",
+        "scope": "campus",
+        "table": "campus-884efda675555c51ca4f6e6e34af1d721abc4bc0664347217a53654babacb05f",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "cfceee84529769fd011c24761cfd3a74a91160de984a59e65f9dcf19bcb99cf0",
         "dataset": "educator_state_retention_by_demographic_group",
         "edition": "2026-04",
@@ -23414,6 +24905,69 @@
         ]
       },
       {
+        "edition_id": "ddeaac0b610c1f926591adf2bedb00131419f3765babf6c817d476f52b565c07",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "bce66df28462b82850ff6f81e44a953eae1297243703f116a0fa3fb259118d99",
+        "scope": "campus",
+        "table": "campus-1ed739262ad170b289854a3162c89bc3b5294126fba334db6af277f5391d3c2c",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "df295b9cd1b73fcb441dedd146a82b4813cbd9407effb71e75c43bc6aa468f1f",
         "dataset": "state_tapr_staff_profile",
         "edition": "2025",
@@ -23688,6 +25242,69 @@
               "class_size_sec_math_avg_size",
               "class_size_sec_sci_avg_size",
               "class_size_sec_soc_stud_avg_size"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "e1cab5477041ee4dbe038e1a4010eecb4539a841c06c37a93c0d3262843f4e22",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "a83d629f34f1427a2abccb6953a28f0f2070b5e393589d4a6f8204f65c6d0664",
+        "scope": "campus",
+        "table": "campus-41943807a32722a291d3dd5d4a9de064eefb08c3c3cc9e211c6cbf929c39a7dd",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
             ]
           }
         ]
@@ -24228,6 +25845,132 @@
               "object_code",
               "program_intent_code",
               "source_update_date"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "e74ad9bad76c7d5c5cde20427ee413c63cc84659a4aee4bbdf8b8681f8770452",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "d8605b8a209a8710cbc6fb7af735f9ab35738314fba33f796d3783432bc74eb3",
+        "scope": "campus",
+        "table": "campus-2aa6b75ef94cdb9699cd1d435009555642a0bb321fda290b6f89459536054feb",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "e767249e6fa7d29ab6928aa716d80289292206f0d3ae12b262a1afbaf541ccc6",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "509de5e86fc974cdc5ce25c14db9545ccf2b092a19ca76e570428f719d62c256",
+        "scope": "campus",
+        "table": "campus-8d0d94c703d39eefb3b339c773cb47ff157791f3fd6016d50be9ba16a193e418",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
             ]
           }
         ]
@@ -25882,6 +27625,69 @@
               "ethnicity",
               "region_number",
               "school_year"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "fc4ca1c457b3efbd53eba842265ab2a3943d1afabe159e994ff6f49131053a72",
+        "dataset": "tprs_student_continuity",
+        "edition": "2026",
+        "revision_sha256": "22896e479f3a829f9f4fa34621397ee112e6033abf92244dd0f4fbaa0f8da8d2",
+        "scope": "campus",
+        "table": "campus-fcafa83812ab3f499783ae8d30fb0ffdabe5c82d489d57d14d5fcb412fdded0d",
+        "grain": "one row per campus_number",
+        "title": "2024-25 TPRS student continuity cohorts, reported 2026",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/perfreport/tprs/tprs_srch.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 22,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "attrition_2024_25_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "percent",
+            "fields": [
+              "attrition_2024_25_percent",
+              "retention_2024_25_non_special_education_grade_1_percent",
+              "retention_2024_25_non_special_education_grade_2_percent",
+              "retention_2024_25_non_special_education_grade_3_percent",
+              "retention_2024_25_non_special_education_grade_4_percent",
+              "retention_2024_25_non_special_education_grade_5_percent",
+              "retention_2024_25_non_special_education_grade_6_percent",
+              "retention_2024_25_non_special_education_grade_7_percent",
+              "retention_2024_25_non_special_education_grade_8_percent",
+              "retention_2024_25_non_special_education_grade_9_percent",
+              "retention_2024_25_non_special_education_kindergarten_percent",
+              "retention_2024_25_special_education_grade_1_percent",
+              "retention_2024_25_special_education_grade_2_percent",
+              "retention_2024_25_special_education_grade_3_percent",
+              "retention_2024_25_special_education_grade_4_percent",
+              "retention_2024_25_special_education_grade_5_percent",
+              "retention_2024_25_special_education_grade_6_percent",
+              "retention_2024_25_special_education_grade_7_percent",
+              "retention_2024_25_special_education_grade_8_percent",
+              "retention_2024_25_special_education_grade_9_percent",
+              "retention_2024_25_special_education_kindergarten_percent"
             ]
           }
         ]

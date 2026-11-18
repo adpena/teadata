@@ -1,63 +1,65 @@
 # Source integration status
 
-The packaged selector identifies **normal data release 0.0.165**. Software, data
-publication and application adoption are separate; an explicitly pinned older
-release does not change when the reader is upgraded. The [machine inventory](source-integration-status-0.0.165.json)
-was regenerated from the actual selected release on November 17, 2026. It lists
-126 registered IDs, 278 configured editions, 13 base inputs and 20 native
-attachments covering 31 dataset IDs and 277 edition/scope keys. The 85 registered
-source-only IDs not attached by name are not 85 missing measures or proof that
-publisher data are unavailable.
+The packaged selector identifies **normal data release 0.0.166**. This is a
+frozen release, not a live TEA feed. Software publication and application adoption
+are separate gates. Historical selections retain their exact release.
+The [machine inventory](source-integration-status-0.0.166.json) was generated from
+the qualified normal parent and current configuration on November 18, 2026:
+127 registered IDs, 279 configured editions,
+13 base inputs and 21 native attachments covering 32 dataset IDs and
+302 edition/scope keys. Registration does not establish
+acquisition, qualification or query access; the source-only IDs not attached
+by name are not a count of missing measures.
 
-- Manifest SHA-256: `e32c15b1f782f7a10f97b2158c4560a0c161d2c47fec5448987a9d55fe4c5685`.
-- Build: `92d82a7b54f4b3f6b8ea9850e31897a746f456d7542cf8e74396d0dc6fab636c`.
-- Actual normal producer: `e24277068834b5a6279764e643c1e46ab6f8194a`.
-- Processing identity: `7c2b10997f6797801a5c93c412a9d79ec4472195029095ae7e33202737d3f3f7`.
+- Manifest SHA-256: `e34cce994f2db88b5a2dd0eb3d6950412d0bd7439603675018503844f4da471a`.
+- Build: `63290448a80ffa9fd959f4217dcb2015f882d51e426bde264b95e292486c6514`.
+- Actual normal producer: `9513698` (full commit retained in the build record).
+- Processing identity: `81f41daec4f9ca09a17f4d720b576be4994c6e9d0db7f2e97f401eafc2fb9ebb`.
 
 ## What this release adds
 
-The TPRS Student projection now has **179 qualified fields**. It preserves all
-174 existing fields and appends five disability-composition Membership
-percentages. Coverage remains 9,105 reporting campuses, 1,202 reporting districts
-and the direct Texas report in 2025–26: 10,308 rows across 25 editions. The new
-five fields add 51,540 observations, including publisher value statuses. No
-measurement year or additional TPRS domain is added by this release.
+The new `tprs_student_continuity` family supplies 22 campus and 24 district/state
+fields for published attrition, grade retention and district/state underreporting.
+Its report edition is **2026**; the measurement/baseline year is **2024–25**,
+with return/processing observations in fall 2025. It does not replace current
+2025–26 Membership or Enrollment, and it is not a dropout or individual-student
+tracking dataset. Campus underreporting is unavailable. Retention populations
+remain separate; counts and denominators are not inferred from percentages.
 
-Their denominator is **Total Students with Disabilities in Membership**, not all
-students. It is declared in source metadata, variable/header discovery and the
-shared DataFrame/CSV/Excel provenance. Selecting a percentage does not read its
-denominator's observations. Excel adds a Denominator column to the Provenance
-field table only when needed. Broad disability group names follow the glossary:
-Intellectual Disabilities includes learning disability, developmental delay and
-traumatic brain injury, not only the specific intellectual-disability category.
-Texas disability Membership 901,935 and Special Education program Membership
-901,932 remain distinct source observations.
+Coverage is 9,105 reporting campuses, 1,202 reporting districts and the direct
+Texas report, preserving all 25 original source partitions. The 229,182 logical
+field slots include observed values and explicit missing, suppressed and not
+applicable states. Missing grade rows/sections have null source coordinates and
+factual absence reasons, never invented eligibility explanations or zeros.
+Names preserve `2024_25`; cross-year harmonized aliases need separate review.
+See [the definitions, populations and scope notes](tprs-continuity-sources.md).
 
-The normal producer reused all retained acquisitions. Every original 174 field,
-raw token and status matched across all 10,308 rows. One shared scientific gate
-replayed the complete new 179-field projection, its locators and raw-HOLD audit.
-Three genuine HTML/XLSX pairs also matched all 1,298 inventoried data cells
-before Class Size. Physical blank XML cells are distinguished from absent cells
-and zero. These are frozen-source checks, not fresh live reacquisition of every
-TEA record. Original download dates remain in provenance.
+The complete retained continuity projection passed original-source raw/value/
+status/locator replay across all 10,308 reports. Three independently requested
+HTML/XLSX pairs supplied 62 published local golden cells and eight absent-grade
+bindings. Actual source comparisons checked 24 district and 22 campus metrics
+against the direct Texas report and frozen raw goldens. Comparisons preserve
+count units and percentage points and require the same exact qualified child.
+These are frozen-source checks; no fresh acquisition of all TEA rows is claimed.
+Original download times remain in the acquisition receipts.
 
-Bounded actual-parent checks verified all nine parent artifacts, replacement-only
-wiring, metadata-only discovery/year resolution, actual district/campus dot
-access, and all 179 district/Texas comparisons. The five new percentages and
-real campus masked, zero and missing cases passed DataFrame, CSV and Excel
-readback with the same shared provenance. Older 174-field descriptors, source
-meaning, description hash, CSV bytes and XLSX data remain unchanged. A new
-reconstruction truthfully cites software 0.0.165; frozen saved files still cite
-0.0.164. The retained saved selection had no supported public query-replay
-recipe, so reconstruction is not described as successful `replay_table` use.
+The qualified normal parent passed its nine artifact integrity/build/schema
+checks and bounded actual-entity discovery, dot-path/year, source-golden,
+statewide-comparison and DataFrame/CSV/Excel provenance readback. Exact source
+replay was reused by unchanged child identity; the other 20 native attachments
+and all 13 base inputs retain their previous qualifications. Their source
+families were not replayed merely to repeat matching evidence. Current 179-field
+Student and Class Size sources remain unchanged. Application cache/deployment
+adoption is recorded in the application rollout, not inferred from this release.
 
-The other 19 native attachments and 13 base inputs are unchanged and retain
-their earlier qualifications. They were not scientifically replayed merely to
-repeat matching evidence. Class-size source bytes are unchanged. The full-report
-inventory exposes unsupported cells without turning them into another dataset:
-blank disability Enrollment/total-percent cells, undocumented CTE dots and
-unreviewed lagged/tail measures remain held. See [Student source notes](attendance-sources.md)
-and [the SOF documentation/formula question](financial-sources.md#sof-202526-dpe-source-accounting-and-an-unresolved-formula-question).
+The full-report inventory separately accounts for 4,709,972 physical data cells
+before Class Size or the actual report end across 10,308 reports. That is layout evidence, not qualification of every
+cell. Remaining mobility/disciplinary period conflicts, CTE dots and blank
+disability Enrollment/total-percent observations remain held. The four SOF DPE
+sheets have exact raw fidelity and accepted dictionary bindings; their additional
+590 numeric semantics remain held. No general adjusted refined ADA was filled
+from a Support Staff Retention field. See [Student source notes](attendance-sources.md)
+and [the SOF formula clarification](financial-sources.md#sof-202526-dpe-source-accounting-and-an-unresolved-formula-question).
 
 ## Qualified native coverage
 
@@ -100,6 +102,7 @@ individual definitions, units, population, revisions and source links.
 | `summary_of_finances_attendance` | 47422 | district | SY ending 2026 |
 | `tprs_attendance_chronic_absence` | 2025 | region, state | SY ending 2024–2025 |
 | `tprs_class_size` | 2026 | campus, district, state | SY ending 2026 |
+| `tprs_student_continuity` | 2026 | campus, district, state | Baseline SY ending 2025; return/processing fall 2025 |
 | `tprs_student_membership_enrollment_reports` | 2026 | campus, district, state | SY ending 2026 |
 
 State means the directly published Texas scope, not a sum of ESCs or districts.
