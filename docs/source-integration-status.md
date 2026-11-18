@@ -1,30 +1,35 @@
 # Source integration status
 
-The packaged selector identifies **normal data release 0.0.168**. This is a
+The packaged selector identifies **normal data release 0.0.169**. This is a
 frozen analysis release, not a live TEA feed. Software publication and
 application deployment are separate gates; historical requests keep their pins.
-The [machine inventory](source-integration-status-0.0.168.json), generated from
+The [machine inventory](source-integration-status-0.0.169.json), generated from
 the qualified normal parent on November 18, 2026, records
 127 registered IDs, 279 configured editions,
-13 base inputs and 22 native attachments covering 33 dataset IDs and
-306 edition/scope keys. Registration is not
+13 base inputs and 23 native attachments covering 33 dataset IDs and
+317 edition/scope keys. Registration is not
 acquisition, semantic qualification or query access.
 
-- Manifest: `6107ada84cdce6dabcddb1b60ff133cfe558622cf4362144570de05bd7f85479`.
-- Build: `ec4d619f474137a292b14a4d577ac925ca9b048b0e2ae3a0b70f18117150a66f`.
-- Processing identity: `e193e862ae8871449aeabb774ad2eca39899451e106c0ee5ec33c2a140788842`.
+- Manifest: `aa5edb6d887957a80ac402e9a29e18f824009e19c3e514dcdf918a5f4c3c87bc`.
+- Build: `7171616da79f540e2274d46b7b9e1adb39e68f804f5f5d8e2e7bf009f1c79663`.
+- Processing identity: `584a2163ab7235eae113b7c433e3b28e774cb551eb47b9890c345f0be3542c8c`.
 
-## What this revision changes
+## District transfer report history
 
-SOF DPE citations now bind the official funding page, workbook URL and actual
-November 17, 2026 download time to the retained HTTP receipt. Values, units,
-periods and source evidence are unchanged from 0.0.167. The 21 unchanged
-attachments reference their existing immutable published files, avoiding
-republication. Strict offline use needs those verified cached files.
+The normal district namespace now offers 14 school years, 2012–13 through
+2025–26, for the publisher's directional district transfer reports. The
+11 added historical editions preserve all 389,183 rows from the separately
+published v0.0.141 bundle, including raw count tokens, statuses, report directions,
+publisher totals and separators. The reporting district is the entity bound to
+each source row. Report rows do not establish a single statewide transfer count
+or reconciled district-pair edges.
 
-Their unchanged source qualifications are reused; this revision checks the
-changed child and bounded normal-parent integration. The legacy full
-`--release` scientific runner still requires adjacent local attachments.
+Qualification replayed the retained original rows and checked 12,073 rows from
+20 independently selected TEA reports. For 2022–23, 364 fully visible district
+totals also matched the retained campus-level detail. Groups with suppression
+were excluded from that comparison, and the separate campus-edge hold remains.
+The normal release preserves the 22 earlier attachment identities. The new child
+is qualified separately, with an offline normal-parent query and export check.
 
 ## Retained SOF DPE coverage
 
@@ -85,7 +90,7 @@ individual definitions, units, population, revisions and source links.
 | --- | --- | --- | --- |
 | `campus_tapr_staff_profile` | 2025 | campus | SY ending 2025 |
 | `district_tapr_staff_profile` | 2025 | district | SY ending 2025 |
-| `district_transfer_reports` | 2024–2026 | district | SY ending 2024–2026 |
+| `district_transfer_reports` | 2013–2026 | district | SY ending 2013–2026 |
 | `educator_district_new_hires` | 5 | district | SY ending 2010–2026 |
 | `educator_district_new_hires_by_epp` | 5 | district | SY ending 2010–2026 |
 | `educator_state_initial_certification_principal` | 2026-09 | state | Academic years ending 2016–2026 |

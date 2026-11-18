@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "observed_at": "2026-11-18T14:06:59.555331+00:00",
+  "observed_at": "2026-11-18T19:35:47.796455+00:00",
   "generator": {
-    "software_version": "0.0.168",
+    "software_version": "0.0.169",
     "working_source_sha256": {
       "scripts/source_inventory.py": "68a90e79a7066867c3604e2a304ab650c59591389e2eb00c0234e035c7a7893a",
       "teadata/release_inventory.py": "5f6e4cbac970e08d71b2d5713ce1eb0cf3e4944b0adedd41e01fed6d20196cce",
@@ -18,9 +18,9 @@
     "source_only_ids": 114,
     "source_only_ids_not_attached": 85,
     "base_inputs": 13,
-    "native_attachments": 22,
+    "native_attachments": 23,
     "native_dataset_ids": 33,
-    "native_edition_scope_keys": 306
+    "native_edition_scope_keys": 317
   },
   "registration": [
     {
@@ -1015,6 +1015,17 @@
       "base_input_present": false,
       "native_attachment_present": true,
       "attached_report_editions": [
+        "2013",
+        "2014",
+        "2015",
+        "2016",
+        "2017",
+        "2018",
+        "2019",
+        "2020",
+        "2021",
+        "2022",
+        "2023",
         "2024",
         "2025",
         "2026"
@@ -2242,9 +2253,9 @@
   "selected_catalog": {
     "schema_version": 1,
     "release": {
-      "source": "https://github.com/adpena/teadata/releases/download/v0.0.168/release.json",
-      "manifest_sha256": "6107ada84cdce6dabcddb1b60ff133cfe558622cf4362144570de05bd7f85479",
-      "build_id": "ec4d619f474137a292b14a4d577ac925ca9b048b0e2ae3a0b70f18117150a66f"
+      "source": "https://github.com/adpena/teadata/releases/download/v0.0.169/release.json",
+      "manifest_sha256": "aa5edb6d887957a80ac402e9a29e18f824009e19c3e514dcdf918a5f4c3c87bc",
+      "build_id": "7171616da79f540e2274d46b7b9e1adb39e68f804f5f5d8e2e7bf009f1c79663"
     },
     "include_variables": true,
     "metadata_inspected": true,
@@ -6972,7 +6983,7 @@
         ]
       },
       {
-        "location": "native-b2123b82b5762f0f71c49c76d2bb96a50891789a9c1b9a61f2e5b1c692fede0a.json",
+        "location": "https://github.com/adpena/teadata/releases/download/v0.0.168/native-b2123b82b5762f0f71c49c76d2bb96a50891789a9c1b9a61f2e5b1c692fede0a.json",
         "manifest_sha256": "b2123b82b5762f0f71c49c76d2bb96a50891789a9c1b9a61f2e5b1c692fede0a",
         "build_id": "3cef71d89335e843dc72b5733c3a32875163f2b2d5bf49119db9de8d88c2fd81",
         "editions": [
@@ -7007,6 +7018,101 @@
             "scope": "district",
             "table": "mo_asahe_dpe",
             "grain": "one publisher LEA row in worksheet mo_asahe_dpe"
+          }
+        ]
+      },
+      {
+        "location": "native-1f4efaf975e0908674a285d6d003c6069a65d8ca8cc7d5897ba8d063e2341798.json",
+        "manifest_sha256": "1f4efaf975e0908674a285d6d003c6069a65d8ca8cc7d5897ba8d063e2341798",
+        "build_id": "ee583c2b79fa439c6424ddb91fe56ebcae72ddac0f1e6b948db3a50571b0cf56",
+        "editions": [
+          {
+            "dataset": "district_transfer_reports",
+            "edition": "2019",
+            "revision_sha256": "5535321f988f91851fdb8b660b9996fceb9d5cb7b34f383bb80e7348df6dcb44",
+            "scope": "district",
+            "table": "report_rows",
+            "grain": "one publisher table row per original source input and logical CSV record"
+          },
+          {
+            "dataset": "district_transfer_reports",
+            "edition": "2023",
+            "revision_sha256": "92756cc23b389b4354ec7ecacc5f549a885f67bd6d4ea65cda7810bf3d108788",
+            "scope": "district",
+            "table": "report_rows",
+            "grain": "one publisher table row per original source input and logical CSV record"
+          },
+          {
+            "dataset": "district_transfer_reports",
+            "edition": "2014",
+            "revision_sha256": "2e13ac2aacd6408f110cb4548dffe6d63290559a2a0ef4fc647a76013f5d9d64",
+            "scope": "district",
+            "table": "report_rows",
+            "grain": "one publisher table row per original source input and logical CSV record"
+          },
+          {
+            "dataset": "district_transfer_reports",
+            "edition": "2020",
+            "revision_sha256": "a6ab6ae6ae8a6160d825a6df3a18b252e5e233ba64a1a910111d6bd5277f8e66",
+            "scope": "district",
+            "table": "report_rows",
+            "grain": "one publisher table row per original source input and logical CSV record"
+          },
+          {
+            "dataset": "district_transfer_reports",
+            "edition": "2022",
+            "revision_sha256": "adc0c8e0d16504fb0c22a3ef9fe8f604714a4d7309d7750be5466f9d3d23001b",
+            "scope": "district",
+            "table": "report_rows",
+            "grain": "one publisher table row per original source input and logical CSV record"
+          },
+          {
+            "dataset": "district_transfer_reports",
+            "edition": "2016",
+            "revision_sha256": "0bbf02d27ac042eb90e3710450ab55346b0334caab51f6c868260f05a4146bc9",
+            "scope": "district",
+            "table": "report_rows",
+            "grain": "one publisher table row per original source input and logical CSV record"
+          },
+          {
+            "dataset": "district_transfer_reports",
+            "edition": "2013",
+            "revision_sha256": "c40b8dd46e202a6c22a367d83d3cd8c54ef7a9ae31c9748e1dd40ed823707bfa",
+            "scope": "district",
+            "table": "report_rows",
+            "grain": "one publisher table row per original source input and logical CSV record"
+          },
+          {
+            "dataset": "district_transfer_reports",
+            "edition": "2021",
+            "revision_sha256": "5cac75da8cef8cceb39a0c2bc4690ec5eb20bdd3e4a2382960d768e08979954c",
+            "scope": "district",
+            "table": "report_rows",
+            "grain": "one publisher table row per original source input and logical CSV record"
+          },
+          {
+            "dataset": "district_transfer_reports",
+            "edition": "2018",
+            "revision_sha256": "6663ec882bd46fef1f3df696e45ec9a5375a74831f3ba27b4965ffed218b1117",
+            "scope": "district",
+            "table": "report_rows",
+            "grain": "one publisher table row per original source input and logical CSV record"
+          },
+          {
+            "dataset": "district_transfer_reports",
+            "edition": "2017",
+            "revision_sha256": "cab86ff907c9447c00706e6ed55641693d0a768b710b00acc9e8eff914358320",
+            "scope": "district",
+            "table": "report_rows",
+            "grain": "one publisher table row per original source input and logical CSV record"
+          },
+          {
+            "dataset": "district_transfer_reports",
+            "edition": "2015",
+            "revision_sha256": "5af155b33dc116335101fa32f8c619bd52fab6080ce6d2d4c55e1db7bd2459bc",
+            "scope": "district",
+            "table": "report_rows",
+            "grain": "one publisher table row per original source input and logical CSV record"
           }
         ]
       }
@@ -7277,6 +7383,55 @@
             "fields": [
               "district_name",
               "district_number"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "085bf65339202b9c42ff16ce7c1322312dab30aa3043d5eef7a019ab252cf6f9",
+        "dataset": "district_transfer_reports",
+        "edition": "2019",
+        "revision_sha256": "5535321f988f91851fdb8b660b9996fceb9d5cb7b34f383bb80e7348df6dcb44",
+        "scope": "district",
+        "table": "report_rows",
+        "grain": "one publisher table row per original source input and logical CSV record",
+        "title": "TEA PEIMS district transfer reports, 2018-2019, all offered regional originals",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/region_district_transfer_report.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2018,
+          "end_year": 2019
+        },
+        "source_qualifiers": null,
+        "variable_count": 10,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2018,
+              "end_year": 2019
+            },
+            "unit": "count",
+            "fields": [
+              "student_transfer_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "line_group_number",
+              "partner_district_number",
+              "report_number",
+              "reporting_charter_status",
+              "reporting_district_number",
+              "reporting_region",
+              "reporting_region_name",
+              "school_year",
+              "transfer_direction"
             ]
           }
         ]
@@ -9845,6 +10000,55 @@
         ]
       },
       {
+        "edition_id": "2628be3d28662b3bcc8942fa5cc57e0db692031c83833145cd6e4d501dde05db",
+        "dataset": "district_transfer_reports",
+        "edition": "2023",
+        "revision_sha256": "92756cc23b389b4354ec7ecacc5f549a885f67bd6d4ea65cda7810bf3d108788",
+        "scope": "district",
+        "table": "report_rows",
+        "grain": "one publisher table row per original source input and logical CSV record",
+        "title": "TEA PEIMS district transfer reports, 2022-2023, all offered regional originals",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/region_district_transfer_report.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2022,
+          "end_year": 2023
+        },
+        "source_qualifiers": null,
+        "variable_count": 10,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2022,
+              "end_year": 2023
+            },
+            "unit": "count",
+            "fields": [
+              "student_transfer_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "line_group_number",
+              "partner_district_number",
+              "report_number",
+              "reporting_charter_status",
+              "reporting_district_number",
+              "reporting_region",
+              "reporting_region_name",
+              "school_year",
+              "transfer_direction"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "26be8974b100f6b66e892fb13bd4f4945881fcaa55a7a286d3d71ce4096d65c6",
         "dataset": "peims_student_programs_and_special_populations",
         "edition": "2026",
@@ -10740,6 +10944,54 @@
             "fields": [
               "first_teaching_school_year",
               "publisher_group"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "2ba6a67c158a0b5e9c0f8d76cc6f65a6d6c25b7a63507f2a9981d8698c53797e",
+        "dataset": "district_transfer_reports",
+        "edition": "2014",
+        "revision_sha256": "2e13ac2aacd6408f110cb4548dffe6d63290559a2a0ef4fc647a76013f5d9d64",
+        "scope": "district",
+        "table": "report_rows",
+        "grain": "one publisher table row per original source input and logical CSV record",
+        "title": "TEA PEIMS district transfer reports, 2013-2014, all offered regional originals",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/region_district_transfer_report.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2013,
+          "end_year": 2014
+        },
+        "source_qualifiers": null,
+        "variable_count": 9,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2013,
+              "end_year": 2014
+            },
+            "unit": "count",
+            "fields": [
+              "student_transfer_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "line_group_number",
+              "partner_district_number",
+              "report_number",
+              "reporting_district_number",
+              "reporting_region",
+              "reporting_region_name",
+              "school_year",
+              "transfer_direction"
             ]
           }
         ]
@@ -12410,6 +12662,55 @@
               "ethnicity",
               "gender",
               "preparation_route"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "3c1a0bc4bca67bc8bc9bc36b8150775d5956c1b573ccd03c1b1ab85a8a4aeb3e",
+        "dataset": "district_transfer_reports",
+        "edition": "2020",
+        "revision_sha256": "a6ab6ae6ae8a6160d825a6df3a18b252e5e233ba64a1a910111d6bd5277f8e66",
+        "scope": "district",
+        "table": "report_rows",
+        "grain": "one publisher table row per original source input and logical CSV record",
+        "title": "TEA PEIMS district transfer reports, 2019-2020, all offered regional originals",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/region_district_transfer_report.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2019,
+          "end_year": 2020
+        },
+        "source_qualifiers": null,
+        "variable_count": 10,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2019,
+              "end_year": 2020
+            },
+            "unit": "count",
+            "fields": [
+              "student_transfer_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "line_group_number",
+              "partner_district_number",
+              "report_number",
+              "reporting_charter_status",
+              "reporting_district_number",
+              "reporting_region",
+              "reporting_region_name",
+              "school_year",
+              "transfer_direction"
             ]
           }
         ]
@@ -15614,6 +15915,55 @@
         ]
       },
       {
+        "edition_id": "64012c72ef4b9fee7e78707207c740d17d7183b1708dd75098df6491b063735b",
+        "dataset": "district_transfer_reports",
+        "edition": "2022",
+        "revision_sha256": "adc0c8e0d16504fb0c22a3ef9fe8f604714a4d7309d7750be5466f9d3d23001b",
+        "scope": "district",
+        "table": "report_rows",
+        "grain": "one publisher table row per original source input and logical CSV record",
+        "title": "TEA PEIMS district transfer reports, 2021–2022, all offered regional originals",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/region_district_transfer_report.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2021,
+          "end_year": 2022
+        },
+        "source_qualifiers": null,
+        "variable_count": 10,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2021,
+              "end_year": 2022
+            },
+            "unit": "count",
+            "fields": [
+              "student_transfer_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "line_group_number",
+              "partner_district_number",
+              "report_number",
+              "reporting_charter_status",
+              "reporting_district_number",
+              "reporting_region",
+              "reporting_region_name",
+              "school_year",
+              "transfer_direction"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "665562b52ff2b0674308933d2ea524cac88b69f828c19bf19738b7695ba7033a",
         "dataset": "educator_state_initial_certification_teacher",
         "edition": "2026-09",
@@ -17901,6 +18251,54 @@
             "fields": [
               "first_teaching_school_year",
               "publisher_group"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "7ee0e33e7446410d0f95e6a16b0d0e137065f3ca0eddcb509a5c49738ab4d1e8",
+        "dataset": "district_transfer_reports",
+        "edition": "2016",
+        "revision_sha256": "0bbf02d27ac042eb90e3710450ab55346b0334caab51f6c868260f05a4146bc9",
+        "scope": "district",
+        "table": "report_rows",
+        "grain": "one publisher table row per original source input and logical CSV record",
+        "title": "TEA PEIMS district transfer reports, 2015-2016, all offered regional originals",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/region_district_transfer_report.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2015,
+          "end_year": 2016
+        },
+        "source_qualifiers": null,
+        "variable_count": 9,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2015,
+              "end_year": 2016
+            },
+            "unit": "count",
+            "fields": [
+              "student_transfer_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "line_group_number",
+              "partner_district_number",
+              "report_number",
+              "reporting_district_number",
+              "reporting_region",
+              "reporting_region_name",
+              "school_year",
+              "transfer_direction"
             ]
           }
         ]
@@ -20983,6 +21381,54 @@
               "retention_2024_25_special_education_grade_8_percent",
               "retention_2024_25_special_education_grade_9_percent",
               "retention_2024_25_special_education_kindergarten_percent"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "95a3f52bfbefc98159c8d5c19f43c0ff6ada90c0509337d0d21f3fef15328b9e",
+        "dataset": "district_transfer_reports",
+        "edition": "2013",
+        "revision_sha256": "c40b8dd46e202a6c22a367d83d3cd8c54ef7a9ae31c9748e1dd40ed823707bfa",
+        "scope": "district",
+        "table": "report_rows",
+        "grain": "one publisher table row per original source input and logical CSV record",
+        "title": "TEA PEIMS district transfer reports, 2012-2013, all offered regional originals",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/region_district_transfer_report.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2012,
+          "end_year": 2013
+        },
+        "source_qualifiers": null,
+        "variable_count": 9,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2012,
+              "end_year": 2013
+            },
+            "unit": "count",
+            "fields": [
+              "student_transfer_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "line_group_number",
+              "partner_district_number",
+              "report_number",
+              "reporting_district_number",
+              "reporting_region",
+              "reporting_region_name",
+              "school_year",
+              "transfer_direction"
             ]
           }
         ]
@@ -26021,6 +26467,55 @@
         ]
       },
       {
+        "edition_id": "deee78479f85e50dc2037fd91a83fe0aa28772b4f5412a275ef59b2051eb6bdf",
+        "dataset": "district_transfer_reports",
+        "edition": "2021",
+        "revision_sha256": "5cac75da8cef8cceb39a0c2bc4690ec5eb20bdd3e4a2382960d768e08979954c",
+        "scope": "district",
+        "table": "report_rows",
+        "grain": "one publisher table row per original source input and logical CSV record",
+        "title": "TEA PEIMS district transfer reports, 2020-2021, all offered regional originals",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/region_district_transfer_report.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2020,
+          "end_year": 2021
+        },
+        "source_qualifiers": null,
+        "variable_count": 10,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2020,
+              "end_year": 2021
+            },
+            "unit": "count",
+            "fields": [
+              "student_transfer_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "line_group_number",
+              "partner_district_number",
+              "report_number",
+              "reporting_charter_status",
+              "reporting_district_number",
+              "reporting_region",
+              "reporting_region_name",
+              "school_year",
+              "transfer_direction"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "df295b9cd1b73fcb441dedd146a82b4813cbd9407effb71e75c43bc6aa468f1f",
         "dataset": "state_tapr_staff_profile",
         "edition": "2025",
@@ -26808,6 +27303,55 @@
         ]
       },
       {
+        "edition_id": "e53a71560315e2abfbec079a00f059eb01590a6b922569342b397b02c360354f",
+        "dataset": "district_transfer_reports",
+        "edition": "2018",
+        "revision_sha256": "6663ec882bd46fef1f3df696e45ec9a5375a74831f3ba27b4965ffed218b1117",
+        "scope": "district",
+        "table": "report_rows",
+        "grain": "one publisher table row per original source input and logical CSV record",
+        "title": "TEA PEIMS district transfer reports, 2017-2018, all offered regional originals",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/region_district_transfer_report.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2017,
+          "end_year": 2018
+        },
+        "source_qualifiers": null,
+        "variable_count": 10,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2017,
+              "end_year": 2018
+            },
+            "unit": "count",
+            "fields": [
+              "student_transfer_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "line_group_number",
+              "partner_district_number",
+              "report_number",
+              "reporting_charter_status",
+              "reporting_district_number",
+              "reporting_region",
+              "reporting_region_name",
+              "school_year",
+              "transfer_direction"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "e641b549496d1ebe5b9f171f37e53573a7f4880dd23bf96dfbdd6c48c7e1bbf4",
         "dataset": "tprs_class_size",
         "edition": "2026",
@@ -27491,6 +28035,55 @@
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
               "membership_white_percent"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "eac26630ffe4174567a5f1d22e8785883c750f692eb13b16d49ce3913619025c",
+        "dataset": "district_transfer_reports",
+        "edition": "2017",
+        "revision_sha256": "cab86ff907c9447c00706e6ed55641693d0a768b710b00acc9e8eff914358320",
+        "scope": "district",
+        "table": "report_rows",
+        "grain": "one publisher table row per original source input and logical CSV record",
+        "title": "TEA PEIMS district transfer reports, 2016-2017, all offered regional originals",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/region_district_transfer_report.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2016,
+          "end_year": 2017
+        },
+        "source_qualifiers": null,
+        "variable_count": 10,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2016,
+              "end_year": 2017
+            },
+            "unit": "count",
+            "fields": [
+              "student_transfer_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "line_group_number",
+              "partner_district_number",
+              "report_number",
+              "reporting_charter_status",
+              "reporting_district_number",
+              "reporting_region",
+              "reporting_region_name",
+              "school_year",
+              "transfer_direction"
             ]
           }
         ]
@@ -29271,6 +29864,54 @@
               "membership_total_students_percent",
               "membership_two_or_more_races_percent",
               "membership_white_percent"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "fd05e54733dfe094b0748b075b3ac2b1a29e68309134730a3a19c5b0a0517b3b",
+        "dataset": "district_transfer_reports",
+        "edition": "2015",
+        "revision_sha256": "5af155b33dc116335101fa32f8c619bd52fab6080ce6d2d4c55e1db7bd2459bc",
+        "scope": "district",
+        "table": "report_rows",
+        "grain": "one publisher table row per original source input and logical CSV record",
+        "title": "TEA PEIMS district transfer reports, 2014-2015, all offered regional originals",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/region_district_transfer_report.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2014,
+          "end_year": 2015
+        },
+        "source_qualifiers": null,
+        "variable_count": 9,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2014,
+              "end_year": 2015
+            },
+            "unit": "count",
+            "fields": [
+              "student_transfer_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "line_group_number",
+              "partner_district_number",
+              "report_number",
+              "reporting_district_number",
+              "reporting_region",
+              "reporting_region_name",
+              "school_year",
+              "transfer_direction"
             ]
           }
         ]
