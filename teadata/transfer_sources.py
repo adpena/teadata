@@ -828,7 +828,9 @@ def validate_campus_directions(source: TransferSourceTable, *, max_examples: int
         left_suffix="_out", right_suffix="_in", coalesce_keys=True, use_threads=False)
     both = pc.and_(pc.is_valid(joined["source_record_out"]), pc.is_valid(joined["source_record_in"]))
     same_status = pc.equal(joined["count_status_out"], joined["count_status_in"])
-    same_value = pc.or_(pc.equal(joined["count_status_out"], "suppressed"),
+    both_observed = pc.and_(pc.equal(joined["count_status_out"], ValueStatus.OBSERVED.value),
+                           pc.equal(joined["count_status_in"], ValueStatus.OBSERVED.value))
+    same_value = pc.or_(pc.invert(both_observed),
                         pc.fill_null(pc.equal(joined["count_value_out"], joined["count_value_in"]), False))
     same_district = pc.and_(pc.equal(joined["source_district_out"], joined["source_district_in"]),
                             pc.equal(joined["destination_district_out"], joined["destination_district_in"]))

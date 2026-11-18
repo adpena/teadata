@@ -365,13 +365,15 @@ def test_changed_header_or_unrecognized_footnote_fails_without_silent_drop(tmp_p
         read(path, sha256(path.read_bytes()).hexdigest())
 
 
-@pytest.mark.parametrize("scenario", ["value", "status", "one_sided", "duplicate", "unknown"])
+@pytest.mark.parametrize("scenario", ["value", "suppressed_in", "suppressed_out", "one_sided", "duplicate", "unknown"])
 def test_independent_direction_gate_rejects_conflicts_before_edge_projection(tmp_path, scenario):
     rows = pair_rows()
     if scenario == "value":
         rows[1][-1] = "1"
-    elif scenario == "status":
+    elif scenario == "suppressed_in":
         rows[1][-1] = "-999"
+    elif scenario == "suppressed_out":
+        rows[0][-1] = "-999"
     elif scenario == "one_sided":
         rows[1][2], rows[1][4] = "003902", "003902003"
     elif scenario == "duplicate":
@@ -391,8 +393,12 @@ def test_independent_direction_gate_rejects_conflicts_before_edge_projection(tmp
         assert report["one_sided_pairs"] == 2 and report["matching_observed"] == 0
         assert len(report["examples"]) == 2
         assert all(row["source_record_in"] is None or row["source_record_out"] is None for row in report["examples"])
+    elif scenario == "value":
+        assert report["value_mismatches"] == 1 and report["status_mismatches"] == 0
+        assert report["matching_observed"] == 0 and len(report["examples"]) == 1
     else:
-        assert report["value_mismatches"] == 1 and report["matching_observed"] == 0
+        assert report["status_mismatches"] == 1 and report["value_mismatches"] == 0
+        assert report["matching_observed"] == 0 and len(report["examples"]) == 1
 
 
 def test_direction_count_lexemes_are_distinct_from_interpreted_equality(tmp_path):

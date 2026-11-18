@@ -107,6 +107,14 @@ has different bytes. Its separate retained preparation and old/new comparison
 are documented below; they do not turn the older audit into proof of raw-byte
 identity.
 
+For 2022–23, the statewide campus report has 131,785 paired detail rows per
+direction. Four pairs disagree on masking and no pair with two reported numeric
+counts disagrees on the count. An older audit counted two of those same masking
+conflicts a second time as value conflicts. Current diagnostics count numeric
+disagreements only when both directions report a value. Canonical campus
+edges for this edition remain on hold. The two reported directions retain
+their original values and suppression states.
+
 ## Retained 2026-11-03 preparation results
 
 The two district preparations each consumed all 20 acquired regional originals.
