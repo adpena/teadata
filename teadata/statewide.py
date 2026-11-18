@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import Decimal, localcontext
 from functools import lru_cache
 from hashlib import sha256
 import json
 from math import isfinite
 import re
+from urllib.parse import parse_qsl, urlsplit
 from typing import TYPE_CHECKING, Any
 
 from .column_schema import _unique_object, crosswalk_dataset, parse_column_schema, reader_options, table_input_sha256s
@@ -295,13 +296,126 @@ def _selected_student_sources(release: DataRelease, key: EditionKey) -> dict[str
 
 
 @dataclass(frozen=True)
+class _ContinuityContract:
+    scope: str
+    fields: Mapping[str, Mapping[str, Any]]
+    policy: ValuePolicy
+    columns: Mapping[str, tuple[str, ...]]
+    sources: Mapping[str, tuple[str, str]]
+    roster_bound: bool = True
+
+    def value(self, row: dict[str, Any], field: str, unit: str) -> tuple[str | None, str, Number | None]:
+        from .tprs_student_continuity import _measurement
+
+        spec = self.fields[field]
+        raw_name, status_name, row_name, column_name, reason_name = self.columns[field]
+        raw, status, value = row[raw_name], row[status_name], row[field]
+        locator, column, reason = row[row_name], row[column_name], row[reason_name]
+        identifier = "S" if self.scope == "state" else row[f"{self.scope}_number"]
+        if (not isinstance(identifier, str) or unit != spec["unit"]
+                or (row["tprs_report_receipt"], row["tprs_report_sha256"]) != self.sources.get(identifier)):
+            raise ContractError("Continuity comparison row differs from its exact source binding")
+        if raw is None:
+            try:
+                omitted = json.loads(row["tprs_unpublished_sections"])
+            except (TypeError, ValueError) as error:
+                raise ContractError("Continuity missing-value context is invalid") from error
+            if (not isinstance(omitted, list) or any(not isinstance(item, str) for item in omitted)
+                    or len(set(omitted)) != len(omitted)
+                    or set(omitted) - {"Retention Rates by Grade", "Class Size Information"}):
+                raise ContractError("Continuity missing-value context is invalid")
+            expected = ("retention_section_not_published" if "Retention Rates by Grade" in omitted
+                        else "retention_grade_row_not_published")
+            if (self.scope != "campus" or spec["section"] != "Retention Rates by Grade"
+                    or locator is not None or column is not None or reason != expected):
+                raise ContractError("Continuity comparison requires an explicit missing campus retention cell")
+            measured = _measurement(None, unit, self.policy, expected)
+        else:
+            if (not isinstance(raw, str) or type(locator) is not int or locator <= 0
+                    or type(column) is not int or column != spec["columns"][self.scope]):
+                raise ContractError("Continuity comparison requires exact local cell locators")
+            measured = _measurement(raw, unit, self.policy)
+        valid_type = type(value) is (int if unit == "count" else float) if status == "observed" else value is None
+        if (measured.status.value != status or not valid_type or measured.value != value or measured.reason != reason):
+            raise ContractError("Continuity comparison typed value differs from its retained token and status")
+        return raw, status, value
+
+
+def _reviewed_continuity(release: DataRelease, key: EditionKey
+                         ) -> tuple[str, str, DatasetMetadata, str, _ContinuityContract]:
+    from . import tprs_student_continuity as continuity
+    from .native_witnesses import reviewed_source_additions
+
+    admission = reviewed_source_additions(release.manifest_sha256)
+    if admission is None or admission[0] != "tprs_continuity":
+        raise ContractError("Continuity comparison requires an exact reviewed native source release")
+    if key.dataset != continuity.DATASET or key.edition != str(continuity.EDITION) or key.scope not in students.SCOPES:
+        raise ContractError("Continuity comparison requires the reviewed edition and scope")
+    original = replace(key, dataset=students.DATASET, table=key.scope)
+    expected = continuity.continuity_campus_edition(original) if key.scope == "campus" else replace(original, dataset=continuity.DATASET)
+    keys = [] if key.scope == "state" else [f"{key.scope}_number"]
+    if key != expected or key.grain != (STATEWIDE_SINGLETON_GRAIN if not keys else f"one row per {keys[0]}"):
+        raise ContractError("Continuity comparison requires the reviewed partition and grain")
+    grid = continuity.definition()
+    fields = {field["field"]: field for field in continuity.semantic_fields(key.scope, grid)}
+    metadata = release.catalog.metadata(key.dataset, edition=key)
+    policy = release.catalog.policy(key.dataset, edition=key)
+    if (policy is None or policy != continuity._policy() or metadata.period != continuity.PERIOD
+            or metadata.version != str(continuity.EDITION)):
+        raise ContractError("Continuity comparison requires the reviewed disclosure policy and measurement period")
+    policy_hash = sha256(canonical_json(policy.to_dict()).encode()).hexdigest()
+    plans = release.catalog.resolve_artifacts(((key, field) for field in fields), period=continuity.PERIOD)
+    if len(plans) != 1:
+        raise ContractError("Continuity comparison requires one exact native leaf")
+    artifact = plans[0]["artifact"]
+    if release.catalog._processing_record(artifact)["parameters"]["recipe"] != continuity._recipe(original, grid):
+        raise ContractError("Continuity comparison processing interpretation differs")
+    sources: dict[str, tuple[str, str]] = {}
+    for acquisition in release.catalog.acquisitions(key.dataset, edition=key):
+        try:
+            identifier = dict(parse_qsl(urlsplit(acquisition["requested_url"]).query)).get("id")
+            if not isinstance(identifier, str):
+                raise ContractError("Continuity comparison acquisition omits its publisher identifier")
+            digest = acquisition["artifact"]["sha256"]
+            students._validate_report_acquisition(acquisition, scope=key.scope, identifier=identifier, expected_sha256=digest)
+            if identifier in sources:
+                raise ContractError("Continuity comparison repeats a publisher identifier")
+            sources[identifier] = acquisition["record_id"], digest
+        except (KeyError, TypeError, ValueError) as error:
+            raise ContractError("Continuity comparison acquisition does not bind an original publisher request") from error
+    hashes = [digest for _, digest in sources.values()]
+    if (not sources or key.revision_sha256 != EditionKey.source_revision(tuple(hashes))
+            or artifact.contract["inputs"] != hashes or artifact.contract["rows"] != len(sources)
+            or key.scope == "state" and set(sources) != {"S"}):
+        raise ContractError("Continuity comparison differs from its ordered source coverage")
+    support = artifact.column_support
+    pointers = {}
+    for field in fields:
+        names = tuple(f"tprs_{kind}_{field}" for kind in ("raw", "status", "row", "column", "reason"))
+        expected_support = {"representation": "normalized", "raw": names[0], "status": names[1],
+                            "auxiliary": list(names[2:]),
+                            "context": ["tprs_report_receipt", "tprs_report_sha256", "tprs_unpublished_sections", *keys]}
+        if support is None or support.projection(field) != expected_support:
+            raise ContractError("Continuity comparison requires retained raw/status/locator/context support")
+        pointers[field] = names
+    table, = continuity._crosswalk({key.table: hashes}, contract=grid)["datasets"][0]["tables"]
+    review = replace(metadata, metrics={name: metric for name, metric in metadata.metrics.items() if metric.field in fields})
+    configured = continuity._configured_source().metadata.metrics
+    expected_metrics = {name: metric for name, metric in configured.items() if metric.field in fields}
+    if review.metrics != expected_metrics or {metric.field for metric in review.metrics.values()} != set(fields):
+        raise ContractError("Continuity comparison metric scope differs")
+    return (key.revision_sha256, sha256(canonical_json(table).encode()).hexdigest(), review, policy_hash,
+            _ContinuityContract(key.scope, fields, policy, pointers, sources))
+
+
+@dataclass(frozen=True)
 class _Projection:
     artifact: ArtifactRef
     columns: tuple[str, ...]
     support: Mapping[str, tuple[str, str]]
     raw_policy: ValuePolicy | None
     integer_rates: bool = False
-    student: _StudentContract | None = None
+    student: _StudentContract | _ContinuityContract | None = None
     decimal_raw: bool = False
 
     def value(self, row: dict[str, Any], field: str, unit: str) -> tuple[str | None, str, Number | None]:
@@ -340,7 +454,7 @@ class _Projection:
 
 def _projection(release: DataRelease, key: EditionKey, fields: list[tuple[str, DataPeriod]], *,
                 keys: list[str], mapping: str, policy: str | None, raw_policy: ValuePolicy | None,
-                integer_rates: bool = False, student: _StudentContract | None = None,
+                integer_rates: bool = False, student: _StudentContract | _ContinuityContract | None = None,
                 decimal_raw: bool = False) -> _Projection:
     by_period: dict[DataPeriod, list[tuple[EditionKey, str]]] = {}
     for field, period in fields:
@@ -537,6 +651,12 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
             raise ContractError("STAAR comparison requires one reviewed same-edition rate policy")
         left_review, right_review = local_metadata, state_metadata
         left_policy = right_policy = None
+    elif local.dataset == statewide.dataset == "tprs_student_continuity":
+        if dimensions or release.manifest_sha256 != statewide_release.manifest_sha256:
+            raise ContractError("Continuity comparison requires the same exact native release and no extra dimensions")
+        local_keys, state_keys = [key_column], []
+        left_revision, left_mapping, left_review, left_policy, left_student = _reviewed_continuity(release, local)
+        right_revision, right_mapping, right_review, right_policy, right_student = _reviewed_continuity(statewide_release, statewide)
     elif local.dataset == statewide.dataset == students.DATASET:
         if dimensions:
             raise ContractError("Student comparison has no additional publisher dimensions")

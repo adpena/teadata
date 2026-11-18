@@ -84,3 +84,14 @@ original partition selection, roster closure and the three independently
 requested workbook witnesses. It does not manufacture expected values from
 candidate output. The existing full-report census is layout evidence rather
 than numerical admission of this projection.
+
+The reviewed statewide comparison contract accepts the same exact qualified
+continuity child for the local and direct Texas observation. It checks the
+ordered original report receipts, mapping, policy, scope and cell support.
+District comparisons expose 24 measures and campus comparisons 22; campus
+underreporting is unavailable. Comparisons use measurement year ending 2025,
+while their publisher edition is 2026. Percentage differences are percentage
+points; count differences retain count units. Suppressed, invalid, missing and
+not applicable observations never produce a numeric difference. An entity
+outside the selected report roster is unavailable. This contract neither sums
+districts into a Texas estimate nor harmonizes another year or source revision.
