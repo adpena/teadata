@@ -292,19 +292,20 @@ def _literal_token(cell: ET.Element, strings: list[str]) -> str | None:
 def _worksheet_cells(rows: list[ET.Element], header_row: int, row_count: int,
                      column_count: int, *, literal: bool = False) -> Iterator[tuple[int, int, ET.Element]]:
     """Validate either reader's physical coordinates without interpreting values."""
+    label = "Literal financial" if literal else "Financial"
     dense_cells = row_count * column_count
     if (literal and dense_cells > MAX_LITERAL_CELLS) or len(rows) != row_count + 1:
-        raise ValueError("Financial worksheet exceeds cell admission or has a physical row gap")
+        raise ValueError(f"{label} worksheet exceeds cell admission or has a physical row gap")
     for row_index, row in enumerate(rows[1:]):
         ordinal = row_index + header_row + 1
         if int(row.attrib["r"]) != ordinal:
-            raise ValueError("Financial worksheet has a physical row gap")
+            raise ValueError(f"{label} worksheet has a physical row gap")
         seen: set[str] = set()
         for cell in row.findall(NS + "c"):
             reference = cell.attrib["r"]
             match = _CELL_ADDRESS.fullmatch(reference)
             if match is None or int(match[2]) != ordinal or reference in seen:
-                raise ValueError("Duplicate or mismatched financial cell coordinate")
+                raise ValueError(f"Duplicate or mismatched {label.lower()} cell coordinate")
             seen.add(reference)
             column = 0
             for character in match[1]:
