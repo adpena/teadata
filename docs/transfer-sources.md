@@ -1,22 +1,16 @@
 # Transfer source intake
 
-The [v0.0.152 normal parent](source-integration-status.md) attaches the reviewed
-2023–24, 2024–25 and 2025–26 district-report editions through the existing lazy
-`release.observations("district_transfer_reports", ...)` planner.
-This is a district-report source, separate from campus edges and TEFA data.
-All acquired regional originals are retained; that does not establish coverage
-of every LEA. Earlier transfer candidates and historical classification holds
-remain outside this parent. Keep published totals, pair details, directions and
-masking states separate. No suppressed count is reconstructed.
+The [v0.0.169 normal release](source-integration-status.md) attaches reviewed
+district transfer reports for 2012–13 through 2025–26 through the existing lazy
+`release.observations("district_transfer_reports", ...)` planner. Regional
+originals document the publishing roster. Keep published totals, pair details,
+directions, and masking states separate from reconciled edges and TEFA data.
 
-The table identifies reporting and partner districts separately; neither is the
-unique source-row key. The current entity/ID-cohort shortcut requires the ordinary
-`district_number` key and therefore does not bind this table automatically. Read
-it through the same canonical source-table API and explicitly filter the intended
-role, for example `reporting_district_number`. Inspect the returned schema and
-raw/support columns before filtering. A reviewed typed role binding is still
-needed for the per-entity shortcut; attachment does not establish that capability.
-Do not rename the partner district to the reporter or infer a direction from it.
+The entity shortcut uses the explicitly declared reporting-district role.
+`district.dataset("district_transfer_reports").at(23).select("student_transfer_count")`
+selects that district’s 2022–23 report, including both directions and their raw
+count tokens. The partner district is a separate column. Source-input and
+record identifiers remain the unique row key.
 
 
 `teadata.scripts.refresh_transfers acquire` retains original TEA regional district
@@ -389,15 +383,16 @@ districts, including 29,216 directional details, 2,197 published totals and
 4,394 separators. The native candidate passed raw and typed source parity.
 All 14,608 reciprocal pairs matched on the original count or masking token.
 Three individual district reports retrieved on November 8, 2026, independently
-matched 196 of those rows in source order. The candidate remains unpublished.
+matched 196 of those rows in source order. These checks preceded publication of
+the historical editions.
 
 For 2020–21, all 20 originals provided 37,460 rows across 1,204 reporting
 districts, including 30,860 directional details, 2,200 published totals,
 and 4,400 separators. The native candidate passed raw and typed source
 parity. The 15,430 reciprocal pairs matched on the original count or
 masking token. Three individual district reports retrieved on November 8,
-2026, independently matched 208 of those rows in source order. The local candidate uses
-the reported district population and remains unpublished.
+2026, independently matched 208 of those rows in source order. The retained
+edition uses the reported district population.
 
 ### Reviewed 2021–22 partner identifiers
 
@@ -435,7 +430,8 @@ individual reports for Austin ISD, Hutto ISD, and Harmony Public Schools –
 Houston North matched in source order, including the original count tokens
 and published totals. Those three witnesses were retrieved on November 8,
 2026, through TEA's [District Transfer Report selector](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/district_transfer_report.html).
-The edition remains unpublished.
+The standalone v0.0.141 history and the reporter-bound v0.0.169 normal release
+both include this edition.
 
 To read the candidate directly, open its manifest and choose an explicit
 edition and field. The catalog resolves the leaf and includes the raw count,
@@ -447,7 +443,7 @@ from teadata.release import DataRelease
 
 release = DataRelease("path/to/candidate/release.json", offline=True)
 entry, = (row for row in release.catalog.editions(dataset="district_transfer_reports")
-          if row["edition"] == "2024")
+          if row["edition"] == "2023")
 edition = EditionKey(entry["dataset"], entry["edition"], entry["revision_sha256"],
                      entry["scope"], entry["table"], entry["grain"])
 selection, = release.catalog.resolve_artifacts([(edition, "student_transfer_count")])
@@ -469,10 +465,10 @@ Admission is 2 MiB for each control/report JSON, 16 MiB per prepared artifact,
 emitted batch. These are input/buffer checks, not a whole-process RSS or duration
 guarantee. Native readback must equal the accepted preparation after only the
 declared column projection. The earlier preparations' `field_correctness_qualified`
-value is false; PASS/readback and native materialization do not upgrade it or
-establish all-LEA coverage. The packaged entries expose the source contracts
-without adding district rows to the default engine or app. Engine/app consumer
-cutover, field correctness and release qualification remain separate reviewed steps.
+value is false. Later field qualification uses the exact native release and
+independent report witnesses. The historical attachment passed that gate for
+v0.0.169. Application adoption and reconciled edge qualification remain
+separate reviewed steps.
 
 ## Compare the district publisher directions
 

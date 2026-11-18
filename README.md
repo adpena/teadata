@@ -24,16 +24,11 @@ PyYAML's supported pure Python implementation is tested on 3.15.
 
 ```bash
 uv venv
-uv pip install teadata==0.0.165
+uv pip install teadata
 ```
 
-Version 0.0.165 packages one immutable normal-release URL and SHA-256 for
-`current_release()` and `DataEngine.load_default()`. The selected release
-retains 20 attachments and 31 native dataset IDs, including statewide educator
-series. Its 2025–26 TPRS Student projection includes disability Membership
-counts and five composition percentages, for 179 qualified fields across 9,105 reporting campuses, 1,202
-reporting districts and Texas. Other TPRS domains retain their documented
-coverage and gaps. Qualified fields use the normal lazy
+The package includes one immutable normal-release URL and SHA-256 for
+`current_release()` and `DataEngine.load_default()`. Qualified fields use the normal lazy
 access and export path, with source-specific years, populations and holds.
 The wheel contains the selector and contracts; data files remain demand-loaded.
 See the [exact coverage and release identity](docs/source-integration-status.md).
@@ -119,29 +114,16 @@ default SQLite checks because SQLite does not enforce declared `VARCHAR` widths.
 
 ## Quick Start
 
-Python packages contain code and metadata; data bundles are distributed
-separately. The package selects a pinned default; optionally select the same
-current release explicitly:
-
-```bash
-export TEADATA_RELEASE_URL="https://github.com/adpena/teadata/releases/download/v0.0.165/release.json"
-export TEADATA_RELEASE_SHA256="e32c15b1f782f7a10f97b2158c4560a0c161d2c47fec5448987a9d55fe4c5685"
-export TEADATA_RELEASE_OFFLINE=0
-```
-
-Unset `TEADATA_RELEASE` when using a URL: a configured local manifest takes
-precedence. For a complete downloaded bundle, set it to the local `release.json`
-instead. The manifest binds one normal engine release and its attached sources
-to exact content hashes. The [coverage inventory](docs/source-integration-status.md)
-and [release selection guide](docs/data-releases.md#current-normal-release-00164)
-show its 20 native attachments, including district/region/Texas College Credit
-and district hiring, reported EPP assignments and direct Texas hiring totals.
+The package selects a pinned data release and fetches the files it needs.
+Use the [coverage inventory](docs/source-integration-status.md) to see the
+edition and available fields, or use the [release selection guide](docs/data-releases.md)
+to select another release explicitly. For a downloaded bundle, set
+`TEADATA_RELEASE` to its local `release.json`. For explicit URL selection, unset
+`TEADATA_RELEASE` and set `TEADATA_RELEASE_URL` and `TEADATA_RELEASE_SHA256`.
 The [TAPR and TPRS supplements](docs/data-releases.md#tapr-and-tprs-supplements)
 remain separately selectable sources.
 
-Installing software does not choose data. The unconfigured source checkout's
-tracked fixture remains unchanged and has no native attachments. Reuse the same
-URL, pin and populated cache with `TEADATA_RELEASE_OFFLINE=1` for offline work;
+Use the same pin and populated cache with `TEADATA_RELEASE_OFFLINE=1` for offline work;
 missing bytes fail rather than triggering a download or silently changing years.
 
 ```python
@@ -367,7 +349,7 @@ Before packaging trim, `0.0.118` artifacts were above the per-file limit:
 - wheel: about `448 MB`
 - sdist: about `446 MB`
 
-The Python distribution includes code, source contracts, and local methodology documents. Data artifacts are distributed separately and selected through one release manifest. Source checkouts hydrate Git LFS; HTTP deployments use a complete adjacent bundle as described in [data releases](docs/data-releases.md#runtime-and-rollout). Installed wheels require `TEADATA_RELEASE` or `TEADATA_RELEASE_URL`. Publishing code does not refresh production data.
+The Python distribution includes code, source contracts, methodology documents, and the default data selector. Deployments can freeze a different manifest explicitly. See [data releases](docs/data-releases.md#runtime-and-rollout) for file, cache, and rollout behavior.
 
 ## Release Policy
 

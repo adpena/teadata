@@ -7,7 +7,17 @@ A build records the files it actually reads. The runtime catalog is embedded in 
 <a id="current-normal-release-00163"></a>
 <a id="current-normal-release-00164"></a>
 
-## Current normal release 0.0.168
+## Current normal release 0.0.169
+
+The [pinned normal release](https://github.com/adpena/teadata/releases/download/v0.0.169/release.json)
+adds reporter-bound district transfer reports for school years 2012–13 through
+2022–23. Together with the three newer editions, the standard district
+namespace covers 14 years through 2025–26. It preserves directional detail,
+publisher totals, masking, and missing rows. See the [coverage inventory](source-integration-status.md)
+and [transfer guide](transfer-sources.md) for the source checks and limitations.
+
+
+## Prior normal release 0.0.168
 
 This revision corrects SOF DPE publisher URLs and binds its citation to the
 original November 17, 2026 download. Source values and measurement definitions
@@ -30,13 +40,13 @@ without loading full metadata values; temporary catalog and receipt validation
 traversals avoid self-retaining recursive closures. These correctness changes
 do not establish a production memory reduction.
 
-`DataEngine.load_default()` selects the packaged, immutable normal168 manifest
-unless an explicit release or scoped context overrides it. Installation keeps
+In software 0.0.168, `DataEngine.load_default()` selects the immutable normal168
+manifest unless an explicit release or scoped context overrides it. Installation keeps
 source payloads external; discovery reads catalog metadata and observations
 remain lazy. Strict offline mode never fetches or substitutes another release.
 See the [current coverage and qualification inventory](source-integration-status.md).
 
-The current parent also retains the 2024–25 baseline continuity measures from
+The 0.0.168 parent also retains the 2024–25 baseline continuity measures from
 the 2026 TPRS report and adds 486 reviewed SOF DPE fields. The latter preserve
 exact numerical values, codes, field-specific periods and publication/row runs;
 104 other facts remain explicitly held. The publisher's 1,243 LEA recipients
