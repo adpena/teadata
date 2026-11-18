@@ -32,6 +32,12 @@ class MeasurementUnit(StrEnum):
     CREDIT_HOURS_PER_STUDENT = "credit_hours_per_student"
     STUDENTS_PER_CLASS = "students_per_class"
     ATTENDANCE_EQUIVALENT = "attendance_equivalent"
+    WEIGHTED_ATTENDANCE_EQUIVALENT = "weighted_attendance_equivalent"
+    WEIGHTED_FTE = "weighted_fte"
+    CURRENCY_PER_ATTENDANCE_EQUIVALENT = "currency_per_attendance_equivalent"
+    CURRENCY_PER_100_TAXABLE_VALUE = "currency_per_100_taxable_value"
+    CURRENCY_PER_TEACHER = "currency_per_teacher"
+    CURRENCY_PER_EVALUATION = "currency_per_evaluation"
     SQUARE_FEET = "square_feet"
     ACRES = "acres"
 

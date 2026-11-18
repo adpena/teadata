@@ -14,6 +14,7 @@ def main(argv: list[str] | None = None) -> int:
     source.add_argument("--config", type=Path, help="Explicit reviewed Config; never edits default sources")
     source.add_argument("--campus-intake", type=Path, help="Exact FY2025 campus actual acquisition manifest")
     source.add_argument("--qualification-case", type=Path, help="Reviewed FY2025 campus and district witness selection")
+    source.add_argument("--sof-dpe", action="store_true", help="Prepare the frozen reviewed SOF DPE quantity subset from retained sources")
     parser.add_argument("--config-sha256")
     parser.add_argument("--campus-intake-sha256")
     parser.add_argument("--qualification-case-sha256")
@@ -22,6 +23,15 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     from teadata.provenance import ProvenanceStore
 
+    if args.sof_dpe:
+        if any(value is not None for value in (args.config_sha256, args.campus_intake_sha256,
+                                               args.qualification_case_sha256, args.source)):
+            parser.error("--sof-dpe uses only --store and a new --output; other source options are incompatible")
+        from teadata.sof_dpe import materialize_sof_dpe
+
+        result = materialize_sof_dpe(ProvenanceStore(args.store), output=args.output)
+        print(json.dumps(result, sort_keys=True))
+        return 0
     if args.qualification_case is not None:
         if not args.qualification_case_sha256 or args.campus_intake_sha256 is not None or args.config_sha256 is not None or args.source is not None:
             parser.error("Financial qualification requires --qualification-case-sha256 and runs separately from other modes")

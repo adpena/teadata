@@ -7,12 +7,13 @@ A build records the files it actually reads. The runtime catalog is embedded in 
 <a id="current-normal-release-00163"></a>
 <a id="current-normal-release-00164"></a>
 
-## Current normal release 0.0.165
+## Current normal release 0.0.167
 
-Software 0.0.165 selects 20 native attachments, 31 dataset IDs and 277
+Software 0.0.167 selects 22 native attachments, 33 dataset IDs and 306
 edition/scope keys. Its TPRS Student projection includes six disability Membership
 counts and five composition percentages, for 179 qualified fields in 2025–26 across 9,105 reporting campuses,
-1,202 reporting districts and Texas. The other 19 attachments remain unchanged,
+1,202 reporting districts and Texas. All 21 preexisting native attachments remain
+unchanged from release 0.0.166,
 including statewide continuous retention cohorts and direct initial
 certification totals. Historical Student contracts retain their original
 168- or 174-field interpretation; mixed or unknown contracts fail explicitly.
@@ -23,11 +24,20 @@ without loading full metadata values; temporary catalog and receipt validation
 traversals avoid self-retaining recursive closures. These correctness changes
 do not establish a production memory reduction.
 
-`DataEngine.load_default()` selects the packaged, immutable normal165 manifest
+`DataEngine.load_default()` selects the packaged, immutable normal167 manifest
 unless an explicit release or scoped context overrides it. Installation keeps
 source payloads external; discovery reads catalog metadata and observations
 remain lazy. Strict offline mode never fetches or substitutes another release.
 See the [current coverage and qualification inventory](source-integration-status.md).
+
+The current parent also retains the 2024–25 baseline continuity measures from
+the 2026 TPRS report and adds 486 reviewed SOF DPE fields. The latter preserve
+exact numerical values, codes, field-specific periods and publication/row runs;
+104 other facts remain explicitly held. The publisher's 1,243 LEA recipients
+include education service centers and Bowie County, not only school districts.
+See [continuity](tprs-continuity-sources.md) and [DPE definitions and limitations](sof-dpe-sources.md).
+These additions use the same lazy catalog and dataset namespaces; none changes
+a historical selection or certifies a publisher funding formula.
 
 The two retained educator attachments contain 151 retention rows across 35
 first teaching cohort/group editions and 33 direct certification role/year rows.

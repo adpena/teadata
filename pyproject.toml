@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "teadata"
-version = "0.0.166"
+version = "0.0.167"
 description = "Pythonic data engine for Texas education datasets"
 authors = [{name="Alejandro Peña", email="adpena@gmail.com"}]
 readme = "README.md"
@@ -156,6 +156,8 @@ include-package-data = false
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra"
+tmp_path_retention_policy = "failed"
+tmp_path_retention_count = 2
 
 [tool.deptry]
 # Optional: folders to skip

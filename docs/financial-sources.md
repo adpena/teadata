@@ -43,6 +43,11 @@ Qualifying those fields does not qualify the other finance fields or establish
 revenue, expenditures, audited costs or funding adequacy. Check the selected
 normal parent's coverage before assuming the new candidate is attached.
 
+The [DPE quantity interpretation](sof-dpe-sources.md) separately accounts for
+all 593 raw DPE facts and selects a reviewed subset with exact decimal storage,
+field-specific periods and explicit holds. Its producer and scientific replay
+do not activate or replace the selected normal release automatically.
+
 The [PEIMS single-file archive](https://tea.texas.gov/about-tea/state-funding/state-funding-reports-and-data/peims-single-file-financial-data-downloads)
 publishes separate district and charter account files. Historical packaging
 varies. The FY2014 and FY2018 district budget ZIPs include a charter CSV
@@ -152,24 +157,27 @@ Actual PWR2024/2025 inspection found narrowed 2025 AF program-code labels while 
 
 The retained statewide publication run **47422, Near Final** contains four DPE
 worksheets: inputs, outputs, M&O ASAHE and I&S ASAHE. They contain 593 fact
-occurrences. Three DPE attendance facts are already qualified through
-`summary_of_finances_attendance`; the remaining 590 have not been numerically
-qualified or added to the normal release. The existing native raw contract
-preserves their original strings. A dictionary match supplies a source
-definition, not proof of a field's unit, measurement period or correctness.
+occurrences: 591 publisher numeric fields and two text fields. Three attendance
+facts remain owned by `summary_of_finances_attendance`. The separately reviewed
+`summary_of_finances_dpe` projection qualifies 486 further fields (462 numeric
+quantities and 24 literal codes/text), with 104 explicit holds. The raw contract
+preserves all 593. A dictionary match alone does not establish numerical units,
+measurement periods or correctness. See [the admission contract and limits](sof-dpe-sources.md)
+and the selected release inventory for normal integration and app-adoption status.
 
-The DPE-only successor now binds all 611 physical headers (593 facts and 18
+The retained raw DPE candidate binds all 611 physical headers (593 facts and 18
 identity/context columns) to the exact dictionary while leaving LPE mappings
 unchanged. It accounts for all eight original sheets and emits only the four
 DPE editions. An independent original-OOXML comparison matched all 729,857
 DPE fact cells, including literal nulls, integer/decimal strings and row runs.
-This establishes raw fidelity and dictionary identity. The additional values
-remain uninterpreted strings with unknown units/reference periods; it does
-not establish numerical qualification, normal-release availability or app
-ingestion. Check the current integration inventory for those later stages.
+That receipt establishes raw fidelity and dictionary identity. It is separate
+from the later 486-field semantic/source replay and 110 selected original-report
+literal goldens. Qualification of that subset does not qualify the 104 holds,
+certify publisher formulas or establish application deployment.
 
-The first three sheets each report 1,243 districts. The I&S sheet reports 1,030;
-its 213 absent districts must not become zero observations. Preserve each row's
+The first three sheets each report 1,243 LEA recipients, including education
+service centers and Bowie County; these are not 1,243 school districts. The
+I&S sheet reports 1,030 recipients; 213 absent rows must not become zeros. Preserve each row's
 actual SOF run separately from publication run 47422 and retain Payment Cycle 2
 without inventing a named interpretation. The separate 2026–27 Preliminary
 run 47562 is a different funding edition.
@@ -201,9 +209,9 @@ definitions or corrections. Both exceptions retain their original values.
 The named official reports are available through the SOF report's own
 “ASAHE for Facilities” link (`rpt=2`); their acquisition timestamps, hashes,
 report headings and displayed-cell comparisons are retained separately.
-No value was corrected and no additional numeric series was qualified.
-The uncertainty also applies to the dictionary's dependent lines 17–18,
-29–30 and 34. Retain the source descriptions and values; do not silently
+No value was corrected by that reconciliation. The uncertainty also applies
+to dependent lines 17–18, 27, 29–30 and 34 and the downstream ASAHE_46_071_ADJ,
+EDA_STATE_SHARE_ADJ and TOT_STATE_AID amounts. Retain source descriptions and values; do not silently
 substitute a different base in either formula.
 
 The [TEA SOF download service](https://tealprod.tea.state.tx.us/fsp/Reports/ReportSelection.aspx)

@@ -1087,9 +1087,11 @@ def _native_review(release: DataRelease, store: ProvenanceStore) -> _NativeRevie
 
         return _NativeReview("TPRS continuity", continuity_qualification,
             partial(retained_continuity_evidence, release, processing_store, expected_manifest_sha256=pin))
-    if addition is not None and addition[0] in {"sof_attendance", "chronic_absence"}:
+    if addition is not None and addition[0] in {"sof_attendance", "sof_dpe", "chronic_absence"}:
         if addition[0] == "sof_attendance":
             from teadata.sof_attendance import qualify_sof_attendance as qualify, retained_sof_evidence as evidence
+        elif addition[0] == "sof_dpe":
+            from teadata.sof_dpe import qualify_sof_dpe as qualify, retained_sof_dpe_evidence as evidence
         else:
             from teadata.attendance_chronic import qualify_attendance_chronic as qualify, retained_attendance_evidence as evidence
         processing_store = _retained_store(release.path.parent / "provenance")

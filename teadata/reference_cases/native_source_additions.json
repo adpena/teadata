@@ -1,6 +1,10 @@
 {
   "schema_version": 1,
   "releases": {
+    "fd1ca0e36103153ae4175e188b7eb86debac289ccfaeb56e8a412df7e9d7857a": {
+      "family": "sof_dpe",
+      "references": {}
+    },
     "b4985df48b57c894b11abd2d2596f74defb29fabe20fe2c589366b56602e2e4e": {
       "family": "tprs_continuity",
       "references": {}

@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "observed_at": "2026-11-18T06:44:26.287753+00:00",
+  "observed_at": "2026-11-18T11:43:20.507488+00:00",
   "generator": {
-    "software_version": "0.0.166",
+    "software_version": "0.0.167",
     "working_source_sha256": {
       "scripts/source_inventory.py": "68a90e79a7066867c3604e2a304ab650c59591389e2eb00c0234e035c7a7893a",
       "teadata/release_inventory.py": "5f6e4cbac970e08d71b2d5713ce1eb0cf3e4944b0adedd41e01fed6d20196cce",
@@ -18,9 +18,9 @@
     "source_only_ids": 114,
     "source_only_ids_not_attached": 85,
     "base_inputs": 13,
-    "native_attachments": 21,
-    "native_dataset_ids": 32,
-    "native_edition_scope_keys": 302
+    "native_attachments": 22,
+    "native_dataset_ids": 33,
+    "native_edition_scope_keys": 306
   },
   "registration": [
     {
@@ -2242,9 +2242,9 @@
   "selected_catalog": {
     "schema_version": 1,
     "release": {
-      "source": "https://github.com/adpena/teadata/releases/download/v0.0.166/release.json",
-      "manifest_sha256": "e34cce994f2db88b5a2dd0eb3d6950412d0bd7439603675018503844f4da471a",
-      "build_id": "63290448a80ffa9fd959f4217dcb2015f882d51e426bde264b95e292486c6514"
+      "source": "https://github.com/adpena/teadata/releases/download/v0.0.167/release.json",
+      "manifest_sha256": "ecc89a8dea775defa5c3e81911d059fe9eb6af09d0ccb65112a5f1be5e43573a",
+      "build_id": "df8c457b82a6029591b4d835fff70a3ddc2b64e2b70389d72754aeb421c8c421"
     },
     "include_variables": true,
     "metadata_inspected": true,
@@ -6869,6 +6869,45 @@
         ]
       },
       {
+        "location": "native-fd1ca0e36103153ae4175e188b7eb86debac289ccfaeb56e8a412df7e9d7857a.json",
+        "manifest_sha256": "fd1ca0e36103153ae4175e188b7eb86debac289ccfaeb56e8a412df7e9d7857a",
+        "build_id": "6101bab118a0922db1bda360875709bc33308eeb7c989bf5da39551d91f125c0",
+        "editions": [
+          {
+            "dataset": "summary_of_finances_dpe",
+            "edition": "47422",
+            "revision_sha256": "722f599d8023ad6cb9c8f83a41318133291f1c768d46c2ba4ff4dee92e625c14",
+            "scope": "district",
+            "table": "inputs_dpe",
+            "grain": "one publisher LEA row in worksheet inputs_dpe"
+          },
+          {
+            "dataset": "summary_of_finances_dpe",
+            "edition": "47422",
+            "revision_sha256": "722f599d8023ad6cb9c8f83a41318133291f1c768d46c2ba4ff4dee92e625c14",
+            "scope": "district",
+            "table": "is_asahe_dpe",
+            "grain": "one publisher LEA row in worksheet is_asahe_dpe"
+          },
+          {
+            "dataset": "summary_of_finances_dpe",
+            "edition": "47422",
+            "revision_sha256": "722f599d8023ad6cb9c8f83a41318133291f1c768d46c2ba4ff4dee92e625c14",
+            "scope": "district",
+            "table": "outputs_dpe",
+            "grain": "one publisher LEA row in worksheet outputs_dpe"
+          },
+          {
+            "dataset": "summary_of_finances_dpe",
+            "edition": "47422",
+            "revision_sha256": "722f599d8023ad6cb9c8f83a41318133291f1c768d46c2ba4ff4dee92e625c14",
+            "scope": "district",
+            "table": "mo_asahe_dpe",
+            "grain": "one publisher LEA row in worksheet mo_asahe_dpe"
+          }
+        ]
+      },
+      {
         "location": "native-fdd86b5bf8e5c4b1e2a97523e3f651cf41281cf0f94cae5cfc7e0a97f0300791.json",
         "manifest_sha256": "fdd86b5bf8e5c4b1e2a97523e3f651cf41281cf0f94cae5cfc7e0a97f0300791",
         "build_id": "07efa838021462de6aad1805a58acf31117ec1a72cc08e2fd3fc384846ad56e5",
@@ -9861,6 +9900,358 @@
               "region_number",
               "school_year",
               "source_scope"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "26c02d59791e5256dfb92c98ac58fe8574101f5f65eab55162b43320b59839bf",
+        "dataset": "summary_of_finances_dpe",
+        "edition": "47422",
+        "revision_sha256": "722f599d8023ad6cb9c8f83a41318133291f1c768d46c2ba4ff4dee92e625c14",
+        "scope": "district",
+        "table": "inputs_dpe",
+        "grain": "one publisher LEA row in worksheet inputs_dpe",
+        "title": "2025–26 SOF District Payment Estimate: reviewed quantities as published",
+        "publisher": "Texas Education Agency",
+        "source_url": null,
+        "declared_period": {
+          "kind": "unknown"
+        },
+        "source_qualifiers": {
+          "family": "sof",
+          "reference_id": "state_funding_index",
+          "publisher_release_status": "Near Final",
+          "publication_run_id": "47422",
+          "row_run_column": "sof_run_id"
+        },
+        "variable_count": 201,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2023,
+              "end_year": 2024
+            },
+            "unit": "currency",
+            "fields": [
+              "inputs_dpe_property_insurance_amt"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "attendance_equivalent",
+            "fields": [
+              "inputs_dpe_asf_ada",
+              "inputs_dpe_py1_ada_adj_tot_refined",
+              "inputs_dpe_py1_ada_tot_refined"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "currency",
+            "fields": [
+              "inputs_dpe_by_ifa_bond_local",
+              "inputs_dpe_py1_ifa_bond_local",
+              "inputs_dpe_py1_ifa_lease_purch_local"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "attendance_equivalent",
+            "fields": [
+              "inputs_dpe_bil_ada",
+              "inputs_dpe_bil_ada_tot_refined",
+              "inputs_dpe_bil_lep_dual_alt_ada",
+              "inputs_dpe_bil_nonlep_dual_alt_ada",
+              "inputs_dpe_bil_prek_fullday_ada",
+              "inputs_dpe_bil_prek_halfday_ada",
+              "inputs_dpe_ee_allk3_ada",
+              "inputs_dpe_flx_ada_tot_refined",
+              "inputs_dpe_flx_bil_ada",
+              "inputs_dpe_flx_bil_ada_tot_refined",
+              "inputs_dpe_flx_esy_ada_tot_refined",
+              "inputs_dpe_flx_esy_bil_ada",
+              "inputs_dpe_flx_esy_bil_ada_tot_refined",
+              "inputs_dpe_flx_esy_mainstream_ada",
+              "inputs_dpe_flx_mainstream_ada",
+              "inputs_dpe_ftvnr_ada",
+              "inputs_dpe_high_school_ada",
+              "inputs_dpe_nifa_ada",
+              "inputs_dpe_peims_ada",
+              "inputs_dpe_prek_4yo_hd_ada",
+              "inputs_dpe_prek_fullday_ada",
+              "inputs_dpe_prek_halfday_ada",
+              "inputs_dpe_school_safety_ada",
+              "inputs_dpe_speced_mainstream_ada",
+              "inputs_dpe_tsbvi_ada",
+              "inputs_dpe_tsd_ada",
+              "inputs_dpe_voced_adv_nt_ada",
+              "inputs_dpe_voced_adv_pt_ada"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "count",
+            "fields": [
+              "inputs_dpe_campus_cnt",
+              "inputs_dpe_fiie_count",
+              "inputs_dpe_ne_uil_stud_count",
+              "inputs_dpe_rdspd_student_count",
+              "inputs_dpe_tchr_3_lt5_count",
+              "inputs_dpe_tia_ack_tchr_cnt",
+              "inputs_dpe_tia_nbct_tchr_cnt",
+              "inputs_dpe_tier_1_stu_cnt",
+              "inputs_dpe_tier_2_stu_cnt",
+              "inputs_dpe_tier_3_stu_cnt",
+              "inputs_dpe_tier_4_stu_cnt",
+              "inputs_dpe_tier_5_stu_cnt",
+              "inputs_dpe_tot_tier_stu_cnt"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "currency",
+            "fields": [
+              "inputs_dpe_actual_frozen_levy",
+              "inputs_dpe_aep_allot",
+              "inputs_dpe_asa_oerim_48_308",
+              "inputs_dpe_base_tchr_incentive_allot",
+              "inputs_dpe_by_is_coll",
+              "inputs_dpe_campus_safety_allot",
+              "inputs_dpe_cert_exam_reimb",
+              "inputs_dpe_ch313_tax_credit",
+              "inputs_dpe_ch41_partner_gain",
+              "inputs_dpe_ch41_tuition_charged",
+              "inputs_dpe_ch41_tuition_paid",
+              "inputs_dpe_college_prep_reimb",
+              "inputs_dpe_district_est_lv1_coll",
+              "inputs_dpe_district_est_lv3_coll",
+              "inputs_dpe_dppc_allot_amt",
+              "inputs_dpe_eda_elig_debt_svc_amt",
+              "inputs_dpe_eda_local_share",
+              "inputs_dpe_eda_state_share",
+              "inputs_dpe_enh_tchr_incentive_allot",
+              "inputs_dpe_frozen_levy_before_sb2",
+              "inputs_dpe_ifa_bond_local",
+              "inputs_dpe_ifa_bond_state",
+              "inputs_dpe_ifa_bond_state_local",
+              "inputs_dpe_ifa_lease_purch_local",
+              "inputs_dpe_ifa_lease_purch_state",
+              "inputs_dpe_interest_refunds_48271",
+              "inputs_dpe_local_rev_shortfall",
+              "inputs_dpe_nifa_allot",
+              "inputs_dpe_nifa_allot_base",
+              "inputs_dpe_other_adjustment",
+              "inputs_dpe_prep_gyo_allot",
+              "inputs_dpe_prep_mentor_allot",
+              "inputs_dpe_prep_presvc_alt_allot",
+              "inputs_dpe_prep_presvc_res_allot",
+              "inputs_dpe_prep_presvc_trad_allot",
+              "inputs_dpe_prep_tot_allot",
+              "inputs_dpe_py1_is_coll",
+              "inputs_dpe_py1_mo_coll_local",
+              "inputs_dpe_py1_tax_levy_tot",
+              "inputs_dpe_py1_tax_tif_payment",
+              "inputs_dpe_supp_tif_payment",
+              "inputs_dpe_tax_refunds_261115c",
+              "inputs_dpe_tia_ack_tchr_allot",
+              "inputs_dpe_tia_exemp_tchr_allot",
+              "inputs_dpe_tia_fee_reimb",
+              "inputs_dpe_tia_mast_tchr_allot",
+              "inputs_dpe_tia_nbct_tchr_allot",
+              "inputs_dpe_tia_recog_tchr_allot",
+              "inputs_dpe_trans_private_allot",
+              "inputs_dpe_trans_reg_allot",
+              "inputs_dpe_trans_speced_allot",
+              "inputs_dpe_trans_voced_allot",
+              "inputs_dpe_tuition_paid"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "currency_per_100_taxable_value",
+            "fields": [
+              "inputs_dpe_max_compr_rate"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "fte",
+            "fields": [
+              "inputs_dpe_ech_fulltime_fte",
+              "inputs_dpe_flx_esy_homebound_fte",
+              "inputs_dpe_flx_esy_hospital_fte",
+              "inputs_dpe_flx_esy_off_camp_fte",
+              "inputs_dpe_flx_esy_prs_fte",
+              "inputs_dpe_flx_esy_res_ct_fte",
+              "inputs_dpe_flx_esy_resource_fte",
+              "inputs_dpe_flx_esy_self_cont_sv_fte",
+              "inputs_dpe_flx_esy_self_contain_fte",
+              "inputs_dpe_flx_esy_speech_fte",
+              "inputs_dpe_flx_esy_st_school_fte",
+              "inputs_dpe_flx_esy_vac_fte",
+              "inputs_dpe_flx_esy_voced_fte",
+              "inputs_dpe_flx_homebound_fte",
+              "inputs_dpe_flx_hospital_fte",
+              "inputs_dpe_flx_off_camp_fte",
+              "inputs_dpe_flx_prs_fte",
+              "inputs_dpe_flx_res_ct_fte",
+              "inputs_dpe_flx_resource_fte",
+              "inputs_dpe_flx_self_cont_sv_fte",
+              "inputs_dpe_flx_self_contain_fte",
+              "inputs_dpe_flx_speech_fte",
+              "inputs_dpe_flx_st_school_fte",
+              "inputs_dpe_flx_vac_fte",
+              "inputs_dpe_flx_voced_fte",
+              "inputs_dpe_rpep_ecodis_fte",
+              "inputs_dpe_rpep_nonecodis_fte",
+              "inputs_dpe_salary_allot_cnt",
+              "inputs_dpe_speced_eys_homebound_fte",
+              "inputs_dpe_speced_eys_hospital_fte",
+              "inputs_dpe_speced_eys_off_camp_fte",
+              "inputs_dpe_speced_eys_res_ct_fte",
+              "inputs_dpe_speced_eys_resource_fte",
+              "inputs_dpe_speced_eys_self_contain_fte",
+              "inputs_dpe_speced_eys_speech_fte",
+              "inputs_dpe_speced_eys_st_school_fte",
+              "inputs_dpe_speced_eys_vac_fte",
+              "inputs_dpe_speced_homebound_fte",
+              "inputs_dpe_speced_hospital_fte",
+              "inputs_dpe_speced_nonpub_fte",
+              "inputs_dpe_speced_off_camp_fte",
+              "inputs_dpe_speced_res_ct_fte",
+              "inputs_dpe_speced_resource_fte",
+              "inputs_dpe_speced_self_cont_sv_fte",
+              "inputs_dpe_speced_self_contain_fte",
+              "inputs_dpe_speced_speech_fte",
+              "inputs_dpe_speced_st_school_fte",
+              "inputs_dpe_speced_vac_fte",
+              "inputs_dpe_voced_adv_fte",
+              "inputs_dpe_voced_fte",
+              "inputs_dpe_voced_fte_tier_1",
+              "inputs_dpe_voced_fte_tier_2",
+              "inputs_dpe_voced_fte_tier_3"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "text",
+            "fields": [
+              "inputs_dpe_apply_asatr_to_coo_flag",
+              "inputs_dpe_chart_facil_elig_flag",
+              "inputs_dpe_district_finance_type_cd",
+              "inputs_dpe_district_type_cd",
+              "inputs_dpe_dppc_pgm_yr",
+              "inputs_dpe_early_credit_flag",
+              "inputs_dpe_efficiency_credit_flag",
+              "inputs_dpe_enh_tchr_incentive_flag",
+              "inputs_dpe_fast_growth_tier",
+              "inputs_dpe_flag_300sqmi",
+              "inputs_dpe_flag_30mi",
+              "inputs_dpe_flag_fast_growth",
+              "inputs_dpe_highest_grade",
+              "inputs_dpe_migrant_dist_flag",
+              "inputs_dpe_mnl_aep_allot_change_note_id",
+              "inputs_dpe_payment_class_cd",
+              "inputs_dpe_processing_flag",
+              "inputs_dpe_regional_insurance_flag"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "weighted_attendance_equivalent",
+            "fields": [
+              "inputs_dpe_ch41_wada_sold",
+              "inputs_dpe_district_est_wada"
+            ]
+          },
+          {
+            "period": {
+              "kind": "calendar_year",
+              "year": 2025
+            },
+            "unit": "currency",
+            "fields": [
+              "inputs_dpe_py1_dpv_local",
+              "inputs_dpe_py1_dpv_t1",
+              "inputs_dpe_py1_dpv_t10",
+              "inputs_dpe_py1_dpv_t13",
+              "inputs_dpe_py1_dpv_t14",
+              "inputs_dpe_py1_dpv_t15",
+              "inputs_dpe_py1_dpv_t16",
+              "inputs_dpe_py1_dpv_t17",
+              "inputs_dpe_py1_dpv_t18",
+              "inputs_dpe_py1_dpv_t19",
+              "inputs_dpe_py1_dpv_t2",
+              "inputs_dpe_py1_dpv_t20",
+              "inputs_dpe_py1_dpv_t21",
+              "inputs_dpe_py1_dpv_t22",
+              "inputs_dpe_py1_dpv_t3",
+              "inputs_dpe_py1_dpv_t4",
+              "inputs_dpe_py1_dpv_t7",
+              "inputs_dpe_py1_dpv_t8",
+              "inputs_dpe_py1_dpv_t9"
+            ]
+          },
+          {
+            "period": {
+              "kind": "calendar_year",
+              "year": 2025
+            },
+            "unit": "currency_per_100_taxable_value",
+            "fields": [
+              "inputs_dpe_i_s_rate",
+              "inputs_dpe_py1_mo_rate_adopt"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "district_name",
+              "district_number",
+              "publisher_estimate_type_cd",
+              "publisher_schoolyear",
+              "sof_run_id"
             ]
           }
         ]
@@ -13339,6 +13730,125 @@
               "region_number",
               "school_year",
               "source_scope"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "4de4629b90e70e0190399e2185b4e9f6b823a8348569c62d6e45e85fe2380383",
+        "dataset": "summary_of_finances_dpe",
+        "edition": "47422",
+        "revision_sha256": "722f599d8023ad6cb9c8f83a41318133291f1c768d46c2ba4ff4dee92e625c14",
+        "scope": "district",
+        "table": "is_asahe_dpe",
+        "grain": "one publisher LEA row in worksheet is_asahe_dpe",
+        "title": "2025–26 SOF District Payment Estimate: reviewed quantities as published",
+        "publisher": "Texas Education Agency",
+        "source_url": null,
+        "declared_period": {
+          "kind": "unknown"
+        },
+        "source_qualifiers": {
+          "family": "sof",
+          "reference_id": "state_funding_index",
+          "publisher_release_status": "Near Final",
+          "publication_run_id": "47422",
+          "row_run_column": "sof_run_id"
+        },
+        "variable_count": 31,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "as_of",
+              "as_of": "2015-08-31"
+            },
+            "unit": "currency",
+            "fields": [
+              "is_asahe_dpe_asahe_as_of_8_31_2015_15k_25k"
+            ]
+          },
+          {
+            "period": {
+              "kind": "as_of",
+              "as_of": "2021-08-31"
+            },
+            "unit": "currency",
+            "fields": [
+              "is_asahe_dpe_asahe_as_of_8_31_2021_25k_40k"
+            ]
+          },
+          {
+            "period": {
+              "kind": "as_of",
+              "as_of": "2023-08-31"
+            },
+            "unit": "currency",
+            "fields": [
+              "is_asahe_dpe_asahe_as_of_8_31_2023_40k_100k"
+            ]
+          },
+          {
+            "period": {
+              "kind": "as_of",
+              "as_of": "2025-08-31"
+            },
+            "unit": "currency",
+            "fields": [
+              "is_asahe_dpe_debt_service_on_eligible_bonds"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "currency",
+            "fields": [
+              "is_asahe_dpe_asahe",
+              "is_asahe_dpe_asahe_for_elderly_disabled",
+              "is_asahe_dpe_debt_service_payment",
+              "is_asahe_dpe_eda_state_aid_100k",
+              "is_asahe_dpe_eda_state_aid_10k",
+              "is_asahe_dpe_eda_state_aid_140k",
+              "is_asahe_dpe_eda_state_aid_60k",
+              "is_asahe_dpe_gain_in_state_aid",
+              "is_asahe_dpe_gain_in_state_aid_for_elderly_disabled",
+              "is_asahe_dpe_i_s_tax_collections",
+              "is_asahe_dpe_ifa_state_aid_100k",
+              "is_asahe_dpe_ifa_state_aid_10k",
+              "is_asahe_dpe_ifa_state_aid_140k",
+              "is_asahe_dpe_ifa_state_aid_60k",
+              "is_asahe_dpe_local_revenue_requirement_net_of_ifa_and_eda",
+              "is_asahe_dpe_local_revenue_requirement_net_of_ifa_and_eda_for_elderly_disabled",
+              "is_asahe_dpe_tax_lost_due_to_homestead_exemption",
+              "is_asahe_dpe_tax_lost_due_to_homestead_exemption_for_elderly_disabled",
+              "is_asahe_dpe_total_state_aid_assistance_provided_under_chapter_46"
+            ]
+          },
+          {
+            "period": {
+              "kind": "calendar_year",
+              "year": 2025
+            },
+            "unit": "currency",
+            "fields": [
+              "is_asahe_dpe_2025_property_value_with_100k_homestead_exemption",
+              "is_asahe_dpe_2025_property_value_with_10k_homestead_exemption",
+              "is_asahe_dpe_2025_property_value_with_140k_and_60k_for_elderly_and_disabled_homestead_exemption"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "district_name",
+              "district_number",
+              "publisher_payment_cycle_cd",
+              "publisher_schoolyear",
+              "sof_run_id"
             ]
           }
         ]
@@ -19308,6 +19818,423 @@
         ]
       },
       {
+        "edition_id": "8e25b01b93b171e6ba18edab7cf41e39e6c8d7feeb274a2deebb75ea1e5bcaf7",
+        "dataset": "summary_of_finances_dpe",
+        "edition": "47422",
+        "revision_sha256": "722f599d8023ad6cb9c8f83a41318133291f1c768d46c2ba4ff4dee92e625c14",
+        "scope": "district",
+        "table": "outputs_dpe",
+        "grain": "one publisher LEA row in worksheet outputs_dpe",
+        "title": "2025–26 SOF District Payment Estimate: reviewed quantities as published",
+        "publisher": "Texas Education Agency",
+        "source_url": null,
+        "declared_period": {
+          "kind": "unknown"
+        },
+        "source_qualifiers": {
+          "family": "sof",
+          "reference_id": "state_funding_index",
+          "publisher_release_status": "Near Final",
+          "publication_run_id": "47422",
+          "row_run_column": "sof_run_id"
+        },
+        "variable_count": 199,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2019,
+              "end_year": 2020
+            },
+            "unit": "currency",
+            "fields": [
+              "outputs_dpe_fga_allot_2020"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2022,
+              "end_year": 2023
+            },
+            "unit": "currency",
+            "fields": [
+              "outputs_dpe_local_rev_shortfall23"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "attendance_equivalent",
+            "fields": [
+              "outputs_dpe_ada_reg_pgm",
+              "outputs_dpe_ada_reg_pgm_actual",
+              "outputs_dpe_bil_dual_alt_ada",
+              "outputs_dpe_ee_k3_tot_ada",
+              "outputs_dpe_ee_tot_ada",
+              "outputs_dpe_insurance_adj_ada"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "currency",
+            "fields": [
+              "outputs_dpe_abc_allot",
+              "outputs_dpe_ada_safety_allot",
+              "outputs_dpe_addl_aid_fed_impact",
+              "outputs_dpe_adj_reg_pgm_allot",
+              "outputs_dpe_asa_recaphh_amt",
+              "outputs_dpe_asa_recaphh_amt_before_sb2",
+              "outputs_dpe_asa_saim_48_307",
+              "outputs_dpe_asa_tc_48_283",
+              "outputs_dpe_asa_tra_allot",
+              "outputs_dpe_asf_allot",
+              "outputs_dpe_asf_ytd_payments",
+              "outputs_dpe_bil_allot",
+              "outputs_dpe_bil_block_grant",
+              "outputs_dpe_bil_dual_alt_allot",
+              "outputs_dpe_bil_dual_alt_unadj_allot",
+              "outputs_dpe_bil_lep_dual_allot",
+              "outputs_dpe_bil_lep_dual_alt_allot",
+              "outputs_dpe_bil_nonlep_dual_allot",
+              "outputs_dpe_bil_nonlep_dual_alt_allot",
+              "outputs_dpe_bil_setaside_p2",
+              "outputs_dpe_bilingual_allot",
+              "outputs_dpe_ccmr_ecodis_allot",
+              "outputs_dpe_ccmr_nonecodis_allot",
+              "outputs_dpe_ccmr_outcomes_allot",
+              "outputs_dpe_ccmr_sped_allot",
+              "outputs_dpe_chart_facil1_allot",
+              "outputs_dpe_chart_facil2_allot",
+              "outputs_dpe_credrecap",
+              "outputs_dpe_dropout_allot",
+              "outputs_dpe_dropout_res_allot",
+              "outputs_dpe_dyslexia_allot",
+              "outputs_dpe_dyslexia_allot_nonsped",
+              "outputs_dpe_dyslexia_allot_sped",
+              "outputs_dpe_early_ed_allot",
+              "outputs_dpe_ee_allk3_allot",
+              "outputs_dpe_ee_edbil_allot",
+              "outputs_dpe_ee_edbil_unadj_allot",
+              "outputs_dpe_ee_k3_tot_allot",
+              "outputs_dpe_ee_prek_allot",
+              "outputs_dpe_ewtg",
+              "outputs_dpe_facil_allot_chart",
+              "outputs_dpe_fast_growth_allot",
+              "outputs_dpe_fga_allot_adj",
+              "outputs_dpe_fga_allot_unadj",
+              "outputs_dpe_fga_hh_allot_adj",
+              "outputs_dpe_fga_hh_allot_unadj",
+              "outputs_dpe_fiie_allot",
+              "outputs_dpe_fincost_adj_before_sb2",
+              "outputs_dpe_form_trans_grant",
+              "outputs_dpe_fsf_allot_adj",
+              "outputs_dpe_fsf_allot_before_asahe",
+              "outputs_dpe_fsf_allot_before_asahe_065",
+              "outputs_dpe_fsf_allot_tot",
+              "outputs_dpe_fsp_ops_with_imtf",
+              "outputs_dpe_fsp_tot_receipts",
+              "outputs_dpe_ftg_unadj",
+              "outputs_dpe_gt_allot",
+              "outputs_dpe_gt_allot_adj",
+              "outputs_dpe_gt_allot_unadj",
+              "outputs_dpe_gt_block_grant",
+              "outputs_dpe_gt_setaside_p2",
+              "outputs_dpe_ifa_bond_lease_state",
+              "outputs_dpe_imtf_allot",
+              "outputs_dpe_mo_coll_lv1",
+              "outputs_dpe_mo_coll_lv1_before_sb2",
+              "outputs_dpe_mo_coll_lv2",
+              "outputs_dpe_mo_coll_lv3",
+              "outputs_dpe_moq_allot",
+              "outputs_dpe_net_065_mo_rev_tot",
+              "outputs_dpe_net_actual_frozen_levy",
+              "outputs_dpe_net_cl_mo_rev_tot",
+              "outputs_dpe_net_frozen_levy_bf_sb2",
+              "outputs_dpe_net_mo_local_rev",
+              "outputs_dpe_net_mo_local_rev_065",
+              "outputs_dpe_net_mo_rev_100k_tot",
+              "outputs_dpe_net_mo_rev_l60k_tot",
+              "outputs_dpe_net_mo_rev_tot",
+              "outputs_dpe_net_pl_mo_rev_tot",
+              "outputs_dpe_op3_recap_amt_lv1",
+              "outputs_dpe_op3_recap_amt_lv3",
+              "outputs_dpe_op4_recap_amt_lv1",
+              "outputs_dpe_other_programs_065",
+              "outputs_dpe_other_programs_amount",
+              "outputs_dpe_other_programs_asahe",
+              "outputs_dpe_peg_allot",
+              "outputs_dpe_pre_k_k_grant",
+              "outputs_dpe_py1_mo_coll_frz",
+              "outputs_dpe_py1_mo_coll_mintr",
+              "outputs_dpe_py1_mo_coll_tot",
+              "outputs_dpe_rdspd_allot",
+              "outputs_dpe_rdspd_unadj_allot",
+              "outputs_dpe_recapture",
+              "outputs_dpe_recapture_after_netting",
+              "outputs_dpe_reg_pgm_allot",
+              "outputs_dpe_regional_insurance_allot",
+              "outputs_dpe_res_fac_allot",
+              "outputs_dpe_rpep_allot",
+              "outputs_dpe_rpep_ecodis_allot",
+              "outputs_dpe_rpep_ecodis_gr_allot",
+              "outputs_dpe_rpep_nonecodis_allot",
+              "outputs_dpe_rpep_nonecodis_gr_allot",
+              "outputs_dpe_rpep_prorated_allot",
+              "outputs_dpe_rpep_sped_gr_allot",
+              "outputs_dpe_safety_allot",
+              "outputs_dpe_sb1882_tot_aid",
+              "outputs_dpe_sce_allot",
+              "outputs_dpe_sce_block_grant",
+              "outputs_dpe_sce_prs_allot",
+              "outputs_dpe_sce_res_fac_non_allot",
+              "outputs_dpe_sce_setaside_p2",
+              "outputs_dpe_small_mid_allot",
+              "outputs_dpe_speced_block_grant",
+              "outputs_dpe_speced_eci_setaside_p2",
+              "outputs_dpe_speced_eys_allot",
+              "outputs_dpe_speced_mainstream_allot",
+              "outputs_dpe_speced_nonpub_allot",
+              "outputs_dpe_speced_reg_allot",
+              "outputs_dpe_speced_res_ct_allot",
+              "outputs_dpe_speced_st_school_allot",
+              "outputs_dpe_ssra_allot",
+              "outputs_dpe_tchr_3_lt5_allot",
+              "outputs_dpe_tchr_incentive_allot",
+              "outputs_dpe_tech_adj_allot",
+              "outputs_dpe_tech_allot",
+              "outputs_dpe_tier_i_allot_p2",
+              "outputs_dpe_tier_i_allot_p2_before_sb2",
+              "outputs_dpe_tier_i_local_share",
+              "outputs_dpe_tier_i_state_share",
+              "outputs_dpe_tier_i_state_share_before_sb2",
+              "outputs_dpe_tier_i_tot_cost_p2",
+              "outputs_dpe_tier_ii_aid_lv1",
+              "outputs_dpe_tier_ii_aid_lv2",
+              "outputs_dpe_tier_ii_aid_lv3",
+              "outputs_dpe_tier_ii_ent_lv3",
+              "outputs_dpe_tier_ii_local_rev_lv2",
+              "outputs_dpe_tier_ii_local_rev_lv3",
+              "outputs_dpe_tot_tax_collection",
+              "outputs_dpe_tot_tier_i_rev",
+              "outputs_dpe_tot_tier_i_rev_before_sb2",
+              "outputs_dpe_tra_allot",
+              "outputs_dpe_trans_tot_allot",
+              "outputs_dpe_trans_tot_regular_allot",
+              "outputs_dpe_uil_allot_48_305",
+              "outputs_dpe_voced_adv_allot",
+              "outputs_dpe_voced_adv_nt_allot",
+              "outputs_dpe_voced_adv_pt_allot",
+              "outputs_dpe_voced_allot",
+              "outputs_dpe_voced_allot_tier_1",
+              "outputs_dpe_voced_allot_tier_2",
+              "outputs_dpe_voced_allot_tier_3",
+              "outputs_dpe_voced_block_grant",
+              "outputs_dpe_voced_setaside_p2",
+              "outputs_dpe_windham_approp"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "currency_per_100_taxable_value",
+            "fields": [
+              "outputs_dpe_drate3",
+              "outputs_dpe_mo_rate_lv2",
+              "outputs_dpe_tier_i_tax_rate_before_sb2",
+              "outputs_dpe_tier_ii_dtr_lv2",
+              "outputs_dpe_tier_ii_dtr_lv3"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "currency_per_attendance_equivalent",
+            "fields": [
+              "outputs_dpe_aba",
+              "outputs_dpe_asf_rate",
+              "outputs_dpe_district_ba",
+              "outputs_dpe_ssra_amt",
+              "outputs_dpe_ssra_per_ada_amt"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "currency_per_evaluation",
+            "fields": [
+              "outputs_dpe_wt_fiie_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "currency_per_pupil",
+            "fields": [
+              "outputs_dpe_rdspd_amt_diff",
+              "outputs_dpe_rdspd_min_per_stud_amt",
+              "outputs_dpe_wt_abc_enroll"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "currency_per_teacher",
+            "fields": [
+              "outputs_dpe_tchr_3_lt5_amt",
+              "outputs_dpe_tchr_3_lt5_lg_amt",
+              "outputs_dpe_tchr_3_lt5_sm_amt"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "fte",
+            "fields": [
+              "outputs_dpe_speced_eys_weighted_fte",
+              "outputs_dpe_speced_sum_tot_fte"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "ratio",
+            "fields": [
+              "outputs_dpe_insurance_adj_factor",
+              "outputs_dpe_tier_ii_aba_adj",
+              "outputs_dpe_wt_ee_all_k3"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "text",
+            "fields": [
+              "outputs_dpe_calc_form_cd",
+              "outputs_dpe_ch41_flag",
+              "outputs_dpe_district_fsp_type",
+              "outputs_dpe_midflag",
+              "outputs_dpe_priorlaw_runid"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "weighted_attendance_equivalent",
+            "fields": [
+              "outputs_dpe_tier_ii_wada"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "weighted_fte",
+            "fields": [
+              "outputs_dpe_speced_weighted_tot_fte"
+            ]
+          },
+          {
+            "period": {
+              "kind": "calendar_year",
+              "year": 2021
+            },
+            "unit": "currency_per_100_taxable_value",
+            "fields": [
+              "outputs_dpe_ty21_mo_rate_adopt"
+            ]
+          },
+          {
+            "period": {
+              "kind": "calendar_year",
+              "year": 2022
+            },
+            "unit": "currency_per_100_taxable_value",
+            "fields": [
+              "outputs_dpe_ty22_mo_rate_adopt"
+            ]
+          },
+          {
+            "period": {
+              "kind": "calendar_year",
+              "year": 2024
+            },
+            "unit": "currency_per_100_taxable_value",
+            "fields": [
+              "outputs_dpe_ty24_adopt_mo_rate"
+            ]
+          },
+          {
+            "period": {
+              "kind": "calendar_year",
+              "year": 2025
+            },
+            "unit": "currency",
+            "fields": [
+              "outputs_dpe_cptd_property_value"
+            ]
+          },
+          {
+            "period": {
+              "kind": "calendar_year",
+              "year": 2025
+            },
+            "unit": "currency_per_100_taxable_value",
+            "fields": [
+              "outputs_dpe_tier_i_mo_tax_rate"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "district_name",
+              "district_number",
+              "publisher_schoolyear",
+              "sof_run_id"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "8e39a14c23bd28cda72ccb81a2d1734dde6ba631719e329f5083c811ab061594",
         "dataset": "peims_special_education_by_primary_disability",
         "edition": "2019",
@@ -24963,6 +25890,132 @@
               "retention_2024_25_special_education_grade_8_percent",
               "retention_2024_25_special_education_grade_9_percent",
               "retention_2024_25_special_education_kindergarten_percent"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "de56dfbfa9fee06b1192e40922db7fc39238b65dc01148f1da724712e0fcf774",
+        "dataset": "summary_of_finances_dpe",
+        "edition": "47422",
+        "revision_sha256": "722f599d8023ad6cb9c8f83a41318133291f1c768d46c2ba4ff4dee92e625c14",
+        "scope": "district",
+        "table": "mo_asahe_dpe",
+        "grain": "one publisher LEA row in worksheet mo_asahe_dpe",
+        "title": "2025–26 SOF District Payment Estimate: reviewed quantities as published",
+        "publisher": "Texas Education Agency",
+        "source_url": null,
+        "declared_period": {
+          "kind": "unknown"
+        },
+        "source_qualifiers": {
+          "family": "sof",
+          "reference_id": "state_funding_index",
+          "publisher_release_status": "Near Final",
+          "publication_run_id": "47422",
+          "row_run_column": "sof_run_id"
+        },
+        "variable_count": 73,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "currency",
+            "fields": [
+              "mo_asahe_dpe_asahe",
+              "mo_asahe_dpe_asahe_065",
+              "mo_asahe_dpe_asahe_100k_allot",
+              "mo_asahe_dpe_asahe_l60k_allot",
+              "mo_asahe_dpe_cl_asahe",
+              "mo_asahe_dpe_dpv_100k_diff",
+              "mo_asahe_dpe_dpv_diff",
+              "mo_asahe_dpe_dpv_diff_065",
+              "mo_asahe_dpe_dpv_diff_40k",
+              "mo_asahe_dpe_dpv_l60k_diff",
+              "mo_asahe_dpe_frozen_levy_diff_065",
+              "mo_asahe_dpe_lfa_100k_diff",
+              "mo_asahe_dpe_lfa_diff",
+              "mo_asahe_dpe_lfa_diff_065",
+              "mo_asahe_dpe_lfa_diff_40k",
+              "mo_asahe_dpe_lfa_l60k_diff",
+              "mo_asahe_dpe_mo_coll_tot_diff",
+              "mo_asahe_dpe_mo_coll_tot_diff_065",
+              "mo_asahe_dpe_mo_coll_tot_diff_100k",
+              "mo_asahe_dpe_mo_coll_tot_diff_40k",
+              "mo_asahe_dpe_mo_coll_tot_l60k_diff",
+              "mo_asahe_dpe_mole",
+              "mo_asahe_dpe_mole_065",
+              "mo_asahe_dpe_mole_100k_diff",
+              "mo_asahe_dpe_mole_40k",
+              "mo_asahe_dpe_mole_l60k_diff",
+              "mo_asahe_dpe_net_frozen_levy_diff_065",
+              "mo_asahe_dpe_other_programs_065_diff",
+              "mo_asahe_dpe_other_programs_asahe_100k_diff",
+              "mo_asahe_dpe_other_programs_asahe_40k_diff",
+              "mo_asahe_dpe_other_programs_asahe_diff",
+              "mo_asahe_dpe_other_programs_asahe_l60k_diff",
+              "mo_asahe_dpe_pl_asahe",
+              "mo_asahe_dpe_py1_mo_coll_mintr_100k_diff",
+              "mo_asahe_dpe_py1_mo_coll_mintr_diff",
+              "mo_asahe_dpe_py1_mo_coll_mintr_diff_065",
+              "mo_asahe_dpe_py1_mo_coll_mintr_diff_40k",
+              "mo_asahe_dpe_py1_mo_coll_mintr_l60k_diff",
+              "mo_asahe_dpe_recap_100k_diff",
+              "mo_asahe_dpe_recap_diff",
+              "mo_asahe_dpe_recap_diff_065",
+              "mo_asahe_dpe_recap_diff_40k",
+              "mo_asahe_dpe_recap_l60k_diff",
+              "mo_asahe_dpe_sag",
+              "mo_asahe_dpe_sag_065",
+              "mo_asahe_dpe_sag_100k_diff",
+              "mo_asahe_dpe_sag_40k",
+              "mo_asahe_dpe_sag_l60k_diff",
+              "mo_asahe_dpe_tier_i_allot_100k_diff",
+              "mo_asahe_dpe_tier_i_allot_diff",
+              "mo_asahe_dpe_tier_i_allot_diff_065",
+              "mo_asahe_dpe_tier_i_allot_diff_40k",
+              "mo_asahe_dpe_tier_i_allot_l60k_diff",
+              "mo_asahe_dpe_tier_i_state_share_100k_diff",
+              "mo_asahe_dpe_tier_i_state_share_diff",
+              "mo_asahe_dpe_tier_i_state_share_diff_065",
+              "mo_asahe_dpe_tier_i_state_share_diff_40k",
+              "mo_asahe_dpe_tier_i_state_share_l60k_diff",
+              "mo_asahe_dpe_tier_ii_aid_lv2_100k_diff",
+              "mo_asahe_dpe_tier_ii_aid_lv2_diff",
+              "mo_asahe_dpe_tier_ii_aid_lv2_diff_065",
+              "mo_asahe_dpe_tier_ii_aid_lv2_diff_40k",
+              "mo_asahe_dpe_tier_ii_aid_lv2_l60k_diff",
+              "mo_asahe_dpe_tier_ii_aid_lv3_100k_diff",
+              "mo_asahe_dpe_tier_ii_aid_lv3_diff",
+              "mo_asahe_dpe_tier_ii_aid_lv3_diff_065",
+              "mo_asahe_dpe_tier_ii_aid_lv3_diff_40k",
+              "mo_asahe_dpe_tier_ii_aid_lv3_l60k_diff"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "text",
+            "fields": [
+              "mo_asahe_dpe_calc_form_cd"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "district_name",
+              "district_number",
+              "publisher_schoolyear",
+              "sof_run_id"
             ]
           }
         ]

@@ -1,65 +1,64 @@
 # Source integration status
 
-The packaged selector identifies **normal data release 0.0.166**. This is a
-frozen release, not a live TEA feed. Software publication and application adoption
-are separate gates. Historical selections retain their exact release.
-The [machine inventory](source-integration-status-0.0.166.json) was generated from
-the qualified normal parent and current configuration on November 18, 2026:
+The packaged selector identifies **normal data release 0.0.167**. This is a
+frozen analysis release, not a live TEA feed. Software publication and
+application deployment are separate gates; historical requests keep their pins.
+The [machine inventory](source-integration-status-0.0.167.json), generated from
+the qualified normal parent on November 18, 2026, records
 127 registered IDs, 279 configured editions,
-13 base inputs and 21 native attachments covering 32 dataset IDs and
-302 edition/scope keys. Registration does not establish
-acquisition, qualification or query access; the source-only IDs not attached
-by name are not a count of missing measures.
+13 base inputs and 22 native attachments covering 33 dataset IDs and
+306 edition/scope keys. Registration is not
+acquisition, semantic qualification or query access.
 
-- Manifest SHA-256: `e34cce994f2db88b5a2dd0eb3d6950412d0bd7439603675018503844f4da471a`.
-- Build: `63290448a80ffa9fd959f4217dcb2015f882d51e426bde264b95e292486c6514`.
-- Actual normal producer: `9513698` (full commit retained in the build record).
-- Processing identity: `81f41daec4f9ca09a17f4d720b576be4994c6e9d0db7f2e97f401eafc2fb9ebb`.
+- Manifest: `ecc89a8dea775defa5c3e81911d059fe9eb6af09d0ccb65112a5f1be5e43573a`.
+- Build: `df8c457b82a6029591b4d835fff70a3ddc2b64e2b70389d72754aeb421c8c421`.
+- Processing identity: `3804ddc10606b294b837636e92138b90ad788bd04e1643b5e886860d33375cd0`.
 
 ## What this release adds
 
-The new `tprs_student_continuity` family supplies 22 campus and 24 district/state
-fields for published attrition, grade retention and district/state underreporting.
-Its report edition is **2026**; the measurement/baseline year is **2024–25**,
-with return/processing observations in fall 2025. It does not replace current
-2025–26 Membership or Enrollment, and it is not a dropout or individual-student
-tracking dataset. Campus underreporting is unavailable. Retention populations
-remain separate; counts and denominators are not inferred from percentages.
+`summary_of_finances_dpe` adds **486 fields: 462 numeric quantities and 24
+literal code/text fields**, from the 2025–26 Near Final publication run 47422.
+The source-wide roster has 1,243 LEA recipients in the first three tables;
+I&S has 1,030. The roster includes 20 education service centers and Bowie County,
+which are preserved as source recipients rather than invented district entities.
+The normal entity snapshot contains 1,229 districts; it is not the source roster.
 
-Coverage is 9,105 reporting campuses, 1,202 reporting districts and the direct
-Texas report, preserving all 25 original source partitions. The 229,182 logical
-field slots include observed values and explicit missing, suppressed and not
-applicable states. Missing grade rows/sections have null source coordinates and
-factual absence reasons, never invented eligibility explanations or zeros.
-Names preserve `2024_25`; cross-year harmonized aliases need separate review.
-See [the definitions, populations and scope notes](tprs-continuity-sources.md).
+The full raw inventory preserves all 593 facts and 729,857 original cells.
+The admitted subset passed exact source/value/status/coordinate replay for
+598,560 cells and 110 frozen original-report display/workbook-cell pairs from
+two district/run reports. These are distinct checks: the latter verify exact
+retained text and raw-cell pairs, not recomputed report-rounding parity.
+No publisher formula is certified or repaired. Source acquisitions were reused;
+the original download dates remain in provenance.
 
-The complete retained continuity projection passed original-source raw/value/
-status/locator replay across all 10,308 reports. Three independently requested
-HTML/XLSX pairs supplied 62 published local golden cells and eight absent-grade
-bindings. Actual source comparisons checked 24 district and 22 campus metrics
-against the direct Texas report and frozen raw goldens. Comparisons preserve
-count units and percentage points and require the same exact qualified child.
-These are frozen-source checks; no fresh acquisition of all TEA rows is claimed.
-Original download times remain in the acquisition receipts.
+Units distinguish currency, funding rates, headcounts, FTE and attendance
+equivalents. Full source precision is retained without binary-float conversion.
+Each field has its actual bound period; earlier tax, insurance and prior-law
+observations do not inherit the funding year. Counts, codes, missing values and
+observed zero remain separate. **104 fields remain held**, with exact reasons;
+three attendance fields keep their existing canonical owner. See the
+[field definitions, admission ledger and limits](sof-dpe-sources.md).
 
-The qualified normal parent passed its nine artifact integrity/build/schema
-checks and bounded actual-entity discovery, dot-path/year, source-golden,
-statewide-comparison and DataFrame/CSV/Excel provenance readback. Exact source
-replay was reused by unchanged child identity; the other 20 native attachments
-and all 13 base inputs retain their previous qualifications. Their source
-families were not replayed merely to repeat matching evidence. Current 179-field
-Student and Class Size sources remain unchanged. Application cache/deployment
-adoption is recorded in the application rollout, not inferred from this release.
+The existing catalog, lazy entity dataset namespace, case-insensitive field
+selection, explicit/default year resolution and standard exports expose this
+family through the normal parent. Actual Cayuga, Austin and charter A+ Academy
+entity checks preserve child and normal-parent provenance. Representative real
+DataFrame, CSV, Excel and SQLite exports preserve exact values and citations.
+The SQLite check used exact decimal text storage and Arrow readback; it does
+not establish another database dialect or every possible query.
 
-The full-report inventory separately accounts for 4,709,972 physical data cells
-before Class Size or the actual report end across 10,308 reports. That is layout evidence, not qualification of every
-cell. Remaining mobility/disciplinary period conflicts, CTE dots and blank
-disability Enrollment/total-percent observations remain held. The four SOF DPE
-sheets have exact raw fidelity and accepted dictionary bindings; their additional
-590 numeric semantics remain held. No general adjusted refined ADA was filled
-from a Support Staff Retention field. See [Student source notes](attendance-sources.md)
-and [the SOF formula clarification](financial-sources.md#sof-202526-dpe-source-accounting-and-an-unresolved-formula-question).
+All 21 preexisting native source pins and 13 base inputs are unchanged; their
+matching source qualifications are reused. Current 179-field Student, Class
+Size and 2024–25 continuity sources remain unchanged. The
+[complete Student field accounting](tprs-student-field-status.md) separately
+accounts for every retained physical cell and the precise remaining holds.
+Mobility/discipline year conflicts, CTE token/denominator questions and publisher
+blanks are not silently resolved or substituted. No general adjusted refined
+ADA is filled from an SSRA-specific field.
+
+Authenticated production continuity export remains unverified. Anonymous health,
+Policy downloads and runtime identity checks do not establish that workflow.
+Application adoption belongs to the application rollout, not this source proof.
 
 ## Qualified native coverage
 
@@ -100,6 +99,7 @@ individual definitions, units, population, revisions and source links.
 | `spp_timely_initial_evaluation` | 2025–2026 | district | SY ending 2024–2025 |
 | `state_tapr_staff_profile` | 2025 | state | SY ending 2025 |
 | `summary_of_finances_attendance` | 47422 | district | SY ending 2026 |
+| `summary_of_finances_dpe` | 47422 Near Final | district-keyed LEA recipients | Field-specific school/tax years and as-of dates; see contract |
 | `tprs_attendance_chronic_absence` | 2025 | region, state | SY ending 2024–2025 |
 | `tprs_class_size` | 2026 | campus, district, state | SY ending 2026 |
 | `tprs_student_continuity` | 2026 | campus, district, state | Baseline SY ending 2025; return/processing fall 2025 |
