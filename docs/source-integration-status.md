@@ -25,8 +25,8 @@ each source row. Report rows do not establish a single statewide transfer count
 or reconciled district-pair edges.
 
 Qualification replayed the retained original rows and checked 12,073 rows from
-20 independently selected TEA reports. For 2022–23, 364 fully visible district
-totals also matched the retained campus-level detail. Groups with suppression
+20 independently selected TEA reports. For 2022–23, campus detail summed to the
+same count in 364 fully visible directional district-pair groups. Groups with suppression
 were excluded from that comparison, and the separate campus-edge hold remains.
 The normal release preserves the 22 earlier attachment identities. The new child
 is qualified separately, with an offline normal-parent query and export check.
