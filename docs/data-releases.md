@@ -1007,6 +1007,22 @@ multiple children of the same family. Capturing or reusing a receipt rehashes th
 required retained records and bytes; it does not rerun semantic replay. Missing
 or changed raw data, processing outputs or publisher witnesses invalidate reuse.
 
+If the entity manifest references a published child URL, pass an explicit local
+evidence map alongside the retained entity release:
+
+```sh
+scripts/check --release /retained/release.json --native-evidence /retained/evidence.json
+```
+
+The map uses `schema_version` 1, the exact `parent_sha256`, and a `manifests`
+object keyed by every remote child manifest's SHA-256. Its values are local
+manifest paths relative to the map, with an adjacent `provenance/` store for
+each. Adjacent child references in the entity manifest keep their existing
+paths. Verification checks the selected children's manifest pins, builds,
+editions, files and publisher evidence offline. The map applies only to release
+qualification and leaves published download locations intact. Provide the same
+map with `--verify` or `--verify-latest` to recheck the corresponding receipt.
+
 ## File organization and names
 
 TEA Data uses the following project conventions. They apply the consistency,

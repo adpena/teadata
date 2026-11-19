@@ -7,6 +7,7 @@ review approvals. Source and log hashes prevent accidental reuse after changes.
 from __future__ import annotations
 
 import argparse
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from functools import partial
@@ -15,20 +16,23 @@ import json
 from math import isfinite
 import os
 from pathlib import Path
+import re
 import signal
 import subprocess
 import sys
 import tempfile
 import time
-from typing import TYPE_CHECKING, Any, Callable, Mapping, Sequence
+from typing import TYPE_CHECKING, Any, Callable, Generator, Mapping, Sequence
 import uuid
 
 if TYPE_CHECKING:
+    from teadata.dataset_metadata import NativeSourceRef
     from teadata.provenance import ProvenanceStore
     from teadata.release import DataRelease
 
 
 SCHEMA_VERSION = 1
+_SHA256 = re.compile(r"[0-9a-f]{64}")
 DEFAULT_CHECK_TIMEOUTS = {"library": 3600.0, "app": 900.0}
 IGNORED_SOURCE_PARTS = frozenset({
     ".git", ".local", ".venv", ".cache", "__pycache__", ".pytest_cache", ".ruff_cache",
@@ -126,7 +130,9 @@ def source_identity(root: Path) -> dict[str, Any]:
     }
 
 
-def default_checks(kind: str, *, release: str | None = None) -> list[Check]:
+def default_checks(
+    kind: str, *, release: str | None = None, native_evidence: tuple[Path, str] | None = None,
+) -> list[Check]:
     if kind == "library":
         checks = [
             Check("ruff", ("@python", "-m", "ruff", "check", ".")),
@@ -146,7 +152,11 @@ def default_checks(kind: str, *, release: str | None = None) -> list[Check]:
     else:
         raise ValueError("Project kind must be library or app")
     if release is not None:
-        checks.append(Check("data-release", ("@python", "-m", "teadata.verification", "--validate-release", release, "--kind", kind)))
+        command = ("@python", "-m", "teadata.verification", "--validate-release", release, "--kind", kind)
+        if native_evidence is not None:
+            path, pin = native_evidence
+            command += ("--native-evidence", str(path), "--native-evidence-sha256", pin)
+        checks.append(Check("data-release", command))
     return checks
 
 
@@ -175,7 +185,10 @@ print(json.dumps({"python": platform.python_version(), "implementation": platfor
     return environment
 
 
-def _input_identity(root: Path, *, kind: str, paired_library: Path | None, release: str | None) -> dict[str, Any]:
+def _input_identity(
+    root: Path, *, kind: str, paired_library: Path | None, release: str | None,
+    native_evidence: Path | None = None,
+) -> dict[str, Any]:
     result: dict[str, Any] = {
         "kind": kind, "mode": "paired" if paired_library else "locked",
         "project": source_identity(root), "runner_sha256": _digest(Path(__file__)),
@@ -183,6 +196,8 @@ def _input_identity(root: Path, *, kind: str, paired_library: Path | None, relea
     }
     if paired_library is not None:
         result["library"] = source_identity(paired_library)
+    if native_evidence is not None and release is None:
+        raise ReceiptError("Native evidence requires a selected entity release")
     if release is not None:
         path = Path(release).expanduser()
         if not path.is_absolute():
@@ -209,20 +224,33 @@ def _input_identity(root: Path, *, kind: str, paired_library: Path | None, relea
             asset = path.parent / filename
             identities[role] = {"filename": filename, "sha256": _digest(asset), "size_bytes": asset.stat().st_size}
         result["release_artifacts"] = identities
-        if document.get("catalog", {}).get("native_sources"):
+        if native_evidence is not None or document.get("catalog", {}).get("native_sources"):
             from teadata.manifest import ContractError
             from teadata.release import DataRelease
 
             try:
                 parent = DataRelease(path, expected_sha256=result["release_manifest_sha256"], offline=True)
-                sources = parent.verify_native_sources()
-                result["native_sources"] = {pin: {name: _digest(asset) for name, asset in files.items()}
-                                            for pin, files in sources.items()}
+                locations = None
+                if native_evidence is None:
+                    sources = parent.verify_native_sources()
+                    result["native_sources"] = {pin: {name: _digest(asset) for name, asset in files.items()}
+                                                for pin, files in sources.items()}
+                else:
+                    binding = _NativeEvidence.read(native_evidence)
+                    locations = binding.for_release(parent)
+                    result["native_evidence_map_sha256"] = binding.sha256
+                    result["native_sources"] = {}
                 evidence = {}
                 for ref in parent.catalog.native_sources:
-                    child, store = _open_reviewed_native_evidence(parent, ref, "native")
-                    review = _native_review(child, store)
-                    evidence[ref.manifest_sha256] = {"family": review.label, "records": review.evidence()}
+                    with _reviewed_release_child(parent, ref, locations) as (child, store):
+                        if locations is not None:
+                            result["native_sources"][ref.manifest_sha256] = {
+                                "manifest": child.manifest_sha256,
+                                **{name: _digest(asset) for name, (asset, _) in child._verified_bytes.items()},
+                                **{name: _digest(asset) for name, (asset, _, _) in child._column_schema_data.items()},
+                            }
+                        review = _native_review(child, store)
+                        evidence[ref.manifest_sha256] = {"family": review.label, "records": review.evidence()}
                 result["native_evidence"] = evidence
             except (ContractError, OSError, ValueError) as error:
                 raise ReceiptError(f"A release check requires verified retained native sources: {error}") from error
@@ -310,11 +338,16 @@ def _controller_python_version() -> str:
     return ".".join(str(part) for part in sys.version_info[:3])
 
 
-def _latest_pointer(checks_root: Path, kind: str, *, paired: bool, version: str, release: str | None) -> Path:
+def _latest_pointer(
+    checks_root: Path, kind: str, *, paired: bool, version: str, release: str | None,
+    native_evidence: Path | None = None,
+) -> Path:
     mode = "paired" if paired else "locked"
     name = f"latest-{kind}-{mode}-{version}"
     if release is not None:
         name += f"-release-{sha256(os.fsencode(release)).hexdigest()}"
+    if native_evidence is not None:
+        name += f"-evidence-{sha256(os.fsencode(native_evidence)).hexdigest()}"
     return checks_root / f"{name}.json"
 
 
@@ -346,14 +379,17 @@ def run_checks(
     kind: str,
     paired_library: Path | None = None,
     release: str | None = None,
+    native_evidence: Path | None = None,
     checks: Sequence[Check] | None = None,
     timeout: float | None = None,
 ) -> Path:
     timeout = _resolved_timeout(kind, timeout)
     root = root.resolve()
     paired_library = paired_library.resolve() if paired_library is not None else None
-    before = _input_identity(root, kind=kind, paired_library=paired_library, release=release)
-    policy = list(checks) if checks is not None else default_checks(kind, release=release)
+    native_evidence = root / native_evidence if native_evidence is not None else None
+    before = _input_identity(root, kind=kind, paired_library=paired_library, release=release, native_evidence=native_evidence)
+    binding = (native_evidence, before["native_evidence_map_sha256"]) if native_evidence is not None else None
+    policy = list(checks) if checks is not None else default_checks(kind, release=release, native_evidence=binding)
     if not policy or len({check.name for check in policy}) != len(policy):
         raise ValueError("Checks must be nonempty and uniquely named")
     checks_root = root / ".local" / "checks"
@@ -379,7 +415,7 @@ def run_checks(
                 print("Paired dependency check failed. Coordinate the app lockfile and sibling library metadata before running checks again; inspect the setup-dependencies log.", file=sys.stderr)
             break
     try:
-        after = _input_identity(root, kind=kind, paired_library=paired_library, release=release)
+        after = _input_identity(root, kind=kind, paired_library=paired_library, release=release, native_evidence=native_evidence)
     except (OSError, ReceiptError, subprocess.CalledProcessError) as error:
         after = {"unavailable": type(error).__name__}
     actual_environment = _try_environment_identity(python, kind, root)
@@ -401,7 +437,7 @@ def run_checks(
     # default-policy receipt used by --verify-latest and the push guard.
     if checks is None:
         _write_document(_latest_pointer(checks_root, kind, paired=paired_library is not None,
-                                        version=version, release=release),
+                                        version=version, release=release, native_evidence=native_evidence),
                         {"receipt": f"{run_id}/receipt.json", "record_id": document["record_id"]})
     print(f"Receipt: {path}", flush=True)
     if before != after:
@@ -416,6 +452,7 @@ def verify_receipt(
     kind: str,
     paired_library: Path | None = None,
     release: str | None = None,
+    native_evidence: Path | None = None,
     checks: Sequence[Check] | None = None,
 ) -> dict[str, Any]:
     root = root.resolve()
@@ -433,10 +470,12 @@ def verify_receipt(
     version, python, _, setup = _check_runtime(root, paired=paired_library is not None)
     if record.get("python_version") != version:
         raise ReceiptError("Receipt was checked with a different Python runtime")
-    current = _input_identity(root, kind=kind, paired_library=paired_library, release=release)
+    native_evidence = root / native_evidence if native_evidence is not None else None
+    current = _input_identity(root, kind=kind, paired_library=paired_library, release=release, native_evidence=native_evidence)
     if record.get("inputs") != current:
         raise ReceiptError("Receipt is stale for this revision, source, lockfile, runner, or release")
-    policy = list(checks) if checks is not None else default_checks(kind, release=release)
+    binding = (native_evidence, current["native_evidence_map_sha256"]) if native_evidence is not None else None
+    policy = list(checks) if checks is not None else default_checks(kind, release=release, native_evidence=binding)
     if record.get("policy") != [item.to_dict() for item in policy] or record.get("setup_policy") != [item.to_dict() for item in setup]:
         raise ReceiptError("Receipt does not match the current check policy")
     expected = [*setup, *policy]
@@ -820,14 +859,76 @@ def _validate_tefa_cases(release: DataRelease) -> dict[str, Any]:
             "uncovered": reference["limits"]}
 
 
-def _validate_release(path: str, kind: str) -> None:
+@dataclass(frozen=True)
+class _NativeEvidence:
+    sha256: str
+    parent_sha256: str
+    manifests: Mapping[str, Path]
+
+    @classmethod
+    def read(cls, path: Path, expected_sha256: str | None = None) -> _NativeEvidence:
+        def unique(pairs: list[tuple[str, Any]]) -> dict[str, Any]:
+            result = dict(pairs)
+            if len(result) != len(pairs):
+                raise ReceiptError("Duplicate key in native evidence map")
+            return result
+
+        limit = 1024 * 1024
+        if not path.is_file() or path.is_symlink():
+            raise ReceiptError("Native evidence map must be a regular local file")
+        with path.open("rb") as stream:
+            raw = stream.read(limit + 1)
+        if len(raw) > limit:
+            raise ReceiptError("Native evidence map is too large")
+        pin = sha256(raw).hexdigest()
+        if expected_sha256 is not None and pin != expected_sha256:
+            raise ReceiptError("Native evidence map changed since capture")
+        document = json.loads(raw, object_pairs_hook=unique)
+        if (not isinstance(document, dict) or set(document) != {"schema_version", "parent_sha256", "manifests"}
+                or type(document["schema_version"]) is not int or document["schema_version"] != 1
+                or not isinstance(document["parent_sha256"], str) or not _SHA256.fullmatch(document["parent_sha256"])
+                or not isinstance(document["manifests"], dict) or not document["manifests"]):
+            raise ReceiptError("Invalid native evidence map")
+        manifests = {}
+        for child_pin, location in document["manifests"].items():
+            if (not _SHA256.fullmatch(child_pin) or not isinstance(location, str) or not location
+                    or "://" in location or "\0" in location or Path(location).anchor):
+                raise ReceiptError("Native evidence entries require a child SHA-256 and a relative local manifest path")
+            manifests[child_pin] = path.parent / location
+        return cls(pin, document["parent_sha256"], manifests)
+
+    def for_release(self, release: DataRelease) -> Mapping[str, Path]:
+        if self.parent_sha256 != release.manifest_sha256:
+            raise ReceiptError("Native evidence map binds a different parent manifest")
+        expected = {ref.manifest_sha256 for ref in release.catalog.native_sources if "://" in ref.location}
+        if self.manifests.keys() != expected:
+            missing = sorted(expected - self.manifests.keys())
+            extra = sorted(self.manifests.keys() - expected)
+            raise ReceiptError(f"Native evidence map must bind exactly the parent's remote attachments "
+                               f"(missing: {', '.join(missing) or 'none'}; unexpected: {', '.join(extra) or 'none'})")
+        return self.manifests
+
+
+def _validate_release(
+    path: str, kind: str, native_evidence: tuple[Path, str] | None = None,
+) -> None:
     from teadata.manifest import ContractError
     from teadata.release import DataRelease
-    release = DataRelease(Path(path).expanduser(), offline=True)
+    evidence = _NativeEvidence.read(*native_evidence) if native_evidence is not None else None
+    try:
+        release = DataRelease(Path(path).expanduser(), offline=True,
+                              expected_sha256=evidence.parent_sha256 if evidence is not None else None)
+    except ContractError as error:
+        raise ReceiptError(str(error)) from error
     if release.catalog.to_dict()["schema_version"] != 2:
         raise ReceiptError("Edition catalogs require --native-release with an exact pin and retained source store")
     provenance_records = _validate_release_provenance(release)
-    release.verify()
+    if evidence is None:
+        release.verify()
+        locations = None
+    else:
+        locations = evidence.for_release(release)
+        release._verify_artifacts(discard_cached_reads=True)
     publisher_checks = _validate_publisher_cases(release)
     private_checks = _validate_tefa_cases(release)
     if kind == "library":
@@ -836,9 +937,9 @@ def _validate_release(path: str, kind: str) -> None:
             raise ReceiptError("Release was built from different processing code or lockfile; rebuild it")
     for ref in release.catalog.native_sources:
         try:
-            child, store = _open_reviewed_native_evidence(release, ref, "native")
-            review = _native_review(child, store)
-            report = review.qualify()
+            with _reviewed_release_child(release, ref, locations) as (child, store):
+                review = _native_review(child, store)
+                report = review.qualify()
         except (ContractError, ReceiptError) as error:
             raise ReceiptError(f"Attached native source {ref.manifest_sha256} requires reviewed source evidence: {error}") from error
         if report["status"] != "PASS_REVIEWED_NATIVE":
@@ -858,13 +959,39 @@ def _retained_store(path: Path):
     return ProvenanceStore(path)
 
 
-def _open_reviewed_native_evidence(release, ref, label: str):
-    from teadata.release import _open_native_source
+def _open_reviewed_native_evidence(
+    release: DataRelease, ref: NativeSourceRef, label: str, local: Path | None = None,
+) -> tuple[DataRelease, ProvenanceStore]:
+    from teadata.release import DataRelease, _open_native_source
 
-    child = _open_native_source(ref, release.path, offline=True)
+    if local is None:
+        child = _open_native_source(ref, release.path, offline=True)
+    else:
+        if not local.is_file() or local.is_symlink():
+            raise ReceiptError(f"Missing regular local native manifest for {ref.manifest_sha256}: {local}")
+        child = DataRelease(local, expected_sha256=ref.manifest_sha256, offline=True)
+        retained = child.native_source_ref(location=ref.location)
+        if retained.build_id != ref.build_id or set(retained.editions) != set(ref.editions):
+            raise ReceiptError(f"Retained build or editions differ for native manifest {ref.manifest_sha256}")
     if child.remote:
         raise ReceiptError(f"Stage the exact reviewed {label} attachment locally with its adjacent provenance store for qualification")
     return child, _retained_store(child.path.parent / "provenance")
+
+
+@contextmanager
+def _reviewed_release_child(
+    release: DataRelease, ref: NativeSourceRef, locations: Mapping[str, Path] | None,
+) -> Generator[tuple[DataRelease, ProvenanceStore]]:
+    if locations is None:
+        yield _open_reviewed_native_evidence(release, ref, "native")
+        return
+    child, store = _open_reviewed_native_evidence(release, ref, "native", locations.get(ref.manifest_sha256))
+    try:
+        child.verify(discard_cached_reads=True)
+        yield child, store
+    finally:
+        child.catalog._clear_edition_caches()
+        child._column_schema_data.clear()
 
 
 @dataclass(frozen=True)
@@ -1222,12 +1349,15 @@ def main() -> None:
     parser.add_argument("--root", type=Path, default=Path.cwd())
     parser.add_argument("--paired-library", type=Path)
     parser.add_argument("--release", help="Retained local release manifest to verify, in addition to code checks")
+    parser.add_argument("--native-evidence", type=Path,
+                        help="JSON map from a release's remote child pins to retained local manifests")
     parser.add_argument("--verify", type=Path, help="Verify an existing receipt instead of executing checks")
     parser.add_argument("--verify-latest", action="store_true")
     parser.add_argument("--install-hook", action="store_true", help="Install an optional pre-push code-check hook, preserving Git LFS")
     parser.add_argument("--timeout", type=float, help="Maximum seconds for each check "
                         f"(default: library {DEFAULT_CHECK_TIMEOUTS['library']:g}; app {DEFAULT_CHECK_TIMEOUTS['app']:g})")
     parser.add_argument("--validate-release", help=argparse.SUPPRESS)
+    parser.add_argument("--native-evidence-sha256", help=argparse.SUPPRESS)
     parser.add_argument("--source-parity", type=Path, help="Offline raw fidelity check for selected supported native release editions")
     parser.add_argument("--native-release", type=Path, help="Qualify an exact reviewed native bundle offline")
     parser.add_argument("--native-pin", help="Trusted manifest SHA-256 for --native-release")
@@ -1248,6 +1378,13 @@ def main() -> None:
         parser.error("Paired mode applies to the app")
     if args.verify and args.verify_latest:
         parser.error("Choose --verify or --verify-latest")
+    if args.native_evidence is not None:
+        if not (args.release or args.validate_release):
+            parser.error("--native-evidence requires --release")
+        args.native_evidence = args.root.resolve() / args.native_evidence.expanduser()
+    if ((args.native_evidence_sha256 is not None) !=
+            (args.validate_release is not None and args.native_evidence is not None)):
+        parser.error("The internal release validator requires a captured native evidence SHA-256")
     if args.actual_pwr_controls and (args.native_release is None or args.source_parity is not None):
         parser.error("Actual PWR controls require --native-release and run separately from source parity")
     if args.course_controls and (args.native_release is None or args.source_parity is not None):
@@ -1300,7 +1437,8 @@ def main() -> None:
                 raise SystemExit(2)
             return
         if args.validate_release:
-            _validate_release(args.validate_release, args.kind)
+            binding = (args.native_evidence, args.native_evidence_sha256) if args.native_evidence is not None else None
+            _validate_release(args.validate_release, args.kind, binding)
             return
         if args.install_hook:
             path = install_pre_push_hook(args.root, kind=args.kind, paired=args.paired_library is not None)
@@ -1310,7 +1448,8 @@ def main() -> None:
         if args.verify_latest:
             checks_root = args.root / ".local/checks"
             pointer_path = _latest_pointer(checks_root, args.kind, paired=args.paired_library is not None,
-                                           version=_controller_python_version(), release=args.release)
+                                           version=_controller_python_version(), release=args.release,
+                                           native_evidence=args.native_evidence)
             pointer = json.loads(pointer_path.read_text())
             if (not isinstance(pointer, dict) or not isinstance(pointer.get("receipt"), str)
                     or not isinstance(pointer.get("record_id"), str)):
@@ -1321,12 +1460,14 @@ def main() -> None:
             pointer_record_id = pointer["record_id"]
             args.verify = checks_root / relative
         if args.verify:
-            document = verify_receipt(args.verify, args.root, kind=args.kind, paired_library=args.paired_library, release=args.release)
+            document = verify_receipt(args.verify, args.root, kind=args.kind, paired_library=args.paired_library,
+                                      release=args.release, native_evidence=args.native_evidence)
             if pointer_record_id is not None and pointer_record_id != document["record_id"]:
                 raise ReceiptError("Latest receipt pointer does not match the verified record")
             print(f"Verified local checks for {document['inputs']['project']['head']}")
         else:
-            path = run_checks(args.root, kind=args.kind, paired_library=args.paired_library, release=args.release, timeout=args.timeout)
+            path = run_checks(args.root, kind=args.kind, paired_library=args.paired_library, release=args.release,
+                              native_evidence=args.native_evidence, timeout=args.timeout)
             if json.loads(path.read_text())["status"] != "passed":
                 raise SystemExit(1)
     except (ReceiptError, OSError, ValueError, subprocess.CalledProcessError) as error:

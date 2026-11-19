@@ -501,6 +501,68 @@ def test_release_input_cannot_capture_an_artifact_outside_its_directory(project)
         run_checks(project, kind="library", checks=passing(), release="release.json")
 
 
+def test_retained_remote_child_participates_in_release_receipt(project, monkeypatch):
+    from types import SimpleNamespace
+
+    from teadata import release, verification
+    from test_release_inventory import native
+
+    child = native(project / "retained")
+    store = child.path.parent / "provenance"
+    assert (store / "objects").is_dir() and (store / "records").is_dir()
+    ref = child.native_source_ref(location="https://example.invalid/native.json")
+    output = project / ".local"
+    output.mkdir(exist_ok=True)
+    asset = output / "entities.sqlite"
+    asset.write_bytes(b"parent artifact")
+    manifest = output / "release.json"
+    manifest.write_text(json.dumps({
+        "artifacts": {"entities": {"filename": asset.name}}, "catalog": {"native_sources": [ref.to_dict()]},
+    }))
+    pin = verification._digest(manifest)
+    parent = SimpleNamespace(manifest_sha256=pin, path=manifest, build_id="parent",
+                             catalog=SimpleNamespace(native_sources=[ref], to_dict=lambda: {"schema_version": 2}),
+                             _verify_artifacts=lambda **kwargs: {"entities": asset},
+                             verify_native_sources=lambda: pytest.fail("Opened the remote child"))
+    ctor = release.DataRelease
+    monkeypatch.setattr(release, "DataRelease", lambda path, **kwargs: parent if path == manifest else ctor(path, **kwargs))
+    monkeypatch.setattr(verification, "_validate_release_provenance", lambda *args: 1)
+    monkeypatch.setattr(verification, "_validate_publisher_cases", lambda *args: {})
+    monkeypatch.setattr(verification, "_validate_tefa_cases", lambda *args: {})
+    monkeypatch.setattr(verification, "_native_review", lambda selected, raw_store: verification._NativeReview(
+        selected.manifest_sha256, lambda: {"status": "PASS_REVIEWED_NATIVE"},
+        lambda: [verification._digest(raw_store.root / "witness")],
+    ))
+    witness = store / "witness"
+    witness.write_text("retained bytes")
+    selected = output / "evidence.json"
+    document = {"schema_version": 1, "parent_sha256": pin,
+                "manifests": {child.manifest_sha256: "../retained/" + child.path.name}}
+    selected.write_text(json.dumps(document))
+    binding = (selected, verification._digest(selected))
+    checks = passing()
+    receipt = run_checks(project, kind="library", release=str(manifest), native_evidence=selected, checks=checks)
+
+    def recheck():
+        return verify_receipt(receipt, project, kind="library", release=str(manifest), native_evidence=selected, checks=checks)
+
+    current = recheck()["inputs"]
+    assert current["native_evidence_map_sha256"] == binding[1]
+    assert current["native_sources"][child.manifest_sha256]["manifest"] == child.manifest_sha256
+    assert len(current["native_sources"][child.manifest_sha256]) > 1
+    assert verification.default_checks("app", release=str(manifest), native_evidence=binding)[-1].argv[-1] == binding[1]
+    verification._validate_release(str(manifest), "app", binding)
+    witness.write_text("changed raw evidence")
+    with pytest.raises(ReceiptError, match="stale"):
+        recheck()
+    selected.write_text(json.dumps(document, indent=2))
+    with pytest.raises(ReceiptError, match="changed since capture"):
+        verification._validate_release(str(manifest), "app", binding)
+    selected.write_text(json.dumps({**document, "manifests": {"b" * 64: "bad.json"}}))
+    with pytest.raises(ReceiptError, match="exactly the parent's remote attachments"):
+        run_checks(project, kind="library", release=str(manifest), native_evidence=selected, checks=checks)
+
+
 def test_composed_first_receipt_requires_retained_publisher_evidence(project, monkeypatch):
     from types import SimpleNamespace
 
