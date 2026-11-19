@@ -1,7 +1,7 @@
 # Transfer source intake
 
-The [v0.0.170 normal release](source-integration-status.md) adds reviewed
-statewide campus transfer reports for 2024–25 and 2025–26. The existing lazy
+The [v0.0.171 normal release](source-integration-status.md) includes reviewed
+statewide campus transfer reports for 2020–21, 2021–22, 2024–25 and 2025–26. The existing lazy
 `release.observations("campus_transfer_reports", ...)` planner and campus dataset
 namespace select rows for the reporting campus. Year selection and original
 row locators remain available in exports. The normal release also retains
@@ -573,7 +573,7 @@ without upgrading that status.
 
 ### Campus native source check
 
-The reviewed 2020–21 and 2021–22 source-only preparations use their fall
+The reviewed 2020–21 and 2021–22 source preparations use their fall
 AskTED archive to identify historical campuses and their reported districts.
 Absent present-day district records do not prevent admission for these exact
 publisher inputs. The March 31, 2021 AskTED archive supplies supplemental
@@ -585,8 +585,11 @@ from the retained originals. The producer checks the current roster gap using
 the pinned registry; portable parity can verify the manifest binding and
 archive evidence without the companion entity database.
 
-These historical preparations and comparisons are separate from inclusion
-in the default release.
+The v0.0.171 normal release includes both reporter-bound campus editions.
+The directional comparisons covered 368 and 364 fully observed district groups
+for 2020–21 and 2021–22, respectively. Suppressed groups remain outside the
+observed-count check. Campus edge qualification remains separate from the
+availability of source rows.
 
 Use `scripts/check --source-parity` with the exact native candidate
 manifest, retained source store, and campus edition ID. The streaming

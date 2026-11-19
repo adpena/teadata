@@ -915,9 +915,10 @@ def _validate_release(
     from teadata.manifest import ContractError
     from teadata.release import DataRelease
     evidence = _NativeEvidence.read(*native_evidence) if native_evidence is not None else None
+    manifest = Path(path).expanduser()
     try:
-        release = DataRelease(Path(path).expanduser(), offline=True,
-                              expected_sha256=evidence.parent_sha256 if evidence is not None else None)
+        release = (DataRelease(manifest, offline=True) if evidence is None
+                   else DataRelease(manifest, offline=True, expected_sha256=evidence.parent_sha256))
     except ContractError as error:
         raise ReceiptError(str(error)) from error
     if release.catalog.to_dict()["schema_version"] != 2:
