@@ -23,9 +23,15 @@ class CampusTransferReview:
     district_only_suppressed: int
 
 
-# These two district processing records retain the separate regional publisher
+# These district processing records retain the separate regional publisher
 # reports and their source-row lineage. They do not contain individual campus reports.
 REVIEWED_CAMPUS_TRANSFERS = {
+    "435affccc788e71bce14ef0fe86bbbbdb39da60d6a2da8965eb526361803c06b": CampusTransferReview(
+        2021, "974d886e6dee838b9e3baa97425ab7d3eb27af527f8439fcf0333dc68e086467", 368, 0,
+    ),
+    "4f40beb6c56fb0d3e06c97f4318f8a37700446ab66e93b762a91b5a644d25074": CampusTransferReview(
+        2022, "44e8b06228f8ef8a21d419f63ad0e8f494c3d95c6ef2807fc87ad5c5eae85485", 364, 0,
+    ),
     "06c5988e150c80761d7231323c56ed1981e336e1c0933dbdd5b1415aaf78d09e": CampusTransferReview(
         2025, "0e7dea1c32deccc3a6b65f7f9936c0f938f5ff8447d11100ff0fd66dada6dfcb", 420, 0,
     ),
