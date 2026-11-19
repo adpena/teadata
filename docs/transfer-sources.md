@@ -573,6 +573,21 @@ without upgrading that status.
 
 ### Campus native source check
 
+The reviewed 2020–21 and 2021–22 source-only preparations use their fall
+AskTED archive to identify historical campuses and their reported districts.
+Absent present-day district records do not prevent admission for these exact
+publisher inputs. The March 31, 2021 AskTED archive supplies supplemental
+name evidence when fall labels differ. Only the pinned 2020–21 CSV admits an
+exact 34-byte UTF-8 clipping of an archive label. The report columns preserve
+their original labels. Materialization records archive locators and occurrence
+counts for reporting and partner roles. Portable parity replays that evidence
+from the retained originals. The producer checks the current roster gap using
+the pinned registry; portable parity can verify the manifest binding and
+archive evidence without the companion entity database.
+
+These historical preparations and comparisons are separate from inclusion
+in the default release.
+
 Use `scripts/check --source-parity` with the exact native candidate
 manifest, retained source store, and campus edition ID. The streaming
 check compares each publisher column and its typed projection against both

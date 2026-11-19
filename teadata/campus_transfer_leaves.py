@@ -13,10 +13,10 @@ from pathlib import Path
 import platform
 import shutil
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from collections.abc import Collection, Iterator, Mapping
 from tempfile import mkdtemp
-from typing import Any, TypedDict
+from typing import Any, NamedTuple, TypedDict
 
 import pyarrow as pa
 import pyarrow.compute as arrow_compute
@@ -44,6 +44,13 @@ from .transfer_sources import (
 DATASET = "campus_transfer_reports"
 DIRECTORY_REFERENCE = "historical_endpoint_directory"
 LIFECYCLE_REFERENCE = "historical_endpoint_lifecycle"
+NAME_ARCHIVE_REFERENCE = "historical_endpoint_names"
+_OLDER_ORIGINALS = {
+    2021: "8d1d7a255d2a7d6305cbdc5c27594257679edf46c02f9bdfa1a5b1f8e6a9e54b",
+    2022: "9b17649a37e25559d52bfc470a837071a366533655a2afaa8f35ef862c185d66",
+}
+_NAME_ARCHIVE_RECEIPT = "1d712dbfee50d42fc498a07ffcca2911f3c991566b558ca191256f9cb63b8098"
+_NAME_ARCHIVE_DATE = "2021-03-31"
 _DETAIL = "transfer_row_kind"
 _LOCATORS = ("transfer_source_input", "transfer_source_record")
 _HISTORICAL_FIELDS = ("reporting_campus_askted_record", "partner_campus_askted_record", "historical_askted_archive_as_of")
@@ -179,6 +186,88 @@ def _fall_identity_rows(directory: str, interested: Collection[str]) -> Iterator
         yield record, campus, district, name
 
 
+class _NameProof(NamedTuple):
+    role: str
+    campus: str
+    district: str
+    label: str
+    archive: str
+    record: int
+    clipped: bool
+
+
+@dataclass(frozen=True)
+class _NameArchive:
+    directory: str
+    receipts: tuple[str, str]
+    sha256: str
+    width: int | None
+    as_of: str = _NAME_ARCHIVE_DATE
+
+    def recipe(self, counts: Counter[_NameProof]) -> dict[str, Any]:
+        return {"receipts": list(self.receipts), "as_of": self.as_of,
+                "proofs": [{**proof._asdict(), "rows": count} for proof, count in sorted(counts.items())]}
+
+
+def _name_archive_reference(source: ResolvedDataset) -> ReferenceDocument | None:
+    refs = [item for item in source.metadata.references if item.reference_id == NAME_ARCHIVE_REFERENCE]
+    if refs:
+        reference, = refs
+        return reference
+    return None
+
+
+def _name_archive(store: ProvenanceStore, source: ResolvedDataset, year: int, original: str) -> _NameArchive | None:
+    reference = _name_archive_reference(source)
+    if year not in _OLDER_ORIGINALS:
+        if reference is not None:
+            raise ValueError("Supplemental campus names are scoped to the two reviewed transfer originals")
+        return None
+    if (original != _OLDER_ORIGINALS[year] or reference is None or reference.role != "source_notes"
+            or reference.status != "available" or reference.url != ARCHIVE_URL
+            or reference.provenance_ids != (_NAME_ARCHIVE_RECEIPT,) or not reference.reviewed_sha256):
+        raise ValueError("Historical campus names require the reviewed transfer original and AskTED archive")
+    archive, directory = _verified_archive(store, _NAME_ARCHIVE_RECEIPT, year=2021, season="spring",
+                                           expected_sha256=reference.reviewed_sha256)
+    if archive.publisher_declared_as_of != _NAME_ARCHIVE_DATE:
+        raise ValueError("Supplemental campus archive date differs from its reviewed scope")
+    return _NameArchive(directory, (archive.receipt, archive.index_receipt), archive.sha256,
+                        34 if year == 2021 else None, archive.publisher_declared_as_of)
+
+
+def _alternate_names(archive: _NameArchive, campuses: Collection[str]) -> dict:
+    aliases = {}
+    for record, campus, district, name in _fall_identity_rows(archive.directory, campuses):
+        if campus in aliases or district is None or campus[:7] != district or not name:
+            raise ValueError("Supplemental AskTED campus evidence is ambiguous or malformed")
+        aliases[campus] = {"record": record, "district": district, "name": name}
+    return aliases
+
+
+def _clipped_name(name: str, width: int) -> str | None:
+    raw = name.encode("utf-8")
+    if len(raw) > width:
+        try:
+            return raw[:width].decode("utf-8").rstrip()
+        except UnicodeDecodeError:
+            return None
+    return None
+
+
+def _match_name(role: str, campus: str, district: str, label: str, fall: Mapping[str, Any],
+                alternate: Mapping[str, Any] | None, width: int | None) -> _NameProof | None:
+    if district != fall["district"]:
+        return None
+    for archive, row in (("fall", fall), ("supplemental", alternate)):
+        if row is None or district != row["district"]:
+            continue
+        if label == row["name"]:
+            return _NameProof(role, campus, district, label, archive, row["record"], False)
+        if width is not None and label == _clipped_name(row["name"], width):
+            return _NameProof(role, campus, district, label, archive, row["record"], True)
+    return None
+
+
 _HOLD_REASONS = {
     "missing_endpoint_number": "Campus transfer detail has a missing endpoint number",
     "ambiguous_fall_identity": "AskTED evidence is ambiguous or invalid for transfer endpoint",
@@ -210,7 +299,8 @@ class HistoricalEndpointHold(ValueError):
         super().__init__("; ".join(_HOLD_REASONS[reason] for reason in sorted(issues)))
 
 
-def _endpoint_context(table: pa.Table, directory: str, as_of: str, entities: Path) -> tuple[pa.Table, dict]:
+def _endpoint_context(table: pa.Table, directory: str, as_of: str, entities: Path, *,
+                      archive: _NameArchive | None = None, proofs: Counter[_NameProof] | None = None) -> tuple[pa.Table, dict]:
     details = pc.equal(table[_DETAIL], "detail")
     observations = table.filter(details)
     issues: dict[str, set[str | None]] = defaultdict(set)
@@ -229,7 +319,7 @@ def _endpoint_context(table: pa.Table, directory: str, as_of: str, entities: Pat
             seen.add(campus)
             if district is None or campus[:7] != district or not name:
                 issues["invalid_fall_identity"].add(campus)
-            elif registry.get_district(district, include_meta=False, cache=False) is None:
+            elif archive is None and registry.get_district(district, include_meta=False, cache=False) is None:
                 issues["district_absent_from_registry"].add(campus)
             else:
                 reviewed[campus] = {"record": record, "district": district, "name": name}
@@ -237,14 +327,20 @@ def _endpoint_context(table: pa.Table, directory: str, as_of: str, entities: Pat
         issues["missing_fall_evidence"].update(unresolved)
     keys = sorted(reviewed)
     positions = pa.array([reviewed[key]["record"] for key in keys], type=pa.int64())
+    aliases = _alternate_names(archive, reviewed) if archive is not None else {}
     context = []
     for campus, district, name in _ENDPOINTS:
         values = pa.array(keys, type=table[campus].type)
         affected = observations.filter(pc.is_in(observations[campus], value_set=values))
-        for row in affected.select([campus, district, name]).group_by([campus, district, name]).aggregate([]).to_pylist():
+        for row in affected.select([campus, district, name]).group_by([campus, district, name]).aggregate(
+                [([], "count_all")] if proofs is not None else []).to_pylist():
             evidence = reviewed[row[campus]]
-            if row[district] != evidence["district"] or row[name].strip() != evidence["name"]:
+            proof = _match_name(campus, row[campus], row[district], row[name].strip(), evidence,
+                                aliases.get(row[campus]), archive.width if archive is not None else None)
+            if proof is None:
                 issues["conflicting_transfer_identity"].add(row[campus])
+            elif proofs is not None:
+                proofs[proof] += row["count_all"]
         indexes = pc.index_in(table[campus], value_set=values)
         context.append(pc.if_else(details, pc.take(positions, indexes), pa.scalar(None, type=pa.int64())))
     if issues:
@@ -336,6 +432,8 @@ def materialize_campus_transfers(store: ProvenanceStore, *, config: Path, config
     validate_reference_records(source, store.read_record, verify_all_claimed=True)
     table, directions, original_sha, prepared_sha = _prepared_table(store, cfg, source, year, preparation)
     directory, as_of, directory_receipts = _fall_directory(store, source, year)
+    name_archive = _name_archive(store, source, year, original_sha)
+    name_proofs: Counter[_NameProof] = Counter()
     raw_manifest = _captured_input(registry_manifest, registry_sha256)
     registry = DataRelease(registry_manifest, expected_sha256=registry_sha256, offline=True)
     entities = registry.artifact("entities")
@@ -343,7 +441,8 @@ def materialize_campus_transfers(store: ProvenanceStore, *, config: Path, config
     if file_identity(entities) != entities_identity:
         raise ValueError("Companion entity registry differs from the pinned manifest before resolution")
     try:
-        table, historical = _endpoint_context(table, directory, as_of, entities)
+        table, historical = _endpoint_context(table, directory, as_of, entities, archive=name_archive,
+                                              proofs=name_proofs if name_archive is not None else None)
     finally:
         if file_identity(entities) != entities_identity:
             raise ValueError("Companion entity registry changed during historical endpoint resolution")
@@ -376,7 +475,7 @@ def materialize_campus_transfers(store: ProvenanceStore, *, config: Path, config
     stage = Path(mkdtemp(prefix=".campus-transfer-leaf-", dir=output.parent))
     try:
         target = ProvenanceStore(stage / "provenance")
-        roots = list(dict.fromkeys([preparation, *directory_receipts,
+        roots = list(dict.fromkeys([preparation, *directory_receipts, *(name_archive.receipts if name_archive else ()),
                                    *(identifier for ref in source.metadata.references for identifier in ref.provenance_ids)]))
         for root in roots:
             target.copy_record_from(store, root)
@@ -399,6 +498,9 @@ def materialize_campus_transfers(store: ProvenanceStore, *, config: Path, config
                   "registry_build_id": registry.build_id, "directory_receipts": list(directory_receipts),
                   "directory_archive_as_of": as_of, "historical_endpoints": historical}
         physical_inputs = [original_sha, prepared_sha]
+        if name_archive is not None:
+            recipe["historical_names"] = name_archive.recipe(name_proofs)
+            physical_inputs.append(name_archive.sha256)
         if obsolescence is not None:
             recipe["campus_obsolescence"] = obsolescence.recipe()
             physical_inputs.append(obsolescence.sha256)

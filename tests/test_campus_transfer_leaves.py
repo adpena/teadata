@@ -1,6 +1,7 @@
 """Tests of edition-scoped endpoint admission, with a separate publisher readback."""
 
 from datetime import datetime, timezone
+from collections import Counter
 from pathlib import Path
 
 import pandas as pd
@@ -95,6 +96,37 @@ def test_historical_endpoint_context_uses_detail_rows_only(endpoint_inputs):
     assert result["reporting_campus_askted_record"].to_pylist() == [None, 2, None]
     assert result["partner_campus_askted_record"].to_pylist() == [2, None, None]
     assert result["historical_askted_archive_as_of"].to_pylist() == ["2024-10-31", "2024-10-31", None]
+
+
+def test_reviewed_archive_preserves_source_labels_and_role_counts(endpoint_inputs):
+    from teadata.source_parity_typed import _CampusHistory, _append_historical_locators
+
+    table, _, entities = endpoint_inputs
+    wire = "A" * 34
+    long = wire + " LONG"
+    directory = f"School Number,District Number,School Name\n000202001,000202,{long}\n"
+    supplemental = "School Number,District Number,School Name\n000202001,000202,Earlier Name\n"
+    archive = leaves._NameArchive(supplemental, ("a" * 64, "b" * 64), "c" * 64, 34)
+    table = table.set_column(table.schema.get_field_index("REPORT_CAMPUS_NAME"), "REPORT_CAMPUS_NAME",
+                             pa.array(["Current", wire, "Ignored separator"]))
+    table = table.set_column(table.schema.get_field_index("CAMPNAME_RES_OR_ATTEND"), "CAMPNAME_RES_OR_ATTEND",
+                             pa.array(["Earlier Name", "Current", ""]))
+    counts = Counter()
+    projected, fall = leaves._endpoint_context(table, directory, "2020-10-31", entities, archive=archive, proofs=counts)
+    assert projected.select(table.column_names).equals(table)
+    assert projected["reporting_campus_askted_record"].to_pylist() == [None, 2, None]
+    assert {(p.role, p.archive, p.clipped, p.label, n) for p, n in counts.items()} == {
+        ("transfer_reporting_number", "fall", True, wire, 1),
+        ("transfer_partner_number", "supplemental", False, "Earlier Name", 1),
+    }
+    verified = Counter()
+    history = _CampusHistory("2020-10-31", fall, names=archive, aliases=leaves._alternate_names(archive, fall))
+    assert _append_historical_locators(table, history, set(), verified).equals(projected)
+    assert archive.recipe(verified) == archive.recipe(counts)
+    witness = {"name": "Earlier Name", "district": "'999999", "record": 2}
+    for label, alternate, width in ((wire[:-1], None, 34), (wire, None, None), ("Earlier Name", witness, 34)):
+        assert leaves._match_name("reporting", "'000202001", "'000202", label, fall["'000202001"],
+                                  alternate, width) is None
 
 
 @pytest.mark.parametrize(("rows", "message"), [
@@ -276,11 +308,13 @@ def test_obsolete_context_is_separate_from_fall_identity(endpoint_inputs, monkey
     ("source-config.yaml", b"data_sources: [", "unexpected filename"),
     ("source-config.input", b"data_sources: [", "cannot be parsed"),
     ("source-config.input", b"year_min: .inf", "cannot be parsed"),
+    ("source-config.input", None, "Malformed supplemental response"),
 ])
 def test_campus_replay_rejects_malformed_retained_config(filename, contents, message, monkeypatch):
     import json
 
     from teadata import source_parity_typed as replay
+    from teadata.acquisition import AcquisitionError
 
     source = load_config().resolve_dataset(leaves.DATASET, 2025, reader_profile="source", exact=True)
     directory_ref, = [item for item in source.metadata.references if item.reference_id == leaves.DIRECTORY_REFERENCE]
@@ -301,8 +335,15 @@ def test_campus_replay_rejects_malformed_retained_config(filename, contents, mes
               "registry_build_id": manifest["catalog"]["build_id"],
               "historical_endpoints": {"'000202001": {"record": 2, "district": "'000202", "name": "Historical"}}}
     monkeypatch.setattr(replay, "_fall_directory", lambda *_: (directory, as_of, tuple(receipts)))
+    if contents is None:
+        contents = (Path(__file__).resolve().parents[1] / "teadata/teadata_sources.yaml").read_bytes()
+
+        def malformed_archive(*_):
+            raise AcquisitionError(message)
+
+        monkeypatch.setattr(replay, "_name_archive", malformed_archive)
     monkeypatch.setattr(replay, "_resource", lambda _store, identity, *_args: json.dumps(manifest).encode()
                         if identity == companion else contents)
     with pytest.raises(ValueError, match=message):
         replay._campus_history(object(), source, 2025, recipe, graph, [*receipts, companion_id],
-                               {"filename": filename}, 4096)
+                               {"filename": filename}, 4096, "f" * 64)

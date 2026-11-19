@@ -24,11 +24,17 @@ from .campus_transfer_leaves import (
     _HISTORICAL_FIELDS,
     _OBSOLESCENCE_FIELDS,
     _CampusObsolescence,
+    _NameArchive,
+    _NameProof,
+    _alternate_names,
     _append_campus_obsolescence,
     _campus_obsolescence,
     _fall_directory,
     _fall_identity_rows,
     _lifecycle_reference,
+    _match_name,
+    _name_archive,
+    _name_archive_reference,
     _validate_campus_acquisition,
 )
 from .column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
@@ -99,6 +105,9 @@ class _CampusHistory:
     as_of: str
     endpoints: dict[str, _FallEndpoint]
     obsolescence: _CampusObsolescence | None = None
+    names: _NameArchive | None = None
+    aliases: dict[str, _FallEndpoint] | None = None
+    claimed_names: dict | None = None
 
     @property
     def context(self) -> tuple[str, ...]:
@@ -153,7 +162,8 @@ def _validate_fall_endpoints(directory: str, claimed: Any) -> dict[str, _FallEnd
 
 
 def _campus_history(store: ProvenanceStore, source: ResolvedDataset, year: int, recipe: dict,
-                    graph: dict, direct_inputs: list[str], config_artifact: dict, resource_bytes: int) -> _CampusHistory:
+                    graph: dict, direct_inputs: list[str], config_artifact: dict, resource_bytes: int,
+                    original_sha: str) -> _CampusHistory:
     reference, = [item for item in source.metadata.references if item.reference_id == DIRECTORY_REFERENCE]
     directory_receipt, = reference.provenance_ids
     index_receipt = graph[directory_receipt]["parameters"]["archive_index_record"]
@@ -186,12 +196,30 @@ def _campus_history(store: ProvenanceStore, source: ResolvedDataset, year: int, 
     except (RuntimeError, OverflowError) as error:
         raise ValueError("Campus transfer retained configuration cannot be parsed") from error
     configured = config.resolve_dataset(source.dataset, year, reader_profile="source", exact=True)
-    if _lifecycle_reference(configured) != reference:
-        raise ValueError("Campus lifecycle reference differs from its retained source configuration")
+    supplemental = _name_archive_reference(source)
+    if (_lifecycle_reference(configured) != reference or _name_archive_reference(configured) != supplemental
+            or [r for r in configured.metadata.references if r.reference_id == DIRECTORY_REFERENCE] !=
+               [r for r in source.metadata.references if r.reference_id == DIRECTORY_REFERENCE]):
+        raise ValueError("Campus archive references differ from the retained source configuration")
+    if supplemental is not None:
+        name_receipt, = supplemental.provenance_ids
+        name_index = graph[name_receipt]["parameters"]["archive_index_record"]
+        if not {name_receipt, name_index} <= set(direct_inputs):
+            raise ValueError("Campus transfer recipe omits its supplemental archive receipts")
+        if any(graph[identifier]["artifact"]["size_bytes"] > resource_bytes for identifier in (name_receipt, name_index)):
+            raise _Uncovered("Supplemental AskTED archive exceeds its retained resource budget")
+    try:
+        names = _name_archive(store, source, year, original_sha)
+    except AcquisitionError as error:
+        raise ValueError(str(error)) from error
+    claims = recipe.get("historical_names")
+    if (names is None and "historical_names" in recipe) or (names is not None and not isinstance(claims, dict)):
+        raise ValueError("Campus transfer recipe has inconsistent supplemental name evidence")
+    aliases = _alternate_names(names, endpoints) if names is not None else None
     if reference is None:
         if "campus_obsolescence" in recipe:
             raise ValueError("Campus transfer recipe lacks its reviewed lifecycle reference")
-        return _CampusHistory(as_of, endpoints)
+        return _CampusHistory(as_of, endpoints, names=names, aliases=aliases, claimed_names=claims)
     receipt, = reference.provenance_ids
     if receipt not in direct_inputs:
         raise ValueError("Campus transfer recipe omits its reviewed lifecycle input")
@@ -200,7 +228,7 @@ def _campus_history(store: ProvenanceStore, source: ResolvedDataset, year: int, 
     obsolescence = _campus_obsolescence(store, reference, as_of=as_of, historical=endpoints)
     if canonical_json(recipe.get("campus_obsolescence")) != canonical_json(obsolescence.recipe()):
         raise ValueError("Campus transfer recipe differs from the exact AskTED obsolete dates")
-    return _CampusHistory(as_of, endpoints, obsolescence)
+    return _CampusHistory(as_of, endpoints, obsolescence, names, aliases, claims)
 
 
 def _check_campus_directional_witness(report: dict, validation: object, policy: ValuePolicy, original_sha256: str) -> None:
@@ -340,8 +368,8 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
         inputs = [(ENCODING, None, contract["rows"], ())]
         upstream = graph
     else:
-        if (key.scope, key.table) != (grain, "report_rows") or (campus and period.end_year in {2021, 2022}):
-            raise _Uncovered("Transfer table or historical CSV layout is unsupported")
+        if (key.scope, key.table) != (grain, "report_rows"):
+            raise _Uncovered("Transfer table is unsupported")
         preparation_id = recipe.get("preparation" if campus else "prepared_processing_id")
         if preparation_id not in record["inputs"]:
             raise ValueError("Transfer leaf does not bind its historical preparation")
@@ -374,7 +402,9 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
                     or report.get("toolchain") != prior.get("toolchain")):
                 raise ValueError("Campus preparation differs from its accepted directional witness")
             history = _campus_history(store, source, period.end_year, recipe, graph, record["inputs"], configs[0],
-                                      resource_bytes)
+                                      resource_bytes, hashes[0])
+            if history.names is not None:
+                attached_hashes.append(history.names.sha256)
             if history.obsolescence is not None:
                 attached_hashes.append(history.obsolescence.sha256)
             if record["validation"].get("historical_endpoints_qualified") != len(history.endpoints):
@@ -479,6 +509,7 @@ def _wire(original: _Original, selection: _Typed, *, limit: int) -> Iterator[tup
     preamble: list[str] = []
     notes: list[str] = []
     found_header = footer = False
+    padded_campus = selection.transfer_grain == "campus" and selection.period.end_year in {2021, 2022}
     count = record = 0
     transfer_annotations = iter(original.annotations)
     with original.path.open("rb") as stream:
@@ -495,6 +526,10 @@ def _wire(original: _Original, selection: _Typed, *, limit: int) -> Iterator[tup
                 last_line = reader.line_num
                 data = False
                 kind = "blank"
+                padded_annotation = (
+                    padded_campus and len(row) == len(header) and not any(row[1:])
+                    and " ".join(row[0].split()) in ("", *(_FOOTNOTES if found_header else titles))
+                )
                 if layout is not None:
                     if first_line != record or last_line != record:
                         raise ValueError("PEIMS source requires one physical line per CSV record")
@@ -517,7 +552,7 @@ def _wire(original: _Original, selection: _Typed, *, limit: int) -> Iterator[tup
                     if row == header and (record == 1 if historical else preamble == titles):
                         found_header = True
                         kind = "header"
-                    elif not historical and len(row) <= 1:
+                    elif not historical and (len(row) <= 1 or padded_annotation):
                         title = " ".join(row[0].split()) if row else ""
                         if title:
                             kind = "preamble"
@@ -526,17 +561,17 @@ def _wire(original: _Original, selection: _Typed, *, limit: int) -> Iterator[tup
                                 raise ValueError("Unexpected transfer publisher title")
                     else:
                         raise ValueError("Unexpected transfer preamble or header")
-                elif len(row) == len(header) and not footer:
+                elif len(row) == len(header) and not footer and not padded_annotation:
                     data = True
                 else:
                     if historical and (footer or row):
                         raise ValueError("Header-first district replay requires one trailing blank record")
                     footer = True
-                    note = " ".join(row[0].split()) if len(row) == 1 else ""
+                    note = " ".join(row[0].split()) if len(row) == 1 or padded_annotation else ""
                     if note:
                         kind = "footer"
                         notes.append(note)
-                    if len(row) > 1 or tuple(notes) != _FOOTNOTES[:len(notes)]:
+                    if (len(row) > 1 and not padded_annotation) or tuple(notes) != _FOOTNOTES[:len(notes)]:
                         raise ValueError("Unexpected transfer publisher footnote or data after the footer")
                 if data:
                     if len(row) != len(header) or not found_header:
@@ -618,7 +653,8 @@ def _batch(selection: _Typed, index: int, rows: list[list[str]], positions: list
     return source.append_column("transfer_source_input", pa.repeat(pa.scalar(index, type=pa.int32()), len(rows)))
 
 
-def _append_historical_locators(table: pa.Table, history: _CampusHistory, seen: set[str]) -> pa.Table:
+def _append_historical_locators(table: pa.Table, history: _CampusHistory, seen: set[str],
+                                proofs: Counter[_NameProof] | None = None) -> pa.Table:
     details = pc.equal(table["transfer_row_kind"], "detail")
     keys = tuple(history.endpoints)
     ids = pa.array(keys, type=pa.string())
@@ -627,11 +663,17 @@ def _append_historical_locators(table: pa.Table, history: _CampusHistory, seen: 
     for column, (campus, district, name) in zip(_HISTORICAL_FIELDS[:2], _ENDPOINTS, strict=True):
         offsets = pc.index_in(table[campus], value_set=ids)
         affected = table.select([campus, district, name]).filter(pc.and_(details, pc.is_valid(offsets)))
-        for row in affected.group_by([campus, district, name]).aggregate([]).to_pylist():
+        for row in affected.group_by([campus, district, name]).aggregate(
+                [([], "count_all")] if proofs is not None else []).to_pylist():
             identifier = row[campus]
             evidence = history.endpoints[identifier]
-            if row[district] != evidence["district"] or row[name].strip() != evidence["name"]:
+            proof = _match_name(campus, identifier, row[district], row[name].strip(), evidence,
+                                (history.aliases or {}).get(identifier),
+                                history.names.width if history.names is not None else None)
+            if proof is None:
                 raise ValueError("Campus transfer source disagrees with the recorded fall identity")
+            if proofs is not None:
+                proofs[proof] += row["count_all"]
             seen.add(identifier)
         locator = pc.if_else(details, pc.take(records, offsets), pa.scalar(None, type=pa.int64()))
         locations.append(locator)
@@ -724,6 +766,7 @@ def compare_typed(release: DataRelease, store: ProvenanceStore, key: EditionKey,
         examples_left = max_examples
         total = 0
         seen: set[str] = set()
+        name_proofs: Counter[_NameProof] = Counter()
         for index, original in enumerate(selection.originals):
             rows: list[list[str]] = []
             positions: list[tuple[int, int, int]] = []
@@ -741,7 +784,9 @@ def compare_typed(release: DataRelease, store: ProvenanceStore, key: EditionKey,
                 if "prepared" in targets:
                     examples_left = targets["prepared"].compare(expected, index, records, examples_left)
                     if selection.campus_history is not None:
-                        expected = _append_historical_locators(expected, selection.campus_history, seen)
+                        history = selection.campus_history
+                        expected = _append_historical_locators(expected, history, seen,
+                                                               name_proofs if history.names is not None else None)
                         if selection.campus_history.obsolescence is not None:
                             expected = _append_campus_obsolescence(expected, selection.campus_history.obsolescence)
                     expected = expected.rename_columns([selection.projection.get(name, name) for name in expected.column_names])
@@ -767,6 +812,10 @@ def compare_typed(release: DataRelease, store: ProvenanceStore, key: EditionKey,
                 original.identity_repair.validate_hits(correction_hits)
         if selection.campus_history is not None and seen != selection.campus_history.endpoints.keys():
             raise ValueError("Recorded historical endpoint IDs do not all occur in publisher detail rows")
+        if (selection.campus_history is not None and selection.campus_history.names is not None
+                and canonical_json(selection.campus_history.names.recipe(name_proofs)) !=
+                    canonical_json(selection.campus_history.claimed_names)):
+            raise ValueError("Campus transfer alias evidence differs from replayed labels, locators or role counts")
         diagnostics = {stage: target.finish() for stage, target in targets.items()}
     for stage, path in paths.items():
         initial, final = before[stage], path.stat()
@@ -784,6 +833,14 @@ def compare_typed(release: DataRelease, store: ProvenanceStore, key: EditionKey,
         }
         if selection.campus_history.obsolescence is not None:
             selection.lineage["campus_obsolescence"] = selection.campus_history.obsolescence.recipe()
+        if names := selection.campus_history.names:
+            supplemental = [count for proof, count in name_proofs.items() if proof.archive == "supplemental"]
+            selection.lineage["supplemental_campus_names"] = {
+                "receipts": list(names.receipts),
+                "as_of": names.as_of,
+                "distinct_role_proofs": len(supplemental),
+                "source_role_occurrences": sum(supplemental),
+            }
     return {"status": "FAIL_MISMATCH" if mismatches else "PASS_RAW_PARITY",
             "rows": total, "fields": len(selection.fields), "raw_cells": total * len(selection.fields),
             "compared_cells": sum(value["checked"] for fields in diagnostics.values() for value in fields.values()),
