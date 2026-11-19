@@ -1,8 +1,11 @@
 # Transfer source intake
 
-The [v0.0.169 normal release](source-integration-status.md) attaches reviewed
-district transfer reports for 2012–13 through 2025–26 through the existing lazy
-`release.observations("district_transfer_reports", ...)` planner. Regional
+The [v0.0.170 normal release](source-integration-status.md) adds reviewed
+statewide campus transfer reports for 2024–25 and 2025–26. The existing lazy
+`release.observations("campus_transfer_reports", ...)` planner and campus dataset
+namespace select rows for the reporting campus. Year selection and original
+row locators remain available in exports. The normal release also retains
+district transfer reports for 2012–13 through 2025–26. Regional
 originals document the publishing roster. Keep published totals, pair details,
 directions, and masking states separate from reconciled edges and TEFA data.
 

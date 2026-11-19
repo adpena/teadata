@@ -7,7 +7,16 @@ A build records the files it actually reads. The runtime catalog is embedded in 
 <a id="current-normal-release-00163"></a>
 <a id="current-normal-release-00164"></a>
 
-## Current normal release 0.0.169
+## Current normal release 0.0.170
+
+The [pinned normal release](https://github.com/adpena/teadata/releases/download/v0.0.170/release.json)
+adds 2024–25 and 2025–26 campus transfer report rows to lazy campus queries
+and exports. The reporting campus owns each record. The partner, direction,
+original count token, status and publisher row remain available. All 23
+previous native attachments retain their identities. See the
+[coverage inventory](source-integration-status.md) and [transfer guide](transfer-sources.md).
+
+## Prior normal release 0.0.169
 
 The [pinned normal release](https://github.com/adpena/teadata/releases/download/v0.0.169/release.json)
 adds reporter-bound district transfer reports for school years 2012–13 through

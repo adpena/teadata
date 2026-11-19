@@ -1,18 +1,29 @@
 # Source integration status
 
-The packaged selector identifies **normal data release 0.0.169**. This is a
+The packaged selector identifies **normal data release 0.0.170**. This is a
 frozen analysis release, not a live TEA feed. Software publication and
 application deployment are separate gates; historical requests keep their pins.
-The [machine inventory](source-integration-status-0.0.169.json), generated from
-the qualified normal parent on November 18, 2026, records
+The [machine inventory](source-integration-status-0.0.170.json), generated from
+the qualified normal parent on November 19, 2026, records
 127 registered IDs, 279 configured editions,
-13 base inputs and 23 native attachments covering 33 dataset IDs and
-317 edition/scope keys. Registration is not
+13 base inputs and 25 native attachments covering 34 dataset IDs and
+319 edition/scope keys. Registration is not
 acquisition, semantic qualification or query access.
 
-- Manifest: `aa5edb6d887957a80ac402e9a29e18f824009e19c3e514dcdf918a5f4c3c87bc`.
-- Build: `7171616da79f540e2274d46b7b9e1adb39e68f804f5f5d8e2e7bf009f1c79663`.
-- Processing identity: `584a2163ab7235eae113b7c433e3b28e774cb551eb47b9890c345f0be3542c8c`.
+- Manifest: `6c6cb83478f726417900b62e03c1ea4655578b5c9a7ec690ffd0cea91b8d0661`.
+- Build: `cae3704e351a25b9c29e68c5e6e99f9fb23e3ec72d149ad5525549119d5c2ee0`.
+- Processing identity: `71b241b4157d9dd461c7a86ae68f565dc12b28716c25e8c1c265f92b2651670d`.
+
+## Campus transfer report coverage
+
+The normal release adds 2024–25 and 2025–26 statewide campus report rows and
+preserves all 23 existing native attachment identities. The campus namespace
+selects the reporting campus, with the partner campus kept in a separate
+field. Year selection defaults to 2025–26 at this scope. Explicit 2024–25
+selection preserves its historical campus and source locators. Both editions
+passed retained original-source verification and representative normal-parent
+query and CSV/XLSX export checks. These are directional report records.
+Reconciled campus edges and suppressed-count estimates have separate contracts.
 
 ## District transfer report history
 
@@ -89,6 +100,7 @@ individual definitions, units, population, revisions and source links.
 | Native dataset | Report editions | Scopes | Bound field periods |
 | --- | --- | --- | --- |
 | `campus_tapr_staff_profile` | 2025 | campus | SY ending 2025 |
+| `campus_transfer_reports` | 2025–2026 | campus | SY ending 2025–2026 |
 | `district_tapr_staff_profile` | 2025 | district | SY ending 2025 |
 | `district_transfer_reports` | 2013–2026 | district | SY ending 2013–2026 |
 | `educator_district_new_hires` | 5 | district | SY ending 2010–2026 |
