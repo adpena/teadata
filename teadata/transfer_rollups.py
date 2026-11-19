@@ -294,6 +294,14 @@ def _compare_details(campus: pa.Table, district: pa.Table) -> dict:
     }
 
 
+def _compare_detail_files(campus: Path, district: Path) -> dict:
+    filters = [("transfer_row_kind", "=", "detail")]
+    return _compare_details(
+        pq.read_table(campus, columns=[*_KEYS, *_CAMPUS_IDS, _STATUS, _CAMPUS_VALUE], filters=filters),
+        pq.read_table(district, columns=[*_KEYS, _STATUS, _DISTRICT_VALUE], filters=filters),
+    )
+
+
 def compare_transfer_rollup(store: ProvenanceStore, *, year: int, campus_preparation: str,
                             district_release: Path, district_pin: str) -> dict:
     graph = store.verify_record_closure([campus_preparation])
@@ -318,11 +326,7 @@ def compare_transfer_rollup(store: ProvenanceStore, *, year: int, campus_prepara
             raise ValueError("Campus transfer rows differ from the retained preparation")
     release = DataRelease(district_release, expected_sha256=district_pin, offline=True)
     ref = _district_leaf(release, year)
-    filters = [("transfer_row_kind", "=", "detail")]
-    result = _compare_details(
-        pq.read_table(campus_path, columns=[*_KEYS, *_CAMPUS_IDS, _STATUS, _CAMPUS_VALUE], filters=filters),
-        pq.read_table(release.artifact(ref.identity), columns=[*_KEYS, _STATUS, _DISTRICT_VALUE], filters=filters),
-    )
+    result = _compare_detail_files(campus_path, release.artifact(ref.identity))
     return {**result, "year": year, "campus_preparation": campus_preparation,
             "campus_prepared_sha256": campus_digest, "campus_preparation_status": validation["status"],
             "district_manifest_sha256": release.manifest_sha256, "district_leaf_sha256": ref.sha256,

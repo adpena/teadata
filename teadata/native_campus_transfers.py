@@ -1,0 +1,75 @@
+"""Qualify the reviewed statewide campus transfer observations."""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any
+
+from .dataset_metadata import DataPeriod, EntityRowBinding
+from .manifest import ContractError
+from .source_parity import validate_source_parity
+from .transfer_rollups import PASS_OBSERVED_TRANSFER_ROLLUP, _compare_detail_files
+
+if TYPE_CHECKING:
+    from .provenance import ProvenanceStore
+    from .release import DataRelease
+
+
+@dataclass(frozen=True, slots=True)
+class CampusTransferReview:
+    year: int
+    district_processing: str
+    comparable_groups: int
+    district_only_suppressed: int
+
+
+# These two district processing records retain the separate regional publisher
+# reports and their source-row lineage. They do not contain individual campus reports.
+REVIEWED_CAMPUS_TRANSFERS = {
+    "06c5988e150c80761d7231323c56ed1981e336e1c0933dbdd5b1415aaf78d09e": CampusTransferReview(
+        2025, "0e7dea1c32deccc3a6b65f7f9936c0f938f5ff8447d11100ff0fd66dada6dfcb", 420, 0,
+    ),
+    "429355f35f834ad018f7b2b40e162d06062433e333711756a8ccf7353fd4e0cf": CampusTransferReview(
+        2026, "7ea45b656a5ae28649e9fc58b7e65329b8b7a04c0706475c6b1c50db69d1fe96", 418, 12,
+    ),
+}
+
+
+def qualify_campus_transfers(release: DataRelease, processing_store: ProvenanceStore,
+                             district_store: ProvenanceStore) -> dict[str, Any]:
+    review = REVIEWED_CAMPUS_TRANSFERS.get(release.manifest_sha256)
+    if review is None or not release.offline:
+        raise ContractError("Select the exact reviewed offline campus transfer candidate")
+    year = review.year
+    identifier, = release.catalog.to_dict()["artifacts"]
+    ref = release.catalog.artifact_ref(identifier)
+    key = ref.edition
+    if ((key.dataset, key.edition, key.scope, key.table, ref.output) !=
+            ("campus_transfer_reports", str(year), "campus", "report_rows", "leaf")
+            or release.catalog.metadata(key.dataset, edition=key).period != DataPeriod("school_year", year - 1, year)
+            or ref.entity_binding != EntityRowBinding("reporting_campus_number", "reporting campus")):
+        raise ContractError("Campus transfer edition, period or reporting role differs from its review")
+    parity = validate_source_parity(release, processing_store, edition_ids=[key.identity])
+    if parity["status"] != "PASS_RAW_PARITY":
+        raise ContractError(f"Campus transfer source parity failed: {parity['editions']}")
+
+    # Typed parity has replayed the publisher rows, identities and mask tokens
+    # against this leaf and checked the selected preparation's recorded directions.
+    leaf = processing_store.read_record(ref.processing_id)
+    preparation = processing_store.read_record(leaf["parameters"]["recipe"]["preparation"])
+    campus = processing_store.verify_artifact(preparation["outputs"]["prepared_source"]["sha256"])
+    district_graph = district_store.verify_record_closure([review.district_processing])
+    district_leaf = district_graph[review.district_processing]["outputs"]["leaf"]
+    district = district_store.verify_artifact(district_leaf["sha256"])
+    rollup = _compare_detail_files(campus, district)
+    coverage = rollup["coverage"]
+    if (rollup["status"] != PASS_OBSERVED_TRANSFER_ROLLUP
+            or coverage["exact"] != review.comparable_groups
+            or coverage["district_only_suppressed"] != review.district_only_suppressed):
+        raise ContractError(f"Campus transfer comparison differs from its reviewed coverage: {coverage}")
+    return {"status": "PASS_REVIEWED_NATIVE", "build_id": release.build_id,
+            "manifest_sha256": release.manifest_sha256, "parity": parity,
+            "district_comparison": {**rollup, "processing_id": review.district_processing,
+                                    "district_leaf_sha256": district_leaf["sha256"]},
+            "qualification_scope": "statewide_campus_rows_and_complete_cross_district_groups",
+            "independent_individual_campus_report": False, "suppressed_values_inferred": False}

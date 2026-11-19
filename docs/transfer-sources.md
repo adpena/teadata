@@ -205,6 +205,24 @@ found only in AskTED by identifier. The current campus registry is independent.
 Release review must cover both 2024–25 and 2025–26 before attaching this series
 to the normal snapshot.
 
+TEA's statewide campus selector offers one CSV for each year. A separate TEA
+district report can check the campus rollup for complete, observed
+cross-district groups. The native review replays each campus leaf against the
+original, checks the reporting-campus binding and compares against separately
+retained regional district reports. All 420 comparable groups match in
+2024–25 and all 418 match in 2025–26. The 12 district-only groups in 2025–26
+remain suppressed. Within-district details and masked groups fall outside this
+count comparison. There is no individual campus report in the publisher's
+selector. [TEA transfer reports](https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/transfer_reports.html)
+
+Use the existing `scripts/check --native-release` path with the exact campus
+manifest and the retained district release's provenance store. The verifier
+checks both receipt graphs. For a parent release check or a reused verification
+receipt, copy the exact district processing closure into the staged campus
+child's adjacent `provenance/` store. Parent checks resolve the witness there.
+The candidate manifest stays byte-identical. Release inventories record
+qualification and activation separately.
+
 ## Offline structural preparation
 
 `prepare` consumes either explicitly pinned source acquisition/SHA pairs or one

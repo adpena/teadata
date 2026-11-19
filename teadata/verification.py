@@ -1012,6 +1012,14 @@ def _reviewed_educator_aggregate(release: DataRelease, store: ProvenanceStore) -
 
 def _native_review(release: DataRelease, store: ProvenanceStore) -> _NativeReview:
     """Select one reviewed plan for standalone, parent and receipt-reuse gates."""
+    from teadata.native_campus_transfers import REVIEWED_CAMPUS_TRANSFERS, qualify_campus_transfers
+
+    campus = REVIEWED_CAMPUS_TRANSFERS.get(release.manifest_sha256)
+    if campus is not None:
+        processing_store = _retained_store(release.path.parent / "provenance")
+        return _NativeReview("campus transfers", partial(qualify_campus_transfers, release, processing_store, store),
+            partial(_native_record_evidence, release, processing_store, store, [campus.district_processing]))
+
     educator = _reviewed_educator_aggregate(release, store)
     if educator is not None:
         return educator
