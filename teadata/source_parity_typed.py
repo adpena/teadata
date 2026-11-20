@@ -10,13 +10,14 @@ from decimal import Decimal
 from hashlib import sha256
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Iterator, Literal, TypedDict
+from typing import TYPE_CHECKING, Any, Iterator, Literal
 
 import pyarrow as pa
 import pyarrow.compute as arrow_compute
 import pyarrow.parquet as pq
 
 from .acquisition import AcquisitionError
+from .campus_transfer_admission import preparation_witness
 from .campus_transfer_leaves import (
     DATASET as CAMPUS_TRANSFERS,
     DIRECTORY_REFERENCE,
@@ -24,9 +25,9 @@ from .campus_transfer_leaves import (
     _HISTORICAL_FIELDS,
     _OBSOLESCENCE_FIELDS,
     _CampusObsolescence,
-    _NameArchive,
+    _FallEndpoint,
+    _NameEvidence,
     _NameProof,
-    _alternate_names,
     _append_campus_obsolescence,
     _campus_obsolescence,
     _fall_directory,
@@ -34,7 +35,8 @@ from .campus_transfer_leaves import (
     _lifecycle_reference,
     _match_name,
     _name_archive,
-    _name_archive_reference,
+    _name_archive_references,
+    _reviewed_parent_proof,
     _validate_campus_acquisition,
 )
 from .column_schema import crosswalk_dataset, parse_column_schema, table_input_sha256s
@@ -94,19 +96,12 @@ class _Original:
     identity_repair: PartnerIdentityRepair | None = None
 
 
-class _FallEndpoint(TypedDict):
-    record: int
-    district: str
-    name: str
-
-
 @dataclass(frozen=True)
 class _CampusHistory:
     as_of: str
     endpoints: dict[str, _FallEndpoint]
     obsolescence: _CampusObsolescence | None = None
-    names: _NameArchive | None = None
-    aliases: dict[str, _FallEndpoint] | None = None
+    names: _NameEvidence | None = None
     claimed_names: dict | None = None
 
     @property
@@ -196,30 +191,36 @@ def _campus_history(store: ProvenanceStore, source: ResolvedDataset, year: int, 
     except (RuntimeError, OverflowError) as error:
         raise ValueError("Campus transfer retained configuration cannot be parsed") from error
     configured = config.resolve_dataset(source.dataset, year, reader_profile="source", exact=True)
-    supplemental = _name_archive_reference(source)
-    if (_lifecycle_reference(configured) != reference or _name_archive_reference(configured) != supplemental
+    supplemental = _name_archive_references(source)
+    if (_lifecycle_reference(configured) != reference or _name_archive_references(configured) != supplemental
             or [r for r in configured.metadata.references if r.reference_id == DIRECTORY_REFERENCE] !=
                [r for r in source.metadata.references if r.reference_id == DIRECTORY_REFERENCE]):
         raise ValueError("Campus archive references differ from the retained source configuration")
-    if supplemental is not None:
-        name_receipt, = supplemental.provenance_ids
+    archive_receipts = set(directory_receipts)
+    for name_reference in supplemental.values():
+        name_receipt, = name_reference.provenance_ids
         name_index = graph[name_receipt]["parameters"]["archive_index_record"]
         if not {name_receipt, name_index} <= set(direct_inputs):
             raise ValueError("Campus transfer recipe omits its supplemental archive receipts")
-        if any(graph[identifier]["artifact"]["size_bytes"] > resource_bytes for identifier in (name_receipt, name_index)):
-            raise _Uncovered("Supplemental AskTED archive exceeds its retained resource budget")
+        archive_receipts.update((name_receipt, name_index))
+    if sum(graph[identifier]["artifact"]["size_bytes"] for identifier in archive_receipts) > resource_bytes:
+        raise _Uncovered("Combined AskTED archive evidence exceeds its retained resource budget")
     try:
-        names = _name_archive(store, source, year, original_sha)
+        archives = _name_archive(store, source, year, original_sha)
     except AcquisitionError as error:
         raise ValueError(str(error)) from error
     claims = recipe.get("historical_names")
-    if (names is None and "historical_names" in recipe) or (names is not None and not isinstance(claims, dict)):
+    if (not archives and "historical_names" in recipe) or (archives and not isinstance(claims, dict)):
         raise ValueError("Campus transfer recipe has inconsistent supplemental name evidence")
-    aliases = _alternate_names(names, endpoints) if names is not None else None
+    name_evidence = _NameEvidence.for_campuses(archives, endpoints)
+    parent_proof = _reviewed_parent_proof(year, companion["sha256"], endpoints, name_evidence)
+    if recipe.get("historical_parent_proof") != parent_proof:
+        raise ValueError("Campus transfer recipe differs from the reviewed historical-only parents")
+    names = name_evidence if archives else None
     if reference is None:
         if "campus_obsolescence" in recipe:
             raise ValueError("Campus transfer recipe lacks its reviewed lifecycle reference")
-        return _CampusHistory(as_of, endpoints, names=names, aliases=aliases, claimed_names=claims)
+        return _CampusHistory(as_of, endpoints, names=names, claimed_names=claims)
     receipt, = reference.provenance_ids
     if receipt not in direct_inputs:
         raise ValueError("Campus transfer recipe omits its reviewed lifecycle input")
@@ -228,16 +229,7 @@ def _campus_history(store: ProvenanceStore, source: ResolvedDataset, year: int, 
     obsolescence = _campus_obsolescence(store, reference, as_of=as_of, historical=endpoints)
     if canonical_json(recipe.get("campus_obsolescence")) != canonical_json(obsolescence.recipe()):
         raise ValueError("Campus transfer recipe differs from the exact AskTED obsolete dates")
-    return _CampusHistory(as_of, endpoints, obsolescence, names, aliases, claims)
-
-
-def _check_campus_directional_witness(report: dict, validation: object, policy: ValuePolicy, original_sha256: str) -> None:
-    directions = report["source_validation"]
-    if (not isinstance(validation, dict) or not isinstance(directions, dict) or directions.get("status") != "PASS"
-            or directions.get("raw_count_token_differences") != 0
-            or directions.get("input_sha256") != original_sha256 or directions != validation.get("directional_readback")
-            or report.get("policy_sha256") != sha256(json.dumps(policy.to_dict(), sort_keys=True).encode()).hexdigest()):
-        raise ValueError("Campus preparation differs from its accepted directional witness")
+    return _CampusHistory(as_of, endpoints, obsolescence, names, claims)
 
 
 def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *, resource_bytes: int) -> _Typed:
@@ -380,7 +372,8 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
                 or preparation["processor"] != "teadata.scripts.refresh_transfers"
                 or (not campus and preparation["code_version"] != recipe.get("historical_preparation_producer"))
                 or preparation["code_version"] != prior.get("processor_sha256")
-                or not isinstance(validation, dict) or validation.get("status") != "PASS" or validation.get("raw_string_readback_equal") is not True
+                or not isinstance(validation, dict) or (not campus and validation.get("status") != "PASS")
+                or validation.get("raw_string_readback_equal") is not True
                 or prior.get("value_policy") != policy.to_dict()
                 or (not campus and recipe.get("publisher_totals_computed") is not False)
                 or set(preparation["outputs"]) != {"prepared_source", "annotations", "validation_report"}):
@@ -394,20 +387,21 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
             original, = ids
             source = ResolvedDataset(key.dataset, "data_sources", period.end_year, period.end_year, "", metadata)
             _validate_campus_acquisition(upstream[original], source, period.end_year)
-            _check_campus_directional_witness(report, record["validation"], policy, hashes[0])
-            if (record["validation"].get("publisher_totals_computed") is not False
-                    or any(validation.get(name) is not True or report.get(name) is not True for name in (
-                        "prepared_source_qualified", "canonical_edges_qualified"))
+            expected = preparation_witness(period.end_year, original, hashes[0], preparation_id, preparation, report, policy)
+            leaf_validation = record.get("validation")
+            if (not isinstance(leaf_validation, dict) or leaf_validation.get("publisher_totals_computed") is not False
+                    or leaf_validation.get("directional_readback") != expected
+                    or (expected["status"] == "HOLD" and leaf_validation.get("canonical_edges_qualified") is not False)
                     or report.get("implementation") != {name: prior.get(name) for name in ("processor_sha256", "cli_sha256")}
                     or report.get("toolchain") != prior.get("toolchain")):
                 raise ValueError("Campus preparation differs from its accepted directional witness")
             history = _campus_history(store, source, period.end_year, recipe, graph, record["inputs"], configs[0],
                                       resource_bytes, hashes[0])
             if history.names is not None:
-                attached_hashes.append(history.names.sha256)
+                attached_hashes.extend(archive.sha256 for archive in history.names.archives.values())
             if history.obsolescence is not None:
                 attached_hashes.append(history.obsolescence.sha256)
-            if record["validation"].get("historical_endpoints_qualified") != len(history.endpoints):
+            if leaf_validation.get("historical_endpoints_qualified") != len(history.endpoints):
                 raise ValueError("Campus preparation differs from its historical endpoint coverage")
             ordered, controls = list(zip(ids, hashes, strict=True)), {original: None}
         else:
@@ -437,7 +431,7 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
         names, support, operations = _leaf_projection([*report["columns"], *extra], fields, grain=grain,
                                                       year=period.end_year, extra_context=extra)
         if (ordered != list(zip(ids, hashes[:-1], strict=True)) or not set(ids) <= set(preparation["inputs"])
-                or report["status"] != "prepared" or report["year"] != period.end_year or report["grain"] != key.scope
+                or (not campus and report["status"] != "prepared") or report["year"] != period.end_year or report["grain"] != key.scope
                 or report.get("publisher_totals_computed") is not False or report.get("raw_string_readback_equal") is not True
                 or report["rows"] != contract["rows"] or validation.get("rows") != contract["rows"]
                 or names != contract["columns"] or operations != recipe.get("publisher_projection")
@@ -668,7 +662,7 @@ def _append_historical_locators(table: pa.Table, history: _CampusHistory, seen: 
             identifier = row[campus]
             evidence = history.endpoints[identifier]
             proof = _match_name(campus, identifier, row[district], row[name].strip(), evidence,
-                                (history.aliases or {}).get(identifier),
+                                history.names.aliases.get(identifier, {}) if history.names is not None else {},
                                 history.names.width if history.names is not None else None)
             if proof is None:
                 raise ValueError("Campus transfer source disagrees with the recorded fall identity")
@@ -834,13 +828,13 @@ def compare_typed(release: DataRelease, store: ProvenanceStore, key: EditionKey,
         if selection.campus_history.obsolescence is not None:
             selection.lineage["campus_obsolescence"] = selection.campus_history.obsolescence.recipe()
         if names := selection.campus_history.names:
-            supplemental = [count for proof, count in name_proofs.items() if proof.archive == "supplemental"]
-            selection.lineage["supplemental_campus_names"] = {
-                "receipts": list(names.receipts),
-                "as_of": names.as_of,
-                "distinct_role_proofs": len(supplemental),
-                "source_role_occurrences": sum(supplemental),
-            }
+            evidence = {}
+            for label, archive in names.archives.items():
+                occurrences = [count for proof, count in name_proofs.items() if proof.archive == label]
+                evidence[label] = {"receipts": list(archive.receipts), "as_of": archive.as_of,
+                                   "distinct_role_proofs": len(occurrences),
+                                   "source_role_occurrences": sum(occurrences)}
+            selection.lineage["supplemental_campus_names"] = evidence.get("supplemental", evidence)
     return {"status": "FAIL_MISMATCH" if mismatches else "PASS_RAW_PARITY",
             "rows": total, "fields": len(selection.fields), "raw_cells": total * len(selection.fields),
             "compared_cells": sum(value["checked"] for fields in diagnostics.values() for value in fields.values()),

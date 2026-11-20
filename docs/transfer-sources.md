@@ -575,11 +575,23 @@ counts. Each archived validation report also recorded two value mismatches
 under its earlier counter. Those rows are part of the four masking differences.
 The archived reports are preserved.
 
-Both years remain outside the normal campus transfer series. Their canonical
-edges remain on hold. A future directional release needs the exact preparation
-receipts and dated AskTED evidence for historical campus and parent identities.
-The district comparison qualifies only the complete, visible groups shown
-above. It provides no unmasked estimate for another publisher direction.
+Both years remain outside the published normal campus transfer series. The
+directional materializer admits only the exact reviewed originals, preparations
+and validation reports. Its current comparison must reproduce all four mixed
+observed and suppressed pairs, including their original CSV record and line
+locators. The canonical-edge hold remains in force. The district comparison
+qualifies only the complete, visible groups shown above. The other publisher
+direction keeps its original suppression token and null typed count.
+
+For 2022–23, the fall AskTED archive records 211 transfer campus IDs missing
+from the pinned current entity registry. Six belong to four districts also
+absent from that registry. The March 2023 archive corroborates those six
+campus and district pairs. The March 2021 and March 2023 archives document
+alternate names for four of the 211 campuses. For 2023–24, the fall archive
+records 113 missing campus IDs with current parent district records. The
+March 2024 archive provides the exact alternate name for Rocketship Explore
+Elementary. The archives establish historical reporting identities. They do
+not assign current parents or infer opening, closure or rename dates.
 
 
 ### Campus native source check
@@ -606,8 +618,11 @@ Use `scripts/check --source-parity` with the exact native candidate
 manifest, retained source store, and campus edition ID. The streaming
 check compares each publisher column and its typed projection against both
 the prepared table and native leaf. It checks recorded historical campus
-locators against the pinned fall AskTED directory. An independent recheck
-of the companion registry's missing campus roster is a separate step.
+locators against the pinned fall AskTED directory. For the 2022–23 and 2023–24
+candidates, portable parity also checks the exact reviewed set of missing
+campus IDs and each supplemental archive locator. The materializer verifies
+that missing-ID set against the companion entity database. A portable parity
+run does not need a second copy of that database.
 
 If `materialize-campus` finds unresolved historical endpoints, it emits a
 JSON `HOLD_HISTORICAL_TRANSFER_ENDPOINTS` result and exits with status 2.

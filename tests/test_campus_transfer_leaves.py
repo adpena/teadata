@@ -90,7 +90,7 @@ def endpoint_inputs(monkeypatch, tmp_path):
 
 def test_historical_endpoint_context_uses_detail_rows_only(endpoint_inputs):
     table, directory, entities = endpoint_inputs
-    result, evidence = leaves._endpoint_context(table, directory, "2024-10-31", entities)
+    result, evidence, _ = leaves._endpoint_context(table, directory, "2024-10-31", entities)
     assert result.select(table.column_names).equals(table)
     assert evidence == {"'000202001": {"record": 2, "district": "'000202", "name": "Historical"}}
     assert result["reporting_campus_askted_record"].to_pylist() == [None, 2, None]
@@ -112,7 +112,8 @@ def test_reviewed_archive_preserves_source_labels_and_role_counts(endpoint_input
     table = table.set_column(table.schema.get_field_index("CAMPNAME_RES_OR_ATTEND"), "CAMPNAME_RES_OR_ATTEND",
                              pa.array(["Earlier Name", "Current", ""]))
     counts = Counter()
-    projected, fall = leaves._endpoint_context(table, directory, "2020-10-31", entities, archive=archive, proofs=counts)
+    projected, fall, names = leaves._endpoint_context(table, directory, "2020-10-31", entities,
+                                                     archives={"supplemental": archive}, proofs=counts)
     assert projected.select(table.column_names).equals(table)
     assert projected["reporting_campus_askted_record"].to_pylist() == [None, 2, None]
     assert {(p.role, p.archive, p.clipped, p.label, n) for p, n in counts.items()} == {
@@ -120,13 +121,36 @@ def test_reviewed_archive_preserves_source_labels_and_role_counts(endpoint_input
         ("transfer_partner_number", "supplemental", False, "Earlier Name", 1),
     }
     verified = Counter()
-    history = _CampusHistory("2020-10-31", fall, names=archive, aliases=leaves._alternate_names(archive, fall))
+    history = _CampusHistory("2020-10-31", fall, names=names)
     assert _append_historical_locators(table, history, set(), verified).equals(projected)
     assert archive.recipe(verified) == archive.recipe(counts)
     witness = {"name": "Earlier Name", "district": "'999999", "record": 2}
     for label, alternate, width in ((wire[:-1], None, 34), (wire, None, None), ("Earlier Name", witness, 34)):
         assert leaves._match_name("reporting", "'000202001", "'000202", label, fall["'000202001"],
-                                  alternate, width) is None
+                                  {"supplemental": alternate} if alternate else {}, width) is None
+
+
+def test_reviewed_parent_proof_binds_exact_campuses_and_spring_record(monkeypatch):
+    from hashlib import sha256
+
+    campus = "'220819003"
+    district = "'220819"
+    label = "HIGH POINT ACADEMY FW EL"
+    fall = {campus: {"record": 8343, "district": district, "name": label}}
+    signature = sha256(leaves.canonical_json([campus]).encode()).hexdigest()
+    monkeypatch.setitem(leaves._REVIEWED_ENDPOINTS, 2023, leaves._ReviewedEndpoints("fall", signature, (2021, 2023)))
+    monkeypatch.setattr(leaves, "_HISTORICAL_PARENT_CAMPUSES", frozenset([campus]))
+    names = leaves._NameEvidence({}, {campus: {
+        "spring_2021": {"record": 6200, "district": district, "name": label},
+        "spring_2023": {"record": 8393, "district": district, "name": label},
+    }})
+    assert leaves._reviewed_parent_proof(2023, leaves._REVIEWED_REGISTRY, fall, names) == {
+        campus: {"district": district, "fall_record": 8343, "spring_record": 8393}}
+    with pytest.raises(ValueError, match="companion registry"):
+        leaves._reviewed_parent_proof(2023, leaves._REVIEWED_REGISTRY, {"'220819004": fall[campus]}, names)
+    wrong_archive = leaves._NameEvidence({}, {campus: {"spring_2021": names.aliases[campus]["spring_2021"]}})
+    with pytest.raises(ValueError, match="matching fall and spring"):
+        leaves._reviewed_parent_proof(2023, leaves._REVIEWED_REGISTRY, fall, wrong_archive)
 
 
 @pytest.mark.parametrize(("rows", "message"), [
@@ -228,7 +252,7 @@ def test_fall_endpoint_locator_preserves_blank_logical_record(endpoint_inputs):
 
     table, directory, entities = endpoint_inputs
     directory = directory.replace("\n000202001", "\n\n000202001")
-    _, evidence = leaves._endpoint_context(table, directory, "2024-10-31", entities)
+    _, evidence, _ = leaves._endpoint_context(table, directory, "2024-10-31", entities)
     assert evidence["'000202001"]["record"] == 3
     assert _validate_fall_endpoints(directory, evidence) == evidence
 
@@ -237,22 +261,66 @@ def test_campus_witness_is_pinned_to_policy_and_input_even_when_reports_agree():
     from hashlib import sha256
     import json
 
-    from teadata.source_parity_typed import _check_campus_directional_witness
+    from teadata.campus_transfer_admission import preparation_witness
 
     cfg = load_config()
     source = cfg.resolve_dataset(leaves.DATASET, 2025, reader_profile="source", exact=True)
     policy = cfg.value_policies[source.metadata.value_policy]
     witness = {"status": "PASS", "raw_count_token_differences": 0, "input_sha256": "a" * 64}
-    report = {"source_validation": witness,
+    qualifications = {"prepared_source_qualified": True, "canonical_edges_qualified": True, "raw_string_readback_equal": True}
+    report = {"status": "prepared", **qualifications, "source_validation": witness,
               "policy_sha256": sha256(json.dumps(policy.to_dict(), sort_keys=True).encode()).hexdigest()}
-    validation = {"directional_readback": witness}
-    _check_campus_directional_witness(report, validation, policy, "a" * 64)
+    preparation = {"validation": {"status": "PASS", **qualifications}, "outputs": {}}
+    assert preparation_witness(2025, "receipt", "a" * 64, "preparation", preparation, report, policy) == witness
     with pytest.raises(ValueError, match="directional witness"):
-        _check_campus_directional_witness(report, validation, policy, "b" * 64)
+        preparation_witness(2025, "receipt", "b" * 64, "preparation", preparation, report, policy)
     with pytest.raises(ValueError, match="directional witness"):
-        _check_campus_directional_witness({**report, "policy_sha256": "c" * 64}, validation, policy, "a" * 64)
+        preparation_witness(2025, "receipt", "a" * 64, "preparation", preparation, {**report, "policy_sha256": "c" * 64}, policy)
     with pytest.raises(ValueError, match="directional witness"):
-        _check_campus_directional_witness(report, None, policy, "a" * 64)
+        preparation_witness(2025, "receipt", "a" * 64, "preparation", {}, report, policy)
+    for malformed in (None, [], "PASS"):
+        with pytest.raises(ValueError, match="directional witness"):
+            preparation_witness(2025, "receipt", "a" * 64, "preparation", preparation,
+                                {**report, "source_validation": malformed}, policy)
+
+
+def test_reviewed_masking_hold_admits_directional_preparation_only():
+    from copy import deepcopy
+    from hashlib import sha256
+    import json
+
+    from teadata.campus_transfer_admission import _REVIEWED, preparation_witness
+
+    reviewed = _REVIEWED[2023]
+    policy = load_config().value_policies["campus_transfers"]
+    directions = {"status": "HOLD", "input_sha256": reviewed.original, "status_mismatches": 4,
+                  "raw_count_token_differences": 4, "value_mismatches": 2, "unknown_count_rows": 0,
+                  "duplicate_out_keys": 0, "duplicate_in_keys": 0, "one_sided_pairs": 0,
+                  "historical_district_mismatches": 0,
+                  "examples": [{"source_record_out": i, "source_record_in": i + 10,
+                                "count_status_out": "suppressed", "count_status_in": "observed"}
+                               for i in (4, 3, 2, 1)]}
+    qualifications = {"status": "HOLD", "prepared_source_qualified": True, "canonical_edges_qualified": False,
+                      "raw_string_readback_equal": True}
+    preparation = {"validation": qualifications, "outputs": {
+        "prepared_source": {"sha256": reviewed.prepared}, "annotations": {"sha256": reviewed.annotations},
+        "validation_report": {"sha256": reviewed.report}}}
+    report = {**qualifications, "source_validation": directions,
+              "policy_sha256": sha256(json.dumps(policy.to_dict(), sort_keys=True).encode()).hexdigest()}
+    args = (2023, reviewed.acquisition, reviewed.original, reviewed.processing, preparation)
+    result = preparation_witness(*args, report, policy)
+    assert result["value_mismatches"] == 0 and directions["value_mismatches"] == 2
+    assert [row["source_record_in"] for row in result["examples"]] == [11, 12, 13, 14]
+    with pytest.raises(ValueError, match="reviewed masking-only hold"):
+        preparation_witness(*args[:3], "another-preparation", preparation, report, policy)
+    for altered in ({**directions, "one_sided_pairs": 1}, {**directions, "examples": directions["examples"][:3]},
+                    {**directions, "historical_district_mismatches": 1}):
+        with pytest.raises(ValueError, match="reviewed masking-only hold"):
+            preparation_witness(*args, {**report, "source_validation": altered}, policy)
+    wrong_artifact = deepcopy(preparation)
+    wrong_artifact["outputs"]["validation_report"]["sha256"] = reviewed.annotations
+    with pytest.raises(ValueError, match="reviewed masking-only hold"):
+        preparation_witness(*args[:4], wrong_artifact, report, policy)
 
 
 def test_obsolete_context_is_separate_from_fall_identity(endpoint_inputs, monkeypatch):
@@ -263,7 +331,7 @@ def test_obsolete_context_is_separate_from_fall_identity(endpoint_inputs, monkey
     from teadata.dataset_metadata import ReferenceDocument
 
     table, directory, entities = endpoint_inputs
-    table, historical = leaves._endpoint_context(table, directory, "2024-10-31", entities)
+    table, historical, _ = leaves._endpoint_context(table, directory, "2024-10-31", entities)
     receipt, digest = "a" * 64, "b" * 64
     reference = ReferenceDocument.from_dict({
         "reference_id": leaves.LIFECYCLE_REFERENCE, "title": "AskTED All Public Schools Closed, printed 2026-11-07", "role": "source_notes",

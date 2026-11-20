@@ -21,6 +21,7 @@ class CampusTransferReview:
     district_processing: str
     comparable_groups: int
     district_only_suppressed: int
+    canonical_edges_on_hold: bool = False
 
 
 # These district processing records retain the separate regional publisher
@@ -31,6 +32,12 @@ REVIEWED_CAMPUS_TRANSFERS = {
     ),
     "4f40beb6c56fb0d3e06c97f4318f8a37700446ab66e93b762a91b5a644d25074": CampusTransferReview(
         2022, "44e8b06228f8ef8a21d419f63ad0e8f494c3d95c6ef2807fc87ad5c5eae85485", 364, 0,
+    ),
+    "4771c65391a31c17bbf1e78147bf2d61660728d9eb4399d25c510cb41e332683": CampusTransferReview(
+        2023, "83ff68b7c6b6e7887386e6bd7e60444125d048d0e009a90151ccdf56ffc5a3ea", 364, 0, canonical_edges_on_hold=True,
+    ),
+    "6f466968708b31ec1d0ec283d55fdbf5e40530873962428e1b451b3a0dcc81ef": CampusTransferReview(
+        2024, "1ca5b30a7987f18c737ba51fbf37a861d853403269c3a7c5396f1c41abc9316c", 372, 6, canonical_edges_on_hold=True,
     ),
     "06c5988e150c80761d7231323c56ed1981e336e1c0933dbdd5b1415aaf78d09e": CampusTransferReview(
         2025, "0e7dea1c32deccc3a6b65f7f9936c0f938f5ff8447d11100ff0fd66dada6dfcb", 420, 0,
@@ -62,6 +69,8 @@ def qualify_campus_transfers(release: DataRelease, processing_store: ProvenanceS
     # Typed parity has replayed the publisher rows, identities and mask tokens
     # against this leaf and checked the selected preparation's recorded directions.
     leaf = processing_store.read_record(ref.processing_id)
+    if review.canonical_edges_on_hold and leaf["validation"].get("canonical_edges_qualified") is not False:
+        raise ContractError("Reviewed campus transfer masking conflicts require the canonical-edge hold")
     preparation = processing_store.read_record(leaf["parameters"]["recipe"]["preparation"])
     campus = processing_store.verify_artifact(preparation["outputs"]["prepared_source"]["sha256"])
     district_graph = district_store.verify_record_closure([review.district_processing])
@@ -78,4 +87,5 @@ def qualify_campus_transfers(release: DataRelease, processing_store: ProvenanceS
             "district_comparison": {**rollup, "processing_id": review.district_processing,
                                     "district_leaf_sha256": district_leaf["sha256"]},
             "qualification_scope": "statewide_campus_rows_and_complete_cross_district_groups",
+            "canonical_edges_on_hold": review.canonical_edges_on_hold,
             "independent_individual_campus_report": False, "suppressed_values_inferred": False}
