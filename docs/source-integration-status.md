@@ -1,40 +1,35 @@
 # Source integration status
 
-The packaged selector identifies **normal data release 0.0.171**. This is a
+The packaged selector identifies **normal data release 0.0.172**. This is a
 frozen analysis release, not a live TEA feed. Software publication and
 application deployment are separate gates; historical requests keep their pins.
-The [machine inventory](source-integration-status-0.0.171.json), generated from
+The [machine inventory](source-integration-status-0.0.172.json), generated from
 the qualified normal parent on November 19, 2026, records
 127 registered IDs, 279 configured editions,
-13 base inputs and 27 native attachments covering 34 dataset IDs and
-321 edition/scope keys. Registration is not
+13 base inputs and 29 native attachments covering 34 dataset IDs and
+323 edition/scope keys. Registration is not
 acquisition, semantic qualification or query access.
 
-- Manifest: `07e82e352e9a09c30bf66514cf8e53393e73e1c27b3100195ee92e14d75bb37d`.
-- Build: `5730eaf1d525765c80de3e0d2faafdcf1967e9bb6e82498ed70f6f15b5f88177`.
-- Processing record: `5a39c6c82d96a079799bc15a7710fb9fa1c8763269f531784d7d6bb60592dfb8`.
+- Manifest: `4ab4ae37901ecd5a12c758132384e4b7e68d39e01bea922f10f8cdf2affa1a78`.
+- Build: `b8f09da7d384866b44324cd1c6e43bf9fb7d1febcf67a7b6c23023fad0746a0c`.
+- Processing record: `545e06a712435f5c3ae39c4af2f2321977a5b091ae34572986bbdeab54a33f17`.
 
 ## Campus transfer report coverage
 
-This release adds 2020–21 and 2021–22 to the previously released 2024–25 and
-2025–26 statewide campus transfer reports. All 25 previous attachments and
-13 base inputs retain their identities. The campus namespace uses the reporting
-campus. Partner campus, report direction, TEA's raw count token, value status
-and original row locator remain available. The newest eligible edition at
-campus scope is 2025–26.
+The normal catalog covers all six statewide campus transfer reports from
+2020–21 through 2025–26. This release adds 2022–23 and 2023–24 with 279,340
+and 297,734 publisher rows. All 27 earlier native attachments and 13 base
+inputs keep their source identities. The default at campus scope remains
+2025–26.
 
-The historical editions contain 264,444 and 260,366 source rows. Archived AskTED
-directories document reporting and partner campuses absent from the current
-entity snapshot. The checks against the district reports reproduced 368 and 364
-fully observed directional district groups, respectively. Comparisons exclude
-groups with a masked count. See the [transfer source guide](transfer-sources.md)
-for scope, source locators and date limits. A first check through the installed
-wheel confirmed offline query access. Representative CSV and Excel exports
-preserved observed, suppressed and missing values.
-
-These editions preserve directional source rows. Canonical campus transfer edges
-have a separate contract. Campus source rows for 2022–23 and 2023–24 remain
-outside this normal release.
+Each observation keeps the reporting campus, partner campus, published
+direction, raw count token, value status and original row locator. Archived
+AskTED records support historical reporting IDs that are absent from the
+current registry. The retained district reports match 364 and 372 fully
+observed directional district groups, respectively. Four pairs per edition
+have different masking across directions. The reconciled edges remain on
+hold, and the source rows retain each publisher observation. See the
+[transfer source guide](transfer-sources.md) for scope and limitations.
 
 ## District transfer report history
 
@@ -111,7 +106,7 @@ individual definitions, units, population, revisions and source links.
 | Native dataset | Report editions | Scopes | Bound field periods |
 | --- | --- | --- | --- |
 | `campus_tapr_staff_profile` | 2025 | campus | SY ending 2025 |
-| `campus_transfer_reports` | 2021, 2022, 2025, 2026 | campus | SY ending 2021, 2022, 2025, 2026 |
+| `campus_transfer_reports` | 2021–2026 | campus | SY ending 2021–2026 |
 | `district_tapr_staff_profile` | 2025 | district | SY ending 2025 |
 | `district_transfer_reports` | 2013–2026 | district | SY ending 2013–2026 |
 | `educator_district_new_hires` | 5 | district | SY ending 2010–2026 |

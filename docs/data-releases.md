@@ -7,7 +7,19 @@ A build records the files it actually reads. The runtime catalog is embedded in 
 <a id="current-normal-release-00163"></a>
 <a id="current-normal-release-00164"></a>
 
-## Current normal release 0.0.171
+## Current normal release 0.0.172
+
+The [pinned normal release](https://github.com/adpena/teadata/releases/download/v0.0.172/release.json)
+adds 2022–23 and 2023–24 statewide campus transfer reports, completing
+continuous directional coverage from 2020–21 through 2025–26. Each row keeps
+its reported direction and masking status. The two new editions are released
+as directional source rows. Their separately reconciled edge series remains
+on hold after four reciprocal pairs in each edition showed differing masks.
+The 27 preceding native attachments keep their identities. See the
+[coverage inventory](source-integration-status.md)
+and [transfer guide](transfer-sources.md).
+
+## Prior normal release 0.0.171
 
 The [pinned normal release](https://github.com/adpena/teadata/releases/download/v0.0.171/release.json)
 adds the 2020–21 and 2021–22 statewide campus transfer reports to the normal

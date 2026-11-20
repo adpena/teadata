@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "observed_at": "2026-11-19T20:27:08.905964+00:00",
+  "observed_at": "2026-11-20T04:44:58.019306+00:00",
   "generator": {
-    "software_version": "0.0.171",
+    "software_version": "0.0.172",
     "working_source_sha256": {
       "scripts/source_inventory.py": "68a90e79a7066867c3604e2a304ab650c59591389e2eb00c0234e035c7a7893a",
       "teadata/release_inventory.py": "5f6e4cbac970e08d71b2d5713ce1eb0cf3e4944b0adedd41e01fed6d20196cce",
@@ -18,9 +18,9 @@
     "source_only_ids": 114,
     "source_only_ids_not_attached": 85,
     "base_inputs": 13,
-    "native_attachments": 27,
+    "native_attachments": 29,
     "native_dataset_ids": 34,
-    "native_edition_scope_keys": 321
+    "native_edition_scope_keys": 323
   },
   "registration": [
     {
@@ -550,6 +550,8 @@
       "attached_report_editions": [
         "2021",
         "2022",
+        "2023",
+        "2024",
         "2025",
         "2026"
       ],
@@ -2260,9 +2262,9 @@
   "selected_catalog": {
     "schema_version": 1,
     "release": {
-      "source": "https://github.com/adpena/teadata/releases/download/v0.0.171/release.json",
-      "manifest_sha256": "07e82e352e9a09c30bf66514cf8e53393e73e1c27b3100195ee92e14d75bb37d",
-      "build_id": "5730eaf1d525765c80de3e0d2faafdcf1967e9bb6e82498ed70f6f15b5f88177"
+      "source": "https://github.com/adpena/teadata/releases/download/v0.0.172/release.json",
+      "manifest_sha256": "4ab4ae37901ecd5a12c758132384e4b7e68d39e01bea922f10f8cdf2affa1a78",
+      "build_id": "b8f09da7d384866b44324cd1c6e43bf9fb7d1febcf67a7b6c23023fad0746a0c"
     },
     "include_variables": true,
     "metadata_inspected": true,
@@ -7169,6 +7171,21 @@
         ]
       },
       {
+        "location": "native-4771c65391a31c17bbf1e78147bf2d61660728d9eb4399d25c510cb41e332683.json",
+        "manifest_sha256": "4771c65391a31c17bbf1e78147bf2d61660728d9eb4399d25c510cb41e332683",
+        "build_id": "ebd2c47cfd2ab661de575186b328c0fddc4f19fec14a3ac9f3aa43e8f7b4c41e",
+        "editions": [
+          {
+            "dataset": "campus_transfer_reports",
+            "edition": "2023",
+            "revision_sha256": "8998fab23b04e67f758a7a691d24688a83f13fd9fa552bc90d4b18c9a77b869e",
+            "scope": "campus",
+            "table": "report_rows",
+            "grain": "one publisher table row per original source input and logical CSV record"
+          }
+        ]
+      },
+      {
         "location": "native-4f40beb6c56fb0d3e06c97f4318f8a37700446ab66e93b762a91b5a644d25074.json",
         "manifest_sha256": "4f40beb6c56fb0d3e06c97f4318f8a37700446ab66e93b762a91b5a644d25074",
         "build_id": "e2697aac7c3aae994527d332b0198e346f38d0645dfb142e1787aa6ae5eb78b0",
@@ -7177,6 +7194,21 @@
             "dataset": "campus_transfer_reports",
             "edition": "2022",
             "revision_sha256": "f4d288816f9f75805ba8e94009c5a716a81f4f8692c2c17538049c2fd9a3e35e",
+            "scope": "campus",
+            "table": "report_rows",
+            "grain": "one publisher table row per original source input and logical CSV record"
+          }
+        ]
+      },
+      {
+        "location": "native-6f466968708b31ec1d0ec283d55fdbf5e40530873962428e1b451b3a0dcc81ef.json",
+        "manifest_sha256": "6f466968708b31ec1d0ec283d55fdbf5e40530873962428e1b451b3a0dcc81ef",
+        "build_id": "a171ed1dba3d892423476933651c0756080e7db208248fdcbed1f6d5dc01bebf",
+        "editions": [
+          {
+            "dataset": "campus_transfer_reports",
+            "edition": "2024",
+            "revision_sha256": "e6c1f3bd1197986338536393cc5384b8eb0e3115b26a92d4aedad2837d9aa88a",
             "scope": "campus",
             "table": "report_rows",
             "grain": "one publisher table row per original source input and logical CSV record"
@@ -7554,6 +7586,59 @@
               "aggregation_level",
               "school_year",
               "source_scope"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "0aa9f758fb00f81938ac67ca2d24a3093488b5c09a025ec7bd49fe60ecdac9b3",
+        "dataset": "campus_transfer_reports",
+        "edition": "2024",
+        "revision_sha256": "e6c1f3bd1197986338536393cc5384b8eb0e3115b26a92d4aedad2837d9aa88a",
+        "scope": "campus",
+        "table": "report_rows",
+        "grain": "one publisher table row per original source input and logical CSV record",
+        "title": "2023–24 statewide campus transfer report",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/campus_transfer_report.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2023,
+          "end_year": 2024
+        },
+        "source_qualifiers": null,
+        "variable_count": 14,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2023,
+              "end_year": 2024
+            },
+            "unit": "count",
+            "fields": [
+              "student_transfer_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "line_group_number",
+              "partner_campus_name",
+              "partner_campus_number",
+              "partner_district_name",
+              "partner_district_number",
+              "report_number",
+              "reporting_campus_name",
+              "reporting_campus_number",
+              "reporting_district_name",
+              "reporting_district_number",
+              "reporting_region",
+              "school_year",
+              "transfer_direction"
             ]
           }
         ]
@@ -15875,6 +15960,59 @@
               "reported_epp_assignment",
               "school_year_end",
               "school_year_label"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "611166684fda47d507e08169673b7628a8fafbf06482ce970dbe74444138190a",
+        "dataset": "campus_transfer_reports",
+        "edition": "2023",
+        "revision_sha256": "8998fab23b04e67f758a7a691d24688a83f13fd9fa552bc90d4b18c9a77b869e",
+        "scope": "campus",
+        "table": "report_rows",
+        "grain": "one publisher table row per original source input and logical CSV record",
+        "title": "2022–23 statewide campus transfer report",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/Transfer_Reports/campus_transfer_report.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2022,
+          "end_year": 2023
+        },
+        "source_qualifiers": null,
+        "variable_count": 14,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2022,
+              "end_year": 2023
+            },
+            "unit": "count",
+            "fields": [
+              "student_transfer_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "line_group_number",
+              "partner_campus_name",
+              "partner_campus_number",
+              "partner_district_name",
+              "partner_district_number",
+              "report_number",
+              "reporting_campus_name",
+              "reporting_campus_number",
+              "reporting_district_name",
+              "reporting_district_number",
+              "reporting_region",
+              "school_year",
+              "transfer_direction"
             ]
           }
         ]

@@ -1,7 +1,7 @@
 # Transfer source intake
 
-The [v0.0.171 normal release](source-integration-status.md) includes reviewed
-statewide campus transfer reports for 2020–21, 2021–22, 2024–25 and 2025–26. The existing lazy
+The [v0.0.172 normal release](source-integration-status.md) includes reviewed
+statewide campus transfer reports for every year from 2020–21 through 2025–26. The existing lazy
 `release.observations("campus_transfer_reports", ...)` planner and campus dataset
 namespace select rows for the reporting campus. Year selection and original
 row locators remain available in exports. The normal release also retains
@@ -575,7 +575,7 @@ counts. Each archived validation report also recorded two value mismatches
 under its earlier counter. Those rows are part of the four masking differences.
 The archived reports are preserved.
 
-Both years remain outside the published normal campus transfer series. The
+Both years are included as directional source rows in v0.0.172. The
 directional materializer admits only the exact reviewed originals, preparations
 and validation reports. Its current comparison must reproduce all four mixed
 observed and suppressed pairs, including their original CSV record and line

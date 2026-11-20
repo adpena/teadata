@@ -75,6 +75,9 @@ def _decode_payload(payload: Any) -> Optional[dict]:
             text = data.decode("utf-8")
         except Exception:
             return None
+        # A compressed row's expanded bytes are no longer needed while JSON
+        # parsing builds the Python object graph from the decoded text.
+        del data
         return json.loads(text) if text else None
     if isinstance(payload, str):
         return json.loads(payload) if payload else None
