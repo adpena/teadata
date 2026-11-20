@@ -284,6 +284,72 @@ def test_passing_receipt_is_bound_to_source_logs_and_policy(project):
     assert receipt.stat().st_mode & 0o777 == 0o600
 
 
+def test_release_receipt_retains_a_large_inventory_once(project, monkeypatch):
+    from teadata import verification
+
+    identity = verification._input_identity
+    records = ["a" * 64] * 35000
+
+    def with_native_records(*args, **kwargs):
+        return {**identity(*args, **kwargs), "native_evidence": {"source": {"records": records}}}
+
+    monkeypatch.setattr(verification, "_input_identity", with_native_records)
+    receipt = run_checks(project, kind="library", checks=passing())
+    result = verify_receipt(receipt, project, kind="library", checks=passing())
+    assert result["inputs"]["native_evidence"]["source"]["records"] == records
+    assert "inputs_after" not in result
+    assert result["inputs_after_sha256"] == sha256(verification._canonical(result["inputs"])).hexdigest()
+    assert receipt.stat().st_size < verification.MAX_RECEIPT_BYTES < 2 * len(verification._canonical(result["inputs"]))
+
+
+def test_receipt_requires_the_ending_identity_for_its_schema(project, monkeypatch):
+    from teadata import verification
+
+    identity = verification._input_identity
+    monkeypatch.setattr(verification, "_input_identity",
+                        lambda *args, **kwargs: {**identity(*args, **kwargs), "example_count": 1})
+    receipt = run_checks(project, kind="library", checks=passing())
+    current = json.loads(receipt.read_text())
+    current.pop("record_id")
+    legacy = {**current, "schema_version": 1, "inputs_after": current["inputs"]}
+    legacy.pop("inputs_after_sha256")
+
+    def persist(record):
+        verification._write_document(receipt, {**record,
+            "record_id": sha256(verification._canonical(record)).hexdigest()})
+
+    persist(legacy)
+    assert verify_receipt(receipt, project, kind="library", checks=passing())["schema_version"] == 1
+    for invalid in (
+        {**legacy, "inputs_after_sha256": current["inputs_after_sha256"]},
+        {**current, "inputs_after": current["inputs"]},
+        {**current, "inputs_after_sha256": "0" * 64},
+        {**current, "source_stable": 1},
+    ):
+        persist(invalid)
+        with pytest.raises(ReceiptError, match="complete stable passing run"):
+            verify_receipt(receipt, project, kind="library", checks=passing())
+    changed = {**current["inputs"], "example_count": True}
+    persist({**current, "inputs": changed, "inputs_after_sha256": sha256(verification._canonical(changed)).hexdigest()})
+    with pytest.raises(ReceiptError, match="stale"):
+        verify_receipt(receipt, project, kind="library", checks=passing())
+
+
+def test_oversized_receipt_keeps_evidence_without_replacing_latest(project, monkeypatch):
+    from teadata import verification
+
+    monkeypatch.setattr(verification, "default_checks", lambda *args, **kwargs: passing())
+    original = run_checks(project, kind="library")
+    checks = original.parent.parent
+    pointer, = checks.glob("latest-library-*.json")
+    first = pointer.read_bytes()
+    monkeypatch.setattr(verification, "MAX_RECEIPT_BYTES", 128)
+    with pytest.raises(ReceiptError, match="full record was retained"):
+        run_checks(project, kind="library")
+    assert pointer.read_bytes() == first
+    assert len(list(checks.glob("*/receipt.json"))) == 2
+
+
 @pytest.mark.parametrize("kind,paired", [("library", False), ("app", False), ("app", True)])
 def test_focused_checks_preserve_the_default_policy_pointer(project, monkeypatch, kind, paired):
     # Exercise actual receipt publication and verification without provisioning

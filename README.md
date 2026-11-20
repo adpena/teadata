@@ -301,6 +301,9 @@ Focused checks supplied programmatically retain their own receipts without
 replacing the full-policy pointer used by `--verify-latest` and the push guard.
 Each Python runtime and selected release has a separate pointer. An earlier
 receipt from the same check scope still needs to match the current inputs.
+Release receipts keep the full starting evidence inventory and the digest of
+the inventory checked at the end. If a receipt exceeds the verifier's size
+limit, the runner keeps it and its logs without advancing the latest pointer.
 
 The app's JavaScript check uses Node 22 or later's native glob discovery in
 `static/js/tests/**/*.test.cjs` and `frontend/tests/**/*.test.mjs`. New matching

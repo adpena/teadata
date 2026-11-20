@@ -31,7 +31,8 @@ if TYPE_CHECKING:
     from teadata.release import DataRelease
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
+MAX_RECEIPT_BYTES = 4 * 1024 * 1024
 _SHA256 = re.compile(r"[0-9a-f]{64}")
 DEFAULT_CHECK_TIMEOUTS = {"library": 3600.0, "app": 900.0}
 IGNORED_SOURCE_PARTS = frozenset({
@@ -420,19 +421,23 @@ def run_checks(
         after = {"unavailable": type(error).__name__}
     actual_environment = _try_environment_identity(python, kind, root)
     passed = len(results) == len(setup) + len(policy) and all(item["returncode"] == 0 for item in results)
+    ending_input_digest = sha256(_canonical(after)).hexdigest()
+    stable = sha256(_canonical(before)).hexdigest() == ending_input_digest
     receipt = {
         "schema_version": SCHEMA_VERSION, "run_id": run_id, "python_version": version,
         "recorded_at": datetime.now(timezone.utc).isoformat(),
         "scope": "code-and-selected-release" if release else "code-only; raw inputs and data artifacts are not certified",
         "policy": [check.to_dict() for check in policy], "setup_policy": [check.to_dict() for check in setup],
-        "inputs": before, "inputs_after": after, "source_stable": before == after,
+        "inputs": before, "inputs_after_sha256": ending_input_digest, "source_stable": stable,
         "environment": environment_before, "environment_after": actual_environment,
         "checks": results,
-        "status": "passed" if passed and before == after and environment_before is not None and environment_before == actual_environment and environment_before.get("python") == version else "failed",
+        "status": "passed" if passed and stable and environment_before is not None and environment_before == actual_environment and environment_before.get("python") == version else "failed",
     }
     document = {**receipt, "record_id": sha256(_canonical(receipt)).hexdigest()}
     path = directory / "receipt.json"
     _write_document(path, document)
+    if path.stat().st_size > MAX_RECEIPT_BYTES:
+        raise ReceiptError(f"Receipt exceeds the verification size limit. The full record was retained at {path}")
     # Focused callers retain their receipt path; they must not displace the
     # default-policy receipt used by --verify-latest and the push guard.
     if checks is None:
@@ -440,7 +445,7 @@ def run_checks(
                                         version=version, release=release, native_evidence=native_evidence),
                         {"receipt": f"{run_id}/receipt.json", "record_id": document["record_id"]})
     print(f"Receipt: {path}", flush=True)
-    if before != after:
+    if not stable:
         print("Source changed during checks; this receipt cannot be used for landing.", file=sys.stderr)
     return path
 
@@ -457,22 +462,31 @@ def verify_receipt(
 ) -> dict[str, Any]:
     root = root.resolve()
     path = path.resolve()
-    if path.stat().st_size > 4 * 1024 * 1024:
+    if path.stat().st_size > MAX_RECEIPT_BYTES:
         raise ReceiptError("Receipt is too large")
     document = json.loads(path.read_text())
     if not isinstance(document, dict):
         raise ReceiptError("Receipt must be a JSON object")
     record = {key: value for key, value in document.items() if key != "record_id"}
-    if document.get("record_id") != sha256(_canonical(record)).hexdigest() or record.get("schema_version") != SCHEMA_VERSION:
+    schema = record.get("schema_version")
+    if (type(schema) is not int or schema not in (1, SCHEMA_VERSION)
+            or document.get("record_id") != sha256(_canonical(record)).hexdigest()):
         raise ReceiptError("Receipt integrity or schema mismatch")
-    if record.get("status") != "passed" or not record.get("source_stable") or record.get("inputs") != record.get("inputs_after"):
+    inputs = record.get("inputs")
+    encoded_inputs = _canonical(inputs)
+    if schema == 1:
+        stable = "inputs_after_sha256" not in record and _canonical(record.get("inputs_after")) == encoded_inputs
+    else:
+        stable = ("inputs_after" not in record
+                  and record.get("inputs_after_sha256") == sha256(encoded_inputs).hexdigest())
+    if record.get("status") != "passed" or record.get("source_stable") is not True or not isinstance(inputs, dict) or not stable:
         raise ReceiptError("Receipt does not contain a complete stable passing run")
     version, python, _, setup = _check_runtime(root, paired=paired_library is not None)
     if record.get("python_version") != version:
         raise ReceiptError("Receipt was checked with a different Python runtime")
     native_evidence = root / native_evidence if native_evidence is not None else None
     current = _input_identity(root, kind=kind, paired_library=paired_library, release=release, native_evidence=native_evidence)
-    if record.get("inputs") != current:
+    if encoded_inputs != _canonical(current):
         raise ReceiptError("Receipt is stale for this revision, source, lockfile, runner, or release")
     binding = (native_evidence, current["native_evidence_map_sha256"]) if native_evidence is not None else None
     policy = list(checks) if checks is not None else default_checks(kind, release=release, native_evidence=binding)
