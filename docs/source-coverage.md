@@ -558,12 +558,12 @@ and [TEA's explanation of the financial basis and indicators](https://tea.texas.
 
 Both populations are available as native district observations in
 [TEA Data v0.0.146](https://github.com/adpena/teadata/releases/tag/v0.0.146).
-Their workbook, public roster,
-and announcement controls were checked separately. The 165 graded
-non-university charters remain on hold. The final export, roster, and
-Charter FIRST statistics agree with one another, but the [TEA newsroom table](https://tea.texas.gov/about-tea/newsroom/tea-releases-final-2025-2026-financial-accountability-ratings)
-reports one fewer B and one more C. The reason for that discrepancy remains
-unverified. No combined total or campus rating is admitted.
+Their workbook, public roster, and announcement controls were checked separately.
+For the 165 graded charters outside public higher education institutions, the
+retained final export, public roster, and Charter FIRST statistics report 36 B
+and 17 C ratings. The [TEA newsroom table](https://tea.texas.gov/about-tea/newsroom/tea-releases-final-2025-2026-financial-accountability-ratings)
+reports 37 B and 16 C ratings. The reason remains unresolved, and this population
+remains on hold. No combined total or campus rating is admitted.
 
 To replay the exact retained acquisitions into a new unpublished directory,
 run `uv run --locked python -m teadata.scripts.refresh_first_ratings --store
