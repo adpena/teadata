@@ -537,6 +537,22 @@ including nine charter destinations. A passing result establishes reciprocal
 detail agreement for the checked edition. Source qualification, roster
 coverage, historical geometry, and activation have separate gates.
 
+An offline audit of the district attachments in
+[TEA Data 0.0.172](https://github.com/adpena/teadata/releases/tag/v0.0.172)
+covered all 14 school years from 2012–13 through 2025–26. It found 212,922
+residence-to-attendance district pair-editions in both published directions.
+The observed counts agreed for 70,833 pairs, and 142,027 pairs were suppressed
+on both sides. The other 62 pairs differed in suppression status, all in
+2018–19. Nine of those pairs had a charter destination. The audit found
+zero pairs reported in only one direction and zero differences between two
+observed counts. Thirteen editions passed this directional agreement check.
+
+The 45 unknown origin type classifications are separate from the 2018–19
+hold. The counts are 13 in 2012–13, 30 in 2013–14, and two in 2014–15.
+These pairs appear in the reports. The same-year rosters leave their origin
+type unresolved. Preserve the independently published rows and masks.
+Canonical district transfer edges still require separate qualification.
+
 ## Compare campus observations with district reports
 
 `compare-campus-district` compares cross-district directional details from a
