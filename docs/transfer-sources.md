@@ -559,16 +559,27 @@ district suppression. The check does not reconstruct masked counts.
 
 | School year | Exact observed groups | District-only masked groups |
 | --- | ---: | ---: |
+| 2022–23 | 364 | 0 |
 | 2023–24 | 372 | 6 |
 | 2024–25 | 420 | 0 |
 | 2025–26 | 418 | 12 |
 
 `PASS_OBSERVED_TRANSFER_ROLLUP` covers only this visible subset. A disagreement,
 a campus-only cross-district group, a district-only observed group, or no
-comparable groups yields `HOLD`. The 2023–24 campus preparation's canonical
-edge status remains `HOLD` because of the directional masking differences
-described above. The comparison can use its separately accepted source rows
-without upgrading that status.
+comparable groups yields `HOLD`.
+
+The 2022–23 and 2023–24 campus originals retain 279,340 and 297,734
+publisher rows, respectively. Current replay found four reciprocal pairs with
+different masking in each year, and zero differences between two observed
+counts. Each archived validation report also recorded two value mismatches
+under its earlier counter. Those rows are part of the four masking differences.
+The archived reports are preserved.
+
+Both years remain outside the normal campus transfer series. Their canonical
+edges remain on hold. A future directional release needs the exact preparation
+receipts and dated AskTED evidence for historical campus and parent identities.
+The district comparison qualifies only the complete, visible groups shown
+above. It provides no unmasked estimate for another publisher direction.
 
 
 ### Campus native source check
