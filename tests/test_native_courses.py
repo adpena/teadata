@@ -11,7 +11,8 @@ import pytest
 from teadata.dataset_metadata import EditionKey
 from teadata.manifest import ContractError
 from teadata.native_courses import (
-    HOLD_CAMPUS_GEOGRAPHY, PASS_COURSE_CONTROLS, _campus_blocks, _compare_batch, _district_campus_witness, _replay,
+    HOLD_CAMPUS_GEOGRAPHY, PASS_COURSE_CONTROLS, REVIEWED_STATE_DISTRICT_COURSES, _campus_blocks, _compare_batch,
+    _district_campus_witness, _replay, qualify_reviewed_state_district_courses,
 )
 from teadata.peims_course_sources import CSV_HEADERS, DATASET, course_csv_preamble
 from teadata.scripts.verify_peims_courses import _HTML_HEADER
@@ -159,3 +160,29 @@ def test_course_controls_never_exit_success_for_a_campus_hold(monkeypatch, capsy
     else:
         main()
     assert status in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("pin", REVIEWED_STATE_DISTRICT_COURSES)
+@pytest.mark.parametrize("scope_change", [None, "campus", "duplicate", "different-pin"])
+def test_course_normal_release_requires_exact_state_district_scope(monkeypatch, pin, scope_change):
+    editions = [{"edition": {"edition": str(year), "scope": scope}}
+                for year in REVIEWED_STATE_DISTRICT_COURSES[pin] for scope in ("state", "district")]
+    if scope_change == "campus":
+        editions[0]["edition"]["scope"] = "campus"
+    elif scope_change == "duplicate":
+        editions[-1] = editions[0]
+    elif scope_change == "different-pin":
+        pin = "0" * 64
+    check = Mock(return_value={"status": PASS_COURSE_CONTROLS, "editions": editions})
+    monkeypatch.setattr("teadata.native_courses.qualify_courses", check)
+    release = SimpleNamespace(manifest_sha256=pin)
+
+    if scope_change is None:
+        proof = qualify_reviewed_state_district_courses(release, Mock(), Mock())
+        assert proof["status"] == "PASS_REVIEWED_NATIVE"
+        assert proof["source_replay_status"] == PASS_COURSE_CONTROLS
+    else:
+        with pytest.raises(ContractError, match="course"):
+            qualify_reviewed_state_district_courses(release, Mock(), Mock())
+        if scope_change == "different-pin":
+            check.assert_not_called()

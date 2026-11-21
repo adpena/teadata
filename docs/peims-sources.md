@@ -220,6 +220,25 @@ records how TEA resolved that campus number.
 
 ### Build and verify a course candidate
 
+The 2018–19 through 2021–22 archive registers publisher source layouts for
+Texas, districts and campuses. The exact reviewed Texas and district child
+contains eight editions and 811,419 source rows. It retains 201,796 masked
+course enrollment cells. Independent Texas, Hays CISD and A+ Academy HTML
+reports reproduced 38,015 measure cells. Earlier editions remain outside
+this child. The corresponding historical campus files retain literal source
+district IDs and remain on hold for campus-level interpretation.
+
+To recheck a retained historical child, run `scripts/check --native-release`
+with its manifest, the exact pin
+`dd77af2bda817efb97341685afc2683b0c1fd0ea17ebd1f1d5dffb06f1de9866`, and
+`--source-store` pointing at the original publisher witnesses. The same
+check accepts the separately reviewed 2022–23 through 2025–26 Texas and
+district child, which contains eight editions and 820,454 source rows,
+pinned to
+`8f0448c7f85db9b8afc0897951e2850d35c8a5cdd31abeed7c323bd348a5507f`.
+The [current release inventory](source-integration-status.md) identifies
+which data are available through the normal library selection.
+
 The source profile admits separate state, district and campus leaves. It preserves the
 publisher course code, leading-zero district number, raw measure tokens and
 physical source row. Head counts and course membership use integers, and FTE

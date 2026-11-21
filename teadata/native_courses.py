@@ -1,4 +1,4 @@
-"""Replay unpublished PEIMS course leaves against retained CSV and HTML reports."""
+"""Replay PEIMS course leaves against retained CSV and HTML reports."""
 
 from __future__ import annotations
 
@@ -35,6 +35,10 @@ from .values import ValueStatus
 pc: Any = arrow_compute
 PASS_COURSE_CONTROLS = "PASS_REVIEWED_PEIMS_COURSE_CONTROLS"
 HOLD_CAMPUS_GEOGRAPHY = "HOLD_PEIMS_CAMPUS_GEOGRAPHY"
+REVIEWED_STATE_DISTRICT_COURSES = {
+    "dd77af2bda817efb97341685afc2683b0c1fd0ea17ebd1f1d5dffb06f1de9866": range(2019, 2023),
+    "8f0448c7f85db9b8afc0897951e2850d35c8a5cdd31abeed7c323bd348a5507f": range(2023, 2027),
+}
 _BATCH_ROWS = 4096
 _MAX_LINE_BYTES = 8192
 _MEASURE_FIELDS = tuple(COURSE_FACT_UNITS)
@@ -398,3 +402,26 @@ def qualify_courses(release: DataRelease, store: ProvenanceStore, witnesses: Pro
         report.update(district_csv_rows=sum(item.get("district_csv_rows", 0) for item in results),
                       district_csv_compared_cells=sum(item.get("district_csv_compared_cells", 0) for item in results))
     return report
+
+
+def reviewed_course_witnesses(manifest_sha256: str) -> tuple[str, ...]:
+    """Return exact publisher receipts used by the normal-release qualification."""
+    reviews = json.loads(files("teadata").joinpath("reference_cases/native_peims_courses.json").read_text())
+    years = (str(year) for year in REVIEWED_STATE_DISTRICT_COURSES[manifest_sha256])
+    return tuple(receipt for year in years for receipt in
+                 (reviews["state"][year]["html"], *reviews["district"][year].values()))
+
+
+def qualify_reviewed_state_district_courses(
+    release: DataRelease, store: ProvenanceStore, witnesses: ProvenanceStore,
+) -> dict[str, Any]:
+    """Admit one exact Texas and district child with all reviewed years."""
+    years = REVIEWED_STATE_DISTRICT_COURSES.get(release.manifest_sha256)
+    if years is None:
+        raise ContractError("The course manifest differs from the reviewed source")
+    report = qualify_courses(release, store, witnesses)
+    coverage = [(row["edition"]["edition"], row["edition"]["scope"]) for row in report["editions"]]
+    expected = {(str(year), scope) for year in years for scope in ("state", "district")}
+    if report["status"] != PASS_COURSE_CONTROLS or len(coverage) != len(expected) or set(coverage) != expected:
+        raise ContractError("The course source requires all eight reviewed Texas and district editions")
+    return {**report, "status": "PASS_REVIEWED_NATIVE", "source_replay_status": report["status"]}

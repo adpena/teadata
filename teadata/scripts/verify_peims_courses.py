@@ -17,7 +17,9 @@ from teadata.peims_course_sources import CSV_HEADERS, ENCODING, GRADE_LABELS, ME
 from teadata.provenance import ProvenanceStore
 
 
-_ROWS = {2023: 1386, 2024: 1397, 2025: 1422, 2026: 1453}
+_CURRENT_ROWS = {2023: 1386, 2024: 1397, 2025: 1422, 2026: 1453}
+_HISTORICAL_ROWS = {2019: 1342, 2020: 1358, 2021: 1379, 2022: 1385}
+_ROWS = _HISTORICAL_ROWS | _CURRENT_ROWS
 _STANDARD_FOOTER_SHA256 = {
     "csv": "2b84fb6e114e983247ff277f83034d30ee2d4323dae633047e2020a9dafe5953",
     "html": "7b70e943548e2c8d03879c24b993336e03f49071bdc26c30a300d4049aa44ce7",
@@ -142,8 +144,8 @@ def main(argv: list[str] | None = None) -> None:
     args = parser.parse_args(argv)
     try:
         selections = [(int(year), csv_id, html_id) for year, csv_id, html_id in args.pair]
-        if sorted(year for year, _, _ in selections) != sorted(_ROWS):
-            raise ContractError("Select one exact CSV/HTML receipt pair per year from 2023 through 2026")
+        if sorted(year for year, _, _ in selections) not in (sorted(_CURRENT_ROWS), sorted(_HISTORICAL_ROWS)):
+            raise ContractError("Select one exact CSV/HTML receipt pair per year for 2019–2022 or 2023–2026")
         if not (args.store / "records").is_dir() or not (args.store / "objects").is_dir():
             raise ContractError("An existing retained provenance store is required")
         store = ProvenanceStore(args.store)

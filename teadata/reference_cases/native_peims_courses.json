@@ -1,11 +1,39 @@
 {
   "state": {
+    "2019": {
+      "html": "c5a3432c68c46e88f7cd5952e4b8bb4571d8c196dfeb79886518c3d55bf716df"
+    },
+    "2020": {
+      "html": "a678c113867042c3179de81747a3eb32750cec6c5a711cb3b939e977beb5e03b"
+    },
+    "2021": {
+      "html": "e2c734ff555b38efbda174f03469bf86e7ed511c26cd87297788d1dd0a1a6c72"
+    },
+    "2022": {
+      "html": "d6481ed35ab496a02a32385c84d15ef25aa414577de2ee11a77b31f8ca98ca55"
+    },
     "2023": {"html": "0b982beddda26f2d4515264bca782d4bff3c408ed246c6cfbff8c7fb894c189e"},
     "2024": {"html": "1ff4dbd6bcd81695d36dbb129b35d83b19571f4f22d7c1952af53633c9f21e1a"},
     "2025": {"html": "6e3333bc9663abf5d33685838a6ecc77207c1b7159c399b67ca2af60250e3669"},
     "2026": {"html": "cea5fd8baa3c740914856de275dc29a33508b3dafbcf51d9bf4b7370b84cc99c"}
   },
   "district": {
+    "2019": {
+      "057829": "c8b043f3f41d2d8b5aad648bb627593b793c19070a9bf35d0db17bb659780b81",
+      "105906": "14dab5b71e8ee610e98b750520bd75d621a548d8bfc075e5dc37dad682243428"
+    },
+    "2020": {
+      "057829": "a0b86abf7627d368d8b8e93a806550596e97faf221e9dea9167de043af80ca9e",
+      "105906": "840658eda3c5aa4827e5f75e2350b3c0caa481737f16889fd56b4ed5167a9ae0"
+    },
+    "2021": {
+      "057829": "ad7fda49d563f9e3f01d1f5b87243d6ea1a8a290ca47484982c10af81645daa1",
+      "105906": "cf5b069c8afa910e99916abcc24c6d730de59900976fc157563b738c72ed66f5"
+    },
+    "2022": {
+      "057829": "965ffb61aba15de9fa3da0e9b6f20db8a04a4d074ef0ecd6cb628a98098af000",
+      "105906": "d096678412fb926c098ea6217e5b93dcbb44d0b95757802c2adfbcff2afaddf3"
+    },
     "2023": {"105906": "b1573ccc59b2dd673cfa2c2ad28cabe07589de40fcdb13e87106925e1ecb7b8b"},
     "2024": {"105906": "4a87d91628087323ffa01612b4cc445722f18fd45ddfb2bc14767e5a8c3f102d"},
     "2025": {"105906": "1406ab1cb048b7725dbacb4130d858d0ecd93612bfcc56a463c9174af9901ad2"},
@@ -15,6 +43,38 @@
     }
   },
   "campus": {
+    "2019": {
+      "district_csv": {
+        "057829": "0b1b4800b0da3a217b2d1661d401eeee7a52043f0137ccabc5db643283c0a6c7"
+      },
+      "html": {
+        "057829001": "b5f19a91d4de50587637474282b57caa185cd31a7ba23e4e25d92b334c1cebc2"
+      }
+    },
+    "2020": {
+      "district_csv": {
+        "057829": "95d0305fcc680cc255f642ea74bbb93b6af8aad9b32fd98e2a3af9e74cb3d273"
+      },
+      "html": {
+        "057829001": "262a625c916f898d5cad201b99a01fcf4bd96ee8f7313696f5ac555e4fabaa9b"
+      }
+    },
+    "2021": {
+      "district_csv": {
+        "057829": "b7e4e0162d9f830a3fbc5d434fc7146d081e83a181da09c682413a8ff05e8fe6"
+      },
+      "html": {
+        "057829001": "a9ce136d63fcf924f09002cc2f1da119dc0fbe7134a00a3f64798c2f2e7699f6"
+      }
+    },
+    "2022": {
+      "district_csv": {
+        "057829": "183870f9953e2eb0f4f76fc6c7e33333686db31dab82fc03a45c08eb2f501f12"
+      },
+      "html": {
+        "057829001": "5ffd076675b4758364ca89bcddba55039dca92aa7658f6f1763b511d35ca1d49"
+      }
+    },
     "2023": {
       "html": {"105906101": "ed32e23d00ddf4737b5b48bb62f4f7ace2ce7752a75dc3693adb4f71a84fa4ed"},
       "district_csv": {"105906": "7d040c5e03efaafffb50c3f077b1e0cec8f06662bdb7faef17b46b60231945ca"}
