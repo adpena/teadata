@@ -639,9 +639,9 @@ The published `0.0.173` string syntax includes comparisons, `and`, `or`,
 `not`, `in`, `not in`, `is None` and `is not None`. Use the corresponding
 bracket form on that release if you prefer overloaded operators.
 
-On `main` after `0.0.173`, query strings also accept pandas-style `&` and
-`|`. Comparisons bind first, followed by `&` and then `|`. Group the operand
-of `~` with parentheses. Both forms below use the same lazy scan.
+Starting with `0.0.174`, query strings also accept pandas-style `&` and `|`.
+Comparisons bind first, followed by `&` and then `|`. Group the operand of
+`~` with parentheses. Both forms below use the same lazy scan.
 
 ```python
 selected = table.query(
