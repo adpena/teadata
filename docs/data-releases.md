@@ -19,6 +19,12 @@ exact report coverage and qualifications.
 TEA Data software 0.0.179 uses the same 0.0.178 data manifest and adds recorded
 filters for multi-year source selections. See the [series query example](querying.md#filter-a-multidimensional-series).
 
+TEA Data software 0.0.180 also selects the 0.0.178 data manifest. It adds
+the [bounded SQLite course reader](peims-sources.md#bounded-course-preview-and-export)
+for district and direct Texas previews, CSV bundles and Excel exports.
+The 2025–26 CTE reconciliation reader is available for retained final reports.
+The normal catalog has the same qualified data editions as 0.0.179.
+
 ## Prior normal release 0.0.177
 
 The [pinned normal release](https://github.com/adpena/teadata/releases/download/v0.0.177/release.json) adds
