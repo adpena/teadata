@@ -10,6 +10,7 @@ from __future__ import annotations
 from collections.abc import Iterator, Mapping, Sequence
 from copy import deepcopy
 from dataclasses import dataclass, replace
+from decimal import Decimal
 from functools import lru_cache
 import gzip
 from hashlib import sha256
@@ -186,6 +187,74 @@ class StudentReport:
     cells: tuple[StudentCell, ...]
     acquisition_notes: tuple[str, ...] = ()
     grid_sha256: str = ""
+
+
+@dataclass(frozen=True)
+class CteMembership:
+    """Reconciled participation and the original cells used in the calculation."""
+
+    count: int
+    denominator: int
+    rate: Measurement
+    count_cell: StudentCell
+    rate_cell: StudentCell
+    denominator_cells: tuple[StudentCell, ...]
+
+
+def reconcile_cte_membership(report: StudentReport) -> tuple[CteMembership, CteMembership]:
+    """Check the all-grade and grades 9–12 rates in one 2025–26 district or Texas report.
+
+    Use after verifying the source receipt. Arithmetic qualification does not
+    establish a report's finality, roster coverage or publication approval.
+    """
+    _identifier(report.scope, report.identifier)
+    _need(report.scope in {"district", "state"} and report.grid_sha256 == _CURRENT_STUDENT_GRID,
+          "CTE Membership requires the reviewed district or direct Texas Student Information grid")
+    program = "Students by Instructional Program"
+    label = "Career and Technical Education"
+    grades = "Students by Grade"
+    denominator_rows = ("", "Total Students"), *((grades, f"Grade {grade}") for grade in range(9, 13))
+    labels = label, label + " (9-12 grades only)"
+    needed = {(section, row, "count") for section, row in denominator_rows}
+    needed.update((program, row, quantity) for row in labels for quantity in ("count", "percent"))
+    cells: dict[tuple[str, str, str], StudentCell] = {}
+    for cell in report.cells:
+        key = cell.section, cell.label, cell.measure
+        if cell.population == "membership" and cell.geography_role == "local" and key in needed:
+            _need(cell.period == PERIOD and key not in cells, "Duplicate or off-period CTE Membership source cell")
+            cells[key] = cell
+    _need(cells.keys() == needed, "CTE Membership source cell is missing")
+
+    def published_count(cell: StudentCell) -> int:
+        digits = cell.raw.replace(",", "")
+        _need(len(digits) <= 19 and _COUNT.fullmatch(cell.raw) is not None,
+              "CTE Membership count source token is unqualified")
+        count = int(digits)
+        _need(count < 2**63, "CTE Membership count exceeds the supported range")
+        return count
+
+    def reconcile(row: str, denominator: tuple[tuple[str, str], ...]) -> CteMembership:
+        count_cell = cells[program, row, "count"]
+        rate_cell = cells[program, row, "percent"]
+        denominators = tuple(cells[section, name, "count"] for section, name in denominator)
+        count = published_count(count_cell)
+        total = sum(map(published_count, denominators))
+        _need(count <= total, "CTE Membership count exceeds its population")
+        if total == 0:
+            _need(row == labels[1] and rate_cell.raw == "0.0%", "Unqualified CTE Membership zero population display")
+            rate = Measurement(None, ValueStatus.NOT_APPLICABLE, rate_cell.raw, "zero_denominator", unit="percent")
+        else:
+            tenths = (2000 * count + total) // (2 * total)
+            expected = f"{tenths // 10}.{tenths % 10}"
+            _need(rate_cell.raw == expected + "%", "CTE Membership percentage disagrees with source counts")
+            rate = Measurement(Decimal(expected), ValueStatus.OBSERVED, rate_cell.raw, unit="percent")
+        return CteMembership(count, total, rate, count_cell, rate_cell, denominators)
+
+    all_grades = reconcile(labels[0], denominator_rows[:1])
+    secondary = reconcile(labels[1], denominator_rows[1:])
+    _need(secondary.count <= all_grades.count and secondary.denominator <= all_grades.denominator,
+          "Grades 9–12 CTE Membership exceeds the all-grade population or count")
+    return all_grades, secondary
 
 
 def semantic_fields(contract: Mapping[str, Any] | None = None) -> list[dict[str, Any]]:

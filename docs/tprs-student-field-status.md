@@ -41,6 +41,26 @@ absent-grade bindings and 9,380 absent-section bindings as explicit missing
 states with no manufactured coordinates. These are publication facts, not
 assumed eligibility exclusions.
 
+## November 20 district and Texas CTE reports
+
+The refreshed 2025–26 Student Information reports support a separate CTE
+Membership reconciliation for reporting districts and the direct Texas
+report. The all-grade denominator is Total Students in Membership. The grades
+9–12 denominator sums the four published Membership grade counts. The
+`teadata.tprs_students.reconcile_cte_membership` reader uses the reviewed grid
+and retains the original count, rate and denominator cells with their source
+positions. Where a grade-restricted denominator is zero and TEA prints `0.0%`,
+the reconciled rate is undefined and the printed token remains available. A
+zero count with a positive denominator can still produce an observed rate of
+zero. Programs can overlap. See the [TPRS glossary, p. 39](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/comprehensive-tprs-glossary.pdf#page=39).
+
+The retained district census includes 1,202 reports and one direct Texas
+report. It reproduces 2,309 rates with nonzero denominators and preserves 97
+grade-restricted zero-denominator displays. District numerators and denominators
+reconcile to both direct Texas totals. The existing released field inventory
+above remains tied to its original source vintage. The refreshed campus reports
+and publication of CTE as native fields require separate qualification.
+
 The catalog read used to resolve live coverage was offline and opened metadata,
 not observations. Original-source replay and retained HTML/XLSX witnesses have
 separate receipts. **Authenticated production continuity export remains

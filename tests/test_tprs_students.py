@@ -1,6 +1,7 @@
 from copy import deepcopy
 from dataclasses import replace
 from datetime import datetime, timezone
+from decimal import Decimal
 import gzip
 from hashlib import sha256
 from html import escape
@@ -129,6 +130,37 @@ def parse(grid, **kwargs):
     scope, identifier = kwargs.pop("scope", "district"), kwargs.pop("identifier", "001902")
     return students.parse_student_report(html(report_rows(grid, scope, identifier, **kwargs)),
                                          scope=scope, identifier=identifier, contract=grid)
+
+
+@pytest.mark.parametrize("scope,identifier", [("district", "001902"), ("state", "S")])
+def test_reconcile_cte_membership_preserves_publisher_cells_and_zero_denominator(grid, scope, identifier):
+    rows = report_rows(grid, scope, identifier)
+    values = {"Total Students": ("16", "100.0%"), "Career and Technical Education": ("1", "6.3%"),
+              "Career and Technical Education (9-12 grades only)": ("0", "0.0%")}
+    values.update({f"Grade {grade}": ("0", "0.0%") for grade in range(9, 13)})
+    for row in rows:
+        if row[0] in values:
+            row[1:3] = values[row[0]]
+    report = students.parse_student_report(html(rows), scope=scope, identifier=identifier)
+    all_grades, secondary = students.reconcile_cte_membership(report)
+    assert (all_grades.count, all_grades.denominator, all_grades.rate.numeric) == (1, 16, Decimal("6.3"))
+    assert all_grades.rate_cell.raw == "6.3%" and all_grades.rate_cell.column == 3
+    assert secondary.count == 0 and secondary.denominator == 0 and secondary.rate.numeric is None
+    assert secondary.rate.status == ValueStatus.NOT_APPLICABLE and secondary.rate.raw == "0.0%"
+    assert [cell.label for cell in secondary.denominator_cells] == [f"Grade {grade}" for grade in range(9, 13)]
+
+    for tokens in (("*", "6.3%"), ("1", "6.2%"), ("9" * 4301, "6.3%")):
+        next(row for row in rows if row[0] == "Career and Technical Education")[1:3] = tokens
+        with pytest.raises(ContractError, match="CTE Membership"):
+            students.reconcile_cte_membership(students.parse_student_report(html(rows), scope=scope, identifier=identifier))
+    with pytest.raises(ContractError, match="reviewed"):
+        students.reconcile_cte_membership(replace(report, grid_sha256=""))
+    with pytest.raises(ContractError, match="Duplicate"):
+        students.reconcile_cte_membership(replace(report, cells=(*report.cells, all_grades.rate_cell)))
+    grade_nine = secondary.denominator_cells[0]
+    cells = tuple(replace(cell, raw="17") if cell is grade_nine else cell for cell in report.cells)
+    with pytest.raises(ContractError, match="exceeds the all-grade"):
+        students.reconcile_cte_membership(replace(report, cells=cells))
 
 
 def receipt(store, tmp_path, raw, *, identifier="001902", scope="district", overrides=None, legacy=False, parents=()):
