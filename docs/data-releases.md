@@ -9,6 +9,11 @@ A build records the files it actually reads. The runtime catalog is embedded in 
 
 ## Current normal release 0.0.175
 
+TEA Data software 0.0.176 keeps this data selection. It can explicitly open
+a composed release that adds qualified native editions to a pinned entity
+core. The composed manifest and the core manifest each retain their own
+identity. See [how to compose a release](#add-native-editions-without-rebuilding-the-entity-artifacts).
+
 The [pinned normal release](https://github.com/adpena/teadata/releases/download/v0.0.175/release.json) adds the 2018–19 through 2021–22 PEIMS
 Staff FTE and Salary reports for districts and Texas. All 31 earlier native
 attachments retain their identities. Staff FTE, reported total base pay
