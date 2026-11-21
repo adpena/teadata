@@ -7,7 +7,16 @@ A build records the files it actually reads. The runtime catalog is embedded in 
 <a id="current-normal-release-00163"></a>
 <a id="current-normal-release-00164"></a>
 
-## Current normal release 0.0.172
+## Current normal release 0.0.173
+
+The [pinned normal release](https://github.com/adpena/teadata/releases/download/v0.0.173/release.json) exposes 2025–26 STAAR All Grades and
+2023–24 through 2025–26 STAAR End-of-Course at campus, district, ESC region
+and Texas scope. The 29 earlier attachments retain their identities.
+Use the [statewide comparison API](querying.md#compare-a-published-measure-with-texas)
+for reviewed accountability-subset results. Consult the
+[coverage inventory](source-integration-status.md) for report and field periods.
+
+## Prior normal release 0.0.172
 
 The [pinned normal release](https://github.com/adpena/teadata/releases/download/v0.0.172/release.json)
 adds 2022–23 and 2023–24 statewide campus transfer reports, completing

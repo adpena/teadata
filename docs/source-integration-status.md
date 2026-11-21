@@ -1,23 +1,33 @@
 # Source integration status
 
-The packaged selector identifies **normal data release 0.0.172**. This is a
-frozen analysis release, not a live TEA feed. Software publication and
-application deployment are separate gates; historical requests keep their pins.
-The [machine inventory](source-integration-status-0.0.172.json), generated from
-the qualified normal parent on November 19, 2026, records
+The packaged selector identifies **normal data release 0.0.173**. This is a
+frozen analysis release. Software publication and application deployment are
+separate gates. Historical requests keep their pins.
+The [machine inventory](source-integration-status-0.0.173.json), generated from
+the normal parent on November 20, 2026, records
 127 registered IDs, 279 configured editions,
-13 base inputs and 29 native attachments covering 34 dataset IDs and
-323 edition/scope keys. Registration is not
-acquisition, semantic qualification or query access.
+13 base inputs and 31 native attachments covering 42 dataset IDs and
+339 edition/scope keys. Registration, acquisition, qualification and query
+access are separate statuses.
 
-- Manifest: `4ab4ae37901ecd5a12c758132384e4b7e68d39e01bea922f10f8cdf2affa1a78`.
-- Build: `b8f09da7d384866b44324cd1c6e43bf9fb7d1febcf67a7b6c23023fad0746a0c`.
-- Processing record: `545e06a712435f5c3ae39c4af2f2321977a5b091ae34572986bbdeab54a33f17`.
+- Manifest: `f615653415db314ed40324408ae792b03e5976234d6baa142e308a29142fbe66`.
+- Build: `211acd03164d56d09ccbde8025c67e35f3cfdc6898a84fe106ae3b5a025e4c21`.
+- Processing record: `20c81e7135417787def2ef13dd37d40b803a6e9a482f652278785f61ab99582c`.
+
+## STAAR publisher assessment rates
+
+The normal release includes 2025–26 All Grades and 2023–24 through 2025–26
+End-of-Course at campus, district, ESC region and direct Texas scopes.
+Statewide comparison uses the reviewed accountability-subset rates and
+matches the same report year. Independent named records were reconciled
+for each included report edition and scope. Other physical columns keep
+their source and export identity. Cross-year scientific comparability and
+inferred denominators remain outside this qualification.
 
 ## Campus transfer report coverage
 
 The normal catalog covers all six statewide campus transfer reports from
-2020–21 through 2025–26. This release adds 2022–23 and 2023–24 with 279,340
+2020–21 through 2025–26. Release 0.0.172 added 2022–23 and 2023–24 with 279,340
 and 297,734 publisher rows. All 27 earlier native attachments and 13 base
 inputs keep their source identities. The default at campus scope remains
 2025–26.
@@ -105,12 +115,16 @@ individual definitions, units, population, revisions and source links.
 
 | Native dataset | Report editions | Scopes | Bound field periods |
 | --- | --- | --- | --- |
+| `campus_tapr_staar_all_grades` | 2026 | campus | SY ending 2026 |
+| `campus_tapr_staar_end_of_course` | 2024–2026 | campus | SY ending 2024–2026 |
 | `campus_tapr_staff_profile` | 2025 | campus | SY ending 2025 |
 | `campus_transfer_reports` | 2021–2026 | campus | SY ending 2021–2026 |
+| `district_tapr_staar_all_grades` | 2026 | district | SY ending 2026 |
+| `district_tapr_staar_end_of_course` | 2024–2026 | district | SY ending 2024–2026 |
 | `district_tapr_staff_profile` | 2025 | district | SY ending 2025 |
 | `district_transfer_reports` | 2013–2026 | district | SY ending 2013–2026 |
-| `educator_district_new_hires` | 5 | district | SY ending 2010–2026 |
 | `educator_district_new_hires_by_epp` | 5 | district | SY ending 2010–2026 |
+| `educator_district_new_hires` | 5 | district | SY ending 2010–2026 |
 | `educator_state_initial_certification_principal` | 2026-09 | state | Academic years ending 2016–2026 |
 | `educator_state_initial_certification_superintendent` | 2026-09 | state | Academic years ending 2016–2026 |
 | `educator_state_initial_certification_teacher` | 2026-09 | state | Academic years ending 2016–2026 |
@@ -118,8 +132,8 @@ individual definitions, units, population, revisions and source links.
 | `educator_state_retention_by_demographic_group` | 2026-04 | state | First-teaching cohorts ending 2014–2025 |
 | `educator_state_retention_by_gender` | 2026-04 | state | First-teaching cohorts ending 2014–2025 |
 | `educator_state_retention_by_preparation_route` | 2026-04 | state | First-teaching cohorts ending 2014–2017, 2019–2025 |
-| `facility_usage` | 2026 | district | SY ending 2026 |
 | `facility_usage_submission` | 2026 | district | SY ending 2026 |
+| `facility_usage` | 2026 | district | SY ending 2026 |
 | `first_financial_accountability_district` | 2026 | district | FY ending 2025 |
 | `first_financial_accountability_university_charter` | 2026 | district | FY ending 2025 |
 | `frc_per_pupil_expenditure` | 2025 | campus, district, state | FY ending 2025 |
@@ -129,9 +143,13 @@ individual definitions, units, population, revisions and source links.
 | `peims_staff_fte_and_salary` | 2023–2026 | district, state | SY ending 2023–2026 |
 | `peims_student_enrollment_by_ethnicity` | 2019–2026 | campus, district, state | SY ending 2019–2026 |
 | `peims_student_programs_and_special_populations` | 2023–2026 | campus, district, state | SY ending 2023–2026 |
+| `region_tapr_staar_all_grades` | 2026 | region | SY ending 2026 |
+| `region_tapr_staar_end_of_course` | 2024–2026 | region | SY ending 2024–2026 |
 | `region_tapr_staff_profile` | 2025 | region | SY ending 2025 |
 | `region_tapr_student_profile` | 2025 | region | SY ending 2024–2025 |
 | `spp_timely_initial_evaluation` | 2025–2026 | district | SY ending 2024–2025 |
+| `state_tapr_staar_all_grades` | 2026 | state | SY ending 2026 |
+| `state_tapr_staar_end_of_course` | 2024–2026 | state | SY ending 2024–2026 |
 | `state_tapr_staff_profile` | 2025 | state | SY ending 2025 |
 | `summary_of_finances_attendance` | 47422 | district | SY ending 2026 |
 | `summary_of_finances_dpe` | 47422 Near Final | district-keyed LEA recipients | Field-specific school/tax years and as-of dates; see contract |
