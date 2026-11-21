@@ -595,6 +595,29 @@ def test_source_query_string_uses_the_same_native_filter(tmp_path):
                        params={'ids': ['001001', '001002']}).select('membership').to_arrow().num_rows == 2
 
 
+def test_pandas_style_source_query_preserves_boolean_precedence_and_replays(tmp_path):
+    release, _, key, _ = fixture_release(
+        tmp_path, damage="normalized", schema_version=4, first_membership="0", last_enrollment="A&B|C",
+    )
+    expression = 'district_number == @first | membership >= @minimum & ~(enrollment == "11" | enrollment == "A&B|C")'
+    table = release.table(key)
+    view = table[["membership"]].query(
+        expression, params={"first": "001001", "minimum": 17}, record=True,
+    )
+    rows = view.to_arrow()
+    enrollment = table["enrollment"]
+    inline = table[
+        (table["district_number"] == "001001")
+        | ((table["membership"] >= 17) & ~((enrollment == "11") | (enrollment == "A&B|C")))
+    ][["membership"]]
+    assert inline.to_arrow().equals(rows)
+    assert rows["district_number"].to_pylist() == ["001001"]
+    assert rows["membership"].to_pylist() == [0]
+    document = view.provenance().to_dict()
+    assert document["selector"]["query_replay"]["queries"][0]["expression"] == expression
+    assert ExportProvenance.from_dict(document).replay_table(release).to_arrow().equals(rows)
+
+
 @pytest.mark.parametrize(("expression", "expected"), [
     ("membership == 0", ["001001"]),
     ("membership is None", ["001002"]),
@@ -682,6 +705,7 @@ def test_query_exact_thresholds_preserve_nulls_and_native_numeric_ranges():
     "__import__('os').system('echo unsafe')", 'membership.__class__ == 1',
     'membership + 1 == 2', 'membership > @unknown', 'membership > None',
     'membership in [x for x in range(10)]', 'membership == @ value',
+    'membership > 0 & enrollment.strip() == "11"', 'membership == (1 | 2)', '~membership == 0',
 ])
 def test_source_query_rejects_unsupported_syntax_before_leaf_io(tmp_path, monkeypatch, expression):
     release, _, key, _ = fixture_release(tmp_path)

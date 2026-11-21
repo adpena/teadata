@@ -617,7 +617,21 @@ frame = table.query(
 ```
 
 Use comparisons, `and`, `or`, `not`, `in`, `not in`, `is None` and
-`is not None`. Field names are canonical identifiers. Membership follows
+`is not None`. Pandas-style `&` and `|` also combine conditions. Comparisons
+bind first, followed by `&` and then `|`. Use `~(condition)` for negation.
+
+```python
+selected = table.query(
+    "membership_total_students_count >= @minimum & ~(district_number in @excluded)",
+    params={"minimum": 1_000, "excluded": ["001001"]},
+)
+same_selection = table[
+    (table["membership_total_students_count"] >= 1_000)
+    & ~table["district_number"].isin(["001001"])
+]
+```
+
+Field names are canonical identifiers. Membership follows
 Arrow's `.isin()` behavior. To exclude nulls from a negated membership test,
 also add `field is not None`. Query strings and total parameter use each have
 an 8 KiB limit. Parameters accept only scalar values and bounded membership

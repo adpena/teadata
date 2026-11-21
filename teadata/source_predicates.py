@@ -23,6 +23,7 @@ _QUERY_BYTES = 8192
 _SCALARS = (str, int, float, bool, Decimal)
 _COMPARE = {ast.Eq: eq, ast.NotEq: ne, ast.Lt: lt, ast.LtE: le, ast.Gt: gt, ast.GtE: ge}
 _REVERSE = {eq: eq, ne: ne, lt: gt, le: ge, gt: lt, ge: le}
+_BOOLEAN_OPERATORS = {"&": "and", "|": "or"}
 
 
 @dataclass(frozen=True, slots=True)
@@ -129,6 +130,8 @@ def prepare_predicate(expression: str, params: Mapping[str, object] | None, *, r
                 if name.type != tokenize.NAME or not name.string.isascii() or name.start != token.end:
                     raise ValueError("Expected an explicit @parameter name")
                 source.append((tokenize.NAME, _PARAMETER + name.string))
+            elif token.type == tokenize.OP and token.string in _BOOLEAN_OPERATORS:
+                source.append((tokenize.NAME, _BOOLEAN_OPERATORS[token.string]))
             else:
                 source.append((token.type, token.string))
         parsed = tokenize.untokenize(source).strip()
@@ -306,7 +309,7 @@ def prepare_predicate(expression: str, params: Mapping[str, object] | None, *, r
             children = list(map(predicate, node.values))
             combine = and_ if isinstance(node.op, ast.And) else or_
             return lambda schema: reduce(combine, (child(schema) for child in children))
-        if isinstance(node, ast.UnaryOp) and isinstance(node.op, ast.Not):
+        if isinstance(node, ast.UnaryOp) and isinstance(node.op, (ast.Not, ast.Invert)):
             child = predicate(node.operand)
             return lambda schema: ~child(schema)
         if isinstance(node, ast.Name) and not node.id.startswith(_PARAMETER):
