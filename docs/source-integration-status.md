@@ -162,10 +162,11 @@ individual definitions, units, population, revisions and source links.
 | `peims_college_credit` | 2022–2026 | district, region, state | SY ending 2022–2026 |
 | `peims_financial_single_file_budgets` | 2026 | district | FY ending 2026 |
 | `peims_special_education_by_primary_disability` | 2013–2026 | district, state | SY ending 2013–2026 |
-| `peims_staff_fte_and_salary` | 2019–2026 | district, state | SY ending 2019–2026 |
+| `peims_staff_fte_and_salary` | 2019–2026 | district | SY ending 2019–2026 |
+| `peims_staff_fte_and_salary` | 2013–2026 | state | SY ending 2013–2026 |
 | `peims_student_enrollment_by_ethnicity` | 2019–2026 | campus, district, state | SY ending 2019–2026 |
 | `peims_student_programs_and_special_populations` | 2023–2026 | campus, district, state | SY ending 2023–2026 |
-| `peims_teacher_course_enrollment` | 2019–2026 | district, state | SY ending 2019–2026 |
+| `peims_teacher_course_enrollment` | 2013–2026 | district, state | SY ending 2013–2026 |
 | `region_tapr_staar_all_grades` | 2026 | region | SY ending 2026 |
 | `region_tapr_staar_end_of_course` | 2024–2026 | region | SY ending 2024–2026 |
 | `region_tapr_staff_profile` | 2025 | region | SY ending 2025 |

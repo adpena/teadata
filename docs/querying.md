@@ -313,7 +313,7 @@ SQL tables. For ad hoc DuckDB queries, register the series' Arrow batches.
 
 ### Filter a multidimensional series
 
-On the development branch, `ObservationSeries.query()` applies the same source
+Starting with 0.0.179, `ObservationSeries.query()` applies the same source
 predicate to every pinned year. It validates the predicate against the selected
 schemas before reading observations. Course, district and year remain separate
 columns. You can retain the exact filter in every source receipt with `record=True`.

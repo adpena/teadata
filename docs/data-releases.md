@@ -7,7 +7,19 @@ A build records the files it actually reads. The runtime catalog is embedded in 
 <a id="current-normal-release-00163"></a>
 <a id="current-normal-release-00164"></a>
 
-## Current normal release 0.0.177
+## Current normal data release 0.0.178
+
+The [pinned data release](https://github.com/adpena/teadata/releases/download/v0.0.178/release.json)
+extends PEIMS Teacher FTE and Course Enrollment to 2012–13 for districts and
+Texas. Earlier Staff FTE and Salary editions extend the direct Texas series to
+2012–13. The early district staffing reports remain under review. See the
+[current source integration inventory](source-integration-status.md) for
+exact report coverage and qualifications.
+
+TEA Data software 0.0.179 uses the same 0.0.178 data manifest and adds recorded
+filters for multi-year source selections. See the [series query example](querying.md#filter-a-multidimensional-series).
+
+## Prior normal release 0.0.177
 
 The [pinned normal release](https://github.com/adpena/teadata/releases/download/v0.0.177/release.json) adds
 PEIMS Teacher FTE and Course Enrollment reports for Texas and districts from
