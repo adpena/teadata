@@ -41,6 +41,21 @@ GRADE_LABELS = frozenset({
     "NOT APPLICABLE", "PRE-KINDERGARTEN", "SECONDARY (GRADES 7-12)",
 })
 
+_2016_DISTRICT_FTE_ERROR_SHA256 = "052d99852c6a1c3f7620e3c3c1a9cedfa9d4282faa27f01727836b559f20b65d"
+_2016_DISTRICT_FTE_ERROR_ROWS = frozenset({45960, 45961, 45982, 114547, 114553, 115212, 115213, 143231, 143259})
+
+
+def course_grade_labels(year: int | None) -> frozenset[str]:
+    if year == 2013:
+        return GRADE_LABELS | {"PRE-KINDERGARTEN/KINDERGARTEN"}
+    return GRADE_LABELS
+
+
+def course_teacher_fte_error_rows(year: int, scope: str, digest: str) -> frozenset[int]:
+    if (year, scope, digest) == (2016, "district", _2016_DISTRICT_FTE_ERROR_SHA256):
+        return _2016_DISTRICT_FTE_ERROR_ROWS
+    return frozenset()
+
 
 def course_field_names(scope: str) -> tuple[str, ...]:
     return ("source_scope", "aggregation_level", "school_year", *_GEO_FIELDS[scope],

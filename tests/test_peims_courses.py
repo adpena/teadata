@@ -15,7 +15,8 @@ from teadata.analytical import write_leaf_artifact
 from teadata.dataset_metadata import ArtifactRef, DatasetMetadata, EditionKey, ReferenceDocument, ResolvedDataset
 from teadata.export_provenance import ExportProvenance
 from teadata.manifest import BuildRecorder, ContractError, canonical_json
-from teadata.peims_course_sources import DATASET, course_csv_preamble
+from teadata.native_courses import _compare_batch
+from teadata.peims_course_sources import DATASET, course_csv_preamble, course_teacher_fte_error_rows
 from teadata.provenance import ProvenanceStore
 from teadata.release import DataRelease, publish_release
 from teadata.teadata_config import load_config
@@ -90,6 +91,44 @@ def test_native_course_batches_preserve_codes_precision_and_masks(tmp_path, scop
     assert table["course_enrollment_count"].to_pylist() == [None, 0]
     assert table["peims_raw_course_enrollment_count"].to_pylist() == ["-999", "0"]
     assert table["peims_status_course_enrollment_count"].to_pylist() == ["suppressed", "observed"]
+
+
+def test_teacher_fte_error_admission_is_pinned_to_the_reviewed_extract():
+    digest = "052d99852c6a1c3f7620e3c3c1a9cedfa9d4282faa27f01727836b559f20b65d"
+    assert len(course_teacher_fte_error_rows(2016, "district", digest)) == 9
+    assert not course_teacher_fte_error_rows(2016, "district", "0" * 64)
+    assert not course_teacher_fte_error_rows(2016, "campus", digest)
+    assert not course_teacher_fte_error_rows(2017, "district", digest)
+
+
+@pytest.mark.parametrize("change", [None, "moved", "omitted", "extra", "lowercase", "wrong_field"])
+def test_reviewed_fte_error_preserves_raw_invalid_and_rejects_other_cells(tmp_path, monkeypatch, change):
+    monkeypatch.setattr(courses, "course_teacher_fte_error_rows", lambda *args: frozenset({10}))
+    geo = ["STATE", "COUNTYREGIONDISTRICT", "2025-2026", "001902", "CAYUGA ISD", "TRADITIONAL ISD/CSD", "07"]
+    first = [*geo, "ART", "00123456", "ART, GRADE 2", "GRADE 2", "1", "ERROR", "0", "0", "-999"]
+    second = [*geo, "ART", "00123457", "ART, GRADE 3", "GRADE 3", "1", "0", "0", "0", "0"]
+    if change in {"moved", "omitted"}:
+        first[12] = "0"
+    if change in {"moved", "extra"}:
+        second[12] = "ERROR"
+    if change == "lowercase":
+        first[12] = "error"
+    if change == "wrong_field":
+        first[11] = "ERROR"
+    path, selection = _raw_source(tmp_path, "district", [first, second])
+    if change:
+        with pytest.raises(ContractError, match="row positions|numeric token"):
+            list(courses._batches(path, selection))
+        return
+    (batch,) = courses._batches(path, selection)
+    assert batch["teacher_fte_count"].to_pylist() == [None, Decimal("0.00")]
+    assert batch["peims_raw_teacher_fte_count"].to_pylist() == ["ERROR", "0"]
+    assert batch["peims_status_teacher_fte_count"].to_pylist() == ["invalid", "observed"]
+    assert _compare_batch([first, second], batch, "district", 10, teacher_fte_error_rows=frozenset({10})) == 1
+    column = batch.schema.get_field_index("peims_status_teacher_fte_count")
+    damaged = batch.set_column(column, batch.schema.field(column), pa.array(["suppressed", "observed"]))
+    with pytest.raises(ContractError, match="measure status differs"):
+        _compare_batch([first, second], damaged, "district", 10, teacher_fte_error_rows=frozenset({10}))
 
 
 @pytest.mark.parametrize(("damage", "match"), [

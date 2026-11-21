@@ -218,6 +218,22 @@ returned 59 course rows for A+ Academy Elementary (`057829001`) in 2023–24.
 The [selection receipt](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/a5d05dd3d90060f054d41962f18d8df08e73ff37ee0f1477469102597256632e.json)
 records how TEA resolved that campus number.
 
+### 2012–13 through 2017–18 archive
+
+The early source contracts retain direct Texas and statewide district
+editions. Their CSV footers print `-9999999`, while the course enrollment
+cells use `-999` and the matching direct Texas HTML displays `N/A`.
+The parser preserves the literal source token and physical row. The
+2012–13 grade label `PRE-KINDERGARTEN/KINDERGARTEN` is preserved as printed.
+
+In the 2015–16 district extract, nine teacher FTE cells contain `ERROR`.
+All nine values also appear in the individual TEA district reports. The
+numeric field is null, the status is `invalid`, and the raw field retains
+`ERROR`. The exception is bound to the exact district extract and physical
+row positions. Suppressed course enrollment and observed zero remain
+distinct. The released 0.0.177 selector continues to open 2018–19 through
+2025–26. The early archive is qualified separately before publication.
+
 ### Build and verify a course candidate
 
 The 2018–19 through 2021–22 archive registers publisher source layouts for

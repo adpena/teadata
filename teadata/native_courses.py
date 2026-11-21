@@ -23,7 +23,7 @@ from .dataset_metadata import DataPeriod, EditionKey
 from .manifest import ContractError, canonical_json
 from .peims_course_sources import (
     BROKER, COURSE_FACT_UNITS, CSV_HEADERS, DATASET, ENCODING, SELECTOR, SOURCE_RECORD,
-    course_column_support, course_csv_preamble, course_field_names,
+    course_column_support, course_csv_preamble, course_field_names, course_teacher_fte_error_rows,
 )
 from .peims_courses import COURSE_RECIPE, _admit
 from .provenance import ProvenanceStore
@@ -36,8 +36,9 @@ pc: Any = arrow_compute
 PASS_COURSE_CONTROLS = "PASS_REVIEWED_PEIMS_COURSE_CONTROLS"
 HOLD_CAMPUS_GEOGRAPHY = "HOLD_PEIMS_CAMPUS_GEOGRAPHY"
 REVIEWED_STATE_DISTRICT_COURSES = {
-    "dd77af2bda817efb97341685afc2683b0c1fd0ea17ebd1f1d5dffb06f1de9866": range(2019, 2023),
-    "8f0448c7f85db9b8afc0897951e2850d35c8a5cdd31abeed7c323bd348a5507f": range(2023, 2027),
+    digest: range(*bounds) for digest, bounds in json.loads(
+        files("teadata").joinpath("reference_cases/native_peims_course_releases.json").read_text()
+    ).items()
 }
 _BATCH_ROWS = 4096
 _MAX_LINE_BYTES = 8192
@@ -73,11 +74,16 @@ def _raw_batches(path: Path, year: int, scope: str, count: int) -> Iterator[list
         _check_footer([row for row in footer if row], year, "csv")
 
 
-def _typed_measure(raw: pa.Array, status: pa.Array, value: pa.Array, index: int) -> None:
+def _typed_measure(raw: pa.Array, status: pa.Array, value: pa.Array, index: int,
+                   fte_error: pa.Array | None = None) -> None:
     suppressed = pc.equal(raw, "-999")
     if index != 4 and pc.any(suppressed).as_py():
         raise ContractError(f"Unexpected course masking token for {_MEASURE_FIELDS[index]}")
     expected_status = pc.if_else(suppressed, ValueStatus.SUPPRESSED.value, ValueStatus.OBSERVED.value)
+    unavailable = suppressed
+    if fte_error is not None:
+        expected_status = pc.if_else(fte_error, ValueStatus.INVALID.value, expected_status)
+        unavailable = pc.or_(suppressed, fte_error)
     if not status.equals(expected_status):
         raise ContractError(f"Course measure status differs for {_MEASURE_FIELDS[index]}")
     if index in (1, 3):
@@ -88,14 +94,15 @@ def _typed_measure(raw: pa.Array, status: pa.Array, value: pa.Array, index: int)
         if value.type != pa.int64():
             raise ContractError(f"Course count is not int64 for {_MEASURE_FIELDS[index]}")
         pattern = r"^[0-9]+$"
-    if not pc.all(pc.or_(suppressed, pc.match_substring_regex(raw, pattern))).as_py():
+    if not pc.all(pc.or_(unavailable, pc.match_substring_regex(raw, pattern))).as_py():
         raise ContractError(f"Course raw value is unreviewed for {_MEASURE_FIELDS[index]}")
-    expected_value = pc.cast(pc.if_else(suppressed, None, raw), value.type, safe=True)
+    expected_value = pc.cast(pc.if_else(unavailable, None, raw), value.type, safe=True)
     if not value.equals(expected_value):
         raise ContractError(f"Course normalized value differs for {_MEASURE_FIELDS[index]}")
 
 
-def _compare_batch(rows: list[list[str]], native: pa.RecordBatch, scope: str, first: int) -> int:
+def _compare_batch(rows: list[list[str]], native: pa.RecordBatch, scope: str, first: int, *,
+                   teacher_fte_error_rows: frozenset[int] = frozenset()) -> int:
     if native.num_rows != len(rows):
         raise ContractError("Course raw and native batch sizes differ")
     raw = list(zip(*rows, strict=True))
@@ -111,7 +118,13 @@ def _compare_batch(rows: list[list[str]], native: pa.RecordBatch, scope: str, fi
         archived = pa.array(tokens, type=pa.string())
         if not native[f"peims_raw_{name}"].equals(archived):
             raise ContractError(f"Course raw measure differs for {name} at source line {first}")
-        _typed_measure(archived, native[f"peims_status_{name}"], native[name], index)
+        invalid = None
+        if name == "teacher_fte_count" and teacher_fte_error_rows:
+            invalid = pc.equal(archived, "ERROR")
+            positions = {first + offset for offset in pc.indices_nonzero(invalid).to_pylist()}
+            if positions != {line for line in teacher_fte_error_rows if first <= line < first + len(rows)}:
+                raise ContractError("Course teacher FTE ERROR physical row positions differ")
+        _typed_measure(archived, native[f"peims_status_{name}"], native[name], index, invalid)
         masked += pc.sum(pc.equal(archived, "-999")).as_py()
     return masked
 
@@ -277,13 +290,18 @@ def _campus_witness(store: ProvenanceStore, identifier: str, year: int, campus: 
 
 def _replay(release: DataRelease, store: ProvenanceStore, witnesses: ProvenanceStore,
             config: Config, key: EditionKey, review: dict[str, Any]) -> dict[str, Any]:
+    year = int(key.edition)
+    if key.scope == "district":
+        required = {"105906"} if 2023 <= year <= 2025 else {"057829", "105906"}
+        if missing := required.difference(review):
+            raise ContractError("Course district controls require the reviewed publisher witnesses: "
+                                + ", ".join(sorted(missing)))
     variables = list(release.catalog.variables(edition=key))
     (plan,) = release.catalog.resolve_artifacts((key, row["field"]) for row in variables)
     ref = plan["artifact"]
     (acquisition,) = release.catalog.acquisitions(key.dataset, edition=key)
     receipt_id = acquisition["record_id"]
     contract = ref.contract
-    year = int(key.edition)
     reviewed = _admit(config, config, store, year, key.scope)
     metadata = release.catalog.metadata(key.dataset, edition=key)
     if (receipt_id != reviewed.receipt or [reviewed.digest] != contract["inputs"]
@@ -320,17 +338,23 @@ def _replay(release: DataRelease, store: ProvenanceStore, witnesses: ProvenanceS
         raise ContractError("Course native leaf grain, crosswalk or period differs")
 
     source = store.verify_artifact(reviewed.digest)
+    error_rows = course_teacher_fte_error_rows(year, key.scope, reviewed.digest)
     html_reviews = review["html"] if key.scope == "campus" else review
     district_csv_reviews = review["district_csv"] if key.scope == "campus" else {}
     selections: dict[str, list[list[str]]] = {name: [] for name in html_reviews} if key.scope != "state" else {}
     district_slices: dict[str, list[list[str]]] = {name: [] for name in district_csv_reviews}
     selection_position = 5 if key.scope == "campus" else 3
+    affected_districts: set[str] = set()
     rows = masked = 0
     with pq.ParquetFile(release.artifact(ref.identity)) as leaf:
         original = _raw_batches(source, year, key.scope, contract["rows"])
         for raw, native in zip(original, leaf.iter_batches(batch_size=_BATCH_ROWS, use_threads=False), strict=True):
-            masked += _compare_batch(raw, native, key.scope, rows + 10)
+            first = rows + 10
+            masked += _compare_batch(raw, native, key.scope, first, teacher_fte_error_rows=error_rows)
             rows += len(raw)
+            if error_rows:
+                affected_districts.update(raw[position - first][3] for position in error_rows
+                                          if first <= position < first + len(raw))
             for row in raw if selections or district_slices else ():
                 if (selected := selections.get(row[selection_position])) is not None:
                     selected.append(row)
@@ -338,13 +362,16 @@ def _replay(release: DataRelease, store: ProvenanceStore, witnesses: ProvenanceS
                     district_slice.append(row)
     if rows != contract["rows"]:
         raise ContractError("Course native and source record counts differ")
+    if affected_without_witness := affected_districts.difference(selections):
+        raise ContractError("Course teacher FTE errors require a publisher witness for every affected district: "
+                            + ", ".join(sorted(affected_without_witness)))
 
     controls: list[dict[str, Any]] = []
     if key.scope == "state":
         html, evidence = _open_report(witnesses, review["html"], year, "html")
-        published = _course_rows(_html_rows(html, year), "html")
+        published = _course_rows(_html_rows(html, year), "html", year=year)
         original_rows = [row[3:] for block in _raw_batches(source, year, key.scope, rows) for row in block]
-        if evidence["sha256"] in contract["inputs"] or published != _course_rows(original_rows, "csv"):
+        if evidence["sha256"] in contract["inputs"] or published != _course_rows(original_rows, "csv", year=year):
             raise ContractError("Course statewide HTML witness differs from the native leaf's source")
         controls.append({**evidence, "rows": rows})
     for district, original_rows in selections.items() if key.scope == "district" else ():
@@ -352,8 +379,10 @@ def _replay(release: DataRelease, store: ProvenanceStore, witnesses: ProvenanceS
             raise ContractError(f"Course district witness {district} is absent from the bulk source")
         _, name, charter, region = original_rows[0][3:7]
         displayed, evidence = _district_witness(witnesses, review[district], year, district, name, charter, region)
+        error_courses = frozenset(row[8] for row in original_rows if row[12] == "ERROR") if error_rows else frozenset()
         if (evidence["sha256"] in contract["inputs"] or any(row[4:7] != [name, charter, region] for row in original_rows)
-                or _course_rows(displayed, "html") != _course_rows([row[7:] for row in original_rows], "csv")):
+                or _course_rows(displayed, "html", year=year, teacher_fte_errors=error_courses)
+                != _course_rows([row[7:] for row in original_rows], "csv", year=year, teacher_fte_errors=error_courses)):
             raise ContractError(f"Course district HTML witness {district} differs from the native leaf's source")
         controls.append({**evidence, "district_number": district, "rows": len(displayed)})
     for campus, original_rows in selections.items() if key.scope == "campus" else ():
@@ -365,6 +394,8 @@ def _replay(release: DataRelease, store: ProvenanceStore, witnesses: ProvenanceS
               "rows": rows, "masked_cells": masked, "raw_cells": rows * len(CSV_HEADERS[key.scope]),
               "publisher_witnesses": controls,
               "publisher_compared_cells": sum(item["rows"] for item in controls) * len(_MEASURE_FIELDS)}
+    if error_rows:
+        result["invalid_teacher_fte_cells"] = len(error_rows)
     if key.scope == "campus":
         district_csv_witnesses = [_district_campus_witness(witnesses, district_csv_reviews[district], year, district, raw)
                                   for district, raw in district_slices.items()]
@@ -423,5 +454,5 @@ def qualify_reviewed_state_district_courses(
     coverage = [(row["edition"]["edition"], row["edition"]["scope"]) for row in report["editions"]]
     expected = {(str(year), scope) for year in years for scope in ("state", "district")}
     if report["status"] != PASS_COURSE_CONTROLS or len(coverage) != len(expected) or set(coverage) != expected:
-        raise ContractError("The course source requires all eight reviewed Texas and district editions")
+        raise ContractError("The course source requires the complete reviewed Texas and district editions")
     return {**report, "status": "PASS_REVIEWED_NATIVE", "source_replay_status": report["status"]}

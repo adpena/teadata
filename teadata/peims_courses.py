@@ -17,8 +17,9 @@ from .column_schema import crosswalk_dataset, parse_column_schema, reader_option
 from .dataset_metadata import ArtifactRef, DataPeriod, DatasetMetadata, EditionKey, ResolvedDataset
 from .manifest import BuildRecorder, ContractError, canonical_json, file_identity
 from .peims_course_sources import (
-    COURSE_FACT_UNITS, CSV_HEADERS, DATASET, ENCODING, GRADE_LABELS, SOURCE_RECORD,
-    course_column_support, course_csv_preamble, matches_course_header, open_course_report,
+    COURSE_FACT_UNITS, CSV_HEADERS, DATASET, ENCODING, SOURCE_RECORD,
+    course_column_support, course_csv_preamble, course_grade_labels, course_teacher_fte_error_rows,
+    matches_course_header, open_course_report,
 )
 from .provenance import ProvenanceStore, validate_reference_records
 from .teadata_config import load_config, load_config_bytes
@@ -99,11 +100,14 @@ def _admit(config: Config, canonical: Config, store: ProvenanceStore, year: int,
     metadata = source.metadata
     policy = config.value_policies.get(metadata.value_policy)
     rule = None if policy is None else policy.tokens.get("-999")
+    error_rule = None if policy is None else policy.tokens.get("error")
+    expected_tokens = {"-999", "error"} if year == 2016 else {"-999"}
     if (not config.is_source_only(DATASET, year) or metadata != canonical_source.metadata or metadata.version != str(year)
             or metadata.period != DataPeriod("school_year", year - 1, year) or metadata.provenance_ids
             or {key: metric.unit for key, metric in metadata.metrics.items()} != COURSE_FACT_UNITS
             or policy != canonical.value_policies.get(canonical_source.metadata.value_policy)
-            or policy is None or set(policy.tokens) != {"-999"} or rule is None or rule.status != ValueStatus.SUPPRESSED):
+            or policy is None or set(policy.tokens) != expected_tokens or rule is None or rule.status != ValueStatus.SUPPRESSED
+            or (year == 2016 and (error_rule is None or error_rule.status != ValueStatus.INVALID))):
         raise ContractError("PEIMS course source requires the exact period, units and masking policy")
     if (not table or table != reviewed or not matches_course_header(table, scope)
             or table["metric_period"] != metadata.period.to_dict()):
@@ -174,6 +178,8 @@ def _batches(path: Path, source: _CourseSource) -> Iterator[pa.RecordBatch]:
     seen_courses: set[str] = set()
     geography_keys = _GEOGRAPHY_KEYS[source.scope]
     geography_context = _GEOGRAPHY_CONTEXT[source.scope]
+    grade_labels = pa.array(sorted(course_grade_labels(source.year)))
+    error_rows = course_teacher_fte_error_rows(source.year, source.scope, source.digest)
     with pa.memory_map(str(path)) as archive, archive.get_stream(offset, size) as body:
         with arrow_csv.open_csv(body,
             read_options=arrow_csv.ReadOptions(column_names=names, encoding=ENCODING, block_size=_CSV_BLOCK_BYTES,
@@ -188,7 +194,7 @@ def _batches(path: Path, source: _CourseSource) -> Iterator[pa.RecordBatch]:
                                     ("school_year", source.source.metadata.period.label)):
                     require(pc.equal(values[name], token), "PEIMS course row differs from its selected scope or year")
                 require(pc.match_substring_regex(values["course_code"], r"^[A-Z0-9]{8}$"), "Malformed course code")
-                require(pc.is_in(values["grade_level"], value_set=pa.array(sorted(GRADE_LABELS))), "Unreviewed course grade label")
+                require(pc.is_in(values["grade_level"], value_set=grade_labels), "Unreviewed course grade label")
                 for name in ("subject", "course_title"):
                     require(pc.match_substring_regex(values[name], r"\S"), "Blank PEIMS course subject or title")
                 runs = [(batch.num_rows, None)]
@@ -229,15 +235,23 @@ def _batches(path: Path, source: _CourseSource) -> Iterator[pa.RecordBatch]:
                     if len(seen_courses) != old_count + width:
                         raise ContractError("Duplicate PEIMS course code within the selected geography")
                     start = stop
+                end = next_record + batch.num_rows
                 for name, unit in COURSE_FACT_UNITS.items():
                     raw = values[name]
                     numeric = pc.match_substring_regex(raw, r"^[0-9]+(?:\.[0-9]{2})?$" if unit == "fte" else r"^[0-9]+$")
                     allowed = pc.or_(numeric, pc.equal(raw, "-999")) if name == "course_enrollment_count" else numeric
+                    unavailable = ValueStatus.SUPPRESSED.value
+                    if name == "teacher_fte_count" and error_rows:
+                        invalid = pc.equal(raw, "ERROR")
+                        positions = {next_record + index for index in pc.indices_nonzero(invalid).to_pylist()}
+                        if positions != {line for line in error_rows if next_record <= line < end}:
+                            raise ContractError("PEIMS district teacher FTE ERROR row positions differ from the reviewed extract")
+                        allowed = pc.or_(numeric, invalid)
+                        unavailable = ValueStatus.INVALID.value
                     require(allowed, f"Unreviewed PEIMS course numeric token in {name}")
                     values[name] = pc.cast(pc.if_else(numeric, raw, pa.scalar(None, pa.string())), schema.field(name).type)
                     values[support[name]["raw"]] = raw
-                    values[support[name]["status"]] = pc.if_else(numeric, ValueStatus.OBSERVED.value, ValueStatus.SUPPRESSED.value)
-                end = next_record + batch.num_rows
+                    values[support[name]["status"]] = pc.if_else(numeric, ValueStatus.OBSERVED.value, unavailable)
                 values[SOURCE_RECORD] = pa.array(range(next_record, end), type=pa.int64())
                 yield pa.RecordBatch.from_arrays([values[name] for name in schema.names], schema=schema)
                 next_record = end

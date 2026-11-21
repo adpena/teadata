@@ -1000,6 +1000,15 @@ value_policies:
       '-999':
         status: suppressed
         reason: ferpa_primary_or_complementary_mask_no_documented_count_bounds
+  peims_course_csv_2016:
+    reference_id: course_criteria
+    tokens:
+      '-999':
+        status: suppressed
+        reason: ferpa_primary_or_complementary_mask_no_documented_count_bounds
+      'ERROR':
+        status: invalid
+        reason: publisher_literal_teacher_fte_error
   peims_staff_csv:
     reference_id: staff_definition
     tokens:
@@ -19164,6 +19173,203 @@ data_sources:
               district: 23488
 
   peims_teacher_course_enrollment:
+    2013:
+      metadata:
+        metrics: &peims_course_early_metrics
+          teacher_head_count:
+            field: teacher_head_count
+            unit: count
+          teacher_fte_count:
+            field: teacher_fte_count
+            unit: fte
+          contract_teacher_head_count:
+            field: contract_teacher_head_count
+            unit: count
+          contract_teacher_fte_count:
+            field: contract_teacher_fte_count
+            unit: fte
+          course_enrollment_count:
+            field: course_enrollment_count
+            unit: count
+        notes: Course enrollment is course membership on the reporting date. Published
+          CSVs use -999 for masking despite the older footer naming -9999999. Independent
+          Texas HTML displays N/A for those cells. This edition predates charter partner
+          teacher FTE inclusion. The captures postdate the September 2026 regeneration.
+          Publisher finality is unspecified.
+        period:
+          kind: school_year
+          start_year: 2012
+          end_year: 2013
+        publisher: Texas Education Agency
+        references: &peims_course_early_references
+        - reference_id: course_criteria
+          role: methodology
+          status: available
+          title: TEA teacher FTE and course enrollment criteria and masking notes
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/About_TeacherFTE_Enroll.html
+          reviewed_sha256: 441b25b52cc377b02bd97832834f59814bac453a458de3b91d1f77e90be0a1f6
+          provenance_ids:
+          - 3f0a9a11c39e00dbada1e7017aba382afe7b859bd142a00c0d3b2125752f6b10
+        - reference_id: course_selector
+          role: source_notes
+          status: available
+          title: TEA Teacher FTE and Course Enrollment report selector
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html
+          reviewed_sha256: 97ee5b421b145440663aa58ac65af7ba38785cd5268397c407439ab33306cdd5
+          provenance_ids:
+          - 67a39bd274e492426111703a32278ad84a63cb5db037963779e18d5147da80a1
+        - reference_id: column_crosswalk
+          role: schema
+          status: available
+          title: Reviewed PEIMS course CSV positional crosswalk and physical framing
+          path: schemas/peims--2013-2018--teacher-course-enrollment-crosswalk.json
+          reviewed_sha256: 008d4f128455bb69611d9ac198bbb2f1f1007f4d8d1674c3c5275e2c87e1c175
+          provenance_ids:
+          - 75926ed11d9ab001c6d1948bf9c6756db9623cf3d879c1d90303f08701814437
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html
+        title: 2012–13 PEIMS Teacher FTE and Course Enrollment
+        value_policy: peims_course_csv
+        version: '2013'
+      path: data/peims/2013/peims_teacher_course_enrollment.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2018--teacher-course-enrollment-crosswalk.json
+            acquisition_ids:
+              state: 12939453d8fc53178eff06b73cbd1adc57cdc045a32285a74f75e7ae592f4232
+              district: 58297602b9cd012e0f853eff30d30103041abb67c22caded664dcbb61329585a
+    2014:
+      metadata:
+        metrics: *peims_course_early_metrics
+        notes: Course enrollment is course membership on the reporting date. Published
+          CSVs use -999 for masking despite the older footer naming -9999999. Independent
+          Texas HTML displays N/A for those cells. This edition predates charter partner
+          teacher FTE inclusion. The captures postdate the September 2026 regeneration.
+          Publisher finality is unspecified.
+        period:
+          kind: school_year
+          start_year: 2013
+          end_year: 2014
+        publisher: Texas Education Agency
+        references: *peims_course_early_references
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html
+        title: 2013–14 PEIMS Teacher FTE and Course Enrollment
+        value_policy: peims_course_csv
+        version: '2014'
+      path: data/peims/2014/peims_teacher_course_enrollment.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2018--teacher-course-enrollment-crosswalk.json
+            acquisition_ids:
+              state: b56971ca6c3810b46a45008a4b520afd83f69736305c97797be988801777b418
+              district: 6200fe7d22ce4f3b099fa7d2caa791622d1b0c49c6ebf430faec9222224d14b4
+    2015:
+      metadata:
+        metrics: *peims_course_early_metrics
+        notes: Course enrollment is course membership on the reporting date. Published
+          CSVs use -999 for masking despite the older footer naming -9999999. Independent
+          Texas HTML displays N/A for those cells. This edition predates charter partner
+          teacher FTE inclusion. The captures postdate the September 2026 regeneration.
+          Publisher finality is unspecified.
+        period:
+          kind: school_year
+          start_year: 2014
+          end_year: 2015
+        publisher: Texas Education Agency
+        references: *peims_course_early_references
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html
+        title: 2014–15 PEIMS Teacher FTE and Course Enrollment
+        value_policy: peims_course_csv
+        version: '2015'
+      path: data/peims/2015/peims_teacher_course_enrollment.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2018--teacher-course-enrollment-crosswalk.json
+            acquisition_ids:
+              state: 65df24063a9f805ed43992cce6a2cc9e1bc6697503cf54555724d07b7d050379
+              district: 10b021daacf3bf7d8457853cddf62c72f77a59420bff6d794385ac62ba78acc1
+    2016:
+      metadata:
+        metrics: *peims_course_early_metrics
+        notes: Course enrollment is course membership on the reporting date. Published
+          CSVs use -999 for masking despite the older footer naming -9999999. Independent
+          Texas HTML displays N/A for those cells. This edition predates charter partner
+          teacher FTE inclusion. The captures postdate the September 2026 regeneration.
+          Publisher finality is unspecified. The district file prints ERROR in nine teacher
+          FTE cells. The raw literal is preserved with status invalid and a null numeric
+          value. Direct Texas has no such cells.
+        period:
+          kind: school_year
+          start_year: 2015
+          end_year: 2016
+        publisher: Texas Education Agency
+        references: *peims_course_early_references
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html
+        title: 2015–16 PEIMS Teacher FTE and Course Enrollment
+        value_policy: peims_course_csv_2016
+        version: '2016'
+      path: data/peims/2016/peims_teacher_course_enrollment.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2018--teacher-course-enrollment-crosswalk.json
+            acquisition_ids:
+              state: 817443151dc9d017ca11aa6cd52ae068922f090caf18a4bb1721e818905e273b
+              district: 5f4dd6f21dd3b056c12aedf8eb6b6271b7dd5d7af26023785ee228446f2856db
+    2017:
+      metadata:
+        metrics: *peims_course_early_metrics
+        notes: Course enrollment is course membership on the reporting date. Published
+          CSVs use -999 for masking despite the older footer naming -9999999. Independent
+          Texas HTML displays N/A for those cells. This edition predates charter partner
+          teacher FTE inclusion. The captures postdate the September 2026 regeneration.
+          Publisher finality is unspecified.
+        period:
+          kind: school_year
+          start_year: 2016
+          end_year: 2017
+        publisher: Texas Education Agency
+        references: *peims_course_early_references
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html
+        title: 2016–17 PEIMS Teacher FTE and Course Enrollment
+        value_policy: peims_course_csv
+        version: '2017'
+      path: data/peims/2017/peims_teacher_course_enrollment.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2018--teacher-course-enrollment-crosswalk.json
+            acquisition_ids:
+              state: 315a089218674e13cab1125af9628e2e8f349f4b6de3d84d91ef356b6fb28b23
+              district: 71500e59a41d6227a4b71c7fce33c8ffd7e108b7d577cccd7e9989ad655ec2ef
+    2018:
+      metadata:
+        metrics: *peims_course_early_metrics
+        notes: Course enrollment is course membership on the reporting date. Published
+          CSVs use -999 for masking despite the older footer naming -9999999. Independent
+          Texas HTML displays N/A for those cells. This edition predates charter partner
+          teacher FTE inclusion. The captures postdate the September 2026 regeneration.
+          Publisher finality is unspecified.
+        period:
+          kind: school_year
+          start_year: 2017
+          end_year: 2018
+        publisher: Texas Education Agency
+        references: *peims_course_early_references
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html
+        title: 2017–18 PEIMS Teacher FTE and Course Enrollment
+        value_policy: peims_course_csv
+        version: '2018'
+      path: data/peims/2018/peims_teacher_course_enrollment.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2018--teacher-course-enrollment-crosswalk.json
+            acquisition_ids:
+              state: b17b97db3baca9eb2c03d0a527b14cf38506dbb2878fabfc7ba2ef04cc939cdf
+              district: aa7b1fc9e1833fa46d893b271aa18c2f3577322c8123fc9fddcedb894c1a4004
     2019:
       metadata:
         metrics:

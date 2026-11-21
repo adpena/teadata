@@ -80,8 +80,16 @@ def test_course_replay_rejects_candidate_owned_replacement_receipt(monkeypatch):
     release.catalog.acquisitions.return_value = [{"record_id": "b" * 64}]
     monkeypatch.setattr("teadata.native_courses._admit", lambda *args: SimpleNamespace(receipt="c" * 64))
     with pytest.raises(ContractError, match="packaged source edition and scope"):
-        _replay(release, store, witnesses, config, key, {})
+        _replay(release, store, witnesses, config, key, {"057829": "a", "105906": "b"})
     store.verify_record_closure.assert_not_called()
+
+
+def test_early_course_replay_requires_both_ordinary_district_controls():
+    release = Mock()
+    key = EditionKey(DATASET, "2016", "a" * 64, "district", "district", "district and course")
+    with pytest.raises(ContractError, match="105906"):
+        _replay(release, Mock(), Mock(), Mock(), key, {"057829": "a"})
+    release.catalog.variables.assert_not_called()
 
 
 def test_campus_blocks_match_values_without_reassigning_conflicting_headings(monkeypatch):
