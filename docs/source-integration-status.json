@@ -1,26 +1,26 @@
 {
   "schema_version": 1,
-  "observed_at": "2026-11-21T06:00:55.842103+00:00",
+  "observed_at": "2026-11-21T16:23:33.390874+00:00",
   "generator": {
-    "software_version": "0.0.175",
+    "software_version": "0.0.177",
     "working_source_sha256": {
       "scripts/source_inventory.py": "68a90e79a7066867c3604e2a304ab650c59591389e2eb00c0234e035c7a7893a",
-      "teadata/release_inventory.py": "5f6e4cbac970e08d71b2d5713ce1eb0cf3e4944b0adedd41e01fed6d20196cce",
-      "teadata/release.py": "cdce1593d10a5113732e90ae8698cf92ac14b6ea1fe0f32826a5097c94b422c7",
+      "teadata/release_inventory.py": "5436b1384f986756c0e896de08a817bcadef902a1e5ad0514ee7249a580a1359",
+      "teadata/release.py": "13e2410deeea0186e74bf88035bf5c0ff5535610889cd695042ee7091ab7cdc7",
       "teadata/teadata_config.py": "df0ddde32572e3f43d245f07fbb7640eabedf9a8bfccfc068fdc3c8e3c498b24"
     }
   },
-  "config_sha256": "215dd97196cc740835435dcf83887b1862a8214a3f11c71df02bc3a4eb85327f",
+  "config_sha256": "8cef0d1778455cf76359743a6f472dd3dd625b65ec4f5510f8db8a40d1a5e8a6",
   "scope": "Configuration registration and selected catalog metadata only. No observation, source acquisition or qualification replay.",
   "summary": {
     "registered_ids": 127,
-    "registered_editions": 279,
+    "registered_editions": 283,
     "source_only_ids": 114,
-    "source_only_ids_not_attached": 77,
+    "source_only_ids_not_attached": 76,
     "base_inputs": 13,
-    "native_attachments": 32,
-    "native_dataset_ids": 42,
-    "native_edition_scope_keys": 347
+    "native_attachments": 34,
+    "native_dataset_ids": 43,
+    "native_edition_scope_keys": 363
   },
   "registration": [
     {
@@ -1569,21 +1569,41 @@
       "dataset": "peims_teacher_course_enrollment",
       "section": "data_sources",
       "registered_editions": [
+        2019,
+        2020,
+        2021,
+        2022,
         2023,
         2024,
         2025,
         2026
       ],
       "source_only_editions": [
+        2019,
+        2020,
+        2021,
+        2022,
         2023,
         2024,
         2025,
         2026
       ],
       "base_input_present": false,
-      "native_attachment_present": false,
-      "attached_report_editions": [],
-      "attached_scopes": []
+      "native_attachment_present": true,
+      "attached_report_editions": [
+        "2019",
+        "2020",
+        "2021",
+        "2022",
+        "2023",
+        "2024",
+        "2025",
+        "2026"
+      ],
+      "attached_scopes": [
+        "district",
+        "state"
+      ]
     },
     {
       "dataset": "rda_special_education_indicator1",
@@ -2306,9 +2326,10 @@
   "selected_catalog": {
     "schema_version": 1,
     "release": {
-      "source": "https://github.com/adpena/teadata/releases/download/v0.0.175/release.json",
-      "manifest_sha256": "2a19e22760af8da443af29a38d01d7d9c13f65095fd739e78bb7a0a1dc345f1b",
-      "build_id": "31038e45f324b824e1d7f27dee4e1c6e001d5d770013bd710c1e9eda7ca0d368"
+      "source": "https://github.com/adpena/teadata/releases/download/v0.0.177/release.json",
+      "manifest_sha256": "f8d4252072def12409c7d39d4573aceb4ebe46d2dda3712b58c136c9d7009fa9",
+      "build_id": "31038e45f324b824e1d7f27dee4e1c6e001d5d770013bd710c1e9eda7ca0d368",
+      "core_manifest_sha256": "2a19e22760af8da443af29a38d01d7d9c13f65095fd739e78bb7a0a1dc345f1b"
     },
     "include_variables": true,
     "metadata_inspected": true,
@@ -7363,6 +7384,77 @@
         ]
       },
       {
+        "location": "native-8f0448c7f85db9b8afc0897951e2850d35c8a5cdd31abeed7c323bd348a5507f.json",
+        "manifest_sha256": "8f0448c7f85db9b8afc0897951e2850d35c8a5cdd31abeed7c323bd348a5507f",
+        "build_id": "2513034fe7d7a19065a122360868b616eba7ea954ecf8d6791c7cf9e4bf37c73",
+        "editions": [
+          {
+            "dataset": "peims_teacher_course_enrollment",
+            "edition": "2026",
+            "revision_sha256": "beeda9da46d6f805fd16cf070dbaa3e2a9bf4a54d03b9d9d6427050408c231c0",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year and course_code"
+          },
+          {
+            "dataset": "peims_teacher_course_enrollment",
+            "edition": "2024",
+            "revision_sha256": "b35df37d5340d57b89d9e4e8682a703920b256142514d2c02fafd145375b1542",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number and course_code"
+          },
+          {
+            "dataset": "peims_teacher_course_enrollment",
+            "edition": "2024",
+            "revision_sha256": "5ae59d3411bf76fa63310b153a9a82f79f04fa037590737878c68fb67c333131",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year and course_code"
+          },
+          {
+            "dataset": "peims_teacher_course_enrollment",
+            "edition": "2026",
+            "revision_sha256": "2acc9e3ad77c84bb130407264b2ec567217d3c710a56473fe0b6baae51b4d717",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number and course_code"
+          },
+          {
+            "dataset": "peims_teacher_course_enrollment",
+            "edition": "2023",
+            "revision_sha256": "edf1f5c3d998715a3e1531d2562ea794a91587d0e562606b0f664773f90ffb6b",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year and course_code"
+          },
+          {
+            "dataset": "peims_teacher_course_enrollment",
+            "edition": "2023",
+            "revision_sha256": "8303e40ead7fa3dd36edd90c1a5e012e30a20933acec8eb46d95f3113040025b",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number and course_code"
+          },
+          {
+            "dataset": "peims_teacher_course_enrollment",
+            "edition": "2025",
+            "revision_sha256": "ac5114792947049b66f74c59abe08e036a03dc5cb516206cd6fdc6076bc08f6a",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year and course_code"
+          },
+          {
+            "dataset": "peims_teacher_course_enrollment",
+            "edition": "2025",
+            "revision_sha256": "c35a8a4e893ee975548f4262adfc2ab9ba945f7c090a811494ac6e9f5f75145a",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number and course_code"
+          }
+        ]
+      },
+      {
         "location": "native-b399e271381f944ec3844d435f8e110c3c83049bdd75421e4eaa87e3ffd217c2.json",
         "manifest_sha256": "b399e271381f944ec3844d435f8e110c3c83049bdd75421e4eaa87e3ffd217c2",
         "build_id": "8ea6fbb29a4593753f3ff61aa8d380d1a5784f3ab6c89681061bd663e459ccc2",
@@ -7471,6 +7563,77 @@
             "grain": "one publisher row per district_number and staff_category and staff_role"
           }
         ]
+      },
+      {
+        "location": "native-dd77af2bda817efb97341685afc2683b0c1fd0ea17ebd1f1d5dffb06f1de9866.json",
+        "manifest_sha256": "dd77af2bda817efb97341685afc2683b0c1fd0ea17ebd1f1d5dffb06f1de9866",
+        "build_id": "432a332ceb4b38d5c28b6266ba22dc37fb36323a790a9704d751964703a33c01",
+        "editions": [
+          {
+            "dataset": "peims_teacher_course_enrollment",
+            "edition": "2021",
+            "revision_sha256": "c66510c71ca8737263234bd49936e64e655cd7da7a898d04c4979a62b4584919",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number and course_code"
+          },
+          {
+            "dataset": "peims_teacher_course_enrollment",
+            "edition": "2019",
+            "revision_sha256": "598b1e6d138bf297d40babd55e60ee474a06bb9640912b9ca5b5edcffa913da0",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number and course_code"
+          },
+          {
+            "dataset": "peims_teacher_course_enrollment",
+            "edition": "2019",
+            "revision_sha256": "84436731e77f41806164d0a5a3a743336a33712da37ae2c87ce19927d49c61e3",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year and course_code"
+          },
+          {
+            "dataset": "peims_teacher_course_enrollment",
+            "edition": "2020",
+            "revision_sha256": "6776ccc3190d99a5523f174abb002341acd3872bdbd61224bc49a72ff91f0137",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number and course_code"
+          },
+          {
+            "dataset": "peims_teacher_course_enrollment",
+            "edition": "2021",
+            "revision_sha256": "230fab2f8a71d59808b779f87d75ed9db656c396aad38b2b347bebabfb91eb87",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year and course_code"
+          },
+          {
+            "dataset": "peims_teacher_course_enrollment",
+            "edition": "2022",
+            "revision_sha256": "13ec5dd3e5df654b959170fd50b5b0febd12aa8af10424047283e308a9b7b0f8",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year and course_code"
+          },
+          {
+            "dataset": "peims_teacher_course_enrollment",
+            "edition": "2020",
+            "revision_sha256": "c4854828489c5e070731b4a3ff4328df7e5b17d8ddfa0a1fcb0a6aecf54a9981",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per school_year and course_code"
+          },
+          {
+            "dataset": "peims_teacher_course_enrollment",
+            "edition": "2022",
+            "revision_sha256": "e1dd626dd8a9ee1f6c12a6a9dae0433d371408548deea33a3435f8106baa4d97",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per school_year and district_number and course_code"
+          }
+        ]
       }
     ],
     "editions": [
@@ -7513,6 +7676,67 @@
               "ethnicity",
               "gender",
               "preparation_route"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "015e06799c2ec0ce93eef91045872a2642a797e1b53324ca1dfa50cbb96c687b",
+        "dataset": "peims_teacher_course_enrollment",
+        "edition": "2026",
+        "revision_sha256": "beeda9da46d6f805fd16cf070dbaa3e2a9bf4a54d03b9d9d6427050408c231c0",
+        "scope": "state",
+        "table": "state",
+        "grain": "one publisher row per school_year and course_code",
+        "title": "2025–26 PEIMS Teacher FTE and Course Enrollment",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2025,
+          "end_year": 2026
+        },
+        "source_qualifiers": null,
+        "variable_count": 12,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "count",
+            "fields": [
+              "contract_teacher_head_count",
+              "course_enrollment_count",
+              "teacher_head_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "fte",
+            "fields": [
+              "contract_teacher_fte_count",
+              "teacher_fte_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "aggregation_level",
+              "course_code",
+              "course_title",
+              "grade_level",
+              "school_year",
+              "source_scope",
+              "subject"
             ]
           }
         ]
@@ -10338,6 +10562,71 @@
               "region_number",
               "service_code",
               "service_description"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "0be7d8d2690dc2901d34d0bad47e17ca38ede71f0fee239b302e0562a1848125",
+        "dataset": "peims_teacher_course_enrollment",
+        "edition": "2024",
+        "revision_sha256": "b35df37d5340d57b89d9e4e8682a703920b256142514d2c02fafd145375b1542",
+        "scope": "district",
+        "table": "district",
+        "grain": "one publisher row per school_year and district_number and course_code",
+        "title": "2023–24 PEIMS Teacher FTE and Course Enrollment",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2023,
+          "end_year": 2024
+        },
+        "source_qualifiers": null,
+        "variable_count": 16,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2023,
+              "end_year": 2024
+            },
+            "unit": "count",
+            "fields": [
+              "contract_teacher_head_count",
+              "course_enrollment_count",
+              "teacher_head_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2023,
+              "end_year": 2024
+            },
+            "unit": "fte",
+            "fields": [
+              "contract_teacher_fte_count",
+              "teacher_fte_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "aggregation_level",
+              "charter_status",
+              "course_code",
+              "course_title",
+              "district_name",
+              "district_number",
+              "grade_level",
+              "region_number",
+              "school_year",
+              "source_scope",
+              "subject"
             ]
           }
         ]
@@ -13338,6 +13627,67 @@
         ]
       },
       {
+        "edition_id": "27b94ebe439d5417e66fbbb2f563efc149cadc9cb9b4754962c64d06e23a17c6",
+        "dataset": "peims_teacher_course_enrollment",
+        "edition": "2024",
+        "revision_sha256": "5ae59d3411bf76fa63310b153a9a82f79f04fa037590737878c68fb67c333131",
+        "scope": "state",
+        "table": "state",
+        "grain": "one publisher row per school_year and course_code",
+        "title": "2023–24 PEIMS Teacher FTE and Course Enrollment",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2023,
+          "end_year": 2024
+        },
+        "source_qualifiers": null,
+        "variable_count": 12,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2023,
+              "end_year": 2024
+            },
+            "unit": "count",
+            "fields": [
+              "contract_teacher_head_count",
+              "course_enrollment_count",
+              "teacher_head_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2023,
+              "end_year": 2024
+            },
+            "unit": "fte",
+            "fields": [
+              "contract_teacher_fte_count",
+              "teacher_fte_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "aggregation_level",
+              "course_code",
+              "course_title",
+              "grade_level",
+              "school_year",
+              "source_scope",
+              "subject"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "282e294d0e5299aefed03567fe37a411aa284a433ae0e33b16ad584ef77fb571",
         "dataset": "peims_college_credit",
         "edition": "2025",
@@ -14678,6 +15028,71 @@
         ]
       },
       {
+        "edition_id": "33ba8067bbc28e8d5ca5bc864e6b650a47eb9e3afe3ab220a34ebdb4612eade1",
+        "dataset": "peims_teacher_course_enrollment",
+        "edition": "2021",
+        "revision_sha256": "c66510c71ca8737263234bd49936e64e655cd7da7a898d04c4979a62b4584919",
+        "scope": "district",
+        "table": "district",
+        "grain": "one publisher row per school_year and district_number and course_code",
+        "title": "2020–21 PEIMS Teacher FTE and Course Enrollment",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2020,
+          "end_year": 2021
+        },
+        "source_qualifiers": null,
+        "variable_count": 16,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2020,
+              "end_year": 2021
+            },
+            "unit": "count",
+            "fields": [
+              "contract_teacher_head_count",
+              "course_enrollment_count",
+              "teacher_head_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2020,
+              "end_year": 2021
+            },
+            "unit": "fte",
+            "fields": [
+              "contract_teacher_fte_count",
+              "teacher_fte_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "aggregation_level",
+              "charter_status",
+              "course_code",
+              "course_title",
+              "district_name",
+              "district_number",
+              "grade_level",
+              "region_number",
+              "school_year",
+              "source_scope",
+              "subject"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "33d4db0b260b76d2e00dc1b175a6e0f74fb30fd476bf87d89ea2d4067b5ce0cc",
         "dataset": "tprs_student_continuity",
         "edition": "2026",
@@ -15064,6 +15479,71 @@
               "region_number",
               "staff_category",
               "staff_role"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "384b3a97c8563ae1350d761e16f0e29a8faa7d444393645b16b9b6bc9ac7eba9",
+        "dataset": "peims_teacher_course_enrollment",
+        "edition": "2019",
+        "revision_sha256": "598b1e6d138bf297d40babd55e60ee474a06bb9640912b9ca5b5edcffa913da0",
+        "scope": "district",
+        "table": "district",
+        "grain": "one publisher row per school_year and district_number and course_code",
+        "title": "2018–19 PEIMS Teacher FTE and Course Enrollment",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2018,
+          "end_year": 2019
+        },
+        "source_qualifiers": null,
+        "variable_count": 16,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2018,
+              "end_year": 2019
+            },
+            "unit": "count",
+            "fields": [
+              "contract_teacher_head_count",
+              "course_enrollment_count",
+              "teacher_head_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2018,
+              "end_year": 2019
+            },
+            "unit": "fte",
+            "fields": [
+              "contract_teacher_fte_count",
+              "teacher_fte_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "aggregation_level",
+              "charter_status",
+              "course_code",
+              "course_title",
+              "district_name",
+              "district_number",
+              "grade_level",
+              "region_number",
+              "school_year",
+              "source_scope",
+              "subject"
             ]
           }
         ]
@@ -15594,6 +16074,71 @@
               "reported_epp_assignment",
               "school_year_end",
               "school_year_label"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "3c7e23aedf6c7aed1f943b4953156a8f6899606f7d24fe4524114cb5c1722c8b",
+        "dataset": "peims_teacher_course_enrollment",
+        "edition": "2026",
+        "revision_sha256": "2acc9e3ad77c84bb130407264b2ec567217d3c710a56473fe0b6baae51b4d717",
+        "scope": "district",
+        "table": "district",
+        "grain": "one publisher row per school_year and district_number and course_code",
+        "title": "2025–26 PEIMS Teacher FTE and Course Enrollment",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2025,
+          "end_year": 2026
+        },
+        "source_qualifiers": null,
+        "variable_count": 16,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "count",
+            "fields": [
+              "contract_teacher_head_count",
+              "course_enrollment_count",
+              "teacher_head_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2025,
+              "end_year": 2026
+            },
+            "unit": "fte",
+            "fields": [
+              "contract_teacher_fte_count",
+              "teacher_fte_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "aggregation_level",
+              "charter_status",
+              "course_code",
+              "course_title",
+              "district_name",
+              "district_number",
+              "grade_level",
+              "region_number",
+              "school_year",
+              "source_scope",
+              "subject"
             ]
           }
         ]
@@ -23555,6 +24100,67 @@
         ]
       },
       {
+        "edition_id": "72a645ebd8f5e5ef50197501226d4f2151bf9b5b0c2f2dbcab71246a48ebcbb9",
+        "dataset": "peims_teacher_course_enrollment",
+        "edition": "2023",
+        "revision_sha256": "edf1f5c3d998715a3e1531d2562ea794a91587d0e562606b0f664773f90ffb6b",
+        "scope": "state",
+        "table": "state",
+        "grain": "one publisher row per school_year and course_code",
+        "title": "2022–23 PEIMS Teacher FTE and Course Enrollment",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2022,
+          "end_year": 2023
+        },
+        "source_qualifiers": null,
+        "variable_count": 12,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2022,
+              "end_year": 2023
+            },
+            "unit": "count",
+            "fields": [
+              "contract_teacher_head_count",
+              "course_enrollment_count",
+              "teacher_head_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2022,
+              "end_year": 2023
+            },
+            "unit": "fte",
+            "fields": [
+              "contract_teacher_fte_count",
+              "teacher_fte_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "aggregation_level",
+              "course_code",
+              "course_title",
+              "grade_level",
+              "school_year",
+              "source_scope",
+              "subject"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "7467c2bf82379f8b3a35464744336f157c74ff3e1f68c405ccf744a832465bfb",
         "dataset": "educator_state_retention_by_gender",
         "edition": "2026-04",
@@ -23805,6 +24411,71 @@
         ]
       },
       {
+        "edition_id": "776e06c984599b876aede1891609d501df624564ba82d7010ee6e892b2cb13f4",
+        "dataset": "peims_teacher_course_enrollment",
+        "edition": "2023",
+        "revision_sha256": "8303e40ead7fa3dd36edd90c1a5e012e30a20933acec8eb46d95f3113040025b",
+        "scope": "district",
+        "table": "district",
+        "grain": "one publisher row per school_year and district_number and course_code",
+        "title": "2022–23 PEIMS Teacher FTE and Course Enrollment",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2022,
+          "end_year": 2023
+        },
+        "source_qualifiers": null,
+        "variable_count": 16,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2022,
+              "end_year": 2023
+            },
+            "unit": "count",
+            "fields": [
+              "contract_teacher_head_count",
+              "course_enrollment_count",
+              "teacher_head_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2022,
+              "end_year": 2023
+            },
+            "unit": "fte",
+            "fields": [
+              "contract_teacher_fte_count",
+              "teacher_fte_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "aggregation_level",
+              "charter_status",
+              "course_code",
+              "course_title",
+              "district_name",
+              "district_number",
+              "grade_level",
+              "region_number",
+              "school_year",
+              "source_scope",
+              "subject"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "779360519f69bc9ddaaf1dc8f8958e063573c8ecf8c2f7d7274d8bd633193d5e",
         "dataset": "peims_staff_fte_and_salary",
         "edition": "2024",
@@ -23859,6 +24530,67 @@
               "region_number",
               "staff_category",
               "staff_role"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "77f002b00ee00dea9884a26fbb14657bd719f844dcba00c8e14405ecfc061412",
+        "dataset": "peims_teacher_course_enrollment",
+        "edition": "2019",
+        "revision_sha256": "84436731e77f41806164d0a5a3a743336a33712da37ae2c87ce19927d49c61e3",
+        "scope": "state",
+        "table": "state",
+        "grain": "one publisher row per school_year and course_code",
+        "title": "2018–19 PEIMS Teacher FTE and Course Enrollment",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2018,
+          "end_year": 2019
+        },
+        "source_qualifiers": null,
+        "variable_count": 12,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2018,
+              "end_year": 2019
+            },
+            "unit": "count",
+            "fields": [
+              "contract_teacher_head_count",
+              "course_enrollment_count",
+              "teacher_head_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2018,
+              "end_year": 2019
+            },
+            "unit": "fte",
+            "fields": [
+              "contract_teacher_fte_count",
+              "teacher_fte_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "aggregation_level",
+              "course_code",
+              "course_title",
+              "grade_level",
+              "school_year",
+              "source_scope",
+              "subject"
             ]
           }
         ]
@@ -33451,6 +34183,71 @@
         ]
       },
       {
+        "edition_id": "9af272608f9ef7d31395d088d17f802a24282f74bafb37f654bd57798eacb980",
+        "dataset": "peims_teacher_course_enrollment",
+        "edition": "2020",
+        "revision_sha256": "6776ccc3190d99a5523f174abb002341acd3872bdbd61224bc49a72ff91f0137",
+        "scope": "district",
+        "table": "district",
+        "grain": "one publisher row per school_year and district_number and course_code",
+        "title": "2019–20 PEIMS Teacher FTE and Course Enrollment",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2019,
+          "end_year": 2020
+        },
+        "source_qualifiers": null,
+        "variable_count": 16,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2019,
+              "end_year": 2020
+            },
+            "unit": "count",
+            "fields": [
+              "contract_teacher_head_count",
+              "course_enrollment_count",
+              "teacher_head_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2019,
+              "end_year": 2020
+            },
+            "unit": "fte",
+            "fields": [
+              "contract_teacher_fte_count",
+              "teacher_fte_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "aggregation_level",
+              "charter_status",
+              "course_code",
+              "course_title",
+              "district_name",
+              "district_number",
+              "grade_level",
+              "region_number",
+              "school_year",
+              "source_scope",
+              "subject"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "9dccdf168eb7400ed6eb5ff6337a3e1dcc04c7f099633c800e23a359634f84dc",
         "dataset": "tprs_student_continuity",
         "edition": "2026",
@@ -34266,6 +35063,67 @@
             "fields": [
               "first_teaching_school_year",
               "publisher_group"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "ac06c2d782e3320c4ac697e5d5628aa2cd385af1eb53b4de8bf6116168391250",
+        "dataset": "peims_teacher_course_enrollment",
+        "edition": "2021",
+        "revision_sha256": "230fab2f8a71d59808b779f87d75ed9db656c396aad38b2b347bebabfb91eb87",
+        "scope": "state",
+        "table": "state",
+        "grain": "one publisher row per school_year and course_code",
+        "title": "2020–21 PEIMS Teacher FTE and Course Enrollment",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2020,
+          "end_year": 2021
+        },
+        "source_qualifiers": null,
+        "variable_count": 12,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2020,
+              "end_year": 2021
+            },
+            "unit": "count",
+            "fields": [
+              "contract_teacher_head_count",
+              "course_enrollment_count",
+              "teacher_head_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2020,
+              "end_year": 2021
+            },
+            "unit": "fte",
+            "fields": [
+              "contract_teacher_fte_count",
+              "teacher_fte_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "aggregation_level",
+              "course_code",
+              "course_title",
+              "grade_level",
+              "school_year",
+              "source_scope",
+              "subject"
             ]
           }
         ]
@@ -39578,6 +40436,67 @@
         ]
       },
       {
+        "edition_id": "c0847f844a09dfa1713d5716337b94d4a6d994180c05a52ac6932e24d33e04f9",
+        "dataset": "peims_teacher_course_enrollment",
+        "edition": "2022",
+        "revision_sha256": "13ec5dd3e5df654b959170fd50b5b0febd12aa8af10424047283e308a9b7b0f8",
+        "scope": "state",
+        "table": "state",
+        "grain": "one publisher row per school_year and course_code",
+        "title": "2021–22 PEIMS Teacher FTE and Course Enrollment",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2021,
+          "end_year": 2022
+        },
+        "source_qualifiers": null,
+        "variable_count": 12,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2021,
+              "end_year": 2022
+            },
+            "unit": "count",
+            "fields": [
+              "contract_teacher_head_count",
+              "course_enrollment_count",
+              "teacher_head_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2021,
+              "end_year": 2022
+            },
+            "unit": "fte",
+            "fields": [
+              "contract_teacher_fte_count",
+              "teacher_fte_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "aggregation_level",
+              "course_code",
+              "course_title",
+              "grade_level",
+              "school_year",
+              "source_scope",
+              "subject"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "c12ed3f6d2e16afb56b92e4db94f829a3964661bfe6586db948a7135724ebd7e",
         "dataset": "peims_special_education_by_primary_disability",
         "edition": "2018",
@@ -43896,6 +44815,67 @@
         ]
       },
       {
+        "edition_id": "d79bf91b6ce19181278e852e6d67aabf857a956a7031b5580941de4ac4524cc1",
+        "dataset": "peims_teacher_course_enrollment",
+        "edition": "2025",
+        "revision_sha256": "ac5114792947049b66f74c59abe08e036a03dc5cb516206cd6fdc6076bc08f6a",
+        "scope": "state",
+        "table": "state",
+        "grain": "one publisher row per school_year and course_code",
+        "title": "2024–25 PEIMS Teacher FTE and Course Enrollment",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 12,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "contract_teacher_head_count",
+              "course_enrollment_count",
+              "teacher_head_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "fte",
+            "fields": [
+              "contract_teacher_fte_count",
+              "teacher_fte_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "aggregation_level",
+              "course_code",
+              "course_title",
+              "grade_level",
+              "school_year",
+              "source_scope",
+              "subject"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "d8785e5d11f9c78fb1c753ae496d490346220c8d99806ad794a55585e8bb92c9",
         "dataset": "tprs_class_size",
         "edition": "2026",
@@ -44380,6 +45360,67 @@
               "reporting_region_name",
               "school_year",
               "transfer_direction"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "df1062e5443b076316390fa3706a6080922789ee8533db17e7ef9e7568c53d2f",
+        "dataset": "peims_teacher_course_enrollment",
+        "edition": "2020",
+        "revision_sha256": "c4854828489c5e070731b4a3ff4328df7e5b17d8ddfa0a1fcb0a6aecf54a9981",
+        "scope": "state",
+        "table": "state",
+        "grain": "one publisher row per school_year and course_code",
+        "title": "2019–20 PEIMS Teacher FTE and Course Enrollment",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2019,
+          "end_year": 2020
+        },
+        "source_qualifiers": null,
+        "variable_count": 12,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2019,
+              "end_year": 2020
+            },
+            "unit": "count",
+            "fields": [
+              "contract_teacher_head_count",
+              "course_enrollment_count",
+              "teacher_head_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2019,
+              "end_year": 2020
+            },
+            "unit": "fte",
+            "fields": [
+              "contract_teacher_fte_count",
+              "teacher_fte_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "aggregation_level",
+              "course_code",
+              "course_title",
+              "grade_level",
+              "school_year",
+              "source_scope",
+              "subject"
             ]
           }
         ]
@@ -46943,6 +47984,71 @@
         ]
       },
       {
+        "edition_id": "eb8fc645d5b075d6955084bde97ac3ec94260007ffb489aae5caaedd87cebbfe",
+        "dataset": "peims_teacher_course_enrollment",
+        "edition": "2025",
+        "revision_sha256": "c35a8a4e893ee975548f4262adfc2ab9ba945f7c090a811494ac6e9f5f75145a",
+        "scope": "district",
+        "table": "district",
+        "grain": "one publisher row per school_year and district_number and course_code",
+        "title": "2024–25 PEIMS Teacher FTE and Course Enrollment",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2024,
+          "end_year": 2025
+        },
+        "source_qualifiers": null,
+        "variable_count": 16,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "count",
+            "fields": [
+              "contract_teacher_head_count",
+              "course_enrollment_count",
+              "teacher_head_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2024,
+              "end_year": 2025
+            },
+            "unit": "fte",
+            "fields": [
+              "contract_teacher_fte_count",
+              "teacher_fte_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "aggregation_level",
+              "charter_status",
+              "course_code",
+              "course_title",
+              "district_name",
+              "district_number",
+              "grade_level",
+              "region_number",
+              "school_year",
+              "source_scope",
+              "subject"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "ec0342e8fb4a6463251b2563c4c8cbf3dbb12e5035d92e1bcccc972ff35a5eba",
         "dataset": "campus_transfer_reports",
         "edition": "2026",
@@ -47357,6 +48463,71 @@
               "region_number",
               "school_year",
               "source_scope"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "f2625d3725701a636870d8964fc3a8ef46ca596aab02b301321e67098b1c583a",
+        "dataset": "peims_teacher_course_enrollment",
+        "edition": "2022",
+        "revision_sha256": "e1dd626dd8a9ee1f6c12a6a9dae0433d371408548deea33a3435f8106baa4d97",
+        "scope": "district",
+        "table": "district",
+        "grain": "one publisher row per school_year and district_number and course_code",
+        "title": "2021–22 PEIMS Teacher FTE and Course Enrollment",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adfte.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2021,
+          "end_year": 2022
+        },
+        "source_qualifiers": null,
+        "variable_count": 16,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2021,
+              "end_year": 2022
+            },
+            "unit": "count",
+            "fields": [
+              "contract_teacher_head_count",
+              "course_enrollment_count",
+              "teacher_head_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2021,
+              "end_year": 2022
+            },
+            "unit": "fte",
+            "fields": [
+              "contract_teacher_fte_count",
+              "teacher_fte_count"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "aggregation_level",
+              "charter_status",
+              "course_code",
+              "course_title",
+              "district_name",
+              "district_number",
+              "grade_level",
+              "region_number",
+              "school_year",
+              "source_scope",
+              "subject"
             ]
           }
         ]

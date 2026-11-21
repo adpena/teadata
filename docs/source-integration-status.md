@@ -1,18 +1,29 @@
 # Source integration status
 
-The packaged selector identifies **normal data release 0.0.175**. This is a
+The packaged selector identifies **normal data release 0.0.177**. This is a
 frozen analysis release. Software publication and application deployment are
 separate gates. Historical requests keep their pins.
-The [machine inventory](source-integration-status-0.0.175.json), generated from
-the normal parent on November 21, 2026, records
-127 registered IDs, 279 configured editions,
-13 base inputs and 32 native attachments covering 42 dataset IDs and
-347 edition/scope keys. Registration, acquisition, qualification and query
+The [machine inventory](source-integration-status-0.0.177.json), generated from
+the composed 0.0.177 manifest and current source configuration on November 21,
+2026, records
+127 registered IDs, 283 configured editions,
+13 base inputs and 34 native attachments covering 43 dataset IDs and
+363 edition/scope keys. Registration, acquisition, qualification and query
 access are separate statuses.
 
-- Manifest: `2a19e22760af8da443af29a38d01d7d9c13f65095fd739e78bb7a0a1dc345f1b`.
+- Manifest: `f8d4252072def12409c7d39d4573aceb4ebe46d2dda3712b58c136c9d7009fa9`.
+- Entity core manifest: `2a19e22760af8da443af29a38d01d7d9c13f65095fd739e78bb7a0a1dc345f1b`.
 - Build: `31038e45f324b824e1d7f27dee4e1c6e001d5d770013bd710c1e9eda7ca0d368`.
 - Processing record: `270ef47f9e8f3a2d7ce5057ae7c8c73061c4db88123cb64f47b2522cb7cb43bc`.
+
+## PEIMS teacher FTE and course enrollment
+
+Two attachments add statewide district and directly reported Texas data from
+2018–19 through 2025–26. The course code and scope are part of the grain, so
+the same student or teacher can contribute to several courses. Native leaves
+retain the raw publisher tokens, value statuses and source row locators.
+Earlier district years and campus affiliations stay outside this release.
+See the [course source notes](peims-sources.md#build-and-verify-a-course-candidate).
 
 ## Historical PEIMS staffing
 
@@ -152,6 +163,7 @@ individual definitions, units, population, revisions and source links.
 | `peims_staff_fte_and_salary` | 2019–2026 | district, state | SY ending 2019–2026 |
 | `peims_student_enrollment_by_ethnicity` | 2019–2026 | campus, district, state | SY ending 2019–2026 |
 | `peims_student_programs_and_special_populations` | 2023–2026 | campus, district, state | SY ending 2023–2026 |
+| `peims_teacher_course_enrollment` | 2019–2026 | district, state | SY ending 2019–2026 |
 | `region_tapr_staar_all_grades` | 2026 | region | SY ending 2026 |
 | `region_tapr_staar_end_of_course` | 2024–2026 | region | SY ending 2024–2026 |
 | `region_tapr_staff_profile` | 2025 | region | SY ending 2025 |
@@ -259,7 +271,8 @@ Frozen prior inventories remain available for
 [0.0.158](source-integration-status-0.0.158.json),
 [0.0.159](source-integration-status-0.0.159.json),
 [0.0.160](source-integration-status-0.0.160.json),
-[0.0.161](source-integration-status-0.0.161.json) and
-[0.0.163](source-integration-status-0.0.163.json).
+[0.0.161](source-integration-status-0.0.161.json),
+[0.0.163](source-integration-status-0.0.163.json) and
+[0.0.175](source-integration-status-0.0.175.json).
 The previous narrative is preserved in Git history; those historical counts
 must not be reused as the current selected release.

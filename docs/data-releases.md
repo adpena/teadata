@@ -7,7 +7,19 @@ A build records the files it actually reads. The runtime catalog is embedded in 
 <a id="current-normal-release-00163"></a>
 <a id="current-normal-release-00164"></a>
 
-## Current normal release 0.0.175
+## Current normal release 0.0.177
+
+The [pinned normal release](https://github.com/adpena/teadata/releases/download/v0.0.177/release.json) adds
+PEIMS Teacher FTE and Course Enrollment reports for Texas and districts from
+2018–19 through 2025–26. The two course attachments contain 1,631,873 report
+rows across 16 edition and scope combinations. Campus course data remain
+under review. This release composes the same 0.0.175 entity core and preserves
+its 32 native attachments. TEA Data 0.0.177 selects this manifest by default.
+See the [course source notes](peims-sources.md#build-and-verify-a-course-candidate).
+
+<a id="current-normal-release-00175"></a>
+
+## Prior normal release 0.0.175
 
 TEA Data software 0.0.176 keeps this data selection. It can explicitly open
 a composed release that adds qualified native editions to a pinned entity
