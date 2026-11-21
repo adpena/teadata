@@ -672,6 +672,34 @@ After materialization, the result supports pandas `.loc` and boolean
 indexing. Use [pandas `.query()`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.query.html)
 only with trusted expressions on that DataFrame because it can execute Python code.
 
+### Range filters and previews
+
+The development API adds `between()` and `head()` to regular and partitioned
+source views. A range accepts a canonical field name, two numeric or text
+bounds, and `inclusive="both"`, `"left"`, `"right"`, or `"neither"`.
+Use `Decimal` for exact decimal fields. Text ranges use publisher strings and
+compare lexicographically. Null rows are excluded.
+
+```python
+selected = table.between(
+    "membership_total_students_count", 1_000, 20_000,
+    inclusive="left", record=True,
+)
+preview = selected.head(5)
+```
+
+`between()` uses the same bound parameters and replay as `.query()`.
+`head(n)` returns an Arrow table of at most `n` rows in scan order. It closes
+the scan once it has enough rows. Limits must be nonnegative integers. The
+Arrow schema carries `teadata_preview` with the requested limit and
+`teadata_provenance` for the full selection. Use a full export to share that
+selection as a complete dataset.
+
+The preview bounds returned rows. Artifact verification and entity ID
+resolution can read more bytes. Preparing a single source can verify its
+artifact even for `head(0)`. Later partitions are unopened if the preview
+is complete.
+
 ## Compare a published measure with Texas
 
 `Query.compare_statewide()` selects the publisher's statewide observation for

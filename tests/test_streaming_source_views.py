@@ -1,10 +1,12 @@
 from contextlib import closing
+from decimal import Decimal
 import json
 
 import pyarrow as pa
 from pyarrow.dataset import field
 import pytest
 
+from teadata.export_provenance import ExportProvenance
 from teadata.release import DataRelease
 from teadata.source_views import _provenance_batches
 
@@ -15,6 +17,65 @@ from test_partitioned_series import routed_series as routed_series
 def receipt(view):
     value = view.provenance()
     return value if isinstance(value, dict) else value.to_dict()
+
+
+def test_range_retains_exact_endpoints_and_query_replay(tmp_path):
+    high = 2**53 + 1
+    fixture = make_edition_fixture(tmp_path, families=("student",), normalized=True, observed_amount=high)
+    release = DataRelease(fixture["root"], offline=True)
+    edition, _, _ = fixture["leaves"]["student"]
+    view = release.table(edition).select("amount")
+    for inclusive, expected in (
+        ("both", [0, high]), ("left", [0]), ("right", [high]), ("neither", []),
+    ):
+        selected = view.between("amount", 0, high, inclusive=inclusive, record=True)
+        assert selected.to_arrow()["amount"].to_pylist() == expected
+        proof = ExportProvenance.from_dict(receipt(selected))
+        assert proof.replay_table(release).to_arrow()["amount"].to_pylist() == expected
+    assert view.between("amount", Decimal(high) - Decimal("0.1"), Decimal(high)).head()["amount"].to_pylist() == [high]
+    assert view.between("amount", high, 0).head().num_rows == 0
+    assert view.to_arrow()["amount"].to_pylist() == [0, None, None, high]
+
+
+def test_partition_preview_stops_at_exact_boundary_and_marks_partial_result(routed_series, monkeypatch):
+    release, _ = routed_series
+    view = release.series("tprs_class_size", "amount", scope="campus", years=[25], ids=[2, 4, 102, 104]).for_year(25)
+    original = DataRelease._open_artifact
+    original_dataset = DataRelease.analytical_dataset
+    opened = set()
+
+    def open_leaf(self, identity):
+        opened.add(identity)
+        assert len(opened) == 1, "Preview requested a later partition"
+        return original(self, identity)
+
+    def open_dataset(self, identity):
+        opened.add(identity)
+        assert len(opened) == 1, "Preview requested a later partition"
+        return original_dataset(self, identity)
+
+    monkeypatch.setattr(DataRelease, "_open_artifact", open_leaf)
+    monkeypatch.setattr(DataRelease, "analytical_dataset", open_dataset)
+    empty = view.head(0)
+    assert empty.num_rows == 0 and "amount" in empty.schema.names
+    assert not opened
+    for invalid in (-1, True, 1.5):
+        with pytest.raises(ValueError, match="nonnegative integer"):
+            view.head(invalid)
+    with pytest.raises(ValueError, match="canonical source field"):
+        view.between("amount or other_field", 0, 2)
+    with pytest.raises(TypeError, match="numbers or publisher text"):
+        view.between("amount", False, 2)
+    with pytest.raises(ValueError, match="Range inclusive"):
+        view.between("amount", 0, 2, inclusive="invalid")
+    assert not opened
+    preview = view.head(2)
+    assert preview.num_rows == 2 and len(opened) == 1
+    assert json.loads(preview.schema.metadata[b"teadata_preview"]) == {"limit": 2, "provenance_scope": "full_selection"}
+    assert len(json.loads(preview.schema.metadata[b"teadata_provenance"])["partitions"]) == 2
+    opened.clear()
+    assert view.between("amount", 0, 2**63 - 1, record=True).head(1).num_rows == 1
+    assert len(opened) == 1
 
 
 def test_single_view_stream_is_lazy_filtered_exact_and_carries_receipt(tmp_path, monkeypatch):

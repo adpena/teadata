@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 import re
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any, BinaryIO, Generator, Iterator, Protocol, Self, overload
+from typing import TYPE_CHECKING, Any, BinaryIO, Generator, Iterator, Literal, Protocol, Self, overload
 
 from .dataset_metadata import ArtifactRef, DataPeriod, EditionKey
 from .identifiers import canonical_source_identifiers
@@ -32,6 +32,29 @@ if TYPE_CHECKING:
     from .release import DataRelease
     from .source_predicates import PreparedPredicate
     from .source_series import ObservationSeries
+
+
+_RangeBound = int | float | Decimal | str
+_RangeInclusive = Literal["both", "left", "right", "neither"]
+
+
+def _range_query(field: str, lower: _RangeBound, upper: _RangeBound,
+                 inclusive: _RangeInclusive) -> tuple[str, dict[str, object]]:
+    if not isinstance(field, str) or not field.isascii() or not field.isidentifier():
+        raise ValueError("Range filters require one canonical source field name")
+    if inclusive not in ("both", "left", "right", "neither"):
+        raise ValueError("Range inclusive must be 'both', 'left', 'right', or 'neither'")
+    if type(lower) not in (int, float, Decimal, str) or type(upper) not in (int, float, Decimal, str):
+        raise TypeError("Range bounds must be numbers or publisher text")
+    left = "<=" if inclusive in ("both", "left") else "<"
+    right = "<=" if inclusive in ("both", "right") else "<"
+    return f"@lower {left} {field} {right} @upper", {"lower": lower, "upper": upper}
+
+
+def _preview_limit(n: int) -> int:
+    if type(n) is not int or n < 0:
+        raise ValueError("Preview row limit must be a nonnegative integer")
+    return n
 
 
 def _projection(release: DataRelease, edition: EditionKey, fields: tuple[str, ...], *,
@@ -152,6 +175,12 @@ class SourceTable:
 
         return replace(self, _queries=(*self._queries, prepare_predicate(expression, params, record=record)))
 
+    def between(self, field: str, lower: _RangeBound, upper: _RangeBound, *,
+                inclusive: _RangeInclusive = "both", record: bool = False) -> SourceTable:
+        """Filter one field by exact bounds with independently selectable endpoints."""
+        expression, params = _range_query(field, lower, upper, inclusive)
+        return self.query(expression, params=params, record=record)
+
     @overload
     def __getitem__(self, key: str) -> Expression: ...
 
@@ -189,6 +218,11 @@ class SourceTable:
     def to_arrow(self) -> pa.Table:
         """Materialize the filtered projection with its keys and source support."""
         return self._prepare().to_arrow()
+
+    def head(self, n: int = 5) -> pa.Table:
+        """Materialize at most n rows in scan order as an Arrow preview."""
+        limit = _preview_limit(n)
+        return self._prepare().to_arrow(preview_rows=limit)
 
     def to_df(self, *, restore_original_headers: bool = False) -> pd.DataFrame:
         """Materialize the selected rows as an ordinary pandas DataFrame."""
@@ -257,6 +291,12 @@ class PartitionedSourceTable:
         query = prepare_predicate(expression, params, record=record)
         return PartitionedSourceTable(tuple(replace(part, _queries=(*part._queries, query)) for part in self.partitions))
 
+    def between(self, field: str, lower: _RangeBound, upper: _RangeBound, *,
+                inclusive: _RangeInclusive = "both", record: bool = False) -> PartitionedSourceTable:
+        """Filter one field by exact bounds across the selected partitions."""
+        expression, params = _range_query(field, lower, upper, inclusive)
+        return self.query(expression, params=params, record=record)
+
     @overload
     def __getitem__(self, key: str) -> Expression: ...
 
@@ -322,6 +362,11 @@ class PartitionedSourceTable:
 
     def to_arrow(self) -> pa.Table:
         return self._prepare().to_arrow()
+
+    def head(self, n: int = 5) -> pa.Table:
+        """Materialize at most n rows in partition and scan order."""
+        limit = _preview_limit(n)
+        return self._prepare().to_arrow(preview_rows=limit)
 
     def to_df(self, *, restore_original_headers: bool = False) -> pd.DataFrame:
         return self._prepare(restore_original_headers=restore_original_headers).to_df()
@@ -775,13 +820,19 @@ class _TableExport:
             if close := getattr(batches, "close", None):
                 close()
 
-    def to_arrow(self) -> pa.Table:
+    def to_arrow(self, *, preview_rows: int | None = None) -> pa.Table:
         import pyarrow as pa
 
-        schema = self.schema.with_metadata({**(self.schema.metadata or {}),
-            b"teadata_provenance": canonical_json(self.provenance().to_dict()).encode()})
+        metadata = {**(self.schema.metadata or {}),
+                    b"teadata_provenance": canonical_json(self.provenance().to_dict()).encode()}
+        if preview_rows is not None:
+            metadata[b"teadata_preview"] = canonical_json({
+                "limit": preview_rows, "provenance_scope": "full_selection",
+            }).encode()
+        schema = self.schema.with_metadata(metadata)
         with _owned_batches(self.batches()) as batches:
-            return pa.Table.from_batches(batches, schema=schema)
+            selected = batches if preview_rows is None else _prefix_batches(batches, preview_rows)
+            return pa.Table.from_batches(selected, schema=schema)
 
     def to_df(self) -> pd.DataFrame:
         import pandas as pd
@@ -1135,6 +1186,17 @@ def _owned_batches(batches: Iterator[pa.RecordBatch]) -> Generator[Iterator[pa.R
     finally:
         if close := getattr(batches, "close", None):
             close()
+
+
+def _prefix_batches(batches: Iterator[pa.RecordBatch], remaining: int) -> Iterator[pa.RecordBatch]:
+    if not remaining:
+        return
+    for batch in batches:
+        if batch.num_rows >= remaining:
+            yield batch if batch.num_rows == remaining else batch.slice(0, remaining)
+            return
+        yield batch
+        remaining -= batch.num_rows
 
 
 def write_csv(table: _StreamingExport, path_or_buf: str | Path | BinaryIO) -> None:
