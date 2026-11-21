@@ -1,8 +1,9 @@
 # PEIMS Staff FTE Counts and Salary
 
-`peims_staff_fte_and_salary` covers the October PEIMS staff reports for
-2018–19 through 2025–26 in the normal release. Each year has a separate Texas report and district
-report. District rows retain the exact six-digit district identifier and the
+`peims_staff_fte_and_salary` covers October PEIMS staffing from 2012–13
+through 2025–26 for Texas and from 2018–19 through 2025–26 for districts.
+Texas and district results come from separate publisher reports. District
+rows retain the exact six-digit district identifier and the
 publisher's literal staff category and role. Texas rows retain the published
 state scope. Category and role are part of the key. The single space in the
 category of certain publisher totals remains part of their identity. Absent
@@ -36,10 +37,10 @@ district `.` for Average Base Pay in the 2024–25 or 2025–26 edition has
 edition is listed as published March 19, 2026. TEA's listing does not supply a
 finality label. Employee Count is available only in the 2025–26 edition.
 
-Each source receipt preserves the publisher request, content digest, and a
-link to the earlier capture of the same CSV bytes. The definition links return
-the same content as the retained annual criteria receipts. The provenance
-closure also includes the selector and reviewed column-layout evidence.
+Each source receipt preserves the publisher request and content digest.
+The provenance closure includes the publisher selector and the reviewed
+column layout. The annual definition links identify the retained TEA
+criteria used for each edition.
 
 ## Historical coverage
 
@@ -51,10 +52,12 @@ exact CSV bytes. The criteria explicitly list contracted staff among
 exclusions starting in 2019–20. Earlier criteria list ESC staff, and the
 wording alone cannot establish a change in reporting practice.
 
-The retained 2012–13 through 2017–18 editions contain unexplained dot
-tokens in numeric fields. They remain outside the qualified release. The
-publisher evidence does not establish a common suppression interpretation
-across those years.
+The six direct Texas editions for 2012–13 through 2017–18 contain 396 rows.
+Independent Texas HTML reports reproduce their categories, roles, and 1,188
+numeric values. Each edition is bound to its own TEA guide, CSV, and HTML
+selection. The publisher reported no dot tokens in these six Texas tables.
+The corresponding district editions remain held because the annual guides
+leave 357 dot cells unexplained across 119 rows with three dots each.
 
 ## Reproduce a native candidate
 

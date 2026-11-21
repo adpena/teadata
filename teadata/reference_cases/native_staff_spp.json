@@ -155,5 +155,49 @@
       "c7a02280b6228040552cb895da02a6fb9f9773887fc96e7121a257dc40adf95b": 4,
       "d2f1f6c94eef232c197a464a847a21a1ed1b309cef3dbe63bf64bc1eddfa75aa": 4
     }
+  },
+  {
+    "dataset": "peims_staff_fte_and_salary",
+    "manifests": {
+      "cc7ca0e40f94055a40868cdced6cd62dffdd5b46141a12d8d7fbb1db7b3d19db": 3
+    },
+    "editions": {
+      "6c86efa7cd7103f885c1cd6eb8183bbe44c701b1b378384f3f0b4b17c53e22e7": [
+        {
+          "entity": "state",
+          "receipt": "41bc42a854f82485150a13850cbcd4e37b60626745f8df38d04b2ced9bd9b8e8"
+        }
+      ],
+      "659ff397f28cdf3538a72be94f89a584ba888deef105e1adbc444bd2fd7f910d": [
+        {
+          "entity": "state",
+          "receipt": "97a0fa684bb9f5eee3c680d89b75094c0804f85dd67cd424ac77d6828671ea0f"
+        }
+      ],
+      "22a6776c19315aea3edab794a1ab823f885e84247e230b59e8880648cd62cbf3": [
+        {
+          "entity": "state",
+          "receipt": "3554bf1863b7ff67d72cf89dd5e7d14f03a1a741b1827fdeb36de71fa906789a"
+        }
+      ],
+      "fc34a76d2b27105a9bacd3935f9e308c7236e79af12f6ab835deb2080990342a": [
+        {
+          "entity": "state",
+          "receipt": "5cac6fd86f1e4b7e4eb4252f4f661abf8ca579fda906f94cec796385cf6dc758"
+        }
+      ],
+      "975bc878052b9fa986d25687765c3771383038877a3f9d620d5313de93480a2f": [
+        {
+          "entity": "state",
+          "receipt": "1a3e2c101ca160be73a942877e543d164198027c403e8eb279b6f2e9324d1561"
+        }
+      ],
+      "f6b73f5a7518a63d23ae82f01edd00622efbdcc27837c2d6c17163da4ac0e494": [
+        {
+          "entity": "state",
+          "receipt": "35b2ea27d4d25db09cc4e234ae10866404810ead986b58b193f2eccf8e6fce23"
+        }
+      ]
+    }
   }
 ]

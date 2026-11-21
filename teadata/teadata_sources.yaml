@@ -1009,6 +1009,9 @@ value_policies:
       'ERROR':
         status: invalid
         reason: publisher_literal_teacher_fte_error
+  peims_texas_staff_archive:
+    reference_id: staff_definition
+    tokens: {}
   peims_staff_csv:
     reference_id: staff_definition
     tokens:
@@ -19714,6 +19717,184 @@ data_sources:
               campus: b167d12d5376336b863e7553b604247e184f6df389d85f24f64114089e418293
 
   peims_staff_fte_and_salary:
+    2013:
+      metadata:
+        metrics: &peims_texas_staff_facts
+          staff_fte: {field: staff_fte, unit: fte}
+          staff_total_base_pay: {field: staff_total_base_pay, unit: currency}
+          staff_average_base_pay: {field: staff_average_base_pay, unit: currency}
+        notes: Direct Texas PEIMS October Snapshot by publisher staffing role.
+          Excludes ESC staff. Base pay excludes supplements. Publisher finality is unspecified.
+          Earliest district editions remain outside reviewed coverage.
+        period: {kind: school_year, start_year: 2012, end_year: 2013}
+        publisher: Texas Education Agency
+        references:
+        - reference_id: staff_definition
+          role: data_dictionary
+          status: available
+          title: TEA 2012–13 staff FTE and salary criteria and role definitions
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.std_download_selected_report.sas&rpt_subject=about&fname=abtstf13&ftype=html
+          reviewed_sha256: 19a84017ca7495367ecb615c2f2893bba0d92ec9d22415c73463a93238ad7f0a
+          provenance_ids: [471d4c3178b9be740b1e58f7bd35ca852fc6a00ccacda08aba00e2b658110bd2]
+        - &peims_texas_staff_columns
+          reference_id: column_crosswalk
+          role: schema
+          status: available
+          title: TEA Data reviewed Texas staffing source headers and record framing
+          path: schemas/peims--2013-2018--texas-staff-fte-and-salary-crosswalk.json
+          reviewed_sha256: 83bd48772960c0c07158932783d2026aeafbf2dea4fca1c62fd0c4cc3cc3b899
+          provenance_ids: [d1a74555eafa8309e380f5274c6a44b28c535f3661cc5bc1739d503f3b3f814f]
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adpeb.html
+        title: 2012–13 Texas PEIMS Staff FTE Counts and Salary
+        value_policy: peims_texas_staff_archive
+        version: '2013'
+      path: data/peims/2013/peims_staff_fte_and_salary--state.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2018--texas-staff-fte-and-salary-crosswalk.json
+            acquisition_ids:
+              state: e997fe3ea92291b64decbd93ccec107d1723ab6be561f214af5f9c9c96de332b
+    2014:
+      metadata:
+        metrics: *peims_texas_staff_facts
+        notes: Direct Texas PEIMS October Snapshot by publisher staffing role.
+          Excludes ESC staff. Base pay excludes supplements. Publisher finality is unspecified.
+          Earliest district editions remain outside reviewed coverage.
+        period: {kind: school_year, start_year: 2013, end_year: 2014}
+        publisher: Texas Education Agency
+        references:
+        - reference_id: staff_definition
+          role: data_dictionary
+          status: available
+          title: TEA 2013–14 staff FTE and salary criteria and role definitions
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.std_download_selected_report.sas&rpt_subject=about&fname=abtstf14&ftype=html
+          reviewed_sha256: f54bdcbf0725267e9eb0896a396ee232d49e2aeca6f684d14ebae28b04fb4f9a
+          provenance_ids: [ecc71e7670a1ab29534feccd21f8b2abeb24d6dfa2a3756cd21f3015ca5c8cb8]
+        - *peims_texas_staff_columns
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adpeb.html
+        title: 2013–14 Texas PEIMS Staff FTE Counts and Salary
+        value_policy: peims_texas_staff_archive
+        version: '2014'
+      path: data/peims/2014/peims_staff_fte_and_salary--state.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2018--texas-staff-fte-and-salary-crosswalk.json
+            acquisition_ids:
+              state: 32d16870627c1ec6614607bad0386b451f5e7c713b2c40933a77437d15f86bc8
+    2015:
+      metadata:
+        metrics: *peims_texas_staff_facts
+        notes: Direct Texas PEIMS October Snapshot by publisher staffing role.
+          Excludes ESC staff. Base pay excludes supplements. Publisher finality is unspecified.
+          Earliest district editions remain outside reviewed coverage.
+        period: {kind: school_year, start_year: 2014, end_year: 2015}
+        publisher: Texas Education Agency
+        references:
+        - reference_id: staff_definition
+          role: data_dictionary
+          status: available
+          title: TEA 2014–15 staff FTE and salary criteria and role definitions
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.std_download_selected_report.sas&rpt_subject=about&fname=abtstf15&ftype=html
+          reviewed_sha256: 65074a5ff2c8d5f18d3293129d0d8c73a9e84726c7d819dc73c15b36caccd0ab
+          provenance_ids: [fa24ae1263b4e75d44c1f8a306925f562ef345f4574babbd6bf7dc0b12657eb9]
+        - *peims_texas_staff_columns
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adpeb.html
+        title: 2014–15 Texas PEIMS Staff FTE Counts and Salary
+        value_policy: peims_texas_staff_archive
+        version: '2015'
+      path: data/peims/2015/peims_staff_fte_and_salary--state.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2018--texas-staff-fte-and-salary-crosswalk.json
+            acquisition_ids:
+              state: f0bf9bb376b62877819a9452d456680a207db989fdcf2ffb6a376b74ed30b3ae
+    2016:
+      metadata:
+        metrics: *peims_texas_staff_facts
+        notes: Direct Texas PEIMS October Snapshot by publisher staffing role.
+          Excludes ESC staff. Base pay excludes supplements. Publisher finality is unspecified.
+          Earliest district editions remain outside reviewed coverage.
+        period: {kind: school_year, start_year: 2015, end_year: 2016}
+        publisher: Texas Education Agency
+        references:
+        - reference_id: staff_definition
+          role: data_dictionary
+          status: available
+          title: TEA 2015–16 staff FTE and salary criteria and role definitions
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.std_download_selected_report.sas&rpt_subject=about&fname=abtstf16&ftype=html
+          reviewed_sha256: 11f76df1765a18287379bfa3a75c9bf8c733da55551d90c12af02477f1ab654f
+          provenance_ids: [8839774aa15cc5b6eb8d44612d49497ba93022d73ca84b05574620ce2f7201a1]
+        - *peims_texas_staff_columns
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adpeb.html
+        title: 2015–16 Texas PEIMS Staff FTE Counts and Salary
+        value_policy: peims_texas_staff_archive
+        version: '2016'
+      path: data/peims/2016/peims_staff_fte_and_salary--state.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2018--texas-staff-fte-and-salary-crosswalk.json
+            acquisition_ids:
+              state: 9068ae4ef2155d773fc1266e5917114e041928d2048f970f7c1eba896261d2e7
+    2017:
+      metadata:
+        metrics: *peims_texas_staff_facts
+        notes: Direct Texas PEIMS October Snapshot by publisher staffing role.
+          Excludes ESC staff. Base pay excludes supplements. Publisher finality is unspecified.
+          Earliest district editions remain outside reviewed coverage.
+        period: {kind: school_year, start_year: 2016, end_year: 2017}
+        publisher: Texas Education Agency
+        references:
+        - reference_id: staff_definition
+          role: data_dictionary
+          status: available
+          title: TEA 2016–17 staff FTE and salary criteria and role definitions
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.std_download_selected_report.sas&rpt_subject=about&fname=abtstf17&ftype=html
+          reviewed_sha256: 2159b49a068ea703f1c32a242bd3aeb243d241c165f6d6e3092336d8950999f3
+          provenance_ids: [c56e4c8b2009df1e51f511ab69baf6076722ee246df323e1a0ea03ab355dd998]
+        - *peims_texas_staff_columns
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adpeb.html
+        title: 2016–17 Texas PEIMS Staff FTE Counts and Salary
+        value_policy: peims_texas_staff_archive
+        version: '2017'
+      path: data/peims/2017/peims_staff_fte_and_salary--state.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2018--texas-staff-fte-and-salary-crosswalk.json
+            acquisition_ids:
+              state: 11f364dd32ebf58e8e22fcedbe910b3139614344f3ead1eef4888f06e22a2b85
+    2018:
+      metadata:
+        metrics: *peims_texas_staff_facts
+        notes: Direct Texas PEIMS October Snapshot by publisher staffing role.
+          Excludes ESC staff. Base pay excludes supplements. Publisher finality is unspecified.
+          Earliest district editions remain outside reviewed coverage.
+        period: {kind: school_year, start_year: 2017, end_year: 2018}
+        publisher: Texas Education Agency
+        references:
+        - reference_id: staff_definition
+          role: data_dictionary
+          status: available
+          title: TEA 2017–18 staff FTE and salary criteria and role definitions
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=adhoc.std_download_selected_report.sas&rpt_subject=about&fname=abtstf18&ftype=html
+          reviewed_sha256: 8db367c24f4c9c46841d1d2d347adfa78601eaddaf1ece275eff925998e22a5a
+          provenance_ids: [ce33f30ef956cdcf641773ece98baa8b436a51353c010e3cd1ded75383def243]
+        - *peims_texas_staff_columns
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adpeb.html
+        title: 2017–18 Texas PEIMS Staff FTE Counts and Salary
+        value_policy: peims_texas_staff_archive
+        version: '2018'
+      path: data/peims/2018/peims_staff_fte_and_salary--state.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/peims--2013-2018--texas-staff-fte-and-salary-crosswalk.json
+            acquisition_ids:
+              state: 8df5f1f682fc7b8c7d96d8ca372dc185180e957fe04d44f191c47dfc74543e22
     2023:
       metadata:
         metrics: &peims_staff_facts

@@ -23,7 +23,7 @@ from . import frc_ppe as frc
 from .identifiers import canonical_source_identifiers
 from .manifest import ContractError, canonical_json
 from .peims_courses import DATASET as COURSES, course_key_columns
-from .peims_leaves import PRIMARY_DISABILITY, SCOPES_BY_DATASET, _key_columns
+from .peims_leaves import PRIMARY_DISABILITY, SCOPES_BY_DATASET, _key_columns, peims_scopes
 from .release import _student_attachments
 from .staar_comparison import staar_rate_contract, supports_staar_rates
 from .tapr import tapr_source_identifiers
@@ -675,7 +675,7 @@ def _compare_source(release: DataRelease, local: EditionKey, statewide: EditionK
         elif left_student.cohort != right_student.cohort:
             raise ContractError("Student comparison requires the same pinned statewide cohort")
     elif course_pair or (local.dataset == statewide.dataset and local.dataset in SCOPES_BY_DATASET):
-        scopes = {"state", "district"} if course_pair else SCOPES_BY_DATASET[local.dataset]
+        scopes = {"state", "district"} if course_pair else peims_scopes(local.dataset, int(local.edition))
         if local.scope not in scopes or local.table != local.scope or statewide.table != "state":
             raise ContractError("Publisher PEIMS statistics are unavailable for the selected scope")
         local_keys = course_key_columns(local.scope) if course_pair else _key_columns(local.dataset, local.scope)

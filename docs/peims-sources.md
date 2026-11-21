@@ -231,8 +231,10 @@ All nine values also appear in the individual TEA district reports. The
 numeric field is null, the status is `invalid`, and the raw field retains
 `ERROR`. The exception is bound to the exact district extract and physical
 row positions. Suppressed course enrollment and observed zero remain
-distinct. The released 0.0.177 selector continues to open 2018–19 through
-2025–26. The early archive is qualified separately before publication.
+distinct. Release 0.0.178 opens all 14 years at Texas and district scopes.
+The early archive contains 1,164,360 published rows, and independent named
+reports reproduce 52,335 measure cells. Campus course affiliation remains
+under review.
 
 ### Build and verify a course candidate
 

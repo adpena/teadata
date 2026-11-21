@@ -27,7 +27,9 @@ from .peims_staff import (
     staff_allows_unavailable_average,
     staff_employee_basis,
     staff_fact_units,
+    staff_scopes,
     staff_values,
+    validate_early_staff_guide,
     validate_staff_request,
 )
 from .provenance import ProvenanceStore, validate_reference_records
@@ -58,6 +60,10 @@ MAX_SOURCE_RECORDS = 60_000
 ENCODING = "cp1252"
 
 
+def peims_scopes(dataset: str, year: int) -> frozenset[str]:
+    return staff_scopes(year) if dataset == STAFF else SCOPES_BY_DATASET[dataset]
+
+
 def _admit_source(config: Config, dataset: str, year: int, store: ProvenanceStore) -> tuple[
     ResolvedDataset, ValuePolicy, list[dict[str, Any]], dict[str, str], list[str]
 ]:
@@ -78,7 +84,7 @@ def _admit_source(config: Config, dataset: str, year: int, store: ProvenanceStor
         raise ValueError("PEIMS requires its reviewed positional crosswalk")
     tables = crosswalk_dataset(parse_column_schema(resource["text"].encode()), dataset, str(year))["tables"]
     identifiers = reader_options(source.reader, "source").get("acquisition_ids")
-    scopes = SCOPES_BY_DATASET[dataset]
+    scopes = peims_scopes(dataset, year)
     if (len(tables) != len(scopes) or {table["table"] for table in tables} != scopes
             or not isinstance(identifiers, dict) or set(identifiers) != scopes
             or any(not isinstance(identifier, str) for identifier in identifiers.values())
@@ -87,6 +93,8 @@ def _admit_source(config: Config, dataset: str, year: int, store: ProvenanceStor
     references = [identifier for ref in source.metadata.references for identifier in ref.provenance_ids]
     records = store.verify_record_closure([*identifiers.values(), *references])
     validate_reference_records(source, records.__getitem__, verify_all_claimed=True)
+    if dataset == STAFF:
+        validate_early_staff_guide(source.metadata, year, records)
     for table in tables:
         scope = table["table"]
         identifier = identifiers[scope]

@@ -3797,7 +3797,7 @@ wheels = [
 
 [[package]]
 name = "teadata"
-version = "0.0.177"
+version = "0.0.178"
 source = { editable = "." }
 dependencies = [
     { name = "certifi" },
@@ -3886,7 +3886,7 @@ scripts = [
     { name = "tqdm" },
 ]
 speedups = [
-    { name = "nanoarrow", marker = "(python_full_version < '3.15' and implementation_name == 'cpython' and platform_machine == 'arm64' and sys_platform == 'darwin') or (python_full_version < '3.15' and implementation_name == 'cpython' and platform_machine == 'x86_64' and sys_platform == 'darwin') or (python_full_version < '3.15' and implementation_name == 'cpython' and platform_machine == 'aarch64' and sys_platform == 'linux') or (python_full_version < '3.15' and implementation_name == 'cpython' and platform_machine == 'x86_64' and sys_platform == 'linux') or (python_full_version < '3.15' and implementation_name == 'cpython' and platform_machine == 'AMD64' and sys_platform == 'win32')" },
+    { name = "nanoarrow", marker = "python_full_version < '3.15' and implementation_name == 'cpython' and ((platform_machine == 'arm64' and sys_platform == 'darwin') or (platform_machine == 'x86_64' and sys_platform == 'darwin') or (platform_machine == 'aarch64' and sys_platform == 'linux') or (platform_machine == 'x86_64' and sys_platform == 'linux') or (platform_machine == 'AMD64' and sys_platform == 'win32'))" },
     { name = "polars" },
 ]
 
@@ -3920,7 +3920,7 @@ requires-dist = [
     { name = "mkdocs-material", marker = "extra == 'docs'", specifier = ">=9.7.7" },
     { name = "mkdocstrings", extras = ["python"], marker = "extra == 'docs'", specifier = ">=0.24" },
     { name = "msgpack", marker = "extra == 'dev'", specifier = ">=1.2.3" },
-    { name = "nanoarrow", marker = "(python_full_version < '3.15' and implementation_name == 'cpython' and platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'speedups') or (python_full_version < '3.15' and implementation_name == 'cpython' and platform_machine == 'x86_64' and sys_platform == 'darwin' and extra == 'speedups') or (python_full_version < '3.15' and implementation_name == 'cpython' and platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'speedups') or (python_full_version < '3.15' and implementation_name == 'cpython' and platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'speedups') or (python_full_version < '3.15' and implementation_name == 'cpython' and platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'speedups')", specifier = ">=0.9.0" },
+    { name = "nanoarrow", marker = "python_full_version < '3.15' and implementation_name == 'cpython' and ((platform_machine == 'arm64' and sys_platform == 'darwin' and extra == 'speedups') or (platform_machine == 'x86_64' and sys_platform == 'darwin' and extra == 'speedups') or (platform_machine == 'aarch64' and sys_platform == 'linux' and extra == 'speedups') or (platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'speedups') or (platform_machine == 'AMD64' and sys_platform == 'win32' and extra == 'speedups'))", specifier = ">=0.9.0" },
     { name = "nbconvert", marker = "extra == 'notebooks'", specifier = ">=7.17.2" },
     { name = "numpy", marker = "python_full_version < '3.15'", specifier = ">=1.26,!=2.4.0" },
     { name = "numpy", marker = "python_full_version >= '3.15'", specifier = ">=2.5.2" },

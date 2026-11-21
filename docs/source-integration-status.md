@@ -1,28 +1,28 @@
 # Source integration status
 
-The packaged selector identifies **normal data release 0.0.177**. This is a
+The packaged selector identifies **normal data release 0.0.178**. This is a
 frozen analysis release. Software publication and application deployment are
 separate gates. Historical requests keep their pins.
-The [machine inventory](source-integration-status-0.0.177.json), generated from
-the composed 0.0.177 manifest and current source configuration on November 21,
+The [machine inventory](source-integration-status-0.0.178.json), generated from
+the composed 0.0.178 manifest and current source configuration on November 21,
 2026, records
-127 registered IDs, 283 configured editions,
-13 base inputs and 34 native attachments covering 43 dataset IDs and
-363 edition/scope keys. Registration, acquisition, qualification and query
+127 registered IDs, 295 configured editions,
+13 base inputs and 36 native attachments covering 43 dataset IDs and
+381 edition/scope keys. Registration, acquisition, qualification and query
 access are separate statuses.
 
-- Manifest: `f8d4252072def12409c7d39d4573aceb4ebe46d2dda3712b58c136c9d7009fa9`.
+- Manifest: `f2c562ef05ccdce555eb66093490268275a7210f7705b98da96071ddc7b6dcc2`.
 - Entity core manifest: `2a19e22760af8da443af29a38d01d7d9c13f65095fd739e78bb7a0a1dc345f1b`.
 - Build: `31038e45f324b824e1d7f27dee4e1c6e001d5d770013bd710c1e9eda7ca0d368`.
 - Processing record: `270ef47f9e8f3a2d7ce5057ae7c8c73061c4db88123cb64f47b2522cb7cb43bc`.
 
 ## PEIMS teacher FTE and course enrollment
 
-Two attachments add statewide district and directly reported Texas data from
-2018–19 through 2025–26. The course code and scope are part of the grain, so
+Three attachments cover statewide district and directly reported Texas data
+from 2012–13 through 2025–26. The course code and scope are part of the grain, so
 the same student or teacher can contribute to several courses. Native leaves
 retain the raw publisher tokens, value statuses and source row locators.
-Earlier district years and campus affiliations stay outside this release.
+Campus course affiliations remain under review.
 See the [course source notes](peims-sources.md#build-and-verify-a-course-candidate).
 
 ## Historical PEIMS staffing
@@ -30,9 +30,11 @@ See the [course source notes](peims-sources.md#build-and-verify-a-course-candida
 The 2018–19 through 2021–22 Staff FTE and Salary reports add 210,306
 publisher rows across eight district and direct Texas editions. FTE uses
 exact scale-two decimals. Published total and average base pay retain their
-nominal dollar units. This source has no campus scope. The historical
-2012–13 through 2017–18 editions remain held while undetermined publisher
-dot tokens are investigated. See the [staff source notes](peims-staff.md).
+nominal dollar units. This source has no campus scope. Six earlier direct
+Texas editions extend statewide staffing to 2012–13 and add 396 verified
+publisher rows. The corresponding district editions remain outside coverage
+while undetermined publisher dot tokens are investigated.
+See the [staff source notes](peims-staff.md).
 
 ## STAAR publisher assessment rates
 

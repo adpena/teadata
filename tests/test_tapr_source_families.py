@@ -619,9 +619,13 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     assert current['value_policies'].pop('peims_primary_disability_csv')['reference_id'] == 'peims_disability_masking'
     assert set(current['value_policies'].pop('peims_primary_disability_csv_through_2018')['tokens']) == {'-9999999'}
     staff = 'peims_staff_fte_and_salary'
-    assert list(current['data_sources'].pop(staff)) == [2023, 2024, 2025, 2026]
+    staff_editions = current['data_sources'].pop(staff)
+    assert list(staff_editions) == [*range(2013, 2019), *range(2023, 2027)]
+    assert all(set(staff_editions[year]['reader']['profiles']['source']['acquisition_ids']) == {'state'}
+               for year in range(2013, 2019))
     assert current['schema']['data_sources'].pop(staff) == ['csv']
     assert current['value_policies'].pop('peims_staff_csv')['reference_id'] == 'staff_definition'
+    assert current['value_policies'].pop('peims_texas_staff_archive')['tokens'] == {}
     courses = 'peims_teacher_course_enrollment'
     assert list(current['data_sources'].pop(courses)) == list(range(2013, 2027))
     assert current['schema']['data_sources'].pop(courses) == ['csv']

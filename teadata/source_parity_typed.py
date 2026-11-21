@@ -45,7 +45,7 @@ from .district_transfer_identity import REVIEW_YEAR, PartnerIdentityRepair, revi
 from .manifest import canonical_json
 from .district_types import DISTRICT_TYPE_COLUMNS, DISTRICT_TYPE_REFERENCE, reviewed_district_types
 from .peims_leaves import DATASETS as PEIMS_DATASETS, PRIMARY_DISABILITY
-from .peims_leaves import ENCODING, SCOPES_BY_DATASET, _count_columns, _key_columns
+from .peims_leaves import ENCODING, _count_columns, _key_columns, peims_scopes
 from .peims_staff import (
     STAFF,
     STAFF_EMPLOYEE_BASIS,
@@ -54,6 +54,7 @@ from .peims_staff import (
     matches_staff_source,
     staff_allows_unavailable_average,
     staff_fact_units,
+    validate_early_staff_guide,
     validate_staff_request,
 )
 from .provenance import validate_record_graph
@@ -277,6 +278,10 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
     if (period is None or period.kind != "school_year" or period.end_year is None or str(period.end_year) != key.edition
             or period.start_year != period.end_year - 1):
         raise ValueError("Typed replay requires its exact recorded school-year period")
+    if peims and key.scope not in peims_scopes(key.dataset, period.end_year):
+        raise _Uncovered("PEIMS scope is outside this source edition's reviewed coverage")
+    if staff:
+        validate_early_staff_guide(metadata, period.end_year, {value: graph[value] for value in record["inputs"]})
     policy = release.catalog.policy(key.dataset, edition=key)
     if _digest(policy.to_dict()) != contract["policy_sha256"]:
         raise ValueError("Typed leaf policy differs from its reviewed edition policy")
@@ -312,7 +317,7 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
     history = None
     attached_hashes = []
     if peims:
-        if (key.scope not in SCOPES_BY_DATASET[key.dataset] or key.table != key.scope or len(ids) != 1
+        if (key.table != key.scope or len(ids) != 1
                 or recipe.get("encoding") != ENCODING
                 or mapping.get("header_identity") != "position" or not mapping.get("layout")
                 or mapping["layout"]["label_record"] is not None):
