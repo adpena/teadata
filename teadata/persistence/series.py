@@ -37,13 +37,13 @@ class SeriesSqlExport:
 
 
 class SeriesCoverageError(ContractError):
-    """The selected publication has no rows for requested entity-year pairs."""
+    """The selection returned no rows for requested entity-year pairs."""
 
     def __init__(self, result: SeriesSqlExport):
         self.result = result
         pairs = result.missing_entity_years
         super().__init__(
-            f"No published rows for {len(pairs)} requested entity-year pairs: {pairs[:5]}. "
+            f"No matching rows for {len(pairs)} requested entity-year pairs: {pairs[:5]}. "
             "Inspect result.missing_entity_years, or pass require_complete=False to record the gaps."
         )
 
@@ -80,6 +80,8 @@ def _namespace(connection: Connection, table: Table) -> str:
 
 def _sql_tables(series: ObservationSeries, connection: Connection, observations: Table,
                 receipts: Table) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
+    if any(query.recipe_json is None for _, view, _, _ in series._sources for query in view._queries):
+        raise ContractError("SQL series imports require query filters recorded with record=True.")
     if connection.get_execution_options().get("schema_translate_map"):
         raise ValueError("Use explicit SQL schemas without schema translation for series imports.")
     schema = _namespace(connection, observations)

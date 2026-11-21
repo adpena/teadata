@@ -237,8 +237,35 @@ class ObservationSeries:
             return parts[0] if len(parts) == 1 else PartitionedSourceTable(parts)
         raise ContractError(f"School year {target} is outside this series. Selected years: {self.years}.")
 
+    def query(self, expression: str, *, params: Mapping[str, object] | None = None,
+              record: bool = False) -> ObservationSeries:
+        """Apply a source query to each pinned year without opening its observations."""
+        from pyarrow import ArrowException
+
+        from .analytical import _leaf_schema
+        from .source_predicates import prepare_predicate, validate_queries
+
+        predicate = prepare_predicate(expression, params, record=record)
+        validated = set()
+        filtered = []
+        for year, view, selection, _ in self._sources:
+            schema = _leaf_schema(selection.artifact.contract)
+            if schema not in validated:
+                try:
+                    validate_queries((predicate,), schema)
+                except (ArrowException, KeyError, TypeError, ValueError) as error:
+                    raise ContractError(f"Query filter does not match the pinned source schema for school year {year}: {error}") from error
+                validated.add(schema)
+            view = replace(view, _queries=(*view._queries, predicate))
+            source = selection.provenance(view.release, period=view.measurement_period, entity_build=view._entity_build,
+                                          entity_ids=view._entity_ids, opaque_filter=False, queries=view._queries)
+            filtered.append((year, view, selection, source))
+        return replace(self, _sources=tuple(filtered))
+
     def pair_years(self, *, from_year: int | str, to_year: int | str) -> ObservationPair:
         """Plan a two-year alignment of publisher rows by public entity ID."""
+        if any(view._queries for _, view, _, _ in self._sources):
+            raise ContractError("pair_years requires an unfiltered series. Use the filtered series for long-form results.")
         return ObservationPair._plan(self, _required_year(from_year), _required_year(to_year))
 
     def provenance(self) -> dict[str, Any]:
@@ -282,7 +309,7 @@ class ObservationSeries:
         for year, view, selected, _ in self._sources:
             scalar = primitive_scalar(year, pa.int32())
             offsets = {name: position for position, name in enumerate(selected.columns)}
-            export = _open_export(view.release, selected, period=view.measurement_period,
+            export = _open_export(view.release, selected, queries=view._queries, period=view.measurement_period,
                                   entity_build=view._entity_build, entity_ids=view._entity_ids)
             batches = export.batches()
             try:
@@ -332,8 +359,9 @@ class ObservationSeries:
         propagate for rollback. Observation column keys match `series.schema`
         plus `import_id`. The receipt table has `id` as its primary key and a
         JSON `receipt` column. This method does not create tables or commit.
-        Explicitly selected IDs require a row for every selected year by
-        default. Pass `require_complete=False` to record missing pairs.
+        Explicitly selected IDs require a matching row for every selected year by
+        default. Pass `require_complete=False` to record unmatched pairs. Record
+        every query filter for SQL materialization and reads.
         """
         from .persistence.series import _export_series
 

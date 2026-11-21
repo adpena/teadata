@@ -209,7 +209,7 @@ class ExportProvenance:
         """Restore a recorded selection against its exact open native release."""
         from dataclasses import replace
 
-        from .source_predicates import restore_query
+        from .source_predicates import restore_query, validate_queries
 
         document = self.from_dict(self.to_dict()).to_dict()
         if document.get("release") != {"build_id": release.build_id, "manifest_sha256": release.manifest_sha256}:
@@ -251,17 +251,14 @@ class ExportProvenance:
         if rebuilt["description_sha256"] != document["description_sha256"]:
             raise ContractError("Recorded source selection differs from the pinned release")
         # Bind the filters against the admitted schema without opening the data.
-        from pyarrow import ArrowException, Table
-        from pyarrow.dataset import dataset
+        from pyarrow import ArrowException
 
         from .analytical import _leaf_schema
 
         artifact = release.catalog.artifact_ref(rebuilt["artifact"]["id"])
         schema = _leaf_schema(artifact.contract)
-        empty = dataset(Table.from_batches([], schema=schema))
         try:
-            for query in table._queries:
-                empty.scanner(filter=query(schema))
+            validate_queries(table._queries, schema)
         except (ArrowException, KeyError, TypeError, ValueError) as error:
             raise ContractError("Recorded filter does not match the pinned source schema") from error
         return table

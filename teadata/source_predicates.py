@@ -46,6 +46,16 @@ class PreparedPredicate:
         return self.bind(schema)
 
 
+def validate_queries(queries: tuple[PreparedPredicate, ...], schema: Schema) -> None:
+    """Bind filters as booleans against a schema without opening any data files."""
+    from pyarrow import Table
+    from pyarrow.dataset import dataset
+
+    empty = dataset(Table.from_batches([], schema=schema))
+    for query in queries:
+        empty.scanner(filter=query(schema)).to_table()
+
+
 def _encode_parameter(value):
     if type(value) is tuple:
         return [_encode_parameter(item) for item in value]

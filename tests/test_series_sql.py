@@ -32,6 +32,14 @@ def test_sql_projection_preserves_support_and_transactional_coverage(tmp_path, m
     engine = create_engine("sqlite://", connect_args={"autocommit": legacy} if legacy is not None else {})
     metadata.create_all(engine)
 
+    opaque = series.query("amount is None")
+    with engine.begin() as connection:
+        with pytest.raises(ContractError, match="recorded with record=True"):
+            opaque.to_sql(connection, facts, receipts=receipts)
+        with pytest.raises(ContractError, match="recorded with record=True"):
+            list(opaque.iter_sql_batches(connection, facts, receipts=receipts, import_id="0" * 64))
+        assert connection.scalar(select(func.count()).select_from(receipts)) == 0
+
     with engine.connect() as connection:
         with pytest.raises(ValueError, match="active SQLAlchemy transaction"):
             series.to_sql(connection, facts, receipts=receipts)

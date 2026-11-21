@@ -311,6 +311,37 @@ Use [`series.to_sql()`](enrichment.md#materialize-selected-observations-into-you
 to stream the same projected records and provenance into caller-defined
 SQL tables. For ad hoc DuckDB queries, register the series' Arrow batches.
 
+### Filter a multidimensional series
+
+On the development branch, `ObservationSeries.query()` applies the same source
+predicate to every pinned year. It validates the predicate against the selected
+schemas before reading observations. Course, district and year remain separate
+columns. You can retain the exact filter in every source receipt with `record=True`.
+
+```python
+def course_series(scope, **cohort):
+    return release.series(
+        "peims_teacher_course_enrollment", "course_enrollment_count",
+        scope=scope, years=[25, 26], **cohort,
+    ).query("course_code == @course", params={"course": "03100500"}, record=True)
+
+district = course_series("district", ids=[175904])
+texas = course_series("state")
+district.to_csv_bundle("district-course.zip")
+texas.to_excel("texas-course.xlsx")
+```
+
+Use the directly reported Texas rows for the statewide comparison. Keep masked
+tokens and zero counts distinct. Course membership measures the reporting-date
+snapshot. Review the source definitions before comparing years.
+
+Recorded filters may contain the supplied parameter values. If recording is
+disabled, the export describes the filter as opaque. SQL receipt-based imports
+require recorded filters. A missing entity/year pair after filtering means no
+row matched the selection. Use separate long-form outputs for filtered results,
+since `pair_years()` requires an unfiltered series with one publisher row per
+entity and school year.
+
 ## Align two years by public ID
 
 Use `series.pair_years(from_year=13, to_year=2022)` to align two years

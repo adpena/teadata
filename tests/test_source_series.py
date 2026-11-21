@@ -157,6 +157,43 @@ def test_series_plans_once_and_streams_selected_years_with_provenance(tmp_path, 
     assert series.to_df().attrs["teadata_provenance"] == provenance
 
 
+def test_series_queries_keep_pinned_filters_and_replay_without_mutating_the_input(tmp_path, monkeypatch):
+    from zipfile import ZipFile
+
+    from teadata.export_provenance import ExportProvenance
+
+    children = releases(tmp_path)
+    parent = children[2023]
+    use_children(parent, children, monkeypatch)
+    series = parent.series("campus_student", "amount", scope="campus", years=[23, 24], ids=[2, 4])
+    with monkeypatch.context() as guard:
+        guard.setattr(DataRelease, "artifact", lambda *a, **k: pytest.fail("Query planning opened a native leaf"))
+        for invalid in ("unknown_field is None", "amount"):
+            with pytest.raises(ContractError, match="pinned source schema for school year 2023"):
+                series.query(invalid)
+        selected = series.query("amount >= @minimum or amount is None", params={"minimum": 7}, record=True)
+        selected = selected.query("amount_status in @statuses", params={"statuses": ["observed", "suppressed"]}, record=True)
+        with pytest.raises(ContractError, match="requires an unfiltered series"):
+            selected.pair_years(from_year=23, to_year=24)
+
+    assert series.to_arrow()["amount"].to_pylist() == [None, 6, None, 7]
+    table = selected.to_arrow()
+    assert table["measurement_school_year"].to_pylist() == [2023, 2024, 2024]
+    assert table["VALUE"].to_pylist() == ["-999", "-999", "7"]
+    provenance = selected.provenance()
+    for year, child in list(children.items())[:2]:
+        source = next(entry["provenance"] for entry in provenance["sources"] if entry["school_year"] == year)
+        replayed = ExportProvenance.from_dict(source).replay_table(child)
+        assert replayed.to_arrow().equals(selected.for_year(year).to_arrow())
+    bundle = BytesIO()
+    selected.to_csv_bundle(bundle)
+    with ZipFile(bundle) as archive:
+        assert json.loads(archive.read("provenance.json")) == provenance
+    header, *rows = excel_export(selected, BytesIO())
+    assert len(rows) == table.num_rows
+    assert list(header) == table.column_names
+
+
 def test_series_rejects_bad_years_pins_and_incompatible_projections_before_reads(tmp_path, monkeypatch):
     children = releases(tmp_path, normalized=False)
     parent = children[2023]
