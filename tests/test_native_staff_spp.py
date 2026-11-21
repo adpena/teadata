@@ -19,15 +19,17 @@ from teadata.spp_leaves import DATASET as SPP
 
 def test_known_manifest_registry_binds_disjoint_complete_witness_inventories():
     staff = gate.reviewed_staff_spp("8cd071e5cfaac027a43895aa2335206d87eb5bf19a9001b2cc42797c5b0c9325")
+    archive = gate.reviewed_staff_spp("bff718af1114eaebc475d7260a0269cd022005fe95999f1e6cb814b0032cf28d")
     spp = gate.reviewed_staff_spp("c7a02280b6228040552cb895da02a6fb9f9773887fc96e7121a257dc40adf95b")
-    assert staff is not None and spp is not None
-    assert staff[:2] == (STAFF, 3) and spp[:2] == (SPP, 4)
+    assert staff is not None and archive is not None and spp is not None
+    assert staff[:2] == archive[:2] == (STAFF, 3) and spp[:2] == (SPP, 4)
     assert gate.reviewed_staff_spp("d2f1f6c94eef232c197a464a847a21a1ed1b309cef3dbe63bf64bc1eddfa75aa") == spp
     assert gate.reviewed_staff_spp("0" * 64) is None
     assert gate.reviewed_staff_spp("465e130bcb4bc48a523e4901103d34a41ead89123141a2ca7bb0c6ef3171b4a0") is None
-    assert len(staff[2]) == 8 and len(spp[2]) == 2
-    witnesses = [w for plan in (staff, spp) for reports in plan[2].values() for w in reports]
-    assert len(witnesses) == len({w["receipt"] for w in witnesses}) == 15
+    assert len(staff[2]) == len(archive[2]) == 8 and len(spp[2]) == 2
+    assert staff[2].keys().isdisjoint(archive[2])
+    witnesses = [w for plan in (staff, archive, spp) for reports in plan[2].values() for w in reports]
+    assert len(witnesses) == len({w["receipt"] for w in witnesses}) == 23
     assert [(w["entity"], w["publisher_rate_precision"]) for w in witnesses if "publisher_rate_precision" in w] == [
         ("227901", {"workbook": 1, "html": 2})]
 

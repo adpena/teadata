@@ -22,6 +22,8 @@ from .peims_staff import (
     STAFF_EMPLOYEE_BASIS,
     STAFF_EMPLOYEE_COUNT,
     STAFF_RECIPE,
+    STAFF_SELECTOR,
+    matches_staff_source,
     staff_allows_unavailable_average,
     staff_employee_basis,
     staff_fact_units,
@@ -64,6 +66,8 @@ def _admit_source(config: Config, dataset: str, year: int, store: ProvenanceStor
             or source.metadata.period != DataPeriod("school_year", year - 1, year)
             or source.metadata.provenance_ids):
         raise ValueError("PEIMS requires a source-only exact annual edition with acquisitions assigned by scope")
+    if dataset == STAFF and source.metadata.source_url != STAFF_SELECTOR:
+        raise ValueError("PEIMS staffing requires its canonical publisher selector")
     policy = config.value_policies.get(source.metadata.value_policy)
     if policy is None:
         raise ValueError("PEIMS requires its reviewed value policy")
@@ -84,21 +88,28 @@ def _admit_source(config: Config, dataset: str, year: int, store: ProvenanceStor
     records = store.verify_record_closure([*identifiers.values(), *references])
     validate_reference_records(source, records.__getitem__, verify_all_claimed=True)
     for table in tables:
-        record = records[identifiers[table["table"]]]
+        scope = table["table"]
+        identifier = identifiers[scope]
+        record = records[identifier]
         expected, = table_input_sha256s(table)
         if table.get("metric_period") != source.metadata.period.to_dict():
             raise ValueError("PEIMS crosswalk period differs from its exact source edition")
         observed = record.get("source_metadata", {})
         content_type = record.get("response_headers", {}).get("content-type", "").split(";", 1)[0].strip().lower()
+        if dataset == STAFF:
+            identity_matches = matches_staff_source(record, identifier, year, scope)
+        else:
+            identity_matches = (record["dataset"], record["section"], observed.get("source_url")) == (
+                dataset, source.section, source.metadata.source_url)
         if (record["kind"] != "acquisition" or record["method"] != "download"
-                or record["dataset"] != dataset or record["section"] != source.section
+                or not identity_matches
                 or record["requested_year"] != year or record["resolved_year"] != year
                 or observed.get("version") != str(year) or observed["period"] != source.metadata.period.to_dict()
-                or observed.get("source_url") != source.metadata.source_url or content_type not in {"text/csv", "application/csv"}
+                or content_type not in {"text/csv", "application/csv"}
                 or record["artifact"]["sha256"] != expected or not 0 < record["artifact"]["size_bytes"] <= SOURCE_BYTES):
             raise ValueError(f"PEIMS {dataset} {table['table']} acquisition differs from its exact source contract")
         if dataset == STAFF:
-            validate_staff_request(record, year, table["table"])
+            validate_staff_request(record, year, scope)
     return source, policy, tables, identifiers, references
 
 

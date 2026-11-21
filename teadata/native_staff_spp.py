@@ -14,7 +14,7 @@ from . import spp_leaves
 from .dataset_metadata import DataPeriod
 from .manifest import ContractError
 from .native_witnesses import _BROKER, _Rows
-from .peims_staff import STAFF, STAFF_EMPLOYEE_BASIS, STAFF_EMPLOYEE_COUNT, staff_fact_units
+from .peims_staff import STAFF, STAFF_EMPLOYEE_BASIS, STAFF_EMPLOYEE_COUNT, STAFF_SELECTOR, staff_fact_units
 from .source_parity import validate_source_parity
 
 if TYPE_CHECKING:
@@ -23,16 +23,15 @@ if TYPE_CHECKING:
     from .release import DataRelease
 
 
-_STAFF_SELECTOR = "https://rptsvr1.tea.texas.gov/adhocrpt/adpeb.html"
 _SPP_HEADER = ["State Performance Plan / Annual Performance Report Indicators",
                "Target", "Rate", "MetTarget", "Rate", "MetState Target"]
 
 
 def reviewed_staff_spp(manifest_sha256: str) -> tuple[str, int, dict[str, Any]] | None:
     reviews = json.loads(files("teadata").joinpath("reference_cases/native_staff_spp.json").read_text())
-    for dataset, review in reviews.items():
+    for review in reviews:
         if manifest_sha256 in review["manifests"]:
-            return dataset, review["manifests"][manifest_sha256], review["editions"]
+            return review["dataset"], review["manifests"][manifest_sha256], review["editions"]
     return None
 
 
@@ -82,7 +81,7 @@ def _staff_report(store: ProvenanceStore, ref: ArtifactRef, table, entity: str, 
     else:
         raise ContractError("Independent staffing witness has unsupported geography")
     content = _read_report(store, ref, receipt, dataset="reference:peims_staff_fte_salary_witness",
-                           url=url, selector=_STAFF_SELECTOR, method=method, year=year, controls=controls)
+                           url=url, selector=STAFF_SELECTOR, method=method, year=year, controls=controls)
     if (f"{year - 1}-{year} Staff Salaries and FTE Counts -- Excluding ESC Staff" not in content
             or f"Staff Salary FTE Report_{geography}_{year - 1}-{key.edition[-2:]}" not in content
             or (selected is not None and re.search(rf"\({entity}\s*\)", content) is None)):

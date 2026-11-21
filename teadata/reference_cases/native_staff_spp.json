@@ -1,5 +1,6 @@
-{
-  "peims_staff_fte_and_salary": {
+[
+  {
+    "dataset": "peims_staff_fte_and_salary",
     "editions": {
       "1ce988cd6ec239bc5a9f22f7dec3a03cd9702cba2166254ecff470ea598ffe3c": [
         {
@@ -54,7 +55,64 @@
       "8cd071e5cfaac027a43895aa2335206d87eb5bf19a9001b2cc42797c5b0c9325": 3
     }
   },
-  "spp_timely_initial_evaluation": {
+  {
+    "dataset": "peims_staff_fte_and_salary",
+    "editions": {
+      "0d4f28faa9bab2a5aa31f012b4a11a908fc570958f1bea89c64c721a5354512f": [
+        {
+          "entity": "state",
+          "receipt": "f5cde5be5aba1db0fc162311a901753e243ade8901796d8c78411b7bf470ad46"
+        }
+      ],
+      "16574180e44988ff315d3ada241dabd20336f523f59a6ba2bcec000fecf65f2c": [
+        {
+          "entity": "227901",
+          "receipt": "0f59409a34ec1ea22a17bd6d7bca3ed27b0c566e35fe34b25dc02908729ac6de"
+        }
+      ],
+      "981f15b351d4c96e73048a2b8d69117a47e3ec31ee129209f744f34b646cea6f": [
+        {
+          "entity": "227901",
+          "receipt": "51158972a050d16f4a888c8f3ebca980172d1b7824eadea7f427717fa4c125f6"
+        }
+      ],
+      "a05f65caea1f92a51454ab7e067887d022e32a3d7180100c0c4c8fa139576300": [
+        {
+          "entity": "state",
+          "receipt": "23267ed236af1c029b387d859d8dca43ef22ed9afbc053ab98c32dbadf4ebb5e"
+        }
+      ],
+      "a2c605959b4f0ce51dba14c89a999e19283feec05358c7baa15362e3995b4c52": [
+        {
+          "entity": "227901",
+          "receipt": "d9dba44b0010ba951ae13ef8131d2fd58de975965a736bd44da8b853b1d707f0"
+        }
+      ],
+      "bb8ba9c0cf8f2dafebd9bc2f90094dff2806a2b1ba4db7576bf98beb322328fb": [
+        {
+          "entity": "state",
+          "receipt": "e111a836cd5093c1ce359c0990cf9433e5763e686551cbb7b6584cf0368503db"
+        }
+      ],
+      "bf1fd2733f2cc7ebe59f8a781a24377e9e4f84d1354276dbdd75f6325b96fea3": [
+        {
+          "entity": "state",
+          "receipt": "9fc20ccad213091745e9d9b0d5dbadc7974f6373882d9c3265d2bc1a37721d13"
+        }
+      ],
+      "f6297b8401e3d96b2eaf8fefdf18416a7166f828565bc349c8e7aeb78b661e19": [
+        {
+          "entity": "227901",
+          "receipt": "746339e5e7e5ef36c92966005e9d14167a14a46613b1abcd5a747dd96c83c75a"
+        }
+      ]
+    },
+    "manifests": {
+      "bff718af1114eaebc475d7260a0269cd022005fe95999f1e6cb814b0032cf28d": 3
+    }
+  },
+  {
+    "dataset": "spp_timely_initial_evaluation",
     "editions": {
       "2d0ca008b2abd901d5a20c155b5e3eb520b5d3c8008ee2ab34be98d856f81c4b": [
         {
@@ -98,4 +156,4 @@
       "d2f1f6c94eef232c197a464a847a21a1ed1b309cef3dbe63bf64bc1eddfa75aa": 4
     }
   }
-}
+]

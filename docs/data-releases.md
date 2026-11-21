@@ -993,9 +993,18 @@ The same command admits the exact standalone PEIMS staffing and SPP Indicator
 11 candidates listed in `teadata/reference_cases/native_staff_spp.json`. Keep
 each candidate's bundled `provenance` directory beside its manifest and pass
 the separate store containing its TEA HTML witnesses with `--source-store`.
-Staffing compares every retained CSV cell using the typed source verifier,
-then checks the native values against eight independently selected Texas and
-Austin staffing reports. Indicator 11 replays the native projection from
+Each staffing candidate compares its retained CSV cells using the typed source
+verifier, then checks native values against eight independently selected Texas
+and Austin staffing reports. The 2018–19 through 2021–22 candidate preserves
+the original archive receipt IDs in its lineage. It is qualified as a standalone
+candidate and awaits attachment to a published parent. Its four direct Texas
+reports are separate from the four statewide-by-district extracts.
+The archived criteria first explicitly exclude contracted staff in 2019–20.
+The 2021–22 district-name bytes retain trailing NUL padding. The source notes
+for the 2012–13 through 2017–18 extracts do not establish why some figures use
+a period, so those editions remain outside the qualified staffing series.
+
+Indicator 11 replays the native projection from
 all 40 original regional workbooks, including raw tokens, typed values,
 statuses and physical source locations. Seven separate TEA district reports
 check the published rates and target flags. The Austin 2024–25 witness

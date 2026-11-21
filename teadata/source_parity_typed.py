@@ -51,6 +51,7 @@ from .peims_staff import (
     STAFF_EMPLOYEE_BASIS,
     STAFF_EMPLOYEE_COUNT,
     STAFF_RECIPE,
+    matches_staff_source,
     staff_allows_unavailable_average,
     staff_fact_units,
     validate_staff_request,
@@ -458,7 +459,8 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
     for claimed, (encoding, region, rows, annotations) in zip(acquisitions, inputs, strict=True):
         receipt = upstream.get(claimed["record_id"])
         if (receipt is None or receipt != {name: value for name, value in claimed.items() if name != "record_id"}
-                or receipt["kind"] != "acquisition" or receipt["method"] != "download" or receipt["dataset"] != key.dataset
+                or receipt["kind"] != "acquisition" or receipt["method"] != "download"
+                or (not staff and receipt["dataset"] != key.dataset)
                 or receipt["resolved_year"] != period.end_year or receipt["requested_year"] != period.end_year
                 or receipt["source_metadata"].get("version") != key.edition
                 or receipt["source_metadata"].get("period") != period.to_dict()):
@@ -466,6 +468,8 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
         digest = claimed["artifact"]["sha256"]
         if staff:
             assert period.end_year is not None
+            if not matches_staff_source(receipt, claimed["record_id"], period.end_year, key.scope):
+                raise ValueError("Staffing catalog acquisition differs from its reviewed source identity")
             validate_staff_request(receipt, period.end_year, key.scope)
         repair = identity_review.for_original(region, digest) if identity_review is not None else None
         originals.append(_Original(store.verify_artifact(digest), digest, encoding, region, rows, annotations, repair))

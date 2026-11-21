@@ -6,7 +6,9 @@ import pytest
 
 from teadata.column_schema import crosswalk_dataset, parse_column_schema, reader_options, table_input_sha256s
 from teadata.peims_leaves import _key_columns
-from teadata.peims_staff import STAFF, staff_allows_unavailable_average, staff_employee_basis, staff_values, validate_staff_request
+from teadata.peims_staff import (
+    STAFF, matches_staff_source, staff_allows_unavailable_average, staff_employee_basis, staff_values, validate_staff_request,
+)
 from teadata.provenance import ProvenanceStore, validate_record_graph, validate_reference_records
 from teadata.teadata_config import load_config
 from teadata.values import ValuePolicy
@@ -43,8 +45,24 @@ def test_staff_config_binds_exact_publisher_year_scope_and_layout(year, state_ro
         assert layout["last_data_record"] - layout["first_data_record"] + 1 == rows
         assert {item["field"] for item in table["fields"]} >= set(_key_columns(STAFF, scope))
         assert not any(item["field"] == "school_year" for item in table["fields"])
+        assert matches_staff_source(record, options["acquisition_ids"][scope], year, scope)
         with pytest.raises(ValueError, match="scope or edition"):
             validate_staff_request(record, year, "state" if scope == "district" else "district")
+
+
+def test_staff_archive_admission_binds_exact_receipt_year_scope_and_publisher():
+    original = {
+        "dataset": "reference:peims_staff_fte_salary_history",
+        "section": "reference",
+        "source_metadata": {"source_url": "https://rptsvr1.tea.texas.gov/cgi/sas/broker"},
+    }
+    identifier = "54b1d62ed8e5c93be3bfa7cabcaeddda118747eb6df7756642d885285c61a09a"
+    assert matches_staff_source(original, identifier, 2022, "state")
+    assert not matches_staff_source(original, identifier, 2022, "district")
+    assert not matches_staff_source(original, identifier, 2021, "state")
+    assert not matches_staff_source(original, "0" * 64, 2022, "state")
+    assert not matches_staff_source({**original, "section": "peims"}, identifier, 2022, "state")
+    assert not matches_staff_source({**original, "source_metadata": {}}, identifier, 2022, "state")
 
 
 def test_staff_values_preserve_decimal_fte_and_unavailable_average():
