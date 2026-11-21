@@ -1,7 +1,7 @@
 # PEIMS Staff FTE Counts and Salary
 
-`peims_staff_fte_and_salary` registers the October PEIMS staff reports for
-2022–23 through 2025–26. Each year has a separate Texas report and district
+`peims_staff_fte_and_salary` covers the October PEIMS staff reports for
+2018–19 through 2025–26 in the normal release. Each year has a separate Texas report and district
 report. District rows retain the exact six-digit district identifier and the
 publisher's literal staff category and role. Texas rows retain the published
 state scope. Category and role are part of the key. The single space in the
@@ -34,18 +34,32 @@ Raw tokens and original CSV record numbers travel with the typed values. A
 district `.` for Average Base Pay in the 2024–25 or 2025–26 edition has
 `missing` status. A published numeric zero has `observed` status. The latest
 edition is listed as published March 19, 2026. TEA's listing does not supply a
-finality label. Employee Count is absent from the three earlier editions.
+finality label. Employee Count is available only in the 2025–26 edition.
 
 Each source receipt preserves the publisher request, content digest, and a
 link to the earlier capture of the same CSV bytes. The definition links return
 the same content as the retained annual criteria receipts. The provenance
 closure also includes the selector and reviewed column-layout evidence.
 
-## Offline candidate
+## Historical coverage
+
+The 2018–19 through 2021–22 editions use direct Texas and statewide district
+CSV reports with annual criteria and independent named HTML report checks.
+District names in the 2021–22 CSV can contain trailing NUL padding. District
+identities use the publisher's six-digit ID. The source receipt preserves the
+exact CSV bytes. The criteria explicitly list contracted staff among
+exclusions starting in 2019–20. Earlier criteria list ESC staff, and the
+wording alone cannot establish a change in reporting practice.
+
+The retained 2012–13 through 2017–18 editions contain unexplained dot
+tokens in numeric fields. They remain outside the qualified release. The
+publisher evidence does not establish a common suppression interpretation
+across those years.
+
+## Reproduce a native candidate
 
 Select the exact school-year end and use the reviewed source configuration
-with the retained provenance store. The normal snapshot does not open these
-source-only editions.
+with the retained provenance store. The release catalog opens the pinned staffing observations on demand.
 
 ```sh
 uv run --locked python -m teadata.scripts.refresh_peims \

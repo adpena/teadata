@@ -7,7 +7,16 @@ A build records the files it actually reads. The runtime catalog is embedded in 
 <a id="current-normal-release-00163"></a>
 <a id="current-normal-release-00164"></a>
 
-## Current normal release 0.0.173
+## Current normal release 0.0.175
+
+The [pinned normal release](https://github.com/adpena/teadata/releases/download/v0.0.175/release.json) adds the 2018–19 through 2021–22 PEIMS
+Staff FTE and Salary reports for districts and Texas. All 31 earlier native
+attachments retain their identities. Staff FTE, reported total base pay
+and reported average base pay now have eight school years in these scopes.
+The [staff source notes](peims-staff.md) document the population, units,
+source variants and withheld earlier editions.
+
+## Prior normal release 0.0.173
 
 The [pinned normal release](https://github.com/adpena/teadata/releases/download/v0.0.173/release.json) exposes 2025–26 STAAR All Grades and
 2023–24 through 2025–26 STAAR End-of-Course at campus, district, ESC region

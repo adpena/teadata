@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
-  "observed_at": "2026-11-21T02:59:12.308550+00:00",
+  "observed_at": "2026-11-21T06:00:55.842103+00:00",
   "generator": {
-    "software_version": "0.0.173",
+    "software_version": "0.0.175",
     "working_source_sha256": {
       "scripts/source_inventory.py": "68a90e79a7066867c3604e2a304ab650c59591389e2eb00c0234e035c7a7893a",
       "teadata/release_inventory.py": "5f6e4cbac970e08d71b2d5713ce1eb0cf3e4944b0adedd41e01fed6d20196cce",
@@ -18,9 +18,9 @@
     "source_only_ids": 114,
     "source_only_ids_not_attached": 77,
     "base_inputs": 13,
-    "native_attachments": 31,
+    "native_attachments": 32,
     "native_dataset_ids": 42,
-    "native_edition_scope_keys": 339
+    "native_edition_scope_keys": 347
   },
   "registration": [
     {
@@ -1481,6 +1481,10 @@
       "base_input_present": false,
       "native_attachment_present": true,
       "attached_report_editions": [
+        "2019",
+        "2020",
+        "2021",
+        "2022",
         "2023",
         "2024",
         "2025",
@@ -2302,9 +2306,9 @@
   "selected_catalog": {
     "schema_version": 1,
     "release": {
-      "source": "https://github.com/adpena/teadata/releases/download/v0.0.173/release.json",
-      "manifest_sha256": "f615653415db314ed40324408ae792b03e5976234d6baa142e308a29142fbe66",
-      "build_id": "211acd03164d56d09ccbde8025c67e35f3cfdc6898a84fe106ae3b5a025e4c21"
+      "source": "https://github.com/adpena/teadata/releases/download/v0.0.175/release.json",
+      "manifest_sha256": "2a19e22760af8da443af29a38d01d7d9c13f65095fd739e78bb7a0a1dc345f1b",
+      "build_id": "31038e45f324b824e1d7f27dee4e1c6e001d5d770013bd710c1e9eda7ca0d368"
     },
     "include_variables": true,
     "metadata_inspected": true,
@@ -7396,6 +7400,77 @@
             "grain": "one row per region_number"
           }
         ]
+      },
+      {
+        "location": "native-bff718af1114eaebc475d7260a0269cd022005fe95999f1e6cb814b0032cf28d.json",
+        "manifest_sha256": "bff718af1114eaebc475d7260a0269cd022005fe95999f1e6cb814b0032cf28d",
+        "build_id": "87f8a9f0899ec901257c6ea5aa5769a52c1df0386798f58b30a406cc4ad66fa0",
+        "editions": [
+          {
+            "dataset": "peims_staff_fte_and_salary",
+            "edition": "2019",
+            "revision_sha256": "0536019e725a6677fe4f619057cbbf21fff12f62b8747faacd94ae0b51b107db",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per staff_category and staff_role"
+          },
+          {
+            "dataset": "peims_staff_fte_and_salary",
+            "edition": "2019",
+            "revision_sha256": "7515e651fdecaf7b47651a165ba59c6f243a9d989cb274e45075bc3b59d85335",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per district_number and staff_category and staff_role"
+          },
+          {
+            "dataset": "peims_staff_fte_and_salary",
+            "edition": "2021",
+            "revision_sha256": "9f047b4705b4d8e24eedfc4e8fd96cf61a351f12ae3df75041607dbadb19e8be",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per district_number and staff_category and staff_role"
+          },
+          {
+            "dataset": "peims_staff_fte_and_salary",
+            "edition": "2021",
+            "revision_sha256": "743103a67cbe5b047795cf3ec81a4461de678503ad6d3f55f41ed7d3dc940166",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per staff_category and staff_role"
+          },
+          {
+            "dataset": "peims_staff_fte_and_salary",
+            "edition": "2020",
+            "revision_sha256": "1da70e6c2ae4909fabbd8618ff9cc73ffdf823c9ceb2e3d5da3ffc68eb319df3",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per district_number and staff_category and staff_role"
+          },
+          {
+            "dataset": "peims_staff_fte_and_salary",
+            "edition": "2020",
+            "revision_sha256": "144e682aee37d692f5889d1493395351394738683be0e6ddfeb0626e30fcc69a",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per staff_category and staff_role"
+          },
+          {
+            "dataset": "peims_staff_fte_and_salary",
+            "edition": "2022",
+            "revision_sha256": "12b4c2413571af65e3b26fb741e66da960e0faa410651963fa6b6e8436da4a14",
+            "scope": "state",
+            "table": "state",
+            "grain": "one publisher row per staff_category and staff_role"
+          },
+          {
+            "dataset": "peims_staff_fte_and_salary",
+            "edition": "2022",
+            "revision_sha256": "fe25dff62b8d9b2047b5b70c774450885d3357dc5dba7239b42744cbff2616b4",
+            "scope": "district",
+            "table": "district",
+            "grain": "one publisher row per district_number and staff_category and staff_role"
+          }
+        ]
       }
     ],
     "editions": [
@@ -10378,6 +10453,60 @@
         ]
       },
       {
+        "edition_id": "0d4f28faa9bab2a5aa31f012b4a11a908fc570958f1bea89c64c721a5354512f",
+        "dataset": "peims_staff_fte_and_salary",
+        "edition": "2019",
+        "revision_sha256": "0536019e725a6677fe4f619057cbbf21fff12f62b8747faacd94ae0b51b107db",
+        "scope": "state",
+        "table": "state",
+        "grain": "one publisher row per staff_category and staff_role",
+        "title": "2018–19 PEIMS Staff FTE Counts and Salary",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adpeb.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2018,
+          "end_year": 2019
+        },
+        "source_qualifiers": null,
+        "variable_count": 5,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2018,
+              "end_year": 2019
+            },
+            "unit": "currency",
+            "fields": [
+              "staff_average_base_pay",
+              "staff_total_base_pay"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2018,
+              "end_year": 2019
+            },
+            "unit": "fte",
+            "fields": [
+              "staff_fte"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "staff_category",
+              "staff_role"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "0d680de27ed854ec31017fd46f50062fffc77613b0ffe24a9d388675e3402543",
         "dataset": "educator_district_new_hires_by_epp",
         "edition": "5",
@@ -11018,6 +11147,65 @@
               "aggregation_level",
               "school_year",
               "source_scope"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "16574180e44988ff315d3ada241dabd20336f523f59a6ba2bcec000fecf65f2c",
+        "dataset": "peims_staff_fte_and_salary",
+        "edition": "2019",
+        "revision_sha256": "7515e651fdecaf7b47651a165ba59c6f243a9d989cb274e45075bc3b59d85335",
+        "scope": "district",
+        "table": "district",
+        "grain": "one publisher row per district_number and staff_category and staff_role",
+        "title": "2018–19 PEIMS Staff FTE Counts and Salary",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adpeb.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2018,
+          "end_year": 2019
+        },
+        "source_qualifiers": null,
+        "variable_count": 10,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2018,
+              "end_year": 2019
+            },
+            "unit": "currency",
+            "fields": [
+              "staff_average_base_pay",
+              "staff_total_base_pay"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2018,
+              "end_year": 2019
+            },
+            "unit": "fte",
+            "fields": [
+              "staff_fte"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "charter_status",
+              "county_name",
+              "district_name",
+              "district_number",
+              "region_number",
+              "staff_category",
+              "staff_role"
             ]
           }
         ]
@@ -33204,6 +33392,65 @@
         ]
       },
       {
+        "edition_id": "981f15b351d4c96e73048a2b8d69117a47e3ec31ee129209f744f34b646cea6f",
+        "dataset": "peims_staff_fte_and_salary",
+        "edition": "2021",
+        "revision_sha256": "9f047b4705b4d8e24eedfc4e8fd96cf61a351f12ae3df75041607dbadb19e8be",
+        "scope": "district",
+        "table": "district",
+        "grain": "one publisher row per district_number and staff_category and staff_role",
+        "title": "2020–21 PEIMS Staff FTE Counts and Salary",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adpeb.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2020,
+          "end_year": 2021
+        },
+        "source_qualifiers": null,
+        "variable_count": 10,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2020,
+              "end_year": 2021
+            },
+            "unit": "currency",
+            "fields": [
+              "staff_average_base_pay",
+              "staff_total_base_pay"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2020,
+              "end_year": 2021
+            },
+            "unit": "fte",
+            "fields": [
+              "staff_fte"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "charter_status",
+              "county_name",
+              "district_name",
+              "district_number",
+              "region_number",
+              "staff_category",
+              "staff_role"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "9dccdf168eb7400ed6eb5ff6337a3e1dcc04c7f099633c800e23a359634f84dc",
         "dataset": "tprs_student_continuity",
         "edition": "2026",
@@ -33365,6 +33612,60 @@
             "fields": [
               "first_teaching_school_year",
               "publisher_group"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "a05f65caea1f92a51454ab7e067887d022e32a3d7180100c0c4c8fa139576300",
+        "dataset": "peims_staff_fte_and_salary",
+        "edition": "2021",
+        "revision_sha256": "743103a67cbe5b047795cf3ec81a4461de678503ad6d3f55f41ed7d3dc940166",
+        "scope": "state",
+        "table": "state",
+        "grain": "one publisher row per staff_category and staff_role",
+        "title": "2020–21 PEIMS Staff FTE Counts and Salary",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adpeb.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2020,
+          "end_year": 2021
+        },
+        "source_qualifiers": null,
+        "variable_count": 5,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2020,
+              "end_year": 2021
+            },
+            "unit": "currency",
+            "fields": [
+              "staff_average_base_pay",
+              "staff_total_base_pay"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2020,
+              "end_year": 2021
+            },
+            "unit": "fte",
+            "fields": [
+              "staff_fte"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "staff_category",
+              "staff_role"
             ]
           }
         ]
@@ -33533,6 +33834,65 @@
               "education_service_center_label",
               "school_year_end",
               "school_year_label"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "a2c605959b4f0ce51dba14c89a999e19283feec05358c7baa15362e3995b4c52",
+        "dataset": "peims_staff_fte_and_salary",
+        "edition": "2020",
+        "revision_sha256": "1da70e6c2ae4909fabbd8618ff9cc73ffdf823c9ceb2e3d5da3ffc68eb319df3",
+        "scope": "district",
+        "table": "district",
+        "grain": "one publisher row per district_number and staff_category and staff_role",
+        "title": "2019–20 PEIMS Staff FTE Counts and Salary",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adpeb.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2019,
+          "end_year": 2020
+        },
+        "source_qualifiers": null,
+        "variable_count": 10,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2019,
+              "end_year": 2020
+            },
+            "unit": "currency",
+            "fields": [
+              "staff_average_base_pay",
+              "staff_total_base_pay"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2019,
+              "end_year": 2020
+            },
+            "unit": "fte",
+            "fields": [
+              "staff_fte"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "charter_status",
+              "county_name",
+              "district_name",
+              "district_number",
+              "region_number",
+              "staff_category",
+              "staff_role"
             ]
           }
         ]
@@ -37782,6 +38142,60 @@
         ]
       },
       {
+        "edition_id": "bb8ba9c0cf8f2dafebd9bc2f90094dff2806a2b1ba4db7576bf98beb322328fb",
+        "dataset": "peims_staff_fte_and_salary",
+        "edition": "2020",
+        "revision_sha256": "144e682aee37d692f5889d1493395351394738683be0e6ddfeb0626e30fcc69a",
+        "scope": "state",
+        "table": "state",
+        "grain": "one publisher row per staff_category and staff_role",
+        "title": "2019–20 PEIMS Staff FTE Counts and Salary",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adpeb.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2019,
+          "end_year": 2020
+        },
+        "source_qualifiers": null,
+        "variable_count": 5,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2019,
+              "end_year": 2020
+            },
+            "unit": "currency",
+            "fields": [
+              "staff_average_base_pay",
+              "staff_total_base_pay"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2019,
+              "end_year": 2020
+            },
+            "unit": "fte",
+            "fields": [
+              "staff_fte"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "staff_category",
+              "staff_role"
+            ]
+          }
+        ]
+      },
+      {
         "edition_id": "bba3bf699e28c2a82f7791342b73b3c42414d67009aaaf4a8a39bf254508faae",
         "dataset": "tprs_class_size",
         "edition": "2026",
@@ -37931,6 +38345,60 @@
               "class_size_sec_math_avg_size",
               "class_size_sec_sci_avg_size",
               "class_size_sec_soc_stud_avg_size"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "bf1fd2733f2cc7ebe59f8a781a24377e9e4f84d1354276dbdd75f6325b96fea3",
+        "dataset": "peims_staff_fte_and_salary",
+        "edition": "2022",
+        "revision_sha256": "12b4c2413571af65e3b26fb741e66da960e0faa410651963fa6b6e8436da4a14",
+        "scope": "state",
+        "table": "state",
+        "grain": "one publisher row per staff_category and staff_role",
+        "title": "2021–22 PEIMS Staff FTE Counts and Salary",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adpeb.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2021,
+          "end_year": 2022
+        },
+        "source_qualifiers": null,
+        "variable_count": 5,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2021,
+              "end_year": 2022
+            },
+            "unit": "currency",
+            "fields": [
+              "staff_average_base_pay",
+              "staff_total_base_pay"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2021,
+              "end_year": 2022
+            },
+            "unit": "fte",
+            "fields": [
+              "staff_fte"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "staff_category",
+              "staff_role"
             ]
           }
         ]
@@ -47297,6 +47765,65 @@
               "reported_epp_assignment",
               "school_year_end",
               "school_year_label"
+            ]
+          }
+        ]
+      },
+      {
+        "edition_id": "f6297b8401e3d96b2eaf8fefdf18416a7166f828565bc349c8e7aeb78b661e19",
+        "dataset": "peims_staff_fte_and_salary",
+        "edition": "2022",
+        "revision_sha256": "fe25dff62b8d9b2047b5b70c774450885d3357dc5dba7239b42744cbff2616b4",
+        "scope": "district",
+        "table": "district",
+        "grain": "one publisher row per district_number and staff_category and staff_role",
+        "title": "2021–22 PEIMS Staff FTE Counts and Salary",
+        "publisher": "Texas Education Agency",
+        "source_url": "https://rptsvr1.tea.texas.gov/adhocrpt/adpeb.html",
+        "declared_period": {
+          "kind": "school_year",
+          "start_year": 2021,
+          "end_year": 2022
+        },
+        "source_qualifiers": null,
+        "variable_count": 10,
+        "field_periods": [
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2021,
+              "end_year": 2022
+            },
+            "unit": "currency",
+            "fields": [
+              "staff_average_base_pay",
+              "staff_total_base_pay"
+            ]
+          },
+          {
+            "period": {
+              "kind": "school_year",
+              "start_year": 2021,
+              "end_year": 2022
+            },
+            "unit": "fte",
+            "fields": [
+              "staff_fte"
+            ]
+          },
+          {
+            "period": {
+              "kind": "unknown"
+            },
+            "unit": null,
+            "fields": [
+              "charter_status",
+              "county_name",
+              "district_name",
+              "district_number",
+              "region_number",
+              "staff_category",
+              "staff_role"
             ]
           }
         ]

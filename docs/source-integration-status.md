@@ -1,18 +1,27 @@
 # Source integration status
 
-The packaged selector identifies **normal data release 0.0.173**. This is a
+The packaged selector identifies **normal data release 0.0.175**. This is a
 frozen analysis release. Software publication and application deployment are
 separate gates. Historical requests keep their pins.
-The [machine inventory](source-integration-status-0.0.173.json), generated from
-the normal parent on November 20, 2026, records
+The [machine inventory](source-integration-status-0.0.175.json), generated from
+the normal parent on November 21, 2026, records
 127 registered IDs, 279 configured editions,
-13 base inputs and 31 native attachments covering 42 dataset IDs and
-339 edition/scope keys. Registration, acquisition, qualification and query
+13 base inputs and 32 native attachments covering 42 dataset IDs and
+347 edition/scope keys. Registration, acquisition, qualification and query
 access are separate statuses.
 
-- Manifest: `f615653415db314ed40324408ae792b03e5976234d6baa142e308a29142fbe66`.
-- Build: `211acd03164d56d09ccbde8025c67e35f3cfdc6898a84fe106ae3b5a025e4c21`.
-- Processing record: `20c81e7135417787def2ef13dd37d40b803a6e9a482f652278785f61ab99582c`.
+- Manifest: `2a19e22760af8da443af29a38d01d7d9c13f65095fd739e78bb7a0a1dc345f1b`.
+- Build: `31038e45f324b824e1d7f27dee4e1c6e001d5d770013bd710c1e9eda7ca0d368`.
+- Processing record: `270ef47f9e8f3a2d7ce5057ae7c8c73061c4db88123cb64f47b2522cb7cb43bc`.
+
+## Historical PEIMS staffing
+
+The 2018–19 through 2021–22 Staff FTE and Salary reports add 210,306
+publisher rows across eight district and direct Texas editions. FTE uses
+exact scale-two decimals. Published total and average base pay retain their
+nominal dollar units. This source has no campus scope. The historical
+2012–13 through 2017–18 editions remain held while undetermined publisher
+dot tokens are investigated. See the [staff source notes](peims-staff.md).
 
 ## STAAR publisher assessment rates
 
@@ -140,7 +149,7 @@ individual definitions, units, population, revisions and source links.
 | `peims_college_credit` | 2022–2026 | district, region, state | SY ending 2022–2026 |
 | `peims_financial_single_file_budgets` | 2026 | district | FY ending 2026 |
 | `peims_special_education_by_primary_disability` | 2013–2026 | district, state | SY ending 2013–2026 |
-| `peims_staff_fte_and_salary` | 2023–2026 | district, state | SY ending 2023–2026 |
+| `peims_staff_fte_and_salary` | 2019–2026 | district, state | SY ending 2019–2026 |
 | `peims_student_enrollment_by_ethnicity` | 2019–2026 | campus, district, state | SY ending 2019–2026 |
 | `peims_student_programs_and_special_populations` | 2023–2026 | campus, district, state | SY ending 2023–2026 |
 | `region_tapr_staar_all_grades` | 2026 | region | SY ending 2026 |

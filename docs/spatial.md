@@ -168,7 +168,7 @@ contracts. Application use requires admitting the artifact separately.
 
 ### Offline map outlines
 
-Use the `geography_boundaries` module on the development branch to build a
+Use the `geography_boundaries` module to build a
 separately pinned SQLite artifact from the reviewed ESC2024 and legislative
 layer receipts. It checks publisher identities, geographic coverage and
 the source coordinate systems. A reader can request metadata or bytes for
