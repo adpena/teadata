@@ -332,6 +332,7 @@ def test_composition_reuses_sealed_artifacts_and_preserves_query_provenance(norm
     remote.verify()
     monkeypatch.setattr(transport, "urlopen", lambda *a, **k: pytest.fail("Offline verification called transport"))
     reopened = DataRelease(remote_url, expected_sha256=pin, cache_dir=cache, offline=True)
+    assert reopened.core_manifest_path == cache / "manifests" / f"{core.manifest_sha256}.json"
     inventory = reopened.verified_cache_inventory()
     for manifest_pin in (pin, core.manifest_sha256, child.manifest_sha256):
         assert inventory[f"manifests/{manifest_pin}.json"]["sha256"] == manifest_pin

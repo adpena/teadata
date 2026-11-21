@@ -521,6 +521,11 @@ class DataRelease:
         return self._core_release.manifest_sha256 if self._core_release is not None else self.manifest_sha256
 
     @property
+    def core_manifest_path(self) -> Path:
+        """Local path of the manifest binding the serialized entity artifacts."""
+        return self._core_release.path if self._core_release is not None else self.path
+
+    @property
     def native_sources(self) -> tuple[NativeSourceRef, ...]:
         """Native selections visible to this release, including any composition."""
         return self._composition_sources if self._core_release is not None else self.catalog.native_sources
