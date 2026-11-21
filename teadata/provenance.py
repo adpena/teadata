@@ -101,9 +101,46 @@ class _RecordFrame:
     metadata: DatasetMetadata | None
 
 
+@dataclass(slots=True)
+class _ValidatedRecordGraph:
+    records: dict[str, dict[str, Any]]
+    dependencies: dict[str, tuple[str, ...]]
+
+    @classmethod
+    def from_records(cls, read_record: Callable[[str], Mapping[str, Any]],
+                     record_ids: Sequence[str]) -> _ValidatedRecordGraph:
+        dependencies: dict[str, tuple[str, ...]] = {}
+        records = _validate_record_graph(read_record, record_ids, adjacency=dependencies)
+        return cls(records, dependencies)
+
+    def artifact_hashes(self, roots: Sequence[str]) -> set[str]:
+        """Collect artifacts reachable from these inputs in the validated graph."""
+        hashes: set[str] = set()
+        visited: set[str] = set()
+        pending = list(roots)
+        while pending:
+            identifier = pending.pop()
+            if identifier in visited:
+                continue
+            visited.add(identifier)
+            record = self.records[identifier]
+            if record["kind"] == "acquisition":
+                hashes.add(record["artifact"]["sha256"])
+            else:
+                hashes.update(artifact["sha256"] for artifact in record["outputs"].values())
+            pending.extend(self.dependencies[identifier])
+        return hashes
+
+
 def validate_record_graph(read_record: Callable[[str], Mapping[str, Any]],
                           record_ids: Sequence[str]) -> dict[str, dict[str, Any]]:
     """Canonical pure receipt/typed-reference closure, shared by store and catalog."""
+    return _validate_record_graph(read_record, record_ids)
+
+
+def _validate_record_graph(read_record: Callable[[str], Mapping[str, Any]],
+                           record_ids: Sequence[str], *,
+                           adjacency: dict[str, tuple[str, ...]] | None = None) -> dict[str, dict[str, Any]]:
     records: dict[str, dict[str, Any]] = {}
     pending: set[str] = set()
     stack: list[tuple[_RecordFrame | None, Iterator[str]]] = [(None, iter(record_ids))]
@@ -152,6 +189,8 @@ def validate_record_graph(read_record: Callable[[str], Mapping[str, Any]],
             dependencies = record["inputs"]
             if not artifacts or not dependencies or not record.get("processor") or not record.get("code_version"):
                 raise ValueError("Incomplete processing receipt")
+        if adjacency is not None:
+            dependencies = adjacency[identifier] = tuple(dependencies)
         stack.append((_RecordFrame(identifier, record, artifacts, metadata), iter(dependencies)))
     return records
 

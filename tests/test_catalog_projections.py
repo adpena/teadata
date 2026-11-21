@@ -1330,6 +1330,25 @@ def damage_selected_mapping(document, edition):
     return changed
 
 
+def test_leaf_requires_inputs_reachable_from_its_processing_receipt(edition_fixture):
+    document = edition_fixture["catalog"].to_dict()
+    _, student, _ = edition_fixture["leaves"]["student"]
+    staff_key, _, _ = edition_fixture["leaves"]["staff"]
+    references = document["editions"][staff_key.identity]["metadata"]["references"]
+    staff_schema, = (receipt for reference in references if reference["role"] == "schema"
+                     for receipt in reference["provenance_ids"])
+    records = document["provenance"]
+    assert records[staff_schema]["artifact"]["sha256"] not in student.contract["inputs"]
+    processing = deepcopy(records[student.processing_id])
+    processing["inputs"] = [staff_schema]
+    replacement = sha256((canonical_json(processing) + "\n").encode()).hexdigest()
+    records[replacement] = processing
+    document["artifacts"][student.identity]["processing_id"] = replacement
+
+    with pytest.raises(ContractError, match="Leaf derivation does not close its physical inputs"):
+        rehash_catalog(document, edition_fixture["resources"])
+
+
 @pytest.mark.parametrize("selection", ["direct", "dependency", "complete_verify", "publication"])
 def test_crosswalk_semantics_precede_every_selected_leaf_transport(edition_fixture, catalog_transport, tmp_path, selection):
     from teadata.release import DataRelease, publish_release

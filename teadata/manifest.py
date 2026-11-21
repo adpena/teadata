@@ -24,7 +24,7 @@ from ._sqlite import readonly_connection
 from .dataset_metadata import ArtifactRef, ColumnSchemaRef, DataPeriod, DatasetMetadata, EditionKey, EditionMetadataRef, FieldBinding, LeafColumnSupport, MetricDefinition, ResolvedDataset
 from .dataset_metadata import EntityRowBinding, NativeSourceRef, parse_native_sources
 from .metric_bindings import MetricBinding, parse_bindings
-from .provenance import ProvenanceStore, validate_record_graph, validate_reference_records
+from .provenance import ProvenanceStore, _ValidatedRecordGraph, validate_record_graph, validate_reference_records
 from .values import Measurement, ValuePolicy, ValueStatus, measure
 from .transfer_summary import charter_transfer_observations
 from .column_schema import (
@@ -438,7 +438,9 @@ class DatasetCatalog:
             content = {k: v for k, v in document.items() if k != "build_id"}
             if identity != sha256(canonical_json(content).encode()).hexdigest() or (expected_build_id is not None and identity != expected_build_id):
                 raise ValueError("Dataset catalog identity mismatch")
-            self._records = validate_record_graph(document["provenance"].__getitem__, list(document["provenance"]))
+            provenance = document["provenance"]
+            graph = _ValidatedRecordGraph.from_records(provenance.__getitem__, list(provenance))
+            self._records = graph.records
             self._policies = {name: ValuePolicy.from_dict(value) for name, value in document["value_policies"].items()}
             self._edition_policies = ({identifier: {name: ValuePolicy.from_dict(value) for name, value in policies.items()}
                                       for identifier, policies in edition_policies.items()}
@@ -520,10 +522,7 @@ class DatasetCatalog:
                         or record.get("parameters", {}).get("toolchain") != contract["producer"]["toolchain"]
                         or any(output.get(name) != getattr(ref, name) for name in ("sha256", "size_bytes"))):
                     raise ValueError("Leaf does not match its processing output")
-                graph = validate_record_graph(self._records.__getitem__, record["inputs"])
-                acquired_hashes = {artifact["sha256"] for item in graph.values()
-                    for artifact in ([item["artifact"]] if item["kind"] == "acquisition" else item["outputs"].values())}
-                if not set(contract["inputs"]) <= acquired_hashes:
+                if not set(contract["inputs"]) <= graph.artifact_hashes(record["inputs"]):
                     raise ValueError("Leaf derivation does not close its physical inputs")
                 self._artifact_refs[identifier] = ref
                 self._artifact_keys[identifier] = tuple(contract["key_columns"])
