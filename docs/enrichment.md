@@ -294,7 +294,7 @@ and, optionally, campus or district IDs. Inspect `series.schema` and
 SQLAlchemy Core tables and an active transaction. The same contract appears
 in `describe_operators()["release_methods"]`.
 
-Run the [SQLite example](../examples/materialize_research_db.py) from this
+Run the [SQLite example](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/examples/materialize_research_db.py) from this
 checkout. It uses public release assets and a database path you choose.
 
 ```bash

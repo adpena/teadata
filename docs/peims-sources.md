@@ -155,9 +155,9 @@ and the difference between a true zero and suppression.
 
 | Publisher witness | 2025–26 PEIMS observation |
 | --- | --- |
-| [Austin ISD ethnicity report](../provenance/records/03288b78e7ef6ed8faf33cdc710669d07e05611467ad17bc6b5f09ab54809293.json) | Asian 3,446 and American Indian or Alaska Native 123 |
-| [Del Valle ISD program report](../provenance/records/d57f7ea3daa2d3df48a9acdbc1200e10857acbb525feeeab51eeafca234a70c7.json) and [Texas program report](../provenance/records/8678c92b4c16e804a20d2a26d4dbd5d9a7ec78204186148540a6d343be9243fc.json) | G/T 557 of 11,811 Enrollment in Del Valle and 489,027 of 5,467,642 Enrollment statewide |
-| [A+ Academy EL ethnicity report](../provenance/records/ec75b056b4c3538f0ed415427e3d71bd0d29ff337f582efebf6d3cc0a79ad07c.json) and [program report](../provenance/records/1007442d96b05eb9839f36a7b23fcb7b4bfa055c27a5eebaddf76efe2db0bcf3.json) | Campus `057829001`, district `057829`, Asian count `<10`, and an observed military-connected count of zero |
+| [Austin ISD ethnicity report](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/03288b78e7ef6ed8faf33cdc710669d07e05611467ad17bc6b5f09ab54809293.json) | Asian 3,446 and American Indian or Alaska Native 123 |
+| [Del Valle ISD program report](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/d57f7ea3daa2d3df48a9acdbc1200e10857acbb525feeeab51eeafca234a70c7.json) and [Texas program report](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/8678c92b4c16e804a20d2a26d4dbd5d9a7ec78204186148540a6d343be9243fc.json) | G/T 557 of 11,811 Enrollment in Del Valle and 489,027 of 5,467,642 Enrollment statewide |
+| [A+ Academy EL ethnicity report](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/ec75b056b4c3538f0ed415427e3d71bd0d29ff337f582efebf6d3cc0a79ad07c.json) and [program report](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/1007442d96b05eb9839f36a7b23fcb7b4bfa055c27a5eebaddf76efe2db0bcf3.json) | Campus `057829001`, district `057829`, Asian count `<10`, and an observed military-connected count of zero |
 
 The 18 historical leaves cover 197,674 rows across the two families and
 three scopes. The offline qualification gate compares their typed and raw
@@ -167,7 +167,7 @@ campus ethnicity reports omit the overall count. Use the program report for
 that count and retain suppressed categories without summing them.
 
 Use the historical manifest pinned in
-[`native_peims_historical.json`](../teadata/reference_cases/native_peims_historical.json)
+[`native_peims_historical.json`](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/teadata/reference_cases/native_peims_historical.json)
 with the [native release gate](data-releases.md#qualifying-reviewed-native-bundles).
 The manifest's adjacent `provenance` directory supplies raw parity evidence.
 The separate source store passed with `--source-store` supplies the individual
@@ -194,8 +194,8 @@ definition change. The publisher uses `-999` in CSV and `N/A` in HTML for
 masked cells, including some larger values masked to prevent imputation.
 
 The November 4, 2026 acquisition retains the
-[selector](../provenance/records/67a39bd274e492426111703a32278ad84a63cb5db037963779e18d5147da80a1.json)
-and [criteria](../provenance/records/3f0a9a11c39e00dbada1e7017aba382afe7b859bd142a00c0d3b2125752f6b10.json)
+[selector](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/67a39bd274e492426111703a32278ad84a63cb5db037963779e18d5147da80a1.json)
+and [criteria](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/3f0a9a11c39e00dbada1e7017aba382afe7b859bd142a00c0d3b2125752f6b10.json)
 with the exact request controls, hashes and retrieval times. The following
 offline comparison requires the archived objects under the provenance store's
 `objects/` directory. To replay from another checkout, use the archive or
@@ -213,9 +213,9 @@ uv run --locked --offline python -m teadata.scripts.verify_peims_courses --store
   --pair 2026 b83eb582021312eaf322d97e0ea081085258d9f89e26e11cbdd9c2efa8b82cc1 cea5fd8baa3c740914856de275dc29a33508b3dafbcf51d9bf4b7370b84cc99c
 ```
 
-An [individual campus extract](../provenance/records/50bdbb47f990375b35b64c5fa2e92c92edff30d4c267a5388b814854a78c97b6.json)
+An [individual campus extract](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/50bdbb47f990375b35b64c5fa2e92c92edff30d4c267a5388b814854a78c97b6.json)
 returned 59 course rows for A+ Academy Elementary (`057829001`) in 2023–24.
-The [selection receipt](../provenance/records/a5d05dd3d90060f054d41962f18d8df08e73ff37ee0f1477469102597256632e.json)
+The [selection receipt](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/a5d05dd3d90060f054d41962f18d8df08e73ff37ee0f1477469102597256632e.json)
 records how TEA resolved that campus number.
 
 ### Build and verify a course candidate
@@ -231,10 +231,10 @@ types for this export.
 
 | School year | State course rows | District course rows | District IDs | Campus course rows |
 | --- | ---: | ---: | ---: | ---: |
-| 2022–23 | 1,386 | [200,743](../provenance/records/ee41014dd9408af8f32371848f14138583af7ced5c8bf48ee7e896e1c5e0f1ff.json) | 1,211 | [504,825](../provenance/records/c07f85fa1df8bd2ef952d76e288f00a143f40325685f4cc41e6a06cf6582ab1e.json) |
-| 2023–24 | 1,397 | [201,999](../provenance/records/93c96e9c71b2201e09ba1abde6b0c8f3fb1da2c4befa71d662c1766ff2dda0d2.json) | 1,209 | [511,268](../provenance/records/ae2d4079fcd7647b1645c63848c87cb9a4278877ee896ebfb8e43795c5fbf086.json) |
-| 2024–25 | 1,422 | [204,303](../provenance/records/7963ec85cdfdce4e02849ec53520caed1df31588fd3c0c2b26161cc061c5773c.json) | 1,207 | [519,697](../provenance/records/0ca396d94c1bf6bb871a6bea4c31e73da726af62246ffd2b8acb9c68702b59af.json) |
-| 2025–26 | 1,453 | [207,751](../provenance/records/c54740974d39fdbc3c461120aba68db87b3af07fa3615eb91c868bd2d1c0ae81.json) | 1,203 | [533,161](../provenance/records/b167d12d5376336b863e7553b604247e184f6df389d85f24f64114089e418293.json) |
+| 2022–23 | 1,386 | [200,743](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/ee41014dd9408af8f32371848f14138583af7ced5c8bf48ee7e896e1c5e0f1ff.json) | 1,211 | [504,825](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/c07f85fa1df8bd2ef952d76e288f00a143f40325685f4cc41e6a06cf6582ab1e.json) |
+| 2023–24 | 1,397 | [201,999](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/93c96e9c71b2201e09ba1abde6b0c8f3fb1da2c4befa71d662c1766ff2dda0d2.json) | 1,209 | [511,268](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/ae2d4079fcd7647b1645c63848c87cb9a4278877ee896ebfb8e43795c5fbf086.json) |
+| 2024–25 | 1,422 | [204,303](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/7963ec85cdfdce4e02849ec53520caed1df31588fd3c0c2b26161cc061c5773c.json) | 1,207 | [519,697](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/0ca396d94c1bf6bb871a6bea4c31e73da726af62246ffd2b8acb9c68702b59af.json) |
+| 2025–26 | 1,453 | [207,751](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/c54740974d39fdbc3c461120aba68db87b3af07fa3615eb91c868bd2d1c0ae81.json) | 1,203 | [533,161](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/b167d12d5376336b863e7553b604247e184f6df389d85f24f64114089e418293.json) |
 
 `TEADATA_PROVENANCE_DIR` must contain the selected acquisition and reference
 closures. Build into a new directory and pin its manifest before verification.
@@ -257,7 +257,7 @@ The course check independently decodes the retained CSV and compares all raw
 fields, physical row locators, typed measures and statuses with the candidate.
 It also compares the four state leaves with separately requested TEA HTML
 reports and checks individual district reports for Hays CISD across all four
-district years and A+ Academy in 2025–26. The [publisher witness inventory](../teadata/reference_cases/native_peims_courses.json)
+district years and A+ Academy in 2025–26. The [publisher witness inventory](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/teadata/reference_cases/native_peims_courses.json)
 identifies the exact HTML receipts. District publisher agreement is scoped to
 those selections. These checks support explicit catalog reads from the
 unpublished candidate. Dataset activation and release publication are separate.
@@ -279,13 +279,13 @@ instructional campus entities.
 
 Five separately selected TEA HTML reports reproduce the course values of
 two distinct bulk district groups while printing the same district heading
-over both. In 2022–23, TEA's [Kyle Elementary HTML](../provenance/records/ed32e23d00ddf4737b5b48bb62f4f7ace2ce7752a75dc3693adb4f71a84fa4ed.json)
+over both. In 2022–23, TEA's [Kyle Elementary HTML](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/ed32e23d00ddf4737b5b48bb62f4f7ace2ce7752a75dc3693adb4f71a84fa4ed.json)
 shows McAllen ISD over both the 42-row Hays CISD group and the one-row
-McAllen ISD group. The [campus selector receipt](../provenance/records/2010d278de7ae385d1d8566f197ca1df51b5ae6344c35613d458c9cb77616277.json)
+McAllen ISD group. The [campus selector receipt](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/2010d278de7ae385d1d8566f197ca1df51b5ae6344c35613d458c9cb77616277.json)
 binds that report to Kyle Elementary. DeKalb Elementary's 2025–26 bulk CSV contains two
 `SE000001` records. One has suppressed enrollment and the other has an
-observed zero. TEA's [monitoring report](../provenance/records/03192c1d0591443eeace54456d8162f0f589f1562630cb533a0743d197f3d4e3.json)
-identifies a fiscal agent for 2023–24, and its [staff assignment rules](../provenance/records/0cd44065979f6b8dd860402840ce9ca545d3170a8aecf508edd0c1940a559d84.json)
+observed zero. TEA's [monitoring report](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/03192c1d0591443eeace54456d8162f0f589f1562630cb533a0743d197f3d4e3.json)
+identifies a fiscal agent for 2023–24, and its [staff assignment rules](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/0cd44065979f6b8dd860402840ce9ca545d3170a8aecf508edd0c1940a559d84.json)
 anticipate assignments across districts. These references provide context
 for the rows while the report's repeated heading remains unresolved.
 
@@ -300,7 +300,7 @@ canonical affiliations and dataset activation remain outside the verified
 contract. Preserve earlier manifest bytes and use the corresponding
 checkout when replaying a candidate tied to an earlier crosswalk revision.
 
-The [publisher witness inventory](../teadata/reference_cases/native_peims_courses.json)
+The [publisher witness inventory](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/teadata/reference_cases/native_peims_courses.json)
 also pins nine separately requested Selected Districtwide Campus Totals
 CSVs. Across the four school years, these reports reproduced 3,602 rows
 and 46,826 shared cells from their complete statewide district slices,
@@ -390,7 +390,7 @@ worksheet. CSV needs a separate JSON sidecar containing the same descriptor.
 Existing series SQL exports retain raw/status columns and pinned import receipts;
 store Decimal columns as exact text or a compatible exact numeric type.
 
-The [reviewed publisher cases](../teadata/reference_cases/native_college_credit.json)
+The [reviewed publisher cases](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/teadata/reference_cases/native_college_credit.json)
 include direct Texas totals, leading-zero ISD and charter IDs, observed zero,
 partially suppressed rows and historical HIGH POINT ACADEMY (220819) observations.
 That ID appears in the 2021–22/2022–23 source reports but is absent from the

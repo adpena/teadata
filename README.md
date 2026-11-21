@@ -9,6 +9,16 @@ It provides:
 - config-driven enrichment from TAPR, accountability, transfers, PEIMS financials, and closure datasets
 - sidecar sqlite stores for fast boundary/map/entity lookup
 
+## Start here
+
+| Goal | Guide |
+| --- | --- |
+| Run a first analysis and export the evidence | [Researcher quick start](docs/index.md) |
+| Check released datasets, years, scopes, and gaps | [Source integration inventory](docs/source-integration-status.md) |
+| Interpret a measure or compare years | [Source methodology](docs/source-coverage.md) |
+| Discover operators, filter rows, or compare with Texas | [Query guide](docs/querying.md) |
+| Reopen a pinned release or cite an export | [Release selection](docs/data-releases.md#runtime-and-rollout) and [citations](docs/data-releases.md#citing-tea-data) |
+
 ## Installation
 
 Python 3.11 through 3.15 are supported. Development and local checks default to
@@ -142,15 +152,14 @@ if aldine is not None:
         print(campus.name, campus.campus_number)
 ```
 
-The district operation returns a `Query`. `.first()` selects its first match or
-returns `None`; iterate the query to inspect every match when a name or wildcard
-can identify multiple districts.
+The district operation returns a `Query`. `.first()` selects the first result
+or returns `None` for an empty result. Use the six-digit district ID to identify
+a district unambiguously.
 
 `DataEngine()` creates an empty engine by default (`autoload=False`).
-`load_default()` and `from_snapshot()` without a path use the configured release:
-`TEADATA_RELEASE`, then `TEADATA_RELEASE_URL`, then the package's
-`teadata/.cache/release.json`, unless a release is already pinned by
-`using_release()`.
+`load_default()` and `from_snapshot()` without a path use an active
+`using_release()` context first, followed by `TEADATA_RELEASE`,
+`TEADATA_RELEASE_URL`, and the pin in `teadata/default_release.json`.
 
 ## Public API Surface
 

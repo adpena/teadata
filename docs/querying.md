@@ -1,6 +1,22 @@
-# Query System
+# Query guide
 
-The `Query` object wraps lists of `District` or `Campus` and supports fluent chaining via the `>>` operator.
+Start by deciding whether you need entities, published observations, or a
+materialized DataFrame. The following interfaces can be used in one workflow.
+
+| Task | Interface |
+| --- | --- |
+| Select districts or campuses and apply spatial or entity conditions | `engine >> ("district", district_id)` and chained [Query operators](#discover-query-operators) |
+| Select the measurement year and fields for a cohort | `query.observations(...)` with [school-year selection](#school-years-and-source-editions) |
+| Filter and project publisher rows before reading them | [Lazy table brackets](#filter-a-source-table-before-loading-it-into-pandas) or [parameterized query strings](#write-a-query-string) |
+| Compare published rates and counts within the same report context | [Statewide comparison](#compare-a-published-measure-with-texas) |
+| Analyze already loaded rows with pandas | `to_df()`, then pandas filtering and projection |
+
+An observation view can span multiple native partitions and uses the same
+filtering and projection syntax. Use Arrow `Expression` values for Python
+filters, `EditionKey` for an exact publisher revision and scope, and
+`DataPeriod` where an operation accepts an explicit measurement period.
+The [operator inventory](#discover-query-operators) identifies which arguments
+can be serialized and which require live Python values.
 
 ## Basics
 
@@ -548,14 +564,17 @@ selected = table[(count >= 1_000) & (count < 20_000)][["membership_total_student
 frame = selected.to_df()
 ```
 
-Column expressions use Arrow comparisons, `&`, `|`, `~`, `.isin()` and
-`.is_null()`. A comparison excludes null values. Select a typed field to keep
+Column expressions use Arrow comparisons, `&`, `|`, `~`, `.isin()`,
+`.is_null()` and `.is_valid()`. A comparison excludes null values. Select a typed field to keep
 its raw token and status in the result alongside its numeric value. Raw-only
 tables compare the publisher's literal strings. A predicate may use columns
 in the native table that are absent from the result. Unknown fields fail when
 the scan binds. `select()` and `where()` offer named equivalents for column
 selection and filtering. Each call returns a new view. `to_arrow()`, `to_df()`,
-`to_csv()` and `to_excel()` execute the scan and read only the selected leaf.
+`to_csv()` and `to_excel()` execute the scan over the selected leaf or leaves.
+Parenthesize each comparison in a bracket filter. Use `field.is_valid()` to
+select non-null values. Use the source's exported status column to distinguish
+different reasons for a null value, such as suppression and missingness.
 
 The DataFrame records its manifest, edition and artifact identity in
 `attrs["teadata"]`. Its `attrs["teadata_provenance"]` and the Excel
@@ -616,9 +635,13 @@ frame = table.query(
 ).select("membership_total_students_count").to_df()
 ```
 
-Use comparisons, `and`, `or`, `not`, `in`, `not in`, `is None` and
-`is not None`. Pandas-style `&` and `|` also combine conditions. Comparisons
-bind first, followed by `&` and then `|`. Use `~(condition)` for negation.
+The published `0.0.173` string syntax includes comparisons, `and`, `or`,
+`not`, `in`, `not in`, `is None` and `is not None`. Use the corresponding
+bracket form on that release if you prefer overloaded operators.
+
+On `main` after `0.0.173`, query strings also accept pandas-style `&` and
+`|`. Comparisons bind first, followed by `&` and then `|`. Group the operand
+of `~` with parentheses. Both forms below use the same lazy scan.
 
 ```python
 selected = table.query(

@@ -40,7 +40,7 @@ fields already owned by `summary_of_finances_attendance`. Codes remain strings,
 including numeric-looking codes. No undocumented boolean meaning is inferred.
 The complete admission and hold ledger, dictionary descriptions, report-line
 references and source coordinates are in
-[`sof-dpe-47422-v1.json`](../teadata/methodologies/sof-dpe-47422-v1.json).
+[`sof-dpe-47422-v1.json`](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/teadata/methodologies/sof-dpe-47422-v1.json).
 
 Units distinguish dollars, funding rates, headcounts, FTE, weighted FTE, ADA
 and weighted ADA. None is interchangeable with Membership or Enrollment.

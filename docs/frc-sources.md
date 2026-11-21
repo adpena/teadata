@@ -9,9 +9,9 @@ expenditure scope from PEIMS Actual PWR and TAPR. [TEA FRC definitions](https://
 
 | Scope | Rows | Published source |
 | --- | ---: | --- |
-| Texas | 1 | [State report, Part (x)](../provenance/records/4e46558c32fa4cf97baef5dc41a1f3c8168ad06c72a65cd734177c5aae572937.json) |
-| District | 1,202 | [Statewide district summary](../provenance/records/29b8ca8721fdb8c512b96261b7ee8aa43f0d4cda3c3a2051fdaf6a036d98160e.json) |
-| Campus | 8,866 | [Statewide campus summary](../provenance/records/3a120c76f02aea19904a9e5ff6bb0c6d835de8b598140afd732e24bd5a7fd9af.json) |
+| Texas | 1 | [State report, Part (x)](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/4e46558c32fa4cf97baef5dc41a1f3c8168ad06c72a65cd734177c5aae572937.json) |
+| District | 1,202 | [Statewide district summary](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/29b8ca8721fdb8c512b96261b7ee8aa43f0d4cda3c3a2051fdaf6a036d98160e.json) |
+| Campus | 8,866 | [Statewide campus summary](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/provenance/records/3a120c76f02aea19904a9e5ff6bb0c6d835de8b598140afd732e24bd5a7fd9af.json) |
 
 The state observation is the direct published total with enrollment of
 5,530,672 and spending of $12,147 per pupil. The district table's enrollments

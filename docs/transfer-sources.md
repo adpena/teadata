@@ -443,7 +443,7 @@ TEA has not confirmed the underlying cause. Both same-year AskTED archives
 contain all 34 IDs. The names that differ use a longer spelling or different
 punctuation.
 
-The project owner approved the [edition-specific identity overlay](../teadata/methodologies/district-transfer-2022-partner-ids.json)
+The project owner approved the [edition-specific identity overlay](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/teadata/methodologies/district-transfer-2022-partner-ids.json)
 after an independent review. The overlay binds each exact region and original
 SHA-256 to its reviewed labels and occurrence counts. It populates the
 normalized partner ID and exposes `transfer_partner_id_corrected` as

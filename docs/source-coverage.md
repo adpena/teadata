@@ -18,7 +18,7 @@ PEIMS course-credit counts retain service/course and student-group dimensions.
 A student can contribute to several course counts, so reported Total rows are
 not unique-student participation or annual-graduate readiness. Use the
 [College Credit definitions and comparison limits](peims-sources.md#peims-college-credit)
-and [explicit pinned release selection](data-releases.md#normal-release-00158-select-the-data-explicitly).
+and [release selection](data-releases.md#runtime-and-rollout).
 
 The three educator hiring products add district and reported EPP assignment
 rows for **2009–10 through 2025–26**, plus direct Texas counts and ratios for
@@ -83,9 +83,10 @@ proof of publisher availability, acquisition or semantic qualification. The
 selected catalog's explicit per-field periods control actual observation years.
 Metadata-only catalog inspection and comparison do not acquire, qualify or
 attach a source.
-The v0.0.128 table below remains a historical release description.
-
-This historical table describes the [v0.0.128 entity release](https://github.com/adpena/teadata/releases/tag/v0.0.128), build ID `17061ef34da36b4c968e0d162cfeb2ba0dfddd64fe4fd8067a785b3dd2bca685`. It includes all 13 recorded inputs, including roster, boundary, and reference inputs used alongside enrichment. The catalog for each selected release records the requested and resolved edition, source period, and provenance.
+The table below records the 13 build inputs of the historical
+[v0.0.128 entity release](https://github.com/adpena/teadata/releases/tag/v0.0.128),
+build `17061ef34da36b4c968e0d162cfeb2ba0dfddd64fe4fd8067a785b3dd2bca685`.
+Each selected release's catalog records its own editions, source periods, and provenance.
 
 | Source ID | Use in the entity build | Period in v0.0.128 | Editions in the tracked source configuration |
 | --- | --- | --- | --- |
@@ -103,7 +104,7 @@ This historical table describes the [v0.0.128 entity release](https://github.com
 | `campuses` | Campus geometry | School year 2024–25 | 2025 |
 | `tefa` | Private school finder listings | School year 2026–27 | 2025, 2027 |
 
-A configured edition means the [source configuration](../teadata/teadata_sources.yaml) defines a reader for that version. Loading this entity release supplies the periods in the third column. The TAPR profile editions `2024` and `2025` refer to school years 2023–24 and 2024–25. Some individual fields measure a different period than the report. Use field metadata when the measurement year matters. Fiscal years, calendar years, and dated reference snapshots keep their own period types.
+A configured edition means the [source configuration](https://github.com/adpena/teadata/blob/6022993a701333cf5ddeda67a8c70705d4db77f8/teadata/teadata_sources.yaml) defines a reader for that version. Loading this entity release supplies the periods in the third column. The TAPR profile editions `2024` and `2025` refer to school years 2023–24 and 2024–25. Some individual fields measure a different period than the report. Use field metadata when the measurement year matters. Fiscal years, calendar years, and dated reference snapshots keep their own period types.
 
 ## Statewide district and campus sources
 

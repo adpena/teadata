@@ -37,6 +37,8 @@ nav:
     - Dataset Contracts and Releases: data-releases.md
     - Versioning: versioning.md
   - Source Audits:
+    - Released Source Inventory: source-integration-status.md
+    - Source Coverage and Methodology: source-coverage.md
     - Facility Usage (2025–26): facility-usage.md
     - Transfer Preparation: transfer-sources.md
     - Spatial Sources (2026-11): spatial-source-quality-2026-11.md

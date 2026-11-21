@@ -1,84 +1,62 @@
-# TEA Data Engine
+# TEA Data
 
-**Unofficial Python toolkit for Texas public education data — spatially-aware, object-oriented, fast.**
+TEA Data is an independent Python library for working with Texas public
+education data. Use it to select district and campus cohorts, query published
+observations, and export results with their source and measurement period.
 
-Load a catalog-bound release, then query its district and campus objects with a fluent `>>` operator.
+## Export a published observation
 
----
-
-## Quick start
-
-### 1) Clone & install (editable)
-
-```bash
-GIT_LFS_SKIP_SMUDGE=1 git clone https://github.com/adpena/teadata.git
-cd teadata
-# Install with uv (recommended)
-uv sync
-```
-
-### 2) Install an application dependency
-
-Select a published version and retain your application's lockfile:
+In an existing uv project, add the exact software version used in this example.
+Keep `uv.lock` with the analysis.
 
 ```bash
-uv add "teadata==0.0.132"
+uv add "teadata==0.0.173"
 ```
 
-### 3) Load the configured release
-
-Set `TEADATA_RELEASE` to a local release manifest or `TEADATA_RELEASE_URL` to an
-immutable remote release manifest. Python packages contain code and metadata,
-with data bundles distributed separately. For example:
-
-```bash
-export TEADATA_RELEASE_URL="https://github.com/adpena/teadata/releases/download/v0.0.128/release.json"
-export TEADATA_RELEASE_SHA256="9dd062128273cbb90f3b9c952b072d74a629de6ecbcff8065c4295b511eaa9aa"
-```
-
-A source checkout may instead have a local `teadata/.cache/release.json`;
-ordinary wheel installs do not include that bundle. A release pinned by `using_release()` takes
-precedence. The manifest selects the snapshot and sidecars; selected artifact
-hashes are checked when they are loaded.
+Start in a shell without release overrides to use the packaged manifest pin.
+Save the example as `texas-algebra.py` and run `uv run --locked texas-algebra.py`.
+First use can fetch the required metadata and source files. Run it in a
+directory where `texas-algebra-2025-26.zip` does not already exist.
 
 ```python
-from teadata import DataEngine
+from teadata import citation, current_release
 
-engine = DataEngine.load_default()
+release = current_release()
+measure = (
+    "state_2026_staar_performance_eoc_algebra_i_"
+    "all_students_percent_at_meets_gl_standard_or_above"
+)
+view = release.observations(
+    "state_tapr_staar_end_of_course",
+    measure,
+    scope="state",
+    school_year="2025-26",
+)
 
-print(len(engine.districts), len(engine.campuses))
-# Counts depend on the selected release.
+print(view.to_df()[measure].tolist())  # ['51'], the publisher's raw percent token
+print(release.manifest_sha256)
+view.to_csv_bundle("texas-algebra-2025-26.zip")
+print(citation(release).text)
 ```
 
-`DataEngine()` creates an empty engine by default (`autoload=False`).
-`DataEngine.from_snapshot()` without a path uses the same configured release.
-An explicit `from_snapshot(path)` is for a trusted local catalog-bound snapshot.
+TEA reports that 51% of its Texas Algebra I End-of-Course accountability
+subset met or exceeded the grade-level standard in 2025–26. The source table
+keeps the publisher's raw token as text. Use the [statewide comparison
+API](querying.md#compare-a-published-measure-with-texas) for the reviewed
+numeric comparison.
 
-### 4) Look up a district
+The ZIP contains `data.csv`, `provenance.json` with the exact selection and
+publisher references, and `manifest.json` with both member hashes. Keep it with
+your code and cite the publisher report, TEA Data software, and frozen data build.
+[Data and software citations](data-releases.md#citing-tea-data)
 
-```python
-# 101902 is a six-digit TEA district number.
-aldine = (engine >> ("district", "101902")).first()
-if aldine is not None:
-    print(aldine.name, aldine.rating)
-    for campus in aldine.campuses:
-        print(campus.name, campus.rating)
+## Choose a route
 
-# Name matching is case-insensitive and can return multiple districts.
-for district in (engine >> ("district", "Northside ISD")):
-    print(district.district_number, district.name)
-```
-
-The district operation returns a `Query`. `.first()` selects the first match or
-returns `None`; iterate the query to inspect all matches for an ambiguous name
-or wildcard. `district.campuses` lists campuses assigned to that district.
-
-## What you get
-
-- **Rich domain objects**: `District` with polygon boundaries; `Campus` with point geometry and canonical IDs.
-- **Fluent query language**: chain filters/transforms with `>>`.
-- **Spatial acceleration**: nearest-k, containment, and district/campus lookups.
-- **Config-driven ingestion**: add datasets by editing YAML/TOML; get schema checks and year-based resolution.
-- **Enrichment**: attach new fields (e.g., accountability, finance) as dynamic attributes — and alias into canonical ones.
-- **Reproducible caches**: build once into a `.pkl` (and `.pkl.gz`) “repo snapshot”, reload instantly next time.
-- **Private school coverage**: ingest Texas private schools when the dataset is present, flagged via `Campus.is_private` for easy filtering.
+| Goal | Guide |
+| --- | --- |
+| Find a dataset, measurement year, or geographic scope | [Source integration inventory](source-integration-status.md) |
+| Understand a population, masking rule, or series break | [Source coverage and methodology](source-coverage.md) |
+| Select entities, filter a table, or compare with Texas | [Query guide](querying.md) |
+| Export a series or materialize observations into SQL | [Observations and exports](enrichment.md#observations-across-school-years) |
+| Reopen a historical release or work offline | [Release selection and caching](data-releases.md#runtime-and-rollout) |
+| Prepare and validate a source | [Configuration](config.md) and [qualification](data-releases.md#qualifying-reviewed-native-bundles) |
