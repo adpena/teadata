@@ -1,7 +1,7 @@
 """Detached, metadata-only projections of one pinned release and its changes."""
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Literal, TypedDict
+from typing import TYPE_CHECKING, Any, Literal, NotRequired, TypedDict
 
 from .dataset_metadata import EditionKey
 from .manifest import ContractError
@@ -14,6 +14,7 @@ class ReleaseIdentity(TypedDict):
     source: str
     manifest_sha256: str
     build_id: str
+    core_manifest_sha256: NotRequired[str]
 
 
 class CatalogInventory(TypedDict):
@@ -60,8 +61,11 @@ def _validate_flag(include_variables: bool) -> None:
 
 
 def _identity(release: DataRelease) -> ReleaseIdentity:
-    return {"source": release.source, "manifest_sha256": release.manifest_sha256,
-            "build_id": release.build_id}
+    result: ReleaseIdentity = {"source": release.source, "manifest_sha256": release.manifest_sha256,
+                               "build_id": release.build_id}
+    if release.core_manifest_sha256 != release.manifest_sha256:
+        result["core_manifest_sha256"] = release.core_manifest_sha256
+    return result
 
 
 def _index(rows: list[dict[str, Any]], key: str) -> dict[str, dict[str, Any]]:
@@ -105,7 +109,7 @@ def catalog_inventory(release: DataRelease, *, include_variables: bool = False) 
             if include_variables:
                 row["metadata"] = metadata
             base.append(row)
-    attachments = [ref.to_dict() for ref in release.catalog.native_sources]
+    attachments = [ref.to_dict() for ref in release.native_sources]
     resources = ([ref.to_dict() for ref in release.catalog.edition_metadata_refs()]
                  if getattr(release.catalog, "_v4", False) else [])
     rows = []
@@ -115,7 +119,7 @@ def catalog_inventory(release: DataRelease, *, include_variables: bool = False) 
         reader = _reader(release) if include_variables else release
         rows.extend(_edition(reader, key, include_variables) for key in keys)
     else:
-        for ref in release.catalog.native_sources:
+        for ref in release.native_sources:
             if include_variables:
                 # One transient parent/child per attachment bounds decoded metadata lifetime.
                 parent = _reader(release)

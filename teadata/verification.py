@@ -214,6 +214,9 @@ def _input_identity(
         document = json.loads(path.read_text())
         if not isinstance(document, dict):
             raise ReceiptError("Release manifest must be a JSON object")
+        if document.get("schema_version") == 5:
+            raise ReceiptError("The producer qualification check requires the original entity core manifest. "
+                               "Verify a pinned composition with DataRelease.verify().")
         artifacts = document.get("artifacts", {})
         if not isinstance(artifacts, dict) or not artifacts:
             raise ReceiptError("Release manifest has no artifacts")
@@ -935,6 +938,8 @@ def _validate_release(
                    else DataRelease(manifest, offline=True, expected_sha256=evidence.parent_sha256))
     except ContractError as error:
         raise ReceiptError(str(error)) from error
+    if getattr(release, "_core_release", None) is not None:
+        raise ReceiptError("The producer qualification check requires the original entity core manifest.")
     if release.catalog.to_dict()["schema_version"] != 2:
         raise ReceiptError("Edition catalogs require --native-release with an exact pin and retained source store")
     provenance_records = _validate_release_provenance(release)

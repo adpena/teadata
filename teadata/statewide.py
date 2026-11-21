@@ -764,7 +764,7 @@ def compare_statewide(items: Sequence[object], *, release: DataRelease, local: E
         if release._v3:
             _require_frc_manifest(release.manifest_sha256)
         else:
-            sources = [source for source in release.catalog.native_sources
+            sources = [source for source in release.native_sources
                        if local in source.editions or statewide in source.editions]
             if len(sources) != 1 or not {local, statewide} <= set(sources[0].editions):
                 raise ContractError("FRC comparison requires both exact editions in one native attachment")
@@ -772,7 +772,7 @@ def compare_statewide(items: Sequence[object], *, release: DataRelease, local: E
     entity_manifest = None if release._v3 else release.manifest_sha256
     local_release = release._native_edition_release(local)
     shared = release._v3 or any(local in ref.editions and statewide in ref.editions
-                               for ref in release.catalog.native_sources)
+                               for ref in release.native_sources)
     state_release = local_release if shared else release._native_edition_release(statewide)
     statistics, local_plan, state_plan = _compare_source(local_release, local, statewide, metric, dimensions,
                                                         school_year, period, statewide_release=state_release)

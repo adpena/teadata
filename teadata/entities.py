@@ -29,6 +29,7 @@ from .grades import coerce_grade_spans, spans_to_bounds
 from .identifiers import EntityIdentityError, campus_lookup_key, canonical_source_identifier
 
 if TYPE_CHECKING:
+    from .dataset_metadata import NativeSourceRef
     from .manifest import _SQLMetadataOrigin
     from .persistence.sqlalchemy_store import LazyMetaDict
     from .source_views import DatasetFields, TPRSFields
@@ -179,16 +180,21 @@ class _SQLMetadataOwner:
         names = set(object.__dir__(self))
         if include_meta:
             names.update(self._metadata_names())
+        scope = "district" if isinstance(self, District) else "campus"
+        if not (isinstance(self, Campus) and self.is_private):
+            names.update(key.dataset for source in self._attached_sources() for key in source.editions
+                         if key.scope == scope)
+        return sorted(names)
+
+    def _attached_sources(self) -> tuple[NativeSourceRef, ...]:
         try:
             repo = object.__getattribute__(self, "_repo")
         except AttributeError:
-            repo = None
-        catalog = getattr(repo, "catalog", None) if repo is not None else None
-        scope = "district" if isinstance(self, District) else "campus"
-        if catalog is not None and not (isinstance(self, Campus) and self.is_private):
-            names.update(key.dataset for source in catalog.native_sources for key in source.editions
-                         if key.scope == scope)
-        return sorted(names)
+            return ()
+        release = getattr(repo, "_source_release", None)
+        if release is not None:
+            return release.native_sources
+        return getattr(getattr(repo, "catalog", None), "native_sources", ())
 
     def _check_namespace_collision(self, name: str) -> None:
         from .manifest import ContractError
@@ -203,16 +209,9 @@ class _SQLMetadataOwner:
     def _dataset_attribute(self, name: str) -> DatasetFields | None:
         if name.startswith("_"):
             return None
-        try:
-            repo = object.__getattribute__(self, "_repo")
-        except AttributeError:
-            return None
-        catalog = getattr(repo, "catalog", None) if repo is not None else None
-        if catalog is None:
-            return None
         # Only attached descriptor names are inspected; no unrelated field payloads.
         if not any(key.dataset.casefold() == name.casefold()
-                   for source in catalog.native_sources for key in source.editions):
+                   for source in self._attached_sources() for key in source.editions):
             return None
         self._check_namespace_collision(name)
         return self.dataset(name)

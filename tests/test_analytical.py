@@ -206,7 +206,8 @@ def test_arrow_types_are_explicit():
         list(presentation_values(pa.RecordBatch.from_pylist([{"wrong": 0}])))
 
 
-def test_complete_release_binds_arrow_children_to_exact_source(analytical, catalog, tmp_path, monkeypatch):
+@pytest.fixture
+def normal_release(analytical, catalog, tmp_path):
     source, paths, _ = analytical
     paths = {**paths, "entities": source}
     for role in ("maps", "boundaries"):
@@ -226,11 +227,17 @@ def test_complete_release_binds_arrow_children_to_exact_source(analytical, catal
     record_id = store.record_processing(dataset="test_release", inputs=list(catalog.to_dict()["provenance"]), outputs=paths,
                                        processor="fixture", code_version="test",
                                        parameters={"build_id": catalog.build_id})
-    manifest = publish_release(tmp_path / "published", catalog, paths,
-                               processing={"record_id": record_id, "record": store.read_record(record_id)})
+    return publish_release(tmp_path / "published", catalog, paths,
+                           processing={"record_id": record_id, "record": store.read_record(record_id)})
+
+
+def test_complete_release_binds_arrow_children_to_exact_source(normal_release, monkeypatch):
+    from teadata.release import ANALYTICAL_RELEASE_ROLES
+
+    manifest = normal_release
     release = DataRelease(manifest)
     assert json.loads(manifest.read_text())["schema_version"] == 2
-    assert set(release.verify()) == set(paths)
+    assert set(release.verify()) == ANALYTICAL_RELEASE_ROLES
     artifact = release.artifact
     admissions = []
 
@@ -252,6 +259,114 @@ def test_complete_release_binds_arrow_children_to_exact_source(analytical, catal
     manifest.write_text(json.dumps(document))
     with pytest.raises(ContractError, match="complete artifact"):
         DataRelease(manifest)
+
+
+def test_composition_reuses_sealed_artifacts_and_preserves_query_provenance(normal_release, monkeypatch):
+    from hashlib import sha256
+    from io import BytesIO
+    import pickle
+    from uuid import UUID
+    from test_catalog_projections import make_edition_fixture
+    from teadata.dataset_metadata import DataPeriod
+    from teadata.engine import DataEngine
+    from teadata.entities import Campus
+    from teadata.query import Query
+    import teadata.release as transport
+    from teadata.release import using_release
+
+    root = normal_release.parent
+    fixture = make_edition_fixture(root, families=("student",), normalized=True, entity_grain=True,
+                                   amount_period=DataPeriod("school_year", 2024, 2025).to_dict())
+    child_path = fixture["root"].rename(root / "student-native.json")
+    child = DataRelease(child_path, offline=True)
+    core = DataRelease(normal_release, offline=True)
+    assert not core.native_sources
+    descriptor = {"schema_version": 5, "core": {"location": normal_release.name,
+                  "manifest_sha256": core.manifest_sha256},
+                  "native_sources": [child.native_source_ref(location=child_path.name).to_dict()]}
+    path = root / "composed.json"
+    raw = canonical_json(descriptor).encode()
+    path.write_bytes(raw)
+    pin = sha256(raw).hexdigest()
+    composed = DataRelease(path, expected_sha256=pin, offline=True)
+    assert composed.core_manifest_sha256 == core.manifest_sha256 and composed.manifest_sha256 != core.manifest_sha256
+    assert composed.build_id == core.build_id and composed.processing == core.processing
+    assert composed.verify() == core.verify()
+    assert composed.analytical_dataset("campus").to_table().equals(core.analytical_dataset("campus").to_table())
+    assert pickle.loads(pickle.dumps(composed)).catalog_inventory() == composed.catalog_inventory()
+    key, = composed.native_sources[0].editions
+    engine = DataEngine()
+    engine.catalog = core.catalog
+    campus = Campus(UUID(int=1), None, "Historical campus", "", False, campus_number="000000004")
+    engine.add_campus(campus)
+    cohort = Query([campus], engine)
+    with using_release(composed), pytest.raises(ContractError, match="Bind the composed release"):
+        cohort.observations(key.dataset, "amount", scope="campus", edition=key)
+    engine.bind_release(composed)
+    assert key.dataset in campus.available_datasets() and key.dataset in dir(campus)
+    assert getattr(campus, key.dataset).amount == 5
+    campus.meta[key.dataset] = "unrelated field"
+    with pytest.raises(ContractError, match="conflicts with the source namespace"):
+        getattr(campus, key.dataset)
+    selected = cohort.observations(key.dataset, "amount", scope="campus", edition=key)
+    assert selected.to_arrow()["amount"].to_pylist() == [5]
+    assert selected.provenance().to_dict()["selector"]["entity_release"] == {
+        "build_id": core.build_id, "manifest_sha256": pin}
+    with pytest.raises(ContractError, match="different release manifest"):
+        cohort.observations(key.dataset, "amount", scope="campus", edition=key, release=core)
+    saved_engine = pickle.loads(pickle.dumps(engine))
+    saved = Query([saved_engine._campuses[campus.id]], saved_engine)
+    with pytest.raises(ContractError, match="Rebind the saved entity release"):
+        saved.observations(key.dataset, "amount", scope="campus", edition=key)
+    restored = saved.observations(key.dataset, "amount", scope="campus", edition=key, release=composed)
+    assert restored.to_arrow().equals(selected.to_arrow())
+
+    def fetch(url, *, timeout):
+        del timeout
+        return BytesIO((root / url.rsplit("/", 1)[1]).read_bytes())
+
+    monkeypatch.setattr(transport, "urlopen", fetch)
+    remote_url = "https://example.invalid/composed.json"
+    cache = root / "remote-cache"
+    remote = DataRelease(remote_url, expected_sha256=pin, cache_dir=cache)
+    remote.verify()
+    monkeypatch.setattr(transport, "urlopen", lambda *a, **k: pytest.fail("Offline verification called transport"))
+    reopened = DataRelease(remote_url, expected_sha256=pin, cache_dir=cache, offline=True)
+    inventory = reopened.verified_cache_inventory()
+    for manifest_pin in (pin, core.manifest_sha256, child.manifest_sha256):
+        assert inventory[f"manifests/{manifest_pin}.json"]["sha256"] == manifest_pin
+
+
+def test_composition_refuses_unpinned_chained_or_conflicting_roots(tmp_path, catalog, monkeypatch):
+    from dataclasses import replace
+    from hashlib import sha256
+    from test_catalog_projections import make_edition_fixture, attach_observation_child
+
+    fixture = make_edition_fixture(tmp_path, families=("student",))
+    child = DataRelease(fixture["root"].rename(tmp_path / "child.json"), offline=True)
+    core = attach_observation_child(catalog, child, analytical=True)
+    extra = child.native_source_ref(location="new-source.json")
+    extra = replace(extra, manifest_sha256="a" * 64, editions=tuple(
+        replace(key, revision_sha256="b" * 64) for key in extra.editions))
+    descriptor = {"schema_version": 5, "core": {"location": core.path.name,
+                  "manifest_sha256": core.manifest_sha256}, "native_sources": [extra.to_dict()]}
+    root = tmp_path / "composition.json"
+    monkeypatch.setattr(DataRelease, "artifact", lambda *a, **k: pytest.fail("Validation opened an artifact"))
+
+    def write(path):
+        raw = canonical_json(descriptor).encode()
+        path.write_bytes(raw)
+        return sha256(raw).hexdigest()
+
+    pin = write(root)
+    with pytest.raises(ContractError, match="requires an exact manifest"):
+        DataRelease(root, offline=True)
+    with pytest.raises(ContractError, match="cannot replace a core"):
+        DataRelease(root, expected_sha256=pin, offline=True)
+    descriptor["core"] = {"location": root.name, "manifest_sha256": pin}
+    chained = tmp_path / "chained.json"
+    with pytest.raises(ContractError, match="requires a schema 2 entity core"):
+        DataRelease(chained, expected_sha256=write(chained), offline=True)
 
 
 def test_actual_producer_is_separate_from_source_catalog_processor(analytical, catalog):

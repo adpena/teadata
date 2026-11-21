@@ -39,7 +39,7 @@ def compare_cores(before: DataRelease, after: DataRelease, *, verify_equal_artif
     old_parameters, new_parameters = old_record["parameters"], new_record["parameters"]
     inputs_changed.update(f"parameters.{key}" for key in
                           _different_keys(old_parameters, new_parameters) - _CATALOG_SELECTION_KEYS)
-    old_refs, new_refs = before.catalog.native_sources, after.catalog.native_sources
+    old_refs, new_refs = before.native_sources, after.native_sources
     prefix_retained = new_refs[:len(old_refs)] == old_refs
     appended = new_refs[len(old_refs):] if prefix_retained else ()
     existing_keys = {(key.dataset, key.edition, key.scope, key.table) for ref in old_refs for key in ref.editions}

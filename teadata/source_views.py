@@ -488,7 +488,7 @@ class EntitySources:
 
     def datasets(self) -> tuple[EditionKey, ...]:
         """List exact source identities using only the release index."""
-        if attachments := self.release.catalog.native_sources:
+        if attachments := self.release.native_sources:
             return tuple(key for source in attachments for key in source.editions
                          if key.scope == self.scope and key.edition == self.edition)
         return tuple(EditionKey.from_dict({name: row[name] for name in EditionKey.__dataclass_fields__})
@@ -622,7 +622,7 @@ class _EntityFields:
         else:
             groups.extend(tuple(key for key in source.editions
                                 if key.scope == self.scope and key.dataset in self._datasets)
-                          for source in self.release.catalog.native_sources)
+                          for source in self.release.native_sources)
         names: dict[str, set[str]] = {}
         files: dict[Path, tuple[str, int, tuple[int, ...]]] = {}
         for keys in groups:
@@ -666,7 +666,7 @@ class _EntityFields:
         if not indexes:
             raise ContractError(
                 f"No qualified {self._label} native families are attached for {self.scope}. "
-                "Inspect release.catalog.native_sources; configured sources are not automatically admitted."
+                "Inspect release.native_sources; configured sources are not automatically admitted."
             )
         names = {name for values in indexes.values() for name in values}
         resolved = []

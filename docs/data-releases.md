@@ -1410,3 +1410,54 @@ through both release readers. With the current entity manifest format, an
 attached edition changes the embedded build identity even when the core
 inputs match. Reusing those files across different build IDs requires a format
 that identifies the entity build and the assembled release separately.
+
+### Add native editions without rebuilding the entity artifacts
+
+A schema 5 composition pins one already qualified schema 2 entity manifest and
+one or more additional native sources. Build it only after qualifying the source
+editions independently. The composition can sit beside a local core manifest,
+or pin an immutable remote core URL. Use an exact adjacent JSON filename or
+immutable URL for each native root. Relative core and added attachment
+locations resolve against the manifest that declared them.
+
+```python
+from hashlib import sha256
+import json
+from pathlib import Path
+
+from teadata.release import DataRelease
+
+directory = Path("retained")
+core = DataRelease(directory / "release.json",
+                   expected_sha256=trusted_core_pin, offline=True)
+native = DataRelease(directory / "staffing.json",
+                     expected_sha256=trusted_staffing_pin, offline=True)
+document = {
+    "schema_version": 5,
+    "core": {"location": core.path.name, "manifest_sha256": core.manifest_sha256},
+    "native_sources": [native.native_source_ref(location=native.path.name).to_dict()],
+}
+raw = (json.dumps(document, sort_keys=True, separators=(",", ":")) + "\n").encode()
+candidate = directory / "composed.json"
+with candidate.open("xb") as stream:
+    stream.write(raw)
+release = DataRelease(candidate, expected_sha256=sha256(raw).hexdigest(), offline=True)
+assert release.core_manifest_sha256 == core.manifest_sha256
+assert release.build_id == core.build_id
+assert release.artifact("entities") == core.artifact("entities")
+```
+
+Use the composition's exact manifest SHA-256 when selecting the release. Its
+`build_id`, processing receipt and `catalog` describe the immutable core.
+`release.native_sources`, catalog inventory, entity namespaces and observation
+queries include the additional edition selections. Query provenance records
+both the selected entity release and the exact native source. The format
+rejects composition chains and conflicting attachments. A new source may add
+editions but cannot replace an edition already visible through the core.
+
+Opening or listing a composition reads the two manifest indexes. Core artifacts
+are still resolved through the core and native observation files are opened
+only when needed. Use `release.verify()` for full integrity verification. The
+existing producer qualification command still takes the original core and
+native-source qualification takes the exact native source release. Hosting or
+deploying this format requires a reader that supports both pinned manifests.

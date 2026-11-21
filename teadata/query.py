@@ -622,15 +622,28 @@ class Query:
             raise ValueError("An empty Query needs scope='district' or scope='campus'.")
         _validate_observation_selection(dataset, fields, scope, edition)
         catalog = getattr(self._repo, "catalog", None)
-        if catalog is None or not catalog.native_sources:
-            raise ContractError("The query's entity build has no attached native sources")
+        if catalog is None:
+            raise ContractError("Observation queries require an entity build catalog")
         if any(catalog._entity_build_id(item) != catalog.build_id for item in self._items):
             raise ContractError("Observation queries require entities bound to the snapshot")
-        parent = release if release is not None else getattr(self._repo, "_source_release", None)
+        bound = getattr(self._repo, "_source_release", None)
+        if bound is not None and release is not None and bound.manifest_sha256 != release.manifest_sha256:
+            raise ContractError("This query is pinned to a different release manifest. Load another engine for that release.")
+        parent = bound if bound is not None else release
+        saved_pin = getattr(self._repo, "_source_manifest_pin", None)
+        if saved_pin is not None and (parent is None or parent.manifest_sha256 != saved_pin):
+            raise ContractError("Rebind the saved entity release or supply its exact release manifest.")
         if parent is None:
+            if not catalog.native_sources:
+                raise ContractError("The entity core has no attached native sources. "
+                                    "Bind the composed release or supply its exact manifest explicitly.")
             parent = current_release()
+            if parent.core_manifest_sha256 != parent.manifest_sha256:
+                raise ContractError("Bind the composed release to this engine or supply its exact manifest explicitly.")
         if parent.build_id != catalog.build_id:
             raise ContractError("Observation queries require the release for their entity build")
+        if not parent.native_sources:
+            raise ContractError("The query's entity build has no attached native sources")
         return parent._entity_observations(dataset, fields, school_year=year, scope=scope, edition=edition,
                                            identifiers=tuple(dict.fromkeys(identifiers)))
 
@@ -1111,7 +1124,7 @@ _RELEASE_METHODS: list[_ReleaseMethod] = [{
         description="False reads only the opened root. True can fetch metadata under the release's offline policy; never observation leaves.")}],
     "result": "CatalogInventory",
     "result_methods": [], "result_operations": [],
-    "discovery": ["catalog.native_sources", "catalog.editions", "catalog.variables"],
+    "discovery": ["release.native_sources", "catalog.editions", "catalog.variables"],
 }, {
     "name": "catalog_diff",
     "receiver": "DataRelease",

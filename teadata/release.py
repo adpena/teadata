@@ -27,6 +27,7 @@ from platformdirs import user_cache_path
 from .analytical import ANALYTICAL_DATASETS, ANALYTICAL_ROLES, analytical_dataset, validate_artifact, validate_leaf_artifact
 from .dataset_metadata import ArtifactRef, COLUMN_SCHEMA_MAX_BYTES, ColumnSchemaRef, EditionKey, EditionMetadataRef, validate_http_url
 from .dataset_metadata import DataPeriod, FieldBinding, NativeSourceRef, _parse_school_year, _validate_observation_selection
+from .dataset_metadata import _digest_text, _native_manifest_location, parse_native_sources
 from .manifest import (
     ContractError,
     DatasetCatalog,
@@ -111,11 +112,15 @@ def _matches_metadata_files(files: tuple[_MetadataStamp, ...]) -> bool:
     return bool(files)
 
 
+def _release_reference(location: str, parent: str | Path) -> str:
+    if "://" in location:
+        return location
+    return urljoin(str(parent), location) if "://" in str(parent) else str(Path(parent).parent / location)
+
+
 def _open_native_source(ref: NativeSourceRef, parent: str | Path, *, offline: bool,
                         cache_dir: Path | None = None) -> DataRelease:
-    location = ref.location
-    if "://" not in location:
-        location = urljoin(str(parent), location) if "://" in str(parent) else str(Path(parent).parent / location)
+    location = _release_reference(ref.location, parent)
     child = DataRelease(location, expected_sha256=ref.manifest_sha256, offline=offline, cache_dir=cache_dir)
     if not child._v3 or child.build_id != ref.build_id:
         raise ContractError("Native source manifest has a different catalog type or build ID")
@@ -365,9 +370,11 @@ class DataRelease:
 
     _metadata_trace: set[_MetadataStamp] | None = None
     _source_name_indexes: dict[tuple[str, tuple[str, ...]], _SourceNameIndex]
+    _core_release: DataRelease | None = None
 
     def __init__(self, manifest: str | Path, *, expected_sha256: str | None = None, offline: bool = False,
-                 cache_dir: Path | None = None, _local_manifest: _LocalManifest | None = None):
+                 cache_dir: Path | None = None, _local_manifest: _LocalManifest | None = None,
+                 _required_schema: int | None = None):
         self._reset_artifact_locks()
         self.source = str(manifest)
         self.remote = "://" in self.source
@@ -392,8 +399,17 @@ class DataRelease:
         if expected_sha256 is not None and digest != expected_sha256:
             raise ContractError("Release manifest checksum differs from its trusted pin")
         document = json.loads(raw)
+        if not isinstance(document, dict):
+            raise ContractError("Release manifest must be a JSON object")
         version = document.get("schema_version")
+        if _required_schema is not None and (type(version) is not int or version != _required_schema):
+            raise ContractError(f"A composed release requires a schema {_required_schema} entity core")
         self._v3 = type(version) is int and version in (3, 4)
+        if type(version) is int and version == 5:
+            if expected_sha256 is None:
+                raise ContractError("A composed release requires an exact manifest SHA-256 pin")
+            self._open_composition(document)
+            return
         if self._v3:
             if (set(document) != {"schema_version", "catalog"}
                     or type(document["catalog"].get("schema_version")) is not int
@@ -453,6 +469,71 @@ class DataRelease:
             ):
                 raise ContractError("Artifact does not match its processing receipt")
 
+    def _open_composition(self, document: dict) -> None:
+        try:
+            if set(document) != {"schema_version", "core", "native_sources"}:
+                raise ValueError("A composed release needs exactly a core and native source selections")
+            descriptor = document["core"]
+            if not isinstance(descriptor, dict) or set(descriptor) != {"location", "manifest_sha256"}:
+                raise ValueError("Invalid composed release core descriptor")
+            core_pin = _digest_text(descriptor["manifest_sha256"])
+            core_location = descriptor["location"]
+            if core_location != "release.json":
+                core_location = _native_manifest_location(core_location)
+            added = parse_native_sources(document["native_sources"])
+            if not added:
+                raise ValueError("A composed release must add at least one native source")
+        except (TypeError, ValueError) as error:
+            raise ContractError(str(error)) from error
+        parent = self.source if self.remote else self.path
+        location = _release_reference(core_location, parent)
+        if core_pin == self.manifest_sha256 or location == str(parent):
+            raise ContractError("A composed release cannot point to itself as its core")
+        core = DataRelease(location, expected_sha256=core_pin, offline=self.offline,
+                           cache_dir=self._cache_dir, _required_schema=2)
+        original = core.catalog.native_sources
+        combined = original + added
+        try:
+            parse_native_sources([ref.to_dict() for ref in combined])
+        except ValueError as error:
+            raise ContractError(f"Conflicting composed release attachments: {error}") from error
+        def logical_key(key: EditionKey) -> tuple[str, str, str, str]:
+            return key.dataset, key.edition, key.scope, key.table
+
+        existing = {logical_key(key) for ref in original for key in ref.editions}
+        appended = [logical_key(key) for ref in added for key in ref.editions]
+        if existing.intersection(appended):
+            raise ContractError("A composed release cannot replace a core source edition")
+        if len(set(appended)) != len(appended):
+            raise ContractError("A composed release cannot add conflicting versions of a source edition")
+        if any(ref.manifest_sha256 in {core_pin, self.manifest_sha256} for ref in added):
+            raise ContractError("A composed release cannot attach either entity manifest as a native source")
+        if any(_release_reference(ref.location, parent) in {location, str(parent)} for ref in added):
+            raise ContractError("A native source location collides with a composed entity manifest")
+        self.catalog, self._processing, self._artifacts = core.catalog, core._processing, core._artifacts
+        self._composition_sources = combined
+        self._added_attachment_pins = frozenset(ref.manifest_sha256 for ref in added)
+        self._core_release = core
+
+    @property
+    def core_manifest_sha256(self) -> str:
+        """Exact manifest binding the serialized entity artifacts."""
+        return self._core_release.manifest_sha256 if self._core_release is not None else self.manifest_sha256
+
+    @property
+    def native_sources(self) -> tuple[NativeSourceRef, ...]:
+        """Native selections visible to this release, including any composition."""
+        return self._composition_sources if self._core_release is not None else self.catalog.native_sources
+
+    def _native_parent(self, ref: NativeSourceRef) -> str | Path:
+        core = self._core_release
+        owner = core if core is not None and ref.manifest_sha256 not in self._added_attachment_pins else self
+        return owner.source if owner.remote else owner.path
+
+    def _open_attached_source(self, ref: NativeSourceRef) -> DataRelease:
+        return _open_native_source(ref, self._native_parent(ref), offline=self.offline,
+                                   cache_dir=getattr(self, "_cache_dir", None))
+
     @property
     def processing(self) -> dict:
         if self._v3:
@@ -493,7 +574,7 @@ class DataRelease:
         """
         if not self._v3:
             raise ContractError("native_source_ref requires a native schema3/schema4 source release; "
-                                "use catalog.native_sources to inspect an entity release's attachments")
+                                "use release.native_sources to inspect an entity release's attachments")
         from .dataset_metadata import _native_manifest_location
 
         _native_manifest_location(location)
@@ -527,8 +608,8 @@ class DataRelease:
     def __getstate__(self) -> dict:
         from .tprs_partitions import STUDENT_DERIVED_ROUTES
 
-        if self._v3:
-            return {"_v3": True, "source": self.source, "pin": self.manifest_sha256, "offline": self.offline,
+        if self._v3 or self._core_release is not None:
+            return {"_reopen": True, "source": self.source, "pin": self.manifest_sha256, "offline": self.offline,
                     "cache_dir": self._cache_dir}
         return {key: value for key, value in self.__dict__.items()
                 if key not in {"_campus_observation_routes", "_campus_observation_plan",
@@ -536,7 +617,7 @@ class DataRelease:
                                *(route.memo_attribute for route in STUDENT_DERIVED_ROUTES.values())}}
 
     def __setstate__(self, state: dict) -> None:
-        if state.get("_v3") is True:
+        if state.get("_reopen") is True or state.get("_v3") is True:
             self.__init__(state["source"], expected_sha256=state["pin"], offline=state["offline"],
                           cache_dir=state.get("cache_dir"))
         else:
@@ -557,6 +638,8 @@ class DataRelease:
             return lock
 
     def artifact(self, role: str, *, discard_cached_reads: bool = False) -> Path:
+        if self._core_release is not None:
+            return self._core_release.artifact(role, discard_cached_reads=discard_cached_reads)
         if self._v3:
             digest = self.catalog.artifact_ref(role).sha256
         else:
@@ -670,9 +753,8 @@ class DataRelease:
     def verify_native_sources(self, *, discard_cached_reads: bool = False) -> dict[str, dict[str, Path]]:
         """Verify attached native roots and return their manifests and content-addressed files."""
         verified = {}
-        parent = self.source if self.remote else self.path
-        for ref in self.catalog.native_sources:
-            child = _open_native_source(ref, parent, offline=self.offline, cache_dir=getattr(self, "_cache_dir", None))
+        for ref in self.native_sources:
+            child = self._open_attached_source(ref)
             try:
                 child.verify(discard_cached_reads=discard_cached_reads)
                 verified[ref.manifest_sha256] = {
@@ -692,11 +774,13 @@ class DataRelease:
         """Verify an offline URL release and list the exact cache files it needs."""
         if not self.remote or not self.offline or self._v3:
             raise ContractError("A cache inventory requires an offline entity release URL")
-        _require_cache_file(self.path)
-        if file_identity(self.path)["sha256"] != self.manifest_sha256:
-            raise ContractError("Cached root manifest changed after selection")
+        roots = (self, self._core_release) if self._core_release is not None else (self,)
+        for root in roots:
+            _require_cache_file(root.path)
+            if file_identity(root.path)["sha256"] != root.manifest_sha256:
+                raise ContractError("Cached root manifest changed after selection")
         paths = self._verify_artifacts(discard_cached_reads=True)
-        selected = [(self.path, self.manifest_sha256)]
+        selected = [(root.path, root.manifest_sha256) for root in roots]
         selected.extend((path, self._artifacts[role]["sha256"]) for role, path in paths.items())
         for pin, files in self.verify_native_sources(discard_cached_reads=True).items():
             selected.extend((path, pin if name == "manifest" else name) for name, path in files.items())
@@ -835,13 +919,12 @@ class DataRelease:
             raise TypeError("Native table selection requires an exact EditionKey")
         if self._v3:
             return self
-        for ref in self.catalog.native_sources:
+        for ref in self.native_sources:
             if edition in ref.editions:
-                parent = self.source if self.remote else self.path
-                return _open_native_source(ref, parent, offline=self.offline, cache_dir=getattr(self, "_cache_dir", None))
+                return self._open_attached_source(ref)
         raise ContractError(
             f"Exact native edition {edition.dataset}/{edition.scope}/{edition.edition}/{edition.table} "
-            f"with revision {edition.revision_sha256} is not attached. See release.catalog.native_sources."
+            f"with revision {edition.revision_sha256} is not attached. See release.native_sources."
         )
 
     def table(self, edition: EditionKey) -> SourceTable:
@@ -865,11 +948,10 @@ class DataRelease:
                 child = DataRelease(self.source if self.remote else self.path, expected_sha256=self.manifest_sha256,
                                     offline=self.offline, cache_dir=self._cache_dir)
             elif not self._v3:
-                refs = [ref for ref in self.catalog.native_sources if any(
+                refs = [ref for ref in self.native_sources if any(
                     (key.dataset, key.scope, key.edition) == (DATASET, "campus", edition) for key in ref.editions)]
                 if len(refs) == 1:
-                    child = _open_native_source(refs[0], self.source if self.remote else self.path,
-                                                offline=self.offline, cache_dir=self._cache_dir)
+                    child = self._open_attached_source(refs[0])
         if child is not None:
             try:
                 route = self._automatic_student_campus_index(child, edition, reuse_catalog=True, require_ledger=True)
@@ -895,11 +977,9 @@ class DataRelease:
             if self._v3:
                 yield self
             else:
-                parent = self.source if self.remote else self.path
-                for ref in self.catalog.native_sources:
+                for ref in self.native_sources:
                     if any(matches(key) for key in ref.editions):
-                        yield _open_native_source(ref, parent, offline=self.offline,
-                                                  cache_dir=getattr(self, "_cache_dir", None))
+                        yield self._open_attached_source(ref)
 
         routes: dict[str, EditionKey] = {}
         for child in sources():
@@ -969,13 +1049,11 @@ class DataRelease:
                     for row in self.catalog.editions(dataset=dataset, scope=scope, include_metadata=False)
                 )
                 return
-            parent = self.source if self.remote else self.path
-            for ref in self.catalog.native_sources:
+            for ref in self.native_sources:
                 keys = [key for key in ref.editions if key.dataset == dataset and key.scope == scope
                         and (edition is None or key == edition)]
                 if keys:
-                    child = _open_native_source(ref, parent, offline=self.offline,
-                                                cache_dir=getattr(self, "_cache_dir", None))
+                    child = self._open_attached_source(ref)
                     if trace_metadata and getattr(child.catalog, "_v4", False):
                         child._metadata_trace = set()
                     yield child, keys
@@ -1107,14 +1185,12 @@ class DataRelease:
                    and bool(getattr(os, "O_NOFOLLOW", 0))
                    and 0 < len(fields) <= 32 and all(isinstance(name, str) and len(name) <= 256 for name in fields))
         request = (fields, school_year)
-        parent = self.source if self.remote else self.path
-        cache_dir = getattr(self, "_cache_dir", None)
         memo_name = derived_route.memo_attribute if route_derived and derived_route else "_campus_observation_plan"
         if memoize:
             memo: _CampusObservationPlan | None = getattr(self, memo_name, None)
             if memo is not None and memo.request == request:
-                child = _open_native_source(memo.source, parent, offline=self.offline, cache_dir=cache_dir)
-                route_child = (_open_native_source(memo.route_source, parent, offline=self.offline, cache_dir=cache_dir)
+                child = self._open_attached_source(memo.source)
+                route_child = (self._open_attached_source(memo.route_source)
                                if memo.route_source is not None else None)
                 if memo.matches_files(child, route_child):
                     if route_derived:
@@ -1168,9 +1244,9 @@ class DataRelease:
                 if (memoize and route.files and trace and len(trace) <= 256 and len(options) <= 64
                         and all(len(str(path)) <= 4096 for path, _ in trace)
                         and all(source is child for source, _, _ in options)):
-                    ref, = (ref for ref in self.catalog.native_sources if ref.manifest_sha256 == child.manifest_sha256)
+                    ref, = (ref for ref in self.native_sources if ref.manifest_sha256 == child.manifest_sha256)
                     memo = _CampusObservationPlan(request, year, ref, matching_keys, route, tuple(trace))
-                    selected = _open_native_source(ref, parent, offline=self.offline, cache_dir=cache_dir)
+                    selected = self._open_attached_source(ref)
                     if not route.matches_files(selected):
                         route = self._automatic_student_campus_index(child, first.edition, reuse_catalog=reuse_catalog)
                         if route is None:
@@ -1192,8 +1268,6 @@ class DataRelease:
         from .tprs_partitions import STUDENT_DERIVED_ROUTES
 
         route_definition = STUDENT_DERIVED_ROUTES[dataset]
-        parent = self.source if self.remote else self.path
-        cache_dir = getattr(self, "_cache_dir", None)
         request = (fields, school_year)
         selected, student_child = None, None
         returned = False
@@ -1208,11 +1282,11 @@ class DataRelease:
                 returned = True
                 return result
             route, route_source = None, None
-            refs = [ref for ref in self.catalog.native_sources if any(
+            refs = [ref for ref in self.native_sources if any(
                 (key.dataset, key.scope, key.edition) == (DATASET, "campus", first.edition) for key in ref.editions)]
             if memoize and len(refs) == 1:
                 route_source = refs[0]
-                student_child = _open_native_source(route_source, parent, offline=self.offline, cache_dir=cache_dir)
+                student_child = self._open_attached_source(route_source)
                 route = self._automatic_student_campus_index(student_child, first.edition,
                     reuse_catalog=bool(getattr(student_child.catalog, "_v4", False)))
                 if route is not None and not route.files:
@@ -1222,8 +1296,8 @@ class DataRelease:
                     route = None
             index = route.index if route is not None else self.tprs_student_campus_index(edition=first.edition)
             matching_keys = frozenset(key for _, key in matches)
-            derived_refs = [ref for ref in self.catalog.native_sources if ref.manifest_sha256 == child.manifest_sha256]
-            selected = (_open_native_source(derived_refs[0], parent, offline=self.offline, cache_dir=cache_dir)
+            derived_refs = [ref for ref in self.native_sources if ref.manifest_sha256 == child.manifest_sha256]
+            selected = (self._open_attached_source(derived_refs[0])
                         if len(derived_refs) == 1 else child)
             trace = getattr(child, "_metadata_trace", None)
             candidate = None

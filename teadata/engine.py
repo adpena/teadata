@@ -392,6 +392,9 @@ class DataEngine:
         catalog = getattr(self, "catalog", None)
         if not isinstance(catalog, DatasetCatalog) or catalog.build_id != release.build_id:
             raise ContractError("Source binding requires the release for this engine's entity build")
+        saved_pin = getattr(self, "_source_manifest_pin", None)
+        if saved_pin is not None and saved_pin != release.manifest_sha256:
+            raise ContractError("This engine was saved with a different release manifest. Load the matching release.")
         previous = getattr(self, "_source_release", None)
         if previous is not None:
             if previous.manifest_sha256 != release.manifest_sha256:
@@ -424,7 +427,7 @@ class DataEngine:
 
     def _entity_datasets(self, entity: District | Campus) -> tuple[str, ...]:
         release, scope, _ = self._entity_source_context(entity)
-        return tuple(sorted({key.dataset for source in release.catalog.native_sources
+        return tuple(sorted({key.dataset for source in release.native_sources
                              for key in source.editions if key.scope == scope}))
 
     def _entity_dataset(self, entity: District | Campus, name: str) -> DatasetFields:
@@ -434,7 +437,7 @@ class DataEngine:
             raise ValueError("Dataset selection requires a nonempty name. See entity.available_datasets().")
         release, scope, identifier = self._entity_source_context(entity)
         scopes: dict[str, set[str]] = {}
-        for source in release.catalog.native_sources:
+        for source in release.native_sources:
             for key in source.editions:
                 scopes.setdefault(key.dataset, set()).add(key.scope)
         matches = [candidate for candidate in scopes if candidate.casefold() == name.casefold()]
@@ -989,7 +992,9 @@ class DataEngine:
     def __getstate__(self) -> dict[str, Any]:
         state = self.__dict__.copy()
         state.pop("_campus_spatial_caches", None)
-        state.pop("_source_release", None)
+        release = state.pop("_source_release", None)
+        if release is not None and release.core_manifest_sha256 != release.manifest_sha256:
+            state["_source_manifest_pin"] = release.manifest_sha256
         state["_district_cover_index"] = None
         return state
 
