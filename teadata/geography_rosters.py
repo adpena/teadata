@@ -10,11 +10,10 @@ import json
 import os
 from pathlib import Path
 import sqlite3
-from stat import S_ISREG
 from tempfile import TemporaryDirectory
 from typing import Literal, TypedDict
 
-from ._sqlite import readonly_connection
+from ._sqlite import verified_database
 from .askted_directory import AskTEDDirectory, DirectoryField, Season, read_askted_directory
 from .dataset_metadata import DataPeriod
 from .legislative_rosters import LegislativePlan, LegislativeSchoolRoster, RosterSource, read_legislative_school_rosters
@@ -198,27 +197,6 @@ class GeographyRosters:
 @contextmanager
 def open_geography_rosters(path: Path, *, expected_sha256: str) -> Generator[GeographyRosters]:
     """Verify exact local bytes once, then serve indexed read-only selections."""
-    path = path.absolute()
-    identity = _plain_database_identity(path)
-    with path.open("rb") as stream:
-        if (_identity(os.fstat(stream.fileno())) != identity
-                or file_digest(stream, "sha256").hexdigest() != expected_sha256):
-            raise ValueError("Geography roster file differs from its expected SHA-256")
-        with closing(readonly_connection(path, immutable=True)) as connection:
-            if (connection.execute("PRAGMA application_id").fetchone() != (_APPLICATION_ID,)
-                    or connection.execute("PRAGMA user_version").fetchone() != (_SCHEMA_VERSION,)):
-                raise ValueError("Unsupported geography roster file format")
-            if (_identity(os.fstat(stream.fileno())) != identity or _plain_database_identity(path) != identity):
-                raise ValueError("Geography roster file changed while opening")
-            yield GeographyRosters(connection)
-
-
-def _identity(info: os.stat_result) -> tuple[int, int, int, int, int]:
-    return info.st_dev, info.st_ino, info.st_size, info.st_mtime_ns, info.st_ctime_ns
-
-
-def _plain_database_identity(path: Path) -> tuple[int, int, int, int, int]:
-    info = path.lstat()
-    if not S_ISREG(info.st_mode) or any(os.path.lexists(str(path) + suffix) for suffix in ("-wal", "-shm", "-journal")):
-        raise ValueError("Geography rosters require a regular, checkpointed SQLite artifact")
-    return _identity(info)
+    with verified_database(path, expected_sha256=expected_sha256, application_id=_APPLICATION_ID,
+                           schema_version=_SCHEMA_VERSION, label="Geography roster") as connection:
+        yield GeographyRosters(connection)

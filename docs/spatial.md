@@ -166,6 +166,36 @@ For legislative plans, the roster preserves the publisher's school district
 subtotals. Geometry and derived spatial relationships have their own source
 contracts. Application use requires admitting the artifact separately.
 
+### Offline map outlines
+
+Use the `geography_boundaries` module on the development branch to build a
+separately pinned SQLite artifact from the reviewed ESC2024 and legislative
+layer receipts. It checks publisher identities, geographic coverage and
+the source coordinate systems. A reader can request metadata or bytes for
+one exact layer and geography number. Identity and gzip responses carry
+separate digests. They contain the same GeoJSON Feature.
+
+```python
+from teadata.geography_boundaries import build_geography_boundaries, open_geography_boundaries
+
+outline_pin = build_geography_boundaries(
+    store, sources={"ESC2024": RosterSource(boundary_receipt, boundary_sha256)},
+    output=Path("boundaries.sqlite3"),
+)
+with open_geography_boundaries(Path("boundaries.sqlite3"), expected_sha256=outline_pin) as maps:
+    region = maps.get("ESC2024", 13, encoding="gzip", include_body=False)
+```
+
+The complete Feature fits within 128 KiB uncompressed and 48 KiB gzip.
+Larger outlines try rounding to five decimal places in WGS84 and then
+topology-preserving tolerances of 5, 25, 50 and 100 meters in EPSG:5070.
+The final display shape must have at most 0.10% area disagreement against
+the original, measured in EPSG:5070. When a valid outline cannot meet those limits,
+the reader returns a `held` entry with the original acquisition citation.
+Use the official source geometry for spatial analysis and shared borders.
+The geometry and roster files can be versioned and admitted independently.
+The artifact does not enable an application route on its own.
+
 ### Boundary sources retained for profiles
 
 The retained [2026 Census TIGER/Line county layer](https://www.census.gov/geographies/mapping-files/2026/geo/tiger-line-file.html)

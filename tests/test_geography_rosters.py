@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from teadata import geography_rosters as rosters
+from teadata import _sqlite, geography_rosters as rosters
 from teadata.askted_directory import AskTEDDirectory, DirectoryEntry, DirectoryField, DirectoryObservation, DirectorySource
 from teadata.dataset_metadata import DataPeriod
 from teadata.legislative_rosters import LegislativeDistrictSchool, LegislativePlan, LegislativeSchoolRoster, RosterSource
@@ -76,13 +76,13 @@ def test_geography_rosters_preserve_scope_source_rows_and_unassigned_districts(t
     journal.unlink()
     replacement = tmp_path / "replacement.sqlite3"
     copy2(artifact, replacement)
-    opener = rosters.readonly_connection
+    opener = _sqlite.readonly_connection
 
     def replace_then_open(*args, **kwargs):
         replacement.replace(artifact)
         return opener(*args, **kwargs)
 
-    monkeypatch.setattr(rosters, "readonly_connection", replace_then_open)
+    monkeypatch.setattr(_sqlite, "readonly_connection", replace_then_open)
     with pytest.raises(ValueError, match="changed while opening"):
         with rosters.open_geography_rosters(artifact, expected_sha256=digest):
             pytest.fail("A different SQLite file was accepted")
