@@ -1385,3 +1385,20 @@ registered edition and attached scopes. Unestablished publisher availability,
 acquisition/qualification and downstream deployment stay explicit. The coverage
 file groups fields sharing identical period/unit metadata to avoid repeating
 the same objects for every field. Use the library inventory for full bindings.
+
+### Compare core artifacts before planning reuse
+
+Compare two retained manifests with their independently recorded SHA-256 values.
+
+```sh
+uv run python -m teadata.scripts.release_core_comparison before/release.json after/release.json \
+  --before-sha256 "$BEFORE_PIN" --after-sha256 "$AFTER_PIN"
+```
+
+The report separates changed core catalog and processing inputs, additive native
+editions and declared output byte equality. The default comparison opens only
+the two manifests. Use `--verify-equal-artifacts` to admit matching outputs
+through both release readers. With the current entity manifest format, an
+attached edition changes the embedded build identity even when the core
+inputs match. Reusing those files across different build IDs requires a format
+that identifies the entity build and the assembled release separately.

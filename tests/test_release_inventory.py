@@ -237,3 +237,54 @@ def test_registration_digest_binds_the_config_bytes_actually_parsed(tmp_path, mo
     assert result["registration"][0]["dataset"] == "original"
     assert result["config_sha256"] == sha256(original).hexdigest()
     assert result["config_sha256"] != sha256(config.read_bytes()).hexdigest()
+
+
+def test_core_comparison_distinguishes_edition_changes_from_embedded_identity(tmp_path, selected_catalog, monkeypatch):
+    from dataclasses import replace
+
+    from teadata.dataset_metadata import NativeSourceRef
+    from teadata.scripts.release_core_comparison import compare_cores
+
+    child = native(tmp_path / "native", version=3)
+    original = attach_observation_child(selected_catalog, child)
+    original = DataRelease(original.path.rename(original.path.with_name("before.json")), offline=True)
+    new_key = replace(original.catalog.native_sources[0].editions[0], edition="2024")
+    extra = NativeSourceRef("extra.json", "a" * 64, "b" * 64, (new_key,))
+    appended = attach_observation_child(selected_catalog, child, additional_refs=(extra,))
+
+    with monkeypatch.context() as guard:
+        guard.setattr(DataRelease, "artifact", lambda *a, **k: pytest.fail("Default comparison opened artifacts"))
+        report = compare_cores(original, appended)
+    assert report["retains_existing_native_sources"] and report["adds_distinct_native_editions"]
+    assert not report["changed_core_catalog_sections"]
+    assert not report["same_catalog_build_id"]
+    assert all(role["declared_same_bytes"] and not role["verified_under_both_releases"]
+               for role in report["artifacts"].values())
+
+    with pytest.raises(FileNotFoundError):
+        compare_cores(original, appended, verify_equal_artifacts=True)
+    assert not compare_cores(appended, original)["retains_existing_native_sources"]
+
+
+def test_core_comparison_keeps_processor_and_receipt_identity(tmp_path, selected_catalog):
+    from teadata.scripts.release_core_comparison import compare_cores
+
+    child = native(tmp_path / "native", version=3)
+    before = attach_observation_child(selected_catalog, child)
+    changed = json.loads(before.path.read_bytes())
+    catalog = changed["catalog"]
+    catalog["processor_sha256"] = "c" * 64
+    catalog.pop("build_id")
+    catalog["build_id"] = sha256(canonical_json(catalog).encode()).hexdigest()
+    record = changed["processing"]["record"]
+    record["parameters"]["build_id"] = catalog["build_id"]
+    record["parameters"]["recipe"] = "new"
+    record["inputs"] = ["a" * 64]
+    changed["processing"]["record_id"] = sha256((canonical_json(record) + "\n").encode()).hexdigest()
+    candidate = tmp_path / "candidate.json"
+    candidate.write_text(canonical_json(changed))
+
+    report = compare_cores(before, DataRelease(candidate, offline=True))
+    assert report["changed_core_catalog_sections"] == ["processor_sha256"]
+    assert report["changed_core_processing_inputs"] == ["inputs", "parameters.recipe"]
+    assert not report["adds_distinct_native_editions"]
