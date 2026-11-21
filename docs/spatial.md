@@ -131,6 +131,41 @@ the 2026 election, applies from that instant under the reviewed schedule.
 The constitutional start of the new terms is separate from the House’s
 swearing-in schedule. [Texas Redistricting current districts](https://redistricting.capitol.texas.gov/Current-districts) · [Twentieth Amendment](https://www.archives.gov/founding-docs/amendments-11-27#amend20)
 
+### Offline school district roster projection
+
+Build an indexed, read-only roster file from a pinned AskTED archive and
+one or more Red-160 workbooks. The builder reuses the source readers and
+preserves their geography keys, edition dates, publisher labels, and row
+locators. It keeps all AskTED district IDs, including those absent from a
+selected entity snapshot. Directory conflicts and blanks remain inspectable
+through `reader.directory_issues(assignment)`.
+
+```python
+from pathlib import Path
+from teadata.askted_directory import DirectoryField
+from teadata.geography_rosters import build_geography_rosters, open_geography_rosters
+from teadata.legislative_rosters import LegislativePlan, RosterSource
+
+output = Path("rosters.sqlite3")
+pin = build_geography_rosters(
+    store, directory=RosterSource(directory_receipt, directory_sha256),
+    year=2026, season="spring",
+    district_locator=RosterSource(locator_receipt, locator_sha256),
+    workbooks={LegislativePlan.TEXAS_HOUSE: RosterSource(workbook_receipt, workbook_sha256)},
+    output=output,
+)
+with open_geography_rosters(output, expected_sha256=pin) as reader:
+    region = reader.get(DirectoryField.ESC_REGION_SERVED, 13)
+    house = reader.get(LegislativePlan.TEXAS_HOUSE, 1)
+```
+
+Opening verifies the file pin. Queries use indexed selections within the
+open reader. Each roster carries its source citation. For ESCs, the selected
+field identifies region served, PEIMS reporting region or office geography.
+For legislative plans, the roster preserves the publisher's school district
+subtotals. Geometry and derived spatial relationships have their own source
+contracts. Application use requires admitting the artifact separately.
+
 ### Boundary sources retained for profiles
 
 The retained [2026 Census TIGER/Line county layer](https://www.census.gov/geographies/mapping-files/2026/geo/tiger-line-file.html)
