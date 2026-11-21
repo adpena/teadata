@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 import re
 from tempfile import TemporaryDirectory
-from typing import TYPE_CHECKING, Any, BinaryIO, Generator, Iterator, Literal, Protocol, Self, overload
+from typing import TYPE_CHECKING, Any, BinaryIO, Generator, Iterator, Literal, Protocol, Self, TypeVar, overload
 
 from .dataset_metadata import ArtifactRef, DataPeriod, EditionKey
 from .identifiers import canonical_source_identifiers
@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 
 _RangeBound = int | float | Decimal | str
 _RangeInclusive = Literal["both", "left", "right", "neither"]
+_T = TypeVar("_T")
 
 
 def _range_query(field: str, lower: _RangeBound, upper: _RangeBound,
@@ -830,7 +831,7 @@ class _TableExport:
                 "limit": preview_rows, "provenance_scope": "full_selection",
             }).encode()
         schema = self.schema.with_metadata(metadata)
-        with _owned_batches(self.batches()) as batches:
+        with _owned_iterator(self.batches()) as batches:
             selected = batches if preview_rows is None else _prefix_batches(batches, preview_rows)
             return pa.Table.from_batches(selected, schema=schema)
 
@@ -862,12 +863,13 @@ class _ExportSelection:
 
     def provenance(self, release: DataRelease, *, period: DataPeriod | None,
                    entity_build: tuple[str, str] | None, entity_ids: tuple[str, ...] | None,
-                   opaque_filter: bool, queries: tuple[PreparedPredicate, ...] = ()) -> ExportProvenance:
+                   opaque_filter: bool, queries: tuple[PreparedPredicate, ...] = (),
+                   query_recipes: tuple[str, ...] = ()) -> ExportProvenance:
         from .export_provenance import describe_export
 
         if entity_ids is not None:
             _entity_key(self.artifact)
-        records = [query.recipe_json for query in queries]
+        records = [*(query.recipe_json for query in queries), *query_recipes]
         opaque_filter = opaque_filter or any(record is None for record in records)
         replay = None
         if records and not opaque_filter:
@@ -1001,8 +1003,6 @@ class _ParquetScan:
 def _plan_export(release: DataRelease, edition: EditionKey, *, restore_original_headers: bool,
                  selected_fields: tuple[str, ...] | None, include_support: bool,
                  period: DataPeriod | None) -> _ExportSelection:
-    import pyarrow as pa
-
     if type(restore_original_headers) is not bool:
         raise ValueError("Original headers must be explicitly enabled or disabled")
 
@@ -1019,6 +1019,8 @@ def _plan_export(release: DataRelease, edition: EditionKey, *, restore_original_
     header_kinds = ()
     publisher_columns = None
     if restore_original_headers:
+        import pyarrow as pa
+
         from .analytical import _leaf_schema
         from .peims_college_credit import DATASET as credit_dataset
         from .peims_course_sources import DATASET as course_dataset
@@ -1179,12 +1181,12 @@ class _CSVStream(Protocol):
 
 
 @contextmanager
-def _owned_batches(batches: Iterator[pa.RecordBatch]) -> Generator[Iterator[pa.RecordBatch], None, None]:
+def _owned_iterator(iterator: Iterator[_T]) -> Generator[Iterator[_T], None, None]:
     """Close even a retained iterator when encoding or a consumer fails."""
     try:
-        yield batches
+        yield iterator
     finally:
-        if close := getattr(batches, "close", None):
+        if close := getattr(iterator, "close", None):
             close()
 
 
@@ -1212,7 +1214,7 @@ def _write_csv_stream(table: _StreamingExport, stream: _CSVStream) -> None:
         csv.writer(labels, lineterminator="\r\n").writerows(table.headers)
         stream.write(labels.getvalue().encode("utf-8"))
     with CSVWriter(stream, table.schema, write_options=WriteOptions(include_header=not table.restore_original_headers)) as writer:
-        with _owned_batches(table.batches()) as batches:
+        with _owned_iterator(table.batches()) as batches:
             for batch in batches:
                 writer.write_batch(batch)
 
@@ -1248,13 +1250,18 @@ def write_csv_bundle(table: _StreamingExport, path_or_buf: str | Path | BinaryIO
     publisher approval. Source and selection identities remain the existing
     canonical provenance record. The caller owns non-path output streams.
     """
+    _write_csv_bundle(table.provenance(), lambda stream: _write_csv_stream(table, stream), path_or_buf)
+
+
+def _write_csv_bundle(provenance_record: _WriterProvenance, write_data: Callable[[_CSVStream], None],
+                      path_or_buf: str | Path | BinaryIO) -> None:
     from zipfile import ZIP_DEFLATED, ZipFile
 
-    provenance = canonical_json(table.provenance().to_dict()).encode("utf-8")
+    provenance = canonical_json(provenance_record.to_dict()).encode("utf-8")
     with _export_stream(path_or_buf) as stream, ZipFile(stream, "w", compression=ZIP_DEFLATED,
                                                      compresslevel=6, allowZip64=True) as archive:
         with archive.open("data.csv", "w", force_zip64=True) as member, _DigestWriter(member) as writer:
-            _write_csv_stream(table, writer)
+            write_data(writer)
             data_identity = {"sha256": writer.digest.hexdigest(), "size_bytes": writer.size}
         archive.writestr("provenance.json", provenance)
         manifest = {"schema_version": 1, "format": "teadata-csv-bundle",
@@ -1326,14 +1333,24 @@ def _excel_workbook(path_or_buf: str | Path | BinaryIO) -> Generator[Workbook, N
 
 
 def write_excel(table: _StreamingExport, path_or_buf: str | Path | BinaryIO) -> None:
+    def data_rows():
+        with _owned_iterator(table.batches()) as batches:
+            for batch in batches:
+                yield from zip(*(column.to_pylist() for column in batch.columns), strict=True)
+
+    _write_excel_rows(table.provenance(), table.headers, len(table.schema), table.rows_hint, data_rows(), path_or_buf)
+
+
+def _write_excel_rows(provenance: _WriterProvenance, headers: tuple[tuple[str, ...], ...], width: int,
+                      rows_hint: int | None, data_rows: Iterator[Sequence[Any]],
+                      path_or_buf: str | Path | BinaryIO) -> None:
     from openpyxl.cell import WriteOnlyCell
 
-    max_rows = 1_048_576 - len(table.headers)
+    max_rows = 1_048_576 - len(headers)
     row_limit_error = "Source exceeds Excel worksheet limits; use CSV for this table"
-    if len(table.schema) > 16_384 or (table.rows_hint is not None and table.rows_hint > max_rows):
+    if width > 16_384 or (rows_hint is not None and rows_hint > max_rows):
         raise ValueError(row_limit_error)
-    provenance = table.provenance()
-    with _excel_workbook(path_or_buf) as workbook:
+    with _owned_iterator(data_rows), _excel_workbook(path_or_buf) as workbook:
         sheet = workbook.create_sheet("Data")
 
         def cells(values):
@@ -1352,14 +1369,11 @@ def write_excel(table: _StreamingExport, path_or_buf: str | Path | BinaryIO) -> 
                 else:
                     yield value
 
-        for row in table.headers:
+        for row in headers:
             sheet.append(list(cells(row)))
         rows = 0
-        with _owned_batches(table.batches()) as batches:
-            for batch in batches:
-                rows += batch.num_rows
-                if rows > max_rows:
-                    raise ValueError(row_limit_error)
-                for row in zip(*(column.to_pylist() for column in batch.columns), strict=True):
-                    sheet.append(list(cells(row)))
+        for rows, row in enumerate(data_rows, 1):
+            if rows > max_rows:
+                raise ValueError(row_limit_error)
+            sheet.append(list(cells(row)))
         provenance._append_sheet(workbook, rows=rows)

@@ -299,6 +299,28 @@ identifies the exact HTML receipts. District publisher agreement is scoped to
 those selections. These checks support explicit catalog reads from the
 unpublished candidate. Dataset activation and release publication are separate.
 
+### Bounded course preview and export
+
+`teadata.peims_course_index.build_course_index(release, path)` compiles a
+SQLite projection from the district and direct Texas course enrollment releases
+already available to `release`. It reads and verifies the pinned source leaves
+during preparation. Store the checksum of the completed SQLite file alongside
+the selected release manifest pin.
+
+`select_course_enrollment(release, path, expected_sha256=..., scope="district",
+years=[2026], course="03100500", districts=["227901"])` reads one course across
+up to two years and 40 districts. `scope="state"` reads the publisher's direct
+Texas observation and takes no district IDs. The same result supplies rows for
+preview and supports `to_csv_bundle()` and `to_excel()`. These use the standard
+series provenance scheme and retain source row order, leading zeroes, suppressed
+tokens and observed zeroes. Absent publisher rows remain absent. The read and
+the two exports do not load Arrow.
+
+Treat the index as a derived immutable artifact. Use an application-owned,
+versioned directory and a new file for each build. The reader checks the exact
+file digest, the format and the release identity. The ordinary release and its
+publisher receipts remain the research evidence for the data.
+
 ### Campus source rows and geography hold
 
 To include the campus source rows, add `--edition 2023 campus`,

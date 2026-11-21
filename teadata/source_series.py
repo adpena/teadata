@@ -39,6 +39,24 @@ def _required_year(value: int | str) -> int:
     return year
 
 
+def _series_provenance(dataset: str, fields: tuple[str, ...], scope: str,
+                       years: tuple[int, ...], ids: tuple[str, ...] | None,
+                       sources: tuple[tuple[int, ExportProvenance], ...]) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "operation": "school_year_series",
+        "dataset": dataset,
+        "fields": list(fields),
+        "scope": scope,
+        "school_years": list(years),
+        "ids": list(ids) if ids is not None else None,
+        "year_column": _YEAR_COLUMN,
+        "cross_year_comparability": "unassessed",
+        "unavailable_context": "null when the column is absent from that edition's projection",
+        "sources": [{"school_year": year, "provenance": source.to_dict()} for year, source in sources],
+    }
+
+
 def _series_ids(ids: Sequence[int | str], scope: str) -> tuple[str, ...]:
     width = 6 if scope == "district" else 9
     message = f"ids must contain distinct, nonzero {scope} numbers of up to {width} digits."
@@ -270,19 +288,8 @@ class ObservationSeries:
 
     def provenance(self) -> dict[str, Any]:
         """Describe each pinned source view and the exact series selector without scanning rows."""
-        result: dict[str, Any] = {
-            "schema_version": 1,
-            "operation": "school_year_series",
-            "dataset": self.dataset,
-            "fields": list(self.fields),
-            "scope": self.scope,
-            "school_years": list(self.years),
-            "ids": list(self.ids) if self.ids is not None else None,
-            "year_column": _YEAR_COLUMN,
-            "cross_year_comparability": "unassessed",
-            "unavailable_context": "null when the column is absent from that edition's projection",
-            "sources": [{"school_year": year, "provenance": source.to_dict()} for year, _, _, source in self._sources],
-        }
+        result = _series_provenance(self.dataset, self.fields, self.scope, self.years, self.ids,
+                                    tuple((year, source) for year, _, _, source in self._sources))
         if self._registry is not None:
             build_id, manifest_sha256, names = self._registry
             assert self.ids is not None
@@ -418,25 +425,31 @@ class _SeriesExport:
         return self.series.provenance()
 
     def _append_sheet(self, workbook: Workbook, *, rows: int | None = None) -> None:
-        from base64 import b64encode
+        _append_series_sheet(workbook, self.to_dict(),
+                             tuple((year, source) for year, _, _, source in self.series._sources), rows=rows)
 
-        from .export_provenance import _provenance_sheet
 
-        sheet = _provenance_sheet(workbook)
-        sheet.append(("TEA Data school-year series export provenance",))
-        if rows is not None:
-            sheet.append(("Total rows exported", rows))
-        sheet.append(("Measurement year column", _YEAR_COLUMN))
-        sheet.append(("Cross-year comparability", "Unassessed; inspect each source's definitions and periods."))
-        sheet.append(("Series selection record", "Part", "Parts", "Base64-encoded UTF-8 JSON"))
-        encoded = b64encode(canonical_json(self.series.provenance()).encode()).decode("ascii")
-        parts = range(0, len(encoded), 12_000)
-        for number, offset in enumerate(parts, 1):
-            sheet.append(("Series selection record", number, len(parts), encoded[offset:offset + 12_000]))
-        for year, _, _, source in self.series._sources:
-            sheet.append(())
-            sheet.append(("Measurement school year ending", year))
-            source._append_sheet(workbook, sheet=sheet)
+def _append_series_sheet(workbook: Workbook, document: dict[str, Any],
+                         sources: tuple[tuple[int, ExportProvenance], ...], *, rows: int | None) -> None:
+    from base64 import b64encode
+
+    from .export_provenance import _provenance_sheet
+
+    sheet = _provenance_sheet(workbook)
+    sheet.append(("TEA Data school-year series export provenance",))
+    if rows is not None:
+        sheet.append(("Total rows exported", rows))
+    sheet.append(("Measurement year column", _YEAR_COLUMN))
+    sheet.append(("Cross-year comparability", "Unassessed; inspect each source's definitions and periods."))
+    sheet.append(("Series selection record", "Part", "Parts", "Base64-encoded UTF-8 JSON"))
+    encoded = b64encode(canonical_json(document).encode()).decode("ascii")
+    parts = range(0, len(encoded), 12_000)
+    for number, offset in enumerate(parts, 1):
+        sheet.append(("Series selection record", number, len(parts), encoded[offset:offset + 12_000]))
+    for year, source in sources:
+        sheet.append(())
+        sheet.append(("Measurement school year ending", year))
+        source._append_sheet(workbook, sheet=sheet)
 
 
 @dataclass(frozen=True, slots=True, eq=False)

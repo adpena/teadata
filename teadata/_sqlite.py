@@ -2,6 +2,7 @@
 
 from collections.abc import Generator
 from contextlib import closing, contextmanager
+from functools import lru_cache
 from hashlib import file_digest
 import os
 from pathlib import Path
@@ -27,20 +28,34 @@ def _plain_database_identity(path: Path, label: str) -> tuple[int, int, int, int
     return _identity(info)
 
 
+def _database_digest(path: Path, identity: tuple[int, int, int, int, int]) -> str:
+    with path.open("rb") as stream:
+        if _identity(os.fstat(stream.fileno())) != identity:
+            raise ValueError("SQLite artifact changed before hashing")
+        digest = file_digest(stream, "sha256").hexdigest()
+        if _identity(os.fstat(stream.fileno())) != identity:
+            raise ValueError("SQLite artifact changed during hashing")
+    return digest
+
+
+_verified_digest = lru_cache(maxsize=16)(_database_digest)
+
+
 @contextmanager
 def verified_database(path: Path, *, expected_sha256: str, application_id: int, schema_version: int,
-                      label: str) -> Generator[sqlite3.Connection]:
+                      label: str, reuse_verification: bool = False) -> Generator[sqlite3.Connection]:
     """Open one pinned, checkpointed database in a directory held immutable during use."""
     path = path.absolute()
     identity = _plain_database_identity(path, label)
-    with path.open("rb") as stream:
-        if (_identity(os.fstat(stream.fileno())) != identity
-                or file_digest(stream, "sha256").hexdigest() != expected_sha256):
-            raise ValueError(f"{label} file differs from its expected SHA-256")
-        with closing(readonly_connection(path, immutable=True)) as connection:
-            if (connection.execute("PRAGMA application_id").fetchone() != (application_id,)
-                    or connection.execute("PRAGMA user_version").fetchone() != (schema_version,)):
-                raise ValueError(f"Unsupported {label.lower()} file format")
-            if (_identity(os.fstat(stream.fileno())) != identity or _plain_database_identity(path, label) != identity):
-                raise ValueError(f"{label} file changed while opening")
-            yield connection
+    # Windows st_ctime reports creation time. An in-place update that restores
+    # mtime can retain the same metadata there, so verify every open.
+    digest = _verified_digest if reuse_verification and os.name == "posix" else _database_digest
+    if digest(path, identity) != expected_sha256:
+        raise ValueError(f"{label} file differs from its expected SHA-256")
+    with closing(readonly_connection(path, immutable=True)) as connection:
+        if (connection.execute("PRAGMA application_id").fetchone() != (application_id,)
+                or connection.execute("PRAGMA user_version").fetchone() != (schema_version,)):
+            raise ValueError(f"Unsupported {label.lower()} file format")
+        if _plain_database_identity(path, label) != identity:
+            raise ValueError(f"{label} file changed while opening")
+        yield connection

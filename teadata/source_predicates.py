@@ -68,6 +68,12 @@ def _encode_parameter(value):
     return value
 
 
+def _recorded_query(expression: str, captured: Mapping[str, object]) -> str:
+    return json.dumps({"expression": expression, "params": {
+        key: _encode_parameter(value) for key, value in captured.items()
+    }}, sort_keys=True, allow_nan=False)
+
+
 def _decode_parameter(raw, *, sequence: bool = True):
     if raw is None or type(raw) in (str, bool):
         return raw
@@ -327,7 +333,5 @@ def prepare_predicate(expression: str, params: Mapping[str, object] | None, *, r
         raise ValueError("Unsupported source query. Use comparisons, membership and boolean operators")
 
     compiled = predicate(tree.body)
-    recipe = json.dumps({"expression": expression, "params": {
-        key: _encode_parameter(value) for key, value in captured.items()
-    }}, sort_keys=True, allow_nan=False) if record else None
+    recipe = _recorded_query(expression, captured) if record else None
     return PreparedPredicate(compiled, recipe)
