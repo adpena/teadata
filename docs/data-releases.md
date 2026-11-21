@@ -493,6 +493,16 @@ and review the year, population, and disclosure rules before interpreting a
 raw value. The tested-grade manifests can be used for the separately reviewed
 [Texas comparison selectors](querying.md#compare-a-published-measure-with-texas).
 
+The native admission gate also checks the exact published 2025–26 All Grades
+and 2023–24 through 2025–26 End-of-Course manifests. Each edition includes
+campus, district, ESC region, and the direct Texas report. In addition to raw
+and restored-header CSV comparisons, the gate compares 210 published rates
+per edition and scope with an independently obtained named TEA report. The
+checks cover the accountability subset and retain observed zero, suppression,
+and missing values separately. Other columns retain their raw source tokens.
+Compare local and Texas values within the same edition. The gate establishes
+neither comparability between editions nor attachment to the default bundle.
+
 ### Exact retained-source parity
 
 Export one exact native table with canonical field names by default. For a

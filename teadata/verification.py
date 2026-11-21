@@ -1173,15 +1173,12 @@ def _native_review(release: DataRelease, store: ProvenanceStore) -> _NativeRevie
         return _NativeReview("regional TAPR", partial(qualify_tapr_regional, release, store),
                              partial(retained_regional_evidence, release, store))
 
-    from teadata.native_staar_all_grades import (
-        PUBLISHER_ROOTS as STAAR_ALL_GRADES_WITNESSES,
-        REVIEWED_MANIFEST as STAAR_ALL_GRADES_MANIFEST,
-        qualify_staar_all_grades,
-    )
+    from teadata.native_staar_rates import QUALIFICATIONS as STAAR_QUALIFICATIONS, qualify_staar_rates
 
-    if release.manifest_sha256 == STAAR_ALL_GRADES_MANIFEST:
-        return _NativeReview("2025–26 STAAR All Grades", partial(qualify_staar_all_grades, release, store),
-                             partial(_native_record_evidence, release, store, store, STAAR_ALL_GRADES_WITNESSES))
+    staar = STAAR_QUALIFICATIONS.get(release.manifest_sha256)
+    if staar is not None:
+        return _NativeReview(staar.name, partial(qualify_staar_rates, release, store),
+                             partial(_native_record_evidence, release, store, store, staar.publisher_roots))
 
     from teadata.native_facility_usage import (
         qualify_facility_usage, reviewed_facility_usage, validate_facility_identity,
