@@ -11,7 +11,7 @@ import pickle
 import signal
 import sqlite3
 import sys
-from threading import Barrier, Event, Thread
+from threading import Barrier, Event, Thread, current_thread
 from types import SimpleNamespace
 from unittest.mock import Mock
 from uuid import UUID
@@ -236,7 +236,7 @@ def test_current_release_reuses_a_pinned_build_cache_offline(release, tmp_path, 
         assert len(files) == len({path for path in staged.values()}) + 1
 
         monkeypatch.setenv("TEADATA_RELEASE_SHA256", "f" * 64)
-        with pytest.raises(ContractError, match="trusted pin"):
+        with pytest.raises(FileNotFoundError, match="not cached for offline use"):
             release_module.current_release()
         monkeypatch.delenv("TEADATA_RELEASE_SHA256")
         with pytest.raises(ContractError, match="expected manifest SHA-256"):
@@ -268,6 +268,102 @@ def test_offline_manifest_rejects_fifo_and_symlink_ancestors(tmp_path):
     slot.symlink_to(elsewhere, target_is_directory=True)
     with pytest.raises(ContractError, match="without symlink paths"):
         DataRelease(url, expected_sha256="0" * 64, offline=True, cache_dir=cache)
+
+
+def test_remote_manifest_revisions_share_url_without_replacing_pins(release, tmp_path, monkeypatch):
+    url = "https://example.invalid/release.json"
+    cache = tmp_path / "cache"
+    slot = cache / "manifests"
+    slot.mkdir(parents=True)
+    first = release.read_bytes()
+    second, third = first + b" ", first + b"\n"
+    first_pin, second_pin, third_pin = (sha256(data).hexdigest() for data in (first, second, third))
+    legacy = slot / (sha256(url.encode()).hexdigest() + ".json")
+    legacy.write_bytes(first)
+    fourth = first + b"\t"
+    response = Mock(side_effect=[BytesIO(second), BytesIO(third), BytesIO(fourth)])
+    monkeypatch.setattr(release_module, "urlopen", response)
+
+    selected = DataRelease(url, expected_sha256=second_pin, cache_dir=cache)
+    assert selected.path == slot / f"{second_pin}.json"
+    unpinned = DataRelease(url, cache_dir=cache)
+    assert unpinned.path not in {legacy, selected.path}
+
+    for pin, path in [(first_pin, legacy), (second_pin, selected.path), (third_pin, unpinned.path)]:
+        restored = DataRelease(url, expected_sha256=pin, offline=True, cache_dir=cache)
+        assert restored.path == path and restored.manifest_sha256 == pin
+    assert legacy.read_bytes() == first
+    assert response.call_count == 2
+    assert set(slot.iterdir()) == {legacy, selected.path, unpinned.path}
+
+    retained = DataRelease(url, expected_sha256=third_pin, cache_dir=cache)
+    assert retained.path == slot / f"{third_pin}.json"
+    assert response.call_count == 2
+    assert DataRelease(url, cache_dir=cache).path.read_bytes() == fourth
+    assert retained.path.read_bytes() == third
+    assert DataRelease(url, expected_sha256=third_pin, offline=True, cache_dir=cache).path == retained.path
+    assert response.call_count == 3
+
+
+def test_remote_manifest_content_cache_can_reopen_at_another_source_url(release, tmp_path, monkeypatch):
+    data = release.read_bytes()
+    pin = sha256(data).hexdigest()
+    second_url = "https://mirror.example.invalid/directory/release.json"
+    content = release.parent / json.loads(data)["artifacts"]["entities"]["filename"]
+    response = Mock(side_effect=[BytesIO(data), BytesIO(content.read_bytes())])
+    monkeypatch.setattr(release_module, "urlopen", response)
+    first = DataRelease("https://example.invalid/release.json", expected_sha256=pin, cache_dir=tmp_path)
+    second = DataRelease(second_url, expected_sha256=pin, cache_dir=tmp_path)
+    assert first.path == second.path
+    assert second.source == second_url
+    second.artifact("entities")
+    assert response.call_count == 2
+    assert response.call_args.args == (f"https://mirror.example.invalid/directory/{content.name}",)
+
+
+def test_bad_content_cache_slot_fails_without_using_legacy_or_network(release, tmp_path, monkeypatch):
+    data = release.read_bytes()
+    pin = sha256(data).hexdigest()
+    url = "https://example.invalid/release.json"
+    slot = tmp_path / "manifests"
+    slot.mkdir()
+    (slot / (sha256(url.encode()).hexdigest() + ".json")).write_bytes(data)
+    (slot / f"{pin}.json").write_bytes(b"broken")
+    response = Mock(side_effect=AssertionError("Corrupt pinned slots must fail closed"))
+    monkeypatch.setattr(release_module, "urlopen", response)
+
+    with pytest.raises(ContractError, match="trusted pin"):
+        DataRelease(url, expected_sha256=pin, cache_dir=tmp_path)
+    response.assert_not_called()
+
+
+def test_concurrent_remote_revisions_publish_only_complete_pinned_bytes(release, tmp_path, monkeypatch):
+    url = "https://example.invalid/release.json"
+    variants = {"first": release.read_bytes(), "second": release.read_bytes() + b" "}
+    overlap = Barrier(len(variants))
+    results, errors = {}, []
+
+    def response(*args, **kwargs):
+        overlap.wait(timeout=5)
+        return BytesIO(variants[current_thread().name])
+
+    def load(name, raw):
+        try:
+            pin = sha256(raw).hexdigest()
+            results[name] = DataRelease(url, expected_sha256=pin, cache_dir=tmp_path)
+        except Exception as error:
+            errors.append(error)
+
+    monkeypatch.setattr(release_module, "urlopen", response)
+    threads = [Thread(target=load, args=(name, raw), name=name, daemon=True) for name, raw in variants.items()]
+    for thread in threads:
+        thread.start()
+    _finish_artifact_threads(threads)
+    assert not errors
+    assert results.keys() == variants.keys()
+    assert set((tmp_path / "manifests").iterdir()) == {selected.path for selected in results.values()}
+    for name, selected in results.items():
+        assert selected.path.read_bytes() == variants[name]
 
 
 def test_current_release_applies_pin_to_the_selected_local_manifest(release, monkeypatch):

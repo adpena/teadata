@@ -1299,6 +1299,14 @@ under one base URL, such as a GitHub Release asset directory. Raw GitHub URLs
 for Git LFS files serve pointer text and fail checksum validation. Remote files
 are cached by content hash and verified before use. A process pins a remote
 release until restart; requests and rebuilds pin one release for their duration.
+Pinned manifest downloads use the manifest SHA-256 as the cache key. Distinct
+pins for one URL can coexist, and the same pinned bytes can be read from one
+cache entry when selected through a mirror. Relative file and attachment
+locations still resolve against the selected URL. Existing URL-keyed cache
+entries remain readable when their bytes match the pin. An unpinned fetch
+refreshes a separate URL slot. A pinned offline reopen can use those bytes
+while they still match the requested pin. Download with an explicit pin when
+retaining multiple revisions.
 
 For a deployment that can download at build time, set `TEADATA_RELEASE_URL` to
 the manifest URL and `TEADATA_RELEASE_SHA256` to its trusted lowercase SHA-256. Run

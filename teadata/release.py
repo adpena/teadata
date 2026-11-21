@@ -7,6 +7,7 @@ from functools import lru_cache, partial
 from contextlib import contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass
+import errno
 from hashlib import sha256
 import json
 import gzip
@@ -66,6 +67,7 @@ if hasattr(os, "register_at_fork"):
 ROLES = frozenset({"snapshot", "entities", "maps", "boundaries"})
 ANALYTICAL_RELEASE_ROLES = ROLES | ANALYTICAL_ROLES
 SNAPSHOT_MAGIC = b"TEADATA_SNAPSHOT_V1 "
+_MAX_MANIFEST_BYTES = 4 * 1024 * 1024
 _ACTIVE_RELEASE: ContextVar[DataRelease | None] = ContextVar(
     "teadata_active_release", default=None
 )
@@ -153,7 +155,7 @@ def _download(url: str, path: Path, *, expected: dict | None = None) -> None:
             temporary = Path(stream.name)
             size = 0
             digest = sha256()
-            limit = expected.get("size_bytes", 4 * 1024 * 1024) if expected else 4 * 1024 * 1024
+            limit = expected.get("size_bytes", _MAX_MANIFEST_BYTES) if expected else _MAX_MANIFEST_BYTES
             while block := response.read(1024 * 1024):
                 size += len(block)
                 if size > limit:
@@ -287,6 +289,77 @@ def _require_unchanged_artifact(path: Path, signature: _ArtifactStamp) -> None:
         raise ContractError("Release artifact changed during verification")
 
 
+def _read_manifest(path: Path, local: _LocalManifest | None = None) -> bytes:
+    with path.open("rb") as stream:
+        if local is not None and _manifest_stamp(os.fstat(stream.fileno())) != local[1]:
+            raise ContractError("Local release manifest changed before reading")
+        raw = stream.read(_MAX_MANIFEST_BYTES + 1)
+        if local is not None and _manifest_stamp(os.fstat(stream.fileno())) != local[1]:
+            raise ContractError("Local release manifest changed during reading")
+    if len(raw) > _MAX_MANIFEST_BYTES:
+        raise ContractError("Release manifest is too large")
+    return raw
+
+
+def _cached_manifest(path: Path) -> tuple[bytes, str]:
+    _require_cache_file(path)
+    raw = _read_manifest(path)
+    return raw, sha256(raw).hexdigest()
+
+
+def _remember_manifest(path: Path, raw: bytes) -> None:
+    with tempfile.NamedTemporaryFile(dir=path.parent, delete=False) as stream:
+        temporary = Path(stream.name)
+        try:
+            stream.write(raw)
+            stream.close()
+            os.replace(temporary, path)
+        finally:
+            temporary.unlink(missing_ok=True)
+
+
+def _remote_manifest(url: str, cache: Path, *, pin: str | None, offline: bool) -> tuple[Path, bytes, str]:
+    validate_http_url(url)
+    directory = cache / "manifests"
+    unpinned = directory / (sha256(f"unpinned:{url}".encode()).hexdigest() + ".json")
+    if pin is None:
+        if offline:
+            raise ContractError("Offline remote roots require an expected manifest SHA-256")
+        # An unpinned refresh must not replace any old pinned URL cache entry.
+        path = unpinned
+    else:
+        path = directory / f"{pin}.json"
+        try:
+            raw, digest = _cached_manifest(path)
+        except FileNotFoundError:
+            legacy = directory / (sha256(url.encode()).hexdigest() + ".json")
+            found_other_pin = False
+            for candidate in (legacy, unpinned):
+                try:
+                    raw, digest = _cached_manifest(candidate)
+                except FileNotFoundError:
+                    continue
+                if digest == pin:
+                    if candidate == unpinned and not offline:
+                        _remember_manifest(path, raw)
+                        return path, raw, digest
+                    return candidate, raw, digest
+                found_other_pin = True
+            if offline:
+                if found_other_pin:
+                    raise ContractError("Cached release manifest checksum differs from its trusted pin")
+                raise FileNotFoundError(errno.ENOENT, "Pinned release manifest is not cached for offline use", path)
+        else:
+            if digest != pin:
+                raise ContractError("Cached release manifest checksum differs from its trusted pin")
+            return path, raw, digest
+    if directory.resolve() != directory:
+        raise ContractError("Release cache entries must be regular files without symlink paths")
+    _download(url, path, expected={"sha256": pin} if pin is not None else None)
+    raw, digest = _cached_manifest(path)
+    return path, raw, digest
+
+
 class DataRelease:
     """A complete bundle with one catalog and content hashes for every artifact."""
 
@@ -307,31 +380,16 @@ class DataRelease:
             raise ContractError("Offline selection must be explicit boolean")
         self.offline = offline
         if self.remote:
-            validate_http_url(self.source)
-            identity = sha256(self.source.encode()).hexdigest()
-            path = self.cache / "manifests" / f"{identity}.json"
-            if offline and expected_sha256 is None:
-                raise ContractError("Offline remote roots require an expected manifest SHA-256")
-            if offline:
-                _require_cache_file(path)
-            # Existing URI slot and content check; never infer a pin from cached leaves.
-            if not offline and (expected_sha256 is None or not path.exists()):
-                _download(self.source, path, expected={"sha256": expected_sha256} if expected_sha256 else None)
+            path, raw, digest = _remote_manifest(self.source, self.cache, pin=expected_sha256, offline=offline)
         else:
             path = Path(manifest).expanduser().resolve()
-        if _local_manifest is not None and path != _local_manifest[0]:
-            raise ContractError("Local release manifest changed during selection")
+            if _local_manifest is not None and path != _local_manifest[0]:
+                raise ContractError("Local release manifest changed during selection")
+            raw = _read_manifest(path, _local_manifest)
+            digest = sha256(raw).hexdigest()
         self.path = path
-        with path.open("rb") as stream:
-            if _local_manifest is not None and _manifest_stamp(os.fstat(stream.fileno())) != _local_manifest[1]:
-                raise ContractError("Local release manifest changed before reading")
-            raw = stream.read(4 * 1024 * 1024 + 1)
-            if _local_manifest is not None and _manifest_stamp(os.fstat(stream.fileno())) != _local_manifest[1]:
-                raise ContractError("Local release manifest changed during reading")
-        if len(raw) > 4 * 1024 * 1024:
-            raise ContractError("Release manifest is too large")
-        self._manifest_sha256 = sha256(raw).hexdigest()
-        if expected_sha256 is not None and self._manifest_sha256 != expected_sha256:
+        self._manifest_sha256 = digest
+        if expected_sha256 is not None and digest != expected_sha256:
             raise ContractError("Release manifest checksum differs from its trusted pin")
         document = json.loads(raw)
         version = document.get("schema_version")
