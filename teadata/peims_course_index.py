@@ -204,7 +204,8 @@ def select_course_enrollment(release: DataRelease, path: str | Path, *, expected
     columns = None
     try:
         with verified_database(Path(path), expected_sha256=expected_sha256, application_id=_APPLICATION_ID,
-                               schema_version=_SCHEMA_VERSION, label="PEIMS course index", reuse_verification=True) as db:
+                               schema_version=_SCHEMA_VERSION, label="PEIMS course index",
+                               reuse_verification=True, discard_cached_reads=True) as db:
             db.execute("PRAGMA trusted_schema=OFF")
             if db.execute("SELECT sha256 FROM release_pin").fetchmany(2) != [(release.manifest_sha256,)]:
                 raise ContractError("PEIMS course index belongs to a different data release")

@@ -97,6 +97,25 @@ def test_course_index_rechecks_replaced_files_and_guards_release_pin(tmp_path, c
         select()
 
 
+def test_cold_course_checksum_advises_away_the_open_index_pages(tmp_path, course_release, monkeypatch):
+    database = tmp_path / "courses.sqlite3"
+    index.build_course_index(course_release, database)
+    pin = file_identity(database)["sha256"]
+    info = database.stat()
+    ranges = []
+
+    def advise(fd, offset, length, policy):
+        assert os.fstat(fd).st_ino == info.st_ino
+        ranges.append((offset, length, policy))
+
+    monkeypatch.setattr(os, "posix_fadvise", advise, raising=False)
+    monkeypatch.setattr(os, "POSIX_FADV_DONTNEED", 4, raising=False)
+    result = index.select_course_enrollment(course_release, database, expected_sha256=pin,
+                                            scope="state", years=[2026], course="00123456")
+    assert [(row.district, row.enrollment) for row in result.rows] == [(None, 12)]
+    assert ranges == [(0, info.st_size, 4)]
+
+
 def test_course_index_preserves_existing_file_and_rejects_duplicate_ids(tmp_path, course_release):
     database = tmp_path / "courses.sqlite3"
     database.write_bytes(b"existing")

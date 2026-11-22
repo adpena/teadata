@@ -318,8 +318,10 @@ the two exports do not load Arrow.
 
 Treat the index as a derived immutable artifact. Use an application-owned,
 versioned directory and a new file for each build. The reader checks the exact
-file digest, the format and the release identity. The ordinary release and its
-publisher receipts remain the research evidence for the data.
+file digest, the format and the release identity. On systems that support
+discard-behind advice, the checksum scan asks the operating system to release
+pages it has already read. The ordinary release and its publisher receipts
+remain the research evidence for the data.
 
 ### Campus source rows and geography hold
 
