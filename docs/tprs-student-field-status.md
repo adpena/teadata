@@ -61,6 +61,13 @@ reconcile to both direct Texas totals. The existing released field inventory
 above remains tied to its original source vintage. The refreshed campus reports
 and publication of CTE as native fields require separate qualification.
 
+The regional roster validator accepts both recorded forms of the same TEA GET
+request. Older receipts record the broker URL and ordered query controls
+separately. Refreshed receipts can record the full request URL with an explicit
+empty list of additional controls. Both forms must bind the exact edition,
+region, scope and response bytes. A report stays linked to its original roster
+receipt even when a later roster response has the same bytes.
+
 The catalog read used to resolve live coverage was offline and opened metadata,
 not observations. Original-source replay and retained HTML/XLSX witnesses have
 separate receipts. **Authenticated production continuity export remains

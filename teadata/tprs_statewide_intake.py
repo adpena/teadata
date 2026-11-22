@@ -13,7 +13,7 @@ import json
 from stat import S_ISREG
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
-from urllib.parse import parse_qsl, urlsplit
+from urllib.parse import parse_qsl, urlencode, urlsplit
 
 from .column_schema import _unique_object
 from .dataset_metadata import ArtifactRef, ColumnSchemaRef, EditionKey
@@ -99,19 +99,27 @@ def _regional_roster(response: bytes, record: Mapping[str, Any], region: str, sc
     size = record["artifact"]["size_bytes"]
     _need(type(size) is int and 0 < len(response) == size <= limit
           and sha256(response).hexdigest() == record["artifact"]["sha256"], "Roster response differs from its receipt")
-    url = urlsplit(record["requested_url"])
+    requested_url = record["requested_url"]
+    url = urlsplit(requested_url)
     controls = parse_qsl(url.query, keep_blank_values=True)
     expected = {"_service": "marykay", "_debug": "0", "_program": "perfrept.acct_json_response.sas",
                 "prmv_level": {"campus": "C", "district": "D"}[scope],
                 "ccyy": str(EDITION), "prmv_var": "region", "prmv_text": region}
     parameters = record["parameters"]
+    form_url = parameters.get("form_url")
+    form_controls = parameters.get("form_controls")
+    # acquire_form records controls separately or as part of the supplied URL.
+    bound_controls = (
+        form_url == BROKER and form_controls == [list(pair) for pair in controls]
+        and requested_url == f"{BROKER}?{urlencode(controls)}"
+    ) or (form_url == requested_url and form_controls == [])
     _need(record["kind"] == "acquisition" and record["method"] == "download" and record["section"] == "reference"
           and record["requested_year"] == record["resolved_year"] == EDITION
           and record["source_metadata"].get("version") == str(EDITION)
-          and record["resolved_url"] == record["requested_url"] and record["downloaded_at"]
-          and url._replace(query="").geturl() == BROKER and not url.fragment and len(controls) == len(expected)
-          and dict(controls) == expected and parameters.get("form_controls") == [list(pair) for pair in controls]
-          and parameters.get("form_url") == BROKER and parameters.get("http_method") == "GET"
+          and record["resolved_url"] == requested_url and record["downloaded_at"]
+          and requested_url == f"{BROKER}?{url.query}" and "#" not in requested_url
+          and len(controls) == len(expected) and dict(controls) == expected and bound_controls
+          and parameters.get("http_method") == "GET"
           and parameters.get("http_status") == 200
           and record["response_headers"].get("content-type", "").split(";")[0] == "application/json",
           "Roster receipt does not bind the exact public regional request")

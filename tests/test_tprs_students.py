@@ -870,7 +870,7 @@ def test_selected_aggregate_size_refuses_before_parsing_or_staging(tmp_path, gri
     assert not output.exists()
 
 
-def _roster_receipt(store, tmp_path, region, rows, *, scope):
+def _roster_receipt(store, tmp_path, region, rows, *, scope, full_url=False):
     roster = tmp_path / "roster.json"
     roster.write_text(canonical_json(rows))
     controls = [("_service", "marykay"), ("_debug", "0"), ("_program", "perfrept.acct_json_response.sas"),
@@ -879,15 +879,17 @@ def _roster_receipt(store, tmp_path, region, rows, *, scope):
     return store.record_acquisition(roster, ResolvedDataset("reference:roster", "reference", 2026, 2026, "",
         DatasetMetadata(version="2026")), downloaded_at=datetime(2026, 11, 4, tzinfo=timezone.utc),
         requested_url=url, resolved_url=url, response_headers={"content-type": "application/json"},
-        parameters={"form_url": students.BROKER, "http_method": "GET", "http_status": 200,
-                    "form_controls": [list(pair) for pair in controls]})
+        parameters={"form_url": url if full_url else students.BROKER, "http_method": "GET", "http_status": 200,
+                    "form_controls": [] if full_url else [list(pair) for pair in controls]})
 
 
-def test_statewide_intake_requires_complete_roster_and_original_report_parent(tmp_path, grid, monkeypatch):
+@pytest.mark.parametrize("full_url", [False, True], ids=["separate-controls", "full-url"])
+def test_statewide_intake_requires_complete_roster_and_original_report_parent(tmp_path, grid, monkeypatch, full_url):
     monkeypatch.setattr(tprs_statewide_intake, "REGIONS", ("19",))
     monkeypatch.setattr(tprs_statewide_intake, "DISTRICT_COUNT", 1)
     store = ProvenanceStore(tmp_path / "store")
-    roster_id = _roster_receipt(store, tmp_path, "19", [{"DISTRICT": "071901", "REGION": "19"}], scope="district")
+    roster_id = _roster_receipt(store, tmp_path, "19", [{"DISTRICT": "071901", "REGION": "19"}],
+                                scope="district", full_url=full_url)
     state = html(report_rows(grid, "state", "S"))
     district = html(report_rows(grid, "district", "071901"))
     state_id = receipt(store, tmp_path, state, scope="state", identifier="S")
@@ -899,6 +901,42 @@ def test_statewide_intake_requires_complete_roster_and_original_report_parent(tm
         tprs_statewide_intake.admit_statewide_selection(store, {**intake, "reports": reports[:1]})
     with pytest.raises(ContractError, match="exact regional roster parent"):
         tprs_statewide_intake.admit_statewide_selection(store, {**intake, "reports": reports})
+    reports[1]["receipt"] = receipt(store, tmp_path, district, identifier="071901", parents=(roster_id,))
+    selected = tprs_statewide_intake.admit_statewide_selection(store, {**intake, "reports": reports})
+    assert [(item.scope, item.identifier) for item in selected.reports] == [("district", "071901"), ("state", "S")]
+
+
+@pytest.mark.parametrize("fault", ["missing", "partial", "reordered", "conflicting", "mixed", "region", "duplicate", "fragment"])
+def test_regional_roster_rejects_inconsistent_request_receipt(tmp_path, fault):
+    store = ProvenanceStore(tmp_path / "store")
+    pin = _roster_receipt(store, tmp_path, "19", [{"CAMPUS": "071901001", "DISTRICT": "071901", "REGION": "19"}],
+                          scope="campus")
+    record = store.read_record(pin)
+    source = store.verify_artifact(record["artifact"]["sha256"]).read_bytes()
+    parameters = record["parameters"]
+    controls = parameters["form_controls"]
+    url = record["requested_url"]
+    if fault == "missing":
+        del parameters["form_controls"]
+    elif fault == "partial":
+        parameters["form_controls"] = controls[:-1]
+    elif fault == "reordered":
+        parameters["form_controls"] = controls[::-1]
+    elif fault == "conflicting":
+        controls[-1][1] = "18"
+    elif fault == "mixed":
+        parameters["form_url"] = url
+    else:
+        if fault == "region":
+            url = url.replace("prmv_text=19", "prmv_text=18")
+        elif fault == "duplicate":
+            url += "&prmv_text=19"
+        else:
+            url += "#"
+        record.update(requested_url=url, resolved_url=url)
+        parameters.update(form_url=url, form_controls=[])
+    with pytest.raises(ContractError, match="exact public regional request"):
+        tprs_statewide_intake._regional_roster(source, record, "19", "campus", tprs_statewide_intake.MAX_CAMPUS_ROSTER_BYTES)
 
 
 @pytest.fixture
