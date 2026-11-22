@@ -25,6 +25,11 @@ for district and direct Texas previews, CSV bundles and Excel exports.
 The 2025–26 CTE reconciliation reader is available for retained final reports.
 The normal catalog has the same qualified data editions as 0.0.179.
 
+TEA Data software 0.0.181 keeps the 0.0.178 data manifest. On supported
+systems, the SQLite course reader asks the operating system to release file
+pages as it verifies the index. The reader still checks the complete SHA-256
+and the pinned release identity.
+
 ## Prior normal release 0.0.177
 
 The [pinned normal release](https://github.com/adpena/teadata/releases/download/v0.0.177/release.json) adds
