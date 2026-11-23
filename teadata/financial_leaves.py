@@ -195,7 +195,7 @@ def _package(archive: zipfile.ZipFile, *, literal: bool = False) -> tuple[dict[s
 
 
 def _sheet_frame(archive: zipfile.ZipFile, member: str, strings: list[str], *, header_row: int,
-                 codes: list[str], literal: bool = False) -> tuple[int, list[ET.Element]]:
+                 codes: list[str], literal: bool = False, max_rows: int = MAX_ROWS) -> tuple[int, list[ET.Element]]:
     """Validate the original worksheet framing before either value reader runs."""
     root = _xml(archive, member, literal=literal)
     if (root.find(".//" + NS + "f") is not None or root.find(NS + "mergeCells/" + NS + "mergeCell") is not None
@@ -215,7 +215,7 @@ def _sheet_frame(archive: zipfile.ZipFile, member: str, strings: list[str], *, h
     if literal and any(not re.fullmatch(r"[1-9][0-9]{0,6}", ordinal) for ordinal in ordinals):
         raise ValueError("Invalid literal financial row ordinal")
     numbers = [int(ordinal) for ordinal in ordinals]
-    if (not numbers or numbers != sorted(set(numbers)) or numbers[-1] - header_row > MAX_ROWS
+    if (not numbers or numbers != sorted(set(numbers)) or numbers[-1] - header_row > max_rows
             or header_row not in numbers):
         raise ValueError("Financial worksheet rows are missing, duplicated, unordered or exceed admission")
     if any(number < header_row for number in numbers):

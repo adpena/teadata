@@ -36,6 +36,18 @@ TAPR_PROFILE_FAMILIES = ("student_staff_profile", "graduation_profile", "student
 TAPR_SOURCE_KEYS = {"campus": "campus_number", "district": "district_number",
                     "state": None, "region": "region_number"}
 TAPR_KEY_WIDTHS = {"campus_number": 9, "district_number": 6, "region_number": 2}
+_ACCOUNTABILITY_PROFILE_FAMILIES = ("accountability_ccmr", "accountability_staar_performance",
+                                   "accountability_academic_growth", "accountability_closing_the_gaps")
+TABULAR_PROFILE_FAMILIES = (*TAPR_PROFILE_FAMILIES, *_ACCOUNTABILITY_PROFILE_FAMILIES)
+
+
+def tabular_profile_dataset(scope: str, family: str) -> str:
+    """Name a reviewed source family without conflating TAPR and accountability."""
+    if family in _ACCOUNTABILITY_PROFILE_FAMILIES:
+        if scope not in {"district", "campus"}:
+            raise ValueError("Accountability bulk files require district or campus scope")
+        return f"{scope}_{family}"
+    return f"{scope}_tapr_{family}"
 
 
 def tapr_source_identifiers(values: Any, *, key_field: str,
@@ -50,10 +62,11 @@ def tapr_source_identifiers(values: Any, *, key_field: str,
         ):
             raise ValueError("Source identifier batches require Arrow strings")
         pc: Any = arrow_compute
-        # These exact archived Profile editions prefix the two-digit code.
+        # These archival reports can prefix the two-digit code.
         # The comparison interface and other sources retain literal ESC keys.
         identifiers = (pc.replace_substring_regex(values, "^'", "")
-                       if dataset == "region_tapr_student_staff_profile" and edition in {"2021", "2022", "2023"}
+                       if dataset in {"region_tapr_student_staff_profile", "region_tapr_staar_all_grades"}
+                       and edition in {"2021", "2022", "2023"}
                        else values)
         valid = pc.fill_null(pc.match_substring_regex(identifiers, r"^(0[1-9]|1[0-9]|20)\z"), False)
         if pc.any(pc.invert(valid)).as_py():
@@ -68,8 +81,9 @@ def qualified_tapr_family(dataset: str, key_field: str | None) -> str:
     """Resolve only the reader's existing exact scope-qualified family names."""
     for scope, source_key in TAPR_SOURCE_KEYS.items():
         if source_key == key_field:
-            for family in TAPR_PROFILE_FAMILIES:
-                if dataset == f"{scope}_tapr_{family}":
+            families = TABULAR_PROFILE_FAMILIES if scope in {"district", "campus"} else TAPR_PROFILE_FAMILIES
+            for family in families:
+                if dataset == tabular_profile_dataset(scope, family):
                     return family
     raise ValueError("TAPR preparation requires an explicit qualified dataset and source edition")
 

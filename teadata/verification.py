@@ -1202,6 +1202,22 @@ def _native_review(release: DataRelease, store: ProvenanceStore) -> _NativeRevie
         return _NativeReview(staar.name, partial(qualify_staar_rates, release, store),
                              partial(_native_record_evidence, release, store, store, staar.publisher_roots))
 
+    from teadata.native_tabular_archives import (
+        archive_publisher_roots, archive_qualifications, qualify_tabular_archive,
+    )
+
+    archive = archive_qualifications().get(release.manifest_sha256)
+    if archive is not None:
+        return _NativeReview(archive["name"], partial(qualify_tabular_archive, release, store),
+                             partial(_native_record_evidence, release, store, store, archive_publisher_roots(archive)))
+
+    from teadata.native_cte_workbooks import cte_workbook_qualifications, qualify_cte_workbook
+
+    workbook = cte_workbook_qualifications().get(release.manifest_sha256)
+    if workbook is not None:
+        return _NativeReview(workbook["title"], partial(qualify_cte_workbook, release, store),
+                             partial(_native_record_evidence, release, store, store, (workbook["publisher_receipt"],)))
+
     from teadata.native_facility_usage import (
         qualify_facility_usage, reviewed_facility_usage, validate_facility_identity,
     )

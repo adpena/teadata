@@ -112,10 +112,10 @@ def test_regional_source_rejects_duplicate_codes_and_unbound_identity(tmp_path):
 
 
 @pytest.mark.parametrize("edition", ["2021", "2022", "2023"])
-def test_historical_regional_profile_accepts_quoted_keys_and_retains_literal_values(tmp_path, edition):
+@pytest.mark.parametrize("dataset", ["region_tapr_student_staff_profile", "region_tapr_staar_all_grades"])
+def test_historical_regional_profile_accepts_quoted_keys_and_retains_literal_values(tmp_path, edition, dataset):
     labels, codes = ["Education Service Center", "Example Value"], ["REGION", "VALUE"]
     fields = ["region_number", "example_value"]
-    dataset = "region_tapr_student_staff_profile"
     path = write_source(tmp_path, [labels, codes, ["'01", "0"], ["'13", "-1"]])
     mapping = mapping_for(path, labels=labels, codes=codes, fields=fields)
     source = read_source(path, mapping=mapping, key_field=fields[0], dataset=dataset, edition=edition)

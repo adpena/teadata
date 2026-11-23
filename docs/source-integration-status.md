@@ -1,20 +1,38 @@
 # Source integration status
 
-The packaged selector identifies **normal data release 0.0.184**. This is a
+The packaged selector identifies **normal data release 0.0.185**. This is a
 frozen analysis release. Software publication and application deployment are
 separate gates. Historical requests keep their pins.
-The [machine inventory](source-integration-status-0.0.184.json), generated from
-the composed 0.0.184 manifest and current source configuration on November 23,
+The [machine inventory](source-integration-status-0.0.185.json), generated from
+the composed 0.0.185 manifest and current source configuration on November 23,
 2026, records
 128 registered IDs, 321 configured editions,
-13 base inputs and 40 native attachments covering 45 dataset IDs and
-443 edition/scope keys. Registration, acquisition, qualification and query
+13 base inputs and 87 native attachments covering 58 dataset IDs and
+582 edition/scope keys. Registration, acquisition, qualification and query
 access are separate statuses.
 
-- Manifest: `05b17e53cc4922bbbbf079762d65e569bc6180f65ad2531ff2b3768e7aafc256`.
+- Manifest: `44199b4c8d71b3b18dbbb45f32ba9750163f13c4b3ad8091501a0553267f1936`.
 - Entity core manifest: `2a19e22760af8da443af29a38d01d7d9c13f65095fd739e78bb7a0a1dc345f1b`.
 - Build: `31038e45f324b824e1d7f27dee4e1c6e001d5d770013bd710c1e9eda7ca0d368`.
 - Processing record: `270ef47f9e8f3a2d7ce5057ae7c8c73061c4db88123cb64f47b2522cb7cb43bc`.
+
+## Historical STAAR, accountability detail and career readiness workbooks
+
+The release adds 139 edition and scope combinations. Forty historical
+STAAR2 tables cover Texas, ESCs, districts and campuses. Sixteen
+accountability CCMR tables cover district and campus rating editions
+2018, 2019 and 2021–26. Six 2026 detail tables cover Student Achievement
+STAAR Performance, Academic Growth and Closing the Gaps at district and
+campus scope. Replay compared
+159,242,291 original CSV cells against each prepared table, final leaf and original-header export. Named publisher reports supplied
+3,565 independent checks.
+
+The 26 qualified CTE workbooks add 77 edition and scope combinations.
+Literal OOXML and an independent workbook reader compared
+2,643,140 cells across 301,909 rows.
+Mixed school years, interim layouts, repeated certification keys and
+unassigned ESC issues are described in the
+[coverage and source exceptions](source-coverage.md#source-editions-periods-and-exceptions).
 
 ## Historical Student Programs and primary disability geography
 
@@ -57,10 +75,10 @@ with zero denominators report `not_applicable`. See the
 
 ## STAAR publisher assessment rates
 
-The normal release includes 2023–24 through 2025–26 All Grades and
-End-of-Course at campus, district, ESC region and direct Texas scopes.
-Statewide comparison uses the reviewed accountability-subset rates and
-matches the same report year. Independent named records were reconciled
+The normal release includes All Grades from 2012–13 through 2025–26 for
+years with spring testing, and End-of-Course from 2023–24, at campus,
+district, ESC region and direct Texas scopes. The statewide comparison
+helper still uses its separately reviewed recent-year rate bindings. Independent named records were reconciled
 for each included report edition and scope. Other physical columns keep
 their source and export identity. Cross-year scientific comparability and
 inferred denominators remain outside this qualification.

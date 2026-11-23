@@ -7,7 +7,16 @@ A build records the files it actually reads. The runtime catalog is embedded in 
 <a id="current-normal-release-00163"></a>
 <a id="current-normal-release-00164"></a>
 
-## Current normal data release 0.0.184
+## Current normal data release 0.0.185
+
+The [pinned release](https://github.com/adpena/teadata/releases/download/v0.0.185/release.json)
+adds 139 edition and scope combinations across historical STAAR, annual
+graduate accountability CCMR, preliminary 2026 accountability detail and
+TEA CTE workbooks. The entity core and all 40 earlier attachments retain
+their identities. Use the [coverage, period and hold notes](source-coverage.md#source-editions-periods-and-exceptions)
+with the [release inventory](source-integration-status.md).
+
+## Prior normal data release 0.0.184
 
 The [pinned release](https://github.com/adpena/teadata/releases/download/v0.0.184/release.json)
 adds 2014–15 through 2021–22 PEIMS Student Programs at Texas, district and

@@ -806,6 +806,7 @@ class _TableExport:
     rows_hint: int | None
     lineage: dict[str, Any]
     provenance: Callable[[], ExportProvenance | PartitionedExportProvenance]
+    nullable_original: bool = False
 
     @property
     def schema(self) -> pa.Schema:
@@ -815,7 +816,8 @@ class _TableExport:
         batches = self.scanner.to_batches()
         try:
             for batch in batches:
-                if self.restore_original_headers and any(column.null_count for column in batch.columns):
+                if (self.restore_original_headers and not self.nullable_original
+                        and any(column.null_count for column in batch.columns)):
                     raise ContractError("A publisher-header export cannot substitute blanks for null values")
                 yield batch
         finally:
@@ -861,6 +863,7 @@ class _ExportSelection:
     selected_fields: tuple[str, ...] | None
     restore_original_headers: bool
     publisher_columns: tuple[str, ...] | None = None
+    nullable_original: bool = False
 
     def provenance(self, release: DataRelease, *, period: DataPeriod | None,
                    entity_build: tuple[str, str] | None, entity_ids: tuple[str, ...] | None,
@@ -1016,19 +1019,29 @@ def _plan_export(release: DataRelease, edition: EditionKey, *, restore_original_
     if include_support and not restore_original_headers and (binding := artifact.entity_binding) is not None:
         columns = tuple(dict.fromkeys((*artifact.contract["key_columns"], binding.column, *columns)))
     original_error = ("Original headers require a complete raw TAPR table or reviewed code-only RDA district table"
-                      " or reviewed PEIMS course or College Credit table")
+                      " or reviewed PEIMS course, College Credit or CTE workbook table")
     header_kinds = ()
     publisher_columns = None
+    nullable_original = False
     if restore_original_headers:
         import pyarrow as pa
 
         from .analytical import _leaf_schema
+        from .native_cte_workbooks import CTE_WORKBOOK_DATASETS, cte_workbook_export_contract
         from .peims_college_credit import DATASET as credit_dataset
         from .peims_course_sources import DATASET as course_dataset
         from .rda_native import NATIVE_DATASET as rda_dataset
         from .tapr import TAPR_SOURCE_KEYS, qualified_tapr_family
 
-        if edition.dataset in {course_dataset, credit_dataset}:
+        if edition.dataset in CTE_WORKBOOK_DATASETS:
+            raw = cte_workbook_export_contract(release, artifact, headers)
+            nullable_original = True
+            selected = set(projected)
+            headers = [row for row in headers if row["field"] in selected]
+            publisher_columns = tuple(row["field"] for row in headers)
+            columns = tuple(raw.get(field, field) for field in publisher_columns)
+            header_kinds = ("code",)
+        elif edition.dataset in {course_dataset, credit_dataset}:
             scope = edition.scope
             selected = set(projected)
             table = release.catalog._source_header_table(edition)
@@ -1084,7 +1097,7 @@ def _plan_export(release: DataRelease, edition: EditionKey, *, restore_original_
     output_headers = (columns,) if not restore_original_headers else tuple(
         tuple(row[kind] for row in headers) for kind in header_kinds)
     return _ExportSelection(artifact, requested, columns, output_headers, selected_fields,
-                            restore_original_headers, publisher_columns)
+                            restore_original_headers, publisher_columns, nullable_original)
 
 
 def prepare_export(release: DataRelease, edition: EditionKey, *, restore_original_headers: bool,
@@ -1139,7 +1152,8 @@ def _open_export(
         return selection.provenance(release, period=period, entity_build=entity_build,
                                     entity_ids=entity_ids, opaque_filter=opaque_filter, queries=queries)
 
-    return _TableExport(scanner, selection.headers, restore_original_headers, rows_hint, lineage, provenance)
+    return _TableExport(scanner, selection.headers, restore_original_headers, rows_hint, lineage, provenance,
+                        selection.nullable_original)
 
 
 def _bind_queries(predicate: Expression | None, queries: tuple[PreparedPredicate, ...],
@@ -1346,6 +1360,7 @@ def _write_excel_rows(provenance: _WriterProvenance, headers: tuple[tuple[str, .
                       rows_hint: int | None, data_rows: Iterator[Sequence[Any]],
                       path_or_buf: str | Path | BinaryIO) -> None:
     from openpyxl.cell import WriteOnlyCell
+    from openpyxl.cell.rich_text import CellRichText
 
     max_rows = 1_048_576 - len(headers)
     row_limit_error = "Source exceeds Excel worksheet limits; use CSV for this table"
@@ -1366,7 +1381,9 @@ def _write_excel_rows(provenance: _WriterProvenance, headers: tuple[tuple[str, .
                         validate_excel_text(value)
                     except ValueError as error:
                         raise ValueError(f"{error}. Use CSV for this table.") from error
-                    cell = WriteOnlyCell(sheet, value=value)
+                    # A plain empty string is serialized as an unvalued cell.
+                    # An empty inline text run retains the publisher's string.
+                    cell = WriteOnlyCell(sheet, value=CellRichText([""]) if value == "" else value)
                     cell.data_type = "s"
                     yield cell
                 else:

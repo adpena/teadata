@@ -29,8 +29,9 @@ from teadata.provenance import ProvenanceStore, validate_reference_records
 from teadata.release import publish_release
 from teadata.scripts.paths import data_path
 from teadata.tapr import (
-    TAPR_KEY_WIDTHS, TAPR_PROFILE_FAMILIES, TAPR_SOURCE_KEYS, TaprReadBudget, TaprSourceRequest, TaprSourceSummary,
-    qualified_tapr_family, reviewed_tapr_data_record_count, tapr_source_identifiers, tapr_source_selection, validate_tapr_key,
+    TAPR_KEY_WIDTHS, TABULAR_PROFILE_FAMILIES, TAPR_SOURCE_KEYS, TaprReadBudget, TaprSourceRequest, TaprSourceSummary,
+    qualified_tapr_family, reviewed_tapr_data_record_count, tabular_profile_dataset, tapr_source_identifiers,
+    tapr_source_selection, validate_tapr_key,
 )
 from teadata.teadata_config import load_config
 
@@ -101,7 +102,7 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
     if not isinstance(edition, str) or edition != str(year) or year < 1:
         raise ValueError("Select a canonical annual integer edition")
     if prepared_inputs is None and (not scopes or len(scopes) != len(set(scopes))
-            or set(scopes) - TAPR_SOURCE_KEYS.keys() or family not in TAPR_PROFILE_FAMILIES):
+            or set(scopes) - TAPR_SOURCE_KEYS.keys() or family not in TABULAR_PROFILE_FAMILIES):
         raise ValueError("Select a declared family and distinct TAPR source scopes")
     output_dir = Path(output_dir)
     if output_dir.exists() or output_dir.is_symlink():
@@ -114,7 +115,7 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
     if budget is not None and not isinstance(budget, TaprReadBudget):
         raise ValueError("TAPR source preparation requires a typed read budget")
     budget = budget if budget is not None else TaprReadBudget()
-    selected_datasets = {scope + "_tapr_" + family for scope in scopes}
+    selected_datasets = {tabular_profile_dataset(scope, family) for scope in scopes}
     dependencies = dict(processing_inputs or {})
     if set(dependencies) - selected_datasets:
         raise ValueError("Processing inputs must name an exact selected dataset/scope")
@@ -130,7 +131,7 @@ def prepare_profiles(cfg, *, edition: str, scopes: list[str], input_dir: Path | 
             reference_store.verify_record_closure([identifier])
     prepared = []
     for scope in scopes:
-        dataset = scope + "_tapr_" + family
+        dataset = tabular_profile_dataset(scope, family)
         requests = cfg.tapr_source_requests(dataset, year, input_dir=input_dir)
         if len(requests) != 1:
             raise ValueError("Bounded TAPR preparation requires one physical table per source; no eager merge fallback")
@@ -497,7 +498,7 @@ def _prepare_edition_leaves(cfg, *, edition: str, year: int, output_dir: Path,
 def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--edition", required=True, help="Canonical annual integer edition, exactly declared by Config")
-    parser.add_argument("--family", choices=TAPR_PROFILE_FAMILIES)
+    parser.add_argument("--family", choices=TABULAR_PROFILE_FAMILIES)
     parser.add_argument("--scope", action="append", choices=tuple(TAPR_SOURCE_KEYS))
     parser.add_argument("--config", type=Path)
     parser.add_argument("--reference-store", type=Path,
