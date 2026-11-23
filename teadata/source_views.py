@@ -6,6 +6,7 @@ import csv
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, replace
+from datetime import datetime, time
 from decimal import Decimal
 from hashlib import sha256
 from io import RawIOBase, StringIO
@@ -1355,7 +1356,9 @@ def _write_excel_rows(provenance: _WriterProvenance, headers: tuple[tuple[str, .
 
         def cells(values):
             for value in values:
-                if (isinstance(value, Decimal) or type(value) is int and abs(value) >= 10**15
+                if isinstance(value, (datetime, time)) and value.tzinfo is not None:
+                    value = value.isoformat()
+                elif (isinstance(value, Decimal) or type(value) is int and abs(value) >= 10**15
                         or isinstance(value, float) and (not isfinite(value) or value != float(format(value, ".15g")))):
                     value = str(value)
                 if isinstance(value, str):

@@ -1,6 +1,7 @@
 """Plain projections keep integrity, complete ID validation and owned handles."""
 
 from contextlib import contextmanager, closing
+from datetime import datetime, time, timedelta, timezone
 from importlib.util import find_spec
 from io import BytesIO
 import json
@@ -113,6 +114,34 @@ def test_consumer_failure_closes_retained_batch_iterator_immediately(consumer):
             (write_csv if consumer == "csv" else write_excel)(export, BytesIO())
     assert closed == [True]
     assert list(retained) == []
+
+
+def test_excel_preserves_timezone_aware_arrow_timestamps_as_text():
+    from openpyxl import load_workbook
+
+    retrieved = datetime(2026, 11, 21, 18, 25, 13, 912345, tzinfo=timezone.utc)
+    offset = datetime(2026, 11, 22, 1, 2, 3, 123456, tzinfo=timezone(timedelta(hours=5, minutes=30)))
+    local = datetime(2026, 11, 21, 18, 25, 13)
+    clock = time(8, 15, 23)
+    batch = pa.record_batch({
+        "retrieved": pa.array([retrieved, None], type=pa.timestamp("us", tz="UTC")),
+        "offset": pa.array([offset, None], type=pa.timestamp("us", tz="+05:30")),
+        "local": pa.array([local, None], type=pa.timestamp("us")),
+        "clock": pa.array([clock, clock], type=pa.time64("us")),
+    })
+    export = SimpleNamespace(schema=batch.schema, headers=(tuple(batch.schema.names),), rows_hint=2,
+                             batches=lambda: iter([batch]),
+                             provenance=lambda: SimpleNamespace(_append_sheet=lambda *a, **k: None))
+    output = BytesIO()
+    write_excel(export, output)
+    output.seek(0)
+    with closing(load_workbook(output, read_only=True)) as workbook:
+        rows = workbook["Data"].iter_rows(max_col=4)
+        assert [cell.value for cell in next(rows)] == batch.schema.names
+        first = next(rows)
+        assert [cell.value for cell in first] == [retrieved.isoformat(), offset.isoformat(), local, clock]
+        assert [cell.data_type for cell in first] == ["s", "s", "d", "d"]
+        assert [cell.value for cell in next(rows)] == [None, None, None, clock]
 
 
 def test_changed_artifact_after_preparation_fails_instead_of_reusing_stale_reader(tmp_path):

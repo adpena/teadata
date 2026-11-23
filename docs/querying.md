@@ -603,6 +603,8 @@ in the native table that are absent from the result. Unknown fields fail when
 the scan binds. `select()` and `where()` offer named equivalents for column
 selection and filtering. Each call returns a new view. `to_arrow()`, `to_df()`,
 `to_csv()` and `to_excel()` execute the scan over the selected leaf or leaves.
+Excel writes timezone-aware timestamps as ISO 8601 text to preserve their
+offsets and fractional seconds.
 Parenthesize each comparison in a bracket filter. Use `field.is_valid()` to
 select non-null values. Use the source's exported status column to distinguish
 different reasons for a null value, such as suppression and missingness.
