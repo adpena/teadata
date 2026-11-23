@@ -7,7 +7,15 @@ A build records the files it actually reads. The runtime catalog is embedded in 
 <a id="current-normal-release-00163"></a>
 <a id="current-normal-release-00164"></a>
 
-## Current normal data release 0.0.185
+## Current normal data release 0.0.186
+
+The direct Texas CCMR report covers accountability editions 2018, 2019, and
+2021–26. Select the graduation school year ending in 2017, 2018, or 2020–25.
+The published statewide count, credit, and percentage retain the display
+precision of each edition. The entity core and existing source editions retain
+their content identities. [Pinned release](https://github.com/adpena/teadata/releases/download/v0.0.186/release.json)
+
+## Prior normal data release 0.0.185
 
 The [pinned release](https://github.com/adpena/teadata/releases/download/v0.0.185/release.json)
 adds 139 edition and scope combinations across historical STAAR, annual

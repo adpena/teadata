@@ -138,7 +138,7 @@ Library publication and downstream application adoption remain separate gates.
 
 ### Accountability, assessment, readiness and special education
 
-The following gaps are relative to the packaged normal data release 0.0.185.
+The following gaps are relative to the packaged normal data release 0.0.186.
 Publisher routes and availability were checked November 23, 2026. Accountability
 editions refer to rating years. STAAR, annual graduate, and PEIMS snapshots use
 the measurement period of the selected report and field.
@@ -147,7 +147,7 @@ the measurement period of the selected report and field.
 | --- | --- | --- |
 | Academic accountability | Preliminary 2026 entity ratings, reporting roster, and district and campus Student Achievement STAAR, Academic Growth, and Closing the Gaps data tables | The [2013 archive](https://rptsvr1.tea.texas.gov/perfreport/account/2013/) and [2014–17 download forms](https://rptsvr1.tea.texas.gov/perfreport/account/2017/download.html) use the performance indexes. [2018–19](https://rptsvr1.tea.texas.gov/perfreport/account/2018/download.html), [2021](https://rptsvr1.tea.texas.gov/perfreport/account/2021/download.html), [2022](https://rptsvr1.tea.texas.gov/perfreport/account/2022/download.html), and [2023–26](https://rptsvr1.tea.texas.gov/perfreport/account/acct_download.html?year=2026) have edition-specific district and campus products. The 2020 ratings were not issued. 2021 used limited designations, and 2022 applied Senate Bill 1365. Qualify domain data and original rating labels by edition before exposing comparisons. |
 | STAAR | 2012–13 through 2025–26 TAPR All Grades for the 13 years with spring testing. Dedicated End-of-Course from 2023–24. Each covers campuses, districts, ESCs and Texas. | [Student Assessment Results](https://tea.texas.gov/assessment-and-accountability/student-assessment-results) and the [TAPR archives](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/texas-academic-performance-reports) distinguish assessment administrations and accountability subsets. Backfill All Grades and End-of-Course separately, then grades, subjects, participation, alternate assessments and student groups. The usual spring 2020 STAAR administrations were canceled. Retain the redesigned assessment boundary and performance standard changes in trend interpretation. |
-| CCMR | District and campus accountability annual-graduate tables for the 2018, 2019 and 2021–26 rating editions. The graduate measurement year ends one year before the rating edition. | The [accountability forms starting in 2018](https://rptsvr1.tea.texas.gov/perfreport/account/2018/download.html) offer district and campus CCMR products. Preserve each accountability cohort and the lag of the underlying evidence. The annual graduate TAPR/TPRS criteria, accountability indicator, and Outcomes Bonus each have distinct populations. Earlier component measures remain useful on their own terms. |
+| CCMR | District and campus accountability annual-graduate tables and direct Texas report totals for the 2018, 2019 and 2021–26 rating editions. The graduate measurement year ends one year before the rating edition. | The [accountability forms starting in 2018](https://rptsvr1.tea.texas.gov/perfreport/account/2018/download.html) offer district and campus CCMR products. Preserve each accountability cohort and the lag of the underlying evidence. The annual graduate TAPR/TPRS criteria, accountability indicator, and Outcomes Bonus each have distinct populations. Earlier component measures remain useful on their own terms. |
 | CTE | CTE Status and Programs of Study workbooks from 2020–21 through interim 2024–25. Separate graduate certifications, classes 2017–24, and annual certifications through 2024–25. These workbooks cover Texas, ESCs and districts where qualified. Previous TPRS Membership and PEIMS course tables remain available. | The [TEA CTE Reports](https://tea2.tea.texas.gov/ar/node/11651) publish status and programs of study from 2020–21 through 2024–25, with 2024–25 labeled interim. Their workbooks contain district, ESC region and direct Texas sheets. The same index lists separate industry certification workbooks for graduating classes 2017–24. Course enrollment, program status, CTE membership and certifications have different grains and denominators. |
 | Special education programs and services | PEIMS program enrollment from 2014–15 through 2025–26 at campus, district and direct Texas scope. SPP timely initial evaluation at district scope for 2023–24 and 2024–25. | The [PEIMS program report archive](https://rptsvr1.tea.texas.gov/adhocrpt/adspr.html) begins in 2014–15. Its fields can vary by edition. Keep service settings, evaluations, membership and funding in their source populations. |
 | Primary disability | PEIMS district, Texas, ESC and county-by-ESC observations for every school year from 2012–13 through 2025–26 | Publishers report October enrollment by primary disability, with county names paired to ESC numbers. Classification changes and masked counts constrain comparisons over time. [TEA Special Education Reports](https://rptsvr1.tea.texas.gov/adhocrpt/adser.html) |
@@ -183,8 +183,12 @@ programs of study and course participation are separate sources.
   performance standards and 14 student groups in each report. These
   cells are already present under their original STAAR2 field codes.
   The replay covers one named report per scope and edition. The standard
-  End-of-Course view starts in 2023–24. The historical middle standard for
-  2013–14 through
+  End-of-Course view starts in 2023–24. The 2017–18 PDF replay matched 600
+  additional rates across the same four scopes. The 60 Current and Monitored
+  English learner cells need a matching source field. TEA assigns that group
+  code `D0`, while the retained STAAR2 file provides the English learner field
+  `DL`. [2017–18 TAPR group definitions](https://rptsvr1.tea.texas.gov/perfreport/tapr/2018/download/taprhelp.html)
+  The historical middle standard for 2013–14 through
   2016–17 uses students tested in two or more subjects. The 2014–15 Texas
   TAPR PDF and bulk file match at 77% on the first All Subjects threshold.
   The alternate TPRS report gives 74% under its own report identity.
@@ -201,16 +205,15 @@ programs of study and course participation are separate sources.
   [2026 data downloads](https://rptsvr1.tea.texas.gov/perfreport/account/acct_download.html?year=2026) ·
   [2019 accountability manual](https://legacycms.tea.texas.gov/system/files/Adopted%202019%20Accountability%20Manual_final.pdf) ·
   [2018 State report](https://rptsvr1.tea.texas.gov/perfreport/account/2018/state.pdf#page=3)
-- **Direct Texas CCMR candidate.** The `state_accountability_ccmr` attachment
+- **Direct Texas CCMR.** The `state_accountability_ccmr` attachment
   covers rating editions 2018, 2019 and 2021–26 at `scope="state"`. Select
   the year the annual graduates finished school, one year before the
   rating edition. The 2020 rating edition is absent. The fields are
   `annual_graduates`, `ccmr_credit_displayed` and `ccmr_percent_reported`.
   Credit keeps the publisher's displayed precision, including 181,168.5
   in the 2018 edition. Percent is the published value. These fields carry
-  no guarantee of comparability across accountability rules. The candidate
-  has been checked through the normal catalog, Arrow, CSV with provenance,
-  and Excel. The packaged default remains 0.0.185 until release.
+  no guarantee of comparability across accountability rules. The normal
+  catalog, Arrow, CSV with provenance, and Excel were checked for this release.
   [2018 Accountability Manual, Chapter 2](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/chapter-2-student-achievement-domain.pdf)
 - **CTE.** The workbook attachments retain the source text, raw numeric
   tokens and physical worksheet row. Some Status and Programs of Study

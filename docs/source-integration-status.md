@@ -1,24 +1,34 @@
 # Source integration status
 
-The packaged selector identifies **normal data release 0.0.185**. This is a
+The packaged selector identifies **normal data release 0.0.186**. This is a
 frozen analysis release. Software publication and application deployment are
 separate gates. Historical requests keep their pins.
-The [machine inventory](source-integration-status-0.0.185.json), generated from
-the composed 0.0.185 manifest and current source configuration on November 23,
+The [machine inventory](source-integration-status-0.0.186.json), generated from
+the composed 0.0.186 manifest and current source configuration on November 23,
 2026, records
 128 registered IDs, 321 configured editions,
-13 base inputs and 87 native attachments covering 58 dataset IDs and
-582 edition/scope keys. Registration, acquisition, qualification and query
+13 base inputs and 88 native attachments covering 59 dataset IDs and
+590 edition/scope keys. Registration, acquisition, qualification and query
 access are separate statuses.
 
-- Manifest: `44199b4c8d71b3b18dbbb45f32ba9750163f13c4b3ad8091501a0553267f1936`.
+- Manifest: `e82f01bc23ef7b812a76d02963f36d5148ed1336967d68e645697407b3fbdca5`.
 - Entity core manifest: `2a19e22760af8da443af29a38d01d7d9c13f65095fd739e78bb7a0a1dc345f1b`.
 - Build: `31038e45f324b824e1d7f27dee4e1c6e001d5d770013bd710c1e9eda7ca0d368`.
 - Processing record: `270ef47f9e8f3a2d7ce5057ae7c8c73061c4db88123cb64f47b2522cb7cb43bc`.
 
+## Direct Texas CCMR
+
+Version 0.0.186 adds eight statewide rating editions in
+`state_accountability_ccmr`. Query `scope="state"` and the school year of the
+annual graduates. Available cohort years end in 2017, 2018 and 2020–25.
+The fields retain the graduate count, displayed credit and reported percentage
+from the direct Texas report. The 2018 rating edition displays fractional
+credit. Consult the edition-specific rules before interpreting changes.
+[Source coverage and methods](source-coverage.md#source-editions-periods-and-exceptions)
+
 ## Historical STAAR, accountability detail and career readiness workbooks
 
-The release adds 139 edition and scope combinations. Forty historical
+Version 0.0.185 added 139 edition and scope combinations. Forty historical
 STAAR2 tables cover Texas, ESCs, districts and campuses. Sixteen
 accountability CCMR tables cover district and campus rating editions
 2018, 2019 and 2021–26. Six 2026 detail tables cover Student Achievement
@@ -312,7 +322,8 @@ Frozen prior inventories remain available for
 [0.0.159](source-integration-status-0.0.159.json),
 [0.0.160](source-integration-status-0.0.160.json),
 [0.0.161](source-integration-status-0.0.161.json),
-[0.0.163](source-integration-status-0.0.163.json) and
-[0.0.175](source-integration-status-0.0.175.json).
+[0.0.163](source-integration-status-0.0.163.json),
+[0.0.175](source-integration-status-0.0.175.json), and
+[0.0.185](source-integration-status-0.0.185.json).
 The previous narrative is preserved in Git history; those historical counts
 must not be reused as the current selected release.
