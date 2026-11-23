@@ -325,6 +325,7 @@ STAAR_2026 = STAAR_TESTED_GRADES + [
     *((2026, *row) for row in STAAR_2026),
     (2024, 'staar_end_of_course', 'STAAR_EOC', 1092, 1134, 0),
     (2025, 'staar_end_of_course', 'STAAR_EOC', 1134, 1176, 0),
+    (2024, 'staar_all_grades', 'STAAR_ALL', 910, 945, 0),
     (2025, 'staar_all_grades', 'STAAR_ALL', 945, 980, 0),
 ])
 def test_staar_sources_keep_raw_scope_and_exact_receipts(
@@ -351,7 +352,7 @@ def test_staar_sources_keep_raw_scope_and_exact_receipts(
         if family.startswith('staar_tested_grade_') or publisher_file in {'STAAR_EOC', 'STAAR_SP', 'PART'}:
             assert cfg.data_sources[dataset].available_years() == [2024, 2025, 2026]
         elif publisher_file == 'STAAR_ALL':
-            assert cfg.data_sources[dataset].available_years() == [2025, 2026]
+            assert cfg.data_sources[dataset].available_years() == [2024, 2025, 2026]
         elif scope == 'region':
             assert cfg.data_sources[dataset].available_years() == [2026]
         assert cfg.column_schema(dataset, year) is None
@@ -397,7 +398,7 @@ def test_staar_sources_keep_raw_scope_and_exact_receipts(
             dictionary_id, = references['dictionary'].provenance_ids
             params = parse_qs(urlsplit(graph[dictionary_id]['requested_url']).query)
             assert (params['ccyy'], params['sumlev'], params['dsname']) == ([str(year)], [letter], [publisher_file])
-        if year == 2024 and publisher_file != 'STAAR_EOC':
+        if year == 2024 and family.startswith('staar_tested_grade_'):
             witness_id, = references['state_report_witness'].provenance_ids
             witness_query = parse_qs(urlsplit(graph[witness_id]['requested_url']).query)
             assert (witness_query['ccyy'], witness_query['lev'], witness_query['id'], witness_query['prgopt']) == (
@@ -571,6 +572,7 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
             dataset = f'{scope}_tapr_{family}'
             current['data_sources'][dataset].pop(2024)
             previous_tested_grades[dataset] = current['data_sources'][dataset]
+        assert current['data_sources'][f'{scope}_tapr_staar_all_grades'].pop(2024)['metadata']['version'] == '2024'
         historical_eoc = current['data_sources'][f'{scope}_tapr_staar_end_of_course']
         for year in (2024, 2025):
             assert historical_eoc.pop(year)['metadata']['version'] == str(year)

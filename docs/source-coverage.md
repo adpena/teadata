@@ -138,7 +138,7 @@ Library publication and downstream application adoption remain separate gates.
 
 ### Accountability, assessment, readiness and special education
 
-The following gaps are relative to the packaged normal data release 0.0.182.
+The following gaps are relative to the packaged normal data release 0.0.183.
 Publisher routes and availability were checked November 23, 2026. Accountability
 editions refer to rating years. STAAR, annual graduate, and PEIMS snapshots use
 the measurement period of the selected report and field.
@@ -146,7 +146,7 @@ the measurement period of the selected report and field.
 | Family | Queryable coverage in the packaged release | Publisher coverage and backfill |
 | --- | --- | --- |
 | Academic accountability | Preliminary 2026 entity ratings and reporting roster | The [2013 archive](https://rptsvr1.tea.texas.gov/perfreport/account/2013/) and [2014–17 download forms](https://rptsvr1.tea.texas.gov/perfreport/account/2017/download.html) use the performance indexes. [2018–19](https://rptsvr1.tea.texas.gov/perfreport/account/2018/download.html), [2021](https://rptsvr1.tea.texas.gov/perfreport/account/2021/download.html), [2022](https://rptsvr1.tea.texas.gov/perfreport/account/2022/download.html), and [2023–26](https://rptsvr1.tea.texas.gov/perfreport/account/acct_download.html?year=2026) have edition-specific district and campus products. The 2020 ratings were not issued. 2021 used limited designations, and 2022 applied Senate Bill 1365. Qualify domain data and original rating labels by edition before exposing comparisons. |
-| STAAR | 2024–25 and 2025–26 All Grades and 2023–24 through 2025–26 End-of-Course, with campus, district, ESC region and direct Texas editions | [Student Assessment Results](https://tea.texas.gov/assessment-and-accountability/student-assessment-results) and the [TAPR archives](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/texas-academic-performance-reports) distinguish assessment administrations and accountability subsets. Backfill All Grades and End-of-Course separately, then grades, subjects, participation, alternate assessments and student groups. The usual spring 2020 STAAR administrations were canceled. Retain the redesigned assessment boundary and performance standard changes in trend interpretation. |
+| STAAR | 2023–24 through 2025–26 All Grades and End-of-Course, with campus, district, ESC region and direct Texas editions | [Student Assessment Results](https://tea.texas.gov/assessment-and-accountability/student-assessment-results) and the [TAPR archives](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/texas-academic-performance-reports) distinguish assessment administrations and accountability subsets. Backfill All Grades and End-of-Course separately, then grades, subjects, participation, alternate assessments and student groups. The usual spring 2020 STAAR administrations were canceled. Retain the redesigned assessment boundary and performance standard changes in trend interpretation. |
 | CCMR | No dedicated CCMR detail attachment | The [accountability forms starting in 2018](https://rptsvr1.tea.texas.gov/perfreport/account/2018/download.html) offer district and campus CCMR products. Preserve each accountability cohort and the lag of the underlying evidence. The annual graduate TAPR/TPRS criteria, accountability indicator, and Outcomes Bonus each have distinct populations. Earlier component measures remain useful on their own terms. |
 | CTE | 2025–26 TPRS Membership at district and direct Texas scope. PEIMS teacher FTE and course enrollment cover 2012–13 through 2025–26 for both scopes, with course as a dimension | The [TEA CTE Reports](https://tea2.tea.texas.gov/ar/node/11651) publish status and programs of study from 2020–21 through 2024–25, with 2024–25 labeled interim. Their workbooks contain district, ESC region and direct Texas sheets. The same index lists separate industry certification workbooks for graduating classes 2017–24. Course enrollment, program status, CTE membership and certifications have different grains and denominators. |
 | Special education programs and services | PEIMS program enrollment for 2022–23 through 2025–26 at campus, district and direct Texas. SPP timely initial evaluation at district scope for 2023–24 and 2024–25. | Extend the [PEIMS program reports](https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports) where published. Keep service settings, evaluations, membership and funding in their source populations. |
@@ -170,9 +170,8 @@ Recent acquisitions awaiting field-level qualification include:
   graduate rates match the publisher's displayed rounding. The 2026 archive
   also contains all 30 offered category/scope files. TEA offers four of the
   categories at campus scope only.
-- Historical All Grades STAAR files for 2012–13 through 2023–24 at each of
-  the four scopes for editions with spring testing. The 2023–24 all-subject, all-student
-  arithmetic audit matches 28,461 observed rates. These earlier editions
+- Historical All Grades STAAR files for 2012–13 through 2022–23 at each of
+  the four scopes for editions with spring testing. These earlier editions
   still require field qualification.
 - The 24 original 2014–15 through 2021–22 PEIMS Student Programs files at
   campus, district and Texas scope. The 73,768 observed Special Education

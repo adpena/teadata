@@ -13427,6 +13427,77 @@ data_sources:
               tables:
                 staar_grades_3_to_8: *tapr_2026_staar_grades_3_to_8_region_csv
   state_tapr_staar_all_grades:
+    2024:
+      metadata:
+        metrics: {}
+        notes: Publisher raw All Grades facts for the accountability subset. The raw source reader applies no value policy.
+        period:
+          end_year: 2024
+          kind: school_year
+          start_year: 2023
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - ae5f70b6ac651b2b3899146b22faf1fbb9ee3bd8b1ff6d86424c9d071dc61da9
+          reference_id: csv_headers
+          reviewed_sha256: 4bdc2872142b77f7129f5e3051b8c1c766d19574b023319eda3c58dbdee92a43
+          role: source_notes
+          status: available
+          title: Original TEA CSV and exact publisher selections
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        - provenance_ids:
+          - 804623a2e96a60d05dab70a39d9fd5984c2d4baba478beb59e2725dba6e37ece
+          reference_id: dictionary
+          reviewed_sha256: e7de9fbc088471df108f025b9128cd61efddbb1078ef20a6d9bf2170ea3a9f47
+          role: data_dictionary
+          status: available
+          title: TEA All Grades dictionary for this geography
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=S&dsname=STAAR_ALL&dd=performance&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reference_id: masking
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+          role: masking_methodology
+          status: available
+          title: 2023–24 TAPR masking methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+        - provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reference_id: glossary
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+          role: glossary
+          status: available
+          title: 2023–24 TAPR glossary
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+        - provenance_ids:
+          - 9f9e446e999ff0a291c48abfa5bd1085242cfa851570854c6ea00ad0ccad36cc
+          reference_id: named_report
+          reviewed_sha256: 74c2449bafd573eba45e9b4f95a27c5a411ea40b1733cfea4bb78dbd7db72ad3
+          role: source_notes
+          status: available
+          title: Named TEA STAAR accountability rate witness
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&lev=S&id=S&prgopt=reports%2Ftapr%2Fperformance.sas
+        - path: schemas/tapr--2024--staar-all-grades-crosswalk.json
+          provenance_ids:
+          - 0bfd9760746b0d735526a454d0052642df89ee4d3ed0574e0f32b53b570ef473
+          reference_id: columns_source
+          reviewed_sha256: 1fbe27706e7aaaf44406553fdde187c596a22b3424d5c981fe4d52e25822a16b
+          role: schema
+          status: available
+          title: TEA Data 2023–24 STAAR All Grades source crosswalk
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        title: 2023–24 TAPR STAAR All Grades (State)
+        value_policy: null
+        version: '2024'
+      path: data/tapr/raw/2024-S-STAAR_ALL-offered.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--staar-all-grades-crosswalk.json
+            tapr_source:
+              scope: state
+              tables:
+                staar_all_grades: data/tapr/raw/2024-S-STAAR_ALL-offered.csv
     2025:
       path: data/tapr/raw/2025-STAAR_ALL-offered.csv
       metadata:
@@ -13549,6 +13620,77 @@ data_sources:
               tables:
                 staar_all_grades: *tapr_2026_staar_all_grades_state_csv
   district_tapr_staar_all_grades:
+    2024:
+      metadata:
+        metrics: {}
+        notes: Publisher raw All Grades facts for the accountability subset. The raw source reader applies no value policy.
+        period:
+          end_year: 2024
+          kind: school_year
+          start_year: 2023
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - 2686910fb7ef98bc888a1d8285bfa0da5cceebc9570d54abf66443fad1f66656
+          reference_id: csv_headers
+          reviewed_sha256: e87a0125473a18ca8915a808aeba48c360db12845d157739c497a6ba0df4ac87
+          role: source_notes
+          status: available
+          title: Original TEA CSV and exact publisher selections
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        - provenance_ids:
+          - 2d3a4bee67bf65e290f290d015df0966dc2c1c1d2fcb9a65fbfa5814cdc93be3
+          reference_id: dictionary
+          reviewed_sha256: ad431f3ca86b93e3f4ff9c4d0c14a78d801660ddab3c0f7299240e6b510773f1
+          role: data_dictionary
+          status: available
+          title: TEA All Grades dictionary for this geography
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=D&dsname=STAAR_ALL&dd=performance&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reference_id: masking
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+          role: masking_methodology
+          status: available
+          title: 2023–24 TAPR masking methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+        - provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reference_id: glossary
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+          role: glossary
+          status: available
+          title: 2023–24 TAPR glossary
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+        - provenance_ids:
+          - 502428d0d3cb0e2af018ed6a5560d47873d4d194e548bd66e7d09197d8945efe
+          reference_id: named_report
+          reviewed_sha256: dff6badb73b1f4b94e9381c2afa7e8725b5d4716c64ca0c150de715c3dad740e
+          role: source_notes
+          status: available
+          title: Named TEA STAAR accountability rate witness
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&lev=D&id=227901&prgopt=reports%2Ftapr%2Fperformance.sas
+        - path: schemas/tapr--2024--staar-all-grades-crosswalk.json
+          provenance_ids:
+          - 0bfd9760746b0d735526a454d0052642df89ee4d3ed0574e0f32b53b570ef473
+          reference_id: columns_source
+          reviewed_sha256: 1fbe27706e7aaaf44406553fdde187c596a22b3424d5c981fe4d52e25822a16b
+          role: schema
+          status: available
+          title: TEA Data 2023–24 STAAR All Grades source crosswalk
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        title: 2023–24 TAPR STAAR All Grades (District)
+        value_policy: null
+        version: '2024'
+      path: data/tapr/raw/2024-D-STAAR_ALL-offered.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--staar-all-grades-crosswalk.json
+            tapr_source:
+              scope: district
+              tables:
+                staar_all_grades: data/tapr/raw/2024-D-STAAR_ALL-offered.csv
     2025:
       path: data/tapr/raw/2025-D-STAAR_ALL-original.csv
       metadata:
@@ -13663,6 +13805,77 @@ data_sources:
               tables:
                 staar_all_grades: *tapr_2026_staar_all_grades_district_csv
   campus_tapr_staar_all_grades:
+    2024:
+      metadata:
+        metrics: {}
+        notes: Publisher raw All Grades facts for the accountability subset. The raw source reader applies no value policy.
+        period:
+          end_year: 2024
+          kind: school_year
+          start_year: 2023
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - de8b0b50c4ebe22be5f3ef69db12f93d56476954b9dc627cb7786cca9405b05b
+          reference_id: csv_headers
+          reviewed_sha256: f59cbc27c49eb22cb0bf47ec1c43980966b9f029ebb71b98ef473beb6454258a
+          role: source_notes
+          status: available
+          title: Original TEA CSV and exact publisher selections
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        - provenance_ids:
+          - d62b02bd853c0a477962eec7de0050b4190875b9a1f35a940528603100a7986b
+          reference_id: dictionary
+          reviewed_sha256: e540e83c27109e80a8c69f3183ea104b4351e135a513852fe07a2dc04e170bb3
+          role: data_dictionary
+          status: available
+          title: TEA All Grades dictionary for this geography
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=C&dsname=STAAR_ALL&dd=performance&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reference_id: masking
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+          role: masking_methodology
+          status: available
+          title: 2023–24 TAPR masking methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+        - provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reference_id: glossary
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+          role: glossary
+          status: available
+          title: 2023–24 TAPR glossary
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+        - provenance_ids:
+          - fb1944c749316706057a3e6aa3104cec9bb345a5f1fcdb1e15c8556a4fd924bd
+          reference_id: named_report
+          reviewed_sha256: b4641852cc836e5d48c69bef2024f4498b14d13f0f20fc54547fa064ecd16ede
+          role: source_notes
+          status: available
+          title: Named TEA STAAR accountability rate witness
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&lev=C&id=227901002&prgopt=reports%2Ftapr%2Fperformance.sas
+        - path: schemas/tapr--2024--staar-all-grades-crosswalk.json
+          provenance_ids:
+          - 0bfd9760746b0d735526a454d0052642df89ee4d3ed0574e0f32b53b570ef473
+          reference_id: columns_source
+          reviewed_sha256: 1fbe27706e7aaaf44406553fdde187c596a22b3424d5c981fe4d52e25822a16b
+          role: schema
+          status: available
+          title: TEA Data 2023–24 STAAR All Grades source crosswalk
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        title: 2023–24 TAPR STAAR All Grades (Campus)
+        value_policy: null
+        version: '2024'
+      path: data/tapr/raw/2024-C-STAAR_ALL-offered.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--staar-all-grades-crosswalk.json
+            tapr_source:
+              scope: campus
+              tables:
+                staar_all_grades: data/tapr/raw/2024-C-STAAR_ALL-offered.csv
     2025:
       path: data/tapr/raw/2025-C-STAAR_ALL-original.csv
       metadata:
@@ -13777,6 +13990,77 @@ data_sources:
               tables:
                 staar_all_grades: *tapr_2026_staar_all_grades_campus_csv
   region_tapr_staar_all_grades:
+    2024:
+      metadata:
+        metrics: {}
+        notes: Publisher raw All Grades facts for the accountability subset. The raw source reader applies no value policy.
+        period:
+          end_year: 2024
+          kind: school_year
+          start_year: 2023
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - 506d10b262e3bf1da4dcbd027d6040b186286e67bef76f7689ad7349301bbe32
+          reference_id: csv_headers
+          reviewed_sha256: 53a1da377424662a489af9ed3d8598cd07aaad3d21807af100f1150ca307a6d2
+          role: source_notes
+          status: available
+          title: Original TEA CSV and exact publisher selections
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        - provenance_ids:
+          - c2800500786d80ce729fc3b94767a17fb1ff8fd0c779f365270d361a7df116b2
+          reference_id: dictionary
+          reviewed_sha256: 99d8f07ea1010cf36426e324c34d0b5dc9c17b23f0d9658eb1d00692e100400e
+          role: data_dictionary
+          status: available
+          title: TEA All Grades dictionary for this geography
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&sumlev=R&dsname=STAAR_ALL&dd=performance&asvab=&prgopt=reports/tapr/dd/dd_tapr_dictionary.sas
+        - provenance_ids:
+          - 27c1d3cebf8added00184ca8a86910dbfc47a1264d7fd216adb25499d1906595
+          reference_id: masking
+          reviewed_sha256: f85b2ef340b07b721e12717fc0dc0f7f5e8290a022391e89de8b65664bdb860a
+          role: masking_methodology
+          status: available
+          title: 2023–24 TAPR masking methodology
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/masking.html
+        - provenance_ids:
+          - 0c7bf8fcad671a0fe5181bfe59a6c63d6a7682d167a3e87e9361f14f8912fabb
+          reference_id: glossary
+          reviewed_sha256: e92631bfd01e9e2e5f4197bfe996069822c852dd5db423fe3faeea5ab7aa62e8
+          role: glossary
+          status: available
+          title: 2023–24 TAPR glossary
+          url: https://rptsvr1.tea.texas.gov/perfreport/tapr/2024/glossary.pdf
+        - provenance_ids:
+          - 2b559a1306079e768a6186a38e9f45f909b04b884eaed0bfdc6e70c13d35ceed
+          reference_id: named_report
+          reviewed_sha256: 38bf0807066ad4dde638c88e41e74a7542223d80487f4623abc9e5d6c1f61b4d
+          role: source_notes
+          status: available
+          title: Named TEA STAAR accountability rate witness
+          url: https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&lev=R&id=13&prgopt=reports%2Ftapr%2Fperformance.sas
+        - path: schemas/tapr--2024--staar-all-grades-crosswalk.json
+          provenance_ids:
+          - 0bfd9760746b0d735526a454d0052642df89ee4d3ed0574e0f32b53b570ef473
+          reference_id: columns_source
+          reviewed_sha256: 1fbe27706e7aaaf44406553fdde187c596a22b3424d5c981fe4d52e25822a16b
+          role: schema
+          status: available
+          title: TEA Data 2023–24 STAAR All Grades source crosswalk
+        source_url: https://rptsvr1.tea.texas.gov/cgi/sas/broker/
+        title: 2023–24 TAPR STAAR All Grades (Region)
+        value_policy: null
+        version: '2024'
+      path: data/tapr/raw/2024-R-STAAR_ALL-offered.csv
+      reader:
+        profiles:
+          source:
+            column_schema: schemas/tapr--2024--staar-all-grades-crosswalk.json
+            tapr_source:
+              scope: region
+              tables:
+                staar_all_grades: data/tapr/raw/2024-R-STAAR_ALL-offered.csv
     2025:
       path: data/tapr/raw/2025-R-STAAR_ALL-original.csv
       metadata:

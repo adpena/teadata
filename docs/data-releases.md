@@ -7,7 +7,17 @@ A build records the files it actually reads. The runtime catalog is embedded in 
 <a id="current-normal-release-00163"></a>
 <a id="current-normal-release-00164"></a>
 
-## Current normal data release 0.0.182
+## Current normal data release 0.0.183
+
+The [pinned release](https://github.com/adpena/teadata/releases/download/v0.0.183/release.json)
+adds 2023–24 TAPR STAAR All Grades at campus, district, ESC region and direct
+Texas scope. The entity core and all 38 earlier native attachments retain
+their identities, including the separate 2023–24 End-of-Course editions.
+Source and export replay covered 9,420,862 raw cells. Four independent
+publisher reports supplied 840 rate checks. The default All Grades year
+remains 2025–26.
+
+## Prior normal data release 0.0.182
 
 The [pinned release](https://github.com/adpena/teadata/releases/download/v0.0.182/release.json)
 adds 2025–26 TPRS CTE Membership for 1,202 districts and the direct Texas
@@ -559,8 +569,8 @@ and review the year, population, and disclosure rules before interpreting a
 raw value. The tested-grade manifests can be used for the separately reviewed
 [Texas comparison selectors](querying.md#compare-a-published-measure-with-texas).
 
-The native admission gate also checks the exact published 2024–25 and 2025–26 All Grades
-and 2023–24 through 2025–26 End-of-Course manifests. Each edition includes
+The native admission gate also checks the exact published 2023–24 through
+2025–26 All Grades and End-of-Course manifests. Each edition includes
 campus, district, ESC region, and the direct Texas report. In addition to raw
 and restored-header CSV comparisons, the gate compares 210 published rates
 per edition and scope with an independently obtained named TEA report. The

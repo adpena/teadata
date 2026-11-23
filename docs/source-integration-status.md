@@ -1,17 +1,17 @@
 # Source integration status
 
-The packaged selector identifies **normal data release 0.0.182**. This is a
+The packaged selector identifies **normal data release 0.0.183**. This is a
 frozen analysis release. Software publication and application deployment are
 separate gates. Historical requests keep their pins.
-The [machine inventory](source-integration-status-0.0.182.json), generated from
-the composed 0.0.182 manifest and current source configuration on November 23,
+The [machine inventory](source-integration-status-0.0.183.json), generated from
+the composed 0.0.183 manifest and current source configuration on November 23,
 2026, records
-127 registered IDs, 295 configured editions,
-13 base inputs and 38 native attachments covering 44 dataset IDs and
-387 edition/scope keys. Registration, acquisition, qualification and query
+127 registered IDs, 299 configured editions,
+13 base inputs and 39 native attachments covering 44 dataset IDs and
+391 edition/scope keys. Registration, acquisition, qualification and query
 access are separate statuses.
 
-- Manifest: `fe0fc848627319ce4f8149fed8ef2c4baab65308c0d00aaf6c3a0014f191bdbc`.
+- Manifest: `1bd085fd1b47614a130a1f597cfca0223141048301d9a6fc4af6bd3589a0f8d5`.
 - Entity core manifest: `2a19e22760af8da443af29a38d01d7d9c13f65095fd739e78bb7a0a1dc345f1b`.
 - Build: `31038e45f324b824e1d7f27dee4e1c6e001d5d770013bd710c1e9eda7ca0d368`.
 - Processing record: `270ef47f9e8f3a2d7ce5057ae7c8c73061c4db88123cb64f47b2522cb7cb43bc`.
@@ -46,7 +46,7 @@ with zero denominators report `not_applicable`. See the
 
 ## STAAR publisher assessment rates
 
-The normal release includes 2024–25 and 2025–26 All Grades and 2023–24 through 2025–26
+The normal release includes 2023–24 through 2025–26 All Grades and
 End-of-Course at campus, district, ESC region and direct Texas scopes.
 Statewide comparison uses the reviewed accountability-subset rates and
 matches the same report year. Independent named records were reconciled

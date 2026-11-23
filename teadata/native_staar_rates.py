@@ -21,6 +21,7 @@ if TYPE_CHECKING:
 
 
 ALL_GRADES_MANIFEST = "b399e271381f944ec3844d435f8e110c3c83049bdd75421e4eaa87e3ffd217c2"
+ALL_GRADES_2024_MANIFEST = "85d89c21d2ad4e381bc78f2831638996146120d5df65ffaf00069cb42bbff032"
 ALL_GRADES_2025_MANIFEST = "a2131525b24f30ebce71bba6d0969255ceabcb7c002e58f5d69efd4a31825fae"
 END_OF_COURSE_MANIFEST = "2e62fb58db2c8afb9510c66feb6f385be8dd4439f6d5b71befa8c2bd4b317fc3"
 _REPORT = "https://rptsvr1.tea.texas.gov/cgi/sas/broker"
@@ -93,6 +94,7 @@ class StaarQualification:
 
 
 QUALIFICATIONS = {
+    ALL_GRADES_2024_MANIFEST: StaarQualification("2023–24 STAAR All Grades", "staar_all_grades", ("2024",)),
     ALL_GRADES_2025_MANIFEST: StaarQualification("2024–25 STAAR All Grades", "staar_all_grades", ("2025",)),
     ALL_GRADES_MANIFEST: StaarQualification("2025–26 STAAR All Grades", "staar_all_grades", ("2026",)),
     END_OF_COURSE_MANIFEST: StaarQualification("STAAR End-of-Course", "staar_end_of_course", ("2024", "2025", "2026")),

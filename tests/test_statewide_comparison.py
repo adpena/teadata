@@ -477,6 +477,7 @@ def test_packaged_staar_comparison_metadata_discovers_exact_scope_neutral_rates(
 
 
 @pytest.mark.parametrize(("year", "family", "metric", "source_field"), [
+    (2024, "staar_all_grades", ALL_GRADES_METRIC, ALL_GRADES_METRIC),
     (2025, "staar_all_grades", ALL_GRADES_METRIC, ALL_GRADES_METRIC),
     (2026, "staar_all_grades", ALL_GRADES_METRIC, ALL_GRADES_METRIC),
     (2024, "staar_end_of_course", EOC_METRIC, "domain_1a_meets_grade_level_std_all_students_eoc_algebra_i_rate"),
@@ -506,7 +507,7 @@ def test_packaged_aggregate_staar_contract_uses_exact_scope_and_source(year, fam
         with pytest.raises(ContractError, match="reviewed publisher revision"):
             staar_rate_contract(release, replace(key, revision_sha256="a" * 64))
         with pytest.raises(ContractError, match="No reviewed STAAR comparison"):
-            staar_rate_contract(release, replace(key, edition="2023" if family == "staar_end_of_course" else "2024"))
+            staar_rate_contract(release, replace(key, edition="2023"))
         names = set(metrics)
 
 
