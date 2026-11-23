@@ -44,8 +44,8 @@ from .dataset_metadata import COLUMN_SCHEMA_MAX_BYTES, DataPeriod, ResolvedDatas
 from .district_transfer_identity import REVIEW_YEAR, PartnerIdentityRepair, reviewed_repair_receipt
 from .manifest import canonical_json
 from .district_types import DISTRICT_TYPE_COLUMNS, DISTRICT_TYPE_REFERENCE, reviewed_district_types
-from .peims_leaves import DATASETS as PEIMS_DATASETS, PRIMARY_DISABILITY
-from .peims_leaves import ENCODING, _count_columns, _key_columns, peims_scopes
+from .peims_leaves import DATASETS as PEIMS_DATASETS, PRIMARY_DISABILITY, PRIMARY_DISABILITY_GEOGRAPHY
+from .peims_leaves import ENCODING, _count_columns, _geography_acquisition, _key_columns, peims_scopes
 from .peims_staff import (
     STAFF,
     STAFF_EMPLOYEE_BASIS,
@@ -324,6 +324,9 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
             raise _Uncovered("No supported recorded PEIMS positional source layout")
         if ids[0] not in record["inputs"] or mapping.get("metric_period") != period.to_dict():
             raise ValueError("PEIMS original receipt or field period differs from the retained projection")
+        if key.dataset == PRIMARY_DISABILITY_GEOGRAPHY and not _geography_acquisition(
+                graph[ids[0]], period.end_year, key.scope):
+            raise ValueError("PEIMS disability geography original differs from its exact report selector")
         if any(token.isascii() and token.isdecimal() for token in policy.tokens):
             raise _Uncovered("PEIMS count tokens conflict with the admitted integer projection")
         names = []
@@ -465,10 +468,11 @@ def _selection(release: DataRelease, store: ProvenanceStore, key: EditionKey, *,
         receipt = upstream.get(claimed["record_id"])
         if (receipt is None or receipt != {name: value for name, value in claimed.items() if name != "record_id"}
                 or receipt["kind"] != "acquisition" or receipt["method"] != "download"
-                or (not staff and receipt["dataset"] != key.dataset)
+                or (not staff and key.dataset != PRIMARY_DISABILITY_GEOGRAPHY and receipt["dataset"] != key.dataset)
                 or receipt["resolved_year"] != period.end_year or receipt["requested_year"] != period.end_year
                 or receipt["source_metadata"].get("version") != key.edition
-                or receipt["source_metadata"].get("period") != period.to_dict()):
+                or receipt["source_metadata"].get("period") != ({"kind": "unknown"}
+                    if key.dataset == PRIMARY_DISABILITY_GEOGRAPHY else period.to_dict())):
             raise ValueError("Catalog acquisition differs from its exact upstream original receipt")
         digest = claimed["artifact"]["sha256"]
         if staff:

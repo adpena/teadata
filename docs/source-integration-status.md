@@ -1,20 +1,31 @@
 # Source integration status
 
-The packaged selector identifies **normal data release 0.0.183**. This is a
+The packaged selector identifies **normal data release 0.0.184**. This is a
 frozen analysis release. Software publication and application deployment are
 separate gates. Historical requests keep their pins.
-The [machine inventory](source-integration-status-0.0.183.json), generated from
-the composed 0.0.183 manifest and current source configuration on November 23,
+The [machine inventory](source-integration-status-0.0.184.json), generated from
+the composed 0.0.184 manifest and current source configuration on November 23,
 2026, records
-127 registered IDs, 299 configured editions,
-13 base inputs and 39 native attachments covering 44 dataset IDs and
-391 edition/scope keys. Registration, acquisition, qualification and query
+128 registered IDs, 321 configured editions,
+13 base inputs and 40 native attachments covering 45 dataset IDs and
+443 edition/scope keys. Registration, acquisition, qualification and query
 access are separate statuses.
 
-- Manifest: `1bd085fd1b47614a130a1f597cfca0223141048301d9a6fc4af6bd3589a0f8d5`.
+- Manifest: `05b17e53cc4922bbbbf079762d65e569bc6180f65ad2531ff2b3768e7aafc256`.
 - Entity core manifest: `2a19e22760af8da443af29a38d01d7d9c13f65095fd739e78bb7a0a1dc345f1b`.
 - Build: `31038e45f324b824e1d7f27dee4e1c6e001d5d770013bd710c1e9eda7ca0d368`.
 - Processing record: `270ef47f9e8f3a2d7ce5057ae7c8c73061c4db88123cb64f47b2522cb7cb43bc`.
+
+## Historical Student Programs and primary disability geography
+
+The Programs backfill adds 24 Texas, district and campus editions from
+2014–15 through 2021–22. The primary disability geography source adds 28
+editions from 2012–13 through 2025–26. The shared verification dispatch
+replayed 1,985,368 raw cells, checked 327 values from named Programs reports
+and reconciled 51,912 county-by-ESC and ESC values against separate TEA
+HTML reports. Raw markers, normalized status and source row are retained.
+As published, a county may appear in several ESCs. See the
+[coverage and classification notes](source-coverage.md#accountability-assessment-readiness-and-special-education).
 
 ## PEIMS teacher FTE and course enrollment
 

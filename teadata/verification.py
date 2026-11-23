@@ -1235,6 +1235,7 @@ def _native_review(release: DataRelease, store: ProvenanceStore) -> _NativeRevie
         reviewed_composed_disability_references,
         reviewed_historical_peims_references,
         reviewed_native_references,
+        reviewed_peims_programs_and_geography,
         reviewed_primary_disability_references,
         reviewed_source_additions,
         validate_native_witnesses,
@@ -1308,7 +1309,8 @@ def _native_review(release: DataRelease, store: ProvenanceStore) -> _NativeRevie
     inline_references = primary_disability if historical_peims is None else historical_peims
     references = (addition[1] if addition is not None and addition[0] == "bound_transfers" else
                   reviewed_native_references() if inline_references is None else inline_references)
-    inline_catalog = inline_references is not None
+    external_peims = reviewed_peims_programs_and_geography(release.manifest_sha256)
+    inline_catalog = inline_references is not None and not external_peims
     composed_disability = {} if inline_catalog else reviewed_composed_disability_references(release.manifest_sha256)
     if references.keys() & composed_disability.keys():
         raise ReceiptError("Reviewed native profile constituents have overlapping editions")

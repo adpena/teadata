@@ -604,7 +604,7 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     assert set(current['value_policies'].pop('historical_district_transfers')['tokens']) == {'-9999999', '.'}
     # Student enrollment and programs have their own exact source contracts.
     for dataset in ('peims_student_enrollment_by_ethnicity', 'peims_student_programs_and_special_populations'):
-        editions = list(range(2019, 2027)) if dataset.endswith('_ethnicity') else list(range(2023, 2027))
+        editions = list(range(2019, 2027)) if dataset.endswith('_ethnicity') else list(range(2015, 2027))
         assert list(current['data_sources'].pop(dataset)) == editions
         assert current['schema']['data_sources'].pop(dataset) == ['csv']
         assert current['value_policies'].pop(dataset + '_2026')['reference_id'] == 'peims_masking'
@@ -620,6 +620,11 @@ def test_latest_source_opt_ins_preserve_unaffected_preexisting_config():
     assert current['schema']['data_sources'].pop(primary_disability) == ['csv']
     assert current['value_policies'].pop('peims_primary_disability_csv')['reference_id'] == 'peims_disability_masking'
     assert set(current['value_policies'].pop('peims_primary_disability_csv_through_2018')['tokens']) == {'-9999999'}
+    geography = 'peims_primary_disability_geography'
+    assert list(current['data_sources'].pop(geography)) == list(range(2013, 2027))
+    assert current['schema']['data_sources'].pop(geography) == ['csv']
+    for year in range(2013, 2027):
+        assert current['value_policies'].pop(f'{geography}_{year}')['reference_id'] == 'peims_disability_masking'
     staff = 'peims_staff_fte_and_salary'
     staff_editions = current['data_sources'].pop(staff)
     assert list(staff_editions) == [*range(2013, 2019), *range(2023, 2027)]

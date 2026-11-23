@@ -44,12 +44,16 @@ if TYPE_CHECKING:
 ENROLLMENT = "peims_student_enrollment_by_ethnicity"
 PROGRAMS = "peims_student_programs_and_special_populations"
 PRIMARY_DISABILITY = "peims_special_education_by_primary_disability"
+PRIMARY_DISABILITY_GEOGRAPHY = "peims_primary_disability_geography"
+DISABILITY_SELECTOR = "https://rptsvr1.tea.texas.gov/adhocrpt/adser.html"
+_DISABILITY_BROKER = "https://rptsvr1.tea.texas.gov/cgi/sas/broker"
 _STUDENT_SCOPES = frozenset({"state", "district", "campus"})
 _STATE_DISTRICT = frozenset({"state", "district"})
 SCOPES_BY_DATASET = {
     ENROLLMENT: _STUDENT_SCOPES,
     PROGRAMS: _STUDENT_SCOPES,
     PRIMARY_DISABILITY: _STATE_DISTRICT,
+    PRIMARY_DISABILITY_GEOGRAPHY: frozenset({"region", "county_region"}),
     STAFF: _STATE_DISTRICT,
 }
 DATASETS = tuple(SCOPES_BY_DATASET)
@@ -62,6 +66,25 @@ ENCODING = "cp1252"
 
 def peims_scopes(dataset: str, year: int) -> frozenset[str]:
     return staff_scopes(year) if dataset == STAFF else SCOPES_BY_DATASET[dataset]
+
+
+def _geography_acquisition(record: dict[str, Any], year: int, scope: str) -> bool:
+    """Bind the retained CSV to the exact TEA geography selector and controls."""
+    report = "county" if scope == "county_region" else scope
+    if report not in {"county", "region"}:
+        return False
+    parameters = record["parameters"]
+    controls = parameters.get("form_controls", [])
+    expected = {
+        "_service": "marykay", "_program": "adhoc.std_driver1.sas", "_debug": "0", "RptClass": "SpecEd",
+        "SchoolYr": str(year)[-2:], "report": f"State{report.title()}", "format": "csv",
+    }
+    return (record["dataset"] == f"reference:peims-disability-geography:primary-disability--{year}--{report}.csv"
+            and record["section"] == "reference"
+            and record["requested_url"] == record["resolved_url"] == _DISABILITY_BROKER
+            and parameters.get("form_url") == _DISABILITY_BROKER
+            and parameters.get("http_method") == "POST" and parameters.get("http_status") == 200
+            and len(controls) == len(expected) and dict(controls) == expected)
 
 
 def _admit_source(config: Config, dataset: str, year: int, store: ProvenanceStore) -> tuple[
@@ -106,13 +129,23 @@ def _admit_source(config: Config, dataset: str, year: int, store: ProvenanceStor
         content_type = record.get("response_headers", {}).get("content-type", "").split(";", 1)[0].strip().lower()
         if dataset == STAFF:
             identity_matches = matches_staff_source(record, identifier, year, scope)
+        elif dataset == PRIMARY_DISABILITY_GEOGRAPHY:
+            parents = observed.get("provenance_ids", [])
+            identity_matches = (
+                _geography_acquisition(record, year, scope)
+                and source.metadata.source_url == DISABILITY_SELECTOR
+                and observed.get("source_url") == DISABILITY_SELECTOR
+                and len(parents) == 1 and records[parents[0]]["requested_url"] == DISABILITY_SELECTOR
+            )
         else:
             identity_matches = (record["dataset"], record["section"], observed.get("source_url")) == (
                 dataset, source.section, source.metadata.source_url)
         if (record["kind"] != "acquisition" or record["method"] != "download"
                 or not identity_matches
                 or record["requested_year"] != year or record["resolved_year"] != year
-                or observed.get("version") != str(year) or observed["period"] != source.metadata.period.to_dict()
+                or observed.get("version") != str(year)
+                or observed.get("period") != ({"kind": "unknown"} if dataset == PRIMARY_DISABILITY_GEOGRAPHY
+                                              else source.metadata.period.to_dict())
                 or content_type not in {"text/csv", "application/csv"}
                 or record["artifact"]["sha256"] != expected or not 0 < record["artifact"]["size_bytes"] <= SOURCE_BYTES):
             raise ValueError(f"PEIMS {dataset} {table['table']} acquisition differs from its exact source contract")
@@ -180,6 +213,8 @@ def _count_columns(raw: pa.ChunkedArray, policy: ValuePolicy) -> tuple[pa.Chunke
 
 
 def _key_columns(dataset: str, scope: str) -> list[str]:
+    if dataset == PRIMARY_DISABILITY_GEOGRAPHY and scope == "county_region":
+        return ["school_year", "county_name", "region_number"]
     geography = [] if scope == "state" else [f"{scope}_number"]
     if dataset == STAFF:
         return [*geography, "staff_category", "staff_role"]
@@ -221,9 +256,12 @@ def _project(path: Path, table: dict[str, Any], source: ResolvedDataset, policy:
         if (not set(geography) <= set(names) or not _all_valid(pc.match_substring_regex(literals["region_number"], r"^[0-9]{2}$"))
                 or literals.select(geography).group_by(geography).aggregate([]).num_rows != len(pc.unique(literals["district_number"]))):
             raise ValueError("PEIMS staffing has conflicting or malformed district identity rows")
-    if source.dataset in (PROGRAMS, PRIMARY_DISABILITY):
+    if source.dataset == PRIMARY_DISABILITY_GEOGRAPHY and not _all_valid(
+            pc.match_substring_regex(literals["region_number"], r"^(?:0[1-9]|1[0-9]|20)$")):
+        raise ValueError("PEIMS disability geography has an invalid education service center")
+    if source.dataset in (PROGRAMS, PRIMARY_DISABILITY, PRIMARY_DISABILITY_GEOGRAPHY):
         aggregation = ("COUNTYREGIONDISTRICT" if source.dataset == PRIMARY_DISABILITY and scope == "district"
-                       else scope.upper())
+                       else "COUNTYREGION" if scope == "county_region" else scope.upper())
         if (not {"source_scope", "aggregation_level"} <= set(names)
                 or not _all_valid(pc.equal(literals["source_scope"], "STATE"))
                 or not _all_valid(pc.equal(literals["aggregation_level"], aggregation))):

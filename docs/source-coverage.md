@@ -138,7 +138,7 @@ Library publication and downstream application adoption remain separate gates.
 
 ### Accountability, assessment, readiness and special education
 
-The following gaps are relative to the packaged normal data release 0.0.183.
+The following gaps are relative to the packaged normal data release 0.0.184.
 Publisher routes and availability were checked November 23, 2026. Accountability
 editions refer to rating years. STAAR, annual graduate, and PEIMS snapshots use
 the measurement period of the selected report and field.
@@ -149,8 +149,18 @@ the measurement period of the selected report and field.
 | STAAR | 2023–24 through 2025–26 All Grades and End-of-Course, with campus, district, ESC region and direct Texas editions | [Student Assessment Results](https://tea.texas.gov/assessment-and-accountability/student-assessment-results) and the [TAPR archives](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/texas-academic-performance-reports) distinguish assessment administrations and accountability subsets. Backfill All Grades and End-of-Course separately, then grades, subjects, participation, alternate assessments and student groups. The usual spring 2020 STAAR administrations were canceled. Retain the redesigned assessment boundary and performance standard changes in trend interpretation. |
 | CCMR | No dedicated CCMR detail attachment | The [accountability forms starting in 2018](https://rptsvr1.tea.texas.gov/perfreport/account/2018/download.html) offer district and campus CCMR products. Preserve each accountability cohort and the lag of the underlying evidence. The annual graduate TAPR/TPRS criteria, accountability indicator, and Outcomes Bonus each have distinct populations. Earlier component measures remain useful on their own terms. |
 | CTE | 2025–26 TPRS Membership at district and direct Texas scope. PEIMS teacher FTE and course enrollment cover 2012–13 through 2025–26 for both scopes, with course as a dimension | The [TEA CTE Reports](https://tea2.tea.texas.gov/ar/node/11651) publish status and programs of study from 2020–21 through 2024–25, with 2024–25 labeled interim. Their workbooks contain district, ESC region and direct Texas sheets. The same index lists separate industry certification workbooks for graduating classes 2017–24. Course enrollment, program status, CTE membership and certifications have different grains and denominators. |
-| Special education programs and services | PEIMS program enrollment for 2022–23 through 2025–26 at campus, district and direct Texas. SPP timely initial evaluation at district scope for 2023–24 and 2024–25. | Extend the [PEIMS program reports](https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports) where published. Keep service settings, evaluations, membership and funding in their source populations. |
-| Primary disability | PEIMS district and direct Texas observations for every school year from 2012–13 through 2025–26 | The [PEIMS Special Education report](https://rptsvr1.tea.texas.gov/adhocrpt/adser.html) also offers county and ESC region totals. It does not offer a campus report. The October enrollment snapshot reports primary disability. Classification changes and masked counts constrain comparisons over time. |
+| Special education programs and services | PEIMS program enrollment from 2014–15 through 2025–26 at campus, district and direct Texas scope. SPP timely initial evaluation at district scope for 2023–24 and 2024–25. | The [PEIMS program report archive](https://rptsvr1.tea.texas.gov/adhocrpt/adspr.html) begins in 2014–15. Its fields can vary by edition. Keep service settings, evaluations, membership and funding in their source populations. |
+| Primary disability | PEIMS district, Texas, ESC and county-by-ESC observations for every school year from 2012–13 through 2025–26 | Publishers report October enrollment by primary disability, with county names paired to ESC numbers. Classification changes and masked counts constrain comparisons over time. [TEA Special Education Reports](https://rptsvr1.tea.texas.gov/adhocrpt/adser.html) |
+
+County observations are published county and ESC pairs. The same county
+can have several rows in one year. Use the published pair as the key.
+Folding pairs into a county total would require separately establishing
+the population and disclosure policy. In 2012–13 TEA's CSV includes a
+literal zero for developmental delay in each geography row. The HTML
+display omits that column. The source preserves those zeros and carries
+no claim that the category is comparable to later developmental delay.
+Historical Programs retain their distinct field sets, including the CTE
+course-based counts published through 2019–20 and Section 504 from 2021–22.
 
 For the 2025–26 CTE Membership source, the exact report
 replay covers 1,202 districts and the direct Texas report. The statewide
@@ -173,10 +183,6 @@ Recent acquisitions awaiting field-level qualification include:
 - Historical All Grades STAAR files for 2012–13 through 2022–23 at each of
   the four scopes for editions with spring testing. These earlier editions
   still require field qualification.
-- The 24 original 2014–15 through 2021–22 PEIMS Student Programs files at
-  campus, district and Texas scope. The 73,768 observed Special Education
-  and enrollment pairs passed the count check. Original suppression remains
-  in the retained source files.
 - The 2020–21 through 2024–25 CTE Status and Programs of Study workbooks and
   industry certification workbooks for graduating classes 2017–24. Retained
   workbook sheet names establish district, region and direct Texas scope.

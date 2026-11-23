@@ -14,7 +14,7 @@ from urllib.parse import urlencode
 
 from .dataset_metadata import ResolvedDataset
 from .manifest import ContractError
-from .peims_leaves import PRIMARY_DISABILITY
+from .peims_leaves import PRIMARY_DISABILITY, PRIMARY_DISABILITY_GEOGRAPHY
 from .transfer_sources import (
     _DISTRICT_YEARS_WITHOUT_CHARTER,
     _FOOTNOTES,
@@ -122,10 +122,15 @@ def reviewed_composed_disability_references(manifest_sha256: str) -> dict[str, A
 
 def reviewed_historical_peims_references(manifest_sha256: str) -> dict[str, Any] | None:
     review = json.loads(files("teadata").joinpath("reference_cases/native_peims_historical.json").read_text())
-    for plan in (review, review["enrollment_only"]):
-        if plan["manifest_sha256"] == manifest_sha256:
+    for plan in (review, review["enrollment_only"], review.get("programs_and_disability_geography", {})):
+        if plan.get("manifest_sha256") == manifest_sha256:
             return plan["editions"]
     return None
+
+
+def reviewed_peims_programs_and_geography(manifest_sha256: str) -> bool:
+    review = json.loads(files("teadata").joinpath("reference_cases/native_peims_historical.json").read_text())
+    return review.get("programs_and_disability_geography", {}).get("manifest_sha256") == manifest_sha256
 
 
 def _enrollment_only_manifest(manifest_sha256: str) -> bool:
@@ -207,7 +212,8 @@ def _open_witness(store: ProvenanceStore, receipt: str, ref: ArtifactRef, entity
     return path
 
 
-def _program(rows: list[list[str]], native: list[dict[str, Any]], entity: str, *, year: int = 2026) -> tuple[int, int]:
+def _program(rows: list[list[str]], native: list[dict[str, Any]], entity: str, *, year: int = 2026,
+             historical_fields: set[str] | None = None) -> tuple[int, int]:
     index, = (index for index, row in enumerate(rows) if "All Enrollment" in row)
     if entity != "state" and not any(f"({entity})" in cell for row in rows[:index] for cell in row):
         raise ContractError("Program publisher report entity differs")
@@ -216,9 +222,14 @@ def _program(rows: list[list[str]], native: list[dict[str, Any]], entity: str, *
     if year < 2025:
         fields = {**fields, "emergentbilingual/englishlearner": fields["emergentbilingual"]}
         del fields["emergentbilingual"]
+    expected = set(_PROGRAM_FIELDS.values())
+    if historical_fields is not None:
+        fields = {alias: name for alias, name in {**fields, "cte": "cte_program_count"}.items()
+                  if name in historical_fields}
+        expected = historical_fields
     facts = [(fields[_label(label)], token)
              for label, token in zip(rows[index], rows[index + 1], strict=True) if _label(label) in fields]
-    if len(facts) != len(_PROGRAM_FIELDS) or {field for field, _ in facts} != set(_PROGRAM_FIELDS.values()):
+    if len(facts) != len(expected) or {field for field, _ in facts} != expected:
         raise ContractError("Program publisher report lacks its reviewed measures")
     for field, token in facts:
         _compare_count(record, field, token)
@@ -427,6 +438,97 @@ def _historical_transfer(release: DataRelease, store: ProvenanceStore, ref: Arti
     return native.num_rows
 
 
+
+class _CountyRows(_Rows):
+    """Apply explicit publisher row groups to county labels only."""
+
+    def __init__(self, content: str):
+        self._county = ""
+        self._remaining = 0
+        self._rowspan = 0
+        super().__init__(content)
+        if self._remaining or self._rowspan:
+            raise ContractError("Incomplete primary disability county row group")
+
+    def handle_starttag(self, tag, attrs):
+        super().handle_starttag(tag, attrs)
+        attributes = dict(attrs)
+        if tag == "th" and attributes.get("scope") == "rowgroup":
+            if self._remaining or self._rowspan or self.row:
+                raise ContractError("Overlapping primary disability county row groups")
+            self._rowspan = int(attributes.get("rowspan") or "0")
+            if not 2 <= self._rowspan <= 20:
+                raise ContractError("Invalid primary disability county row group")
+
+    def handle_endtag(self, tag):
+        super().handle_endtag(tag)
+        if tag != "tr" or not self.rows:
+            return
+        if self._rowspan:
+            self._county = self.rows[-1][0]
+            self._remaining = self._rowspan - 1
+            self._rowspan = 0
+        elif self._remaining:
+            self.rows[-1].insert(0, self._county)
+            self._remaining -= 1
+
+
+def _geographic_disability(store: ProvenanceStore, receipt: str, ref: ArtifactRef,
+                           native: list[dict[str, Any]], columns: dict[str, str]) -> tuple[int, list[str]]:
+    key = ref.edition
+    record = store.read_record(receipt)
+    transport = record["parameters"]
+    county = key.scope == "county_region"
+    expected = {
+        "_service": "marykay", "_program": "adhoc.std_driver1.sas", "_debug": "0", "RptClass": "SpecEd",
+        "SchoolYr": key.edition[-2:], "report": "StateCounty" if county else "StateRegion", "format": "html",
+    }
+    controls = transport.get("form_controls", [])
+    artifact = record["artifact"]
+    if (record["dataset"] != "reference:peims_primary_disability_geography_witness" or record["section"] != "reference"
+            or record["kind"] != "acquisition" or record["method"] != "download"
+            or record["requested_year"] != record["resolved_year"] or str(record["resolved_year"]) != key.edition
+            or record["requested_url"] != _BROKER or record["resolved_url"] != _BROKER
+            or transport.get("form_url") != _BROKER or transport.get("http_method") != "POST"
+            or transport.get("http_status") != 200 or len(controls) != len(expected) or dict(controls) != expected
+            or record["response_headers"].get("content-type", "").split(";")[0].strip().lower() != "text/html"
+            or artifact["sha256"] in ref.contract["inputs"] or not 0 < artifact["size_bytes"] <= 2 * 1024**2):
+        raise ContractError("Invalid independent primary disability geography acquisition")
+    path = store.verify_artifact(artifact["sha256"])
+    if path.stat().st_size != artifact["size_bytes"]:
+        raise ContractError("Primary disability geography witness size differs")
+    rows = (_CountyRows if county else _Rows)(path.read_text(encoding="cp1252")).rows
+    title = f"Students Receiving Special Education Services By Primary DisabilityPEIMS Data {int(key.edition)-1}-{key.edition}"
+    heading = ["County/Region" if county else "Region", "Primary Disability"]
+    scope = "Statewide by County, by Region" if county else "Statewide by Region"
+    if len(rows) < 5 or not rows[0][0].endswith(title) or rows[1:3] != [[scope], heading]:
+        raise ContractError("Primary disability geography heading differs")
+    codes = rows[3]
+    omitted = sorted(set(columns) - set(codes))
+    if (len(codes) != len(set(codes)) or not set(codes) <= set(columns)
+            or omitted != (["DD"] if key.edition == "2013" else [])):
+        raise ContractError("Primary disability geography publisher columns differ")
+    axes = ("county_name", "region_number") if county else ("region_number",)
+    by_key = {tuple(row[field] for field in axes): row for row in native}
+    if len(by_key) != len(native):
+        raise ContractError("Duplicate native primary disability geographic row")
+    matched = 0
+    for row in rows[4:]:
+        physical = by_key.pop(tuple(row[:len(axes)]), None)
+        if physical is None:
+            raise ContractError("Primary disability geography publisher row differs")
+        for code, token in zip(codes, row[len(axes):], strict=True):
+            _compare_count(physical, columns[code], token)
+            matched += 1
+        for code in omitted:
+            field = columns[code]
+            if (physical[field], physical[f"peims_raw_{field}"], physical[f"peims_status_{field}"]) != (0, "0", "observed"):
+                raise ContractError("Unreported primary disability column differs from its literal CSV zeros")
+    if by_key or not matched:
+        raise ContractError("Primary disability geography publisher coverage differs")
+    return matched, omitted
+
+
 def validate_native_witnesses(release: DataRelease, store: ProvenanceStore, references: dict[str, Any]) -> dict[str, Any]:
     """Check the exact reviewed artifacts against independent report bytes."""
     from pyarrow.dataset import field
@@ -442,7 +544,7 @@ def validate_native_witnesses(release: DataRelease, store: ProvenanceStore, refe
             raise ContractError("Each reviewed native edition requires independent publisher witnesses")
         table = release.analytical_dataset(ref.identity)
         columns = ({entry["code"]: entry["field"] for entry in release.catalog.variables(edition=key)
-                    if entry["unit"] == "count"} if key.dataset == PRIMARY_DISABILITY else {})
+                    if entry["unit"] == "count"} if key.dataset in (PRIMARY_DISABILITY, PRIMARY_DISABILITY_GEOGRAPHY) else {})
         for witness in case["reports"]:
             entity, receipt = witness["entity"], witness["receipt"]
             total_key = (key.edition, key.scope, entity)
@@ -457,7 +559,12 @@ def validate_native_witnesses(release: DataRelease, store: ProvenanceStore, refe
                     raise ContractError("Enrollment-only HTML witness requires the ethnicity dataset")
                 if "unreported_codes" in witness and key.dataset != PRIMARY_DISABILITY:
                     raise ContractError("Unreported codes require a primary disability witness")
-                if kind == "reviewed_annual_report_table1":
+                if key.dataset == PRIMARY_DISABILITY_GEOGRAPHY:
+                    if entity != key.scope or len(case["reports"]) != 1:
+                        raise ContractError("Primary disability geography requires the full publisher roster")
+                    count, omitted = _geographic_disability(store, receipt, ref, table.to_table().to_pylist(), columns)
+                    peims_values += count
+                elif kind == "reviewed_annual_report_table1":
                     count = _annual_enrollment_control(store, witness, ref, table.to_table().to_pylist())
                     peims_values += count
                 elif key.dataset == _TRANSFER and int(key.edition) in _HEADER_FIRST_DISTRICT_YEARS:
@@ -477,7 +584,9 @@ def validate_native_witnesses(release: DataRelease, store: ProvenanceStore, refe
                     selection = None if key.scope == "state" else field(f"{key.scope}_number") == entity
                     native = table.to_table(filter=selection).to_pylist()
                     if key.dataset == _PROGRAM:
-                        count, totals[total_key] = _program(rows, native, entity, year=int(key.edition))
+                        year = int(key.edition)
+                        fields = (set(release.catalog.metadata(key.dataset, edition=key).metrics) if year < 2023 else None)
+                        count, totals[total_key] = _program(rows, native, entity, year=year, historical_fields=fields)
                     elif key.dataset == PRIMARY_DISABILITY:
                         count, omitted = _primary_disability(rows, native, key, entity, columns,
                                                             witness.get("unreported_codes", []))

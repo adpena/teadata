@@ -1,6 +1,784 @@
 contract_version: 1
 year_min: 2009
 value_policies:
+  peims_primary_disability_geography_2013:
+    policy_id: peims_primary_disability_geography_2013
+    reference_id: peims_disability_masking
+    tokens:
+      '-9999999':
+        reason: publisher_ferpa_suppression
+        status: suppressed
+  peims_primary_disability_geography_2014:
+    policy_id: peims_primary_disability_geography_2014
+    reference_id: peims_disability_masking
+    tokens:
+      '-9999999':
+        reason: publisher_ferpa_suppression
+        status: suppressed
+  peims_primary_disability_geography_2015:
+    policy_id: peims_primary_disability_geography_2015
+    reference_id: peims_disability_masking
+    tokens:
+      '-9999999':
+        reason: publisher_ferpa_suppression
+        status: suppressed
+  peims_primary_disability_geography_2016:
+    policy_id: peims_primary_disability_geography_2016
+    reference_id: peims_disability_masking
+    tokens:
+      '-9999999':
+        reason: publisher_ferpa_suppression
+        status: suppressed
+  peims_primary_disability_geography_2017:
+    policy_id: peims_primary_disability_geography_2017
+    reference_id: peims_disability_masking
+    tokens:
+      '-9999999':
+        reason: publisher_ferpa_suppression
+        status: suppressed
+  peims_primary_disability_geography_2018:
+    policy_id: peims_primary_disability_geography_2018
+    reference_id: peims_disability_masking
+    tokens:
+      '-9999999':
+        reason: publisher_ferpa_suppression
+        status: suppressed
+  peims_primary_disability_geography_2019:
+    policy_id: peims_primary_disability_geography_2019
+    reference_id: peims_disability_masking
+    tokens:
+      '-999':
+        reason: publisher_ferpa_suppression
+        status: suppressed
+  peims_primary_disability_geography_2020:
+    policy_id: peims_primary_disability_geography_2020
+    reference_id: peims_disability_masking
+    tokens:
+      '-999':
+        reason: publisher_ferpa_suppression
+        status: suppressed
+  peims_primary_disability_geography_2021:
+    policy_id: peims_primary_disability_geography_2021
+    reference_id: peims_disability_masking
+    tokens:
+      '-999':
+        reason: publisher_ferpa_suppression
+        status: suppressed
+  peims_primary_disability_geography_2022:
+    policy_id: peims_primary_disability_geography_2022
+    reference_id: peims_disability_masking
+    tokens:
+      '-999':
+        reason: publisher_ferpa_suppression
+        status: suppressed
+  peims_primary_disability_geography_2023:
+    policy_id: peims_primary_disability_geography_2023
+    reference_id: peims_disability_masking
+    tokens:
+      '-999':
+        reason: publisher_ferpa_suppression
+        status: suppressed
+  peims_primary_disability_geography_2024:
+    policy_id: peims_primary_disability_geography_2024
+    reference_id: peims_disability_masking
+    tokens:
+      '-999':
+        reason: publisher_ferpa_suppression
+        status: suppressed
+  peims_primary_disability_geography_2025:
+    policy_id: peims_primary_disability_geography_2025
+    reference_id: peims_disability_masking
+    tokens:
+      '-999':
+        reason: publisher_ferpa_suppression
+        status: suppressed
+  peims_primary_disability_geography_2026:
+    policy_id: peims_primary_disability_geography_2026
+    reference_id: peims_disability_masking
+    tokens:
+      '-999':
+        reason: publisher_ferpa_suppression
+        status: suppressed
+  peims_student_programs_and_special_populations_2015:
+    policy_id: peims_student_programs_and_special_populations_2015
+    reference_id: peims_masking
+    tokens:
+      '-9999999':
+        reason: publisher_ferpa_suppression
+        status: suppressed
+  peims_student_programs_and_special_populations_2016:
+    policy_id: peims_student_programs_and_special_populations_2016
+    reference_id: peims_masking
+    tokens:
+      '-9999999':
+        reason: publisher_ferpa_suppression
+        status: suppressed
+  peims_student_programs_and_special_populations_2017:
+    policy_id: peims_student_programs_and_special_populations_2017
+    reference_id: peims_masking
+    tokens:
+      '-9999999':
+        reason: publisher_ferpa_suppression
+        status: suppressed
+  peims_student_programs_and_special_populations_2018:
+    policy_id: peims_student_programs_and_special_populations_2018
+    reference_id: peims_masking
+    tokens:
+      '-9999999':
+        reason: publisher_ferpa_suppression
+        status: suppressed
+  peims_student_programs_and_special_populations_2019:
+    policy_id: peims_student_programs_and_special_populations_2019
+    reference_id: peims_masking
+    tokens:
+      '-999':
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <1,060:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <10:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <100:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <110:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <120:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <130:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <140:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <150:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <160:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <170:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <180:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <190:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <20:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <200:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <210:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <220:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <230:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <240:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <250:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <260:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <270:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <280:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <290:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <30:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <300:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <310:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <320:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <330:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <340:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <350:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <360:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <370:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <380:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <390:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <40:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <410:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <420:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <430:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <440:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <450:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <460:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <470:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <480:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <490:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <50:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <540:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <560:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <590:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <60:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <70:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <700:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <750:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <80:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <90:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+  peims_student_programs_and_special_populations_2020:
+    policy_id: peims_student_programs_and_special_populations_2020
+    reference_id: peims_masking
+    tokens:
+      '-999':
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <10:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <100:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <120:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <130:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <140:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <150:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <160:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <170:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <180:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <190:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <20:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <210:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <220:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <230:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <240:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <250:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <260:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <270:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <280:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <290:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <30:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <300:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <340:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <350:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <360:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <370:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <380:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <390:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <40:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <400:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <420:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <430:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <440:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <450:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <460:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <470:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <480:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <50:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <510:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <520:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <540:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <560:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <570:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <590:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <60:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <620:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <640:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <660:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <70:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <770:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <80:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <90:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+  peims_student_programs_and_special_populations_2021:
+    policy_id: peims_student_programs_and_special_populations_2021
+    reference_id: peims_masking
+    tokens:
+      '-999':
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <10:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <100:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <110:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <120:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <130:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <140:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <150:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <160:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <170:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <180:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <190:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <20:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <200:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <210:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <220:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <230:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <240:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <250:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <270:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <280:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <290:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <30:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <300:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <320:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <330:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <340:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <350:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <360:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <370:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <40:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <400:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <420:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <430:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <440:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <450:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <470:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <480:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <490:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <50:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <500:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <510:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <520:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <530:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <570:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <580:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <60:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <620:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <650:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <70:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <720:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <80:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <90:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+  peims_student_programs_and_special_populations_2022:
+    policy_id: peims_student_programs_and_special_populations_2022
+    reference_id: peims_masking
+    tokens:
+      '-999':
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <10:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <100:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <110:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <120:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <130:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <140:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <150:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <160:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <170:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <180:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <190:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <20:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <200:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <210:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <220:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <230:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <240:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <250:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <260:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <270:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <30:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <300:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <310:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <320:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <340:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <350:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <360:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <380:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <390:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <40:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <410:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <420:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <430:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <450:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <490:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <50:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <520:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <550:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <560:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <580:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <60:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <600:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <620:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <650:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <660:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <70:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <730:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <780:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <80:
+        reason: publisher_ferpa_suppression
+        status: suppressed
+      <90:
+        reason: publisher_ferpa_suppression
+        status: suppressed
   peims_student_enrollment_by_ethnicity_2019:
     policy_id: peims_student_enrollment_by_ethnicity_2019
     reference_id: about
@@ -21309,7 +22087,3277 @@ data_sources:
               state: 55c311f424fc5d7e772f19cea988ea810462ba40d0f508f5cf61db1328849e37
               district: 96dcd948a7c02b34be090c9e9263f9298925bb03dfff6fa62a326186ecc56221
               campus: b85d0a297159df460a4d928034f9d1096d77be132b1903f4dfcbda031c7ef134
+  peims_primary_disability_geography:
+    2013:
+      metadata:
+        metrics:
+          primary_autism_count:
+            field: primary_autism_count
+            period:
+              end_year: 2013
+              kind: school_year
+              start_year: 2012
+            unit: count
+          primary_deaf_or_hard_of_hearing_count:
+            field: primary_deaf_or_hard_of_hearing_count
+            period:
+              end_year: 2013
+              kind: school_year
+              start_year: 2012
+            unit: count
+          primary_deafblind_count:
+            field: primary_deafblind_count
+            period:
+              end_year: 2013
+              kind: school_year
+              start_year: 2012
+            unit: count
+          primary_developmental_delay_count:
+            field: primary_developmental_delay_count
+            period:
+              end_year: 2013
+              kind: school_year
+              start_year: 2012
+            unit: count
+          primary_emotional_disturbance_count:
+            field: primary_emotional_disturbance_count
+            period:
+              end_year: 2013
+              kind: school_year
+              start_year: 2012
+            unit: count
+          primary_intellectual_disability_count:
+            field: primary_intellectual_disability_count
+            period:
+              end_year: 2013
+              kind: school_year
+              start_year: 2012
+            unit: count
+          primary_noncategorical_early_childhood_count:
+            field: primary_noncategorical_early_childhood_count
+            period:
+              end_year: 2013
+              kind: school_year
+              start_year: 2012
+            unit: count
+          primary_orthopedic_impairment_count:
+            field: primary_orthopedic_impairment_count
+            period:
+              end_year: 2013
+              kind: school_year
+              start_year: 2012
+            unit: count
+          primary_other_health_impairment_count:
+            field: primary_other_health_impairment_count
+            period:
+              end_year: 2013
+              kind: school_year
+              start_year: 2012
+            unit: count
+          primary_specific_learning_disability_count:
+            field: primary_specific_learning_disability_count
+            period:
+              end_year: 2013
+              kind: school_year
+              start_year: 2012
+            unit: count
+          primary_speech_or_language_impairment_count:
+            field: primary_speech_or_language_impairment_count
+            period:
+              end_year: 2013
+              kind: school_year
+              start_year: 2012
+            unit: count
+          primary_traumatic_brain_injury_count:
+            field: primary_traumatic_brain_injury_count
+            period:
+              end_year: 2013
+              kind: school_year
+              start_year: 2012
+            unit: count
+          primary_visual_impairment_count:
+            field: primary_visual_impairment_count
+            period:
+              end_year: 2013
+              kind: school_year
+              start_year: 2012
+            unit: count
+        notes: Publisher geography aggregates. The county scope has one row per published county name and
+          ESC pair. The same county may appear in several education service centers. Classification comparability
+          over time is not established, including historical DD and NCEC.
+        period:
+          end_year: 2013
+          kind: school_year
+          start_year: 2012
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - fa3cf44d0c6f27b6ee0ec2c0ab4ac23174f167857243f7300c70bda0585a2460
+          reference_id: peims_disability_masking
+          reviewed_sha256: c5127e62c2c5f8900570a5015c7ebdc83dbd73b64a7a41eea9f754d4bf8b016f
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS primary-disability report-specific FERPA masking rules
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: TEA PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - provenance_ids:
+          - 2110091fd74fe9f00e28027746caa3e4998e2de873f993a7c4a50d662c08a89d
+          reference_id: eligibility_transition
+          reviewed_sha256: 34cc627cfdc83ebe291b02d4008e31bb6715cd054e94abea51b035bdd3ca9dd9
+          role: source_notes
+          status: available
+          title: TEA developmental delay and noncategorical early childhood eligibility transition
+          url: https://spedsupport.tea.texas.gov/resource-library/disability-condition-eligibility-definitions
+        - path: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+          provenance_ids:
+          - a15f6791dacfebe22e748779a9dc128052eba8a15723196ff302b56d6a2da509
+          reference_id: column_crosswalk
+          reviewed_sha256: d8bbff8e63eba0fb604991cf76852203226f387ce22cf435a509933535ba368e
+          role: schema
+          status: available
+          title: TEA Data reviewed source headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2012–13 PEIMS Primary Disability by ESC and county by ESC
+        value_policy: peims_primary_disability_geography_2013
+        version: '2013'
+      path: data/peims/2013/peims_primary_disability_geography.csv
+      reader:
+        profiles:
+          source:
+            acquisition_ids:
+              county_region: bb30b01dba603d772d2439961db4df1d8640bbffeab0d013b5b6e1f787ce986a
+              region: ef5f4f4010e9d7e86d40974c221a2695a702aab1e53a16038c34dad75ddc7c9c
+            column_schema: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+    2014:
+      metadata:
+        metrics:
+          primary_autism_count:
+            field: primary_autism_count
+            period:
+              end_year: 2014
+              kind: school_year
+              start_year: 2013
+            unit: count
+          primary_deaf_or_hard_of_hearing_count:
+            field: primary_deaf_or_hard_of_hearing_count
+            period:
+              end_year: 2014
+              kind: school_year
+              start_year: 2013
+            unit: count
+          primary_deafblind_count:
+            field: primary_deafblind_count
+            period:
+              end_year: 2014
+              kind: school_year
+              start_year: 2013
+            unit: count
+          primary_developmental_delay_count:
+            field: primary_developmental_delay_count
+            period:
+              end_year: 2014
+              kind: school_year
+              start_year: 2013
+            unit: count
+          primary_emotional_disturbance_count:
+            field: primary_emotional_disturbance_count
+            period:
+              end_year: 2014
+              kind: school_year
+              start_year: 2013
+            unit: count
+          primary_intellectual_disability_count:
+            field: primary_intellectual_disability_count
+            period:
+              end_year: 2014
+              kind: school_year
+              start_year: 2013
+            unit: count
+          primary_noncategorical_early_childhood_count:
+            field: primary_noncategorical_early_childhood_count
+            period:
+              end_year: 2014
+              kind: school_year
+              start_year: 2013
+            unit: count
+          primary_orthopedic_impairment_count:
+            field: primary_orthopedic_impairment_count
+            period:
+              end_year: 2014
+              kind: school_year
+              start_year: 2013
+            unit: count
+          primary_other_health_impairment_count:
+            field: primary_other_health_impairment_count
+            period:
+              end_year: 2014
+              kind: school_year
+              start_year: 2013
+            unit: count
+          primary_specific_learning_disability_count:
+            field: primary_specific_learning_disability_count
+            period:
+              end_year: 2014
+              kind: school_year
+              start_year: 2013
+            unit: count
+          primary_speech_or_language_impairment_count:
+            field: primary_speech_or_language_impairment_count
+            period:
+              end_year: 2014
+              kind: school_year
+              start_year: 2013
+            unit: count
+          primary_traumatic_brain_injury_count:
+            field: primary_traumatic_brain_injury_count
+            period:
+              end_year: 2014
+              kind: school_year
+              start_year: 2013
+            unit: count
+          primary_visual_impairment_count:
+            field: primary_visual_impairment_count
+            period:
+              end_year: 2014
+              kind: school_year
+              start_year: 2013
+            unit: count
+        notes: Publisher geography aggregates. The county scope has one row per published county name and
+          ESC pair. The same county may appear in several education service centers. Classification comparability
+          over time is not established, including historical DD and NCEC.
+        period:
+          end_year: 2014
+          kind: school_year
+          start_year: 2013
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - fa3cf44d0c6f27b6ee0ec2c0ab4ac23174f167857243f7300c70bda0585a2460
+          reference_id: peims_disability_masking
+          reviewed_sha256: c5127e62c2c5f8900570a5015c7ebdc83dbd73b64a7a41eea9f754d4bf8b016f
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS primary-disability report-specific FERPA masking rules
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: TEA PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - provenance_ids:
+          - 2110091fd74fe9f00e28027746caa3e4998e2de873f993a7c4a50d662c08a89d
+          reference_id: eligibility_transition
+          reviewed_sha256: 34cc627cfdc83ebe291b02d4008e31bb6715cd054e94abea51b035bdd3ca9dd9
+          role: source_notes
+          status: available
+          title: TEA developmental delay and noncategorical early childhood eligibility transition
+          url: https://spedsupport.tea.texas.gov/resource-library/disability-condition-eligibility-definitions
+        - path: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+          provenance_ids:
+          - a15f6791dacfebe22e748779a9dc128052eba8a15723196ff302b56d6a2da509
+          reference_id: column_crosswalk
+          reviewed_sha256: d8bbff8e63eba0fb604991cf76852203226f387ce22cf435a509933535ba368e
+          role: schema
+          status: available
+          title: TEA Data reviewed source headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2013–14 PEIMS Primary Disability by ESC and county by ESC
+        value_policy: peims_primary_disability_geography_2014
+        version: '2014'
+      path: data/peims/2014/peims_primary_disability_geography.csv
+      reader:
+        profiles:
+          source:
+            acquisition_ids:
+              county_region: b92abc75860a63e116f9b1b7608a91f03d3cc8551ed94dab70c38a93dfd1712c
+              region: 9e66b0aeb0e4c49b079eb57a4584f574737e67304a48a9eb0b39667e59a26dbe
+            column_schema: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+    2015:
+      metadata:
+        metrics:
+          primary_autism_count:
+            field: primary_autism_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          primary_deaf_or_hard_of_hearing_count:
+            field: primary_deaf_or_hard_of_hearing_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          primary_deafblind_count:
+            field: primary_deafblind_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          primary_developmental_delay_count:
+            field: primary_developmental_delay_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          primary_emotional_disturbance_count:
+            field: primary_emotional_disturbance_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          primary_intellectual_disability_count:
+            field: primary_intellectual_disability_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          primary_noncategorical_early_childhood_count:
+            field: primary_noncategorical_early_childhood_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          primary_orthopedic_impairment_count:
+            field: primary_orthopedic_impairment_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          primary_other_health_impairment_count:
+            field: primary_other_health_impairment_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          primary_specific_learning_disability_count:
+            field: primary_specific_learning_disability_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          primary_speech_or_language_impairment_count:
+            field: primary_speech_or_language_impairment_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          primary_traumatic_brain_injury_count:
+            field: primary_traumatic_brain_injury_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          primary_visual_impairment_count:
+            field: primary_visual_impairment_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+        notes: Publisher geography aggregates. The county scope has one row per published county name and
+          ESC pair. The same county may appear in several education service centers. Classification comparability
+          over time is not established, including historical DD and NCEC.
+        period:
+          end_year: 2015
+          kind: school_year
+          start_year: 2014
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - fa3cf44d0c6f27b6ee0ec2c0ab4ac23174f167857243f7300c70bda0585a2460
+          reference_id: peims_disability_masking
+          reviewed_sha256: c5127e62c2c5f8900570a5015c7ebdc83dbd73b64a7a41eea9f754d4bf8b016f
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS primary-disability report-specific FERPA masking rules
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: TEA PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - provenance_ids:
+          - 2110091fd74fe9f00e28027746caa3e4998e2de873f993a7c4a50d662c08a89d
+          reference_id: eligibility_transition
+          reviewed_sha256: 34cc627cfdc83ebe291b02d4008e31bb6715cd054e94abea51b035bdd3ca9dd9
+          role: source_notes
+          status: available
+          title: TEA developmental delay and noncategorical early childhood eligibility transition
+          url: https://spedsupport.tea.texas.gov/resource-library/disability-condition-eligibility-definitions
+        - path: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+          provenance_ids:
+          - a15f6791dacfebe22e748779a9dc128052eba8a15723196ff302b56d6a2da509
+          reference_id: column_crosswalk
+          reviewed_sha256: d8bbff8e63eba0fb604991cf76852203226f387ce22cf435a509933535ba368e
+          role: schema
+          status: available
+          title: TEA Data reviewed source headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2014–15 PEIMS Primary Disability by ESC and county by ESC
+        value_policy: peims_primary_disability_geography_2015
+        version: '2015'
+      path: data/peims/2015/peims_primary_disability_geography.csv
+      reader:
+        profiles:
+          source:
+            acquisition_ids:
+              county_region: 8e3993702bd6c17e61088b408967ffc7e3c2976d53e2abaad5ba1b98a3fbb6a0
+              region: 39e6cf73e79ad2c1d67dcc351098a6e8cc6bf4b01ed9c010d1469146b30713b2
+            column_schema: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+    2016:
+      metadata:
+        metrics:
+          primary_autism_count:
+            field: primary_autism_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          primary_deaf_or_hard_of_hearing_count:
+            field: primary_deaf_or_hard_of_hearing_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          primary_deafblind_count:
+            field: primary_deafblind_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          primary_developmental_delay_count:
+            field: primary_developmental_delay_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          primary_emotional_disturbance_count:
+            field: primary_emotional_disturbance_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          primary_intellectual_disability_count:
+            field: primary_intellectual_disability_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          primary_noncategorical_early_childhood_count:
+            field: primary_noncategorical_early_childhood_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          primary_orthopedic_impairment_count:
+            field: primary_orthopedic_impairment_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          primary_other_health_impairment_count:
+            field: primary_other_health_impairment_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          primary_specific_learning_disability_count:
+            field: primary_specific_learning_disability_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          primary_speech_or_language_impairment_count:
+            field: primary_speech_or_language_impairment_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          primary_traumatic_brain_injury_count:
+            field: primary_traumatic_brain_injury_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          primary_visual_impairment_count:
+            field: primary_visual_impairment_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+        notes: Publisher geography aggregates. The county scope has one row per published county name and
+          ESC pair. The same county may appear in several education service centers. Classification comparability
+          over time is not established, including historical DD and NCEC.
+        period:
+          end_year: 2016
+          kind: school_year
+          start_year: 2015
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - fa3cf44d0c6f27b6ee0ec2c0ab4ac23174f167857243f7300c70bda0585a2460
+          reference_id: peims_disability_masking
+          reviewed_sha256: c5127e62c2c5f8900570a5015c7ebdc83dbd73b64a7a41eea9f754d4bf8b016f
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS primary-disability report-specific FERPA masking rules
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: TEA PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - provenance_ids:
+          - 2110091fd74fe9f00e28027746caa3e4998e2de873f993a7c4a50d662c08a89d
+          reference_id: eligibility_transition
+          reviewed_sha256: 34cc627cfdc83ebe291b02d4008e31bb6715cd054e94abea51b035bdd3ca9dd9
+          role: source_notes
+          status: available
+          title: TEA developmental delay and noncategorical early childhood eligibility transition
+          url: https://spedsupport.tea.texas.gov/resource-library/disability-condition-eligibility-definitions
+        - path: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+          provenance_ids:
+          - a15f6791dacfebe22e748779a9dc128052eba8a15723196ff302b56d6a2da509
+          reference_id: column_crosswalk
+          reviewed_sha256: d8bbff8e63eba0fb604991cf76852203226f387ce22cf435a509933535ba368e
+          role: schema
+          status: available
+          title: TEA Data reviewed source headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2015–16 PEIMS Primary Disability by ESC and county by ESC
+        value_policy: peims_primary_disability_geography_2016
+        version: '2016'
+      path: data/peims/2016/peims_primary_disability_geography.csv
+      reader:
+        profiles:
+          source:
+            acquisition_ids:
+              county_region: 24bff0a7d5b73c9e759bf630f83102d6f87c3b0bfa77af0ad0484403dfed739a
+              region: 5c43e233b3ab98acaa0fdfe0a03e747914e0a66f467d173441559f5acd081c58
+            column_schema: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+    2017:
+      metadata:
+        metrics:
+          primary_autism_count:
+            field: primary_autism_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          primary_deaf_or_hard_of_hearing_count:
+            field: primary_deaf_or_hard_of_hearing_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          primary_deafblind_count:
+            field: primary_deafblind_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          primary_developmental_delay_count:
+            field: primary_developmental_delay_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          primary_emotional_disturbance_count:
+            field: primary_emotional_disturbance_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          primary_intellectual_disability_count:
+            field: primary_intellectual_disability_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          primary_noncategorical_early_childhood_count:
+            field: primary_noncategorical_early_childhood_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          primary_orthopedic_impairment_count:
+            field: primary_orthopedic_impairment_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          primary_other_health_impairment_count:
+            field: primary_other_health_impairment_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          primary_specific_learning_disability_count:
+            field: primary_specific_learning_disability_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          primary_speech_or_language_impairment_count:
+            field: primary_speech_or_language_impairment_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          primary_traumatic_brain_injury_count:
+            field: primary_traumatic_brain_injury_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          primary_visual_impairment_count:
+            field: primary_visual_impairment_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+        notes: Publisher geography aggregates. The county scope has one row per published county name and
+          ESC pair. The same county may appear in several education service centers. Classification comparability
+          over time is not established, including historical DD and NCEC.
+        period:
+          end_year: 2017
+          kind: school_year
+          start_year: 2016
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - fa3cf44d0c6f27b6ee0ec2c0ab4ac23174f167857243f7300c70bda0585a2460
+          reference_id: peims_disability_masking
+          reviewed_sha256: c5127e62c2c5f8900570a5015c7ebdc83dbd73b64a7a41eea9f754d4bf8b016f
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS primary-disability report-specific FERPA masking rules
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: TEA PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - provenance_ids:
+          - 2110091fd74fe9f00e28027746caa3e4998e2de873f993a7c4a50d662c08a89d
+          reference_id: eligibility_transition
+          reviewed_sha256: 34cc627cfdc83ebe291b02d4008e31bb6715cd054e94abea51b035bdd3ca9dd9
+          role: source_notes
+          status: available
+          title: TEA developmental delay and noncategorical early childhood eligibility transition
+          url: https://spedsupport.tea.texas.gov/resource-library/disability-condition-eligibility-definitions
+        - path: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+          provenance_ids:
+          - a15f6791dacfebe22e748779a9dc128052eba8a15723196ff302b56d6a2da509
+          reference_id: column_crosswalk
+          reviewed_sha256: d8bbff8e63eba0fb604991cf76852203226f387ce22cf435a509933535ba368e
+          role: schema
+          status: available
+          title: TEA Data reviewed source headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2016–17 PEIMS Primary Disability by ESC and county by ESC
+        value_policy: peims_primary_disability_geography_2017
+        version: '2017'
+      path: data/peims/2017/peims_primary_disability_geography.csv
+      reader:
+        profiles:
+          source:
+            acquisition_ids:
+              county_region: 1fd8c4e071377f2427b18817758093e80bb59a6055cf7809ed1b9cc6b75cf02b
+              region: 53e6e2995374ee9679a3555118490c9d0bf37fa8f07ec182bb29b588858cf20b
+            column_schema: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+    2018:
+      metadata:
+        metrics:
+          primary_autism_count:
+            field: primary_autism_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          primary_deaf_or_hard_of_hearing_count:
+            field: primary_deaf_or_hard_of_hearing_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          primary_deafblind_count:
+            field: primary_deafblind_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          primary_developmental_delay_count:
+            field: primary_developmental_delay_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          primary_emotional_disturbance_count:
+            field: primary_emotional_disturbance_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          primary_intellectual_disability_count:
+            field: primary_intellectual_disability_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          primary_noncategorical_early_childhood_count:
+            field: primary_noncategorical_early_childhood_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          primary_orthopedic_impairment_count:
+            field: primary_orthopedic_impairment_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          primary_other_health_impairment_count:
+            field: primary_other_health_impairment_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          primary_specific_learning_disability_count:
+            field: primary_specific_learning_disability_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          primary_speech_or_language_impairment_count:
+            field: primary_speech_or_language_impairment_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          primary_traumatic_brain_injury_count:
+            field: primary_traumatic_brain_injury_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          primary_visual_impairment_count:
+            field: primary_visual_impairment_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+        notes: Publisher geography aggregates. The county scope has one row per published county name and
+          ESC pair. The same county may appear in several education service centers. Classification comparability
+          over time is not established, including historical DD and NCEC.
+        period:
+          end_year: 2018
+          kind: school_year
+          start_year: 2017
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - fa3cf44d0c6f27b6ee0ec2c0ab4ac23174f167857243f7300c70bda0585a2460
+          reference_id: peims_disability_masking
+          reviewed_sha256: c5127e62c2c5f8900570a5015c7ebdc83dbd73b64a7a41eea9f754d4bf8b016f
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS primary-disability report-specific FERPA masking rules
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: TEA PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - provenance_ids:
+          - 2110091fd74fe9f00e28027746caa3e4998e2de873f993a7c4a50d662c08a89d
+          reference_id: eligibility_transition
+          reviewed_sha256: 34cc627cfdc83ebe291b02d4008e31bb6715cd054e94abea51b035bdd3ca9dd9
+          role: source_notes
+          status: available
+          title: TEA developmental delay and noncategorical early childhood eligibility transition
+          url: https://spedsupport.tea.texas.gov/resource-library/disability-condition-eligibility-definitions
+        - path: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+          provenance_ids:
+          - a15f6791dacfebe22e748779a9dc128052eba8a15723196ff302b56d6a2da509
+          reference_id: column_crosswalk
+          reviewed_sha256: d8bbff8e63eba0fb604991cf76852203226f387ce22cf435a509933535ba368e
+          role: schema
+          status: available
+          title: TEA Data reviewed source headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2017–18 PEIMS Primary Disability by ESC and county by ESC
+        value_policy: peims_primary_disability_geography_2018
+        version: '2018'
+      path: data/peims/2018/peims_primary_disability_geography.csv
+      reader:
+        profiles:
+          source:
+            acquisition_ids:
+              county_region: 98a51d1797c0274c5d8b102c8366becf4f90ebd98ace6b3124da492f9c983e02
+              region: 468f6db211ed61c40e1fb67eb654121046e8dec9cfd8f780306fb5bcdbf50856
+            column_schema: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+    2019:
+      metadata:
+        metrics:
+          primary_autism_count:
+            field: primary_autism_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          primary_deaf_or_hard_of_hearing_count:
+            field: primary_deaf_or_hard_of_hearing_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          primary_deafblind_count:
+            field: primary_deafblind_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          primary_developmental_delay_count:
+            field: primary_developmental_delay_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          primary_emotional_disturbance_count:
+            field: primary_emotional_disturbance_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          primary_intellectual_disability_count:
+            field: primary_intellectual_disability_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          primary_noncategorical_early_childhood_count:
+            field: primary_noncategorical_early_childhood_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          primary_orthopedic_impairment_count:
+            field: primary_orthopedic_impairment_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          primary_other_health_impairment_count:
+            field: primary_other_health_impairment_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          primary_specific_learning_disability_count:
+            field: primary_specific_learning_disability_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          primary_speech_or_language_impairment_count:
+            field: primary_speech_or_language_impairment_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          primary_traumatic_brain_injury_count:
+            field: primary_traumatic_brain_injury_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          primary_visual_impairment_count:
+            field: primary_visual_impairment_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+        notes: Publisher geography aggregates. The county scope has one row per published county name and
+          ESC pair. The same county may appear in several education service centers. Classification comparability
+          over time is not established, including historical DD and NCEC.
+        period:
+          end_year: 2019
+          kind: school_year
+          start_year: 2018
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - fa3cf44d0c6f27b6ee0ec2c0ab4ac23174f167857243f7300c70bda0585a2460
+          reference_id: peims_disability_masking
+          reviewed_sha256: c5127e62c2c5f8900570a5015c7ebdc83dbd73b64a7a41eea9f754d4bf8b016f
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS primary-disability report-specific FERPA masking rules
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: TEA PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - provenance_ids:
+          - 2110091fd74fe9f00e28027746caa3e4998e2de873f993a7c4a50d662c08a89d
+          reference_id: eligibility_transition
+          reviewed_sha256: 34cc627cfdc83ebe291b02d4008e31bb6715cd054e94abea51b035bdd3ca9dd9
+          role: source_notes
+          status: available
+          title: TEA developmental delay and noncategorical early childhood eligibility transition
+          url: https://spedsupport.tea.texas.gov/resource-library/disability-condition-eligibility-definitions
+        - path: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+          provenance_ids:
+          - a15f6791dacfebe22e748779a9dc128052eba8a15723196ff302b56d6a2da509
+          reference_id: column_crosswalk
+          reviewed_sha256: d8bbff8e63eba0fb604991cf76852203226f387ce22cf435a509933535ba368e
+          role: schema
+          status: available
+          title: TEA Data reviewed source headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2018–19 PEIMS Primary Disability by ESC and county by ESC
+        value_policy: peims_primary_disability_geography_2019
+        version: '2019'
+      path: data/peims/2019/peims_primary_disability_geography.csv
+      reader:
+        profiles:
+          source:
+            acquisition_ids:
+              county_region: 1b07921e11f95262b8ba7fa87fbfb2fa506f07e604327545106caf484fe6d0cc
+              region: 535af5228b7420e6ff3cc2cbb98bf6af6fc3cf9ab28d6abd3f94264228c4ceb1
+            column_schema: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+    2020:
+      metadata:
+        metrics:
+          primary_autism_count:
+            field: primary_autism_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          primary_deaf_or_hard_of_hearing_count:
+            field: primary_deaf_or_hard_of_hearing_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          primary_deafblind_count:
+            field: primary_deafblind_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          primary_developmental_delay_count:
+            field: primary_developmental_delay_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          primary_emotional_disturbance_count:
+            field: primary_emotional_disturbance_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          primary_intellectual_disability_count:
+            field: primary_intellectual_disability_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          primary_noncategorical_early_childhood_count:
+            field: primary_noncategorical_early_childhood_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          primary_orthopedic_impairment_count:
+            field: primary_orthopedic_impairment_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          primary_other_health_impairment_count:
+            field: primary_other_health_impairment_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          primary_specific_learning_disability_count:
+            field: primary_specific_learning_disability_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          primary_speech_or_language_impairment_count:
+            field: primary_speech_or_language_impairment_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          primary_traumatic_brain_injury_count:
+            field: primary_traumatic_brain_injury_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          primary_visual_impairment_count:
+            field: primary_visual_impairment_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+        notes: Publisher geography aggregates. The county scope has one row per published county name and
+          ESC pair. The same county may appear in several education service centers. Classification comparability
+          over time is not established, including historical DD and NCEC.
+        period:
+          end_year: 2020
+          kind: school_year
+          start_year: 2019
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - fa3cf44d0c6f27b6ee0ec2c0ab4ac23174f167857243f7300c70bda0585a2460
+          reference_id: peims_disability_masking
+          reviewed_sha256: c5127e62c2c5f8900570a5015c7ebdc83dbd73b64a7a41eea9f754d4bf8b016f
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS primary-disability report-specific FERPA masking rules
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: TEA PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - provenance_ids:
+          - 2110091fd74fe9f00e28027746caa3e4998e2de873f993a7c4a50d662c08a89d
+          reference_id: eligibility_transition
+          reviewed_sha256: 34cc627cfdc83ebe291b02d4008e31bb6715cd054e94abea51b035bdd3ca9dd9
+          role: source_notes
+          status: available
+          title: TEA developmental delay and noncategorical early childhood eligibility transition
+          url: https://spedsupport.tea.texas.gov/resource-library/disability-condition-eligibility-definitions
+        - path: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+          provenance_ids:
+          - a15f6791dacfebe22e748779a9dc128052eba8a15723196ff302b56d6a2da509
+          reference_id: column_crosswalk
+          reviewed_sha256: d8bbff8e63eba0fb604991cf76852203226f387ce22cf435a509933535ba368e
+          role: schema
+          status: available
+          title: TEA Data reviewed source headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2019–20 PEIMS Primary Disability by ESC and county by ESC
+        value_policy: peims_primary_disability_geography_2020
+        version: '2020'
+      path: data/peims/2020/peims_primary_disability_geography.csv
+      reader:
+        profiles:
+          source:
+            acquisition_ids:
+              county_region: 5b763dbc35eb07012be977551098913da7c39f37a9749b2f28a034a3e10e5c0e
+              region: be0ca1d70811131fffb5c25dacace724ea6b451bb14dbe6efedbdc82ade32805
+            column_schema: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+    2021:
+      metadata:
+        metrics:
+          primary_autism_count:
+            field: primary_autism_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          primary_deaf_or_hard_of_hearing_count:
+            field: primary_deaf_or_hard_of_hearing_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          primary_deafblind_count:
+            field: primary_deafblind_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          primary_developmental_delay_count:
+            field: primary_developmental_delay_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          primary_emotional_disturbance_count:
+            field: primary_emotional_disturbance_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          primary_intellectual_disability_count:
+            field: primary_intellectual_disability_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          primary_noncategorical_early_childhood_count:
+            field: primary_noncategorical_early_childhood_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          primary_orthopedic_impairment_count:
+            field: primary_orthopedic_impairment_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          primary_other_health_impairment_count:
+            field: primary_other_health_impairment_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          primary_specific_learning_disability_count:
+            field: primary_specific_learning_disability_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          primary_speech_or_language_impairment_count:
+            field: primary_speech_or_language_impairment_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          primary_traumatic_brain_injury_count:
+            field: primary_traumatic_brain_injury_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          primary_visual_impairment_count:
+            field: primary_visual_impairment_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+        notes: Publisher geography aggregates. The county scope has one row per published county name and
+          ESC pair. The same county may appear in several education service centers. Classification comparability
+          over time is not established, including historical DD and NCEC.
+        period:
+          end_year: 2021
+          kind: school_year
+          start_year: 2020
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - fa3cf44d0c6f27b6ee0ec2c0ab4ac23174f167857243f7300c70bda0585a2460
+          reference_id: peims_disability_masking
+          reviewed_sha256: c5127e62c2c5f8900570a5015c7ebdc83dbd73b64a7a41eea9f754d4bf8b016f
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS primary-disability report-specific FERPA masking rules
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: TEA PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - provenance_ids:
+          - 2110091fd74fe9f00e28027746caa3e4998e2de873f993a7c4a50d662c08a89d
+          reference_id: eligibility_transition
+          reviewed_sha256: 34cc627cfdc83ebe291b02d4008e31bb6715cd054e94abea51b035bdd3ca9dd9
+          role: source_notes
+          status: available
+          title: TEA developmental delay and noncategorical early childhood eligibility transition
+          url: https://spedsupport.tea.texas.gov/resource-library/disability-condition-eligibility-definitions
+        - path: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+          provenance_ids:
+          - a15f6791dacfebe22e748779a9dc128052eba8a15723196ff302b56d6a2da509
+          reference_id: column_crosswalk
+          reviewed_sha256: d8bbff8e63eba0fb604991cf76852203226f387ce22cf435a509933535ba368e
+          role: schema
+          status: available
+          title: TEA Data reviewed source headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2020–21 PEIMS Primary Disability by ESC and county by ESC
+        value_policy: peims_primary_disability_geography_2021
+        version: '2021'
+      path: data/peims/2021/peims_primary_disability_geography.csv
+      reader:
+        profiles:
+          source:
+            acquisition_ids:
+              county_region: 2b9973f3fa9528377e1d16dfc191232532ebdf5251a51fa77990a990288927b2
+              region: d9f4b929bb1871d861c3e1bba8014741cfa9130607faf472addd5fa8a0fbb1a2
+            column_schema: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+    2022:
+      metadata:
+        metrics:
+          primary_autism_count:
+            field: primary_autism_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          primary_deaf_or_hard_of_hearing_count:
+            field: primary_deaf_or_hard_of_hearing_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          primary_deafblind_count:
+            field: primary_deafblind_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          primary_developmental_delay_count:
+            field: primary_developmental_delay_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          primary_emotional_disturbance_count:
+            field: primary_emotional_disturbance_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          primary_intellectual_disability_count:
+            field: primary_intellectual_disability_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          primary_noncategorical_early_childhood_count:
+            field: primary_noncategorical_early_childhood_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          primary_orthopedic_impairment_count:
+            field: primary_orthopedic_impairment_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          primary_other_health_impairment_count:
+            field: primary_other_health_impairment_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          primary_specific_learning_disability_count:
+            field: primary_specific_learning_disability_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          primary_speech_or_language_impairment_count:
+            field: primary_speech_or_language_impairment_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          primary_traumatic_brain_injury_count:
+            field: primary_traumatic_brain_injury_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          primary_visual_impairment_count:
+            field: primary_visual_impairment_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+        notes: Publisher geography aggregates. The county scope has one row per published county name and
+          ESC pair. The same county may appear in several education service centers. Classification comparability
+          over time is not established, including historical DD and NCEC.
+        period:
+          end_year: 2022
+          kind: school_year
+          start_year: 2021
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - fa3cf44d0c6f27b6ee0ec2c0ab4ac23174f167857243f7300c70bda0585a2460
+          reference_id: peims_disability_masking
+          reviewed_sha256: c5127e62c2c5f8900570a5015c7ebdc83dbd73b64a7a41eea9f754d4bf8b016f
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS primary-disability report-specific FERPA masking rules
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: TEA PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - provenance_ids:
+          - 2110091fd74fe9f00e28027746caa3e4998e2de873f993a7c4a50d662c08a89d
+          reference_id: eligibility_transition
+          reviewed_sha256: 34cc627cfdc83ebe291b02d4008e31bb6715cd054e94abea51b035bdd3ca9dd9
+          role: source_notes
+          status: available
+          title: TEA developmental delay and noncategorical early childhood eligibility transition
+          url: https://spedsupport.tea.texas.gov/resource-library/disability-condition-eligibility-definitions
+        - path: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+          provenance_ids:
+          - a15f6791dacfebe22e748779a9dc128052eba8a15723196ff302b56d6a2da509
+          reference_id: column_crosswalk
+          reviewed_sha256: d8bbff8e63eba0fb604991cf76852203226f387ce22cf435a509933535ba368e
+          role: schema
+          status: available
+          title: TEA Data reviewed source headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2021–22 PEIMS Primary Disability by ESC and county by ESC
+        value_policy: peims_primary_disability_geography_2022
+        version: '2022'
+      path: data/peims/2022/peims_primary_disability_geography.csv
+      reader:
+        profiles:
+          source:
+            acquisition_ids:
+              county_region: 3298e38298c4a2e3f69b32e5f37ea2c208bb3db9966b31c20d61d01e13cfa53a
+              region: 908ad4b6f528f40b36367ca341942481c57e7483677d5f8102fbf5344047a91d
+            column_schema: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+    2023:
+      metadata:
+        metrics:
+          primary_autism_count:
+            field: primary_autism_count
+            period:
+              end_year: 2023
+              kind: school_year
+              start_year: 2022
+            unit: count
+          primary_deaf_or_hard_of_hearing_count:
+            field: primary_deaf_or_hard_of_hearing_count
+            period:
+              end_year: 2023
+              kind: school_year
+              start_year: 2022
+            unit: count
+          primary_deafblind_count:
+            field: primary_deafblind_count
+            period:
+              end_year: 2023
+              kind: school_year
+              start_year: 2022
+            unit: count
+          primary_developmental_delay_count:
+            field: primary_developmental_delay_count
+            period:
+              end_year: 2023
+              kind: school_year
+              start_year: 2022
+            unit: count
+          primary_emotional_disturbance_count:
+            field: primary_emotional_disturbance_count
+            period:
+              end_year: 2023
+              kind: school_year
+              start_year: 2022
+            unit: count
+          primary_intellectual_disability_count:
+            field: primary_intellectual_disability_count
+            period:
+              end_year: 2023
+              kind: school_year
+              start_year: 2022
+            unit: count
+          primary_noncategorical_early_childhood_count:
+            field: primary_noncategorical_early_childhood_count
+            period:
+              end_year: 2023
+              kind: school_year
+              start_year: 2022
+            unit: count
+          primary_orthopedic_impairment_count:
+            field: primary_orthopedic_impairment_count
+            period:
+              end_year: 2023
+              kind: school_year
+              start_year: 2022
+            unit: count
+          primary_other_health_impairment_count:
+            field: primary_other_health_impairment_count
+            period:
+              end_year: 2023
+              kind: school_year
+              start_year: 2022
+            unit: count
+          primary_specific_learning_disability_count:
+            field: primary_specific_learning_disability_count
+            period:
+              end_year: 2023
+              kind: school_year
+              start_year: 2022
+            unit: count
+          primary_speech_or_language_impairment_count:
+            field: primary_speech_or_language_impairment_count
+            period:
+              end_year: 2023
+              kind: school_year
+              start_year: 2022
+            unit: count
+          primary_traumatic_brain_injury_count:
+            field: primary_traumatic_brain_injury_count
+            period:
+              end_year: 2023
+              kind: school_year
+              start_year: 2022
+            unit: count
+          primary_visual_impairment_count:
+            field: primary_visual_impairment_count
+            period:
+              end_year: 2023
+              kind: school_year
+              start_year: 2022
+            unit: count
+        notes: Publisher geography aggregates. The county scope has one row per published county name and
+          ESC pair. The same county may appear in several education service centers. Classification comparability
+          over time is not established, including historical DD and NCEC.
+        period:
+          end_year: 2023
+          kind: school_year
+          start_year: 2022
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - fa3cf44d0c6f27b6ee0ec2c0ab4ac23174f167857243f7300c70bda0585a2460
+          reference_id: peims_disability_masking
+          reviewed_sha256: c5127e62c2c5f8900570a5015c7ebdc83dbd73b64a7a41eea9f754d4bf8b016f
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS primary-disability report-specific FERPA masking rules
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: TEA PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - provenance_ids:
+          - 2110091fd74fe9f00e28027746caa3e4998e2de873f993a7c4a50d662c08a89d
+          reference_id: eligibility_transition
+          reviewed_sha256: 34cc627cfdc83ebe291b02d4008e31bb6715cd054e94abea51b035bdd3ca9dd9
+          role: source_notes
+          status: available
+          title: TEA developmental delay and noncategorical early childhood eligibility transition
+          url: https://spedsupport.tea.texas.gov/resource-library/disability-condition-eligibility-definitions
+        - path: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+          provenance_ids:
+          - a15f6791dacfebe22e748779a9dc128052eba8a15723196ff302b56d6a2da509
+          reference_id: column_crosswalk
+          reviewed_sha256: d8bbff8e63eba0fb604991cf76852203226f387ce22cf435a509933535ba368e
+          role: schema
+          status: available
+          title: TEA Data reviewed source headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2022–23 PEIMS Primary Disability by ESC and county by ESC
+        value_policy: peims_primary_disability_geography_2023
+        version: '2023'
+      path: data/peims/2023/peims_primary_disability_geography.csv
+      reader:
+        profiles:
+          source:
+            acquisition_ids:
+              county_region: 70b006da348f686cb01a270aa0c395e664b4d291c69b8aa394a08af9e5e42a5f
+              region: aad6f6e1acab3c66e501f4460ae9222f1b7619a3a35ff375e998f1bca4075bcc
+            column_schema: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+    2024:
+      metadata:
+        metrics:
+          primary_autism_count:
+            field: primary_autism_count
+            period:
+              end_year: 2024
+              kind: school_year
+              start_year: 2023
+            unit: count
+          primary_deaf_or_hard_of_hearing_count:
+            field: primary_deaf_or_hard_of_hearing_count
+            period:
+              end_year: 2024
+              kind: school_year
+              start_year: 2023
+            unit: count
+          primary_deafblind_count:
+            field: primary_deafblind_count
+            period:
+              end_year: 2024
+              kind: school_year
+              start_year: 2023
+            unit: count
+          primary_developmental_delay_count:
+            field: primary_developmental_delay_count
+            period:
+              end_year: 2024
+              kind: school_year
+              start_year: 2023
+            unit: count
+          primary_emotional_disturbance_count:
+            field: primary_emotional_disturbance_count
+            period:
+              end_year: 2024
+              kind: school_year
+              start_year: 2023
+            unit: count
+          primary_intellectual_disability_count:
+            field: primary_intellectual_disability_count
+            period:
+              end_year: 2024
+              kind: school_year
+              start_year: 2023
+            unit: count
+          primary_noncategorical_early_childhood_count:
+            field: primary_noncategorical_early_childhood_count
+            period:
+              end_year: 2024
+              kind: school_year
+              start_year: 2023
+            unit: count
+          primary_orthopedic_impairment_count:
+            field: primary_orthopedic_impairment_count
+            period:
+              end_year: 2024
+              kind: school_year
+              start_year: 2023
+            unit: count
+          primary_other_health_impairment_count:
+            field: primary_other_health_impairment_count
+            period:
+              end_year: 2024
+              kind: school_year
+              start_year: 2023
+            unit: count
+          primary_specific_learning_disability_count:
+            field: primary_specific_learning_disability_count
+            period:
+              end_year: 2024
+              kind: school_year
+              start_year: 2023
+            unit: count
+          primary_speech_or_language_impairment_count:
+            field: primary_speech_or_language_impairment_count
+            period:
+              end_year: 2024
+              kind: school_year
+              start_year: 2023
+            unit: count
+          primary_traumatic_brain_injury_count:
+            field: primary_traumatic_brain_injury_count
+            period:
+              end_year: 2024
+              kind: school_year
+              start_year: 2023
+            unit: count
+          primary_visual_impairment_count:
+            field: primary_visual_impairment_count
+            period:
+              end_year: 2024
+              kind: school_year
+              start_year: 2023
+            unit: count
+        notes: Publisher geography aggregates. The county scope has one row per published county name and
+          ESC pair. The same county may appear in several education service centers. Classification comparability
+          over time is not established, including historical DD and NCEC.
+        period:
+          end_year: 2024
+          kind: school_year
+          start_year: 2023
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - fa3cf44d0c6f27b6ee0ec2c0ab4ac23174f167857243f7300c70bda0585a2460
+          reference_id: peims_disability_masking
+          reviewed_sha256: c5127e62c2c5f8900570a5015c7ebdc83dbd73b64a7a41eea9f754d4bf8b016f
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS primary-disability report-specific FERPA masking rules
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: TEA PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - provenance_ids:
+          - 2110091fd74fe9f00e28027746caa3e4998e2de873f993a7c4a50d662c08a89d
+          reference_id: eligibility_transition
+          reviewed_sha256: 34cc627cfdc83ebe291b02d4008e31bb6715cd054e94abea51b035bdd3ca9dd9
+          role: source_notes
+          status: available
+          title: TEA developmental delay and noncategorical early childhood eligibility transition
+          url: https://spedsupport.tea.texas.gov/resource-library/disability-condition-eligibility-definitions
+        - path: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+          provenance_ids:
+          - a15f6791dacfebe22e748779a9dc128052eba8a15723196ff302b56d6a2da509
+          reference_id: column_crosswalk
+          reviewed_sha256: d8bbff8e63eba0fb604991cf76852203226f387ce22cf435a509933535ba368e
+          role: schema
+          status: available
+          title: TEA Data reviewed source headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2023–24 PEIMS Primary Disability by ESC and county by ESC
+        value_policy: peims_primary_disability_geography_2024
+        version: '2024'
+      path: data/peims/2024/peims_primary_disability_geography.csv
+      reader:
+        profiles:
+          source:
+            acquisition_ids:
+              county_region: 5351c22a256c6be719008ff47eb08e4fe10d4222cc3cc66f99a2c83dfd3881f3
+              region: b72a65befaa658f5ef49efef59a113fff8263c8580d4e5b4a38a605f14642b3d
+            column_schema: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+    2025:
+      metadata:
+        metrics:
+          primary_autism_count:
+            field: primary_autism_count
+            period:
+              end_year: 2025
+              kind: school_year
+              start_year: 2024
+            unit: count
+          primary_deaf_or_hard_of_hearing_count:
+            field: primary_deaf_or_hard_of_hearing_count
+            period:
+              end_year: 2025
+              kind: school_year
+              start_year: 2024
+            unit: count
+          primary_deafblind_count:
+            field: primary_deafblind_count
+            period:
+              end_year: 2025
+              kind: school_year
+              start_year: 2024
+            unit: count
+          primary_developmental_delay_count:
+            field: primary_developmental_delay_count
+            period:
+              end_year: 2025
+              kind: school_year
+              start_year: 2024
+            unit: count
+          primary_emotional_disturbance_count:
+            field: primary_emotional_disturbance_count
+            period:
+              end_year: 2025
+              kind: school_year
+              start_year: 2024
+            unit: count
+          primary_intellectual_disability_count:
+            field: primary_intellectual_disability_count
+            period:
+              end_year: 2025
+              kind: school_year
+              start_year: 2024
+            unit: count
+          primary_noncategorical_early_childhood_count:
+            field: primary_noncategorical_early_childhood_count
+            period:
+              end_year: 2025
+              kind: school_year
+              start_year: 2024
+            unit: count
+          primary_orthopedic_impairment_count:
+            field: primary_orthopedic_impairment_count
+            period:
+              end_year: 2025
+              kind: school_year
+              start_year: 2024
+            unit: count
+          primary_other_health_impairment_count:
+            field: primary_other_health_impairment_count
+            period:
+              end_year: 2025
+              kind: school_year
+              start_year: 2024
+            unit: count
+          primary_specific_learning_disability_count:
+            field: primary_specific_learning_disability_count
+            period:
+              end_year: 2025
+              kind: school_year
+              start_year: 2024
+            unit: count
+          primary_speech_or_language_impairment_count:
+            field: primary_speech_or_language_impairment_count
+            period:
+              end_year: 2025
+              kind: school_year
+              start_year: 2024
+            unit: count
+          primary_traumatic_brain_injury_count:
+            field: primary_traumatic_brain_injury_count
+            period:
+              end_year: 2025
+              kind: school_year
+              start_year: 2024
+            unit: count
+          primary_visual_impairment_count:
+            field: primary_visual_impairment_count
+            period:
+              end_year: 2025
+              kind: school_year
+              start_year: 2024
+            unit: count
+        notes: Publisher geography aggregates. The county scope has one row per published county name and
+          ESC pair. The same county may appear in several education service centers. Classification comparability
+          over time is not established, including historical DD and NCEC.
+        period:
+          end_year: 2025
+          kind: school_year
+          start_year: 2024
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - fa3cf44d0c6f27b6ee0ec2c0ab4ac23174f167857243f7300c70bda0585a2460
+          reference_id: peims_disability_masking
+          reviewed_sha256: c5127e62c2c5f8900570a5015c7ebdc83dbd73b64a7a41eea9f754d4bf8b016f
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS primary-disability report-specific FERPA masking rules
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: TEA PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - provenance_ids:
+          - 2110091fd74fe9f00e28027746caa3e4998e2de873f993a7c4a50d662c08a89d
+          reference_id: eligibility_transition
+          reviewed_sha256: 34cc627cfdc83ebe291b02d4008e31bb6715cd054e94abea51b035bdd3ca9dd9
+          role: source_notes
+          status: available
+          title: TEA developmental delay and noncategorical early childhood eligibility transition
+          url: https://spedsupport.tea.texas.gov/resource-library/disability-condition-eligibility-definitions
+        - path: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+          provenance_ids:
+          - a15f6791dacfebe22e748779a9dc128052eba8a15723196ff302b56d6a2da509
+          reference_id: column_crosswalk
+          reviewed_sha256: d8bbff8e63eba0fb604991cf76852203226f387ce22cf435a509933535ba368e
+          role: schema
+          status: available
+          title: TEA Data reviewed source headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2024–25 PEIMS Primary Disability by ESC and county by ESC
+        value_policy: peims_primary_disability_geography_2025
+        version: '2025'
+      path: data/peims/2025/peims_primary_disability_geography.csv
+      reader:
+        profiles:
+          source:
+            acquisition_ids:
+              county_region: c0b728977ef908e4b73a83384ee3218fd0bd93dce33afb81eb7551397cf1d4e8
+              region: fd37397e6538d2a59c57fb0af70af1bc36180be0ecf3f675b0fe2fe14346a20a
+            column_schema: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+    2026:
+      metadata:
+        metrics:
+          primary_autism_count:
+            field: primary_autism_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          primary_deaf_or_hard_of_hearing_count:
+            field: primary_deaf_or_hard_of_hearing_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          primary_deafblind_count:
+            field: primary_deafblind_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          primary_developmental_delay_count:
+            field: primary_developmental_delay_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          primary_emotional_disturbance_count:
+            field: primary_emotional_disturbance_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          primary_intellectual_disability_count:
+            field: primary_intellectual_disability_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          primary_noncategorical_early_childhood_count:
+            field: primary_noncategorical_early_childhood_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          primary_orthopedic_impairment_count:
+            field: primary_orthopedic_impairment_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          primary_other_health_impairment_count:
+            field: primary_other_health_impairment_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          primary_specific_learning_disability_count:
+            field: primary_specific_learning_disability_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          primary_speech_or_language_impairment_count:
+            field: primary_speech_or_language_impairment_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          primary_traumatic_brain_injury_count:
+            field: primary_traumatic_brain_injury_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+          primary_visual_impairment_count:
+            field: primary_visual_impairment_count
+            period:
+              end_year: 2026
+              kind: school_year
+              start_year: 2025
+            unit: count
+        notes: Publisher geography aggregates. The county scope has one row per published county name and
+          ESC pair. The same county may appear in several education service centers. Classification comparability
+          over time is not established, including historical DD and NCEC.
+        period:
+          end_year: 2026
+          kind: school_year
+          start_year: 2025
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - fa3cf44d0c6f27b6ee0ec2c0ab4ac23174f167857243f7300c70bda0585a2460
+          reference_id: peims_disability_masking
+          reviewed_sha256: c5127e62c2c5f8900570a5015c7ebdc83dbd73b64a7a41eea9f754d4bf8b016f
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS primary-disability report-specific FERPA masking rules
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: TEA PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - provenance_ids:
+          - 2110091fd74fe9f00e28027746caa3e4998e2de873f993a7c4a50d662c08a89d
+          reference_id: eligibility_transition
+          reviewed_sha256: 34cc627cfdc83ebe291b02d4008e31bb6715cd054e94abea51b035bdd3ca9dd9
+          role: source_notes
+          status: available
+          title: TEA developmental delay and noncategorical early childhood eligibility transition
+          url: https://spedsupport.tea.texas.gov/resource-library/disability-condition-eligibility-definitions
+        - path: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
+          provenance_ids:
+          - a15f6791dacfebe22e748779a9dc128052eba8a15723196ff302b56d6a2da509
+          reference_id: column_crosswalk
+          reviewed_sha256: d8bbff8e63eba0fb604991cf76852203226f387ce22cf435a509933535ba368e
+          role: schema
+          status: available
+          title: TEA Data reviewed source headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adser.html
+        title: 2025–26 PEIMS Primary Disability by ESC and county by ESC
+        value_policy: peims_primary_disability_geography_2026
+        version: '2026'
+      path: data/peims/2026/peims_primary_disability_geography.csv
+      reader:
+        profiles:
+          source:
+            acquisition_ids:
+              county_region: c5af6b581cea683cfc8d9ec53a6de55d92c903f5eb6e18b1c1dbc9102c78468a
+              region: 4b79c08ddd0fa664917b467dab9f21121dece74b7dd53c932f6868c9034bddd5
+            column_schema: schemas/peims--2013-2026--primary-disability-geography-crosswalk.json
   peims_student_programs_and_special_populations:
+    2015:
+      metadata:
+        metrics:
+          at_risk_count:
+            field: at_risk_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          bilingual_program_count:
+            field: bilingual_program_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          cte_program_count:
+            field: cte_program_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          dyslexia_identification_count:
+            field: dyslexia_identification_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          economically_disadvantaged_count:
+            field: economically_disadvantaged_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          emergent_bilingual_count:
+            field: emergent_bilingual_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          english_as_a_second_language_program_count:
+            field: english_as_a_second_language_program_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          foster_care_count:
+            field: foster_care_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          gifted_and_talented_program_count:
+            field: gifted_and_talented_program_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          military_connected_count:
+            field: military_connected_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          special_education_program_count:
+            field: special_education_program_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          title_i_program_count:
+            field: title_i_program_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+          total_enrollment_count:
+            field: total_enrollment_count
+            period:
+              end_year: 2015
+              kind: school_year
+              start_year: 2014
+            unit: count
+        notes: October PEIMS Enrollment snapshot. Program populations can overlap. CTE in applicable historical
+          editions counts participation in state-approved courses. Separate from TPRS Membership.
+        period:
+          end_year: 2015
+          kind: school_year
+          start_year: 2014
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - 694ada659e1b4b0d9da4ac5df6de02d0a9f493834d784e37f68f1fff9ec50dc2
+          reference_id: about
+          reviewed_sha256: c3ed8f60f083cd143992d1a86e59da73ea4492b629812292e64ca3d880cee17a
+          role: source_notes
+          status: available
+          title: PEIMS Student Program and Special Populations definitions and population
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/About_StudentProgram.html
+        - provenance_ids:
+          - cacfd931455c3a0ffdde01e794cf9aa8815f7a8b8300618912d0b713b215e885
+          reference_id: peims_masking
+          reviewed_sha256: c940234fd44417fe1e1152cca18d0ee893addd70ed3fc4f7e687492d13ae4954
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS reporting masking rules
+          url: https://tea.texas.gov/data-reports/student-data/discipline-data-products/peims-reporting-masking-web-updated-020125.docx
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: Publisher PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - path: schemas/peims--2015-2022--student-programs-and-special-populations-crosswalk.json
+          provenance_ids:
+          - 9863d95073df334d574c2ccd89d7725f153c3b37721bae2a11a89e37ba5ce446
+          reference_id: column_crosswalk
+          reviewed_sha256: e99eb282b25783ee26d323841d60c6762f2c83be5f368ced992c86d61709144f
+          role: schema
+          status: available
+          title: PEIMS Student Program and Special Populations literal headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adspr.html
+        title: 2014–15 PEIMS Student Programs and Special Populations
+        value_policy: peims_student_programs_and_special_populations_2015
+        version: '2015'
+      path: data/peims/2015/peims_student_programs_and_special_populations.csv
+      reader:
+        profiles:
+          source:
+            acquisition_ids:
+              campus: fb0adaacc72fd1381ac1d462d0d32726d91f8f07b2f17602289393e377210a54
+              district: 9c4d79d89c5a6e26004d6aab010945a6723f1ba089c0014b90d57f7894953653
+              state: a762b2d0ebb79fe7a796a852fb6c7412f18358545b4f7b036663d8c8b0722f99
+            column_schema: schemas/peims--2015-2022--student-programs-and-special-populations-crosswalk.json
+    2016:
+      metadata:
+        metrics:
+          at_risk_count:
+            field: at_risk_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          bilingual_program_count:
+            field: bilingual_program_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          cte_program_count:
+            field: cte_program_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          dyslexia_identification_count:
+            field: dyslexia_identification_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          economically_disadvantaged_count:
+            field: economically_disadvantaged_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          emergent_bilingual_count:
+            field: emergent_bilingual_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          english_as_a_second_language_program_count:
+            field: english_as_a_second_language_program_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          foster_care_count:
+            field: foster_care_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          gifted_and_talented_program_count:
+            field: gifted_and_talented_program_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          military_connected_count:
+            field: military_connected_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          special_education_program_count:
+            field: special_education_program_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          title_i_program_count:
+            field: title_i_program_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+          total_enrollment_count:
+            field: total_enrollment_count
+            period:
+              end_year: 2016
+              kind: school_year
+              start_year: 2015
+            unit: count
+        notes: October PEIMS Enrollment snapshot. Program populations can overlap. CTE in applicable historical
+          editions counts participation in state-approved courses. Separate from TPRS Membership.
+        period:
+          end_year: 2016
+          kind: school_year
+          start_year: 2015
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - 694ada659e1b4b0d9da4ac5df6de02d0a9f493834d784e37f68f1fff9ec50dc2
+          reference_id: about
+          reviewed_sha256: c3ed8f60f083cd143992d1a86e59da73ea4492b629812292e64ca3d880cee17a
+          role: source_notes
+          status: available
+          title: PEIMS Student Program and Special Populations definitions and population
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/About_StudentProgram.html
+        - provenance_ids:
+          - cacfd931455c3a0ffdde01e794cf9aa8815f7a8b8300618912d0b713b215e885
+          reference_id: peims_masking
+          reviewed_sha256: c940234fd44417fe1e1152cca18d0ee893addd70ed3fc4f7e687492d13ae4954
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS reporting masking rules
+          url: https://tea.texas.gov/data-reports/student-data/discipline-data-products/peims-reporting-masking-web-updated-020125.docx
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: Publisher PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - path: schemas/peims--2015-2022--student-programs-and-special-populations-crosswalk.json
+          provenance_ids:
+          - 9863d95073df334d574c2ccd89d7725f153c3b37721bae2a11a89e37ba5ce446
+          reference_id: column_crosswalk
+          reviewed_sha256: e99eb282b25783ee26d323841d60c6762f2c83be5f368ced992c86d61709144f
+          role: schema
+          status: available
+          title: PEIMS Student Program and Special Populations literal headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adspr.html
+        title: 2015–16 PEIMS Student Programs and Special Populations
+        value_policy: peims_student_programs_and_special_populations_2016
+        version: '2016'
+      path: data/peims/2016/peims_student_programs_and_special_populations.csv
+      reader:
+        profiles:
+          source:
+            acquisition_ids:
+              campus: f9d312d0ae7e85e182d74c7b54175ddb11bf0b05c899e9e4defe05a41e012349
+              district: cd3e8981794bd23debd2d567894f2bf5156785ee38813fe8e3e77b09c65dd5c4
+              state: ff680708f2c71718f854d362f7a1059b600e1b9170c4bdefd3ddc416fc92d244
+            column_schema: schemas/peims--2015-2022--student-programs-and-special-populations-crosswalk.json
+    2017:
+      metadata:
+        metrics:
+          at_risk_count:
+            field: at_risk_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          bilingual_program_count:
+            field: bilingual_program_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          cte_program_count:
+            field: cte_program_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          dyslexia_identification_count:
+            field: dyslexia_identification_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          economically_disadvantaged_count:
+            field: economically_disadvantaged_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          emergent_bilingual_count:
+            field: emergent_bilingual_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          english_as_a_second_language_program_count:
+            field: english_as_a_second_language_program_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          foster_care_count:
+            field: foster_care_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          gifted_and_talented_program_count:
+            field: gifted_and_talented_program_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          homeless_count:
+            field: homeless_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          military_connected_count:
+            field: military_connected_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          special_education_program_count:
+            field: special_education_program_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          title_i_program_count:
+            field: title_i_program_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+          total_enrollment_count:
+            field: total_enrollment_count
+            period:
+              end_year: 2017
+              kind: school_year
+              start_year: 2016
+            unit: count
+        notes: October PEIMS Enrollment snapshot. Program populations can overlap. CTE in applicable historical
+          editions counts participation in state-approved courses. Separate from TPRS Membership.
+        period:
+          end_year: 2017
+          kind: school_year
+          start_year: 2016
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - 694ada659e1b4b0d9da4ac5df6de02d0a9f493834d784e37f68f1fff9ec50dc2
+          reference_id: about
+          reviewed_sha256: c3ed8f60f083cd143992d1a86e59da73ea4492b629812292e64ca3d880cee17a
+          role: source_notes
+          status: available
+          title: PEIMS Student Program and Special Populations definitions and population
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/About_StudentProgram.html
+        - provenance_ids:
+          - cacfd931455c3a0ffdde01e794cf9aa8815f7a8b8300618912d0b713b215e885
+          reference_id: peims_masking
+          reviewed_sha256: c940234fd44417fe1e1152cca18d0ee893addd70ed3fc4f7e687492d13ae4954
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS reporting masking rules
+          url: https://tea.texas.gov/data-reports/student-data/discipline-data-products/peims-reporting-masking-web-updated-020125.docx
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: Publisher PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - path: schemas/peims--2015-2022--student-programs-and-special-populations-crosswalk.json
+          provenance_ids:
+          - 9863d95073df334d574c2ccd89d7725f153c3b37721bae2a11a89e37ba5ce446
+          reference_id: column_crosswalk
+          reviewed_sha256: e99eb282b25783ee26d323841d60c6762f2c83be5f368ced992c86d61709144f
+          role: schema
+          status: available
+          title: PEIMS Student Program and Special Populations literal headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adspr.html
+        title: 2016–17 PEIMS Student Programs and Special Populations
+        value_policy: peims_student_programs_and_special_populations_2017
+        version: '2017'
+      path: data/peims/2017/peims_student_programs_and_special_populations.csv
+      reader:
+        profiles:
+          source:
+            acquisition_ids:
+              campus: df822c27f7c8cca30747a44cbe13da11a3b75fafcb3fae87fa7cef5647a95520
+              district: d3b72312aed542f930eeae10b232e277be8b195329299ad93af2c28a4085c88e
+              state: 11763e7aa8ca5fec03192ad31666e829fe67a5e4505038679b4970ffc15f3c34
+            column_schema: schemas/peims--2015-2022--student-programs-and-special-populations-crosswalk.json
+    2018:
+      metadata:
+        metrics:
+          at_risk_count:
+            field: at_risk_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          bilingual_program_count:
+            field: bilingual_program_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          cte_program_count:
+            field: cte_program_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          dyslexia_identification_count:
+            field: dyslexia_identification_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          economically_disadvantaged_count:
+            field: economically_disadvantaged_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          emergent_bilingual_count:
+            field: emergent_bilingual_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          english_as_a_second_language_program_count:
+            field: english_as_a_second_language_program_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          foster_care_count:
+            field: foster_care_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          gifted_and_talented_program_count:
+            field: gifted_and_talented_program_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          homeless_count:
+            field: homeless_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          military_connected_count:
+            field: military_connected_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          special_education_program_count:
+            field: special_education_program_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          title_i_program_count:
+            field: title_i_program_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+          total_enrollment_count:
+            field: total_enrollment_count
+            period:
+              end_year: 2018
+              kind: school_year
+              start_year: 2017
+            unit: count
+        notes: October PEIMS Enrollment snapshot. Program populations can overlap. CTE in applicable historical
+          editions counts participation in state-approved courses. Separate from TPRS Membership.
+        period:
+          end_year: 2018
+          kind: school_year
+          start_year: 2017
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - 694ada659e1b4b0d9da4ac5df6de02d0a9f493834d784e37f68f1fff9ec50dc2
+          reference_id: about
+          reviewed_sha256: c3ed8f60f083cd143992d1a86e59da73ea4492b629812292e64ca3d880cee17a
+          role: source_notes
+          status: available
+          title: PEIMS Student Program and Special Populations definitions and population
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/About_StudentProgram.html
+        - provenance_ids:
+          - cacfd931455c3a0ffdde01e794cf9aa8815f7a8b8300618912d0b713b215e885
+          reference_id: peims_masking
+          reviewed_sha256: c940234fd44417fe1e1152cca18d0ee893addd70ed3fc4f7e687492d13ae4954
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS reporting masking rules
+          url: https://tea.texas.gov/data-reports/student-data/discipline-data-products/peims-reporting-masking-web-updated-020125.docx
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: Publisher PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - path: schemas/peims--2015-2022--student-programs-and-special-populations-crosswalk.json
+          provenance_ids:
+          - 9863d95073df334d574c2ccd89d7725f153c3b37721bae2a11a89e37ba5ce446
+          reference_id: column_crosswalk
+          reviewed_sha256: e99eb282b25783ee26d323841d60c6762f2c83be5f368ced992c86d61709144f
+          role: schema
+          status: available
+          title: PEIMS Student Program and Special Populations literal headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adspr.html
+        title: 2017–18 PEIMS Student Programs and Special Populations
+        value_policy: peims_student_programs_and_special_populations_2018
+        version: '2018'
+      path: data/peims/2018/peims_student_programs_and_special_populations.csv
+      reader:
+        profiles:
+          source:
+            acquisition_ids:
+              campus: 9b3bbb8f89856b65680e44d5813f676e5a01127bbcc743eb938bf3cef977f8b6
+              district: 42d8dae16dfc855253d02c8bc4725c583624069c06fa2d1e8a5ede20581c0b11
+              state: 94822875a592fc433cdf54e02447f1bbcadffc97501ea7a6f8247839f2461f1b
+            column_schema: schemas/peims--2015-2022--student-programs-and-special-populations-crosswalk.json
+    2019:
+      metadata:
+        metrics:
+          at_risk_count:
+            field: at_risk_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          bilingual_program_count:
+            field: bilingual_program_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          cte_program_count:
+            field: cte_program_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          dyslexia_identification_count:
+            field: dyslexia_identification_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          economically_disadvantaged_count:
+            field: economically_disadvantaged_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          emergent_bilingual_count:
+            field: emergent_bilingual_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          english_as_a_second_language_program_count:
+            field: english_as_a_second_language_program_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          foster_care_count:
+            field: foster_care_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          gifted_and_talented_program_count:
+            field: gifted_and_talented_program_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          homeless_count:
+            field: homeless_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          military_connected_count:
+            field: military_connected_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          special_education_program_count:
+            field: special_education_program_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          title_i_program_count:
+            field: title_i_program_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+          total_enrollment_count:
+            field: total_enrollment_count
+            period:
+              end_year: 2019
+              kind: school_year
+              start_year: 2018
+            unit: count
+        notes: October PEIMS Enrollment snapshot. Program populations can overlap. CTE in applicable historical
+          editions counts participation in state-approved courses. Separate from TPRS Membership.
+        period:
+          end_year: 2019
+          kind: school_year
+          start_year: 2018
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - 694ada659e1b4b0d9da4ac5df6de02d0a9f493834d784e37f68f1fff9ec50dc2
+          reference_id: about
+          reviewed_sha256: c3ed8f60f083cd143992d1a86e59da73ea4492b629812292e64ca3d880cee17a
+          role: source_notes
+          status: available
+          title: PEIMS Student Program and Special Populations definitions and population
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/About_StudentProgram.html
+        - provenance_ids:
+          - cacfd931455c3a0ffdde01e794cf9aa8815f7a8b8300618912d0b713b215e885
+          reference_id: peims_masking
+          reviewed_sha256: c940234fd44417fe1e1152cca18d0ee893addd70ed3fc4f7e687492d13ae4954
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS reporting masking rules
+          url: https://tea.texas.gov/data-reports/student-data/discipline-data-products/peims-reporting-masking-web-updated-020125.docx
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: Publisher PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - path: schemas/peims--2015-2022--student-programs-and-special-populations-crosswalk.json
+          provenance_ids:
+          - 9863d95073df334d574c2ccd89d7725f153c3b37721bae2a11a89e37ba5ce446
+          reference_id: column_crosswalk
+          reviewed_sha256: e99eb282b25783ee26d323841d60c6762f2c83be5f368ced992c86d61709144f
+          role: schema
+          status: available
+          title: PEIMS Student Program and Special Populations literal headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adspr.html
+        title: 2018–19 PEIMS Student Programs and Special Populations
+        value_policy: peims_student_programs_and_special_populations_2019
+        version: '2019'
+      path: data/peims/2019/peims_student_programs_and_special_populations.csv
+      reader:
+        profiles:
+          source:
+            acquisition_ids:
+              campus: 474803d8d6156b264827c844de0c3b16a5a59d8503d44dfe57d3be352f4ac401
+              district: f8cf747d108f8880fdbba4d6eb277650f985d15cf3859f0b90e5687fb0144f08
+              state: b0a88ff6ec16cdc1589335920500e10bdca92efa66f24f04e41045e780fbcf2a
+            column_schema: schemas/peims--2015-2022--student-programs-and-special-populations-crosswalk.json
+    2020:
+      metadata:
+        metrics:
+          at_risk_count:
+            field: at_risk_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          bilingual_program_count:
+            field: bilingual_program_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          cte_program_count:
+            field: cte_program_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          dyslexia_identification_count:
+            field: dyslexia_identification_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          economically_disadvantaged_count:
+            field: economically_disadvantaged_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          emergent_bilingual_count:
+            field: emergent_bilingual_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          english_as_a_second_language_program_count:
+            field: english_as_a_second_language_program_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          foster_care_count:
+            field: foster_care_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          gifted_and_talented_program_count:
+            field: gifted_and_talented_program_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          homeless_count:
+            field: homeless_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          military_connected_count:
+            field: military_connected_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          special_education_program_count:
+            field: special_education_program_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          title_i_program_count:
+            field: title_i_program_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+          total_enrollment_count:
+            field: total_enrollment_count
+            period:
+              end_year: 2020
+              kind: school_year
+              start_year: 2019
+            unit: count
+        notes: October PEIMS Enrollment snapshot. Program populations can overlap. CTE in applicable historical
+          editions counts participation in state-approved courses. Separate from TPRS Membership.
+        period:
+          end_year: 2020
+          kind: school_year
+          start_year: 2019
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - 694ada659e1b4b0d9da4ac5df6de02d0a9f493834d784e37f68f1fff9ec50dc2
+          reference_id: about
+          reviewed_sha256: c3ed8f60f083cd143992d1a86e59da73ea4492b629812292e64ca3d880cee17a
+          role: source_notes
+          status: available
+          title: PEIMS Student Program and Special Populations definitions and population
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/About_StudentProgram.html
+        - provenance_ids:
+          - cacfd931455c3a0ffdde01e794cf9aa8815f7a8b8300618912d0b713b215e885
+          reference_id: peims_masking
+          reviewed_sha256: c940234fd44417fe1e1152cca18d0ee893addd70ed3fc4f7e687492d13ae4954
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS reporting masking rules
+          url: https://tea.texas.gov/data-reports/student-data/discipline-data-products/peims-reporting-masking-web-updated-020125.docx
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: Publisher PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - path: schemas/peims--2015-2022--student-programs-and-special-populations-crosswalk.json
+          provenance_ids:
+          - 9863d95073df334d574c2ccd89d7725f153c3b37721bae2a11a89e37ba5ce446
+          reference_id: column_crosswalk
+          reviewed_sha256: e99eb282b25783ee26d323841d60c6762f2c83be5f368ced992c86d61709144f
+          role: schema
+          status: available
+          title: PEIMS Student Program and Special Populations literal headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adspr.html
+        title: 2019–20 PEIMS Student Programs and Special Populations
+        value_policy: peims_student_programs_and_special_populations_2020
+        version: '2020'
+      path: data/peims/2020/peims_student_programs_and_special_populations.csv
+      reader:
+        profiles:
+          source:
+            acquisition_ids:
+              campus: adc87c34c90c90f0f64257dbf0c96329e469ed30973c192d7042c1c82e6d4797
+              district: 349ac59839e8a4229d484c85ab48308b88e06486d1f14f096939000c4f7c3759
+              state: 1f35e884b354b5d8836a7d1eab89e06733e92750dd63950d5977ada82da26137
+            column_schema: schemas/peims--2015-2022--student-programs-and-special-populations-crosswalk.json
+    2021:
+      metadata:
+        metrics:
+          at_risk_count:
+            field: at_risk_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          bilingual_program_count:
+            field: bilingual_program_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          dyslexia_identification_count:
+            field: dyslexia_identification_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          economically_disadvantaged_count:
+            field: economically_disadvantaged_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          emergent_bilingual_count:
+            field: emergent_bilingual_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          english_as_a_second_language_program_count:
+            field: english_as_a_second_language_program_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          foster_care_count:
+            field: foster_care_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          gifted_and_talented_program_count:
+            field: gifted_and_talented_program_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          homeless_count:
+            field: homeless_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          military_connected_count:
+            field: military_connected_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          special_education_program_count:
+            field: special_education_program_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          title_i_program_count:
+            field: title_i_program_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+          total_enrollment_count:
+            field: total_enrollment_count
+            period:
+              end_year: 2021
+              kind: school_year
+              start_year: 2020
+            unit: count
+        notes: October PEIMS Enrollment snapshot. Program populations can overlap. CTE in applicable historical
+          editions counts participation in state-approved courses. Separate from TPRS Membership.
+        period:
+          end_year: 2021
+          kind: school_year
+          start_year: 2020
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - 694ada659e1b4b0d9da4ac5df6de02d0a9f493834d784e37f68f1fff9ec50dc2
+          reference_id: about
+          reviewed_sha256: c3ed8f60f083cd143992d1a86e59da73ea4492b629812292e64ca3d880cee17a
+          role: source_notes
+          status: available
+          title: PEIMS Student Program and Special Populations definitions and population
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/About_StudentProgram.html
+        - provenance_ids:
+          - cacfd931455c3a0ffdde01e794cf9aa8815f7a8b8300618912d0b713b215e885
+          reference_id: peims_masking
+          reviewed_sha256: c940234fd44417fe1e1152cca18d0ee893addd70ed3fc4f7e687492d13ae4954
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS reporting masking rules
+          url: https://tea.texas.gov/data-reports/student-data/discipline-data-products/peims-reporting-masking-web-updated-020125.docx
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: Publisher PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - path: schemas/peims--2015-2022--student-programs-and-special-populations-crosswalk.json
+          provenance_ids:
+          - 9863d95073df334d574c2ccd89d7725f153c3b37721bae2a11a89e37ba5ce446
+          reference_id: column_crosswalk
+          reviewed_sha256: e99eb282b25783ee26d323841d60c6762f2c83be5f368ced992c86d61709144f
+          role: schema
+          status: available
+          title: PEIMS Student Program and Special Populations literal headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adspr.html
+        title: 2020–21 PEIMS Student Programs and Special Populations
+        value_policy: peims_student_programs_and_special_populations_2021
+        version: '2021'
+      path: data/peims/2021/peims_student_programs_and_special_populations.csv
+      reader:
+        profiles:
+          source:
+            acquisition_ids:
+              campus: 6d6c2fb3d54c5c23790506f31dd29e3cc9b2088bef7b9b880ba2d6c9b1ae7458
+              district: 678562e100d804e5780efee9b2a872e723ded1136e0e4303a2ee2282740f5e26
+              state: 6fdb46e846b51aa8f15fcc1d0ab13885dc934f15f25d5447c9aa807315dc2b3c
+            column_schema: schemas/peims--2015-2022--student-programs-and-special-populations-crosswalk.json
+    2022:
+      metadata:
+        metrics:
+          at_risk_count:
+            field: at_risk_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          bilingual_program_count:
+            field: bilingual_program_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          dyslexia_identification_count:
+            field: dyslexia_identification_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          economically_disadvantaged_count:
+            field: economically_disadvantaged_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          emergent_bilingual_count:
+            field: emergent_bilingual_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          english_as_a_second_language_program_count:
+            field: english_as_a_second_language_program_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          foster_care_count:
+            field: foster_care_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          gifted_and_talented_program_count:
+            field: gifted_and_talented_program_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          homeless_count:
+            field: homeless_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          military_connected_count:
+            field: military_connected_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          section_504_count:
+            field: section_504_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          special_education_program_count:
+            field: special_education_program_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          title_i_program_count:
+            field: title_i_program_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+          total_enrollment_count:
+            field: total_enrollment_count
+            period:
+              end_year: 2022
+              kind: school_year
+              start_year: 2021
+            unit: count
+        notes: October PEIMS Enrollment snapshot. Program populations can overlap. CTE in applicable historical
+          editions counts participation in state-approved courses. Separate from TPRS Membership.
+        period:
+          end_year: 2022
+          kind: school_year
+          start_year: 2021
+        publisher: Texas Education Agency
+        references:
+        - provenance_ids:
+          - 694ada659e1b4b0d9da4ac5df6de02d0a9f493834d784e37f68f1fff9ec50dc2
+          reference_id: about
+          reviewed_sha256: c3ed8f60f083cd143992d1a86e59da73ea4492b629812292e64ca3d880cee17a
+          role: source_notes
+          status: available
+          title: PEIMS Student Program and Special Populations definitions and population
+          url: https://rptsvr1.tea.texas.gov/adhocrpt/Standard_Reports/About/About_StudentProgram.html
+        - provenance_ids:
+          - cacfd931455c3a0ffdde01e794cf9aa8815f7a8b8300618912d0b713b215e885
+          reference_id: peims_masking
+          reviewed_sha256: c940234fd44417fe1e1152cca18d0ee893addd70ed3fc4f7e687492d13ae4954
+          role: masking_methodology
+          status: available
+          title: TEA PEIMS reporting masking rules
+          url: https://tea.texas.gov/data-reports/student-data/discipline-data-products/peims-reporting-masking-web-updated-020125.docx
+        - provenance_ids:
+          - 7b29fca472e587b6a2c9093431f11fdaf979d54a5f47e255fabb13cad37e8356
+          reference_id: release_listing
+          reviewed_sha256: 3d9cbc1d6e48344781b655bc0a73f5a821fbdc71d44f4eb32037ef173b2de4c7
+          role: source_notes
+          status: available
+          title: Publisher PEIMS Standard Reports dates
+          url: https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports
+        - path: schemas/peims--2015-2022--student-programs-and-special-populations-crosswalk.json
+          provenance_ids:
+          - 9863d95073df334d574c2ccd89d7725f153c3b37721bae2a11a89e37ba5ce446
+          reference_id: column_crosswalk
+          reviewed_sha256: e99eb282b25783ee26d323841d60c6762f2c83be5f368ced992c86d61709144f
+          role: schema
+          status: available
+          title: PEIMS Student Program and Special Populations literal headers and physical framing
+        source_url: https://rptsvr1.tea.texas.gov/adhocrpt/adspr.html
+        title: 2021–22 PEIMS Student Programs and Special Populations
+        value_policy: peims_student_programs_and_special_populations_2022
+        version: '2022'
+      path: data/peims/2022/peims_student_programs_and_special_populations.csv
+      reader:
+        profiles:
+          source:
+            acquisition_ids:
+              campus: 210703e96a442ff9a6a5a5bc73a4ecaa74ab1a4909269825ffc12858b6c40f0a
+              district: 984ca39e737a962e581fa100851dd24794a3af60cb009de4b782e90fa3aa410e
+              state: 5d39a8df39c40e4699a7dea1eb0339f8d448c4e5fe846fa4047eb1c3fe097fcd
+            column_schema: schemas/peims--2015-2022--student-programs-and-special-populations-crosswalk.json
     2023:
       metadata:
         metrics: &hist_program_001
@@ -24199,6 +28247,8 @@ schema:
     peims_staff_fte_and_salary:
     - csv
     peims_special_education_by_primary_disability:
+    - csv
+    peims_primary_disability_geography:
     - csv
     peims_student_enrollment_by_ethnicity:
     - csv

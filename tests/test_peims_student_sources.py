@@ -6,7 +6,7 @@ import pytest
 
 from teadata.column_schema import crosswalk_dataset, parse_column_schema, reader_options, table_input_sha256s
 from teadata.manifest import ContractError
-from teadata.peims_leaves import PRIMARY_DISABILITY
+from teadata.peims_leaves import PRIMARY_DISABILITY, PRIMARY_DISABILITY_GEOGRAPHY, _geography_acquisition
 from teadata.provenance import ProvenanceStore, validate_record_graph, validate_reference_records
 from teadata.teadata_config import load_config
 from teadata.values import ValueStatus, measure
@@ -53,7 +53,7 @@ def test_source_discovery_is_exact_and_excluded_from_retained_builds(
         assert cfg.is_source_only(dataset, year)
     assert not cfg.is_source_only("accountability", 2025)
     with pytest.raises(KeyError):
-        cfg.resolve_dataset(dataset, 2018, exact=True)
+        cfg.resolve_dataset(dataset, 2014, exact=True)
     with pytest.raises(ContractError, match="Reader profile is required"):
         cfg.load_df(dataset, 2026, exact=True)
     with pytest.raises(ContractError, match="requires a dedicated preparation workflow"):
@@ -131,8 +131,7 @@ def test_historical_peims_bind_each_scope_and_preserve_literal_headers(dataset, 
             label = 'EMERGENT BILINGUAL/ENGLISH LEARNER' if year < 2025 else 'EMERGENT BILINGUAL'
             assert [f['code'] for f in table['fields'] if f['field'] == 'emergent_bilingual_count'] == [label]
         elif year < 2023:
-            with pytest.raises(KeyError):
-                cfg.resolve_dataset(PROGRAMS, year, exact=True, reader_profile='source')
+            assert cfg.resolve_dataset(PROGRAMS, year, exact=True, reader_profile='source').metadata.version == str(year)
             scope = table['table']
             controls = dict(record['parameters']['form_controls'])
             assert record['parameters']['http_method'] == 'GET'
@@ -141,6 +140,29 @@ def test_historical_peims_bind_each_scope_and_preserve_literal_headers(dataset, 
             if year == 2020 and scope != 'state':
                 other = 'CHARTER STATUS' if scope == 'district' else 'GRADE GROUP NAME'
                 assert [field['code'] for field in table['fields'][-3:]] == ['ETHNICITY', other, 'ENROLLMENT']
+
+
+def test_historical_programs_discover_year_specific_counts():
+    cfg = load_config()
+    assert cfg.data_sources[PROGRAMS].available_years() == list(range(2015, 2027))
+    first = cfg.resolve_dataset(PROGRAMS, 2015, exact=True, reader_profile="source").metadata
+    last = cfg.resolve_dataset(PROGRAMS, 2022, exact=True, reader_profile="source").metadata
+    assert "cte_program_count" in first.metrics and "cte_program_count" not in last.metrics
+    assert "section_504_count" in last.metrics and "section_504_count" not in first.metrics
+    assert first.period.label == "2014-2015"
+    assert cfg.value_policies[first.value_policy].tokens["-9999999"].status is ValueStatus.SUPPRESSED
+
+
+def test_disability_geography_receipt_does_not_cross_scope_or_year():
+    cfg = load_config()
+    target = cfg.resolve_dataset(PRIMARY_DISABILITY_GEOGRAPHY, 2026, exact=True, reader_profile="source")
+    receipts = reader_options(target.reader, "source")["acquisition_ids"]
+    assert set(receipts) == {"county_region", "region"}
+    provenance = ProvenanceStore(Path(__file__).resolve().parents[1] / "provenance")
+    county = provenance.read_record(receipts["county_region"])
+    assert _geography_acquisition(county, 2026, "county_region")
+    assert not _geography_acquisition(county, 2025, "county_region")
+    assert not _geography_acquisition(county, 2026, "region")
 
 
 @pytest.mark.parametrize(("year", "district_rows"), [(2023, 1209), (2024, 1206), (2025, 1206), (2026, 1201)])

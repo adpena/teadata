@@ -7,7 +7,17 @@ A build records the files it actually reads. The runtime catalog is embedded in 
 <a id="current-normal-release-00163"></a>
 <a id="current-normal-release-00164"></a>
 
-## Current normal data release 0.0.183
+## Current normal data release 0.0.184
+
+The [pinned release](https://github.com/adpena/teadata/releases/download/v0.0.184/release.json)
+adds 2014–15 through 2021–22 PEIMS Student Programs at Texas, district and
+campus scope, and 2012–13 through 2025–26 primary disability counts at ESC
+and county-by-ESC scope. All 39 earlier attachments and the entity core
+retain their identities. The inspection covered 1,985,368 original cells
+and 52,239 separate HTML report values. See the
+[scope, masking and classification notes](source-coverage.md#accountability-assessment-readiness-and-special-education).
+
+## Prior normal data release 0.0.183
 
 The [pinned release](https://github.com/adpena/teadata/releases/download/v0.0.183/release.json)
 adds 2023–24 TAPR STAAR All Grades at campus, district, ESC region and direct
