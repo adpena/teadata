@@ -870,9 +870,9 @@ both scopes. For example, use
 `staar_performance_all_subjects_all_students_percent_at_meets_gl_standard_or_above`
 with the All Grades editions. These bindings cover the named report groups
 within the STAAR accountability subset. SAT/ACT and the all-tested reports
-are separate populations. The published
-[All Grades (v0.0.133)](https://github.com/adpena/teadata/releases/tag/v0.0.133)
-manifest contains all four 2025–26 scopes. The
+are separate populations. The
+[normal release (v0.0.182)](https://github.com/adpena/teadata/releases/tag/v0.0.182)
+includes all four All Grades scopes in both school years. The standalone
 [End-of-Course (v0.0.132)](https://github.com/adpena/teadata/releases/tag/v0.0.132)
 manifest contains all four scopes for each of the three source editions.
 

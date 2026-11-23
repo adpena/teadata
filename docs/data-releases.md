@@ -7,7 +7,15 @@ A build records the files it actually reads. The runtime catalog is embedded in 
 <a id="current-normal-release-00163"></a>
 <a id="current-normal-release-00164"></a>
 
-## Current normal data release 0.0.178
+## Current normal data release 0.0.182
+
+The [pinned release](https://github.com/adpena/teadata/releases/download/v0.0.182/release.json)
+adds 2025–26 TPRS CTE Membership for 1,202 districts and the direct Texas
+report. It also adds 2024–25 TAPR STAAR All Grades for campus, district, ESC
+region and direct Texas. The entity core and all 36 earlier native attachments
+retain their identities. See the [source coverage and limits](source-coverage.md#accountability-assessment-readiness-and-special-education).
+
+## Prior normal release 0.0.178
 
 The [pinned data release](https://github.com/adpena/teadata/releases/download/v0.0.178/release.json)
 extends PEIMS Teacher FTE and Course Enrollment to 2012–13 for districts and
@@ -551,7 +559,7 @@ and review the year, population, and disclosure rules before interpreting a
 raw value. The tested-grade manifests can be used for the separately reviewed
 [Texas comparison selectors](querying.md#compare-a-published-measure-with-texas).
 
-The native admission gate also checks the exact published 2025–26 All Grades
+The native admission gate also checks the exact published 2024–25 and 2025–26 All Grades
 and 2023–24 through 2025–26 End-of-Course manifests. Each edition includes
 campus, district, ESC region, and the direct Texas report. In addition to raw
 and restored-header CSV comparisons, the gate compares 210 published rates

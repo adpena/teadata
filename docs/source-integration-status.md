@@ -1,17 +1,17 @@
 # Source integration status
 
-The packaged selector identifies **normal data release 0.0.178**. This is a
+The packaged selector identifies **normal data release 0.0.182**. This is a
 frozen analysis release. Software publication and application deployment are
 separate gates. Historical requests keep their pins.
-The [machine inventory](source-integration-status-0.0.178.json), generated from
-the composed 0.0.178 manifest and current source configuration on November 21,
+The [machine inventory](source-integration-status-0.0.182.json), generated from
+the composed 0.0.182 manifest and current source configuration on November 23,
 2026, records
 127 registered IDs, 295 configured editions,
-13 base inputs and 36 native attachments covering 43 dataset IDs and
-381 edition/scope keys. Registration, acquisition, qualification and query
+13 base inputs and 38 native attachments covering 44 dataset IDs and
+387 edition/scope keys. Registration, acquisition, qualification and query
 access are separate statuses.
 
-- Manifest: `f2c562ef05ccdce555eb66093490268275a7210f7705b98da96071ddc7b6dcc2`.
+- Manifest: `fe0fc848627319ce4f8149fed8ef2c4baab65308c0d00aaf6c3a0014f191bdbc`.
 - Entity core manifest: `2a19e22760af8da443af29a38d01d7d9c13f65095fd739e78bb7a0a1dc345f1b`.
 - Build: `31038e45f324b824e1d7f27dee4e1c6e001d5d770013bd710c1e9eda7ca0d368`.
 - Processing record: `270ef47f9e8f3a2d7ce5057ae7c8c73061c4db88123cb64f47b2522cb7cb43bc`.
@@ -36,9 +36,17 @@ publisher rows. The corresponding district editions remain outside coverage
 while undetermined publisher dot tokens are investigated.
 See the [staff source notes](peims-staff.md).
 
+## TPRS CTE Membership
+
+The two 2025–26 editions cover 1,202 districts and the direct Texas report.
+The all-grade and grades 9–12 measures preserve separate denominators,
+original report cells and rate statuses. The 97 district grades 9–12 rates
+with zero denominators report `not_applicable`. See the
+[coverage and district query example](source-coverage.md#accountability-assessment-readiness-and-special-education).
+
 ## STAAR publisher assessment rates
 
-The normal release includes 2025–26 All Grades and 2023–24 through 2025–26
+The normal release includes 2024–25 and 2025–26 All Grades and 2023–24 through 2025–26
 End-of-Course at campus, district, ESC region and direct Texas scopes.
 Statewide comparison uses the reviewed accountability-subset rates and
 matches the same report year. Independent named records were reconciled
