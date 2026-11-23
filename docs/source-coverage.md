@@ -176,19 +176,36 @@ programs of study and course participation are separate sources.
 Recent acquisitions awaiting field-level qualification include:
 
 - District and campus accountability CCMR files for the eight available
-  rating editions from 2018 through 2026. All 21,102 fully observed all-student annual
-  graduate rates match the publisher's displayed rounding. The 2026 archive
-  also contains all 30 offered category/scope files. TEA offers four of the
-  categories at campus scope only.
-- Historical All Grades STAAR files for 2012–13 through 2022–23 at each of
-  the four scopes for editions with spring testing. These earlier editions
-  still require field qualification.
-- The 2020–21 through 2024–25 CTE Status and Programs of Study workbooks and
-  industry certification workbooks for graduating classes 2017–24. Retained
-  workbook sheet names establish district, region and direct Texas scope.
-- The 28 primary-disability bulk exports for county and ESC region, two per
-  school year from 2012–13 through 2025–26. The formats include publisher
-  explanatory rows. County observations are keyed by county and ESC together. File record counts are not counts of reporting geographies.
+  rating editions from 2018 through 2026. The arithmetic replay matched
+  21,102 triplets with observed integer numerators and positive denominators.
+  The 2019 bulk files also contain fractional CCMR credit. Keep the exact
+  decimal points, annual graduate denominator and separately published rate.
+  Some HTML displays round the credit to a whole number. In 2018 use the
+  State PDF for the direct Texas observation. The all-student counts,
+  credits and published rates reconcile for a named campus and district.
+  The 2026 archive contains
+  all 30 offered category and scope files, including four campus-only
+  categories. [2019 accountability manual](https://legacycms.tea.texas.gov/system/files/Adopted%202019%20Accountability%20Manual_final.pdf) · [2018 State report](https://rptsvr1.tea.texas.gov/perfreport/account/2018/state.pdf#page=3)
+- Historical All Grades STAAR files for 2012–13 through 2022–23 at all
+  four scopes for editions with spring testing. Across 16 named reports
+  for 2018–19 and 2020–21 through 2022–23, 3,360 selected rates and statuses
+  reconciled, including 54 literal CSV dots that display as unavailable.
+  Another 72 headline rates from 24 archival PDFs matched for 2012–13
+  through 2017–18. In 2013–14 through 2016–17, the middle threshold's
+  headline aggregate covers students tested in two or more subjects.
+  In 2014–15 the statewide TAPR PDF and bulk CSV agree at 77% for the first
+  All Subjects threshold, while the alternate TPRS report displays 74%.
+  Keep these release identities and population differences separate.
+  [TAPR archive](https://rptsvr1.tea.texas.gov/perfreport/tapr/index.html)
+- The 2020–21 through 2024–25 CTE Status and Programs of Study workbooks
+  and industry certification workbooks for graduating classes 2017–24.
+  The 18 books contain 236,549 Texas, ESC and district rows. Within these
+  books, 630 state totals equal the sum of all 20 explicitly observed
+  ESC counts. Other cases include masks or absent rows, and published
+  completion rates are not additive. The separate annual certifications
+  collection has nine retained workbooks through 2025–26, including
+  combined editions. Keep that publication separate from the graduate
+  cohorts. [TEA CTE Reports](https://tea.texas.gov/student-readiness-and-high-school/college-career-and-military-prep/career-and-technical-education/cte-reports)
 
 The retained acquisition records bind the download URLs or form controls,
 retrieval time and payload hash. The new acquisitions do not extend the
