@@ -1211,6 +1211,15 @@ def _native_review(release: DataRelease, store: ProvenanceStore) -> _NativeRevie
         return _NativeReview(archive["name"], partial(qualify_tabular_archive, release, store),
                              partial(_native_record_evidence, release, store, store, archive_publisher_roots(archive)))
 
+    from teadata.native_state_ccmr import qualify_state_ccmr, state_ccmr_reference
+
+    state_ccmr = state_ccmr_reference()
+    if release.manifest_sha256 == state_ccmr.get("manifest_sha256"):
+        processing_store = _retained_store(release.path.parent / "provenance")
+        roots = [row["source_receipt"] for row in state_ccmr["reports"]] + [state_ccmr["method_2018"]["receipt"]]
+        return _NativeReview("Direct Texas accountability CCMR", partial(qualify_state_ccmr, release, processing_store, store),
+                             partial(_native_record_evidence, release, processing_store, store, roots))
+
     from teadata.native_cte_workbooks import cte_workbook_qualifications, qualify_cte_workbook
 
     workbook = cte_workbook_qualifications().get(release.manifest_sha256)

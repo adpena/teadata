@@ -177,7 +177,14 @@ programs of study and course participation are separate sources.
 
 - **STAAR.** The historical STAAR2 files retain every original field and
   publisher token. Selected rates matched 16 named HTML reports and 24
-  archival PDFs. The historical middle standard for 2013–14 through
+  archival PDFs. An additional End-of-Course replay matched 3,360 rate
+  cells for 2018–19 and 2020–21 through 2022–23 across Texas, Region 13,
+  Austin ISD and Austin High School. It checked five courses, three
+  performance standards and 14 student groups in each report. These
+  cells are already present under their original STAAR2 field codes.
+  The replay covers one named report per scope and edition. The standard
+  End-of-Course view starts in 2023–24. The historical middle standard for
+  2013–14 through
   2016–17 uses students tested in two or more subjects. The 2014–15 Texas
   TAPR PDF and bulk file match at 77% on the first All Subjects threshold.
   The alternate TPRS report gives 74% under its own report identity.
@@ -194,6 +201,17 @@ programs of study and course participation are separate sources.
   [2026 data downloads](https://rptsvr1.tea.texas.gov/perfreport/account/acct_download.html?year=2026) ·
   [2019 accountability manual](https://legacycms.tea.texas.gov/system/files/Adopted%202019%20Accountability%20Manual_final.pdf) ·
   [2018 State report](https://rptsvr1.tea.texas.gov/perfreport/account/2018/state.pdf#page=3)
+- **Direct Texas CCMR candidate.** The `state_accountability_ccmr` attachment
+  covers rating editions 2018, 2019 and 2021–26 at `scope="state"`. Select
+  the year the annual graduates finished school, one year before the
+  rating edition. The 2020 rating edition is absent. The fields are
+  `annual_graduates`, `ccmr_credit_displayed` and `ccmr_percent_reported`.
+  Credit keeps the publisher's displayed precision, including 181,168.5
+  in the 2018 edition. Percent is the published value. These fields carry
+  no guarantee of comparability across accountability rules. The candidate
+  has been checked through the normal catalog, Arrow, CSV with provenance,
+  and Excel. The packaged default remains 0.0.185 until release.
+  [2018 Accountability Manual, Chapter 2](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/chapter-2-student-achievement-domain.pdf)
 - **CTE.** The workbook attachments retain the source text, raw numeric
   tokens and physical worksheet row. Some Status and Programs of Study
   sheets contain several literal school years. Those editions remain

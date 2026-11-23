@@ -1,0 +1,106 @@
+{
+  "reports": [
+    {
+      "geography": "Texas",
+      "rating_edition": 2018,
+      "annual_graduates_year_end": 2017,
+      "direct_report": "https://rptsvr1.tea.texas.gov/perfreport/account/2018/state.pdf",
+      "downloaded_at": "2026-11-23T21:27:22.596832+00:00",
+      "source_receipt": "549af230e25c945a95314ca0b7cae6c8a8945e3a80c91e56a3120b0113b14a0b",
+      "source_sha256": "edb7e77d65135a928cf0dcba6465de7c86b4a3995f650c11c7cd1fe47313eac0",
+      "total_graduates_display": "334,424",
+      "ccmr_credit_display": "181,168.5",
+      "rate_display": "54%"
+    },
+    {
+      "geography": "Texas",
+      "rating_edition": 2019,
+      "annual_graduates_year_end": 2018,
+      "direct_report": "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2019&id=S&lev=S&prgopt=reports%2Facct%2Fdomain1b.sas",
+      "downloaded_at": "2026-11-23T20:58:05.564338+00:00",
+      "source_receipt": "b256ddfb14e17fb4acb93cc3d9440b2ff2f0763b6bd9418726b49c9877d044f9",
+      "source_sha256": "3911a449e1b2653e99c797414f36adc55e419a3a577acf5091780b65d4877ca7",
+      "total_graduates_display": "347,893",
+      "ccmr_credit_display": "227,723",
+      "rate_display": "65%"
+    },
+    {
+      "geography": "Texas",
+      "rating_edition": 2021,
+      "annual_graduates_year_end": 2020,
+      "direct_report": "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2021&id=S&lev=S&prgopt=reports%2Facct%2Fdomain1b.sas",
+      "downloaded_at": "2026-11-23T20:58:04.700604+00:00",
+      "source_receipt": "a2b7d6801a827fc3bdbdb3fa5791fefaf2cc0c927f786d84d54fe55330e15698",
+      "source_sha256": "d07c9c53fb65d7e82d0f0b9d012a72093c335bdb095f345d0c1ca0a8a36a0084",
+      "total_graduates_display": "359,334",
+      "ccmr_credit_display": "226,978",
+      "rate_display": "63%"
+    },
+    {
+      "geography": "Texas",
+      "rating_edition": 2022,
+      "annual_graduates_year_end": 2021,
+      "direct_report": "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2022&id=S&lev=S&prgopt=reports%2Facct%2Fdomain1b.sas",
+      "downloaded_at": "2026-11-23T20:58:04.221854+00:00",
+      "source_receipt": "f08d4b638f9f9fdb968927fa226ae0c754ca31dfd5d973a6e165ad71bf4f5362",
+      "source_sha256": "2176d6c0545bbb25967869a3803f8bb4e9c606df5b7773e881e0e34405d8af46",
+      "total_graduates_display": "357,942",
+      "ccmr_credit_display": "233,727",
+      "rate_display": "65%"
+    },
+    {
+      "geography": "Texas",
+      "rating_edition": 2023,
+      "annual_graduates_year_end": 2022,
+      "direct_report": "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2023&id=S&lev=S&prgopt=reports%2Facct%2Fdomain1b.sas",
+      "downloaded_at": "2026-11-23T20:58:03.380135+00:00",
+      "source_receipt": "93df2b978b2443293d13d9d87a931891d52e56d82d74ca1268489b4d2481bb35",
+      "source_sha256": "400d7648a28292d775905342a6506fc0178282e04ae5436d1a60d43816596ea8",
+      "total_graduates_display": "367,802",
+      "ccmr_credit_display": "254,460",
+      "rate_display": "69%"
+    },
+    {
+      "geography": "Texas",
+      "rating_edition": 2024,
+      "annual_graduates_year_end": 2023,
+      "direct_report": "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2024&id=S&lev=S&prgopt=reports%2Facct%2Fdomain1b.sas",
+      "downloaded_at": "2026-11-23T20:58:02.923660+00:00",
+      "source_receipt": "264ec6d12044db5fa68719c7a77d381ad9dd99dbc10d36eef5c830a0d5d7f4e8",
+      "source_sha256": "78d8a2773bca4f6537c7e0511c6019326ef69bbfd76c178ed3d48ff866c4efb7",
+      "total_graduates_display": "376,638",
+      "ccmr_credit_display": "286,874",
+      "rate_display": "76%"
+    },
+    {
+      "geography": "Texas",
+      "rating_edition": 2025,
+      "annual_graduates_year_end": 2024,
+      "direct_report": "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2025&id=S&lev=S&prgopt=reports%2Facct%2Fdomain1b.sas",
+      "downloaded_at": "2026-11-23T20:58:02.084082+00:00",
+      "source_receipt": "b9ac79148ac70a1d67363c36fc991dd2fcfcc19b95ac6a09cf7d8e6629180030",
+      "source_sha256": "d29ecb8f8655fbd7651b700cd9ef96c276196c003dd04ef4991cb63a4c52bd1a",
+      "total_graduates_display": "381,299",
+      "ccmr_credit_display": "312,239",
+      "rate_display": "82%"
+    },
+    {
+      "geography": "Texas",
+      "rating_edition": 2026,
+      "annual_graduates_year_end": 2025,
+      "direct_report": "https://rptsvr1.tea.texas.gov/cgi/sas/broker?_service=marykay&_program=perfrept.perfmast.sas&_debug=0&ccyy=2026&id=S&lev=S&prgopt=reports%2Facct%2Fdomain1b.sas",
+      "downloaded_at": "2026-11-04T08:46:39.813393+00:00",
+      "source_receipt": "63cb1c9c33dcfb5962f88cc6e5d7427c8bc41cc898a1b94be4ca2c39c0d0b799",
+      "source_sha256": "36e09c67dc90a5984e32a7674c56a9b571643b8f49d4755ab6f223c5e384266b",
+      "total_graduates_display": "399,621",
+      "ccmr_credit_display": "347,012",
+      "rate_display": "87%"
+    }
+  ],
+  "method_2018": {
+    "receipt": "ddb82cd3a8c91f8c343cc90894ccc1bc0de838b11f30fdcd5fd779eb44f03f30",
+    "sha256": "07083d99e94da4eec232c2eddfed181184cc91e3e40dcb30b88cc9b9b40e7871",
+    "url": "https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/chapter-2-student-achievement-domain.pdf"
+  },
+  "manifest_sha256": "f9d3d488c1e9176d24b3c95da4909fd57cfcd71e0c491ae4c9fdad4292b36f47"
+}
