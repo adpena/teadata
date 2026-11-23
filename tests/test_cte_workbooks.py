@@ -35,7 +35,8 @@ def test_cte_workbook_keeps_compound_keys_raw_ids_zero_masks_and_blank(tmp_path)
     assert support["fields"] == {"district_number": {"raw": "raw_district_number"}}
 
 
-def test_excel_retains_literal_empty_text_as_distinct_from_missing_cell():
+@pytest.mark.parametrize("preserve", [False, True])
+def test_excel_can_retain_literal_empty_text_as_distinct_from_missing_cell(preserve):
     class Provenance:
         def _append_sheet(self, workbook, *, rows=None):
             workbook.create_sheet("Provenance")
@@ -45,10 +46,10 @@ def test_excel_retains_literal_empty_text_as_distinct_from_missing_cell():
 
     payload = BytesIO()
     _write_excel_rows(Provenance(), (("Missing", "Empty", "Zero"),), 3, 1,
-                      iter([(None, "", "0")]), payload)
+                      iter([(None, "", "0")]), payload, preserve_empty_text=preserve)
     payload.seek(0)
     book = load_workbook(payload, read_only=True)
     try:
-        assert list(book["Data"].values) == [("Missing", "Empty", "Zero"), (None, "", "0")]
+        assert list(book["Data"].values) == [("Missing", "Empty", "Zero"), (None, "" if preserve else None, "0")]
     finally:
         book.close()

@@ -1353,12 +1353,13 @@ def write_excel(table: _StreamingExport, path_or_buf: str | Path | BinaryIO) -> 
             for batch in batches:
                 yield from zip(*(column.to_pylist() for column in batch.columns), strict=True)
 
-    _write_excel_rows(table.provenance(), table.headers, len(table.schema), table.rows_hint, data_rows(), path_or_buf)
+    _write_excel_rows(table.provenance(), table.headers, len(table.schema), table.rows_hint, data_rows(), path_or_buf,
+                      preserve_empty_text=isinstance(table, _TableExport) and table.nullable_original)
 
 
 def _write_excel_rows(provenance: _WriterProvenance, headers: tuple[tuple[str, ...], ...], width: int,
                       rows_hint: int | None, data_rows: Iterator[Sequence[Any]],
-                      path_or_buf: str | Path | BinaryIO) -> None:
+                      path_or_buf: str | Path | BinaryIO, *, preserve_empty_text: bool = False) -> None:
     from openpyxl.cell import WriteOnlyCell
     from openpyxl.cell.rich_text import CellRichText
 
@@ -1383,7 +1384,9 @@ def _write_excel_rows(provenance: _WriterProvenance, headers: tuple[tuple[str, .
                         raise ValueError(f"{error}. Use CSV for this table.") from error
                     # A plain empty string is serialized as an unvalued cell.
                     # An empty inline text run retains the publisher's string.
-                    cell = WriteOnlyCell(sheet, value=CellRichText([""]) if value == "" else value)
+                    if preserve_empty_text and value == "":
+                        value = CellRichText([""])
+                    cell = WriteOnlyCell(sheet, value=value)
                     cell.data_type = "s"
                     yield cell
                 else:
