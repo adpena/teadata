@@ -1,0 +1,142 @@
+{
+  "manifest_sha256": "791199c0b64f36de8f29bd022afcedf80f97f097b34803e62c8121bd9f2bb21a",
+  "report_ledger_sha256": "2fe69171e35c62e20f6eeb19b7fdd332d1dcfc5db0996eeb4fefeb7276a4b7ac",
+  "state_parent": "43078bf15845f5262cefa762577d4f8b00cfbe8505e72a45236ac6fccc36c8db",
+  "pilot_districts": [
+    "001902",
+    "002901",
+    "004901",
+    "005901",
+    "006902",
+    "007901",
+    "008901",
+    "009901",
+    "011901",
+    "014803",
+    "019901",
+    "020901",
+    "025901",
+    "029901",
+    "030901",
+    "031901",
+    "036901",
+    "043801",
+    "049901",
+    "057829",
+    "071801",
+    "105906",
+    "227824",
+    "227901"
+  ],
+  "rosters": {
+    "01": {
+      "final": "9dbc83d4515d4048657bc01911f87b1583c7fd209b827156a7e53116cb557c4e",
+      "previous": "6fe7d86ec8de593dee3139908db5dc5710b4de83edc3060b313dd71de46aa3e2"
+    },
+    "02": {
+      "final": "7f5c36dffad043b16c32ff8866d70d9e66449728be27328a35a30700611d51c5",
+      "previous": "a3b36e1811637f2297f9c5a271f82c7ad0afc62d6fa6af8396e310a855814fb4"
+    },
+    "03": {
+      "final": "bf4e8adc2cc63f94bdc2bae1c2ec4634449a1a4e348261eb1b9c50cec92869e1",
+      "previous": "988dec66802c707a489ed2e5a943b4e6b256d3590185106b1d62248ac2242471"
+    },
+    "04": {
+      "final": "578d0efde831e4f860eaf0dd255c4034545bdd99d32778322c4ad2cf9945b5be",
+      "previous": "1bb93dd5c1fc78236f477d09ad2b93298c5820ce47706a39fc5120469c8a9294"
+    },
+    "05": {
+      "final": "3f817e892e023811ece5a9da930c331fc0e710643ecba4e3d26e1311a0f23cc7",
+      "previous": "5bc57399d233e85001d8f4c539603813eb0db6533b08d5c9d39cac0947c7bbce"
+    },
+    "06": {
+      "final": "3733b11f01224de4c8d580656162568d0a0bc4d60b9dfc1f1d8ec3b1571b6668",
+      "previous": "a1aa22592632c9ae4abff441056784fe506c4eb9bb6a1d144af68917b9a88285"
+    },
+    "07": {
+      "final": "590368463acae27ffa147e9856678631821c6e09ebae848d93ce3f154352086f",
+      "previous": "66b148cba13b7c31381d2f344298fce7d2a718cfd8180d33be6e60571f0c81d8"
+    },
+    "08": {
+      "final": "cf2b60fc68b525c4bff3f64b32aa94fd0e6d0a26ebe9aa20c07af1eed87af82a",
+      "previous": "994c9106cb7ad0695236e7b41b1cf077da662cf0b5de2ebfdb6c7cea984f9ecb"
+    },
+    "09": {
+      "final": "877e27adee21a2c7391e159e23c489fadcc8f5b6de01ad1376686160e0db3729",
+      "previous": "f81b6421aa0cf022b25276601f5de854b5dd252e6c6501f7ac8c3b3713b61c30"
+    },
+    "10": {
+      "final": "b9b1d1e87b4b18b88606b248b1887d626a822a300ded0b002943935b1269a2b2",
+      "previous": "08e412357e0c2e8470ddbb43e4de101bab6c9852213e9d24479ebc28866f66bb"
+    },
+    "11": {
+      "final": "0b50a23db1c09d860d79f5fc7185da9d17e3f01fb4f0c57067c88a52f100ca49",
+      "previous": "90ef8540dad46d4cc1678d77c613676d737e33d7ef7d7521bd5a7777d91f593f"
+    },
+    "12": {
+      "final": "944adb647ed82f0768ee9a9d2e437ca67d53a8d51f45e52bd728abcfd64a7193",
+      "previous": "c51e7e1151ad2db0b0bf1068104345d0c2e60b44d6a7beac02322e748fe59cc4"
+    },
+    "13": {
+      "final": "ccb8bf455494f9c4b9c819199fe435666edeeb1cc8a9c71967d6adb21a23e257",
+      "previous": "6caecf1817dd9ae3b88c286ebabde52f8f23e566742d70c06c9f498259c01784"
+    },
+    "14": {
+      "final": "6661109def1c601e68e32026d9008ec2961841f4da883d5fc29e3c57de35560a",
+      "previous": "bdf8c129df0bc28493dd5d2a9560340d75ee4e9a255d265e35b2c4f06536c064"
+    },
+    "15": {
+      "final": "b29b625be05dd8d996c8e413f687dff14f86bb65936e96b9af3c37f812036d2e",
+      "previous": "22f4424f9266f2191cd74539568b9fcde082168df43b2fb9bf5c7b9606a98970"
+    },
+    "16": {
+      "final": "c6457e16b097b42484626a50e15afd9c38fbc8c8c9a9946b18901a8a5c2266f0",
+      "previous": "a999bf09f076e17d10bb55869dd83cb1ca21c13218880cb36383bc2faddc0014"
+    },
+    "17": {
+      "final": "c1f716e7253696a281a40d80deba9767f5c34ac58d9fb8cb252c042328535f7d",
+      "previous": "6979e390d799b4b8906ff5dcf5d3ee5f72d80dff6ebb35e5d7971b401990fa49"
+    },
+    "18": {
+      "final": "fd8c0403df3e976aa2a40bcb55614763e3bba38ba87f8257dd59949ae5e97119",
+      "previous": "61040c87d63e298e64e9ac0f13ad22a56090f56d97397e64e5ea2f7681f61b9d"
+    },
+    "19": {
+      "final": "325cbf6805a5cf43f5e3402172a62c9ba1991c962119e923c87fbba5dbb0474c",
+      "previous": "bba5eb8a68367794d4f5e485f02f21aa83a245332edf3ded5abd6322e720ffe8"
+    },
+    "20": {
+      "final": "430ead84dfa4511cbd0e39ab256ae8d4ed483ab569a346d9995a8ae60be19706",
+      "previous": "8a74be5eb88dac57d12704ba9afa9a2a49784688d964a8f6d918b7386c7d1add"
+    }
+  },
+  "xlsx_witnesses": [
+    {
+      "identifier": "S",
+      "scope": "state",
+      "html_receipt": "d34f50017162d98dd6afb1614de879ac82eec7c5d616e5771cd3e58b77454768",
+      "html_sha256": "5b16691929b3097222581a62fca13d97d0ae095bff9f0a709bcb9edc039a773d",
+      "xlsx_receipt": "04999653889215cb0d93773c076ea128519fed977f01313a615ea2d718cbb7e4",
+      "xlsx_sha256": "f4efab057693d7c4dd1c52000ab2e8a7f69f2fbf7241e2a4b7e779ad3990e308",
+      "cells": 204
+    },
+    {
+      "identifier": "057829",
+      "scope": "district",
+      "html_receipt": "2183c20af833387214092622c549281434940762ba4d8d35d8c7af0bef4304c8",
+      "html_sha256": "66d2af7f5e01909ac3d4caf3e0b6084c1cab62601a82b002bc46ceced983b9d4",
+      "xlsx_receipt": "629ad9f7fa6379551d8c97ac1e3e1cc2a35094b7c9ead960ce08c9d5397a25ce",
+      "xlsx_sha256": "015012357a4d7ac08a72ffbc83f301f2a706accdbbac37106513699df9686d24",
+      "cells": 408
+    },
+    {
+      "identifier": "013801",
+      "scope": "district",
+      "html_receipt": "b4e0cad2371570041d3dee7fa39d188564fdd50c6e092b69ec9a88b00ee7bc81",
+      "html_sha256": "ae20716d2110df39779729fc0be9b9b66fe65cc98d7c2feb400d923ae53067c2",
+      "xlsx_receipt": "b846d868e9c3921b2313107cee2cdbab1d13a553b208fa4ce043d8028edb5a2d",
+      "xlsx_sha256": "fa9507e22f6b5237c090a37d2e1013868faa24bb0a15edb4332ebfa56a6d887b",
+      "cells": 408
+    }
+  ]
+}

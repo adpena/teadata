@@ -44,7 +44,9 @@ if TYPE_CHECKING:
 DATASET = "tprs_student_membership_enrollment_reports"
 EDITION = 2026
 PERIOD = DataPeriod("school_year", 2025, 2026)
-RESOURCE = "methodologies/tprs-students-2026.json"
+# Keep the CTE replay on the pinned 2025–26 file when the default grid changes.
+_CTE_MEMBERSHIP_RESOURCE = "methodologies/tprs-students-2026.json"
+RESOURCE = _CTE_MEMBERSHIP_RESOURCE
 SCOPES = {"state": "S", "district": "D", "campus": "C"}
 BROKER = "https://rptsvr1.tea.texas.gov/cgi/sas/broker"
 MAX_REPORT_BYTES = 2 * 1024**2
@@ -127,6 +129,7 @@ class _StudentProfile:
 
 
 # Independently frozen source contracts; never inferred from candidate leaves.
+_CTE_MEMBERSHIP_GRID = "38cdb41b151f762feeb7dc3a7f4d44d6b8a9e3a83e29d86db79ec72bc91c782c"
 _STUDENT_PROFILES = {
     "e7759843a9296a25d03f79782b14c061f696cf9700c76f77d6f1b17c234d9dd5": _StudentProfile(
         "da3896eac4faf500a0b507250059b567e375ee463630804cbd3612a1155461be",
@@ -134,11 +137,11 @@ _STUDENT_PROFILES = {
     "f7628dd08a539c52f5323664b1292e62869875e548230e657b56423461d7526f": _StudentProfile(
         "0a6e3e30a2a3005a92d2b90173b27ac5f18344b1e98158db43e12c419d7fc7e8",
         "d13b4c90563086887f77c4a211813d63977d62aa70ca866579307edfc1ca183e"),
-    "38cdb41b151f762feeb7dc3a7f4d44d6b8a9e3a83e29d86db79ec72bc91c782c": _StudentProfile(
+    _CTE_MEMBERSHIP_GRID: _StudentProfile(
         "77061bf49042409045d82835a3d252887dd201e886a715a9473bbf0ef3af464c",
         "d13b4c90563086887f77c4a211813d63977d62aa70ca866579307edfc1ca183e"),
 }
-_CURRENT_STUDENT_GRID = "38cdb41b151f762feeb7dc3a7f4d44d6b8a9e3a83e29d86db79ec72bc91c782c"
+_CURRENT_STUDENT_GRID = _CTE_MEMBERSHIP_GRID
 
 
 def _student_metadata_sha256(metadata: DatasetMetadata) -> str:
@@ -208,7 +211,7 @@ def reconcile_cte_membership(report: StudentReport) -> tuple[CteMembership, CteM
     establish a report's finality, roster coverage or publication approval.
     """
     _identifier(report.scope, report.identifier)
-    _need(report.scope in {"district", "state"} and report.grid_sha256 == _CURRENT_STUDENT_GRID,
+    _need(report.scope in {"district", "state"} and report.grid_sha256 == _CTE_MEMBERSHIP_GRID,
           "CTE Membership requires the reviewed district or direct Texas Student Information grid")
     program = "Students by Instructional Program"
     label = "Career and Technical Education"
@@ -591,6 +594,36 @@ def _student_sheet_cells(sheet: Any, strings: Sequence[str]) -> dict[tuple[int, 
     return cells
 
 
+def _compare_student_workbook(store: ProvenanceStore, report: StudentReport, witness: Mapping[str, str], *,
+                             contract: Mapping[str, Any]) -> int:
+    """Compare a reviewed HTML receipt with its separately acquired workbook."""
+    _need((report.identifier, report.receipt, report.sha256) ==
+          (witness["identifier"], witness["html_receipt"], witness["html_sha256"]),
+          "Student HTML and workbook witness identities differ")
+    cells = _student_workbook_cells(store, report.scope, witness, contract=contract)
+    labels: dict[tuple[str, str], int] = {}
+    expected_rows = {(cell.section, cell.label) for cell in report.cells}
+    section = ""
+    for number in sorted({number for number, _ in cells}):
+        label = cells.get((number, "A"), "")
+        if label == "Mobility (2024-25)":
+            break
+        if label in contract["sections"]:
+            section = label
+        elif (section, label) in expected_rows:
+            _need((section, label) not in labels, "Student workbook row label repeats")
+            labels[section, label] = number
+    grade_cells = 0
+    for cell in report.cells:
+        number = labels.get((cell.section, cell.label))
+        _need(number is not None, "Student workbook row label is missing")
+        assert number is not None
+        column = chr(ord("A") + cell.column - 1)
+        _need(cells.get((number, column), "") == cell.raw, "Student HTML/workbook current cell differs")
+        grade_cells += cell.section == "Students by Grade"
+    return grade_cells
+
+
 def verify_workbook_witnesses(store: ProvenanceStore, *, contract: Mapping[str, Any] | None = None) -> dict[str, Any]:
     """Independently decode the publisher's OOXML for the complete current grid.
 
@@ -602,25 +635,7 @@ def verify_workbook_witnesses(store: ProvenanceStore, *, contract: Mapping[str, 
     for scope, witness in grid["witnesses"].items():
         report = read_student_report(store, witness["html_receipt"], scope=scope,
             identifier=witness["identifier"], expected_sha256=witness["html_sha256"], contract=grid)
-        cells = _student_workbook_cells(store, scope, witness, contract=grid)
-        labels: dict[tuple[str, str], int] = {}
-        expected_rows = {(cell.section, cell.label) for cell in report.cells}
-        section = ""
-        for number in sorted({number for number, _ in cells}):
-            label = cells.get((number, "A"), "")
-            if label == "Mobility (2024-25)":
-                break
-            if label in grid["sections"]:
-                section = label
-            elif (section, label) in expected_rows:
-                _need((section, label) not in labels, "Student workbook row label repeats")
-                labels[section, label] = number
-        grade_cells = 0
-        for cell in report.cells:
-            number = labels[cell.section, cell.label]
-            column = chr(ord("A") + cell.column - 1)
-            _need(cells.get((number, column), "") == cell.raw, "Student HTML/workbook current cell differs")
-            grade_cells += cell.section == "Students by Grade"
+        grade_cells = _compare_student_workbook(store, report, witness, contract=grid)
         comparisons.append({"scope": scope, "html_receipt": report.receipt,
             "xlsx_receipt": witness["xlsx_receipt"], "current_cells": len(report.cells), "grade_cells": grade_cells})
     return {"status": "PASS_COMPLETE_CURRENT_GRID_HTML_XLSX_WITNESSES", "comparisons": comparisons,

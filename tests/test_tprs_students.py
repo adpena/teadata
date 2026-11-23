@@ -133,7 +133,7 @@ def parse(grid, **kwargs):
 
 
 @pytest.mark.parametrize("scope,identifier", [("district", "001902"), ("state", "S")])
-def test_reconcile_cte_membership_preserves_publisher_cells_and_zero_denominator(grid, scope, identifier):
+def test_reconcile_cte_membership_preserves_publisher_cells_and_zero_denominator(grid, scope, identifier, monkeypatch):
     rows = report_rows(grid, scope, identifier)
     values = {"Total Students": ("16", "100.0%"), "Career and Technical Education": ("1", "6.3%"),
               "Career and Technical Education (9-12 grades only)": ("0", "0.0%")}
@@ -142,6 +142,8 @@ def test_reconcile_cte_membership_preserves_publisher_cells_and_zero_denominator
         if row[0] in values:
             row[1:3] = values[row[0]]
     report = students.parse_student_report(html(rows), scope=scope, identifier=identifier)
+    # An older released CTE report keeps its grid when the default Student grid advances.
+    monkeypatch.setattr(students, "_CURRENT_STUDENT_GRID", "future-student-grid")
     all_grades, secondary = students.reconcile_cte_membership(report)
     assert (all_grades.count, all_grades.denominator, all_grades.rate.numeric) == (1, 16, Decimal("6.3"))
     assert all_grades.rate_cell.raw == "6.3%" and all_grades.rate_cell.column == 3

@@ -136,6 +136,53 @@ is admitted. This family was first published in v0.0.159; its current attachment
 is recorded in the [selected inventory](source-integration-status.md#qualified-native-coverage).
 Library publication and downstream application adoption remain separate gates.
 
+### Accountability, assessment, readiness and special education
+
+The following gaps are relative to the packaged normal data release 0.0.178.
+Publisher routes and availability were checked November 23, 2026. Accountability
+editions refer to rating years. STAAR, annual graduate, and PEIMS snapshots use
+the measurement period of the selected report and field.
+
+| Family | Queryable coverage in the packaged release | Publisher coverage and backfill |
+| --- | --- | --- |
+| Academic accountability | Preliminary 2026 entity ratings and reporting roster | The [2013 archive](https://rptsvr1.tea.texas.gov/perfreport/account/2013/) and [2014–17 download forms](https://rptsvr1.tea.texas.gov/perfreport/account/2017/download.html) use the performance indexes. [2018–19](https://rptsvr1.tea.texas.gov/perfreport/account/2018/download.html), [2021](https://rptsvr1.tea.texas.gov/perfreport/account/2021/download.html), [2022](https://rptsvr1.tea.texas.gov/perfreport/account/2022/download.html), and [2023–26](https://rptsvr1.tea.texas.gov/perfreport/account/acct_download.html?year=2026) have edition-specific district and campus products. The 2020 ratings were not issued. 2021 used limited designations, and 2022 applied Senate Bill 1365. Qualify domain data and original rating labels by edition before exposing comparisons. |
+| STAAR | 2025–26 All Grades and 2023–24 through 2025–26 End-of-Course, with campus, district, ESC region and direct Texas editions | [Student Assessment Results](https://tea.texas.gov/assessment-and-accountability/student-assessment-results) and the [TAPR archives](https://tea.texas.gov/school-and-district-leaders/accountability/academic-accountability/performance-reporting/texas-academic-performance-reports) distinguish assessment administrations and accountability subsets. Backfill All Grades and End-of-Course separately, then grades, subjects, participation, alternate assessments and student groups. The usual spring 2020 STAAR administrations were canceled. Retain the redesigned assessment boundary and performance standard changes in trend interpretation. |
+| CCMR | No dedicated CCMR detail attachment | The [accountability forms starting in 2018](https://rptsvr1.tea.texas.gov/perfreport/account/2018/download.html) offer district and campus CCMR products. Preserve each accountability cohort and the lag of the underlying evidence. The annual graduate TAPR/TPRS criteria, accountability indicator, and Outcomes Bonus each have distinct populations. Earlier component measures remain useful on their own terms. |
+| CTE | PEIMS teacher FTE and course enrollment cover 2012–13 through 2025–26 for district and direct Texas, with course as a dimension | The [TEA CTE Reports](https://tea2.tea.texas.gov/ar/node/11651) publish status and programs of study from 2020–21 through 2024–25, with 2024–25 labeled interim. Their workbooks contain district, ESC region and direct Texas sheets. The same index lists separate industry certification workbooks for graduating classes 2017–24. Course enrollment, program status, CTE membership and certifications have different grains and denominators. |
+| Special education programs and services | PEIMS program enrollment for 2022–23 through 2025–26 at campus, district and direct Texas. SPP timely initial evaluation at district scope for 2023–24 and 2024–25. | Extend the [PEIMS program reports](https://tea.texas.gov/data-reports/student-data/standard-reports/peims-standard-reports) where published. Keep service settings, evaluations, membership and funding in their source populations. |
+| Primary disability | PEIMS district and direct Texas observations for every school year from 2012–13 through 2025–26 | The [PEIMS Special Education report](https://rptsvr1.tea.texas.gov/adhocrpt/adser.html) also offers county and ESC region totals. It does not offer a campus report. The October enrollment snapshot reports primary disability. Classification changes and masked counts constrain comparisons over time. |
+
+For the 2025–26 CTE Membership candidate `791199c0b64f…`, the exact report
+replay covers 1,202 districts and the direct Texas report. The statewide
+all-grade rate is 28.8% (1,573,297 of 5,454,059); the grades 9–12 rate is 76.0%
+(1,269,697 of 1,671,134). For 97 district grades 9–12 observations with a zero
+denominator, the analytical rate is not applicable and the original `0.0%` is
+retained. The candidate supplies all six fields through the existing native
+catalog, with district access such as
+`district.tprs.at("2025–26").membership_cte_percent` on a release carrying it.
+It covers membership at district and direct Texas scopes. Campus results,
+programs of study and course participation are separate sources.
+
+Recent acquisitions awaiting field-level qualification include:
+
+- Original campus and district accountability CCMR files for rating years
+  2023 through 2026. For 2026, 28 category/scope files are retained, including
+  the previously retained CCMR pair. They include summary, distinctions,
+  Student Achievement subject data, School Progress and Closing the Gaps.
+  Four district selectors returned no selectable fields. The Closing the
+  Gaps Participation requests for campus and district returned HTTP 429.
+- The 2020–21 through 2024–25 CTE Status and Programs of Study workbooks and
+  industry certification workbooks for graduating classes 2017–24. Retained
+  workbook sheet names establish district, region and direct Texas scope.
+- The 28 primary-disability bulk exports for county and ESC region, two per
+  school year from 2012–13 through 2025–26. The formats include publisher
+  explanatory rows. File record counts are not counts of reporting geographies.
+
+The retained acquisition records bind the download URLs or form controls,
+retrieval time and payload hash. The new acquisitions do not extend the
+normal release until scope, suppression, field definitions, original values
+and representative official reports are qualified.
+
 ### Historical archive routes
 
 The historical backfill targets all 14 school years from 2012–13 through

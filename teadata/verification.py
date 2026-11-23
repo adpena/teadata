@@ -1188,6 +1188,13 @@ def _native_review(release: DataRelease, store: ProvenanceStore) -> _NativeRevie
         return _NativeReview("regional TAPR", partial(qualify_tapr_regional, release, store),
                              partial(retained_regional_evidence, release, store))
 
+    from teadata.native_tprs_cte import REVIEWED_MANIFEST as CTE_MANIFEST, qualify_tprs_cte, reviewed_cte_roots
+
+    if release.manifest_sha256 == CTE_MANIFEST:
+        processing_store = _retained_store(release.path.parent / "provenance")
+        return _NativeReview("TPRS CTE Membership", partial(qualify_tprs_cte, release, processing_store, store),
+                             partial(_native_record_evidence, release, processing_store, store, reviewed_cte_roots()))
+
     from teadata.native_staar_rates import QUALIFICATIONS as STAAR_QUALIFICATIONS, qualify_staar_rates
 
     staar = STAAR_QUALIFICATIONS.get(release.manifest_sha256)

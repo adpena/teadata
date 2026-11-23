@@ -9,6 +9,7 @@ from .dataset_metadata import EditionKey
 
 
 STUDENT_DATASET = "tprs_student_membership_enrollment_reports"
+CTE_DATASET = "tprs_cte_membership"
 
 
 @dataclass(frozen=True, slots=True)
@@ -22,6 +23,7 @@ STUDENT_DERIVED_ROUTES = MappingProxyType({
     "tprs_student_continuity": StudentDerivedRoute("Student Continuity", "_campus_continuity_plan"),
 })
 TPRS_PARTITION_DATASETS = frozenset({STUDENT_DATASET, *STUDENT_DERIVED_ROUTES})
+TPRS_NAMESPACE_DATASETS = TPRS_PARTITION_DATASETS | {CTE_DATASET}
 
 
 def derived_campus_edition(student: EditionKey, dataset: str) -> EditionKey:

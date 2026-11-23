@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, Any, BinaryIO, Generator, Iterator, Literal, P
 from .dataset_metadata import ArtifactRef, DataPeriod, EditionKey
 from .identifiers import canonical_source_identifiers
 from .manifest import ContractError, canonical_json
-from .tprs_partitions import TPRS_PARTITION_DATASETS as _TPRS_DATASETS
+from .tprs_partitions import TPRS_NAMESPACE_DATASETS
 
 if TYPE_CHECKING:
     import pandas as pd
@@ -772,7 +772,7 @@ class TPRSFields(_EntityFields):
 
     @property
     def _datasets(self) -> frozenset[str]:
-        return _TPRS_DATASETS
+        return TPRS_NAMESPACE_DATASETS
 
     @property
     def _label(self) -> str:
