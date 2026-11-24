@@ -183,11 +183,31 @@ programs of study and course participation are separate sources.
   performance standards and 14 student groups in each report. These
   cells are already present under their original STAAR2 field codes.
   The replay covers one named report per scope and edition. The standard
-  End-of-Course view starts in 2023–24. The 2017–18 PDF replay matched 600
+  End-of-Course view starts in 2023–24. For 2012–13 through 2016–17,
+  acquisition added 20 separate STAAR1 files covering Texas, ESCs, districts,
+  and campuses. A check of one All Students rate per selected course matched
+  92 published rate cells across the named Texas, Region 13, Austin ISD, and
+  Austin High School reports. The check covers Algebra I, Biology, and U.S.
+  History in 2012–13 and adds English I and II in 2013–14 through 2016–17,
+  including the combined English I/Reading I and English II/Reading II
+  labels in the 2013–14 report. The 2012–13 English reading and writing
+  tests require separate bindings. The checked thresholds were Phase-in 1
+  Level II in 2012–13, Phase-in Satisfactory in 2013–14 and 2014–15,
+  Level II Satisfactory in 2015–16, and Approaches Grade Level in 2016–17.
+  The STAAR1 files are acquired evidence awaiting release qualification.
+  [2016–17 advanced download](https://rptsvr1.tea.texas.gov/perfreport/tapr/2017/download/DownloadData.html)
+
+  The 2017–18 PDF replay matched 600
   additional rates across the same four scopes. The 60 Current and Monitored
   English learner cells need a matching source field. TEA assigns that group
-  code `D0`, while the retained STAAR2 file provides the English learner field
-  `DL`. [2017–18 TAPR group definitions](https://rptsvr1.tea.texas.gov/perfreport/tapr/2018/download/taprhelp.html)
+  code `D0`. The additional-group STAAR5 downloads at all four scopes have
+  `D0` All Grades fields. The checked End-of-Course columns omit `D0`.
+  The separate Texas rates-only End-of-Course export contains `DL` for
+  English learners, which is a different population.
+  [2017–18 TAPR group definitions](https://rptsvr1.tea.texas.gov/perfreport/tapr/2018/download/taprhelp.html) ·
+  [Advanced download](https://rptsvr1.tea.texas.gov/perfreport/tapr/2018/download/DownloadData.html) ·
+  [Rates-only download](https://rptsvr1.tea.texas.gov/perfreport/tapr/2018/xplore/DownloadSelData.html)
+
   The historical middle standard for 2013–14 through
   2016–17 uses students tested in two or more subjects. The 2014–15 Texas
   TAPR PDF and bulk file match at 77% on the first All Subjects threshold.
